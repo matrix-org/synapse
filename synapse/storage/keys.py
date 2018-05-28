@@ -92,7 +92,7 @@ class KeyStore(SQLBaseStore):
 
         if verify_key_bytes:
             defer.returnValue(decode_verify_key_bytes(
-                key_id, str(verify_key_bytes)
+                key_id, bytes(verify_key_bytes)
             ))
 
     @defer.inlineCallbacks

@@ -35,6 +35,7 @@ class ServerNoticesManager(object):
         self._config = hs.config
         self._room_creation_handler = hs.get_room_creation_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
+        self._is_mine_id = hs.is_mine_id
 
     def is_enabled(self):
         """Checks if server notices are enabled on this server.
@@ -55,7 +56,7 @@ class ServerNoticesManager(object):
             event_content (dict): content of event to send
 
         Returns:
-            Deferrred[None]
+            Deferred[None]
         """
         room_id = yield self.get_notice_room_for_user(user_id)
 
@@ -89,6 +90,9 @@ class ServerNoticesManager(object):
         if not self.is_enabled():
             raise Exception("Server notices not enabled")
 
+        assert self._is_mine_id(user_id), \
+            "Cannot send server notices to remote users"
+
         rooms = yield self._store.get_rooms_for_user_where_membership_is(
             user_id, [Membership.INVITE, Membership.JOIN],
         )
@@ -109,6 +113,19 @@ class ServerNoticesManager(object):
         # apparently no existing notice room: create a new one
         logger.info("Creating server notices room for %s", user_id)
 
+        # see if we want to override the profile info for the server user.
+        # note that if we want to override either the display name or the
+        # avatar, we have to use both.
+        join_profile = None
+        if (
+            self._config.server_notices_mxid_display_name is not None or
+            self._config.server_notices_mxid_avatar_url is not None
+        ):
+            join_profile = {
+                "displayname": self._config.server_notices_mxid_display_name,
+                "avatar_url": self._config.server_notices_mxid_avatar_url,
+            }
+
         requester = create_requester(system_mxid)
         info = yield self._room_creation_handler.create_room(
             requester,
@@ -121,9 +138,7 @@ class ServerNoticesManager(object):
                 "invite": (user_id,)
             },
             ratelimit=False,
-            creator_join_profile={
-                "displayname": self._config.server_notices_mxid_display_name,
-            },
+            creator_join_profile=join_profile,
         )
         room_id = info['room_id']
 

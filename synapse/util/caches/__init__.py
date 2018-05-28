@@ -17,6 +17,9 @@ from prometheus_client.core import Gauge, REGISTRY, GaugeMetricFamily
 
 import os
 
+from six.moves import intern
+import six
+
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
 
 caches_by_name = {}
@@ -110,7 +113,9 @@ def intern_string(string):
         return None
 
     try:
-        string = string.encode("ascii")
+        if six.PY2:
+            string = string.encode("ascii")
+
         return intern(string)
     except UnicodeEncodeError:
         return string

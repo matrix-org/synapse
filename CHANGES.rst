@@ -1,3 +1,59 @@
+Changes in synapse v0.30.0 (2018-05-24)
+==========================================
+
+'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
+channel whereby server administrators can send messages to users on the server.
+
+They are used as part of communication of the server policies (see ``docs/consent_tracking.md``),
+however the intention is that they may also find a use for features such
+as "Message of the day".
+
+This feature is specific to Synapse, but uses standard Matrix communication mechanisms,
+so should work with any Matrix client. For more details see ``docs/server_notices.md``
+
+Further Server Notices/Consent Tracking Support:
+
+* Allow overriding the server_notices user's avatar (PR #3273)
+* Use the localpart in the consent uri (PR #3272)
+* Support for putting %(consent_uri)s in messages (PR #3271)
+* Block attempts to send server notices to remote users (PR #3270)
+* Docs on consent bits (PR #3268)
+
+
+
+Changes in synapse v0.30.0-rc1 (2018-05-23)
+==========================================
+
+Server Notices/Consent Tracking Support:
+
+* ConsentResource to gather policy consent from users (PR #3213)
+* Move RoomCreationHandler out of synapse.handlers.Handlers (PR #3225)
+* Infrastructure for a server notices room (PR #3232)
+* Send users a server notice about consent (PR #3236)
+* Reject attempts to send event before privacy consent is given (PR #3257)
+* Add a 'has_consented' template var to consent forms (PR #3262)
+* Fix dependency on jinja2 (PR #3263)
+
+Features:
+
+* Cohort analytics (PR #3163, #3241, #3251)
+* Add lxml to docker image for web previews (PR #3239) Thanks to @ptman!
+* Add in flight request metrics (PR #3252)
+
+Changes:
+
+* Remove unused `update_external_syncs` (PR #3233)
+* Use stream rather depth ordering for push actions (PR #3212)
+* Make purge_history operate on tokens (PR #3221)
+* Don't support limitless pagination (PR #3265)
+
+Bug Fixes:
+
+* Fix logcontext resource usage tracking (PR #3258)
+* Fix error in handling receipts (PR #3235)
+* Stop the transaction cache caching failures (PR #3255)
+
+
 Changes in synapse v0.29.1 (2018-05-17)
 ==========================================
 Changes:

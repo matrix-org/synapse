@@ -26,12 +26,13 @@ DEFAULT_CONFIG = """\
 # setting, which defines the id of the user which will be used to send the
 # notices.
 #
-# It's also possible to override the room name, or the display name of the
-# "notices" user.
+# It's also possible to override the room name, the display name of the
+# "notices" user, and the avatar for the user.
 #
 # server_notices:
 #   system_mxid_localpart: notices
 #   system_mxid_display_name: "Server Notices"
+#   system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
 #   room_name: "Server Notices"
 """
 
@@ -48,6 +49,10 @@ class ServerNoticesConfig(Config):
             The display name to use for the server notices user.
             None if server notices are not enabled.
 
+        server_notices_mxid_avatar_url (str|None):
+            The display name to use for the server notices user.
+            None if server notices are not enabled.
+
         server_notices_room_name (str|None):
             The name to use for the server notices room.
             None if server notices are not enabled.
@@ -56,6 +61,7 @@ class ServerNoticesConfig(Config):
         super(ServerNoticesConfig, self).__init__()
         self.server_notices_mxid = None
         self.server_notices_mxid_display_name = None
+        self.server_notices_mxid_avatar_url = None
         self.server_notices_room_name = None
 
     def read_config(self, config):
@@ -68,7 +74,10 @@ class ServerNoticesConfig(Config):
             mxid_localpart, self.server_name,
         ).to_string()
         self.server_notices_mxid_display_name = c.get(
-            'system_mxid_display_name', 'Server Notices',
+            'system_mxid_display_name', None,
+        )
+        self.server_notices_mxid_avatar_url = c.get(
+            'system_mxid_avatar_url', None,
         )
         # todo: i18n
         self.server_notices_room_name = c.get('room_name', "Server Notices")

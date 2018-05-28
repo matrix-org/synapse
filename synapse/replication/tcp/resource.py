@@ -27,6 +27,7 @@ from synapse.metrics import LaterGauge
 import logging
 
 from prometheus_client import Counter
+from six import itervalues
 
 stream_updates_counter = Counter("synapse_replication_tcp_resource_stream_updates",
                                  "", ["stream_name"])
@@ -81,7 +82,7 @@ class ReplicationStreamer(object):
         # We only support federation stream if federation sending hase been
         # disabled on the master.
         self.streams = [
-            stream(hs) for stream in STREAMS_MAP.itervalues()
+            stream(hs) for stream in itervalues(STREAMS_MAP)
             if stream != FederationStream or not hs.config.send_federation
         ]
 

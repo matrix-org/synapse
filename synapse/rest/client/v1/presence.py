@@ -23,6 +23,8 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.http.servlet import parse_json_object_from_request
 from .base import ClientV1RestServlet, client_path_patterns
 
+from six import string_types
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -71,7 +73,7 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
 
             if "status_msg" in content:
                 state["status_msg"] = content.pop("status_msg")
-                if not isinstance(state["status_msg"], basestring):
+                if not isinstance(state["status_msg"], string_types):
                     raise SynapseError(400, "status_msg must be a string.")
 
             if content:
@@ -129,7 +131,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
         if "invite" in content:
             for u in content["invite"]:
-                if not isinstance(u, basestring):
+                if not isinstance(u, string_types):
                     raise SynapseError(400, "Bad invite value.")
                 if len(u) == 0:
                     continue
@@ -140,7 +142,7 @@ class PresenceListRestServlet(ClientV1RestServlet):
 
         if "drop" in content:
             for u in content["drop"]:
-                if not isinstance(u, basestring):
+                if not isinstance(u, string_types):
                     raise SynapseError(400, "Bad drop value.")
                 if len(u) == 0:
                     continue
