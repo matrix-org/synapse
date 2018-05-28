@@ -139,8 +139,8 @@ LaterGauge(
 
 
 class RequestMetrics(object):
-    def start(self, time_msec, name, method):
-        self.start = time_msec
+    def start(self, time_sec, name, method):
+        self.start = time_sec
         self.start_context = LoggingContext.current_context()
         self.name = name
         self.method = method
@@ -149,7 +149,7 @@ class RequestMetrics(object):
 
         _in_flight_requests.add(self)
 
-    def stop(self, time_msec, request):
+    def stop(self, time_sec, request):
         _in_flight_requests.discard(self)
 
         context = LoggingContext.current_context()
@@ -170,7 +170,7 @@ class RequestMetrics(object):
         response_count.labels(request.method, self.name, tag).inc()
 
         response_timer.labels(request.method, self.name, tag).observe(
-            time_msec - self.start
+            time_sec - self.start
         )
 
         ru_utime, ru_stime = context.get_resource_usage()
@@ -181,10 +181,10 @@ class RequestMetrics(object):
             context.db_txn_count
         )
         response_db_txn_duration.labels(request.method, self.name, tag).inc(
-            context.db_txn_duration_ms / 1000.
+            context.db_txn_duration_sec
         )
         response_db_sched_duration.labels(request.method, self.name, tag).inc(
-            context.db_sched_duration_ms / 1000.
+            context.db_sched_duration_sec
         )
 
         response_size.labels(request.method, self.name, tag).inc(request.sentLength)
@@ -207,11 +207,11 @@ class RequestMetrics(object):
         )
 
         in_flight_requests_db_txn_duration.labels(self.method, self.name).inc(
-            diff.db_txn_duration_ms / 1000.
+            diff.db_txn_duration_sec
         )
 
         in_flight_requests_db_sched_duration.labels(self.method, self.name).inc(
-            diff.db_sched_duration_ms / 1000.
+            diff.db_sched_duration_sec
         )
 
 
@@ -223,18 +223,18 @@ class _RequestStats(object):
         "ru_utime",
         "ru_stime",
         "db_txn_count",
-        "db_txn_duration_ms",
-        "db_sched_duration_ms",
+        "db_txn_duration_sec",
+        "db_sched_duration_sec",
     ]
 
     def __init__(
-        self, ru_utime, ru_stime, db_txn_count, db_txn_duration_ms, db_sched_duration_ms
+        self, ru_utime, ru_stime, db_txn_count, db_txn_duration_sec, db_sched_duration_sec
     ):
         self.ru_utime = ru_utime
         self.ru_stime = ru_stime
         self.db_txn_count = db_txn_count
-        self.db_txn_duration_ms = db_txn_duration_ms
-        self.db_sched_duration_ms = db_sched_duration_ms
+        self.db_txn_duration_sec = db_txn_duration_sec
+        self.db_sched_duration_sec = db_sched_duration_sec
 
     @staticmethod
     def from_context(context):
@@ -243,8 +243,8 @@ class _RequestStats(object):
         return _RequestStats(
             ru_utime, ru_stime,
             context.db_txn_count,
-            context.db_txn_duration_ms,
-            context.db_sched_duration_ms,
+            context.db_txn_duration_sec,
+            context.db_sched_duration_sec,
         )
 
     def update(self, context):
@@ -260,14 +260,14 @@ class _RequestStats(object):
             new.ru_utime - self.ru_utime,
             new.ru_stime - self.ru_stime,
             new.db_txn_count - self.db_txn_count,
-            new.db_txn_duration_ms - self.db_txn_duration_ms,
-            new.db_sched_duration_ms - self.db_sched_duration_ms,
+            new.db_txn_duration_sec - self.db_txn_duration_sec,
+            new.db_sched_duration_sec - self.db_sched_duration_sec,
         )
 
         self.ru_utime = new.ru_utime
         self.ru_stime = new.ru_stime
         self.db_txn_count = new.db_txn_count
-        self.db_txn_duration_ms = new.db_txn_duration_ms
-        self.db_sched_duration_ms = new.db_sched_duration_ms
+        self.db_txn_duration_sec = new.db_txn_duration_sec
+        self.db_sched_duration_sec = new.db_sched_duration_sec
 
         return diff
