@@ -642,4 +642,4 @@ class MediaRepositoryResource(Resource):
         if hs.config.url_preview_enabled:
             self.putChild("preview_url", PreviewUrlResource(hs, media_repo))
         if hs.config.url_resolve_enabled:
-            self.putChild("resolve", ResolveResource(hs, media_repo))
+            self.putChild("resolve_url", ResolveResource(hs, media_repo))

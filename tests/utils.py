@@ -57,6 +57,8 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.worker_app = None
         config.email_enable_notifs = False
         config.block_non_admin_invites = False
+        config.max_upload_size = 100
+        config.url_blacklist = []
 
     config.use_frozen_dicts = True
     config.database_config = {"name": "sqlite3"}
@@ -131,6 +133,17 @@ def mock_getRawHeaders(headers=None):
     return getRawHeaders
 
 
+class MockMediaRepo:
+    def __init__(self):
+        self.server_name = "test.machine"
+
+    @defer.inlineCallbacks
+    def create_content(
+        self, _media_type, _upload_name, _content, _content_length, _auth_user):
+        media_id = 'testing-media-id'
+        defer.returnValue("mxc://%s/%s" % (self.server_name, media_id))
+
+
 # This is a mock /resource/ not an entire server
 class MockHttpResource(HttpServer):
 
@@ -139,7 +152,10 @@ class MockHttpResource(HttpServer):
         self.prefix = prefix
 
     def trigger_get(self, path):
-        return self.trigger("GET", path, None)
+        return self.trigger("GET", path, None, None)
+
+    def trigger_post(self, path, content):
+        return self.trigger("POST", path, content, None)
 
     @patch('twisted.web.http.Request')
     @defer.inlineCallbacks
@@ -316,8 +332,7 @@ class SQLiteMemoryDbPool(ConnectionPool, object):
     def prepare(self):
         engine = self.create_engine()
         return self.runWithConnection(
-            lambda conn: prepare_database(conn, engine, self.config)
-        )
+            lambda conn: prepare_database(conn, engine, self.config))
 
     def get_db_conn(self):
         conn = self.connect()

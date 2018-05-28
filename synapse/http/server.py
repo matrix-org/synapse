@@ -108,7 +108,6 @@ def wrap_request_handler(request_handler, include_metrics=False):
             with Measure(self.clock, "wrapped_request_handler"):
                 request_metrics = RequestMetrics()
                 request_metrics.start(self.clock, name=self.__class__.__name__)
-
                 request_context.request = request_id
                 with request.processing():
                     try:

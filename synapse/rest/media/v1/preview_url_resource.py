@@ -29,12 +29,11 @@ from synapse.http.server import (
     respond_with_json,
 )
 from synapse.util.async import ObservableDeferred
-from synapse.util.stringutils import is_ascii
-from synapse.rest.media.v1._base import validate_url_blacklist
+from synapse.rest.media.v1._base import validate_url_blacklist, \
+    parse_content_disposition_filename
 
 import os
 import re
-import cgi
 import ujson as json
 import urlparse
 import itertools
@@ -262,32 +261,7 @@ class PreviewUrlResource(Resource):
 
             media_type = headers["Content-Type"][0]
             time_now_ms = self.clock.time_msec()
-
-            content_disposition = headers.get("Content-Disposition", None)
-            if content_disposition:
-                _, params = cgi.parse_header(content_disposition[0],)
-                download_name = None
-
-                # First check if there is a valid UTF-8 filename
-                download_name_utf8 = params.get("filename*", None)
-                if download_name_utf8:
-                    if download_name_utf8.lower().startswith("utf-8''"):
-                        download_name = download_name_utf8[7:]
-
-                # If there isn't check for an ascii name.
-                if not download_name:
-                    download_name_ascii = params.get("filename", None)
-                    if download_name_ascii and is_ascii(download_name_ascii):
-                        download_name = download_name_ascii
-
-                if download_name:
-                    download_name = urlparse.unquote(download_name)
-                    try:
-                        download_name = download_name.decode("utf-8")
-                    except UnicodeDecodeError:
-                        download_name = None
-            else:
-                download_name = None
+            download_name = parse_content_disposition_filename(headers)
 
             yield self.store.store_local_media(
                 media_id=file_id,

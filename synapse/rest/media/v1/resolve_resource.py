@@ -15,6 +15,7 @@
 
 import re
 import logging
+import cgi
 
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
@@ -27,7 +28,8 @@ from synapse.api.errors import (
     SynapseError, Codes,
 )
 from synapse.http.servlet import parse_json_object_from_request
-from synapse.rest.media.v1._base import validate_url_blacklist
+from synapse.rest.media.v1._base import validate_url_blacklist, \
+    parse_content_disposition_filename
 
 
 logger = logging.getLogger(__name__)
@@ -40,15 +42,12 @@ class ResolveResource(Resource):
         Resource.__init__(self)
 
         self.media_repo = media_repo
-        self.filepaths = media_repo.filepaths
-        self.store = hs.get_datastore()
-        self.clock = hs.get_clock()
         self.max_upload_size = hs.config.max_upload_size
         self.url_blacklist = hs.config.url_blacklist
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
+        self.version_string = hs.version_string
 
     def render_POST(self, request):
         self._async_render_POST(request)
@@ -63,39 +62,39 @@ class ResolveResource(Resource):
     def _async_render_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        body = parse_json_object_from_request(request)
-        url = body.get("url")
+        url = request.args.get("url")[0]
+        # should respond with errors in case of the issues
+        # on validating resource.
+        yield self._validate_resource(url)
 
-        self._validate_resource(url)
+        # should receive downloadable resource uri from the media repo
+        json_object = yield self._upload_and_preview_url(url, requester)
 
+        respond_with_json(
+            request, 200, json_object, send_cors=True
+        )
+
+    @defer.inlineCallbacks
+    def _upload_and_preview_url(self, url, user):
         response = requests.get(url, allow_redirects=True, stream=True)
-        upload_name = self._get_filename(response)
-
-        content_length = response.headers.get('Content-Length')
-        media_type = response.headers.get("Content-Type")
+        headers = response.headers
+        upload_name = parse_content_disposition_filename(headers)
+        content_length = headers.get('Content-Length')
+        media_type = headers.get("Content-Type")
 
         content_uri = yield self.media_repo.create_content(
             media_type, upload_name, response.raw,
-            content_length, requester.user
+            content_length, user
         )
 
         logger.info("Uploaded content with URI %r", content_uri)
 
-        respond_with_json(
-            request, 200, {"content_uri": content_uri}, send_cors=True
-        )
-
-    def _get_filename(self, response):
-        """
-        Get filename from content-disposition
-        """
-        header = response.headers.get('content-disposition')
-        if not header:
-            return None
-        fname = re.findall('filename=(.+)', header)
-        if fname:
-            return None
-        return fname[0]
+        defer.returnValue({
+            "content_uri": content_uri,
+            "media_info": {
+                "media_type": media_type,
+            }
+        })
 
     def _validate_resource(self, url):
         head_response = requests.head(url, allow_redirects=True)
