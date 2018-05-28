@@ -38,26 +38,29 @@ from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
 from synapse.types import UserID, get_domain_from_id
-import synapse.metrics
+from synapse.metrics import LaterGauge
 
 import logging
 
+from prometheus_client import Counter
+
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
 
-notified_presence_counter = metrics.register_counter("notified_presence")
-federation_presence_out_counter = metrics.register_counter("federation_presence_out")
-presence_updates_counter = metrics.register_counter("presence_updates")
-timers_fired_counter = metrics.register_counter("timers_fired")
-federation_presence_counter = metrics.register_counter("federation_presence")
-bump_active_time_counter = metrics.register_counter("bump_active_time")
+notified_presence_counter = Counter("synapse_handler_presence_notified_presence", "")
+federation_presence_out_counter = Counter(
+    "synapse_handler_presence_federation_presence_out", "")
+presence_updates_counter = Counter("synapse_handler_presence_presence_updates", "")
+timers_fired_counter = Counter("synapse_handler_presence_timers_fired", "")
+federation_presence_counter = Counter("synapse_handler_presence_federation_presence", "")
+bump_active_time_counter = Counter("synapse_handler_presence_bump_active_time", "")
 
-get_updates_counter = metrics.register_counter("get_updates", labels=["type"])
+get_updates_counter = Counter("synapse_handler_presence_get_updates", "", ["type"])
 
-notify_reason_counter = metrics.register_counter("notify_reason", labels=["reason"])
-state_transition_counter = metrics.register_counter(
-    "state_transition", labels=["from", "to"]
+notify_reason_counter = Counter(
+    "synapse_handler_presence_notify_reason", "", ["reason"])
+state_transition_counter = Counter(
+    "synapse_handler_presence_state_transition", "", ["from", "to"]
 )
 
 
@@ -142,8 +145,9 @@ class PresenceHandler(object):
             for state in active_presence
         }
 
-        metrics.register_callback(
-            "user_to_current_state_size", lambda: len(self.user_to_current_state)
+        LaterGauge(
+            "synapse_handlers_presence_user_to_current_state_size", "", [],
+            lambda: len(self.user_to_current_state)
         )
 
         now = self.clock.time_msec()
@@ -213,7 +217,8 @@ class PresenceHandler(object):
             60 * 1000,
         )
 
-        metrics.register_callback("wheel_timer_size", lambda: len(self.wheel_timer))
+        LaterGauge("synapse_handlers_presence_wheel_timer_size", "", [],
+                   lambda: len(self.wheel_timer))
 
     @defer.inlineCallbacks
     def _on_shutdown(self):
@@ -316,10 +321,10 @@ class PresenceHandler(object):
 
             # TODO: We should probably ensure there are no races hereafter
 
-            presence_updates_counter.inc_by(len(new_states))
+            presence_updates_counter.inc(len(new_states))
 
             if to_notify:
-                notified_presence_counter.inc_by(len(to_notify))
+                notified_presence_counter.inc(len(to_notify))
                 yield self._persist_and_notify(to_notify.values())
 
             self.unpersisted_users_changes |= set(s.user_id for s in new_states)
@@ -330,7 +335,7 @@ class PresenceHandler(object):
                 if user_id not in to_notify
             }
             if to_federation_ping:
-                federation_presence_out_counter.inc_by(len(to_federation_ping))
+                federation_presence_out_counter.inc(len(to_federation_ping))
 
                 self._push_to_remotes(to_federation_ping.values())
 
@@ -368,7 +373,7 @@ class PresenceHandler(object):
                     for user_id in users_to_check
                 ]
 
-                timers_fired_counter.inc_by(len(states))
+                timers_fired_counter.inc(len(states))
 
                 changes = handle_timeouts(
                     states,
@@ -657,7 +662,7 @@ class PresenceHandler(object):
             updates.append(prev_state.copy_and_replace(**new_fields))
 
         if updates:
-            federation_presence_counter.inc_by(len(updates))
+            federation_presence_counter.inc(len(updates))
             yield self._update_states(updates)
 
     @defer.inlineCallbacks
@@ -932,28 +937,28 @@ def should_notify(old_state, new_state):
         return False
 
     if old_state.status_msg != new_state.status_msg:
-        notify_reason_counter.inc("status_msg_change")
+        notify_reason_counter.labels("status_msg_change").inc()
         return True
 
     if old_state.state != new_state.state:
-        notify_reason_counter.inc("state_change")
-        state_transition_counter.inc(old_state.state, new_state.state)
+        notify_reason_counter.labels("state_change").inc()
+        state_transition_counter.labels(old_state.state, new_state.state).inc()
         return True
 
     if old_state.state == PresenceState.ONLINE:
         if new_state.currently_active != old_state.currently_active:
-            notify_reason_counter.inc("current_active_change")
+            notify_reason_counter.labels("current_active_change").inc()
             return True
 
         if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
             # Only notify about last active bumps if we're not currently acive
             if not new_state.currently_active:
-                notify_reason_counter.inc("last_active_change_online")
+                notify_reason_counter.labels("last_active_change_online").inc()
                 return True
 
     elif new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
-        notify_reason_counter.inc("last_active_change_not_online")
+        notify_reason_counter.labels("last_active_change_not_online").inc()
         return True
 
     return False
@@ -1027,14 +1032,14 @@ class PresenceEventSource(object):
             if changed is not None and len(changed) < 500:
                 # For small deltas, its quicker to get all changes and then
                 # work out if we share a room or they're in our presence list
-                get_updates_counter.inc("stream")
+                get_updates_counter.labels("stream").inc()
                 for other_user_id in changed:
                     if other_user_id in users_interested_in:
                         user_ids_changed.add(other_user_id)
             else:
                 # Too many possible updates. Find all users we can see and check
                 # if any of them have changed.
-                get_updates_counter.inc("full")
+                get_updates_counter.labels("full").inc()
 
                 if from_key:
                     user_ids_changed = stream_change_cache.get_entities_changed(

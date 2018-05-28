@@ -57,7 +57,7 @@ class Auth(object):
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
 
         self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
-        register_cache("token_cache", self.token_cache)
+        register_cache("cache", "token_cache", self.token_cache)
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):

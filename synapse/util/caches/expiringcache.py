@@ -52,11 +52,11 @@ class ExpiringCache(object):
 
         self._cache = OrderedDict()
 
-        self.metrics = register_cache(cache_name, self)
-
         self.iterable = iterable
 
         self._size_estimate = 0
+
+        self.metrics = register_cache("expiring", cache_name, self)
 
     def start(self):
         if not self._expiry_ms:

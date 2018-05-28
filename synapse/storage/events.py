@@ -40,30 +40,27 @@ import synapse.metrics
 from synapse.events import EventBase    # noqa: F401
 from synapse.events.snapshot import EventContext   # noqa: F401
 
+from prometheus_client import Counter
+
 logger = logging.getLogger(__name__)
 
-
-metrics = synapse.metrics.get_metrics_for(__name__)
-persist_event_counter = metrics.register_counter("persisted_events")
-event_counter = metrics.register_counter(
-    "persisted_events_sep", labels=["type", "origin_type", "origin_entity"]
-)
+persist_event_counter = Counter("synapse_storage_events_persisted_events", "")
+event_counter = Counter("synapse_storage_events_persisted_events_sep", "",
+                        ["type", "origin_type", "origin_entity"])
 
 # The number of times we are recalculating the current state
-state_delta_counter = metrics.register_counter(
-    "state_delta",
-)
+state_delta_counter = Counter("synapse_storage_events_state_delta", "")
+
 # The number of times we are recalculating state when there is only a
 # single forward extremity
-state_delta_single_event_counter = metrics.register_counter(
-    "state_delta_single_event",
-)
+state_delta_single_event_counter = Counter(
+    "synapse_storage_events_state_delta_single_event", "")
+
 # The number of times we are reculating state when we could have resonably
 # calculated the delta when we calculated the state for an event we were
 # persisting.
-state_delta_reuse_delta_counter = metrics.register_counter(
-    "state_delta_reuse_delta",
-)
+state_delta_reuse_delta_counter = Counter(
+    "synapse_storage_events_state_delta_reuse_delta", "")
 
 
 def encode_json(json_object):
@@ -445,7 +442,7 @@ class EventsStore(EventsWorkerStore):
                     state_delta_for_room=state_delta_for_room,
                     new_forward_extremeties=new_forward_extremeties,
                 )
-                persist_event_counter.inc_by(len(chunk))
+                persist_event_counter.inc(len(chunk))
                 synapse.metrics.event_persisted_position.set(
                     chunk[-1][0].internal_metadata.stream_ordering,
                 )
@@ -460,7 +457,7 @@ class EventsStore(EventsWorkerStore):
                         origin_type = "remote"
                         origin_entity = get_domain_from_id(event.sender)
 
-                    event_counter.inc(event.type, origin_type, origin_entity)
+                    event_counter.labels(event.type, origin_type, origin_entity).inc()
 
                 for room_id, new_state in current_state_for_room.iteritems():
                     self.get_current_state_ids.prefill(
