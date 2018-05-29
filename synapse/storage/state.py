@@ -182,7 +182,19 @@ class StateGroupWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_state_groups_from_groups(self, groups, types):
-        """Returns dictionary state_group -> (dict of (type, state_key) -> event id)
+        """Returns the state groups for a given set of groups, filtering on
+        types of state events.
+
+        Args:
+            groups(list[int]): list of state group IDs to query
+            types(list[str|None, str|None])|None: List of 2-tuples of the form
+                (`type`, `state_key`), where a `state_key` of `None` matches all
+                state_keys for the `type`. Presence of type of `None` indicates
+                that types not in the list should not be filtered out. If None,
+                all types are returned.
+
+        Returns:
+            dictionary state_group -> (dict of (type, state_key) -> event id)
         """
         results = {}
 
@@ -204,6 +216,9 @@ class StateGroupWorkerStore(SQLBaseStore):
         if types is not None:
             type_set = set(types)
             if (None, None) in type_set:
+                # special case (None, None) to mean that other types should be
+                # returned - i.e. we were just filtering down the state keys
+                # for particular types.
                 include_other_types = True
                 type_set.remove((None, None))
             types = list(type_set)  # deduplicate types list
@@ -360,10 +375,12 @@ class StateGroupWorkerStore(SQLBaseStore):
         that are in the `types` list.
 
         Args:
-            event_ids (list)
-            types (list): List of (type, state_key) tuples which are used to
-                filter the state fetched. `state_key` may be None, which matches
-                any `state_key`
+            event_ids (list[string])
+            types (list[(str|None, str|None)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. If `state_key` is None,
+                all events are returned of the given type.  Presence of type of `None`
+                indicates that types not in the list should not be filtered out.
+                May be None, which matches any key.
 
         Returns:
             deferred: A list of dicts corresponding to the event_ids given.
@@ -399,9 +416,11 @@ class StateGroupWorkerStore(SQLBaseStore):
 
         Args:
             event_ids(list(str)): events whose state should be returned
-            types(list[(str, str)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. May be None, which
-                matches any key
+            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. If `state_key` is None,
+                all events are returned of the given type.  Presence of type of `None`
+                indicates that types not in the list should not be filtered out.
+                May be None, which matches any key.
 
         Returns:
             A deferred dict from event_id -> (type, state_key) -> state_event
@@ -427,9 +446,11 @@ class StateGroupWorkerStore(SQLBaseStore):
 
         Args:
             event_id(str): event whose state should be returned
-            types(list[(str, str)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. May be None, which
-                matches any key
+            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. If `state_key` is None,
+                all events are returned of the given type.  Presence of type of `None`
+                indicates that types not in the list should not be filtered out.
+                May be None, which matches any key.
 
         Returns:
             A deferred dict from (type, state_key) -> state_event
@@ -444,9 +465,11 @@ class StateGroupWorkerStore(SQLBaseStore):
 
         Args:
             event_id(str): event whose state should be returned
-            types(list[(str, str)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. May be None, which
-                matches any key
+            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. If `state_key` is None,
+                all events are returned of the given type.  Presence of type of `None`
+                indicates that types not in the list should not be filtered out.
+                May be None, which matches any key.
 
         Returns:
             A deferred dict from (type, state_key) -> state_event
@@ -492,11 +515,11 @@ class StateGroupWorkerStore(SQLBaseStore):
         missing state.
 
         Args:
-            group: The state group to lookup
-            types (list): List of 2-tuples of the form (`type`, `state_key`),
-                where a `state_key` of `None` matches all state_keys for the
-                `type`. Presence of type of `None` indicates that types not
-                in the list should not be filtered out.
+            group(int): The state group to lookup
+            types(list[str|None, str|None]): List of 2-tuples of the form
+                (`type`, `state_key`), where a `state_key` of `None` matches all
+                state_keys for the `type`. Presence of type of `None` indicates
+                that types not in the list should not be filtered out.
         """
         is_all, known_absent, state_dict_ids = self._state_group_cache.get(group)
 
@@ -560,9 +583,18 @@ class StateGroupWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def _get_state_for_groups(self, groups, types=None):
         """Given list of groups returns dict of group -> list of state events
-        with matching types. `types` is a list of `(type, state_key)`, where
-        a `state_key` of None matches all state_keys. If `types` is None then
-        all events are returned.
+        with matching types.
+
+        Args:
+            groups(list[int]): list of groups whose state to query
+            types(list[str|None, str|None]|None): List of 2-tuples of the form
+                (`type`, `state_key`), where a `state_key` of `None` matches all
+                state_keys for the `type`. Presence of type of `None` indicates
+                that types not in the list should not be filtered out. If None,
+                all events are returned.
+
+        Returns:
+            dict of group -> list of state events
         """
         if types:
             types = frozenset(types)

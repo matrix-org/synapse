@@ -423,7 +423,11 @@ class SyncHandler(object):
 
         Args:
             event(synapse.events.EventBase): event of interest
-
+            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. If `state_key` is None,
+                all events are returned of the given type.  Presence of type of `None`
+                indicates that types not in the list should not be filtered out.
+                May be None, which matches any key.
         Returns:
             A Deferred map from ((type, state_key)->Event)
         """
@@ -440,6 +444,11 @@ class SyncHandler(object):
         Args:
             room_id(str): room for which to get state
             stream_position(StreamToken): point at which to get state
+            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. If `state_key` is None,
+                all events are returned of the given type.  Presence of type of `None`
+                indicates that types not in the list should not be filtered out.
+                May be None, which matches any key.
 
         Returns:
             A Deferred map from ((type, state_key)->Event)
@@ -472,8 +481,6 @@ class SyncHandler(object):
                 be None.
             now_token(str): Token of the end of the current batch.
             full_state(bool): Whether to force returning the full state.
-            lazy_load_members(bool): Whether to only return state for members
-                referenced in this timeline segment
 
         Returns:
              A deferred new event dictionary
@@ -496,7 +503,7 @@ class SyncHandler(object):
                 types = [
                     (EventTypes.Member, state_key)
                     for state_key in set(
-                        event.sender  # FIXME: we also care about targets etc.
+                        event.sender  # FIXME: we also care about invite targets etc.
                         for event in batch.events
                     )
                 ]
@@ -1398,7 +1405,8 @@ class SyncHandler(object):
             return
 
         state = yield self.compute_state_delta(
-            room_id, batch, sync_config, since_token, now_token, full_state=full_state
+            room_id, batch, sync_config, since_token, now_token,
+            full_state=full_state
         )
 
         if room_builder.rtype == "joined":
