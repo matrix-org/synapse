@@ -62,7 +62,7 @@ class DnsTestCase(unittest.TestCase):
         dns_client_mock = Mock()
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSServerError())
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         entry = Mock(spec_set=["expires"])
         entry.expires = 0
@@ -87,7 +87,7 @@ class DnsTestCase(unittest.TestCase):
         dns_client_mock = Mock(spec_set=['lookupService'])
         dns_client_mock.lookupService = Mock(spec_set=[])
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         entry = Mock(spec_set=["expires"])
         entry.expires = 999999999
@@ -111,7 +111,7 @@ class DnsTestCase(unittest.TestCase):
 
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSServerError())
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         cache = {}
 
@@ -126,7 +126,7 @@ class DnsTestCase(unittest.TestCase):
 
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSNameError())
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         cache = {}
 
