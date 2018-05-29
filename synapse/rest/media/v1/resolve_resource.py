@@ -76,30 +76,38 @@ class ResolveResource(Resource):
 
         respond_with_json(request, 200, json_object, send_cors=True)
 
+    def _get_content_type(self, headers):
+        content_type = "application/octet-stream"
+        if "Content-Type" in headers:
+            content_type = headers["Content-Type"]
+            if isinstance(content_type, list):
+                content_type = content_type[0]
+        return content_type
+
+    def _get_msgtype(self, headers):
+        msgtype = 'm.file'
+        content_type = self._get_content_type(headers)
+        if content_type.lower().startswith("image/"):
+            msgtype = 'm.image'
+        elif content_type.lower().startswith("video/"):
+            msgtype = 'm.video'
+        return msgtype
+
     @defer.inlineCallbacks
     def _upload_and_preview_url(self, url, user):
         response = requests.get(url, allow_redirects=True, stream=True)
         headers = response.headers
         upload_name = parse_content_disposition_filename(headers)
         content_length = headers.get('Content-Length')
-
-        if "Content-Type" in headers:
-            content_type = headers["Content-Type"]
-            if isinstance(content_type, list):
-                content_type = content_type[0]
-        else:
-            content_type = "application/octet-stream"
-
-        if content_type.lower().startswith("image/"):
-            msgtype = 'm.image'
-        else:
-            msgtype = 'm.file'
+        content_type = self._get_content_type(headers)
+        msgtype = self._get_msgtype(headers)
+        resolved_data = StringIO(response.content)
 
         content_uri = yield self.media_repo.create_content(
-            content_type, upload_name, StringIO(response.content),
-            content_length, user)
+            content_type, upload_name, resolved_data, content_length, user)
 
-        logger.info("Uploaded content with URI %r", content_uri)
+        logger.info("Uploaded content with URI %r and msgtype %s",
+                    content_uri, msgtype)
 
         defer.returnValue({
             "content_uri": content_uri,
@@ -107,6 +115,9 @@ class ResolveResource(Resource):
         })
 
     def _validate_resource(self, json_object):
+        '''validates params in case of any issues should respond
+        with bad request (400) and list of the errors otherwise
+        silently finish validation'''
         if 'url' not in json_object:
             raise SynapseError(
                 msg="Missing url parameter that should be passed as body of request",
@@ -119,7 +130,6 @@ class ResolveResource(Resource):
         self._should_be_downloadable(url, head_response)
         self._should_have_allowed_max_upload_size(url, head_response)
         self._should_have_allowed_urls(url)
-        return True
 
     def _should_have_url(self, url):
         if not url:
