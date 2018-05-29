@@ -82,19 +82,28 @@ class ResolveResource(Resource):
         headers = response.headers
         upload_name = parse_content_disposition_filename(headers)
         content_length = headers.get('Content-Length')
-        media_type = headers.get("Content-Type")
+
+        if "Content-Type" in headers:
+            content_type = headers["Content-Type"]
+            if isinstance(content_type, list):
+                content_type = content_type[0]
+        else:
+            content_type = "application/octet-stream"
+
+        if content_type.lower().startswith("image/"):
+            msgtype = 'm.image'
+        else:
+            msgtype = 'm.file'
 
         content_uri = yield self.media_repo.create_content(
-            media_type, upload_name, StringIO(response.content),
+            content_type, upload_name, StringIO(response.content),
             content_length, user)
 
         logger.info("Uploaded content with URI %r", content_uri)
 
         defer.returnValue({
             "content_uri": content_uri,
-            "media_info": {
-                "media_type": media_type,
-            }
+            "msgtype": msgtype,
         })
 
     def _validate_resource(self, json_object):
