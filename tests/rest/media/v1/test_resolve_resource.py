@@ -119,7 +119,10 @@ class ResolveResourceTestCase(unittest.TestCase):
         return {}
 
     def _get_args(self, token=_TEST_TOKEN):
-        return dict(url=_EXAMPLE_IMAGE_URL, access_token=_TEST_TOKEN)
+        # TODO: replace args by body url: url request for using json there.
+        return dict(
+            body=json.dumps(dict(url=_EXAMPLE_IMAGE_URL)),
+            access_token=_TEST_TOKEN)
 
     @defer.inlineCallbacks
     def test_authentication_requirements_before_processing_resolve_request(self):

@@ -14,6 +14,10 @@
 # limitations under the License.
 
 import logging
+import json
+
+from StringIO import StringIO
+
 import requests
 
 from twisted.internet import defer
@@ -60,13 +64,15 @@ class ResolveResource(Resource):
     def _async_render_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        url = request.args.get("url")[0]
+        json_object = json.loads(request.content.read())
+
         # should respond with errors in case of the issues
         # on validating resource.
-        yield self._validate_resource(url)
+        yield self._validate_resource(json_object)
 
         # should receive downloadable resource uri from the media repo
-        json_object = yield self._upload_and_preview_url(url, requester)
+        json_object = yield self._upload_and_preview_url(
+            json_object['url'], requester.user)
 
         respond_with_json(request, 200, json_object, send_cors=True)
 
@@ -79,7 +85,7 @@ class ResolveResource(Resource):
         media_type = headers.get("Content-Type")
 
         content_uri = yield self.media_repo.create_content(
-            media_type, upload_name, response.raw,
+            media_type, upload_name, StringIO(response.content),
             content_length, user)
 
         logger.info("Uploaded content with URI %r", content_uri)
@@ -91,7 +97,14 @@ class ResolveResource(Resource):
             }
         })
 
-    def _validate_resource(self, url):
+    def _validate_resource(self, json_object):
+        if 'url' not in json_object:
+            raise SynapseError(
+                msg="Missing url parameter that should be passed as body of request",
+                code=404,
+            )
+        url = json_object.get('url')
+
         head_response = requests.head(url, allow_redirects=True)
         self._should_have_url(url)
         self._should_be_downloadable(url, head_response)
