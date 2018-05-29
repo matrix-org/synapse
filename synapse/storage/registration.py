@@ -101,6 +101,13 @@ class RegistrationStore(RegistrationWorkerStore,
             columns=["user_id", "device_id"],
         )
 
+        self.register_background_index_update(
+            "users_creation_ts",
+            index_name="users_creation_ts",
+            table="users",
+            columns=["creation_ts"],
+        )
+
         # we no longer use refresh tokens, but it's possible that some people
         # might have a background update queued to build this index. Just
         # clear the background update.
