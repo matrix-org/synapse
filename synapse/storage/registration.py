@@ -36,6 +36,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             retcols=[
                 "name", "password_hash", "is_guest",
                 "consent_version", "consent_server_notice_sent",
+                "appservice_id",
             ],
             allow_none=True,
             desc="get_user_by_id",
