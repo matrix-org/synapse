@@ -18,6 +18,7 @@ import simplejson as json
 
 from six import string_types
 
+
 def freeze(o):
     if isinstance(o, dict):
         return frozendict({k: freeze(v) for k, v in o.items()})
