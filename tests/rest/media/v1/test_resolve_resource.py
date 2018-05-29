@@ -146,5 +146,3 @@ class ResolveResourceTestCase(unittest.TestCase):
         and previewable resource'''
         self.assertTrue('content_uri' in resp)
         self.assertTrue(resp['content_uri'] == content_uri)
-
-

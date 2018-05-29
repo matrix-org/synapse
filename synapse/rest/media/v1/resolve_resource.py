@@ -13,24 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import logging
-import cgi
+import requests
 
-from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from twisted.web.resource import Resource
-
-import requests
+from twisted.web.server import NOT_DONE_YET
 
 from synapse.http.server import (
     respond_with_json,
-    wrap_json_request_handler
+    wrap_json_request_handler,
 )
 from synapse.api.errors import (
     SynapseError, Codes,
 )
-from synapse.http.servlet import parse_json_object_from_request
 from synapse.rest.media.v1._base import validate_url_blacklist, \
     parse_content_disposition_filename
 
@@ -57,8 +53,7 @@ class ResolveResource(Resource):
         return NOT_DONE_YET
 
     def render_OPTIONS(self, request):
-        respond_with_json(request, 200, {}, send_cors=True)
-        return NOT_DONE_YET
+        return respond_with_json(request, 200, {}, send_cors=True)
 
     @wrap_json_request_handler
     @defer.inlineCallbacks
@@ -73,9 +68,7 @@ class ResolveResource(Resource):
         # should receive downloadable resource uri from the media repo
         json_object = yield self._upload_and_preview_url(url, requester)
 
-        respond_with_json(
-            request, 200, json_object, send_cors=True
-        )
+        respond_with_json(request, 200, json_object, send_cors=True)
 
     @defer.inlineCallbacks
     def _upload_and_preview_url(self, url, user):
@@ -85,11 +78,9 @@ class ResolveResource(Resource):
         content_length = headers.get('Content-Length')
         media_type = headers.get("Content-Type")
 
-        print(self.media_repo.__dict__)
         content_uri = yield self.media_repo.create_content(
             media_type, upload_name, response.raw,
-            content_length, user
-        )
+            content_length, user)
 
         logger.info("Uploaded content with URI %r", content_uri)
 

@@ -76,7 +76,9 @@ def wrap_json_request_handler(h):
     @defer.inlineCallbacks
     def wrapped_request_handler(self, request):
         try:
+            print("TESTING1")
             yield h(self, request)
+            print("TESTING2")
         except CodeMessageException as e:
             code = e.code
             if isinstance(e, SynapseError):
