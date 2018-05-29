@@ -80,7 +80,7 @@ class KeyStore(SQLBaseStore):
             values={
                 "from_server": from_server,
                 "ts_added_ms": time_now_ms,
-                "tls_certificate": buffer(tls_certificate_bytes),
+                "tls_certificate": db_binary_type(tls_certificate_bytes),
             },
             desc="store_server_certificate",
         )
@@ -143,7 +143,7 @@ class KeyStore(SQLBaseStore):
                 values={
                     "from_server": from_server,
                     "ts_added_ms": time_now_ms,
-                    "verify_key": buffer(verify_key.encode()),
+                    "verify_key": db_binary_type(verify_key.encode()),
                 },
             )
             txn.call_after(
@@ -180,7 +180,7 @@ class KeyStore(SQLBaseStore):
                 "from_server": from_server,
                 "ts_added_ms": ts_now_ms,
                 "ts_valid_until_ms": ts_expires_ms,
-                "key_json": buffer(key_json_bytes),
+                "key_json": db_binary_type(key_json_bytes),
             },
             desc="store_server_keys_json",
         )
