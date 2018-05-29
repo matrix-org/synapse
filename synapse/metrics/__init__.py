@@ -36,6 +36,7 @@ all_gauges = {}
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
+
 class RegistryProxy(object):
 
     def collect(self):
