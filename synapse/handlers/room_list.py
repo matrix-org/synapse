@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+from six import iteritems
 from six.moves import range
 
 from ._base import BaseHandler
@@ -307,7 +308,7 @@ class RoomListHandler(BaseHandler):
         )
 
         event_map = yield self.store.get_events([
-            event_id for key, event_id in current_state_ids.iteritems()
+            event_id for key, event_id in iteritems(current_state_ids)
             if key[0] in (
                 EventTypes.JoinRules,
                 EventTypes.Name,

@@ -262,7 +262,7 @@ class AuthHandler(BaseHandler):
                 defer.returnValue((creds, clientdict, session['id']))
 
         ret = self._auth_dict_for_flows(flows, session)
-        ret['completed'] = creds.keys()
+        ret['completed'] = list(creds.keys())
         ret.update(errordict)
         raise InteractiveAuthIncompleteError(
             ret,

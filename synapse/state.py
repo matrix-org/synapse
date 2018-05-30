@@ -132,7 +132,8 @@ class StateHandler(object):
             defer.returnValue(event)
             return
 
-        state_map = yield self.store.get_events(state.values(), get_prev_content=False)
+        state_map = yield self.store.get_events(list(state.values()),
+                                                get_prev_content=False)
         state = {
             key: state_map[e_id] for key, e_id in iteritems(state) if e_id in state_map
         }
