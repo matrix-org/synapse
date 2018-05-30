@@ -21,7 +21,7 @@ from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.util.logutils import log_function
 
 import logging
-import urllib
+from six.moves.urllib import parse
 
 
 logger = logging.getLogger(__name__)
@@ -949,4 +949,4 @@ def _create_path(prefix, path, *args):
     Returns:
         str
     """
-    return prefix + path % tuple(urllib.quote(arg, "") for arg in args)
+    return prefix + path % tuple(parse.quote(arg, "") for arg in args)
