@@ -89,6 +89,8 @@ class ResolveResource(Resource):
         content_type = self._get_content_type(headers)
         if content_type.lower().startswith("image/"):
             msgtype = 'm.image'
+        elif content_type.lower().startswith("audio/"):
+            msgtype = 'm.audio'
         elif content_type.lower().startswith("video/"):
             msgtype = 'm.video'
         return msgtype
