@@ -152,7 +152,7 @@ class PushRuleEvaluatorForEvent(object):
 
 # Caches (glob, word_boundary) -> regex for push. See _glob_matches
 regex_cache = LruCache(50000 * CACHE_SIZE_FACTOR)
-register_cache("regex_push_cache", regex_cache)
+register_cache("cache", "regex_push_cache", regex_cache)
 
 
 def _glob_matches(glob, value, word_boundary=False):

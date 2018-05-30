@@ -298,16 +298,6 @@ class RoomMemberHandler(object):
             is_blocked = yield self.store.is_room_blocked(room_id)
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
-        else:
-            # we don't allow people to reject invites to, or leave, the
-            # server notice room.
-            is_blocked = yield self._is_server_notice_room(room_id)
-            if is_blocked:
-                raise SynapseError(
-                    http_client.FORBIDDEN,
-                    "You cannot leave this room",
-                    errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
-                )
 
         if effective_membership_state == Membership.INVITE:
             # block any attempts to invite the server notices mxid
@@ -382,6 +372,20 @@ class RoomMemberHandler(object):
                 same_sender = requester.user.to_string() == old_state.sender
                 if same_sender and same_membership and same_content:
                     defer.returnValue(old_state)
+
+            # we don't allow people to reject invites to the server notice
+            # room, but they can leave it once they are joined.
+            if (
+                old_membership == Membership.INVITE and
+                effective_membership_state == Membership.LEAVE
+            ):
+                is_blocked = yield self._is_server_notice_room(room_id)
+                if is_blocked:
+                    raise SynapseError(
+                        http_client.FORBIDDEN,
+                        "You cannot reject this invite",
+                        errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
+                    )
 
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
 

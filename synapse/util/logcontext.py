@@ -59,7 +59,7 @@ class LoggingContext(object):
 
     __slots__ = [
         "previous_context", "name", "ru_stime", "ru_utime",
-        "db_txn_count", "db_txn_duration_ms", "db_sched_duration_ms",
+        "db_txn_count", "db_txn_duration_sec", "db_sched_duration_sec",
         "usage_start",
         "main_thread", "alive",
         "request", "tag",
@@ -84,10 +84,10 @@ class LoggingContext(object):
         def stop(self):
             pass
 
-        def add_database_transaction(self, duration_ms):
+        def add_database_transaction(self, duration_sec):
             pass
 
-        def add_database_scheduled(self, sched_ms):
+        def add_database_scheduled(self, sched_sec):
             pass
 
         def __nonzero__(self):
@@ -103,11 +103,11 @@ class LoggingContext(object):
         self.ru_utime = 0.
         self.db_txn_count = 0
 
-        # ms spent waiting for db txns, excluding scheduling time
-        self.db_txn_duration_ms = 0
+        # sec spent waiting for db txns, excluding scheduling time
+        self.db_txn_duration_sec = 0
 
-        # ms spent waiting for db txns to be scheduled
-        self.db_sched_duration_ms = 0
+        # sec spent waiting for db txns to be scheduled
+        self.db_sched_duration_sec = 0
 
         # If alive has the thread resource usage when the logcontext last
         # became active.
@@ -230,18 +230,18 @@ class LoggingContext(object):
 
         return ru_utime, ru_stime
 
-    def add_database_transaction(self, duration_ms):
+    def add_database_transaction(self, duration_sec):
         self.db_txn_count += 1
-        self.db_txn_duration_ms += duration_ms
+        self.db_txn_duration_sec += duration_sec
 
-    def add_database_scheduled(self, sched_ms):
+    def add_database_scheduled(self, sched_sec):
         """Record a use of the database pool
 
         Args:
-            sched_ms (int): number of milliseconds it took us to get a
+            sched_sec (float): number of seconds it took us to get a
                 connection
         """
-        self.db_sched_duration_ms += sched_ms
+        self.db_sched_duration_sec += sched_sec
 
 
 class LoggingContextFilter(logging.Filter):

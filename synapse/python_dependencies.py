@@ -56,6 +56,7 @@ REQUIREMENTS = {
     "msgpack-python>=0.3.0": ["msgpack"],
     "phonenumbers>=8.2.0": ["phonenumbers"],
     "six": ["six"],
+    "prometheus_client": ["prometheus_client"],
 }
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {

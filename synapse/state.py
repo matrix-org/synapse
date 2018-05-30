@@ -32,7 +32,7 @@ from frozendict import frozendict
 import logging
 import hashlib
 
-from six import itervalues, iteritems
+from six import iteritems, itervalues
 
 logger = logging.getLogger(__name__)
 

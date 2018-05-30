@@ -32,7 +32,8 @@ DEFAULT_CONFIG = """\
 #
 # 'server_notice_content', if enabled, will send a user a "Server Notice"
 # asking them to consent to the privacy policy. The 'server_notices' section
-# must also be configured for this to work.
+# must also be configured for this to work. Notices will *not* be sent to
+# guest users unless 'send_server_notice_to_guests' is set to true.
 #
 # 'block_events_error', if set, will block any attempts to send events
 # until the user consents to the privacy policy. The value of the setting is
@@ -46,6 +47,7 @@ DEFAULT_CONFIG = """\
 #     body: >-
 #       To continue using this homeserver you must review and agree to the
 #       terms and conditions at %(consent_uri)s
+#   send_server_notice_to_guests: True
 #   block_events_error: >-
 #     To continue using this homeserver you must review and agree to the
 #     terms and conditions at %(consent_uri)s
@@ -60,6 +62,7 @@ class ConsentConfig(Config):
         self.user_consent_version = None
         self.user_consent_template_dir = None
         self.user_consent_server_notice_content = None
+        self.user_consent_server_notice_to_guests = False
         self.block_events_without_consent_error = None
 
     def read_config(self, config):
@@ -74,6 +77,9 @@ class ConsentConfig(Config):
         self.block_events_without_consent_error = consent_config.get(
             "block_events_error",
         )
+        self.user_consent_server_notice_to_guests = bool(consent_config.get(
+            "send_server_notice_to_guests", False,
+        ))
 
     def default_config(self, **kwargs):
         return DEFAULT_CONFIG

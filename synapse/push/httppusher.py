@@ -20,22 +20,17 @@ from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
 from . import push_rule_evaluator
 from . import push_tools
-import synapse
 from synapse.push import PusherConfigException
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
+from prometheus_client import Counter
+
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
+http_push_processed_counter = Counter("synapse_http_httppusher_http_pushes_processed", "")
 
-http_push_processed_counter = metrics.register_counter(
-    "http_pushes_processed",
-)
-
-http_push_failed_counter = metrics.register_counter(
-    "http_pushes_failed",
-)
+http_push_failed_counter = Counter("synapse_http_httppusher_http_pushes_failed", "")
 
 
 class HttpPusher(object):

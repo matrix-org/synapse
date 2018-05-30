@@ -5,7 +5,7 @@ Server Notices
 channel whereby server administrators can send messages to users on the server.
 
 They are used as part of communication of the server polices(see
-[consent_tracking.md](consent_tracking.md)), however the intention is that 
+[consent_tracking.md](consent_tracking.md)), however the intention is that
 they may also find a use for features such as "Message of the day".
 
 This is a feature specific to Synapse, but it uses standard Matrix
@@ -24,7 +24,10 @@ history; it will appear to have come from the 'server notices user' (see
 below).
 
 The user is prevented from sending any messages in this room by the power
-levels. They also cannot leave it.
+levels.
+
+Having joined the room, the user can leave the room if they want. Subsequent
+server notices will then cause a new room to be created.
 
 Synapse configuration
 ---------------------

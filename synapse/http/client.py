@@ -23,7 +23,6 @@ from synapse.http import cancelled_to_request_timed_out_error
 from synapse.util.async import add_timeout_to_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
-import synapse.metrics
 from synapse.http.endpoint import SpiderEndpoint
 
 from canonicaljson import encode_canonical_json
@@ -42,6 +41,7 @@ from twisted.web._newclient import ResponseDone
 
 from six import StringIO
 
+from prometheus_client import Counter
 import simplejson as json
 import logging
 import urllib
@@ -49,16 +49,9 @@ import urllib
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
-
-outgoing_requests_counter = metrics.register_counter(
-    "requests",
-    labels=["method"],
-)
-incoming_responses_counter = metrics.register_counter(
-    "responses",
-    labels=["method", "code"],
-)
+outgoing_requests_counter = Counter("synapse_http_client_requests", "", ["method"])
+incoming_responses_counter = Counter("synapse_http_client_responses", "",
+                                     ["method", "code"])
 
 
 class SimpleHttpClient(object):
@@ -95,7 +88,7 @@ class SimpleHttpClient(object):
     def request(self, method, uri, *args, **kwargs):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
-        outgoing_requests_counter.inc(method)
+        outgoing_requests_counter.labels(method).inc()
 
         logger.info("Sending request %s %s", method, uri)
 
@@ -109,14 +102,14 @@ class SimpleHttpClient(object):
             )
             response = yield make_deferred_yieldable(request_deferred)
 
-            incoming_responses_counter.inc(method, response.code)
+            incoming_responses_counter.labels(method, response.code).inc()
             logger.info(
                 "Received response to  %s %s: %s",
                 method, uri, response.code
             )
             defer.returnValue(response)
         except Exception as e:
-            incoming_responses_counter.inc(method, "ERR")
+            incoming_responses_counter.labels(method, "ERR").inc()
             logger.info(
                 "Error sending request to  %s %s: %s %s",
                 method, uri, type(e).__name__, e.message

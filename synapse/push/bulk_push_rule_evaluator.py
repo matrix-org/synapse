@@ -22,14 +22,13 @@ from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 from synapse.event_auth import get_user_power_level
 from synapse.api.constants import EventTypes, Membership
-from synapse.metrics import get_metrics_for
-from synapse.util.caches import metrics as cache_metrics
+from synapse.util.caches import register_cache
 from synapse.util.caches.descriptors import cached
 from synapse.util.async import Linearizer
 from synapse.state import POWER_KEY
 
 from collections import namedtuple
-
+from prometheus_client import Counter
 from six import itervalues, iteritems
 
 logger = logging.getLogger(__name__)
@@ -37,21 +36,18 @@ logger = logging.getLogger(__name__)
 
 rules_by_room = {}
 
-push_metrics = get_metrics_for(__name__)
 
-push_rules_invalidation_counter = push_metrics.register_counter(
-    "push_rules_invalidation_counter"
-)
-push_rules_state_size_counter = push_metrics.register_counter(
-    "push_rules_state_size_counter"
-)
+push_rules_invalidation_counter = Counter(
+    "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter", "")
+push_rules_state_size_counter = Counter(
+    "synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter", "")
 
 # Measures whether we use the fast path of using state deltas, or if we have to
 # recalculate from scratch
-push_rules_delta_state_cache_metric = cache_metrics.register_cache(
+push_rules_delta_state_cache_metric = register_cache(
     "cache",
-    size_callback=lambda: 0,  # Meaningless size, as this isn't a cache that stores values
-    cache_name="push_rules_delta_state_cache_metric",
+    "push_rules_delta_state_cache_metric",
+    cache=[],  # Meaningless size, as this isn't a cache that stores values
 )
 
 
@@ -65,10 +61,10 @@ class BulkPushRuleEvaluator(object):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-        self.room_push_rule_cache_metrics = cache_metrics.register_cache(
+        self.room_push_rule_cache_metrics = register_cache(
             "cache",
-            size_callback=lambda: 0,  # There's not good value for this
-            cache_name="room_push_rule_cache",
+            "room_push_rule_cache",
+            cache=[],  # Meaningless size, as this isn't a cache that stores values
         )
 
     @defer.inlineCallbacks
@@ -310,7 +306,7 @@ class RulesForRoom(object):
                 current_state_ids = context.current_state_ids
                 push_rules_delta_state_cache_metric.inc_misses()
 
-            push_rules_state_size_counter.inc_by(len(current_state_ids))
+            push_rules_state_size_counter.inc(len(current_state_ids))
 
             logger.debug(
                 "Looking for member changes in %r %r", state_group, current_state_ids

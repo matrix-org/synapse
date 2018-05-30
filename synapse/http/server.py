@@ -210,8 +210,8 @@ def wrap_request_handler_with_logging(h):
                         # dispatching to the handler, so that the handler
                         # can update the servlet name in the request
                         # metrics
-                        requests_counter.inc(request.method,
-                                             request.request_metrics.name)
+                        requests_counter.labels(request.method,
+                                                request.request_metrics.name).inc()
                         yield d
     return wrapped_request_handler
 
