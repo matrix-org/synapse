@@ -208,7 +208,7 @@ class Auth(object):
             user_agent = request.requestHeaders.getRawHeaders(
                 b"User-Agent",
                 default=[b""]
-            )[0]
+            )[0].decode('ascii')
             if user and access_token and ip_addr:
                 self.store.insert_client_ip(
                     user_id=user.to_string(),
@@ -244,10 +244,10 @@ class Auth(object):
         if app_service is None:
             defer.returnValue((None, None))
 
-        if "user_id" not in request.args:
+        if b"user_id" not in request.args:
             defer.returnValue((app_service.sender, app_service))
 
-        user_id = request.args["user_id"][0]
+        user_id = request.args[b"user_id"][0].decode('ascii')
         if app_service.sender == user_id:
             defer.returnValue((app_service.sender, app_service))
 
