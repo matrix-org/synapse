@@ -17,7 +17,6 @@ import os
 
 import logging
 import urllib
-import urlparse
 import re
 import fnmatch
 import cgi
