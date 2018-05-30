@@ -1414,7 +1414,7 @@ class EventsStore(EventsWorkerStore):
         # Set of event_ids of all prev_events of those in `forward_events`. This
         # is guaranteed to contain at least the given event_id.
         sibling_events = set()
-        for eid in set(forward_events):
+        for eid in forward_events:
             chunk_id = self._simple_select_one_onecol_txn(
                 txn,
                 table="events",
