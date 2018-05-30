@@ -384,7 +384,7 @@ class RootRedirect(resource.Resource):
         self.url = path
 
     def render_GET(self, request):
-        return redirectTo(self.url.encode('utf8')), request)
+        return redirectTo(self.url.encode('utf8'), request)
 
     def getChild(self, name, request):
         if len(name) == 0:

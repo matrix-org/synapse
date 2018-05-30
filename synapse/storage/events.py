@@ -19,6 +19,7 @@ from functools import wraps
 import itertools
 import logging
 
+from six import PY2, string_types
 import simplejson as json
 from twisted.internet import defer
 
