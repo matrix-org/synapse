@@ -16,6 +16,7 @@
 from ._base import SQLBaseStore
 from synapse.api.constants import PresenceState
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
+from synapse.util import batch_iter
 
 from collections import namedtuple
 from twisted.internet import defer

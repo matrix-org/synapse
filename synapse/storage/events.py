@@ -41,7 +41,7 @@ from synapse.events import EventBase    # noqa: F401
 from synapse.events.snapshot import EventContext   # noqa: F401
 
 from six.moves import range
-from six import string_types, itervalues, iteritems, iterkeys, PY2
+from six import itervalues, iteritems
 
 from prometheus_client import Counter
 

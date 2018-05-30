@@ -52,8 +52,6 @@ from synapse.util.retryutils import NotRetryingDestination
 
 from synapse.util.distributor import user_joined_room
 
-from six import iteritems
-
 logger = logging.getLogger(__name__)
 
 
