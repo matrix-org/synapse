@@ -126,7 +126,7 @@ class AuthTestCase(unittest.TestCase):
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
-        request.args[b"user_id"] = [masquerading_user_id]
+        request.args[b"user_id"] = [masquerading_user_id.encode('ascii')]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), masquerading_user_id)
@@ -140,7 +140,7 @@ class AuthTestCase(unittest.TestCase):
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
-        request.args[b"user_id"] = [masquerading_user_id]
+        request.args[b"user_id"] = [masquerading_user_id.encode('ascii')]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
         self.failureResultOf(d, AuthError)
