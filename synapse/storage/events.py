@@ -1020,7 +1020,7 @@ class EventsStore(EventsWorkerStore):
                     }
                 )
 
-                chunk_id, _ = self._compute_chunk_id_txn(
+                chunk_id, _ = self._insert_into_chunk_txn(
                     txn, event.room_id, event.event_id,
                     [eid for eid, _ in event.prev_events],
                 )
@@ -1119,7 +1119,7 @@ class EventsStore(EventsWorkerStore):
             if event.internal_metadata.is_outlier():
                 chunk_id, _topo = None, 0
             else:
-                chunk_id, _topo = self._compute_chunk_id_txn(
+                chunk_id, _topo = self._insert_into_chunk_txn(
                     txn, event.room_id, event.event_id,
                     [eid for eid, _ in event.prev_events],
                 )
@@ -1358,10 +1358,9 @@ class EventsStore(EventsWorkerStore):
             (event.event_id, event.redacts)
         )
 
-    def _compute_chunk_id_txn(self, txn, room_id, event_id, prev_event_ids):
-        """Computes the chunk ID and topological ordering for an event.
-
-        Also handles updating chunk_graph table.
+    def _insert_into_chunk_txn(self, txn, room_id, event_id, prev_event_ids):
+        """Computes the chunk ID and topological ordering for an event and
+        handles updating chunk_graph table.
 
         Args:
             txn,
