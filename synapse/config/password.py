@@ -23,7 +23,7 @@ class PasswordConfig(Config):
     def read_config(self, config):
         password_config = config.get("password_config", {})
         self.password_enabled = password_config.get("enabled", True)
-        self.password_pepper = password_config.get("pepper", "")
+        self.password_pepper = password_config.get("pepper", "").encode('utf8')
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
