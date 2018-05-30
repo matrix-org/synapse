@@ -298,7 +298,7 @@ class JsonResource(HttpServer, resource.Resource):
         # installed by @request_handler.
 
         kwargs = intern_dict({
-            name: urllib.parse.unquote(value) if value else value
+            name: urllib.unquote(value) if value else value
             for name, value in group_dict.items()
         })
 
