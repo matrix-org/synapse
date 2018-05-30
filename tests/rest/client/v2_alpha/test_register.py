@@ -60,7 +60,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         user_id = "@kermit:muppet"
         token = "kermits_access_token"
         self.request.args = {
-            "access_token": "i_am_an_app_service"
+            b"access_token": [b"i_am_an_app_service"]
         }
         self.request_data = json.dumps({
             "username": "kermit"
@@ -87,7 +87,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_POST_appservice_registration_invalid(self):
         self.request.args = {
-            "access_token": "i_am_an_app_service"
+            b"access_token": [b"i_am_an_app_service"]
         }
 
         self.request_data = json.dumps({

@@ -313,7 +313,7 @@ def setup(config_options):
     # check any extra requirements we have now we have a config
     check_requirements(config)
 
-    version_string = "Synapse/" + get_version_string(synapse)
+    version_string = b"Synapse/" + get_version_string(synapse)
 
     logger.info("Server hostname: %s", config.server_name)
     logger.info("Server version: %s", version_string)

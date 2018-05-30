@@ -55,7 +55,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         user_id = "@someone:interesting"
         token = "my token"
         self.request.args = {
-            "access_token": "i_am_an_app_service"
+            b"access_token": [b"i_am_an_app_service"]
         }
         self.request_data = json.dumps({
             "localpart": "someone",

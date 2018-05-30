@@ -39,7 +39,7 @@ def get_transaction_key(request):
         str: A transaction key
     """
     token = get_access_token_from_request(request)
-    return request.path + "/" + token
+    return request.path.decode('utf8') + "/" + token
 
 
 CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
