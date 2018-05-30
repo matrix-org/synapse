@@ -217,22 +217,25 @@ class MockHttpResource(HttpServer):
 
         headers = {}
         if federation_auth:
-            headers[b"Authorization"] = ["X-Matrix origin=test,key=,sig="]
+            headers[b"Authorization"] = [b"X-Matrix origin=test,key=,sig="]
         mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
         # return the right path if the event requires it
         mock_request.path = path
 
         # add in query params to the right place
-        try:
-            mock_request.args = urlparse.parse_qs(path.split('?')[1])
+        if "?" in path:
+            bytes_path = path.encode('utf8')
+            mock_request.args = urlparse.parse_qs(bytes_path.split(b'?')[1])
             mock_request.path = path.split('?')[0]
             path = mock_request.path
-        except Exception:
-            pass
+
 
         if isinstance(path, bytes):
             path = path.decode('utf8')
+
+        if isinstance(http_method, bytes):
+            http_method = http_method.decode('utf8')
 
         for (method, pattern, func) in self.callbacks:
             if http_method != method:
