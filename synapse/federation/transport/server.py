@@ -116,7 +116,8 @@ class Authenticator(object):
                 key = strip_quotes(param_dict[b"key"])
                 sig = strip_quotes(param_dict[b"sig"])
                 if PY3:
-                    return (origin.decode('ascii'), key.decode('ascii'), sig.decode('ascii'))
+                    return (origin.decode('ascii'), key.decode('ascii'),
+                            sig.decode('ascii'))
                 else:
                     return (origin, key, sig)
             except Exception:
