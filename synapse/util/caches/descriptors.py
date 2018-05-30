@@ -31,6 +31,9 @@ import functools
 import inspect
 import threading
 
+from six import string_types, itervalues
+import six
+
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +208,7 @@ class Cache(object):
     def invalidate_all(self):
         self.check_thread()
         self.cache.clear()
-        for entry in self._pending_deferred_cache.itervalues():
+        for entry in itervalues(self._pending_deferred_cache):
             entry.invalidate()
         self._pending_deferred_cache.clear()
 
@@ -392,9 +395,10 @@ class CacheDescriptor(_CacheDescriptorBase):
 
                 ret.addErrback(onErr)
 
-                # If our cache_key is a string, try to convert to ascii to save
-                # a bit of space in large caches
-                if isinstance(cache_key, basestring):
+                # If our cache_key is a string on py2, try to convert to ascii
+                # to save a bit of space in large caches. Py3 does this
+                # internally automatically.
+                if six.PY2 and isinstance(cache_key, string_types):
                     cache_key = to_ascii(cache_key)
 
                 result_d = ObservableDeferred(ret, consumeErrors=True)
