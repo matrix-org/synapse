@@ -14,6 +14,7 @@
 # limitations under the License.
 import json
 import contextlib
+import random
 
 from mock import Mock
 
@@ -25,6 +26,9 @@ from twisted.internet.defer import succeed
 from twisted.web import server
 from twisted.web.test.test_web import DummyRequest
 
+from synapse.http.request_metrics import (
+    requests_counter,
+)
 from synapse.api.auth import Auth
 from synapse.rest.media.v1.resolve_resource import ResolveResource
 
@@ -33,6 +37,8 @@ class SmartDummyRequest(DummyRequest):
     def __init__(self, method, url, args=None, headers=None):
         DummyRequest.__init__(self, url.split('/'))
         self.method = method
+        self.request_seq = random.randint(0, 100)
+        self.request_metrics = requests_counter
 
         args = args or {}
         for k, v in args.items():
@@ -53,6 +59,9 @@ class SmartDummyRequest(DummyRequest):
     @contextlib.contextmanager
     def processing(self):
         yield
+
+    def get_request_id(self):
+        return "%s-%i" % (self.method, self.request_seq)
 
 
 class DummySite(server.Site):
