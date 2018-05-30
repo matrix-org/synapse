@@ -1378,8 +1378,8 @@ class EventsStore(EventsWorkerStore):
         #
         # 1. If all prev events have the same chunk ID then use that chunk ID
         # 2. If we have none of the prev events but do have events pointing to
-        #    it, then we use their chunk ID if:
-        #     - They’re all in the same chunk, and
+        #    the event, then we use their chunk ID if:
+        #     - They're all in the same chunk, and
         #     - All their prev events match the events being inserted
         # 3. Otherwise, create a new chunk and use that
 
@@ -1411,8 +1411,8 @@ class EventsStore(EventsWorkerStore):
         # Set of chunks that refer to this event.
         forward_chunk_ids = set()
 
-        # Set of event_ids of all prev_events of those in `forward_events`. This
-        # is guaranteed to contain at least the given event_id.
+        # All the prev_events of events in `forward_events`.
+        # Note that this will include the current event_id.
         sibling_events = set()
         for eid in forward_events:
             chunk_id = self._simple_select_one_onecol_txn(
