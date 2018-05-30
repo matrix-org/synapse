@@ -1456,7 +1456,7 @@ class EventsStore(EventsWorkerStore):
                     "room_id": room_id,
                     "chunk_id": chunk_id,
                 },
-                retcol="COALESCE(MAX(topological_ordering), 0)",
+                retcol="MAX(topological_ordering)",
             )
             new_topo += 1
 
@@ -1473,7 +1473,7 @@ class EventsStore(EventsWorkerStore):
                     "room_id": room_id,
                     "chunk_id": chunk_id,
                 },
-                retcol="COALESCE(MIN(topological_ordering), 0)",
+                retcol="MIN(topological_ordering)",
             )
             new_topo -= 1
         else:
