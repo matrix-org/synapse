@@ -526,7 +526,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
-        limit = int(request.args.get(b"limit", [10])[0].decode('ascii'))
+        limit = int(request.args.get(b"limit", [b"10"])[0].decode('ascii'))
 
         results = yield self.handlers.room_context_handler.get_event_context(
             requester.user,
