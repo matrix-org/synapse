@@ -846,7 +846,7 @@ class AuthHandler(BaseHandler):
             Deferred(str): Hashed password.
         """
         def _do_hash():
-            return bcrypt.hashpw(password + self.hs.config.password_pepper.encode(),
+            return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper.encode(),
                                  bcrypt.gensalt(self.bcrypt_rounds))
 
         return make_deferred_yieldable(threads.deferToThread(_do_hash))

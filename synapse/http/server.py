@@ -40,8 +40,9 @@ from twisted.web.util import redirectTo
 
 import collections
 import logging
-import urllib
 import simplejson
+
+from six.moves import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +266,6 @@ class JsonResource(HttpServer, resource.Resource):
         self.hs = hs
 
     def register_paths(self, method, path_patterns, callback):
-        method = method.encode("utf-8")  # method is bytes on py3
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
@@ -299,7 +299,7 @@ class JsonResource(HttpServer, resource.Resource):
         # installed by @request_handler.
 
         kwargs = intern_dict({
-            name: urllib.unquote(value).decode("UTF-8") if value else value
+            name: urllib.parse.unquote(value) if value else value
             for name, value in group_dict.items()
         })
 
@@ -328,7 +328,7 @@ class JsonResource(HttpServer, resource.Resource):
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request.method, []):
+        for path_entry in self.path_regexs.get(request.method.decode('ascii'), []):
             m = path_entry.pattern.match(request.path.decode())
             if m:
                 # We found a match!

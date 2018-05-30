@@ -15,6 +15,7 @@
 
 import random
 import string
+from six import PY3
 from six.moves import range
 
 _string_with_symbols = (
@@ -48,6 +49,9 @@ def to_ascii(s):
 
     If given None then will return None.
     """
+    if PY3:
+        return s
+
     if s is None:
         return None
 
