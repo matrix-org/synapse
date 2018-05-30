@@ -57,7 +57,7 @@ class SmartDummyRequest(DummyRequest):
         return json.loads(self.resp_body)
 
     @contextlib.contextmanager
-    def processing(self):
+    def processing(self, servlet_name):
         yield
 
     def get_request_id(self):
