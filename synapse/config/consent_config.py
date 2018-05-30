@@ -18,6 +18,9 @@ from ._base import Config
 DEFAULT_CONFIG = """\
 # User Consent configuration
 #
+# for detailed instructions, see
+# https://github.com/matrix-org/synapse/blob/master/docs/consent_tracking.md
+#
 # Parts of this section are required if enabling the 'consent' resource under
 # 'listeners', in particular 'template_dir' and 'version'.
 #
