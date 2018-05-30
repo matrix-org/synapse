@@ -1503,24 +1503,17 @@ class EventsStore(EventsWorkerStore):
             retcol="chunk_id",
         )
 
-        prev_chunk_ids = set(
-            pid for pid in prev_chunk_ids
-            if pid is not None and pid not in current_prev_ids and pid != chunk_id
-        )
-        forward_chunk_ids = set(
-            fid for fid in forward_chunk_ids
-            if fid not in current_forward_ids and fid != chunk_id
-        )
-
         for pid in prev_chunk_ids:
-            # Note that the edge direction is reversed than what you might
-            # expect. See ChunkDBOrderedListStore for more details.
-            table.add_edge(pid, chunk_id)
+            if pid is not None and pid not in current_prev_ids and pid != chunk_id:
+                # Note that the edge direction is reversed than what you might
+                # expect. See ChunkDBOrderedListStore for more details.
+                table.add_edge(pid, chunk_id)
 
         for fid in forward_chunk_ids:
             # Note that the edge direction is reversed than what you might
             # expect. See ChunkDBOrderedListStore for more details.
-            table.add_edge(chunk_id, fid)
+            if fid not in current_forward_ids and fid != chunk_id:
+                table.add_edge(chunk_id, fid)
 
         # We now need to update the backwards extremities for the chunks.
 
