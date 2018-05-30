@@ -1459,6 +1459,7 @@ class EventsStore(EventsWorkerStore):
                 retcol="COALESCE(MAX(topological_ordering), 0)",
             )
             new_topo += 1
+
         # If there is only one forward chunk and only one sibling event (which
         # would be the given event), then this satisfies condition two.
         elif len(forward_chunk_ids) == 1 and len(sibling_events) == 1:
@@ -1511,17 +1512,15 @@ class EventsStore(EventsWorkerStore):
             if fid not in current_forward_ids and fid != chunk_id
         )
 
-        if prev_chunk_ids:
-            for pid in prev_chunk_ids:
-                # Note that the edge direction is reversed than what you might
-                # expect. See ChunkDBOrderedListStore for more details.
-                table.add_edge(pid, chunk_id)
+        for pid in prev_chunk_ids:
+            # Note that the edge direction is reversed than what you might
+            # expect. See ChunkDBOrderedListStore for more details.
+            table.add_edge(pid, chunk_id)
 
-        if forward_chunk_ids:
-            for fid in forward_chunk_ids:
-                # Note that the edge direction is reversed than what you might
-                # expect. See ChunkDBOrderedListStore for more details.
-                table.add_edge(chunk_id, fid)
+        for fid in forward_chunk_ids:
+            # Note that the edge direction is reversed than what you might
+            # expect. See ChunkDBOrderedListStore for more details.
+            table.add_edge(chunk_id, fid)
 
         # We now need to update the backwards extremities for the chunks.
 
