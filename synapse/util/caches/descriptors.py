@@ -33,6 +33,8 @@ import functools
 import inspect
 import threading
 
+from six import string_types, itervalues, PY2
+
 
 logger = logging.getLogger(__name__)
 

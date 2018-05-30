@@ -16,6 +16,7 @@
 from six import PY2
 
 from twisted.internet import defer
+import six
 
 from ._base import SQLBaseStore
 
@@ -23,8 +24,12 @@ from unpaddedbase64 import encode_base64
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.util.caches.descriptors import cached, cachedList
 
-if not PY2:
-    buffer = bytes
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = buffer
+else:
+    db_binary_type = memoryview
 
 class SignatureWorkerStore(SQLBaseStore):
     @cached()
@@ -105,7 +110,7 @@ class SignatureStore(SignatureWorkerStore):
             vals.append({
                 "event_id": event.event_id,
                 "algorithm": ref_alg,
-                "hash": buffer(ref_hash_bytes),
+                "hash": db_binary_type(ref_hash_bytes),
             })
 
         self._simple_insert_many_txn(

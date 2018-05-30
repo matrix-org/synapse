@@ -18,17 +18,16 @@ from six import binary_type, text_type
 from frozendict import frozendict
 import simplejson as json
 
-from six import text_type  # this is a hack, using isinstance() would be better
+from six import string_types
 
 def freeze(o):
-    t = type(o)
-    if t is dict:
+    if isinstance(o, dict):
         return frozendict({k: freeze(v) for k, v in o.items()})
 
-    if t is frozendict:
+    if isinstance(o, frozendict):
         return o
 
-    if t is binary_type or t is text_type:
+    if isinstance(o, string_types):
         return o
 
     try:
@@ -40,11 +39,10 @@ def freeze(o):
 
 
 def unfreeze(o):
-    t = type(o)
-    if t is dict or t is frozendict:
+    if isinstance(o, (dict, frozendict)):
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if t is str or t is text_type:
+    if isinstance(o, string_types):
         return o
 
     try:
