@@ -348,7 +348,7 @@ class SearchHandler(BaseHandler):
             rooms = set(e.room_id for e in allowed_events)
             for room_id in rooms:
                 state = yield self.state_handler.get_current_state(room_id)
-                state_results[room_id] = state.values()
+                state_results[room_id] = list(state.values())
 
             state_results.values()
 

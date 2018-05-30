@@ -39,7 +39,7 @@ def get_transaction_key(request):
         str: A transaction key
     """
     token = get_access_token_from_request(request)
-    return request.path + "/" + token
+    return request.path.decode('utf8') + "/" + token
 
 
 CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
@@ -104,7 +104,7 @@ class HttpTransactionCache(object):
 
     def _cleanup(self):
         now = self.clock.time_msec()
-        for key in self.transactions.keys():
+        for key in list(self.transactions.keys()):
             ts = self.transactions[key][1]
             if now > (ts + CLEANUP_PERIOD_MS):  # after cleanup period
                 del self.transactions[key]

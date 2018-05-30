@@ -104,7 +104,7 @@ class RestTestCase(unittest.TestCase):
                 "password": "test",
                 "type": "m.login.password"
             }))
-        self.assertEquals(200, code)
+        self.assertEquals(200, code, msg=response)
         defer.returnValue(response)
 
     @defer.inlineCallbacks

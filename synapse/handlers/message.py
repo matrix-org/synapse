@@ -46,6 +46,8 @@ from synapse.replication.http.send_event import send_event_to_master
 
 from ._base import BaseHandler
 
+from six import iteritems, itervalues
+
 logger = logging.getLogger(__name__)
 
 

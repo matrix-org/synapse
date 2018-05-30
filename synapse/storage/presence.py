@@ -13,12 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six.moves import range
+
 from ._base import SQLBaseStore
 from synapse.api.constants import PresenceState
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
+from synapse.util import batch_iter
 
 from collections import namedtuple
 from twisted.internet import defer
+
+from six.moves import range
 
 
 class UserPresenceState(namedtuple("UserPresenceState",
@@ -115,11 +120,7 @@ class PresenceStore(SQLBaseStore):
             " AND user_id IN (%s)"
         )
 
-        batches = (
-            presence_states[i:i + 50]
-            for i in xrange(0, len(presence_states), 50)
-        )
-        for states in batches:
+        for states in batch_iter(presence_states, 50):
             args = [stream_id]
             args.extend(s.user_id for s in states)
             txn.execute(

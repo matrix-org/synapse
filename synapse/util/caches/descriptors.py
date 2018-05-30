@@ -15,6 +15,8 @@
 # limitations under the License.
 import logging
 
+from six import string_types, PY2, itervalues
+
 from synapse.util.async import ObservableDeferred
 from synapse.util import unwrapFirstError, logcontext
 from synapse.util.caches import CACHE_SIZE_FACTOR
@@ -31,8 +33,7 @@ import functools
 import inspect
 import threading
 
-from six import string_types, itervalues
-import six
+from six import string_types, itervalues, PY2
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ class Cache(object):
 
         self.cache = LruCache(
             max_size=max_entries, keylen=keylen, cache_type=cache_type,
-            size_callback=(lambda d: len(d)) if iterable else None,
+            size_callback=(lambda d: len(d) if d is not None else 0) if iterable else None,
             evicted_callback=self._on_evicted,
         )
 
@@ -398,7 +399,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                 # If our cache_key is a string on py2, try to convert to ascii
                 # to save a bit of space in large caches. Py3 does this
                 # internally automatically.
-                if six.PY2 and isinstance(cache_key, string_types):
+                if PY2 and isinstance(cache_key, string_types):
                     cache_key = to_ascii(cache_key)
 
                 result_d = ObservableDeferred(ret, consumeErrors=True)
@@ -569,7 +570,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                     return results
 
                 return logcontext.make_deferred_yieldable(defer.gatherResults(
-                    cached_defers.values(),
+                    list(cached_defers.values()),
                     consumeErrors=True,
                 ).addCallback(update_results_dict).addErrback(
                     unwrapFirstError

@@ -114,7 +114,7 @@ class DeviceHandler(BaseHandler):
             user_id, device_id=None
         )
 
-        devices = device_map.values()
+        devices = list(device_map.values())
         for device in devices:
             _update_device_from_client_ips(device, ips)
 
@@ -187,7 +187,7 @@ class DeviceHandler(BaseHandler):
             defer.Deferred:
         """
         device_map = yield self.store.get_devices_by_user(user_id)
-        device_ids = device_map.keys()
+        device_ids = list(device_map.keys())
         if except_device_id is not None:
             device_ids = [d for d in device_ids if d != except_device_id]
         yield self.delete_devices(user_id, device_ids)

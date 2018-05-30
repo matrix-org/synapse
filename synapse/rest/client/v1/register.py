@@ -284,9 +284,9 @@ class RegisterRestServlet(ClientV1RestServlet):
                 400, "Cannot change user ID during registration"
             )
 
-        password = register_json["password"].encode("utf-8")
+        password = register_json["password"]
         desired_user_id = (
-            register_json["user"].encode("utf-8")
+            register_json["user"]
             if "user" in register_json else None
         )
 
@@ -317,7 +317,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         if "user" not in register_json:
             raise SynapseError(400, "Expected 'user' key.")
 
-        user_localpart = register_json["user"].encode("utf-8")
+        user_localpart = register_json["user"]
 
         handler = self.handlers.registration_handler
         user_id = yield handler.appservice_register(
@@ -345,14 +345,14 @@ class RegisterRestServlet(ClientV1RestServlet):
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
 
-        user = register_json["user"].encode("utf-8")
-        password = register_json["password"].encode("utf-8")
+        user = register_json["user"]
+        password = register_json["password"]
         admin = register_json.get("admin", None)
 
         # Its important to check as we use null bytes as HMAC field separators
-        if b"\x00" in user:
+        if b"\x00" in user.encode('utf8'):
             raise SynapseError(400, "Invalid user")
-        if b"\x00" in password:
+        if b"\x00" in password.encode('utf8'):
             raise SynapseError(400, "Invalid password")
 
         # str() because otherwise hmac complains that 'unicode' does not
@@ -363,9 +363,9 @@ class RegisterRestServlet(ClientV1RestServlet):
             key=self.hs.config.registration_shared_secret.encode(),
             digestmod=sha1,
         )
-        want_mac.update(user)
+        want_mac.update(user.encode('utf8'))
         want_mac.update(b"\x00")
-        want_mac.update(password)
+        want_mac.update(password.encode('utf8'))
         want_mac.update(b"\x00")
         want_mac.update(b"admin" if admin else b"notadmin")
         want_mac = want_mac.hexdigest()

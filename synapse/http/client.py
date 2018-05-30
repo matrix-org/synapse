@@ -39,12 +39,12 @@ from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 from twisted.web._newclient import ResponseDone
 
-from six import StringIO
+from six import StringIO, text_type
+from six.moves import urllib
 
 from prometheus_client import Counter
 import simplejson as json
 import logging
-import urllib
 
 
 logger = logging.getLogger(__name__)
@@ -112,7 +112,7 @@ class SimpleHttpClient(object):
             incoming_responses_counter.labels(method, "ERR").inc()
             logger.info(
                 "Error sending request to  %s %s: %s %s",
-                method, uri, type(e).__name__, e.message
+                method, uri, type(e).__name__, e.args[0]
             )
             raise e
 
@@ -132,7 +132,7 @@ class SimpleHttpClient(object):
         # TODO: Do we ever want to log message contents?
         logger.debug("post_urlencoded_get_json args: %s", args)
 
-        query_bytes = urllib.urlencode(encode_urlencode_args(args), True)
+        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
 
         actual_headers = {
             b"Content-Type": [b"application/x-www-form-urlencoded"],
@@ -237,7 +237,7 @@ class SimpleHttpClient(object):
             On a non-2xx HTTP response.
         """
         if len(args):
-            query_bytes = urllib.urlencode(args, True)
+            query_bytes = urllib.parse.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
 
         json_str = encode_canonical_json(json_body)
@@ -286,7 +286,7 @@ class SimpleHttpClient(object):
             error message.
         """
         if len(args):
-            query_bytes = urllib.urlencode(args, True)
+            query_bytes = urllib.parse.urlencode(args, True)
             uri = "%s?%s" % (uri, query_bytes)
 
         actual_headers = {
@@ -436,7 +436,7 @@ class CaptchaServerHttpClient(SimpleHttpClient):
 
     @defer.inlineCallbacks
     def post_urlencoded_get_raw(self, url, args={}):
-        query_bytes = urllib.urlencode(encode_urlencode_args(args), True)
+        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True)
 
         response = yield self.request(
             "POST",
@@ -512,7 +512,7 @@ def encode_urlencode_args(args):
 
 
 def encode_urlencode_arg(arg):
-    if isinstance(arg, unicode):
+    if isinstance(arg, text_type):
         return arg.encode('utf-8')
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]

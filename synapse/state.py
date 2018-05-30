@@ -132,7 +132,8 @@ class StateHandler(object):
             defer.returnValue(event)
             return
 
-        state_map = yield self.store.get_events(state.values(), get_prev_content=False)
+        state_map = yield self.store.get_events(list(state.values()),
+                                                get_prev_content=False)
         state = {
             key: state_map[e_id] for key, e_id in iteritems(state) if e_id in state_map
         }
@@ -529,7 +530,7 @@ class StateResolutionHandler(object):
 
 def _ordered_events(events):
     def key_func(e):
-        return -int(e.depth), hashlib.sha1(e.event_id.encode()).hexdigest()
+        return -int(e.depth), hashlib.sha1(e.event_id.encode('ascii')).hexdigest()
 
     return sorted(events, key=key_func)
 

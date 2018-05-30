@@ -26,6 +26,8 @@ from twisted.internet import defer
 import sys
 import time
 import threading
+from six import iterkeys, iteritems
+from six.moves import intern, range
 
 from six import itervalues, iterkeys, iteritems
 from six.moves import intern, range

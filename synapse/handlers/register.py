@@ -17,6 +17,7 @@
 import logging
 
 from twisted.internet import defer
+import six
 
 from synapse.api.errors import (
     AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
@@ -141,6 +142,7 @@ class RegistrationHandler(BaseHandler):
         """
         yield run_on_reactor()
         password_hash = None
+
         if password:
             password_hash = yield self.auth_handler().hash(password)
 

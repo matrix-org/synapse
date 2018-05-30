@@ -30,6 +30,8 @@ from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
 
+from six import iteritems
+
 
 class E2eKeysHandler(object):
     def __init__(self, hs):

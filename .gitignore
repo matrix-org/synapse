@@ -48,7 +48,7 @@ localhost-800*/
 static/client/register/register_config.js
 .tox
 
-env/
+*env/
 *.config
 
 .vscode/

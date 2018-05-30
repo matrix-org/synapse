@@ -125,14 +125,15 @@ def parse_string(request, name, default=None, required=False,
             is not one of those allowed values.
     """
     return parse_string_from_args(
-        request.args, name, default, required, allowed_values, param_type,
+        request.args, name.encode('ascii'), default, required, allowed_values,
+        param_type,
     )
 
 
 def parse_string_from_args(args, name, default=None, required=False,
                            allowed_values=None, param_type="string"):
     if name in args:
-        value = args[name][0]
+        value = args[name][0].decode('ascii')
         if allowed_values is not None and value not in allowed_values:
             message = "Query parameter %r must be one of [%s]" % (
                 name, ", ".join(repr(v) for v in allowed_values)

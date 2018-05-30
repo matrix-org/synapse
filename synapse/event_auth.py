@@ -26,6 +26,8 @@ from synapse.types import UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
+_neginf = float('-inf')
+
 
 def check(event, auth_events, do_sig_check=True, do_size_check=True):
     """ Checks if this event is correctly authed.
@@ -471,14 +473,14 @@ def _check_power_levels(event, auth_events):
     ]
 
     old_list = current_state.content.get("users", {})
-    for user in set(old_list.keys() + user_list.keys()):
+    for user in set(list(old_list.keys()) + list(user_list.keys())):
         levels_to_check.append(
             (user, "users")
         )
 
     old_list = current_state.content.get("events", {})
     new_list = event.content.get("events", {})
-    for ev_id in set(old_list.keys() + new_list.keys()):
+    for ev_id in set(list(old_list.keys()) + list(new_list.keys())):
         levels_to_check.append(
             (ev_id, "events")
         )
@@ -496,14 +498,14 @@ def _check_power_levels(event, auth_events):
         if level_to_check in old_loc:
             old_level = int(old_loc[level_to_check])
         else:
-            old_level = None
+            old_level = _neginf
 
         if level_to_check in new_loc:
             new_level = int(new_loc[level_to_check])
         else:
-            new_level = None
+            new_level = _neginf
 
-        if new_level is not None and old_level is not None:
+        if new_level is not _neginf and old_level is not _neginf:
             if new_level == old_level:
                 continue
 

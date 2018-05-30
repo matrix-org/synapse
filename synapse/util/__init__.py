@@ -20,7 +20,7 @@ from twisted.internet import defer, reactor, task
 import time
 import logging
 
-from itertools import islice
+from itertools import islice, chain
 
 logger = logging.getLogger(__name__)
 

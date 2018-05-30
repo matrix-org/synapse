@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six import binary_type, text_type
+
 from frozendict import frozendict
 import simplejson as json
 
 from six import string_types
-
 
 def freeze(o):
     if isinstance(o, dict):
