@@ -249,7 +249,7 @@ class AuthHandler(BaseHandler):
                 errordict = e.error_dict()
 
         for f in flows:
-            if len(set(f) - set(creds) == 0:
+            if len(set(f) - set(creds)) == 0:
                 # it's very useful to know what args are stored, but this can
                 # include the password in the case of registering, so only log
                 # the keys (confusingly, clientdict may contain a password
