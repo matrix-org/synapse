@@ -77,7 +77,7 @@ class Cache(object):
 
         self.cache = LruCache(
             max_size=max_entries, keylen=keylen, cache_type=cache_type,
-            size_callback=(lambda d: _len(d) if d is not None else 0) if iterable else None,
+            size_callback=(lambda d: len(d) if d is not None else 0) if iterable else None,
             evicted_callback=self._on_evicted,
         )
 
