@@ -21,6 +21,7 @@ from twisted.web.resource import Resource
 
 from ._base import respond_404, FileInfo, respond_with_responder
 from .upload_resource import UploadResource
+from .resolve_resource import ResolveResource
 from .download_resource import DownloadResource
 from .thumbnail_resource import ThumbnailResource
 from .identicon_resource import IdenticonResource
@@ -732,6 +733,17 @@ class MediaRepositoryResource(Resource):
 
            <thumbnail>
 
+    Clients can resolve URL of attachment that should be automatically
+    uploaded and returned the accessible url.
+
+        => POST /_matrix/media/v1/resolve HTTP/1.1
+           <media-url>
+
+        <= HTTP/1.1 200 OK
+           Content-Type: application/json
+
+           { "content_uri": "mxc://<server-name>/<media-id>" }
+
     The thumbnail methods are "crop" and "scale". "scale" trys to return an
     image where either the width or the height is smaller than the requested
     size. The client should then scale and letterbox the image if it needs to
@@ -754,5 +766,7 @@ class MediaRepositoryResource(Resource):
         self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
             self.putChild("preview_url", PreviewUrlResource(
-                hs, media_repo, media_repo.media_storage,
-            ))
+                hs, media_repo, media_repo.media_storage))
+        if hs.config.url_resolve_enabled:
+            self.putChild("resolve_url", ResolveResource(
+                hs, media_repo))

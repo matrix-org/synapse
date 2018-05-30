@@ -13,24 +13,95 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
+import logging
+import urllib
+import re
+import fnmatch
+import cgi
+
+from six.moves.urllib import parse as urlparse
+from twisted.internet import defer
+from twisted.protocols.basic import FileSender
+
 from synapse.http.server import respond_with_json, finish_request
 from synapse.api.errors import (
     cs_error, Codes, SynapseError
 )
 from synapse.util import logcontext
-
-from twisted.internet import defer
-from twisted.protocols.basic import FileSender
-
 from synapse.util.stringutils import is_ascii
 
-import os
-
-import logging
-import urllib
-from six.moves.urllib import parse as urlparse
 
 logger = logging.getLogger(__name__)
+
+
+def validate_url_blacklist(blacklist, url):
+    '''
+    Preview and resolve endpoints would require to validate urls
+    before to process it. In the configuration section the administrator
+    should define blacklist urls to ensure that synapse users will not
+    try to explore files using these api for restricted areas.
+    '''
+    url_tuple = urlparse.urlsplit(url)
+
+    for entry in blacklist:
+        match = True
+
+        for attrib in entry:
+            pattern = entry[attrib]
+            value = getattr(url_tuple, attrib)
+            logger.debug(
+                "Matching attrib '%s' with value '%s' against"
+                " pattern '%s'", attrib, value, pattern)
+
+            if value is None:
+                match = False
+                continue
+
+            if pattern.startswith('^'):
+                if not re.match(pattern, getattr(url_tuple, attrib)):
+                    match = False
+                    continue
+            else:
+                if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
+                    match = False
+                    continue
+
+            if match:
+                logger.warn("URL %s blocked by url_blacklist entry %s", url, entry)
+                return False
+    return True
+
+
+def parse_content_disposition_filename(headers):
+    download_name = None
+
+    content_disposition = headers.get("Content-Disposition", None)
+    if content_disposition:
+        _, params = cgi.parse_header(content_disposition,)
+        download_name = None
+
+        # First check if there is a valid UTF-8 filename
+        download_name_utf8 = params.get("filename*", None)
+        if download_name_utf8:
+            if download_name_utf8.lower().startswith("utf-8''"):
+                download_name = download_name_utf8[7:]
+
+        # If there isn't check for an ascii name.
+        if not download_name:
+            download_name_ascii = params.get("filename", None)
+            if download_name_ascii and is_ascii(download_name_ascii):
+                download_name = download_name_ascii
+
+        if download_name:
+            download_name = urlparse.unquote(download_name)
+            try:
+                download_name = download_name.decode("utf-8")
+            except UnicodeDecodeError:
+                download_name = None
+
+    return download_name
 
 
 def parse_media_id(request):
