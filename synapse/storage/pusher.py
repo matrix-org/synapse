@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import six
+
 from ._base import SQLBaseStore
 from twisted.internet import defer
 
@@ -27,6 +29,13 @@ import types
 
 logger = logging.getLogger(__name__)
 
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = buffer
+else:
+    db_binary_type = memoryview
+
 
 class PusherWorkerStore(SQLBaseStore):
     def _decode_pushers_rows(self, rows):
@@ -34,19 +43,19 @@ class PusherWorkerStore(SQLBaseStore):
             dataJson = r['data']
             r['data'] = None
             try:
-                if isinstance(dataJson, types.BufferType):
-                    dataJson = str(dataJson).decode("UTF8")
+                if isinstance(dataJson, db_binary_type):
+                    dataJson = bytes(dataJson).decode("UTF8")
 
                 r['data'] = json.loads(dataJson)
             except Exception as e:
                 logger.warn(
                     "Invalid JSON in data for pusher %d: %s, %s",
-                    r['id'], dataJson, e.message,
+                    r['id'], dataJson, e.args[0],
                 )
                 pass
 
-            if isinstance(r['pushkey'], types.BufferType):
-                r['pushkey'] = str(r['pushkey']).decode("UTF8")
+            if isinstance(r['pushkey'], db_binary_type):
+                r['pushkey'] = bytes(r['pushkey']).decode("UTF8")
 
         return rows
 
