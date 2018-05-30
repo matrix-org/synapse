@@ -673,7 +673,7 @@ def has_access_token(request):
     Returns:
         bool: False if no access_token was given, True otherwise.
     """
-    query_params = request.args.get("access_token")
+    query_params = request.args.get(b"access_token")
     auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
     return bool(query_params) or bool(auth_headers)
 
