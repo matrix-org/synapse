@@ -25,7 +25,6 @@ from twisted.internet.defer import succeed
 from twisted.web import server
 from twisted.web.test.test_web import DummyRequest
 
-import synapse.handlers.auth
 from synapse.api.auth import Auth
 from synapse.rest.media.v1.resolve_resource import ResolveResource
 
@@ -84,7 +83,8 @@ class DummySite(server.Site):
 
 
 _PATH_PREFIX = "/"
-_EXAMPLE_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Python_logo_and_wordmark.svg/486px-Python_logo_and_wordmark.svg.png"
+_EXAMPLE_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/" \
+    "f/f8/Python_logo_and_wordmark.svg/486px-Python_logo_and_wordmark.svg.png"
 _TEST_USER = "@foo:bar"
 _TEST_TOKEN = "_test_token_"
 _TEST_USER_INFO = {
