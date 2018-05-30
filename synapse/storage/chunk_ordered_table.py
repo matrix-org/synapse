@@ -281,10 +281,32 @@ class ChunkDBOrderedListStore(OrderedListStore):
             # We pick the interval to try and minimise the number of decimal
             # places, i.e. we round to nearest float with `rebalance_digits` and
             # use that as one side of the interval
+
             order = self._get_order(node_id)
+            rebalance_digits = self.rebalance_digits
             a = round(order, self.rebalance_digits)
-            min_order = a - 10 ** -self.rebalance_digits
-            max_order = a + 10 ** -self.rebalance_digits
+            diff = 10 ** - self.rebalance_digits
+
+            while True:
+                min_order = a - diff
+                max_order = a + diff
+
+                sql = """
+                    SELECT count(chunk_id) FROM chunk_linearized
+                    WHERE ordering >= ? AND ordering <= ? AND room_id = ?
+                """
+                self.txn.execute(sql, (
+                    min_order - self.min_difference,
+                    max_order + self.min_difference,
+                    self.room_id,
+                ))
+
+                cnt, = self.txn.fetchone()
+                step = (max_order - min_order) / cnt
+                if step > 1 / self.min_difference:
+                    break
+
+                diff *= 2
 
             # Now we get all the nodes in the range. We add the minimum difference
             # to the bounds to ensure that we don't accidentally move a node to be
@@ -292,6 +314,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
             sql = """
                 SELECT chunk_id FROM chunk_linearized
                 WHERE ordering >= ? AND ordering <= ? AND room_id = ?
+                ORDER BY ordering ASC
             """
             self.txn.execute(sql, (
                 min_order - self.min_difference,

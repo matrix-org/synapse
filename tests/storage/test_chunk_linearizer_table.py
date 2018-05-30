@@ -48,6 +48,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
             table.add_node("A")
             table._insert_after("B", "A")
             table._insert_before("C", "A")
+            table._insert_after("D", "A")
 
             sql = """
                 SELECT chunk_id FROM chunk_linearized
@@ -58,7 +59,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
             ordered = [r for r, in txn]
 
-            self.assertEqual(["C", "A", "B"], ordered)
+            self.assertEqual(["C", "A", "D", "B"], ordered)
 
         yield self.store.runInteraction("test", test_txn)
 
@@ -181,5 +182,46 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
             expected = expected_prefix + list(reversed(expected_suffix))
 
             self.assertEqual(expected, ordered)
+
+        yield self.store.runInteraction("test", test_txn)
+
+    @defer.inlineCallbacks
+    def test_get_edges_to(self):
+        room_id = "foo_room4"
+
+        def test_txn(txn):
+            table = ChunkDBOrderedListStore(
+                txn, room_id, self.clock, 1, 100,
+            )
+
+            table.add_node("A")
+            table._insert_after("B", "A")
+            table._add_edge_to_graph("A", "B")
+            table._insert_before("C", "A")
+            table._add_edge_to_graph("C", "A")
+
+            nodes = table.get_nodes_with_edges_from("A")
+            self.assertEqual([n for _, n in nodes], ["B"])
+
+            nodes = table.get_nodes_with_edges_to("A")
+            self.assertEqual([n for _, n in nodes], ["C"])
+
+        yield self.store.runInteraction("test", test_txn)
+
+    @defer.inlineCallbacks
+    def test_get_next_and_prev(self):
+        room_id = "foo_room5"
+
+        def test_txn(txn):
+            table = ChunkDBOrderedListStore(
+                txn, room_id, self.clock, 1, 100,
+            )
+
+            table.add_node("A")
+            table._insert_after("B", "A")
+            table._insert_before("C", "A")
+
+            self.assertEqual(table.get_next("A"), "B")
+            self.assertEqual(table.get_prev("A"), "C")
 
         yield self.store.runInteraction("test", test_txn)

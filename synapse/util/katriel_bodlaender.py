@@ -112,6 +112,12 @@ class OrderedListStore(object):
             pe_s = self.get_nodes_with_edges_to(s)
             fe_t = self.get_nodes_with_edges_from(t)
 
+            for n, _ in pe_s:
+                assert n not in to_s
+
+            for n, _ in fe_t:
+                assert n not in from_t
+
             l_s = len(pe_s)
             l_t = len(fe_t)
 
@@ -145,15 +151,19 @@ class OrderedListStore(object):
         if t is None:
             t = self.get_next(source)
 
+        for node_id in to_s:
+            self._delete_ordering(node_id)
+
         while to_s:
             s1 = to_s.pop()
-            self._delete_ordering(s1)
             self._insert_after(s1, s)
             s = s1
 
+        for node_id in from_t:
+            self._delete_ordering(node_id)
+
         while from_t:
             t1 = from_t.pop()
-            self._delete_ordering(t1)
             self._insert_before(t1, t)
             t = t1
 
