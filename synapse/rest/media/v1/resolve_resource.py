@@ -118,11 +118,7 @@ class ResolveResource(Resource):
         '''validates params in case of any issues should respond
         with bad request (400) and list of the errors otherwise
         silently finish validation'''
-        if 'url' not in json_object:
-            raise SynapseError(
-                msg="Missing url parameter that should be passed as body of request",
-                code=404,
-            )
+        self._should_have_url_key(json_object)
         url = json_object.get('url')
 
         head_response = requests.head(url, allow_redirects=True)
@@ -130,6 +126,13 @@ class ResolveResource(Resource):
         self._should_be_downloadable(url, head_response)
         self._should_have_allowed_max_upload_size(url, head_response)
         self._should_have_allowed_urls(url)
+
+    def _should_have_url_key(self, json_object):
+        if 'url' not in json_object:
+            raise SynapseError(
+                msg="Missing url parameter that should be passed as body of request",
+                code=404,
+            )
 
     def _should_have_url(self, url):
         if not url:
@@ -148,7 +151,7 @@ class ResolveResource(Resource):
     def _should_be_downloadable(self, url, head_response):
         if head_response.status_code is not requests.codes.ok:
             raise SynapseError(
-                msg="Not found resource to resolve %r" % (url),
+                msg="Not found resource to resolve %s" % url,
                 code=404,
             )
 
@@ -156,13 +159,13 @@ class ResolveResource(Resource):
         content_length = head_response.headers.get("Content-Length")
         if content_length is None:
             raise SynapseError(
-                msg="Request must specify a Content-Length for %r" % (url),
+                msg="Can't resolve %s with missing content length information" % url,
                 code=400
             )
 
         if int(content_length) > self.max_upload_size:
             raise SynapseError(
-                msg="Upload request body is too large for %r" % (url),
+                msg="Upload request body is too large for %s" % url,
                 code=413,
             )
 
