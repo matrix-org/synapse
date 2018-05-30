@@ -1115,19 +1115,19 @@ class EventsStore(EventsWorkerStore):
             ],
         )
 
-        if event.internal_metadata.is_outlier():
-            chunk_id, _topo = None, 0
-        else:
-            chunk_id, _topo = self._compute_chunk_id_txn(
-                txn, event.room_id, event.event_id,
-                [eid for eid, _ in event.prev_events],
-            )
+        for event, _ in events_and_contexts:
+            if event.internal_metadata.is_outlier():
+                chunk_id, _topo = None, 0
+            else:
+                chunk_id, _topo = self._compute_chunk_id_txn(
+                    txn, event.room_id, event.event_id,
+                    [eid for eid, _ in event.prev_events],
+                )
 
-        self._simple_insert_many_txn(
-            txn,
-            table="events",
-            values=[
-                {
+            self._simple_insert_txn(
+                txn,
+                table="events",
+                values={
                     "stream_ordering": event.internal_metadata.stream_ordering,
                     "chunk_id": chunk_id,
                     "topological_ordering": event.depth,
@@ -1145,10 +1145,8 @@ class EventsStore(EventsWorkerStore):
                         "url" in event.content
                         and isinstance(event.content["url"], basestring)
                     ),
-                }
-                for event, _ in events_and_contexts
-            ],
-        )
+                },
+            )
 
     def _store_rejected_events_txn(self, txn, events_and_contexts):
         """Add rows to the 'rejections' table for received events which were
