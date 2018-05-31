@@ -60,7 +60,7 @@ CREATE TABLE chunk_linearized (
 
 CREATE UNIQUE INDEX chunk_linearized_id ON chunk_linearized (chunk_id);
 CREATE UNIQUE INDEX chunk_linearized_next_id ON chunk_linearized (
-    next_chunk_id, room_id,
+    next_chunk_id, room_id
 );
 
 CREATE TABLE chunk_linearized_first (
@@ -93,6 +93,7 @@ def run_create(cur, database_engine, *args, **kwargs):
 
     next_chunk_id = 1
     room_to_next_order = {}
+    prev_chunks_by_room = {}
 
     for row in rows:
         chunk_id = next_chunk_id
@@ -111,6 +112,8 @@ def run_create(cur, database_engine, *args, **kwargs):
         ordering = room_to_next_order.get(room_id, 1)
         room_to_next_order[room_id] = ordering + 1
 
+        prev_chunks = prev_chunks_by_room.setdefault(room_id, [])
+
         SQLBaseStore._simple_insert_txn(
             txn,
             table="chunk_linearized",
@@ -122,7 +125,14 @@ def run_create(cur, database_engine, *args, **kwargs):
             },
         )
 
-        if ordering == 1:
+        if prev_chunks:
+            SQLBaseStore._simple_update_one_txn(
+                txn,
+                table="chunk_linearized",
+                keyvalues={"chunk_id": prev_chunks[-1]},
+                updatevalues={"next_chunk_id": chunk_id},
+            )
+        else:
             SQLBaseStore._simple_insert_txn(
                 txn,
                 table="chunk_linearized_first",
@@ -131,6 +141,8 @@ def run_create(cur, database_engine, *args, **kwargs):
                     "room_id": row["room_id"],
                 },
             )
+
+        prev_chunks.append(chunk_id)
 
 
 def run_upgrade(*args, **kwargs):
