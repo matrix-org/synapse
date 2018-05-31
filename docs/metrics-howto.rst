@@ -56,7 +56,7 @@ How to monitor Synapse metrics using Prometheus
    Restart Prometheus.
 
 
-Removal of deprecated metrics & time based counters becoming histograms in 0.30.0
+Removal of deprecated metrics & time based counters becoming histograms in 0.31.0
 ---------------------------------------------------------------------------------
 
 The duplicated metrics deprecated in Synapse 0.27.0 have been removed.
