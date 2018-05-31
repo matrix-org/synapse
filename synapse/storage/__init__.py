@@ -131,6 +131,7 @@ class DataStore(RoomMemberStore, RoomStore,
         self._group_updates_id_gen = StreamIdGenerator(
             db_conn, "local_group_updates", "stream_id",
         )
+        self._chunk_id_gen = IdGenerator(db_conn, "events", "chunk_id")
 
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = StreamIdGenerator(
