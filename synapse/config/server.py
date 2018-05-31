@@ -136,6 +136,21 @@ class ServerConfig(Config):
                 "type": "manhole",
             })
 
+        metrics_port = config.get("metrics_port")
+        if metrics_port:
+            self.listeners.append({
+                "port": metrics_port,
+                "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
+                "tls": False,
+                "type": "http",
+                "resources": [
+                    {
+                        "names": ["metrics"],
+                        "compress": False,
+                    },
+                ]
+            })
+
     def default_config(self, server_name, **kwargs):
         if ":" in server_name:
             bind_port = int(server_name.split(":")[1])
