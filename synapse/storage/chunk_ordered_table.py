@@ -327,33 +327,34 @@ class ChunkDBOrderedListStore(OrderedListStore):
     def _delete_ordering(self, node_id):
         """Implements OrderedListStore"""
 
-        sql = """
-            UPDATE chunk_linearized SET next_chunk_id = (
-                SELECT next_chunk_id
-                FROM chunk_linearized
-                WHERE chunk_id = ?
-            )
-            WHERE next_chunk_id = ?
-        """
-
-        self.txn.execute(sql, (node_id, node_id,))
-
-        sql = """
-            UPDATE chunk_linearized_first SET chunk_id = (
-                SELECT next_chunk_id
-                FROM chunk_linearized
-                WHERE chunk_id = ?
-            )
-            WHERE chunk_id = ?
-        """
-
-        self.txn.execute(sql, (node_id, node_id,))
+        next_chunk_id = SQLBaseStore._simple_select_one_onecol_txn(
+            txn,
+            table="chunk_linearized",
+            keyvalues={
+                "chunk_id": node_id,
+            },
+            retcol="next_chunk_id",
+        )
 
         SQLBaseStore._simple_delete_txn(
             self.txn,
             table="chunk_linearized",
             keyvalues={"chunk_id": node_id},
         )
+
+        sql = """
+            UPDATE chunk_linearized SET next_chunk_id = ?
+            WHERE next_chunk_id = ?
+        """
+
+        self.txn.execute(sql, (next_chunk_id, node_id,))
+
+        sql = """
+            UPDATE chunk_linearized_first SET chunk_id = ?
+            WHERE chunk_id = ?
+        """
+
+        self.txn.execute(sql, (next_chunk_id, node_id,))
 
     def _add_edge_to_graph(self, source_id, target_id):
         """Implements OrderedListStore"""
