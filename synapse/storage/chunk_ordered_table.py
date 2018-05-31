@@ -156,7 +156,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
 
             row = self.txn.fetchone()
             if row:
-                new_order = self._insert_at_start(node_id, row[0])
+                new_order = self._insert_at_end(node_id, row[0])
             else:
                 new_order = self._insert_first(node_id)
 
