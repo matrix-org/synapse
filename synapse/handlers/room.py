@@ -455,7 +455,7 @@ class RoomContextHandler(BaseHandler):
         state = yield self.store.get_state_for_events(
             [last_event_id], None
         )
-        results["state"] = state[last_event_id].values()
+        results["state"] = list(state[last_event_id].values())
 
         results["start"] = now_token.copy_and_replace(
             "room_key", results["start"]
