@@ -89,8 +89,8 @@ class ChunkDBOrderedListStore(OrderedListStore):
     """
     def __init__(self,
                  txn, room_id, clock,
-                 rebalance_digits=3,
-                 min_difference=1000000):
+                 rebalance_digits=2,
+                 min_difference=1000):
         self.txn = txn
         self.room_id = room_id
         self.clock = clock
@@ -283,7 +283,6 @@ class ChunkDBOrderedListStore(OrderedListStore):
             # use that as one side of the interval
 
             order = self._get_order(node_id)
-            rebalance_digits = self.rebalance_digits
             a = round(order, self.rebalance_digits)
             diff = 10 ** - self.rebalance_digits
 
