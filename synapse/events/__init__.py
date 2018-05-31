@@ -164,7 +164,8 @@ class FrozenEvent(EventBase):
 
         # We intern these strings because they turn up a lot (especially when
         # caching).
-        event_dict = intern_dict(event_dict)
+        if event_dict["type"] != "m.room.message":
+            event_dict = intern_dict(event_dict)
 
         if USE_FROZEN_DICTS:
             frozen_dict = freeze(event_dict)
