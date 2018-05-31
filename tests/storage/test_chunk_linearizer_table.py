@@ -19,6 +19,8 @@ import random
 import tests.unittest
 import tests.utils
 
+from gmpy2 import mpq as Fraction
+
 from synapse.storage.chunk_ordered_table import ChunkDBOrderedListStore
 
 
@@ -42,7 +44,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 100,
+                txn, room_id, self.clock, 5, 100,
             )
 
             table.add_node("A")
@@ -51,13 +53,13 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
             table._insert_after("D", "A")
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
             self.assertEqual(["C", "A", "D", "B"], ordered)
 
@@ -69,7 +71,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 20,
+                txn, room_id, self.clock, 5, 100,
             )
 
             nodes = [(i, "node_%d" % (i,)) for i in xrange(1, 1000)]
@@ -96,13 +98,13 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
                 already_inserted.sort()
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
             self.assertEqual(expected, ordered)
 
@@ -114,7 +116,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 20,
+                txn, room_id, self.clock, 5, 1000,
             )
 
             table.add_node("a")
@@ -132,13 +134,13 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
                 expected.append(node_id)
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
             self.assertEqual(expected, ordered)
 
@@ -150,7 +152,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 100,
+                txn, room_id, self.clock, 5, 100,
             )
 
             table.add_node("a")
@@ -171,13 +173,13 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
                 prev_node = node_id
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
             expected = expected_prefix + list(reversed(expected_suffix))
 
@@ -191,7 +193,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 100,
+                txn, room_id, self.clock, 5, 100,
             )
 
             table.add_node("A")
@@ -214,7 +216,7 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 100,
+                txn, room_id, self.clock, 5, 100,
             )
 
             table.add_node("A")

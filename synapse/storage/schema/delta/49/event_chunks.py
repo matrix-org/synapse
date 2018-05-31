@@ -53,11 +53,22 @@ CREATE INDEX chunk_backwards_extremities_event_id ON chunk_backwards_extremities
 CREATE TABLE chunk_linearized (
     chunk_id BIGINT NOT NULL,
     room_id TEXT NOT NULL,
-    ordering DOUBLE PRECISION NOT NULL
+    next_chunk_id BIGINT,
+    numerator BIGINT NOT NULL,
+    denominator BIGINT NOT NULL
 );
 
 CREATE UNIQUE INDEX chunk_linearized_id ON chunk_linearized (chunk_id);
-CREATE INDEX chunk_linearized_ordering ON chunk_linearized (room_id, ordering);
+CREATE UNIQUE INDEX chunk_linearized_next_id ON chunk_linearized (
+    next_chunk_id, room_id,
+);
+
+CREATE TABLE chunk_linearized_first (
+    chunk_id BIGINT NOT NULL,
+    room_id TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX chunk_linearized_first_id ON chunk_linearized_first (room_id);
 
 INSERT into background_updates (update_name, progress_json)
     VALUES ('event_fields_chunk_id', '{}');
@@ -70,8 +81,8 @@ def run_create(cur, database_engine, *args, **kwargs):
         cur.execute(statement)
 
     txn = LoggingTransaction(
-            cur, "schema_update", database_engine, [], [],
-        )
+        cur, "schema_update", database_engine, [], [],
+    )
 
     rows = SQLBaseStore._simple_select_list_txn(
         txn,
@@ -97,7 +108,7 @@ def run_create(cur, database_engine, *args, **kwargs):
             updatevalues={"chunk_id": chunk_id},
         )
 
-        ordering = room_to_next_order.get(room_id, 0)
+        ordering = room_to_next_order.get(room_id, 1)
         room_to_next_order[room_id] = ordering + 1
 
         SQLBaseStore._simple_insert_txn(
@@ -106,9 +117,20 @@ def run_create(cur, database_engine, *args, **kwargs):
             values={
                 "chunk_id": chunk_id,
                 "room_id": row["room_id"],
-                "ordering": 0,
+                "numerator": ordering,
+                "denominator": 1,
             },
         )
+
+        if ordering == 1:
+            SQLBaseStore._simple_insert_txn(
+                txn,
+                table="chunk_linearized_first",
+                values={
+                    "chunk_id": chunk_id,
+                    "room_id": row["room_id"],
+                },
+            )
 
 
 def run_upgrade(*args, **kwargs):
