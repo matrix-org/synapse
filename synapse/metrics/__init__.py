@@ -34,6 +34,8 @@ all_metrics = []
 all_collectors = []
 all_gauges = {}
 
+HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
+
 
 class RegistryProxy(object):
 
@@ -100,6 +102,8 @@ class CPUMetrics(object):
         self.ticks_per_sec = ticks_per_sec
 
     def collect(self):
+        if not HAVE_PROC_SELF_STAT:
+            return
 
         with open("/proc/self/stat") as s:
             line = s.read()

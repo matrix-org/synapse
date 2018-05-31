@@ -572,6 +572,9 @@ class EventCreationHandler(object):
 
         u = yield self.store.get_user_by_id(user_id)
         assert u is not None
+        if u["appservice_id"] is not None:
+            # users registered by an appservice are exempt
+            return
         if u["consent_version"] == self.config.user_consent_version:
             return
 
