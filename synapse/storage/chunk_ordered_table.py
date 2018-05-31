@@ -339,7 +339,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
         self.txn.execute(sql, (node_id, node_id,))
 
         sql = """
-            UPDATE chunk_linearized_first SET next_chunk_id = (
+            UPDATE chunk_linearized_first SET chunk_id = (
                 SELECT next_chunk_id
                 FROM chunk_linearized
                 WHERE chunk_id = ?
