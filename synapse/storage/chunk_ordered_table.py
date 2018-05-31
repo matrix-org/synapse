@@ -188,7 +188,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
 
             row = self.txn.fetchone()
             if row:
-                self._insert_at_start(node_id, row[0])
+                new_order = self._insert_at_start(node_id, row[0])
             else:
                 new_order = self._insert_first(node_id)
 
@@ -328,7 +328,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
         """Implements OrderedListStore"""
 
         next_chunk_id = SQLBaseStore._simple_select_one_onecol_txn(
-            txn,
+            self.txn,
             table="chunk_linearized",
             keyvalues={
                 "chunk_id": node_id,
