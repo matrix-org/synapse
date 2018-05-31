@@ -212,8 +212,7 @@ class Linearizer(object):
             except Exception:
                 logger.exception("Unexpected exception in Linearizer")
 
-            logger.debug("Acquired linearizer lock %r for key %r", self.name,
-                        key)
+            logger.debug("Acquired linearizer lock %r for key %r", self.name, key)
 
             # if the code holding the lock completes synchronously, then it
             # will recursively run the next claimant on the list. That can
@@ -231,7 +230,7 @@ class Linearizer(object):
 
         else:
             logger.debug("Acquired uncontended linearizer lock %r for key %r",
-                        self.name, key)
+                         self.name, key)
 
         @contextmanager
         def _ctx_manager():
