@@ -14,7 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from ._base import Config, ConfigError
+
+logger = logging.Logger(__name__)
 
 
 class ServerConfig(Config):
@@ -138,6 +142,12 @@ class ServerConfig(Config):
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
+            logger.warn(
+                ("The metrics_port configuration option is deprecated in Synapse 0.31 "
+                 "in favour of a listener. Please see "
+                 "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
+                 " on how to configure the new listener."))
+
             self.listeners.append({
                 "port": metrics_port,
                 "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
