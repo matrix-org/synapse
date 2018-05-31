@@ -13,9 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six import string_types
+from six.moves import http_client
+
 from twisted.internet import defer
 
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.api.errors import SynapseError, Codes
+from synapse.http.servlet import (
+    RestServlet, parse_json_object_from_request,
+    assert_params_in_request,
+)
 from ._base import client_v2_patterns
 
 import logging
@@ -42,12 +49,26 @@ class ReportEventRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         body = parse_json_object_from_request(request)
+        assert_params_in_request(body, ("reason", "score"))
+
+        if not isinstance(body["reason"], string_types):
+            raise SynapseError(
+                http_client.BAD_REQUEST,
+                "Param 'reason' must be a string",
+                Codes.BAD_JSON,
+            )
+        if not isinstance(body["score"], int):
+            raise SynapseError(
+                http_client.BAD_REQUEST,
+                "Param 'score' must be an integer",
+                Codes.BAD_JSON,
+            )
 
         yield self.store.add_event_report(
             room_id=room_id,
             event_id=event_id,
             user_id=user_id,
-            reason=body.get("reason"),
+            reason=body["reason"],
             content=body,
             received_ts=self.clock.time_msec(),
         )
