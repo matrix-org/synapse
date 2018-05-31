@@ -23,14 +23,13 @@ from .logcontext import (
 )
 from synapse.util import logcontext, unwrapFirstError
 
-from functools import wraps
 from contextlib import contextmanager
 
-from twisted.logger import Logger
+import logging
 
 from six.moves import range
 
-logger = Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @defer.inlineCallbacks
@@ -47,6 +46,7 @@ def run_on_reactor():
     iteration of the main loop
     """
     return sleep(0)
+
 
 class ObservableDeferred(object):
     """Wraps a deferred object so that we can add observer deferreds. These
@@ -203,9 +203,8 @@ class Linearizer(object):
         self.key_to_defer[key] = new_defer
 
         if current_defer:
-            logger.debug(
-                "Waiting to acquire linearizer lock {lock} for key {key}",
-                lock=self.name, key=key
+            logger.info(
+                "Waiting to acquire linearizer lock %r for key %r", self.name, key
             )
             try:
                 with PreserveLoggingContext():
@@ -213,8 +212,8 @@ class Linearizer(object):
             except Exception:
                 logger.exception("Unexpected exception in Linearizer")
 
-            logger.debug("Acquired linearizer lock {lock} for key {key}",
-                        lock=self.name, key=key)
+            logger.info("Acquired linearizer lock %r for key %r", self.name,
+                        key)
 
             # if the code holding the lock completes synchronously, then it
             # will recursively run the next claimant on the list. That can
@@ -231,16 +230,15 @@ class Linearizer(object):
             yield run_on_reactor()
 
         else:
-            logger.debug("Acquired uncontended linearizer lock {lock} for key {key}",
-                        lock=self.name, key=key)
+            logger.info("Acquired uncontended linearizer lock %r for key %r",
+                        self.name, key)
 
         @contextmanager
         def _ctx_manager():
             try:
                 yield
             finally:
-                logger.debug("Releasing linearizer lock {lock} for key {key}",
-                            lock=self.name, key=key)
+                logger.info("Releasing linearizer lock %r for key %r", self.name, key)
                 with PreserveLoggingContext():
                     new_defer.callback(None)
                 current_d = self.key_to_defer.get(key)
@@ -285,12 +283,12 @@ class Limiter(object):
             new_defer = defer.Deferred()
             entry[1].append(new_defer)
 
-            logger.debug("Waiting to acquire limiter lock for key {key}", key=key)
+            logger.info("Waiting to acquire limiter lock for key %r", key)
             with PreserveLoggingContext():
                 yield new_defer
-            logger.debug("Acquired limiter lock for key {key}", key=key)
+            logger.info("Acquired limiter lock for key %r", key)
         else:
-            logger.debug("Acquired uncontended limiter lock for key {key}", key=key)
+            logger.info("Acquired uncontended limiter lock for key %r", key)
 
         entry[0] += 1
 
@@ -299,7 +297,7 @@ class Limiter(object):
             try:
                 yield
             finally:
-                logger.debug("Releasing limiter lock for key {key}", key=key)
+                logger.info("Releasing limiter lock for key %r", key)
 
                 # We've finished executing so check if there are any things
                 # blocked waiting to execute and start one of them

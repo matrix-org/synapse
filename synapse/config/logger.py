@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-
 from ._base import Config
 from synapse.util.logcontext import LoggingContextFilter
-from twisted.logger import globalLogBeginner, textFileLogObserver, LogLevel
+from twisted.logger import globalLogBeginner, STDLibLogObserver
 import logging
 import logging.config
 import yaml
@@ -214,13 +212,7 @@ def setup_logging(config, use_worker_options=False):
     # filed as https://github.com/matrix-org/synapse/issues/1727
     #
     # However this may not be too much of a problem if we are just writing to a file.
-
-    text_observer = textFileLogObserver(sys.stdout)
-    def observer(evt):
-
-        if evt["log_level"] != LogLevel.debug:
-            text_observer(evt)
-
+    observer = STDLibLogObserver()
     globalLogBeginner.beginLoggingTo(
         [observer],
         redirectStandardIO=not config.no_redirect_stdio,
