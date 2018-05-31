@@ -16,7 +16,7 @@
 from synapse.util.caches import register_cache, CACHE_SIZE_FACTOR
 
 
-from blist import sorteddict
+from sortedcontainers import SortedDict
 import logging
 
 
@@ -35,7 +35,7 @@ class StreamChangeCache(object):
     def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache={}):
         self._max_size = int(max_size * CACHE_SIZE_FACTOR)
         self._entity_to_key = {}
-        self._cache = sorteddict()
+        self._cache = SortedDict()
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
         self.metrics = register_cache("cache", self.name, self._cache)
@@ -72,7 +72,7 @@ class StreamChangeCache(object):
 
         if stream_pos >= self._earliest_known_stream_pos:
             keys = self._cache.keys()
-            i = keys.bisect_right(stream_pos)
+            i = self._cache.bisect_right(stream_pos)
 
             result = set(
                 self._cache[k] for k in keys[i:]
@@ -93,7 +93,7 @@ class StreamChangeCache(object):
         if stream_pos >= self._earliest_known_stream_pos:
             self.metrics.inc_hits()
             keys = self._cache.keys()
-            i = keys.bisect_right(stream_pos)
+            i = self._cache.bisect_right(stream_pos)
 
             return i < len(keys)
         else:
