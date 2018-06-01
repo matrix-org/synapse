@@ -774,7 +774,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         txn.execute(sql, args)
 
-        rows = [_EventDictReturn(row[0], row[1], row[2], row[3]) for row in txn]
+        rows = [_EventDictReturn(*row) for row in txn]
 
         # If we are paginating topologically and we haven't hit the limit on
         # number of events then we need to fetch events from the previous or
@@ -824,7 +824,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 break
 
             txn.execute(sql, args)
-            new_rows = [_EventDictReturn(row[0], row[1], row[2], row[3]) for row in txn]
+            new_rows = [_EventDictReturn(*row) for row in txn]
 
             if not new_rows:
                 break
