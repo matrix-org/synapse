@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from collections import namedtuple
 
+from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.events import EventsWorkerStore
 from synapse.util.async import Linearizer
 from synapse.util.caches import intern_string
@@ -54,6 +55,9 @@ ProfileInfo = namedtuple(
 
 
 _MEMBERSHIP_PROFILE_UPDATE_NAME = "room_membership_profile_update"
+_ADD_ROOM_MEMBERSHIPS_ROOM_ID_FORGOTTEN_IDX = \
+    "room_memberships_room_id_forgotten_idx"
+_DROP_ROOM_MEMBERSHIPS_ROOM_ID_IDX = "drop_room_memberships_room_id_idx"
 
 
 class RoomMemberWorkerStore(EventsWorkerStore):
@@ -472,11 +476,21 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
 
-class RoomMemberStore(RoomMemberWorkerStore):
+class RoomMemberStore(RoomMemberWorkerStore, BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
         super(RoomMemberStore, self).__init__(db_conn, hs)
         self.register_background_update_handler(
             _MEMBERSHIP_PROFILE_UPDATE_NAME, self._background_add_membership_profile
+        )
+        self.register_background_index_update(
+            _ADD_ROOM_MEMBERSHIPS_ROOM_ID_FORGOTTEN_IDX,
+            index_name="room_memberships_room_id_forgotten",
+            table="room_memberships",
+            columns=["room_id", "forgotten"],
+        )
+        self.register_background_update_handler(
+            _DROP_ROOM_MEMBERSHIPS_ROOM_ID_IDX,
+            self._background_drop_room_memberships_room_id_idx,
         )
 
     def _store_room_members_txn(self, txn, events, backfilled):
@@ -684,6 +698,25 @@ class RoomMemberStore(RoomMemberWorkerStore):
             yield self._end_background_update(_MEMBERSHIP_PROFILE_UPDATE_NAME)
 
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _background_drop_room_memberships_room_id_idx(self, progress, batch_size):
+        """Drops the original (room_id) index on room_memberships, now that
+        we have one which also includes "forgotten".
+        """
+        def drop_old_index(conn):
+            c = conn.cursor()
+
+            sql = "DROP INDEX IF EXISTS room_memberships_room_id"
+            logger.debug("[SQL] %s", sql)
+            c.execute(sql)
+
+        yield self.runWithConnection(
+            drop_old_index,
+        )
+
+        yield self._end_background_update(_DROP_ROOM_MEMBERSHIPS_ROOM_ID_IDX)
+        defer.returnValue(1)
 
 
 class _JoinedHostsCache(object):
