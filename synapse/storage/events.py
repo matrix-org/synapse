@@ -1468,6 +1468,19 @@ class EventsStore(EventsWorkerStore):
                 retcol="COALESCE(MAX(topological_ordering), 0)",
             )
             new_topo += 1
+
+            # We need to now update the database with any new edges between chunks
+            current_prev_ids = set()
+
+            current_forward_ids = self._simple_select_onecol_txn(
+                txn,
+                table="chunk_graph",
+                keyvalues={
+                    "prev_id": chunk_id,
+                },
+                retcol="chunk_id",
+            )
+
         # If there is only one forward chunk and only one sibling event (which
         # would be the given event), then this satisfies condition two.
         elif len(forward_chunk_ids) == 1 and len(sibling_events) == 1:
@@ -1484,6 +1497,18 @@ class EventsStore(EventsWorkerStore):
                 retcol="COALESCE(MIN(topological_ordering), 0)",
             )
             new_topo -= 1
+
+            # We need to now update the database with any new edges between chunks
+            current_prev_ids = self._simple_select_onecol_txn(
+                txn,
+                table="chunk_graph",
+                keyvalues={
+                    "chunk_id": chunk_id,
+                },
+                retcol="prev_id",
+            )
+
+            current_forward_ids = set()
         else:
             chunk_id = self._chunk_id_gen.get_next()
             new_topo = 0
@@ -1492,24 +1517,24 @@ class EventsStore(EventsWorkerStore):
             # ChunkDBOrderedListStore about that.
             table.add_node(chunk_id)
 
-        # We need to now update the database with any new edges between chunks
-        current_prev_ids = self._simple_select_onecol_txn(
-            txn,
-            table="chunk_graph",
-            keyvalues={
-                "chunk_id": chunk_id,
-            },
-            retcol="prev_id",
-        )
+            # We need to now update the database with any new edges between chunks
+            current_prev_ids = self._simple_select_onecol_txn(
+                txn,
+                table="chunk_graph",
+                keyvalues={
+                    "chunk_id": chunk_id,
+                },
+                retcol="prev_id",
+            )
 
-        current_forward_ids = self._simple_select_onecol_txn(
-            txn,
-            table="chunk_graph",
-            keyvalues={
-                "prev_id": chunk_id,
-            },
-            retcol="chunk_id",
-        )
+            current_forward_ids = self._simple_select_onecol_txn(
+                txn,
+                table="chunk_graph",
+                keyvalues={
+                    "prev_id": chunk_id,
+                },
+                retcol="chunk_id",
+            )
 
         prev_chunk_ids = set(
             pid for pid in prev_chunk_ids
@@ -1538,6 +1563,7 @@ class EventsStore(EventsWorkerStore):
                 INSERT INTO chunk_backwards_extremities (chunk_id, event_id)
                 SELECT ?, ? WHERE NOT EXISTS (
                     SELECT event_id FROM events WHERE event_id = ?
+                    AND NOT outlier
                 )
             """, [(chunk_id, eid, eid) for eid in prev_event_ids])
 
