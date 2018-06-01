@@ -25,7 +25,6 @@ NEVER = 1000000
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
-rootLogger.setLevel(logging.DEBUG)
 
 log_format = (
     "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
