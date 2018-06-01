@@ -826,9 +826,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             txn.execute(sql, args)
             new_rows = [_EventDictReturn(*row) for row in txn]
 
-            if not new_rows:
-                break
-
             rows.extend(new_rows)
 
         if limit > 0:
