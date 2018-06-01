@@ -306,7 +306,7 @@ StreamToken.START = StreamToken(
 )
 
 
-class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
+class RoomStreamToken(namedtuple("_StreamToken", ("chunk", "topological", "stream"))):
     """Tokens are positions between events. The token "s1" comes after event 1.
 
             s0    s1
@@ -319,14 +319,18 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     When traversing the live event stream events are ordered by when they
     arrived at the homeserver.
 
-    When traversing historic events the events are ordered by their depth in
-    the event graph "topological_ordering" and then by when they arrived at the
-    homeserver "stream_ordering".
+    When traversing historic events the events are ordered by the topological
+    ordering of the room graph. This is done using event chunks and the
+    `topological_ordering` column.
 
-    Live tokens start with an "s" followed by the "stream_ordering" id of the
-    event it comes after. Historic tokens start with a "t" followed by the
-    "topological_ordering" id of the event it comes after, followed by "-",
-    followed by the "stream_ordering" id of the event it comes after.
+    Live tokens start with an 's' and include the stream_ordering of the event
+    it comes after. Historic tokens start with a 'c' and include the chunk ID,
+    topological ordering and stream ordering of the event it comes after.
+
+    (In previous versions, when chunks were not implemented, the historic tokens
+    started with 't' and included the topological and stream ordering. These
+    tokens can be roughly converted to the new format by looking up the chunk
+    and topological ordering of the event with the same stream ordering).
     """
     __slots__ = []
 
@@ -334,10 +338,19 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     def parse(cls, string):
         try:
             if string[0] == 's':
-                return cls(topological=None, stream=int(string[1:]))
-            if string[0] == 't':
+                return cls(chunk=None, topological=None, stream=int(string[1:]))
+            if string[0] == 't':  # For backwards compat with older tokens.
                 parts = string[1:].split('-', 1)
-                return cls(topological=int(parts[0]), stream=int(parts[1]))
+                return cls(chunk=None, topological=int(parts[0]), stream=int(parts[1]))
+            if string[0] == 'c':
+                # We use '~' as both stream ordering and topological ordering
+                # can be negative, so we can't use '-'
+                parts = string[1:].split('~', 2)
+                return cls(
+                    chunk=int(parts[0]),
+                    topological=int(parts[1]),
+                    stream=int(parts[2]),
+                )
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
@@ -346,12 +359,16 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     def parse_stream_token(cls, string):
         try:
             if string[0] == 's':
-                return cls(topological=None, stream=int(string[1:]))
+                return cls(chunk=None, topological=None, stream=int(string[1:]))
         except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
     def __str__(self):
+        if self.chunk is not None:
+            # We use '~' as both stream ordering and topological ordering
+            # can be negative, so we can't use '-'
+            return "c%d~%d~%d" % (self.chunk, self.topological, self.stream)
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
         else:

@@ -14,7 +14,12 @@
  */
 
 CREATE TABLE IF NOT EXISTS events(
+    -- Defines an ordering used to stream new events to clients. Events
+    -- fetched via backfill have negative values.
     stream_ordering INTEGER PRIMARY KEY,
+    -- Defines a topological ordering of events within a chunk
+    -- (The concept of a chunk was added in later schemas, this used to
+    -- be set to the same value as the `depth` field in an event)
     topological_ordering BIGINT NOT NULL,
     event_id TEXT NOT NULL,
     type TEXT NOT NULL,

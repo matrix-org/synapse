@@ -514,7 +514,8 @@ class RoomEventSource(object):
             events = list(room_events)
             events.extend(e for evs, _ in room_to_events.values() for e in evs)
 
-            events.sort(key=lambda e: e.internal_metadata.order)
+            # Order by the stream ordering of the events.
+            events.sort(key=lambda e: e.internal_metadata.stream_ordering)
 
             if limit:
                 events[:] = events[:limit]
@@ -534,7 +535,7 @@ class RoomEventSource(object):
 
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):
-        events, next_key = yield self.store.paginate_room_events(
+        events, next_key, _ = yield self.store.paginate_room_events(
             room_id=key,
             from_key=config.from_key,
             to_key=config.to_key,
