@@ -828,8 +828,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             rows.extend(new_rows)
 
-        if limit > 0:
-            rows = rows[:limit]
+        # We may have inserted more rows than necessary in the loop above
+        rows = rows[:limit]
 
         if rows:
             chunk = rows[-1].chunk_id
