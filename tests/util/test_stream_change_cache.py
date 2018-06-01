@@ -4,6 +4,9 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 
 class StreamChangeCacheTests(unittest.TestCase):
+    """
+    Tests for StreamChangeCache.
+    """
 
     def test_has_entity_changed(self):
         """
@@ -52,8 +55,9 @@ class StreamChangeCacheTests(unittest.TestCase):
 
         # If we update an existing entity, it keeps the two existing entities
         cache.entity_has_changed("bar@baz.net", 5)
-        self.assertEqual(set(["bar@baz.net", "user@elsewhere.org"]),
-                         set(cache._entity_to_key))
+        self.assertEqual(
+            set(["bar@baz.net", "user@elsewhere.org"]), set(cache._entity_to_key)
+        )
 
     def test_get_all_entities_changed(self):
         """
@@ -67,12 +71,14 @@ class StreamChangeCacheTests(unittest.TestCase):
         cache.entity_has_changed("bar@baz.net", 3)
         cache.entity_has_changed("user@elsewhere.org", 4)
 
-        self.assertEqual(cache.get_all_entities_changed(1),
-                         ["user@foo.com", "bar@baz.net", "user@elsewhere.org"])
-        self.assertEqual(cache.get_all_entities_changed(2),
-                         ["bar@baz.net", "user@elsewhere.org"])
-        self.assertEqual(cache.get_all_entities_changed(3),
-                         ["user@elsewhere.org"])
+        self.assertEqual(
+            cache.get_all_entities_changed(1),
+            ["user@foo.com", "bar@baz.net", "user@elsewhere.org"],
+        )
+        self.assertEqual(
+            cache.get_all_entities_changed(2), ["bar@baz.net", "user@elsewhere.org"]
+        )
+        self.assertEqual(cache.get_all_entities_changed(3), ["user@elsewhere.org"])
         self.assertEqual(cache.get_all_entities_changed(0), None)
 
     def test_has_any_entity_changed(self):
@@ -117,10 +123,10 @@ class StreamChangeCacheTests(unittest.TestCase):
         # Query all the entries, but mid-way through the stream. We should only
         # get the ones after that point.
         self.assertEqual(
-            cache.get_entities_changed(["user@foo.com",
-                                        "bar@baz.net",
-                                        "user@elsewhere.org"], 2),
-            set(["bar@baz.net", "user@elsewhere.org"])
+            cache.get_entities_changed(
+                ["user@foo.com", "bar@baz.net", "user@elsewhere.org"], stream_pos=2
+            ),
+            set(["bar@baz.net", "user@elsewhere.org"]),
         )
 
         # Query all the entries mid-way through the stream, but include one
@@ -128,27 +134,35 @@ class StreamChangeCacheTests(unittest.TestCase):
         # exist, too.
         self.assertEqual(
             cache.get_entities_changed(
-                ["user@foo.com",
-                 "bar@baz.net",
-                 "user@elsewhere.org",
-                 "not@here.website"], 2
+                [
+                    "user@foo.com",
+                    "bar@baz.net",
+                    "user@elsewhere.org",
+                    "not@here.website",
+                ],
+                stream_pos=2,
             ),
-            set(["bar@baz.net", "user@elsewhere.org", "not@here.website"])
+            set(["bar@baz.net", "user@elsewhere.org", "not@here.website"]),
         )
 
         # Query all the entries, but before the first known point. We will get
         # all the entries we queried for, including ones that don't exist.
         self.assertEqual(
             cache.get_entities_changed(
-                ["user@foo.com",
-                 "bar@baz.net",
-                 "user@elsewhere.org",
-                 "not@here.website"], 0
+                [
+                    "user@foo.com",
+                    "bar@baz.net",
+                    "user@elsewhere.org",
+                    "not@here.website",
+                ],
+                stream_pos=0,
             ),
-            set([
-                "user@foo.com",
-                "bar@baz.net",
-                "user@elsewhere.org",
-                "not@here.website"
-            ])
+            set(
+                [
+                    "user@foo.com",
+                    "bar@baz.net",
+                    "user@elsewhere.org",
+                    "not@here.website",
+                ]
+            ),
         )
