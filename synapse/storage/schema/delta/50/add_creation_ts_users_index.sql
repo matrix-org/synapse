@@ -15,6 +15,5 @@
 
 
 
-CREATE INDEX users_creation_ts ON users(creation_ts);
 INSERT into background_updates (update_name, progress_json)
     VALUES ('users_creation_ts', '{}');
