@@ -211,29 +211,17 @@ class MessageHandler(BaseHandler):
             )
 
             if source_config.direction == 'b':
-                # if we're going backwards, we might need to backfill. This
-                # requires that we have a topo token.
-                if room_token.topological:
-                    max_topo = room_token.topological
-                else:
-                    max_topo = yield self.store.get_max_topological_token(
-                        room_id, room_token.stream
-                    )
-
                 if membership == Membership.LEAVE:
                     # If they have left the room then clamp the token to be before
                     # they left the room, to save the effort of loading from the
                     # database.
-                    leave_token = yield self.store.get_topological_token_for_event(
-                        member_event_id
-                    )
-                    leave_token = RoomStreamToken.parse(leave_token)
-                    if leave_token.topological < max_topo:
-                        source_config.from_key = str(leave_token)
 
-                yield self.hs.get_handlers().federation_handler.maybe_backfill(
-                    room_id, max_topo
-                )
+                    leave_token = yield self.store.get_topological_token_for_event(
+                        member_event_id,
+                    )
+                    source_config.from_key = yield self.store.clamp_token_before(
+                        room_id, source_config.from_key, leave_token,
+                    )
 
             events, next_key, extremities = yield self.store.paginate_room_events(
                 room_id=room_id,
@@ -243,6 +231,20 @@ class MessageHandler(BaseHandler):
                 limit=source_config.limit,
                 event_filter=event_filter,
             )
+
+            if source_config.direction == 'b' and extremities:
+                yield self.hs.get_handlers().federation_handler.maybe_backfill(
+                    room_id, extremities
+                )
+
+                events, next_key, extremities = yield self.store.paginate_room_events(
+                    room_id=room_id,
+                    from_key=source_config.from_key,
+                    to_key=source_config.to_key,
+                    direction=source_config.direction,
+                    limit=source_config.limit,
+                    event_filter=event_filter,
+                )
 
             next_token = pagin_config.from_token.copy_and_replace(
                 "room_key", next_key
