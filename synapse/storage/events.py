@@ -1878,7 +1878,13 @@ class EventsStore(EventsWorkerStore):
 
         def reindex_chunks_txn(txn):
             txn.execute("""
-                SELECT stream_ordering, room_id, event_id FROM events
+                SELECT stream_ordering, room_id, event_id,
+                (
+                    SELECT COALESCE(array_agg(prev_event_id), ARRAY[]::TEXT[])
+                    FROM event_edges AS eg
+                    WHERE NOT is_state AND eg.event_id = e.event_id
+                ) AS prev_events
+                FROM events AS e
                 WHERE stream_ordering < ? AND outlier = ? AND chunk_id IS NULL
                 ORDER BY stream_ordering DESC
                 LIMIT ?
@@ -1887,17 +1893,7 @@ class EventsStore(EventsWorkerStore):
             rows = txn.fetchall()
 
             stream_ordering = up_to_stream_id
-            for stream_ordering, room_id, event_id in rows:
-                prev_events = self._simple_select_onecol_txn(
-                    txn,
-                    table="event_edges",
-                    keyvalues={
-                        "event_id": event_id,
-                        "is_state": False,
-                    },
-                    retcol="prev_event_id",
-                )
-
+            for stream_ordering, room_id, event_id, prev_events in rows:
                 chunk_id, topo = self._compute_chunk_id_txn(
                     txn, room_id, event_id, prev_events,
                 )
