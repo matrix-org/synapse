@@ -93,7 +93,7 @@ class ChunkDBOrderedListStore(OrderedListStore):
     def __init__(self,
                  txn, room_id, clock,
                  rebalance_max_denominator=100,
-                 max_denominator=10000):
+                 max_denominator=100000):
         self.txn = txn
         self.room_id = room_id
         self.clock = clock
@@ -507,3 +507,49 @@ def stern_brocot_single(min_frac, max_frac):
             return f
         else:
             a, b, c, d = a, b, a + c, b + d
+
+
+def stern_brocot_range_depth(min_frac, max_denom):
+    assert 0 < min_frac
+
+    states = stern_brocot_single(min_frac)
+
+    while len(states):
+        a, b, c, d = states.pop()
+
+        if b + d > max_denom:
+            continue
+
+        f = (a + c) / float(b + d)
+        if f < min_frac:
+            states.append((a + c, b + d, c, d))
+
+        elif min_frac <= f:
+            states.append((a + c, b + d, c, d))
+            states.append((a, b, a + c, b + d))
+
+            yield Fraction(a + c, b + d)
+        else:
+            states.append((a, b, a + c, b + d))
+
+
+
+def stern_brocot_single(min_frac):
+    assert 0 <= min_frac
+
+    states = []
+
+    a, b, c, d = 0, 1, 1, 0
+
+    states.append((a, b, c, d))
+
+    while True:
+        f = Fraction(a + c, b + d)
+        if f < min_frac:
+            a, b, c, d = a + c, b + d, c, d
+        elif f == min_frac:
+            return states
+        else:
+            a, b, c, d = a, b, a + c, b + d
+
+        states.append((a, b, c, d))
