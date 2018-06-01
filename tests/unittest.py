@@ -19,10 +19,6 @@ from twisted.logger import Logger, LogLevel
 
 import logging
 
-# logging doesn't have a "don't log anything at all EVARRRR setting,
-# but since the highest value is 50, 1000000 should do ;)
-NEVER = 1000000
-
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
 
