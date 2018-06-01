@@ -439,6 +439,10 @@ def run(hs):
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
         stats["total_nonbridged_users"] = total_nonbridged_users
 
+        daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
+        for name, count in daily_user_type_results.iteritems():
+            stats["daily_user_type_" + name] = count
+
         room_count = yield hs.get_datastore().get_room_count()
         stats["total_room_count"] = room_count
 
