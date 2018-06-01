@@ -284,80 +284,47 @@ class BackgroundUpdateStore(SQLBaseStore):
             psql_only: true to only create this index on psql databases (useful
                 for virtual sqlite tables)
         """
-
-        def create_index_psql(conn):
-            conn.rollback()
-            # postgres insists on autocommit for the index
-            conn.set_session(autocommit=True)
-
-            try:
-                c = conn.cursor()
-
-                # If a previous attempt to create the index was interrupted,
-                # we may already have a half-built index. Let's just drop it
-                # before trying to create it again.
-
-                sql = "DROP INDEX IF EXISTS %s" % (index_name,)
-                logger.debug("[SQL] %s", sql)
-                c.execute(sql)
-
-                sql = (
-                    "CREATE %(unique)s INDEX CONCURRENTLY %(name)s"
-                    " ON %(table)s"
-                    " (%(columns)s) %(where_clause)s"
-                ) % {
-                    "unique": "UNIQUE" if unique else "",
-                    "name": index_name,
-                    "table": table,
-                    "columns": ", ".join(columns),
-                    "where_clause": "WHERE " + where_clause if where_clause else ""
-                }
-                logger.debug("[SQL] %s", sql)
-                c.execute(sql)
-            finally:
-                conn.set_session(autocommit=False)
-
-        def create_index_sqlite(conn):
-            # Sqlite doesn't support concurrent creation of indexes.
-            #
-            # We don't use partial indices on SQLite as it wasn't introduced
-            # until 3.8, and wheezy and CentOS 7 have 3.7
-            #
-            # We assume that sqlite doesn't give us invalid indices; however
-            # we may still end up with the index existing but the
-            # background_updates not having been recorded if synapse got shut
-            # down at the wrong moment - hance we use IF NOT EXISTS. (SQLite
-            # has supported CREATE TABLE|INDEX IF NOT EXISTS since 3.3.0.)
-            sql = (
-                "CREATE %(unique)s INDEX IF NOT EXISTS %(name)s ON %(table)s"
-                " (%(columns)s)"
-            ) % {
-                "unique": "UNIQUE" if unique else "",
-                "name": index_name,
-                "table": table,
-                "columns": ", ".join(columns),
-            }
-
-            c = conn.cursor()
-            logger.debug("[SQL] %s", sql)
-            c.execute(sql)
-
-        if isinstance(self.database_engine, engines.PostgresEngine):
-            runner = create_index_psql
-        elif psql_only:
-            runner = None
-        else:
-            runner = create_index_sqlite
-
         @defer.inlineCallbacks
         def updater(progress, batch_size):
-            if runner is not None:
-                logger.info("Adding index %s to %s", index_name, table)
-                yield self.runWithConnection(runner)
+            yield self.create_index_concurrently(
+                index_name, table, columns, where_clause, unique, psql_only,
+            )
             yield self._end_background_update(update_name)
             defer.returnValue(1)
 
         self.register_background_update_handler(update_name, updater)
+
+    def create_index_concurrently(
+            self,
+            index_name,
+            table, columns, where_clause=None,
+            unique=False,
+            psql_only=False,
+    ):
+        """Create an index concurrently on a table
+
+        Args:
+            index_name (str): name of index to add
+            table (str): table to add index to
+            columns (list[str]): columns/expressions to include in index
+            where_clause (str|None): optional "WHERE" clause, to create partial
+                index. Only supported on postgres.
+            unique (bool): true to make a UNIQUE index
+            psql_only: true to only create this index on psql databases (useful
+                for virtual sqlite tables)
+        """
+        if isinstance(self.database_engine, engines.PostgresEngine):
+            runner = create_index_psql
+        elif psql_only:
+            return None
+        else:
+            runner = create_index_sqlite
+
+        logger.info("Adding index %s to %s", index_name, table)
+
+        return self.runWithConnection(
+            runner, index_name, table, columns, where_clause, unique,
+        )
 
     def start_background_update(self, update_name, progress):
         """Starts a background update running.
@@ -412,3 +379,66 @@ class BackgroundUpdateStore(SQLBaseStore):
             keyvalues={"update_name": update_name},
             updatevalues={"progress_json": progress_json},
         )
+
+
+def create_index_psql(
+    conn, index_name, table, columns, where_clause=None, unique=False,
+):
+    conn.rollback()
+    # postgres insists on autocommit for the index
+    conn.set_session(autocommit=True)
+
+    try:
+        c = conn.cursor()
+
+        # If a previous attempt to create the index was interrupted,
+        # we may already have a half-built index. Let's just drop it
+        # before trying to create it again.
+
+        sql = "DROP INDEX IF EXISTS %s" % (index_name,)
+        logger.debug("[SQL] %s", sql)
+        c.execute(sql)
+
+        sql = (
+            "CREATE %(unique)s INDEX CONCURRENTLY %(name)s"
+            " ON %(table)s"
+            " (%(columns)s) %(where_clause)s"
+        ) % {
+            "unique": "UNIQUE" if unique else "",
+            "name": index_name,
+            "table": table,
+            "columns": ", ".join(columns),
+            "where_clause": "WHERE " + where_clause if where_clause else ""
+        }
+        logger.debug("[SQL] %s", sql)
+        c.execute(sql)
+    finally:
+        conn.set_session(autocommit=False)
+
+
+def create_index_sqlite(
+    conn, index_name, table, columns, where_clause=None, unique=False,
+):
+    # Sqlite doesn't support concurrent creation of indexes.
+    #
+    # We don't use partial indices on SQLite as it wasn't introduced
+    # until 3.8, and wheezy and CentOS 7 have 3.7
+    #
+    # We assume that sqlite doesn't give us invalid indices; however
+    # we may still end up with the index existing but the
+    # background_updates not having been recorded if synapse got shut
+    # down at the wrong moment - hance we use IF NOT EXISTS. (SQLite
+    # has supported CREATE TABLE|INDEX IF NOT EXISTS since 3.3.0.)
+    sql = (
+        "CREATE %(unique)s INDEX IF NOT EXISTS %(name)s ON %(table)s"
+        " (%(columns)s)"
+    ) % {
+        "unique": "UNIQUE" if unique else "",
+        "name": index_name,
+        "table": table,
+        "columns": ", ".join(columns),
+    }
+
+    c = conn.cursor()
+    logger.debug("[SQL] %s", sql)
+    c.execute(sql)
