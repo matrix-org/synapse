@@ -15,7 +15,7 @@
 
 from synapse.util.logcontext import PreserveLoggingContext
 
-from twisted.internet import defer, reactor, task
+from twisted.internet import defer, task
 
 import time
 import logging
@@ -38,9 +38,14 @@ class Clock(object):
     TODO(paul): Also move the sleep() functionality into it
     """
 
+    def __init__(self, reactor=None):
+        if not reactor:
+            from twisted.internet import reactor
+        self._reactor = reactor
+
     def time(self):
         """Returns the current system time in seconds since epoch."""
-        return time.time()
+        return self._reactor.seconds()
 
     def time_msec(self):
         """Returns the current system time in miliseconds since epoch."""
@@ -56,6 +61,7 @@ class Clock(object):
             msec(float): How long to wait between calls in milliseconds.
         """
         call = task.LoopingCall(f)
+        call.clock = self._reactor
         call.start(msec / 1000.0, now=False)
         return call
 
@@ -73,7 +79,7 @@ class Clock(object):
                 callback(*args, **kwargs)
 
         with PreserveLoggingContext():
-            return reactor.callLater(delay, wrapped_callback, *args, **kwargs)
+            return self._reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
     def cancel_call_later(self, timer, ignore_errs=False):
         try:
