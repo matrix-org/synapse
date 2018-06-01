@@ -17,8 +17,7 @@ import math
 import logging
 
 from collections import deque
-from gmpy2 import mpq as Fraction
-from fractions import Fraction as FractionPy
+from fractions import Fraction
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
@@ -401,7 +400,8 @@ class ChunkDBOrderedListStore(OrderedListStore):
                     SELECT chunk_id, next_chunk_id, ?, ?, ?, ?, ?
                     FROM chunk_linearized WHERE chunk_id = ?
                 UNION ALL
-                    SELECT n.chunk_id, n.next_chunk_id, n, c, d, ((n + b) / d) * c - a, ((n + b) / d) * d - b
+                    SELECT n.chunk_id, n.next_chunk_id, n,
+                    c, d, ((n + b) / d) * c - a, ((n + b) / d) * d - b
                     FROM chunks AS c
                     INNER JOIN chunk_linearized AS l ON l.chunk_id = c.chunk_id
                     INNER JOIN chunk_linearized AS n ON n.chunk_id = l.next_chunk_id
@@ -485,52 +485,6 @@ def stern_brocot_single(min_frac, max_frac):
             a, b, c, d = a, b, a + c, b + d
 
 
-def stern_brocot_range_depth(min_frac, max_denom):
-    assert 0 < min_frac
-
-    states = stern_brocot_singless(min_frac)
-
-    while len(states):
-        a, b, c, d = states.pop()
-
-        if b + d > max_denom:
-            continue
-
-        f = (a + c) / float(b + d)
-        if f < min_frac:
-            states.append((a + c, b + d, c, d))
-
-        elif min_frac <= f:
-            states.append((a + c, b + d, c, d))
-            states.append((a, b, a + c, b + d))
-
-            yield Fraction(a + c, b + d)
-        else:
-            states.append((a, b, a + c, b + d))
-
-
-
-def stern_brocot_state(min_frac, target_d):
-    assert 0 <= min_frac
-
-    states = []
-
-    a, b, c, d = 0, 1, 1, 0
-
-    while True:
-        f = Fraction(a + c, b + d)
-
-        if b + d >= target_d:
-            return a + c, b + d, c, d
-
-        if f < min_frac:
-            a, b, c, d = a + c, b + d, c, d
-        elif f == min_frac:
-            return a + c, b + d, c, d
-        else:
-            a, b, c, d = a, b, a + c, b + d
-
-
 def find_farey_terms(min_frac, max_denom):
     states = deque([(0, 1, 1, 0)])
 
@@ -544,12 +498,12 @@ def find_farey_terms(min_frac, max_denom):
         if min_frac < left:
             if b >= max_denom or d >= max_denom:
                 return a, b, c, d
-            if b + d  >= max_denom:
+            if b + d >= max_denom:
                 return a + c, b + d, c, d
 
             states.append((a, b, a + c, b + d))
         elif min_frac < mid:
-            if b + d  >= max_denom:
+            if b + d >= max_denom:
                 return a + c, b + d, c, d
 
             states.append((a, b, a + c, b + d))
