@@ -543,7 +543,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             stream = row.stream_ordering
 
             internal = event.internal_metadata
-            if topo_order and chunk:
+            if topo_order:
                 internal.before = str(RoomStreamToken(chunk, topo, stream - 1))
                 internal.after = str(RoomStreamToken(chunk, topo, stream))
                 internal.order = (
