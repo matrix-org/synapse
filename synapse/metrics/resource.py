@@ -13,4 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from prometheus_client.twisted import MetricsResource
+
 METRICS_PREFIX = "/_synapse/metrics"
+
+__all__ = ["MetricsResource", "METRICS_PREFIX"]

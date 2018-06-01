@@ -39,7 +39,8 @@ HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 class RegistryProxy(object):
 
-    def collect(self):
+    @staticmethod
+    def collect():
         for metric in REGISTRY.collect():
             if not metric.name.startswith("__"):
                 yield metric

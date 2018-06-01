@@ -569,7 +569,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                     return results
 
                 return logcontext.make_deferred_yieldable(defer.gatherResults(
-                    cached_defers.values(),
+                    list(cached_defers.values()),
                     consumeErrors=True,
                 ).addCallback(update_results_dict).addErrback(
                     unwrapFirstError

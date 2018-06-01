@@ -197,7 +197,7 @@ class FederationRemoteSendQueue(object):
 
         # We only want to send presence for our own users, so lets always just
         # filter here just in case.
-        local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
+        local_states = list(filter(lambda s: self.is_mine_id(s.user_id), states))
 
         self.presence_map.update({state.user_id: state for state in local_states})
         self.presence_changed[pos] = [state.user_id for state in local_states]
