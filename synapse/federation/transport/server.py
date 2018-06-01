@@ -16,8 +16,6 @@
 
 from twisted.internet import defer
 
-from six import PY3
-
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.api.errors import Codes, SynapseError, FederationDeniedError
 from synapse.http.server import JsonResource
@@ -115,11 +113,7 @@ class Authenticator(object):
                 origin = strip_quotes(param_dict[b"origin"])
                 key = strip_quotes(param_dict[b"key"])
                 sig = strip_quotes(param_dict[b"sig"])
-                if PY3:
-                    return (origin.decode('ascii'), key.decode('ascii'),
-                            sig.decode('ascii'))
-                else:
-                    return (origin, key, sig)
+                return (origin.decode('ascii'), key.decode('ascii'), sig.decode('ascii'))
             except Exception:
                 raise AuthenticationError(
                     400, "Malformed Authorization header", Codes.UNAUTHORIZED
