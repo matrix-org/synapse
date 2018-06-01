@@ -14,21 +14,30 @@
 # limitations under the License.
 import twisted
 from twisted.trial import unittest
+from synapse.util.logcontext import LoggingContextFilter
+from twisted.logger import Logger, LogLevel
 
 import logging
 
-# logging doesn't have a "don't log anything at all EVARRRR setting,
-# but since the highest value is 50, 1000000 should do ;)
-NEVER = 1000000
+# Set up putting Synapse's logs into Trial's.
+rootLogger = logging.getLogger()
 
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter(
-    "%(levelname)s:%(name)s:%(message)s  [%(pathname)s:%(lineno)d]"
-))
-logging.getLogger().addHandler(handler)
-logging.getLogger().setLevel(NEVER)
-logging.getLogger("synapse.storage.SQL").setLevel(NEVER)
-logging.getLogger("synapse.storage.txn").setLevel(NEVER)
+log_format = (
+    "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
+    " - %(message)s"
+)
+
+class ToTwistedHandler(logging.Handler):
+    tx_log = Logger()
+    def emit(self, record):
+        log_entry = self.format(record)
+        self.tx_log.emit(LogLevel.levelWithName(record.levelname.lower()), log_entry)
+
+handler = ToTwistedHandler()
+formatter = logging.Formatter(log_format)
+handler.setFormatter(formatter)
+handler.addFilter(LoggingContextFilter(request=""))
+rootLogger.addHandler(handler)
 
 
 def around(target):
@@ -61,7 +70,7 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel", getattr(self, "loglevel", NEVER))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.ERROR))
 
         @around(self)
         def setUp(orig):
