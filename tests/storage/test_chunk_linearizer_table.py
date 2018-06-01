@@ -44,7 +44,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 5, 100,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             table.add_node("A")
@@ -71,7 +73,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 5, 100,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             nodes = [(i, "node_%d" % (i,)) for i in xrange(1, 1000)]
@@ -116,7 +120,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 5, 1000,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 1000,
             )
 
             table.add_node("a")
@@ -152,7 +158,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 5, 100,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             table.add_node("a")
@@ -193,7 +201,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 5, 100,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             table.add_node("A")
@@ -216,7 +226,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 5, 100,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             table.add_node("A")
