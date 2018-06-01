@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.api.errors import NotFoundError
+
 from ._base import SQLBaseStore
 from .util.id_generators import StreamIdGenerator
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList, cached
@@ -340,32 +340,26 @@ class ReceiptsStore(ReceiptsWorkerStore):
             allow_none=True
         )
 
-        if not res:
-            raise NotFoundError(
-                "Cannot set read receipt on unknown event %s" % (
-                    event_id,
-                ),
-            )
-
-        stream_ordering = int(res["stream_ordering"])
+        stream_ordering = int(res["stream_ordering"]) if res else None
 
         # We don't want to clobber receipts for more recent events, so we
         # have to compare orderings of existing receipts
-        sql = (
-            "SELECT stream_ordering, event_id FROM events"
-            " INNER JOIN receipts_linearized as r USING (event_id, room_id)"
-            " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
-        )
-        txn.execute(sql, (room_id, receipt_type, user_id))
+        if stream_ordering is not None:
+            sql = (
+                "SELECT stream_ordering, event_id FROM events"
+                " INNER JOIN receipts_linearized as r USING (event_id, room_id)"
+                " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
+            )
+            txn.execute(sql, (room_id, receipt_type, user_id))
 
-        for so, eid in txn:
-            if int(so) >= stream_ordering:
-                logger.debug(
-                    "Ignoring new receipt for %s in favour of existing "
-                    "one for later event %s",
-                    event_id, eid,
-                )
-                return False
+            for so, eid in txn:
+                if int(so) >= stream_ordering:
+                    logger.debug(
+                        "Ignoring new receipt for %s in favour of existing "
+                        "one for later event %s",
+                        event_id, eid,
+                    )
+                    return False
 
         txn.call_after(
             self.get_receipts_for_room.invalidate, (room_id, receipt_type)
@@ -413,7 +407,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             }
         )
 
-        if receipt_type == "m.read":
+        if receipt_type == "m.read" and stream_ordering is not None:
             self._remove_old_push_actions_before_txn(
                 txn,
                 room_id=room_id,
