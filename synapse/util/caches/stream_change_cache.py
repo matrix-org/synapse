@@ -32,6 +32,7 @@ class StreamChangeCache(object):
     entities that may have changed since that position. If position key is too
     old then the cache will simply return all given entities.
     """
+
     def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache=None):
         self._max_size = int(max_size * CACHE_SIZE_FACTOR)
         self._entity_to_key = {}
@@ -76,9 +77,11 @@ class StreamChangeCache(object):
         if stream_pos >= self._earliest_known_stream_pos:
             not_known_entities = set(entities) - set(self._entity_to_key)
 
-            result = set(
-                self._cache.values()[self._cache.bisect_right(stream_pos):]
-            ).intersection(entities).union(not_known_entities)
+            result = (
+                set(self._cache.values()[self._cache.bisect_right(stream_pos) :])
+                .intersection(entities)
+                .union(not_known_entities)
+            )
 
             self.metrics.inc_hits()
         else:
@@ -110,7 +113,7 @@ class StreamChangeCache(object):
         assert type(stream_pos) is int
 
         if stream_pos >= self._earliest_known_stream_pos:
-            return self._cache.values()[self._cache.bisect_right(stream_pos):]
+            return self._cache.values()[self._cache.bisect_right(stream_pos) :]
         else:
             return None
 
@@ -130,7 +133,9 @@ class StreamChangeCache(object):
 
             while len(self._cache) > self._max_size + 1:
                 k, r = self._cache.popitem(0)
-                self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
+                self._earliest_known_stream_pos = max(
+                    k, self._earliest_known_stream_pos
+                )
                 self._entity_to_key.pop(r, None)
 
     def get_max_pos_of_last_change(self, entity):
