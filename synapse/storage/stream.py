@@ -543,20 +543,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             stream = row.stream_ordering
 
             internal = event.internal_metadata
+
+            internal.stream_ordering = stream
+
             if topo_order:
                 internal.before = str(RoomStreamToken(chunk, topo, stream - 1))
                 internal.after = str(RoomStreamToken(chunk, topo, stream))
-                internal.order = (
-                    int(chunk) if chunk else 0,
-                    int(topo) if topo else 0,
-                    int(stream),
-                )
             else:
                 internal.before = str(RoomStreamToken(None, None, stream - 1))
                 internal.after = str(RoomStreamToken(None, None, stream))
-                internal.order = (
-                    0, 0, int(stream),
-                )
 
     @defer.inlineCallbacks
     def get_events_around(self, room_id, event_id, before_limit, after_limit):
