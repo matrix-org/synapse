@@ -35,7 +35,7 @@ from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
-from synapse.metrics.resource import METRICS_PREFIX
+from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
     check_requirements
 from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
@@ -60,8 +60,6 @@ from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
-
-from prometheus_client.twisted import MetricsResource
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -232,7 +230,7 @@ class SynapseHomeServer(HomeServer):
             resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
 
         if name == "metrics" and self.get_config().enable_metrics:
-            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy())
+            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
@@ -265,6 +263,13 @@ class SynapseHomeServer(HomeServer):
                     reactor.addSystemEventTrigger(
                         "before", "shutdown", server_listener.stopListening,
                     )
+            elif listener["type"] == "metrics":
+                if not self.get_config().enable_metrics:
+                    logger.warn(("Metrics listener configured, but "
+                                 "collect_metrics is not enabled!"))
+                else:
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -433,6 +438,10 @@ def run(hs):
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
         stats["total_nonbridged_users"] = total_nonbridged_users
+
+        daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
+        for name, count in daily_user_type_results.iteritems():
+            stats["daily_user_type_" + name] = count
 
         room_count = yield hs.get_datastore().get_room_count()
         stats["total_room_count"] = room_count

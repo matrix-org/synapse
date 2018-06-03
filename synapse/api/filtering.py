@@ -417,7 +417,7 @@ class Filter(object):
         return room_ids
 
     def filter(self, events):
-        return filter(self.check, events)
+        return list(filter(self.check, events))
 
     def limit(self):
         return self.filter_json.get("limit", 10)

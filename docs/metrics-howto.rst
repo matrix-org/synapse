@@ -1,25 +1,47 @@
 How to monitor Synapse metrics using Prometheus
 ===============================================
 
-1. Install prometheus:
+1. Install Prometheus:
 
    Follow instructions at http://prometheus.io/docs/introduction/install/
 
-2. Enable synapse metrics:
+2. Enable Synapse metrics:
 
-   Simply setting a (local) port number will enable it. Pick a port.
-   prometheus itself defaults to 9090, so starting just above that for
-   locally monitored services seems reasonable. E.g. 9092:
+   There are two methods of enabling metrics in Synapse.
 
-   Add to homeserver.yaml::
+   The first serves the metrics as a part of the usual web server and can be
+   enabled by adding the "metrics" resource to the existing listener as such::
 
-     metrics_port: 9092
+     resources:
+       - names:
+         - client
+         - metrics
 
-   Also ensure that ``enable_metrics`` is set to ``True``.
+   This provides a simple way of adding metrics to your Synapse installation,
+   and serves under ``/_synapse/metrics``. If you do not wish your metrics be
+   publicly exposed, you will need to either filter it out at your load
+   balancer, or use the second method.
 
-   Restart synapse.
+   The second method runs the metrics server on a different port, in a
+   different thread to Synapse. This can make it more resilient to heavy load
+   meaning metrics cannot be retrieved, and can be exposed to just internal
+   networks easier. The served metrics are available over HTTP only, and will
+   be available at ``/``.
 
-3. Add a prometheus target for synapse.
+   Add a new listener to homeserver.yaml::
+
+     listeners:
+       - type: metrics
+         port: 9000
+         bind_addresses:
+           - '0.0.0.0'
+
+   For both options, you will need to ensure that ``enable_metrics`` is set to
+   ``True``.
+
+   Restart Synapse.
+
+3. Add a Prometheus target for Synapse.
 
    It needs to set the ``metrics_path`` to a non-default value (under ``scrape_configs``)::
 
@@ -31,7 +53,40 @@ How to monitor Synapse metrics using Prometheus
    If your prometheus is older than 1.5.2, you will need to replace
    ``static_configs`` in the above with ``target_groups``.
 
-   Restart prometheus.
+   Restart Prometheus.
+
+
+Removal of deprecated metrics & time based counters becoming histograms in 0.31.0
+---------------------------------------------------------------------------------
+
+The duplicated metrics deprecated in Synapse 0.27.0 have been removed.
+
+All time duration-based metrics have been changed to be seconds. This affects:
+
+================================
+msec -> sec metrics
+================================
+python_gc_time
+python_twisted_reactor_tick_time
+synapse_storage_query_time
+synapse_storage_schedule_time
+synapse_storage_transaction_time
+================================
+
+Several metrics have been changed to be histograms, which sort entries into
+buckets and allow better analysis. The following metrics are now histograms:
+
+=========================================
+Altered metrics
+=========================================
+python_gc_time
+python_twisted_reactor_pending_calls
+python_twisted_reactor_tick_time
+synapse_http_server_response_time_seconds
+synapse_storage_query_time
+synapse_storage_schedule_time
+synapse_storage_transaction_time
+=========================================
 
 
 Block and response metrics renamed for 0.27.0

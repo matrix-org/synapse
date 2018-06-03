@@ -453,6 +453,10 @@ class SyncHandler(object):
         Returns:
             A Deferred map from ((type, state_key)->Event)
         """
+        # FIXME this claims to get the state at a stream position, but
+        # get_recent_events_for_room operates by topo ordering. This therefore
+        # does not reliably give you the state at the given stream position.
+        # (https://github.com/matrix-org/synapse/issues/3305)
         last_events, _ = yield self.store.get_recent_events_for_room(
             room_id, end_token=stream_position.room_key, limit=1,
         )
@@ -608,11 +612,11 @@ class SyncHandler(object):
 
         state = {}
         if state_ids:
-            state = yield self.store.get_events(state_ids.values())
+            state = yield self.store.get_events(list(state_ids.values()))
 
         defer.returnValue({
             (e.type, e.state_key): e
-            for e in sync_config.filter_collection.filter_room_state(state.values())
+            for e in sync_config.filter_collection.filter_room_state(list(state.values()))
         })
 
     @defer.inlineCallbacks
@@ -961,7 +965,7 @@ class SyncHandler(object):
             presence.extend(states)
 
             # Deduplicate the presence entries so that there's at most one per user
-            presence = {p.user_id: p for p in presence}.values()
+            presence = list({p.user_id: p for p in presence}.values())
 
         presence = sync_config.filter_collection.filter_presence(
             presence
@@ -1113,7 +1117,13 @@ class SyncHandler(object):
 
         Returns:
             Deferred(tuple): Returns a tuple of the form:
-            `([RoomSyncResultBuilder], [InvitedSyncResult], newly_joined_rooms)`
+            `(room_entries, invited_rooms, newly_joined_rooms, newly_left_rooms)`
+
+            where:
+                room_entries is a list [RoomSyncResultBuilder]
+                invited_rooms is a list [InvitedSyncResult]
+                newly_joined rooms is a list[str] of room ids
+                newly_left_rooms is a list[str] of room ids
         """
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token

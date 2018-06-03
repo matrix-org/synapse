@@ -104,7 +104,7 @@ class HttpTransactionCache(object):
 
     def _cleanup(self):
         now = self.clock.time_msec()
-        for key in self.transactions.keys():
+        for key in list(self.transactions):
             ts = self.transactions[key][1]
             if now > (ts + CLEANUP_PERIOD_MS):  # after cleanup period
                 del self.transactions[key]
