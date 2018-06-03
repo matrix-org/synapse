@@ -515,6 +515,9 @@ class SyncHandler(object):
                 if not types:
                     # an optimisation to stop needlessly trying to calculate
                     # member_state_ids
+                    #
+                    # XXX: i can't remember what this trying to do. why would
+                    # types ever be []? --matthew
                     lazy_load_members = False
 
                 types.append((None, None))  # don't just filter to room members
@@ -568,6 +571,10 @@ class SyncHandler(object):
                 )
 
                 if lazy_load_members:
+                    # TODO: filter out redundant members based on their event_ids
+                    # (not mxids) at this point. In practice, limited syncs are
+                    # relatively rare so it's not a total disaster to send redundant
+                    # members down at this point.
                     member_state_ids = {
                         t: state_at_timeline_start[t]
                         for t in state_at_timeline_start if t[0] == EventTypes.Member
