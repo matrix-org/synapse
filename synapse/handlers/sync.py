@@ -19,6 +19,8 @@ from synapse.util.async import concurrently_execute
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure, measure_func
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.caches.lrucache import LruCache
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.visibility import filter_events_for_client
 from synapse.types import RoomStreamToken
@@ -32,6 +34,14 @@ import itertools
 from six import itervalues, iteritems
 
 logger = logging.getLogger(__name__)
+
+# Store the cache that tracks which lazy-loaded members have been sent to a given
+# client for no more than 30 minutes.
+LAZY_LOADED_MEMBERS_CACHE_MAX_AGE = 30 * 60 * 1000
+
+# Remember the last 100 members we sent to a client for the purposes of
+# avoiding redundantly sending the same lazy-loaded members to the client
+LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE = 100
 
 
 SyncConfig = collections.namedtuple("SyncConfig", [
@@ -181,6 +191,12 @@ class SyncHandler(object):
         self.clock = hs.get_clock()
         self.response_cache = ResponseCache(hs, "sync")
         self.state = hs.get_state_handler()
+
+        # ExpiringCache((User, Device)) -> LruCache(member mxid string)
+        self.lazy_loaded_members_cache = ExpiringCache(
+            "lazy_loaded_members_cache", self.clock,
+            max_len=0, expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE
+        )
 
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
                                full_state=False):
@@ -599,9 +615,31 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    # TODO: filter out redundant members based on their mxids (not their
+                    # we can filter out redundant members based on their mxids (not their
                     # event_ids) at this point. We know we can do it based on mxid as this
                     # is an non-gappy incremental sync.
+
+                    cache_key = (sync_config.user, sync_config.device)
+                    cache = self.lazy_loaded_members_cache.get(cache_key)
+                    if cache is None:
+                        cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_AGE)
+                        self.lazy_loaded_members_cache[cache_key] = cache
+
+                    # if it's a new sync sequence, then assume the client has had
+                    # amnesia and doesn't want any recent lazy-loaded members
+                    # de-duplicated.
+                    if since_token is None:
+                        cache.clear()
+                    else:
+                        # only send members which aren't in our LruCache (either because
+                        # they're new to this client or have been pushed out of the cache)
+                        types = [
+                            t for t in types if not cache.get(t[1])
+                        ]
+
+                    # add any types we are about to send into our LruCache
+                    for t in types:
+                        cache.put(t[1], True)
 
                     # strip off the (None, None) and filter to just room members
                     types = types[:-1]
