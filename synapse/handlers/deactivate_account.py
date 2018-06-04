@@ -76,7 +76,7 @@ class DeactivateAccountHandler(BaseHandler):
                 user_id, threepid['medium'], threepid['address'],
             )
 
-        # first delete any devices belonging to the user, which will also
+        # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
         yield self._device_handler.delete_all_devices_for_user(user_id)
         # then delete any remaining access tokens which weren't associated with
