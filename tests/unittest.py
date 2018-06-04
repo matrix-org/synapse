@@ -12,26 +12,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import logging
+
 import twisted
+import twisted.logger
 from twisted.trial import unittest
 from synapse.util.logcontext import LoggingContextFilter
 from twisted.logger import Logger, LogLevel
 
-import logging
+from synapse.util.logcontext import LoggingContextFilter
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
 
 log_format = (
-    "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s"
-    " - %(message)s"
+    "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s"
 )
 
+
 class ToTwistedHandler(logging.Handler):
-    tx_log = Logger()
+    tx_log = twisted.logger.Logger()
+
     def emit(self, record):
         log_entry = self.format(record)
-        self.tx_log.emit(LogLevel.levelWithName(record.levelname.lower()), log_entry)
+        log_level = record.levelname.lower().replace('warning', 'warn')
+        self.tx_log.emit(twisted.logger.LogLevel.levelWithName(log_level), log_entry)
 
 handler = ToTwistedHandler()
 formatter = logging.Formatter(log_format)

@@ -75,7 +75,7 @@ class FederationRemoteSendQueue(object):
         # changes. ARGH.
         def register(name, queue):
             LaterGauge("synapse_federation_send_queue_%s_size" % (queue_name,),
-                       "", lambda: len(queue))
+                       "", [], lambda: len(queue))
 
         for queue_name in [
             "presence_map", "presence_changed", "keyed_edu", "keyed_edu_changed",
