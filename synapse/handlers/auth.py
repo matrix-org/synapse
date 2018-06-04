@@ -826,7 +826,7 @@ class AuthHandler(BaseHandler):
             address = address.lower()
 
         identity_handler = self.hs.get_handlers().identity_handler
-        identity_handler.unbind_threepid(
+        yield identity_handler.unbind_threepid(
             user_id,
             {
                 'medium': medium,
