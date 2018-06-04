@@ -147,7 +147,8 @@ class GCCounts(object):
         yield cm
 
 
-REGISTRY.register(GCCounts())
+if not running_on_pypy:
+    REGISTRY.register(GCCounts())
 
 #
 # Twisted reactor metrics

@@ -203,7 +203,7 @@ class Linearizer(object):
         self.key_to_defer[key] = new_defer
 
         if current_defer:
-            logger.info(
+            logger.debug(
                 "Waiting to acquire linearizer lock %r for key %r", self.name, key
             )
             try:
@@ -212,8 +212,7 @@ class Linearizer(object):
             except Exception:
                 logger.exception("Unexpected exception in Linearizer")
 
-            logger.info("Acquired linearizer lock %r for key %r", self.name,
-                        key)
+            logger.debug("Acquired linearizer lock %r for key %r", self.name, key)
 
             # if the code holding the lock completes synchronously, then it
             # will recursively run the next claimant on the list. That can
@@ -230,15 +229,15 @@ class Linearizer(object):
             yield run_on_reactor()
 
         else:
-            logger.info("Acquired uncontended linearizer lock %r for key %r",
-                        self.name, key)
+            logger.debug("Acquired uncontended linearizer lock %r for key %r",
+                         self.name, key)
 
         @contextmanager
         def _ctx_manager():
             try:
                 yield
             finally:
-                logger.info("Releasing linearizer lock %r for key %r", self.name, key)
+                logger.debug("Releasing linearizer lock %r for key %r", self.name, key)
                 with PreserveLoggingContext():
                     new_defer.callback(None)
                 current_d = self.key_to_defer.get(key)
@@ -283,12 +282,12 @@ class Limiter(object):
             new_defer = defer.Deferred()
             entry[1].append(new_defer)
 
-            logger.info("Waiting to acquire limiter lock for key %r", key)
+            logger.debug("Waiting to acquire limiter lock for key %r", key)
             with PreserveLoggingContext():
                 yield new_defer
-            logger.info("Acquired limiter lock for key %r", key)
+            logger.debug("Acquired limiter lock for key %r", key)
         else:
-            logger.info("Acquired uncontended limiter lock for key %r", key)
+            logger.debug("Acquired uncontended limiter lock for key %r", key)
 
         entry[0] += 1
 
@@ -297,7 +296,7 @@ class Limiter(object):
             try:
                 yield
             finally:
-                logger.info("Releasing limiter lock for key %r", key)
+                logger.debug("Releasing limiter lock for key %r", key)
 
                 # We've finished executing so check if there are any things
                 # blocked waiting to execute and start one of them
