@@ -142,7 +142,15 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def unbind_threepid(self, mxid, threepid):
-        yield run_on_reactor()
+        """
+        Removes a binding from an identity server
+        Args:
+            mxid (str): Matrix user ID of binding to be removed
+            threepid (dict): Dict with medium & address of binding to be removed
+
+        Returns:
+            Deferred
+        """
         logger.debug("unbinding threepid %r from %s", threepid, mxid)
         if not self.trusted_id_servers:
             logger.warn("Can't unbind threepid: no trusted ID servers set in config")
