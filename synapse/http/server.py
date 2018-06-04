@@ -38,9 +38,11 @@ from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
 
+from six import PY3
+from six.moves import urllib
+
 import collections
 import logging
-import urllib
 import simplejson
 
 logger = logging.getLogger(__name__)
@@ -296,11 +298,16 @@ class JsonResource(HttpServer, resource.Resource):
         # Now trigger the callback. If it returns a response, we send it
         # here. If it throws an exception, that is handled by the wrapper
         # installed by @request_handler.
-
-        kwargs = intern_dict({
-            name: urllib.unquote(value) if value else value
-            for name, value in group_dict.items()
-        })
+        if PY3:
+            kwargs = intern_dict({
+                name: urllib.parse.unquote(value.decode('utf8')) if value else value
+                for name, value in group_dict.items()
+            })
+        else:
+            kwargs = intern_dict({
+                name: urllib.parse.unquote(value).decode('utf8') if value else value
+                for name, value in group_dict.items()
+            })
 
         callback_return = yield callback(request, **kwargs)
         if callback_return is not None:
@@ -328,7 +335,7 @@ class JsonResource(HttpServer, resource.Resource):
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method.decode('ascii'), []):
-            m = path_entry.pattern.match(request.path.decode('utf8'))
+            m = path_entry.pattern.match(request.path)
             if m:
                 # We found a match!
                 return path_entry.callback, m.groupdict()
