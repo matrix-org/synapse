@@ -1,3 +1,49 @@
+Changes in synapse v0.31.0-rc1 (2018-06-04)
+==========================================
+
+Most notable change is to switch to python prometheus library to improve system stats reporting
+
+Features:
+
+* Switch to the Python Prometheus library (PR #3256, #3274)
+* Let users leave the server notice room after joining (PR #3287)
+
+
+Changes:
+
+* daily user type phone home stats (PR #3264)
+* Use iter* methods for _filter_events_for_server (PR #3267)
+* Docs on consent bits (PR #3268)
+* Remove users from user directory on deactivate (PR #3277)
+* Avoid sending consent notice to guest users (PR #3288)
+* disable CPUMetrics if no /proc/self/stat (PR #3299)
+* Add local and loopback IPv6 addresses to url_preview_ip_range_blacklist (PR #3312) Thanks to @thegcat!
+* Consistently use six's iteritems and wrap lazy keys/values in list() if they're not meant to be lazy (PR #3307)
+* Add private IPv6 addresses to example config for url preview blacklist (PR #3317) Thanks to @thegcat!
+* Reduce stuck read-receipts: ignore depth when updating (PR #3318)
+* Put python's logs into Trial when running unit tests (PR #3319)
+
+Changes, python 3 migration:
+
+* Replace some more comparisons with six (PR #3243) Thanks to @NotAFile!
+* replace some iteritems with six (PR #3244) Thanks to @NotAFile!
+* Add batch_iter to utils (PR #3245) Thanks to @NotAFile!
+* use repr, not str (PR #3246) Thanks to @NotAFile!
+* Misc Python3 fixes (PR #3247) Thanks to @NotAFile!
+* Py3 storage/_base.py (PR #3278) Thanks to @NotAFile!
+* more six iteritems (PR #3279) Thanks to @NotAFile!
+* More Misc. py3 fixes (PR #3280) Thanks to @NotAFile!
+* remaining isintance fixes (PR #3281) Thanks to @NotAFile!
+* py3-ize state.py (PR #3283) Thanks to @NotAFile!
+* extend tox testing for py3 to avoid regressions (PR #3302) Thanks to @krombel!
+* use memoryview in py3 (PR #3303) Thanks to @NotAFile!
+
+Bugs:
+
+* Fix federation backfill bugs (PR #3261)
+* federation: fix LaterGauge usage (PR #3328) Thanks to @intelfx!
+
+
 Changes in synapse v0.30.0 (2018-05-24)
 ==========================================
 
