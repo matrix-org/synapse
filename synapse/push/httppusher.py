@@ -329,7 +329,12 @@ class HttpPusher(object):
         if not notification_dict:
             defer.returnValue([])
         try:
-            resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
+            url = self.url.replace(
+                "https://matrix.org/_matrix/push/v1/notify",
+                "http://http-priv.matrix.org/_matrix/push/v1/notify",
+            )
+
+            resp = yield self.http_client.post_json_get_json(url, notification_dict)
         except Exception:
             logger.warn(
                 "Failed to push event %s to %s",
