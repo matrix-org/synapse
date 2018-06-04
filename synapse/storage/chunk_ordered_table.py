@@ -393,7 +393,8 @@ class ChunkDBOrderedListStore(OrderedListStore):
         old_order = self._get_order(node_id)
 
         a, b, c, d = find_farey_terms(old_order, self.rebalance_md)
-        n = max(b, d)
+        assert old_order < Fraction(a, b)
+        assert c + d > self.rebalance_md
 
         with_sql = """
             WITH RECURSIVE chunks (chunk_id, next, n, a, b, c, d) AS (
@@ -427,46 +428,24 @@ class ChunkDBOrderedListStore(OrderedListStore):
             """
 
         self.txn.execute(sql, (
-            n, a, b, c, d, node_id
+            self.rebalance_md, a, b, c, d, node_id
         ))
 
         rebalance_counter.inc()
 
 
-def stern_brocot_range(n, min_frac, max_frac):
-    assert 0 < min_frac < max_frac
-
-    states = deque([(0, 1, 1, 0)])
-
-    result = []
-
-    while len(result) < n:
-        a, b, c, d = states.popleft()
-
-        f = (a + c) / float(b + d)
-        if f < min_frac:
-            states.append((a + c, b + d, c, d))
-
-        elif min_frac <= f <= max_frac:
-            states.append((a, b, a + c, b + d))
-            states.append((a + c, b + d, c, d))
-
-            result.append(Fraction(a + c, b + d))
-        else:
-            states.append((a, b, a + c, b + d))
-
-    return result
-
-
 def stern_brocot_single(min_frac, max_frac):
     assert 0 <= min_frac < max_frac
 
-    denom = (
+    # If the determinant is 1 then the fraction with smallest numerator and
+    # denominator in the range is the mediant, so we don't have to use the
+    # stern brocot tree to search for it.
+    determinant = (
         min_frac.denominator * max_frac.numerator
         - min_frac.numerator * max_frac.denominator
     )
 
-    if denom == 1:
+    if determinant == 1:
         return Fraction(
             min_frac.numerator + max_frac.numerator,
             min_frac.denominator + max_frac.denominator,
@@ -486,29 +465,21 @@ def stern_brocot_single(min_frac, max_frac):
 
 
 def find_farey_terms(min_frac, max_denom):
-    states = deque([(0, 1, 1, 0)])
+    a, b, c, d =  0, 1, 1, 0
 
     while True:
-        a, b, c, d = states.popleft()
+        cur_frac = Fraction(a + c, b + d)
 
-        left = a / float(b)
-        mid = (a + c) / float(b + d)
-        right = c / float(d) if d > 0 else None
+        if b + d > max_denom:
+            break
 
-        if min_frac < left:
-            if b >= max_denom or d >= max_denom:
-                return a, b, c, d
-            if b + d >= max_denom:
-                return a + c, b + d, c, d
+        if cur_frac <= min_frac:
+            a, b, c, d = a + c, b + d, c, d
+        elif min_frac < cur_frac:
+            a, b, c, d = a, b, a + c, b + d
 
-            states.append((a, b, a + c, b + d))
-        elif min_frac < mid:
-            if b + d >= max_denom:
-                return a + c, b + d, c, d
+    if Fraction(a, b) <= min_frac:
+        k = int((max_denom + b) / d)
+        a, b, c, d = c, d, (k*c-a), (k*d-b)
 
-            states.append((a, b, a + c, b + d))
-            states.append((a + c, b + d, c, d))
-        elif right is None or min_frac < right:
-            states.append((a + c, b + d, c, d))
-        else:
-            states.append((a + c, b + d, c, d))
+    return a, b, c, d
