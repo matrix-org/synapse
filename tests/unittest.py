@@ -12,12 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+
 import twisted
 from twisted.trial import unittest
-from synapse.util.logcontext import LoggingContextFilter
-from twisted.logger import Logger, LogLevel
 
-import logging
+from synapse.util.logcontext import LoggingContextFilter
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
