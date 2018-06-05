@@ -23,7 +23,7 @@ from synapse.api.errors import (
 )
 from synapse.http.client import CaptchaServerHttpClient
 from synapse import types
-from synapse.types import UserID
+from synapse.types import UserID, create_requester, RoomID, RoomAlias
 from synapse.util.async import run_on_reactor, Linearizer
 from synapse.util.threepids import check_3pid_allowed
 from ._base import BaseHandler
@@ -34,6 +34,11 @@ logger = logging.getLogger(__name__)
 class RegistrationHandler(BaseHandler):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         super(RegistrationHandler, self).__init__(hs)
 
         self.auth = hs.get_auth()
@@ -49,6 +54,7 @@ class RegistrationHandler(BaseHandler):
         self._generate_user_id_linearizer = Linearizer(
             name="_generate_user_id_linearizer",
         )
+        self._server_notices_mxid = hs.config.server_notices_mxid
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
@@ -205,10 +211,17 @@ class RegistrationHandler(BaseHandler):
                     token = None
                     attempts += 1
 
+        # auto-join the user to any rooms we're supposed to dump them into
+        fake_requester = create_requester(user_id)
+        for r in self.hs.config.auto_join_rooms:
+            try:
+                yield self._join_user_to_room(fake_requester, r)
+            except Exception as e:
+                logger.error("Failed to join new user to %r: %r", r, e)
+
         # We used to generate default identicons here, but nowadays
         # we want clients to generate their own as part of their branding
         # rather than there being consistent matrix-wide ones, so we don't.
-
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -331,6 +344,14 @@ class RegistrationHandler(BaseHandler):
             yield identity_handler.bind_threepid(c, user_id)
 
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
+        # don't allow people to register the server notices mxid
+        if self._server_notices_mxid is not None:
+            if user_id == self._server_notices_mxid:
+                raise SynapseError(
+                    400, "This user ID is reserved.",
+                    errcode=Codes.EXCLUSIVE
+                )
+
         # valid user IDs must not clash with any user ID namespaces claimed by
         # application services.
         services = self.store.get_app_services()
@@ -483,3 +504,28 @@ class RegistrationHandler(BaseHandler):
         )
 
         defer.returnValue((user_id, access_token))
+
+    @defer.inlineCallbacks
+    def _join_user_to_room(self, requester, room_identifier):
+        room_id = None
+        room_member_handler = self.hs.get_room_member_handler()
+        if RoomID.is_valid(room_identifier):
+            room_id = room_identifier
+        elif RoomAlias.is_valid(room_identifier):
+            room_alias = RoomAlias.from_string(room_identifier)
+            room_id, remote_room_hosts = (
+                yield room_member_handler.lookup_room_alias(room_alias)
+            )
+            room_id = room_id.to_string()
+        else:
+            raise SynapseError(400, "%s was not legal room ID or room alias" % (
+                room_identifier,
+            ))
+
+        yield room_member_handler.update_membership(
+            requester=requester,
+            target=requester.user,
+            room_id=room_id,
+            remote_room_hosts=remote_room_hosts,
+            action="join",
+        )

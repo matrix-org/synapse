@@ -18,6 +18,7 @@ from tests import unittest
 from twisted.internet import defer
 
 from synapse.util.async import Linearizer
+from six.moves import range
 
 
 class LinearizerTestCase(unittest.TestCase):
@@ -58,7 +59,7 @@ class LinearizerTestCase(unittest.TestCase):
                     logcontext.LoggingContext.current_context(), lc)
 
         func(0, sleep=True)
-        for i in xrange(1, 100):
+        for i in range(1, 100):
             func(i)
 
         return func(1000)

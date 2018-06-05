@@ -16,6 +16,8 @@
 from twisted.internet import defer, threads
 from twisted.protocols.basic import FileSender
 
+import six
+
 from ._base import Responder
 
 from synapse.util.file_consumer import BackgroundFileConsumer
@@ -119,7 +121,7 @@ class MediaStorage(object):
                 os.remove(fname)
             except Exception:
                 pass
-            raise t, v, tb
+            six.reraise(t, v, tb)
 
         if not finished_called:
             raise Exception("Finished callback not called")
@@ -253,7 +255,9 @@ class FileResponder(Responder):
         self.open_file = open_file
 
     def write_to_consumer(self, consumer):
-        return FileSender().beginFileTransfer(self.open_file, consumer)
+        return make_deferred_yieldable(
+            FileSender().beginFileTransfer(self.open_file, consumer)
+        )
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.open_file.close()

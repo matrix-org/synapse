@@ -27,7 +27,7 @@ from synapse.types import (
 from synapse.util import unwrapFirstError
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -166,7 +166,8 @@ class InitialSyncHandler(BaseHandler):
                 (messages, token), current_state = yield make_deferred_yieldable(
                     defer.gatherResults(
                         [
-                            preserve_fn(self.store.get_recent_events_for_room)(
+                            run_in_background(
+                                self.store.get_recent_events_for_room,
                                 event.room_id,
                                 limit=limit,
                                 end_token=room_end_token,
@@ -180,8 +181,8 @@ class InitialSyncHandler(BaseHandler):
                     self.store, user_id, messages
                 )
 
-                start_token = now_token.copy_and_replace("room_key", token[0])
-                end_token = now_token.copy_and_replace("room_key", token[1])
+                start_token = now_token.copy_and_replace("room_key", token)
+                end_token = now_token.copy_and_replace("room_key", room_end_token)
                 time_now = self.clock.time_msec()
 
                 d["messages"] = {
@@ -324,8 +325,8 @@ class InitialSyncHandler(BaseHandler):
             self.store, user_id, messages, is_peeking=is_peeking
         )
 
-        start_token = StreamToken.START.copy_and_replace("room_key", token[0])
-        end_token = StreamToken.START.copy_and_replace("room_key", token[1])
+        start_token = StreamToken.START.copy_and_replace("room_key", token)
+        end_token = StreamToken.START.copy_and_replace("room_key", stream_token)
 
         time_now = self.clock.time_msec()
 
@@ -391,9 +392,10 @@ class InitialSyncHandler(BaseHandler):
 
         presence, receipts, (messages, token) = yield defer.gatherResults(
             [
-                preserve_fn(get_presence)(),
-                preserve_fn(get_receipts)(),
-                preserve_fn(self.store.get_recent_events_for_room)(
+                run_in_background(get_presence),
+                run_in_background(get_receipts),
+                run_in_background(
+                    self.store.get_recent_events_for_room,
                     room_id,
                     limit=limit,
                     end_token=now_token.room_key,
@@ -406,8 +408,8 @@ class InitialSyncHandler(BaseHandler):
             self.store, user_id, messages, is_peeking=is_peeking,
         )
 
-        start_token = now_token.copy_and_replace("room_key", token[0])
-        end_token = now_token.copy_and_replace("room_key", token[1])
+        start_token = now_token.copy_and_replace("room_key", token)
+        end_token = now_token
 
         time_now = self.clock.time_msec()
 

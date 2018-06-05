@@ -250,6 +250,9 @@ class ContentRepositoryConfig(Config):
         # - '192.168.0.0/16'
         # - '100.64.0.0/10'
         # - '169.254.0.0/16'
+        # - '::1/128'
+        # - 'fe80::/64'
+        # - 'fc00::/7'
         #
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.

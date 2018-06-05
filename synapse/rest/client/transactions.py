@@ -19,6 +19,7 @@ import logging
 
 from synapse.api.auth import get_access_token_from_request
 from synapse.util.async import ObservableDeferred
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
@@ -80,31 +81,30 @@ class HttpTransactionCache(object):
         Returns:
             Deferred which resolves to a tuple of (response_code, response_dict).
         """
-        try:
-            return self.transactions[txn_key][0].observe()
-        except (KeyError, IndexError):
-            pass  # execute the function instead.
+        if txn_key in self.transactions:
+            observable = self.transactions[txn_key][0]
+        else:
+            # execute the function instead.
+            deferred = run_in_background(fn, *args, **kwargs)
 
-        deferred = fn(*args, **kwargs)
+            observable = ObservableDeferred(deferred)
+            self.transactions[txn_key] = (observable, self.clock.time_msec())
 
-        # if the request fails with a Twisted failure, remove it
-        # from the transaction map. This is done to ensure that we don't
-        # cache transient errors like rate-limiting errors, etc.
-        def remove_from_map(err):
-            self.transactions.pop(txn_key, None)
-            return err
-        deferred.addErrback(remove_from_map)
+            # if the request fails with an exception, remove it
+            # from the transaction map. This is done to ensure that we don't
+            # cache transient errors like rate-limiting errors, etc.
+            def remove_from_map(err):
+                self.transactions.pop(txn_key, None)
+                # we deliberately do not propagate the error any further, as we
+                # expect the observers to have reported it.
 
-        # We don't add any other errbacks to the raw deferred, so we ask
-        # ObservableDeferred to swallow the error. This is fine as the error will
-        # still be reported to the observers.
-        observable = ObservableDeferred(deferred, consumeErrors=True)
-        self.transactions[txn_key] = (observable, self.clock.time_msec())
-        return observable.observe()
+            deferred.addErrback(remove_from_map)
+
+        return make_deferred_yieldable(observable.observe())
 
     def _cleanup(self):
         now = self.clock.time_msec()
-        for key in self.transactions.keys():
+        for key in list(self.transactions):
             ts = self.transactions[key][1]
             if now > (ts + CLEANUP_PERIOD_MS):  # after cleanup period
                 del self.transactions[key]

@@ -28,8 +28,9 @@ from synapse.http.servlet import (
     parse_json_object_from_request, parse_string, parse_integer
 )
 
+from six.moves.urllib import parse as urlparse
+
 import logging
-import urllib
 import simplejson as json
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomCreateRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self._room_creation_handler = hs.get_room_creation_handler()
 
     def register(self, http_server):
         PATTERNS = "/createRoom"
@@ -63,8 +64,7 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        handler = self.handlers.room_creation_handler
-        info = yield handler.create_room(
+        info = yield self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
@@ -165,15 +165,10 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 content=content,
             )
         else:
-            event, context = yield self.event_creation_hander.create_event(
+            event = yield self.event_creation_hander.create_and_send_nonmember_event(
                 requester,
                 event_dict,
-                token_id=requester.access_token_id,
                 txn_id=txn_id,
-            )
-
-            yield self.event_creation_hander.send_nonmember_event(
-                requester, event, context,
             )
 
         ret = {}
@@ -438,7 +433,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         as_client_event = "raw" not in request.args
         filter_bytes = request.args.get("filter", None)
         if filter_bytes:
-            filter_json = urllib.unquote(filter_bytes[-1]).decode("UTF-8")
+            filter_json = urlparse.unquote(filter_bytes[-1]).decode("UTF-8")
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
@@ -655,7 +650,12 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
             content=event_content,
         )
 
-        defer.returnValue((200, {}))
+        return_value = {}
+
+        if membership_action == "join":
+            return_value["room_id"] = room_id
+
+        defer.returnValue((200, return_value))
 
     def _has_3pid_invite_keys(self, content):
         for key in {"id_server", "medium", "address"}:
@@ -718,8 +718,8 @@ class RoomTypingRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, user_id):
         requester = yield self.auth.get_user_by_req(request)
 
-        room_id = urllib.unquote(room_id)
-        target_user = UserID.from_string(urllib.unquote(user_id))
+        room_id = urlparse.unquote(room_id)
+        target_user = UserID.from_string(urlparse.unquote(user_id))
 
         content = parse_json_object_from_request(request)
 

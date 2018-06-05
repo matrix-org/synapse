@@ -169,7 +169,7 @@ class DomainSpecificString(
         except Exception:
             return False
 
-    __str__ = to_string
+    __repr__ = to_string
 
 
 class UserID(DomainSpecificString):

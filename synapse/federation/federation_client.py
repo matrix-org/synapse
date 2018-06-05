@@ -19,6 +19,8 @@ import itertools
 import logging
 import random
 
+from six.moves import range
+
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
@@ -30,20 +32,17 @@ from synapse.federation.federation_base import (
     FederationBase,
     event_from_pdu_json,
 )
-import synapse.metrics
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.retryutils import NotRetryingDestination
 
+from prometheus_client import Counter
+
 logger = logging.getLogger(__name__)
 
-
-# synapse.federation.federation_client is a silly name
-metrics = synapse.metrics.get_metrics_for("synapse.federation.client")
-
-sent_queries_counter = metrics.register_counter("sent_queries", labels=["type"])
+sent_queries_counter = Counter("synapse_federation_client_sent_queries", "", ["type"])
 
 
 PDU_RETRY_TIME_MS = 1 * 60 * 1000
@@ -106,7 +105,7 @@ class FederationClient(FederationBase):
             a Deferred which will eventually yield a JSON object from the
             response
         """
-        sent_queries_counter.inc(query_type)
+        sent_queries_counter.labels(query_type).inc()
 
         return self.transport_layer.make_query(
             destination, query_type, args, retry_on_dns_fail=retry_on_dns_fail,
@@ -125,7 +124,7 @@ class FederationClient(FederationBase):
             a Deferred which will eventually yield a JSON object from the
             response
         """
-        sent_queries_counter.inc("client_device_keys")
+        sent_queries_counter.labels("client_device_keys").inc()
         return self.transport_layer.query_client_keys(
             destination, content, timeout
         )
@@ -135,7 +134,7 @@ class FederationClient(FederationBase):
         """Query the device keys for a list of user ids hosted on a remote
         server.
         """
-        sent_queries_counter.inc("user_devices")
+        sent_queries_counter.labels("user_devices").inc()
         return self.transport_layer.query_user_devices(
             destination, user_id, timeout
         )
@@ -152,7 +151,7 @@ class FederationClient(FederationBase):
             a Deferred which will eventually yield a JSON object from the
             response
         """
-        sent_queries_counter.inc("client_one_time_keys")
+        sent_queries_counter.labels("client_one_time_keys").inc()
         return self.transport_layer.claim_client_keys(
             destination, content, timeout
         )
@@ -392,9 +391,9 @@ class FederationClient(FederationBase):
         """
         if return_local:
             seen_events = yield self.store.get_events(event_ids, allow_rejected=True)
-            signed_events = seen_events.values()
+            signed_events = list(seen_events.values())
         else:
-            seen_events = yield self.store.have_events(event_ids)
+            seen_events = yield self.store.have_seen_events(event_ids)
             signed_events = []
 
         failed_to_fetch = set()
@@ -413,11 +412,12 @@ class FederationClient(FederationBase):
 
         batch_size = 20
         missing_events = list(missing_events)
-        for i in xrange(0, len(missing_events), batch_size):
+        for i in range(0, len(missing_events), batch_size):
             batch = set(missing_events[i:i + batch_size])
 
             deferreds = [
-                preserve_fn(self.get_pdu)(
+                run_in_background(
+                    self.get_pdu,
                     destinations=random_server_list(),
                     event_id=e_id,
                 )
@@ -589,7 +589,7 @@ class FederationClient(FederationBase):
                 }
 
                 valid_pdus = yield self._check_sigs_and_hash_and_fetch(
-                    destination, pdus.values(),
+                    destination, list(pdus.values()),
                     outlier=True,
                 )
 

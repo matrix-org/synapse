@@ -59,20 +59,30 @@ class KeyConfig(Config):
 
         self.expire_access_token = config.get("expire_access_token", False)
 
+        # a secret which is used to calculate HMACs for form values, to stop
+        # falsification of values
+        self.form_secret = config.get("form_secret", None)
+
     def default_config(self, config_dir_path, server_name, is_generating_file=False,
                        **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if is_generating_file:
             macaroon_secret_key = random_string_with_symbols(50)
+            form_secret = '"%s"' % random_string_with_symbols(50)
         else:
             macaroon_secret_key = None
+            form_secret = 'null'
 
         return """\
         macaroon_secret_key: "%(macaroon_secret_key)s"
 
         # Used to enable access token expiration.
         expire_access_token: False
+
+        # a secret which is used to calculate HMACs for form values, to stop
+        # falsification of values
+        form_secret: %(form_secret)s
 
         ## Signing Keys ##
 

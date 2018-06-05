@@ -26,23 +26,25 @@ from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.util.metrics import measure_func
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 import synapse.metrics
+from synapse.metrics import LaterGauge
+from synapse.metrics import (
+    sent_edus_counter,
+    sent_transactions_counter,
+    events_processed_counter,
+)
+
+from prometheus_client import Counter
+
+from six import itervalues
 
 import logging
 
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
-
-client_metrics = synapse.metrics.get_metrics_for("synapse.federation.client")
-sent_pdus_destination_dist = client_metrics.register_distribution(
-    "sent_pdu_destinations"
+sent_pdus_destination_dist = Counter(
+    "synapse_federation_transaction_queue_sent_pdu_destinations", ""
 )
-sent_edus_counter = client_metrics.register_counter("sent_edus")
-
-sent_transactions_counter = client_metrics.register_counter("sent_transactions")
-
-events_processed_counter = client_metrics.register_counter("events_processed")
 
 
 class TransactionQueue(object):
@@ -69,8 +71,10 @@ class TransactionQueue(object):
         # done
         self.pending_transactions = {}
 
-        metrics.register_callback(
-            "pending_destinations",
+        LaterGauge(
+            "synapse_federation_transaction_queue_pending_destinations",
+            "",
+            [],
             lambda: len(self.pending_transactions),
         )
 
@@ -94,12 +98,16 @@ class TransactionQueue(object):
         # Map of destination -> (edu_type, key) -> Edu
         self.pending_edus_keyed_by_dest = edus_keyed = {}
 
-        metrics.register_callback(
-            "pending_pdus",
+        LaterGauge(
+            "synapse_federation_transaction_queue_pending_pdus",
+            "",
+            [],
             lambda: sum(map(len, pdus.values())),
         )
-        metrics.register_callback(
-            "pending_edus",
+        LaterGauge(
+            "synapse_federation_transaction_queue_pending_edus",
+            "",
+            [],
             lambda: (
                 sum(map(len, edus.values()))
                 + sum(map(len, presence.values()))
@@ -169,7 +177,7 @@ class TransactionQueue(object):
             while True:
                 last_token = yield self.store.get_federation_out_pos("events")
                 next_token, events = yield self.store.get_all_new_events_stream(
-                    last_token, self._last_poked_id, limit=20,
+                    last_token, self._last_poked_id, limit=100,
                 )
 
                 logger.debug("Handling %s -> %s", last_token, next_token)
@@ -177,24 +185,33 @@ class TransactionQueue(object):
                 if not events and next_token >= self._last_poked_id:
                     break
 
-                for event in events:
+                @defer.inlineCallbacks
+                def handle_event(event):
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.event_id)
                     if not is_mine and send_on_behalf_of is None:
-                        continue
+                        return
 
-                    # Get the state from before the event.
-                    # We need to make sure that this is the state from before
-                    # the event and not from after it.
-                    # Otherwise if the last member on a server in a room is
-                    # banned then it won't receive the event because it won't
-                    # be in the room after the ban.
-                    destinations = yield self.state.get_current_hosts_in_room(
-                        event.room_id, latest_event_ids=[
-                            prev_id for prev_id, _ in event.prev_events
-                        ],
-                    )
+                    try:
+                        # Get the state from before the event.
+                        # We need to make sure that this is the state from before
+                        # the event and not from after it.
+                        # Otherwise if the last member on a server in a room is
+                        # banned then it won't receive the event because it won't
+                        # be in the room after the ban.
+                        destinations = yield self.state.get_current_hosts_in_room(
+                            event.room_id, latest_event_ids=[
+                                prev_id for prev_id, _ in event.prev_events
+                            ],
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to calculate hosts in room for event: %s",
+                            event.event_id,
+                        )
+                        return
+
                     destinations = set(destinations)
 
                     if send_on_behalf_of is not None:
@@ -207,11 +224,40 @@ class TransactionQueue(object):
 
                     self._send_pdu(event, destinations)
 
-                events_processed_counter.inc_by(len(events))
+                @defer.inlineCallbacks
+                def handle_room_events(events):
+                    for event in events:
+                        yield handle_event(event)
+
+                events_by_room = {}
+                for event in events:
+                    events_by_room.setdefault(event.room_id, []).append(event)
+
+                yield logcontext.make_deferred_yieldable(defer.gatherResults(
+                    [
+                        logcontext.run_in_background(handle_room_events, evs)
+                        for evs in itervalues(events_by_room)
+                    ],
+                    consumeErrors=True
+                ))
 
                 yield self.store.update_federation_out_pos(
                     "events", next_token
                 )
+
+                if events:
+                    now = self.clock.time_msec()
+                    ts = yield self.store.get_received_ts(events[-1].event_id)
+
+                    synapse.metrics.event_processing_lag.labels(
+                        "federation_sender").set(now - ts)
+                    synapse.metrics.event_processing_last_ts.labels(
+                        "federation_sender").set(ts)
+
+                events_processed_counter.inc(len(events))
+
+                synapse.metrics.event_processing_positions.labels(
+                    "federation_sender").set(next_token)
 
         finally:
             self._is_processing = False
@@ -234,7 +280,7 @@ class TransactionQueue(object):
         if not destinations:
             return
 
-        sent_pdus_destination_dist.inc_by(len(destinations))
+        sent_pdus_destination_dist.inc(len(destinations))
 
         for destination in destinations:
             self.pending_pdus_by_dest.setdefault(destination, []).append(
@@ -281,7 +327,9 @@ class TransactionQueue(object):
                 if not states_map:
                     break
 
-                yield self._process_presence_inner(states_map.values())
+                yield self._process_presence_inner(list(states_map.values()))
+        except Exception:
+            logger.exception("Error sending presence states to servers")
         finally:
             self._processing_pending_presence = False
 

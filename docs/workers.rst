@@ -55,7 +55,12 @@ synapse process.)
 
 You then create a set of configs for the various worker processes.  These
 should be worker configuration files, and should be stored in a dedicated
-subdirectory, to allow synctl to manipulate them.
+subdirectory, to allow synctl to manipulate them. An additional configuration
+for the master synapse process will need to be created because the process will
+not be started automatically. That configuration should look like this::
+
+    worker_app: synapse.app.homeserver
+    daemonize: true
 
 Each worker configuration file inherits the configuration of the main homeserver
 configuration file.  You can then override configuration specific to that worker,
@@ -230,9 +235,11 @@ file. For example::
 ``synapse.app.event_creator``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Handles non-state event creation. It can handle REST endpoints matching::
+Handles some event creation. It can handle REST endpoints matching::
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
+    ^/_matrix/client/(api/v1|r0|unstable)/join/
 
 It will create events locally and then send them on to the main synapse
 instance to be persisted and handled.

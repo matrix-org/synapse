@@ -2,6 +2,9 @@ from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.transactions import CLEANUP_PERIOD_MS
 from twisted.internet import defer
 from mock import Mock, call
+
+from synapse.util import async
+from synapse.util.logcontext import LoggingContext
 from tests import unittest
 from tests.utils import MockClock
 
@@ -38,6 +41,78 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
             self.assertEqual(res, self.mock_http_response)
         # expect only a single call to do the work
         cb.assert_called_once_with("some_arg", keyword="arg", changing_args=0)
+
+    @defer.inlineCallbacks
+    def test_logcontexts_with_async_result(self):
+        @defer.inlineCallbacks
+        def cb():
+            yield async.sleep(0)
+            defer.returnValue("yay")
+
+        @defer.inlineCallbacks
+        def test():
+            with LoggingContext("c") as c1:
+                res = yield self.cache.fetch_or_execute(self.mock_key, cb)
+                self.assertIs(LoggingContext.current_context(), c1)
+                self.assertEqual(res, "yay")
+
+        # run the test twice in parallel
+        d = defer.gatherResults([test(), test()])
+        self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+        yield d
+        self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+
+    @defer.inlineCallbacks
+    def test_does_not_cache_exceptions(self):
+        """Checks that, if the callback throws an exception, it is called again
+        for the next request.
+        """
+        called = [False]
+
+        def cb():
+            if called[0]:
+                # return a valid result the second time
+                return defer.succeed(self.mock_http_response)
+
+            called[0] = True
+            raise Exception("boo")
+
+        with LoggingContext("test") as test_context:
+            try:
+                yield self.cache.fetch_or_execute(self.mock_key, cb)
+            except Exception as e:
+                self.assertEqual(e.message, "boo")
+            self.assertIs(LoggingContext.current_context(), test_context)
+
+            res = yield self.cache.fetch_or_execute(self.mock_key, cb)
+            self.assertEqual(res, self.mock_http_response)
+            self.assertIs(LoggingContext.current_context(), test_context)
+
+    @defer.inlineCallbacks
+    def test_does_not_cache_failures(self):
+        """Checks that, if the callback returns a failure, it is called again
+        for the next request.
+        """
+        called = [False]
+
+        def cb():
+            if called[0]:
+                # return a valid result the second time
+                return defer.succeed(self.mock_http_response)
+
+            called[0] = True
+            return defer.fail(Exception("boo"))
+
+        with LoggingContext("test") as test_context:
+            try:
+                yield self.cache.fetch_or_execute(self.mock_key, cb)
+            except Exception as e:
+                self.assertEqual(e.message, "boo")
+            self.assertIs(LoggingContext.current_context(), test_context)
+
+            res = yield self.cache.fetch_or_execute(self.mock_key, cb)
+            self.assertEqual(res, self.mock_http_response)
+            self.assertIs(LoggingContext.current_context(), test_context)
 
     @defer.inlineCallbacks
     def test_cleans_up(self):

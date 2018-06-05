@@ -157,8 +157,9 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
-above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
+There is an offical synapse image available at https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with the docker-compose file available at `contrib/docker`. Further information on this including configuration options is available in `contrib/docker/README.md`.
+
+Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a Dockerfile to automate a synapse server in a single Docker image, at https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
@@ -613,6 +614,9 @@ should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
 
     $ dig -t srv _matrix._tcp.example.com
     _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
+
+Note that the server hostname cannot be an alias (CNAME record): it has to point
+directly to the server hosting the synapse instance.
 
 You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
 its user-ids, by setting ``server_name``::

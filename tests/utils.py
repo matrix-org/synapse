@@ -15,8 +15,7 @@
 
 import hashlib
 from inspect import getcallargs
-import urllib
-import urlparse
+from six.moves.urllib import parse as urlparse
 
 from mock import Mock, patch
 from twisted.internet import defer, reactor
@@ -59,7 +58,13 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.email_enable_notifs = False
         config.block_non_admin_invites = False
         config.federation_domain_whitelist = None
+        config.federation_rc_reject_limit = 10
+        config.federation_rc_sleep_limit = 10
+        config.federation_rc_concurrent = 10
+        config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False
+        config.user_consent_server_notice_content = None
+        config.block_events_without_consent_error = None
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
@@ -212,7 +217,7 @@ class MockHttpResource(HttpServer):
 
         headers = {}
         if federation_auth:
-            headers["Authorization"] = ["X-Matrix origin=test,key=,sig="]
+            headers[b"Authorization"] = ["X-Matrix origin=test,key=,sig="]
         mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
         # return the right path if the event requires it
@@ -234,7 +239,7 @@ class MockHttpResource(HttpServer):
             if matcher:
                 try:
                     args = [
-                        urllib.unquote(u).decode("UTF-8")
+                        urlparse.unquote(u).decode("UTF-8")
                         for u in matcher.groups()
                     ]
 

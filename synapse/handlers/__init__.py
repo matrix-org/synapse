@@ -14,9 +14,7 @@
 # limitations under the License.
 
 from .register import RegistrationHandler
-from .room import (
-    RoomCreationHandler, RoomContextHandler,
-)
+from .room import RoomContextHandler
 from .message import MessageHandler
 from .federation import FederationHandler
 from .directory import DirectoryHandler
@@ -47,7 +45,6 @@ class Handlers(object):
     def __init__(self, hs):
         self.registration_handler = RegistrationHandler(hs)
         self.message_handler = MessageHandler(hs)
-        self.room_creation_handler = RoomCreationHandler(hs)
         self.federation_handler = FederationHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
         self.admin_handler = AdminHandler(hs)

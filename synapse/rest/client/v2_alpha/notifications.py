@@ -88,7 +88,7 @@ class NotificationsServlet(RestServlet):
                     pa["topological_ordering"], pa["stream_ordering"]
                 )
             returned_push_actions.append(returned_pa)
-            next_token = pa["stream_ordering"]
+            next_token = str(pa["stream_ordering"])
 
         defer.returnValue((200, {
             "notifications": returned_push_actions,
