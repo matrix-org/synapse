@@ -15,11 +15,16 @@
 
 from twisted.internet import defer
 
+import itertools
 import random
 import tests.unittest
 import tests.utils
 
-from synapse.storage.chunk_ordered_table import ChunkDBOrderedListStore
+from fractions import Fraction
+
+from synapse.storage.chunk_ordered_table import (
+    ChunkDBOrderedListStore, find_farey_terms, get_fraction_in_range,
+)
 
 
 class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
@@ -42,23 +47,26 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 100,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             table.add_node("A")
             table._insert_after("B", "A")
             table._insert_before("C", "A")
+            table._insert_after("D", "A")
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
-            self.assertEqual(["C", "A", "B"], ordered)
+            self.assertEqual(["C", "A", "D", "B"], ordered)
 
         yield self.store.runInteraction("test", test_txn)
 
@@ -68,7 +76,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 20,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             nodes = [(i, "node_%d" % (i,)) for i in xrange(1, 1000)]
@@ -95,13 +105,13 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
                 already_inserted.sort()
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
             self.assertEqual(expected, ordered)
 
@@ -113,7 +123,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 20,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 1000,
             )
 
             table.add_node("a")
@@ -131,13 +143,13 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
                 expected.append(node_id)
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
             self.assertEqual(expected, ordered)
 
@@ -149,7 +161,9 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
 
         def test_txn(txn):
             table = ChunkDBOrderedListStore(
-                txn, room_id, self.clock, 1, 100,
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
             )
 
             table.add_node("a")
@@ -170,16 +184,119 @@ class ChunkLinearizerStoreTestCase(tests.unittest.TestCase):
                 prev_node = node_id
 
             sql = """
-                SELECT chunk_id FROM chunk_linearized
+                SELECT chunk_id, numerator, denominator FROM chunk_linearized
                 WHERE room_id = ?
-                ORDER BY ordering ASC
             """
             txn.execute(sql, (room_id,))
 
-            ordered = [r for r, in txn]
+            ordered = sorted([(Fraction(n, d), r) for r, n, d in txn])
+            ordered = [c for _, c in ordered]
 
             expected = expected_prefix + list(reversed(expected_suffix))
 
             self.assertEqual(expected, ordered)
 
         yield self.store.runInteraction("test", test_txn)
+
+    @defer.inlineCallbacks
+    def test_get_edges_to(self):
+        room_id = "foo_room4"
+
+        def test_txn(txn):
+            table = ChunkDBOrderedListStore(
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
+            )
+
+            table.add_node("A")
+            table._insert_after("B", "A")
+            table._add_edge_to_graph("A", "B")
+            table._insert_before("C", "A")
+            table._add_edge_to_graph("C", "A")
+
+            nodes = table.get_nodes_with_edges_from("A")
+            self.assertEqual([n for _, n in nodes], ["B"])
+
+            nodes = table.get_nodes_with_edges_to("A")
+            self.assertEqual([n for _, n in nodes], ["C"])
+
+        yield self.store.runInteraction("test", test_txn)
+
+    @defer.inlineCallbacks
+    def test_get_next_and_prev(self):
+        room_id = "foo_room5"
+
+        def test_txn(txn):
+            table = ChunkDBOrderedListStore(
+                txn, room_id, self.clock,
+                self.store.database_engine,
+                5, 100,
+            )
+
+            table.add_node("A")
+            table._insert_after("B", "A")
+            table._insert_before("C", "A")
+
+            self.assertEqual(table.get_next("A"), "B")
+            self.assertEqual(table.get_prev("A"), "C")
+
+        yield self.store.runInteraction("test", test_txn)
+
+    def test_find_farey_terms(self):
+        def _test(min_frac, max_denom):
+            """"Calls `find_farey_terms` with given values and checks they
+            are neighbours in the Farey Sequence.
+            """
+
+            a, b, c, d = find_farey_terms(min_frac, max_denom)
+
+            p = Fraction(a, b)
+            q = Fraction(c, d)
+
+            assert min_frac < p < q
+
+            for x, y in _pairwise(_farey_generator(max_denom)):
+                if min_frac < x < y:
+                    self.assertEqual(x, p)
+                    self.assertEqual(y, q)
+                    break
+
+        _test(Fraction(5, 3), 12)
+        _test(Fraction(1, 3), 12)
+        _test(Fraction(1, 2), 9)
+        _test(Fraction(1, 2), 10)
+        _test(Fraction(1, 2), 15)
+
+    def test_get_fraction_in_range(self):
+        def _test(x, y):
+            assert x < get_fraction_in_range(x, y) < y
+
+        _test(Fraction(1, 2), Fraction(2, 3))
+        _test(Fraction(1, 2), Fraction(3, 2))
+        _test(Fraction(5, 203), Fraction(6, 204))
+
+
+def _farey_generator(n):
+    """Generates Farey sequence of order `n`.
+
+    Note that this doesn't terminate.
+
+    Taken from https://en.wikipedia.org/wiki/Farey_sequence#Next_term
+    """
+
+    a, b, c, d = 0, 1, 1, n
+
+    yield Fraction(a, b)
+
+    while True:
+        k = int((n + b) / d)
+        a, b, c, d = c, d, (k * c - a), (k * d - b)
+        yield Fraction(a, b)
+
+
+def _pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)

@@ -1446,7 +1446,7 @@ class EventsStore(EventsWorkerStore):
             sibling_events.update(pes)
 
         table = ChunkDBOrderedListStore(
-            txn, room_id, self.clock,
+            txn, room_id, self.clock, self.database_engine,
         )
 
         # If there is only one previous chunk (and that isn't None), then this

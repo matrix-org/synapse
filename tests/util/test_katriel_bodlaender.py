@@ -56,3 +56,29 @@ class KatrielBodlaenderTests(unittest.TestCase):
         store.add_edge("node_4", "node_3")
 
         self.assertEqual(list(reversed(nodes)), store.list)
+
+    def test_divergent_graph(self):
+        store = InMemoryOrderedListStore()
+
+        nodes = [
+            "node_1",
+            "node_2",
+            "node_3",
+            "node_4",
+            "node_5",
+            "node_6",
+        ]
+
+        for node in reversed(nodes):
+            store.add_node(node)
+
+        store.add_edge("node_2", "node_3")
+        store.add_edge("node_2", "node_5")
+        store.add_edge("node_1", "node_2")
+        store.add_edge("node_3", "node_4")
+        store.add_edge("node_1", "node_3")
+        store.add_edge("node_4", "node_5")
+        store.add_edge("node_5", "node_6")
+        store.add_edge("node_4", "node_6")
+
+        self.assertEqual(nodes, store.list)
