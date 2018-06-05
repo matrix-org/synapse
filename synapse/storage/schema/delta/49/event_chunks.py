@@ -58,6 +58,10 @@ CREATE TABLE chunk_linearized (
 
 CREATE UNIQUE INDEX chunk_linearized_id ON chunk_linearized (chunk_id);
 CREATE INDEX chunk_linearized_ordering ON chunk_linearized (room_id, ordering);
+
+INSERT into background_updates (update_name, progress_json)
+    VALUES ('event_fields_chunk_id', '{}');
+
 """
 
 
