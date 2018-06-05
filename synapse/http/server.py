@@ -237,7 +237,6 @@ class HttpServer(object):
                 subsequent arguments will be any matched groups from the regex.
                 This should return a tuple of (code, response).
         """
-        pass
 
 
 class JsonResource(HttpServer, resource.Resource):
@@ -280,7 +279,6 @@ class JsonResource(HttpServer, resource.Resource):
         return server.NOT_DONE_YET
 
     @wrap_json_request_handler
-    @defer.inlineCallbacks
     def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
@@ -309,10 +307,16 @@ class JsonResource(HttpServer, resource.Resource):
                 for name, value in group_dict.items()
             })
 
-        callback_return = yield callback(request, **kwargs)
-        if callback_return is not None:
-            code, response = callback_return
-            self._send_response(request, code, response)
+        def _handle_response(ret):
+            if ret is not None:
+                code, response = ret
+                self._send_response(request, code, response)
+
+        d = defer.Deferred()
+        d.addCallback(callback, **kwargs)
+        d.addCallback(_handle_response)
+        d.callback(request)
+        return d
 
     def _get_handler_for_request(self, request):
         """Finds a callback method to handle the given request
