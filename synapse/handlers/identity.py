@@ -149,7 +149,7 @@ class IdentityHandler(BaseHandler):
             threepid (dict): Dict with medium & address of binding to be removed
 
         Returns:
-            Deferred
+            Deferred[bool]: True on success, otherwise False
         """
         logger.debug("unbinding threepid %r from %s", threepid, mxid)
         if not self.trusted_id_servers:
