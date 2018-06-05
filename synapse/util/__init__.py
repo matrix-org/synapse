@@ -17,7 +17,6 @@ from synapse.util.logcontext import PreserveLoggingContext
 
 from twisted.internet import defer, task
 
-import time
 import logging
 
 from itertools import islice
