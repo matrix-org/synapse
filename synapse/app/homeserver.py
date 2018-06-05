@@ -56,7 +56,7 @@ from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 from twisted.application import service
 from twisted.internet import defer, reactor
-from twisted.web.resource import EncodingResourceWrapper
+from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 from twisted.web.util import Redirect
@@ -94,7 +94,10 @@ class SynapseHomeServer(HomeServer):
             handler = handler_cls(config, module_api)
             resources[path] = AdditionalResource(self, handler.handle_request)
 
-        root_resource = RootRedirect(STATIC_PREFIX)
+        if config.redirect_root_to_static:
+            root_resource = RootRedirect(STATIC_PREFIX)
+        else:
+            root_resource = NoResource()
 
         root_resource = create_resource_tree(resources, root_resource)
 

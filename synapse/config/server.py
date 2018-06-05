@@ -26,6 +26,7 @@ class ServerConfig(Config):
     def read_config(self, config):
         self.server_name = config["server_name"]
         self.pid_file = self.abspath(config.get("pid_file"))
+        self.redirect_root_to_static = config.get("redirect_root_to_static", True)
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
@@ -92,8 +93,6 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
-            names = ["client"]
-
             self.listeners.append({
                 "port": bind_port,
                 "bind_addresses": [bind_host],
@@ -101,7 +100,7 @@ class ServerConfig(Config):
                 "type": "http",
                 "resources": [
                     {
-                        "names": names,
+                        "names": ["client"],
                         "compress": gzip_responses,
                     },
                     {
@@ -120,7 +119,7 @@ class ServerConfig(Config):
                     "type": "http",
                     "resources": [
                         {
-                            "names": names,
+                            "names": ["client"],
                             "compress": gzip_responses,
                         },
                         {
@@ -200,6 +199,9 @@ class ServerConfig(Config):
         # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
         #
         # cpu_affinity: 0xFFFFFFFF
+
+        # Whether to redirect the root ressource to the static prefix or not
+        # redirect_root_to_static: True
 
         # The public-facing base URL for the client API (not including _matrix/...)
         # public_baseurl: https://example.com:8448/
