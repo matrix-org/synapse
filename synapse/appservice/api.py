@@ -238,15 +238,15 @@ class ApplicationServiceApi(SimpleHttpClient):
                 args={
                     "access_token": service.hs_token
                 })
-            sent_transactions_counter.label(service.id).inc()
-            sent_events_counter.label(service.id).inc(len(events))
+            sent_transactions_counter.labels(service.id).inc()
+            sent_events_counter.labels(service.id).inc(len(events))
             defer.returnValue(True)
             return
         except CodeMessageException as e:
             logger.warning("push_bulk to %s received %s", uri, e.code)
         except Exception as ex:
             logger.warning("push_bulk to %s threw exception %s", uri, ex)
-        failed_transactions_counter.label(service.id).inc()
+        failed_transactions_counter.labels(service.id).inc()
         defer.returnValue(False)
 
     def _serialize(self, events):
