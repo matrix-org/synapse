@@ -134,7 +134,7 @@ class StreamChangeCache(object):
             while len(self._cache) > self._max_size + 1:
                 k, r = self._cache.popitem(0)
                 self._earliest_known_stream_pos = max(
-                    k, self._earliest_known_stream_pos
+                    k, self._earliest_known_stream_pos,
                 )
                 self._entity_to_key.pop(r, None)
 
