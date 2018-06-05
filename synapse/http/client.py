@@ -19,8 +19,7 @@ from OpenSSL.SSL import VERIFY_NONE
 from synapse.api.errors import (
     CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
 )
-from synapse.http import cancelled_to_request_timed_out_error
-from synapse.http.site import ACCESS_TOKEN_RE
+from synapse.http import cancelled_to_request_timed_out_error, redact_uri
 from synapse.util.async import add_timeout_to_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
@@ -92,10 +91,7 @@ class SimpleHttpClient(object):
         outgoing_requests_counter.labels(method).inc()
 
         # log request but strip `access_token` (AS requests for example include this)
-        logger.info("Sending request %s %s", method, ACCESS_TOKEN_RE.sub(
-            r'\1<redacted>\3',
-            uri
-        ))
+        logger.info("Sending request %s %s", method, redact_uri(uri))
 
         try:
             request_deferred = self.agent.request(
