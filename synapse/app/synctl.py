@@ -171,6 +171,10 @@ def main():
     if cache_factor:
         os.environ["SYNAPSE_CACHE_FACTOR"] = str(cache_factor)
 
+    cache_factors = config.get("synctl_cache_factors", {})
+    for cache_name, factor in cache_factors.iteritems():
+        os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
+
     worker_configfiles = []
     if options.worker:
         start_stop_synapse = False
