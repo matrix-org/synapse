@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.caches import register_cache, CACHE_SIZE_FACTOR
+from synapse.util import caches
 
 
 from sortedcontainers import SortedDict
@@ -34,12 +34,12 @@ class StreamChangeCache(object):
     """
 
     def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache=None):
-        self._max_size = int(max_size * CACHE_SIZE_FACTOR)
+        self._max_size = int(max_size * caches.CACHE_SIZE_FACTOR)
         self._entity_to_key = {}
         self._cache = SortedDict()
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
-        self.metrics = register_cache("cache", self.name, self._cache)
+        self.metrics = caches.register_cache("cache", self.name, self._cache)
 
         if prefilled_cache:
             for entity, stream_pos in prefilled_cache.items():
@@ -131,7 +131,7 @@ class StreamChangeCache(object):
             self._cache[stream_pos] = entity
             self._entity_to_key[entity] = stream_pos
 
-            while len(self._cache) > self._max_size + 1:
+            while len(self._cache) > self._max_size:
                 k, r = self._cache.popitem(0)
                 self._earliest_known_stream_pos = max(
                     k, self._earliest_known_stream_pos,
