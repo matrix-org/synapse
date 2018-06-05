@@ -792,7 +792,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 iterated_chunks = [chunk_id]
 
         table = ChunkDBOrderedListStore(
-            txn, room_id, self.clock,
+            txn, room_id, self.clock, self.database_engine,
         )
 
         if filter_clause:
