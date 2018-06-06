@@ -1,7 +1,10 @@
 Changes in synapse v0.31.0-rc1 (2018-06-04)
 ==========================================
 
-Most notable change is to switch to python prometheus library to improve system stats reporting
+Most notable change is to switch to python prometheus library to improve system
+stats reporting. WARNING this changes a number of prometheus metrics in a
+backwards-incompatible manner. For more details, see
+`docs/metrics-howto.rst <docs/metrics-howto.rst#removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310>`_.
 
 Features:
 
