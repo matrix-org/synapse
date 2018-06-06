@@ -423,7 +423,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_create(self, requester, user_json):
-        yield run_on_reactor()
+        yield run_on_reactor(self.hs.get_clock())
 
         if "localpart" not in user_json:
             raise SynapseError(400, "Expected 'localpart' key.")
