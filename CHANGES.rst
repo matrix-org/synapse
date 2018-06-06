@@ -8,10 +8,10 @@ backwards-incompatible manner. For more details, see
 
 Bug Fixes:
 
- * Fix metric documentation tables (PR #3341)
- * Fix LaterGuage error handling (694968fa81aab4eac81309b1e16f6063103dd57f)
- * Fix replication metrics (b7e7fd2d0edd4d46aaf9d6afc8df14cf3de911f9)
- 
+* Fix metric documentation tables (PR #3341)
+* Fix LaterGuage error handling (694968fa81aab4eac81309b1e16f6063103dd57f)
+* Fix replication metrics (b7e7fd2d0edd4d46aaf9d6afc8df14cf3de911f9)
+
 Changes in synapse v0.31.0-rc1 (2018-06-04)
 ==========================================
 
