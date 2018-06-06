@@ -272,7 +272,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 for typ in types:
                     if typ[1] is None:
                         where_clauses.append("(type = ?)")
-                        where_args.extend(typ[0])
+                        where_args.append(typ[0])
                         wildcard_types = True
                     else:
                         where_clauses.append("(type = ? AND state_key = ?)")
