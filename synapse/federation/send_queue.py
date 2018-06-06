@@ -33,7 +33,7 @@ from .units import Edu
 
 from synapse.storage.presence import UserPresenceState
 from synapse.util.metrics import Measure
-import synapse.metrics
+from synapse.metrics import LaterGauge
 
 from blist import sorteddict
 from collections import namedtuple
@@ -43,9 +43,6 @@ import logging
 from six import itervalues, iteritems
 
 logger = logging.getLogger(__name__)
-
-
-metrics = synapse.metrics.get_metrics_for(__name__)
 
 
 class FederationRemoteSendQueue(object):
@@ -77,10 +74,8 @@ class FederationRemoteSendQueue(object):
         # lambda binds to the queue rather than to the name of the queue which
         # changes. ARGH.
         def register(name, queue):
-            metrics.register_callback(
-                queue_name + "_size",
-                lambda: len(queue),
-            )
+            LaterGauge("synapse_federation_send_queue_%s_size" % (queue_name,),
+                       "", [], lambda: len(queue))
 
         for queue_name in [
             "presence_map", "presence_changed", "keyed_edu", "keyed_edu_changed",
@@ -202,7 +197,7 @@ class FederationRemoteSendQueue(object):
 
         # We only want to send presence for our own users, so lets always just
         # filter here just in case.
-        local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
+        local_states = list(filter(lambda s: self.is_mine_id(s.user_id), states))
 
         self.presence_map.update({state.user_id: state for state in local_states})
         self.presence_changed[pos] = [state.user_id for state in local_states]

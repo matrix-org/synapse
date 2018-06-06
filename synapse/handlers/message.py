@@ -19,6 +19,7 @@ import sys
 
 from canonicaljson import encode_canonical_json
 import six
+from six import string_types, itervalues, iteritems
 from twisted.internet import defer, reactor
 from twisted.internet.defer import succeed
 from twisted.python.failure import Failure
@@ -402,7 +403,7 @@ class MessageHandler(BaseHandler):
                 "avatar_url": profile.avatar_url,
                 "display_name": profile.display_name,
             }
-            for user_id, profile in users_with_profile.iteritems()
+            for user_id, profile in iteritems(users_with_profile)
         })
 
 
@@ -571,6 +572,9 @@ class EventCreationHandler(object):
 
         u = yield self.store.get_user_by_id(user_id)
         assert u is not None
+        if u["appservice_id"] is not None:
+            # users registered by an appservice are exempt
+            return
         if u["consent_version"] == self.config.user_consent_version:
             return
 
@@ -667,7 +671,7 @@ class EventCreationHandler(object):
 
             spam_error = self.spam_checker.check_event_for_spam(event)
             if spam_error:
-                if not isinstance(spam_error, basestring):
+                if not isinstance(spam_error, string_types):
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(
                     403, spam_error, Codes.FORBIDDEN
@@ -881,7 +885,7 @@ class EventCreationHandler(object):
 
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in context.current_state_ids.iteritems()
+                    for k, e_id in iteritems(context.current_state_ids)
                     if k[0] in self.hs.config.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
@@ -895,7 +899,7 @@ class EventCreationHandler(object):
                         "content": e.content,
                         "sender": e.sender,
                     }
-                    for e in state_to_include.itervalues()
+                    for e in itervalues(state_to_include)
                 ]
 
                 invitee = UserID.from_string(event.state_key)

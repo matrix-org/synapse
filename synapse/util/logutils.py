@@ -96,7 +96,7 @@ def time_function(f):
         id = _TIME_FUNC_ID
         _TIME_FUNC_ID += 1
 
-        start = time.clock() * 1000
+        start = time.clock()
 
         try:
             _log_debug_as_f(
@@ -107,10 +107,10 @@ def time_function(f):
 
             r = f(*args, **kwargs)
         finally:
-            end = time.clock() * 1000
+            end = time.clock()
             _log_debug_as_f(
                 f,
-                "[FUNC END] {%s-%d} %f",
+                "[FUNC END] {%s-%d} %.3f sec",
                 (func_name, id, end - start,),
             )
 

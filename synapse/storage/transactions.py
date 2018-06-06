@@ -17,6 +17,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached
 
 from twisted.internet import defer
+import six
 
 from canonicaljson import encode_canonical_json
 
@@ -24,6 +25,13 @@ from collections import namedtuple
 
 import logging
 import simplejson as json
+
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = buffer
+else:
+    db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +118,7 @@ class TransactionStore(SQLBaseStore):
                 "transaction_id": transaction_id,
                 "origin": origin,
                 "response_code": code,
-                "response_json": buffer(encode_canonical_json(response_dict)),
+                "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
             or_ignore=True,

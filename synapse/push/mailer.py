@@ -229,7 +229,8 @@ class Mailer(object):
                 if room_vars['notifs'] and 'messages' in room_vars['notifs'][-1]:
                     prev_messages = room_vars['notifs'][-1]['messages']
                     for message in notifvars['messages']:
-                        pm = filter(lambda pm: pm['id'] == message['id'], prev_messages)
+                        pm = list(filter(lambda pm: pm['id'] == message['id'],
+                                         prev_messages))
                         if pm:
                             if not message["is_historical"]:
                                 pm[0]["is_historical"] = False

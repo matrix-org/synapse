@@ -17,7 +17,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.util.async import ObservableDeferred
-from synapse.util.caches import metrics as cache_metrics
+from synapse.util.caches import register_cache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
@@ -38,14 +38,15 @@ class ResponseCache(object):
         self.timeout_sec = timeout_ms / 1000.
 
         self._name = name
-        self._metrics = cache_metrics.register_cache(
-            "response_cache",
-            size_callback=lambda: self.size(),
-            cache_name=name,
+        self._metrics = register_cache(
+            "response_cache", name, self
         )
 
     def size(self):
         return len(self.pending_result_cache)
+
+    def __len__(self):
+        return self.size()
 
     def get(self, key):
         """Look up the given key.

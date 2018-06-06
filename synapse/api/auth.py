@@ -15,6 +15,8 @@
 
 import logging
 
+from six import itervalues
+
 import pymacaroons
 from twisted.internet import defer
 
@@ -57,7 +59,7 @@ class Auth(object):
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
 
         self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
-        register_cache("token_cache", self.token_cache)
+        register_cache("cache", "token_cache", self.token_cache)
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):
@@ -66,7 +68,7 @@ class Auth(object):
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {
-            (e.type, e.state_key): e for e in auth_events.values()
+            (e.type, e.state_key): e for e in itervalues(auth_events)
         }
         self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
 

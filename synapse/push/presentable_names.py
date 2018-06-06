@@ -113,7 +113,7 @@ def calculate_room_name(store, room_state_ids, user_id, fallback_to_members=True
     # so find out who is in the room that isn't the user.
     if "m.room.member" in room_state_bytype_ids:
         member_events = yield store.get_events(
-            room_state_bytype_ids["m.room.member"].values()
+            list(room_state_bytype_ids["m.room.member"].values())
         )
         all_members = [
             ev for ev in member_events.values()

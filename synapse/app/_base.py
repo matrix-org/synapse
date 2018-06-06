@@ -124,6 +124,19 @@ def quit_with_error(error_string):
     sys.exit(1)
 
 
+def listen_metrics(bind_addresses, port):
+    """
+    Start Prometheus metrics server.
+    """
+    from synapse.metrics import RegistryProxy
+    from prometheus_client import start_http_server
+
+    for host in bind_addresses:
+        reactor.callInThread(start_http_server, int(port),
+                             addr=host, registry=RegistryProxy)
+        logger.info("Metrics now reporting on %s:%d", host, port)
+
+
 def listen_tcp(bind_addresses, port, factory, backlog=50):
     """
     Create a TCP socket for a port and several addresses

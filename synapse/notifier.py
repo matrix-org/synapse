@@ -28,22 +28,20 @@ from synapse.util.logcontext import PreserveLoggingContext, run_in_background
 from synapse.util.metrics import Measure
 from synapse.types import StreamToken
 from synapse.visibility import filter_events_for_client
-import synapse.metrics
+from synapse.metrics import LaterGauge
 
 from collections import namedtuple
+from prometheus_client import Counter
 
 import logging
 
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
+notified_events_counter = Counter("synapse_notifier_notified_events", "")
 
-notified_events_counter = metrics.register_counter("notified_events")
-
-users_woken_by_stream_counter = metrics.register_counter(
-    "users_woken_by_stream", labels=["stream"]
-)
+users_woken_by_stream_counter = Counter(
+    "synapse_notifier_users_woken_by_stream", "", ["stream"])
 
 
 # TODO(paul): Should be shared somewhere
@@ -108,7 +106,7 @@ class _NotifierUserStream(object):
         self.last_notified_ms = time_now_ms
         noify_deferred = self.notify_deferred
 
-        users_woken_by_stream_counter.inc(stream_key)
+        users_woken_by_stream_counter.labels(stream_key).inc()
 
         with PreserveLoggingContext():
             self.notify_deferred = ObservableDeferred(defer.Deferred())
@@ -197,14 +195,14 @@ class Notifier(object):
                 all_user_streams.add(x)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
-        metrics.register_callback("listeners", count_listeners)
+        LaterGauge("synapse_notifier_listeners", "", [], count_listeners)
 
-        metrics.register_callback(
-            "rooms",
+        LaterGauge(
+            "synapse_notifier_rooms", "", [],
             lambda: count(bool, self.room_to_user_streams.values()),
         )
-        metrics.register_callback(
-            "users",
+        LaterGauge(
+            "synapse_notifier_users", "", [],
             lambda: len(self.user_to_user_stream),
         )
 
