@@ -268,9 +268,9 @@ class MatrixFederationHttpClient(object):
         """
         Signs a request by adding an Authorization header to headers_dict
         Args:
-            destination (bytes): The desination home server of the request. May be None
+            destination (bytes|None): The desination home server of the request. May be None
                 if the destination is an identity server, in which case destination_is
-                must be non-null.
+                must be non-None.
             method (bytes): The HTTP method of the request
             url_bytes (bytes): The URI path of the request
             headers_dict (dict): Dictionary of request headers to append to
