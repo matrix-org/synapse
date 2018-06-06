@@ -106,14 +106,14 @@ class SimpleHttpClient(object):
             incoming_responses_counter.labels(method, response.code).inc()
             logger.info(
                 "Received response to  %s %s: %s",
-                method, uri, response.code
+                method, redact_uri(uri), response.code
             )
             defer.returnValue(response)
         except Exception as e:
             incoming_responses_counter.labels(method, "ERR").inc()
             logger.info(
                 "Error sending request to  %s %s: %s %s",
-                method, uri, type(e).__name__, e.message
+                method, redact_uri(uri), type(e).__name__, e.message
             )
             raise e
 
