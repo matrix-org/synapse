@@ -14,19 +14,18 @@
 # limitations under the License.
 
 
-from synapse.http.server import JsonResource
-from synapse.rest.client.v1.register import register_servlets
-from mock import Mock
-from tests import unittest
+import json
 
 from twisted.test.proto_helpers import MemoryReactorClock
-from tests.test_server import make_request, FakeHomeserver
 
-import json
+from mock import Mock
+from synapse.http.server import JsonResource
+from synapse.rest.client.v1.register import register_servlets
+from tests import unittest
+from tests.server import FakeHomeserver, make_request
 
 
 class CreateUserServletTestCase(unittest.TestCase):
-
     def setUp(self):
         self.registration_handler = Mock()
 
