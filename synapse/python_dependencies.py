@@ -56,7 +56,9 @@ REQUIREMENTS = {
     "msgpack-python>=0.3.0": ["msgpack"],
     "phonenumbers>=8.2.0": ["phonenumbers"],
     "six": ["six"],
-    "prometheus_client": ["prometheus_client"],
+
+    # we need at least 0.0.14 for prometheus_client.twisted
+    "prometheus_client>=0.0.14": ["prometheus_client>=0.0.14"],
 }
 
 CONDITIONAL_REQUIREMENTS = {
