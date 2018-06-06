@@ -10,14 +10,14 @@ from twisted.internet.defer import Deferred
 from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.api.ratelimiting import Ratelimiter
-
-
 from synapse.server import HomeServer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.util import Clock
 from synapse.http.site import SynapseRequest
 from synapse.http.server import JsonResource
+
+from six import text_type
 
 
 @attr.s
@@ -89,6 +89,9 @@ class FakeHomeserver(HomeServer):
 
 def make_request(method, path, content=b""):
 
+    if isinstance(content, text_type):
+        content = content.encode('utf8')
+
     site = FakeSite()
     channel = FakeChannel()
 
@@ -118,7 +121,7 @@ class JsonResourceTests(unittest.TestCase):
             return (200, kwargs)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile(b"^/foo/(?P<room_id>[^/]*)$")], _callback)
+        res.register_paths("GET", [re.compile("^/foo/(?P<room_id>[^/]*)$")], _callback)
 
         request, channel = make_request(b"GET", b"/foo/%E2%98%83?a=%E2%98%83")
         request.render(res)
@@ -136,7 +139,7 @@ class JsonResourceTests(unittest.TestCase):
             raise Exception("boo")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile(b"^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/foo")
         request.render(res)
@@ -159,7 +162,7 @@ class JsonResourceTests(unittest.TestCase):
             return d
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile(b"^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/foo")
         request.render(res)
@@ -181,7 +184,7 @@ class JsonResourceTests(unittest.TestCase):
             raise SynapseError(403, "Forbidden!!one!", Codes.FORBIDDEN)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile(b"^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/foo")
         request.render(res)
@@ -203,7 +206,7 @@ class JsonResourceTests(unittest.TestCase):
             self.fail("shouldn't ever get here")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile(b"^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/foobar")
         request.render(res)

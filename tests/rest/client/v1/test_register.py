@@ -53,7 +53,7 @@ class CreateUserServletTestCase(unittest.TestCase):
                 "displayname": "someone interesting",
                 "duration_seconds": 200,
             }
-        ).encode('ascii')
+        )
 
         url = b'/_matrix/client/api/v1/createUser?access_token=i_am_an_app_service'
 
@@ -67,6 +67,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         request, channel = make_request(b"POST", url, request_data)
         request.render(res)
 
+        # Advance the clock because it waits
         self.clock.advance(1)
 
         self.assertEquals(channel.result["code"], b"200")

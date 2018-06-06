@@ -60,6 +60,26 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 """
 
 
+def _str_to_unicode(inp):
+    """
+    Make some bytes whatever str is, decoding with UTF-8 if required.
+    """
+    if PY3:
+        return inp
+    else:
+        return inp.decode('utf8')
+
+
+def _bytes_to_str(inp):
+    """
+    Make some bytes whatever str is, decoding with UTF-8 if required.
+    """
+    if PY3:
+        return inp.decode('utf8')
+    else:
+        return inp
+
+
 def wrap_json_request_handler(h):
     """Wraps a request handler method with exception handling.
 
@@ -296,16 +316,10 @@ class JsonResource(HttpServer, resource.Resource):
         # Now trigger the callback. If it returns a response, we send it
         # here. If it throws an exception, that is handled by the wrapper
         # installed by @request_handler.
-        if PY3:
-            kwargs = intern_dict({
-                name: urllib.parse.unquote(value.decode('utf8')) if value else value
-                for name, value in group_dict.items()
-            })
-        else:
-            kwargs = intern_dict({
-                name: urllib.parse.unquote(value).decode('utf8') if value else value
-                for name, value in group_dict.items()
-            })
+        kwargs = intern_dict({
+            name: _str_to_unicode(urllib.parse.unquote(value)) if value else value
+            for name, value in group_dict.items()
+        })
 
         def _handle_response(ret):
             if ret is not None:
@@ -336,10 +350,13 @@ class JsonResource(HttpServer, resource.Resource):
         if request.method == b"OPTIONS":
             return _options_handler, {}
 
+        # We need request.path to be a str
+        path = _bytes_to_str(request.path)
+
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method.decode('ascii'), []):
-            m = path_entry.pattern.match(request.path)
+            m = path_entry.pattern.match(path)
             if m:
                 # We found a match!
                 return path_entry.callback, m.groupdict()
