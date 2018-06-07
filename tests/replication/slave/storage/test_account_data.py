@@ -37,10 +37,6 @@ class SlavedAccountDataStoreTestCase(BaseSlavedStoreTestCase):
             "get_global_account_data_by_type_for_user",
             [TYPE, USER_ID], {"a": 1}
         )
-        yield self.check(
-            "get_global_account_data_by_type_for_users",
-            [TYPE, [USER_ID]], {USER_ID: {"a": 1}}
-        )
 
         yield self.master_store.add_account_data_for_user(
             USER_ID, TYPE, {"a": 2}
@@ -49,8 +45,4 @@ class SlavedAccountDataStoreTestCase(BaseSlavedStoreTestCase):
         yield self.check(
             "get_global_account_data_by_type_for_user",
             [TYPE, USER_ID], {"a": 2}
-        )
-        yield self.check(
-            "get_global_account_data_by_type_for_users",
-            [TYPE, [USER_ID]], {USER_ID: {"a": 2}}
         )
