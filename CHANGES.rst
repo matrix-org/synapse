@@ -1,15 +1,15 @@
 Changes in synapse v0.31.0 (2018-06-06)
 =======================================
 
-Most notable change from v0.30.0 is to switch to python prometheus library to improve system
-stats reporting. WARNING this changes a number of prometheus metrics in a
+Most notable change from v0.30.0 is to switch to the python prometheus library to improve system
+stats reporting. WARNING: this changes a number of prometheus metrics in a
 backwards-incompatible manner. For more details, see
 `docs/metrics-howto.rst <docs/metrics-howto.rst#removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310>`_.
 
 Bug Fixes:
 
 * Fix metric documentation tables (PR #3341)
-* Fix LaterGuage error handling (694968f)
+* Fix LaterGauge error handling (694968f)
 * Fix replication metrics (b7e7fd2)
 
 Changes in synapse v0.31.0-rc1 (2018-06-04)
@@ -29,7 +29,6 @@ Changes:
 * Remove users from user directory on deactivate (PR #3277)
 * Avoid sending consent notice to guest users (PR #3288)
 * disable CPUMetrics if no /proc/self/stat (PR #3299)
-* Add local and loopback IPv6 addresses to url_preview_ip_range_blacklist (PR #3312) Thanks to @thegcat!
 * Consistently use six's iteritems and wrap lazy keys/values in list() if they're not meant to be lazy (PR #3307)
 * Add private IPv6 addresses to example config for url preview blacklist (PR #3317) Thanks to @thegcat!
 * Reduce stuck read-receipts: ignore depth when updating (PR #3318)
