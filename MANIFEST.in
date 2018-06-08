@@ -35,3 +35,4 @@ recursive-include changelog.d *
 
 prune .github
 prune demo/etc
+prune docker
