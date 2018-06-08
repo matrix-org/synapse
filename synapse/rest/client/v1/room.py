@@ -430,8 +430,8 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         pagination_config = PaginationConfig.from_request(
             request, default_limit=10,
         )
-        as_client_event = "raw" not in request.args
-        filter_bytes = request.args.get("filter", None)
+        as_client_event = b"raw" not in request.args
+        filter_bytes = request.args.get(b"filter", None)
         if filter_bytes:
             filter_json = urlparse.unquote(filter_bytes[-1]).decode("UTF-8")
             event_filter = Filter(json.loads(filter_json))
@@ -526,7 +526,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
-        limit = int(request.args.get("limit", [10])[0])
+        limit = int(request.args.get(b"limit", [b"10"])[0].decode('ascii'))
 
         results = yield self.handlers.room_context_handler.get_event_context(
             requester.user,
@@ -760,7 +760,7 @@ class SearchRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        batch = request.args.get("next_batch", [None])[0]
+        batch = request.args.get(b"next_batch", [None])[0]
         results = yield self.handlers.search_handler.search(
             requester.user,
             content,

@@ -57,18 +57,18 @@ class UploadResource(Resource):
         requester = yield self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
-        content_length = request.getHeader("Content-Length")
+        content_length = request.getHeader(b"Content-Length")
         if content_length is None:
             raise SynapseError(
                 msg="Request must specify a Content-Length", code=400
             )
-        if int(content_length) > self.max_upload_size:
+        if int(content_length.decode('ascii')) > self.max_upload_size:
             raise SynapseError(
                 msg="Upload request body is too large",
                 code=413,
             )
 
-        upload_name = request.args.get("filename", None)
+        upload_name = request.args.get(b"filename", None)
         if upload_name:
             try:
                 upload_name = upload_name[0].decode('UTF-8')
@@ -80,8 +80,8 @@ class UploadResource(Resource):
 
         headers = request.requestHeaders
 
-        if headers.hasHeader("Content-Type"):
-            media_type = headers.getRawHeaders(b"Content-Type")[0]
+        if headers.hasHeader(b"Content-Type"):
+            media_type = headers.getRawHeaders(b"Content-Type")[0].decode('ascii')
         else:
             raise SynapseError(
                 msg="Upload request missing 'Content-Type'",

@@ -38,9 +38,11 @@ from twisted.web import server, resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.util import redirectTo
 
+from six import PY3
+from six.moves import urllib
+
 import collections
 import logging
-import urllib
 import simplejson
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,26 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
   </body>
 </html>
 """
+
+
+def _str_to_unicode(inp):
+    """
+    Make some bytes whatever str is, decoding with UTF-8 if required.
+    """
+    if PY3:
+        return inp
+    else:
+        return inp.decode('utf8')
+
+
+def _bytes_to_str(inp):
+    """
+    Make some bytes whatever str is, decoding with UTF-8 if required.
+    """
+    if PY3:
+        return inp.decode('utf8')
+    else:
+        return inp
 
 
 def wrap_json_request_handler(h):
@@ -235,7 +257,6 @@ class HttpServer(object):
                 subsequent arguments will be any matched groups from the regex.
                 This should return a tuple of (code, response).
         """
-        pass
 
 
 class JsonResource(HttpServer, resource.Resource):
@@ -278,7 +299,6 @@ class JsonResource(HttpServer, resource.Resource):
         return server.NOT_DONE_YET
 
     @wrap_json_request_handler
-    @defer.inlineCallbacks
     def _async_render(self, request):
         """ This gets called from render() every time someone sends us a request.
             This checks if anyone has registered a callback for that method and
@@ -296,16 +316,21 @@ class JsonResource(HttpServer, resource.Resource):
         # Now trigger the callback. If it returns a response, we send it
         # here. If it throws an exception, that is handled by the wrapper
         # installed by @request_handler.
-
         kwargs = intern_dict({
-            name: urllib.unquote(value).decode("UTF-8") if value else value
+            name: _str_to_unicode(urllib.parse.unquote(value)) if value else value
             for name, value in group_dict.items()
         })
 
-        callback_return = yield callback(request, **kwargs)
-        if callback_return is not None:
-            code, response = callback_return
-            self._send_response(request, code, response)
+        def _handle_response(ret):
+            if ret is not None:
+                code, response = ret
+                self._send_response(request, code, response)
+
+        d = defer.Deferred()
+        d.addCallback(callback, **kwargs)
+        d.addCallback(_handle_response)
+        d.callback(request)
+        return d
 
     def _get_handler_for_request(self, request):
         """Finds a callback method to handle the given request
@@ -325,10 +350,13 @@ class JsonResource(HttpServer, resource.Resource):
         if request.method == b"OPTIONS":
             return _options_handler, {}
 
+        # We need request.path to be a str
+        path = _bytes_to_str(request.path)
+
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path)
+        for path_entry in self.path_regexs.get(request.method.decode('ascii'), []):
+            m = path_entry.pattern.match(path)
             if m:
                 # We found a match!
                 return path_entry.callback, m.groupdict()
@@ -384,7 +412,7 @@ class RootRedirect(resource.Resource):
         self.url = path
 
     def render_GET(self, request):
-        return redirectTo(self.url, request)
+        return redirectTo(self.url.encode('utf8'), request)
 
     def getChild(self, name, request):
         if len(name) == 0:
@@ -405,12 +433,14 @@ def respond_with_json(request, code, json_object, send_cors=False,
         return
 
     if pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object) + "\n"
+        json_bytes = (encode_pretty_printed_json(json_object) + "\n"
+                      ).encode("utf-8")
     else:
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
+            # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = simplejson.dumps(json_object)
+            json_bytes = simplejson.dumps(json_object).encode("utf-8")
 
     return respond_with_json_bytes(
         request, code, json_bytes,

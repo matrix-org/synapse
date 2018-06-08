@@ -101,19 +101,19 @@ class Authenticator(object):
 
         def parse_auth_header(header_str):
             try:
-                params = auth.split(" ")[1].split(",")
-                param_dict = dict(kv.split("=") for kv in params)
+                params = auth.split(b" ")[1].split(b",")
+                param_dict = dict(kv.split(b"=") for kv in params)
 
                 def strip_quotes(value):
-                    if value.startswith("\""):
+                    if value.startswith(b"\""):
                         return value[1:-1]
                     else:
                         return value
 
-                origin = strip_quotes(param_dict["origin"])
-                key = strip_quotes(param_dict["key"])
-                sig = strip_quotes(param_dict["sig"])
-                return (origin, key, sig)
+                origin = strip_quotes(param_dict[b"origin"])
+                key = strip_quotes(param_dict[b"key"])
+                sig = strip_quotes(param_dict[b"sig"])
+                return (origin.decode('ascii'), key.decode('ascii'), sig.decode('ascii'))
             except Exception:
                 raise AuthenticationError(
                     400, "Malformed Authorization header", Codes.UNAUTHORIZED
@@ -127,7 +127,7 @@ class Authenticator(object):
             )
 
         for auth in auth_headers:
-            if auth.startswith("X-Matrix"):
+            if auth.startswith(b"X-Matrix"):
                 (origin, key, sig) = parse_auth_header(auth)
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin, {})[key] = sig

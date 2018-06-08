@@ -18,7 +18,6 @@ import logging
 import twisted
 import twisted.logger
 from twisted.trial import unittest
-
 from synapse.util.logcontext import LoggingContextFilter
 
 # Set up putting Synapse's logs into Trial's.
