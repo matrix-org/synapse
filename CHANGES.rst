@@ -1,3 +1,15 @@
+Changes in synapse v0.31.1 (2018-06-08)
+=======================================
+
+v0.31.1 fixes a security bug in the ``get_missing_events`` federation API
+where event visibility rules were not applied correctly.
+
+We are not aware of it being actively exploited but please upgrade asap.
+
+Bug Fixes:
+
+* Fix event filtering in get_missing_events handler (PR #3371)
+
 Changes in synapse v0.31.0 (2018-06-06)
 =======================================
 
