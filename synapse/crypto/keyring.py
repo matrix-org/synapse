@@ -27,10 +27,12 @@ from synapse.util.metrics import Measure
 from twisted.internet import defer
 
 from signedjson.sign import (
-    verify_signed_json, signature_ids, sign_json, encode_canonical_json
+    verify_signed_json, signature_ids, sign_json, encode_canonical_json,
+    SignatureVerifyException,
 )
 from signedjson.key import (
-    is_signing_algorithm_supported, decode_verify_key_bytes
+    is_signing_algorithm_supported, decode_verify_key_bytes,
+    encode_verify_key_base64,
 )
 from unpaddedbase64 import decode_base64, encode_base64
 
@@ -56,7 +58,7 @@ Attributes:
     key_ids(set(str)): The set of key_ids to that could be used to verify the
         JSON object
     json_object(dict): The JSON object to verify.
-    deferred(twisted.internet.defer.Deferred):
+    deferred(Deferred[str, str, nacl.signing.VerifyKey]):
         A deferred (server_name, key_id, verify_key) tuple that resolves when
         a verify key has been fetched. The deferreds' callbacks are run with no
         logcontext.
@@ -736,6 +738,17 @@ class Keyring(object):
 
 @defer.inlineCallbacks
 def _handle_key_deferred(verify_request):
+    """Waits for the key to become available, and then performs a verification
+
+    Args:
+        verify_request (VerifyKeyRequest):
+
+    Returns:
+        Deferred[None]
+
+    Raises:
+        SynapseError if there was a problem performing the verification
+    """
     server_name = verify_request.server_name
     try:
         with PreserveLoggingContext():
@@ -768,11 +781,17 @@ def _handle_key_deferred(verify_request):
     ))
     try:
         verify_signed_json(json_object, server_name, verify_key)
-    except Exception:
+    except SignatureVerifyException as e:
+        logger.debug(
+            "Error verifying signature for %s:%s:%s with key %s: %s",
+            server_name, verify_key.alg, verify_key.version,
+            encode_verify_key_base64(verify_key),
+            str(e),
+        )
         raise SynapseError(
             401,
-            "Invalid signature for server %s with key %s:%s" % (
-                server_name, verify_key.alg, verify_key.version
+            "Invalid signature for server %s with key %s:%s: %s" % (
+                server_name, verify_key.alg, verify_key.version, str(e),
             ),
             Codes.UNAUTHORIZED,
         )
