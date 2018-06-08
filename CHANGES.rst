@@ -6,7 +6,7 @@ applied correctly to ``get_missing_events``.
 
 Bug Fixes:
 
- * Fix event filtering in get_missing_events handler (PR #3371)
+* Fix event filtering in get_missing_events handler (PR #3371)
 
 Changes in synapse v0.31.0 (2018-06-06)
 =======================================
