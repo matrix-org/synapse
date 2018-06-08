@@ -12,9 +12,11 @@ within your control.
 ### Using docker-compose (easier)
 
 This image is designed to run either with an automatically generated configuration
-file or with a custom configuration that requires manual edition.
+file or with a custom configuration that requires manual editing.
 
-An easy way to make use of this image is via docker-compose, see the (https://github.com/matrix-org/synapse/tree/develop/contrib/docker)[contrib] section of the synapse project for examples.
+An easy way to make use of this image is via docker-compose. See the
+(https://github.com/matrix-org/synapse/tree/develop/contrib/docker)[contrib]
+section of the synapse project for examples.
 
 ### Without Compose (harder)
 
