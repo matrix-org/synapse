@@ -31,3 +31,4 @@ recursive-exclude jenkins *.sh
 
 prune .github
 prune demo/etc
+prune docker
