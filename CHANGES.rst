@@ -1,3 +1,13 @@
+Changes in synapse v0.31.1 (2018-06-08)
+=======================================
+
+This release fixes a security bug where event visibility rules were not
+applied correctly to ``get_missing_events``.
+
+Bug Fixes:
+
+ * Fix event filtering in get_missing_events handler (PR #3371)
+
 Changes in synapse v0.31.0 (2018-06-06)
 =======================================
 
