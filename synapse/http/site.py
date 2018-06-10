@@ -14,17 +14,15 @@
 
 import contextlib
 import logging
-import re
 import time
 
 from twisted.web.server import Site, Request
 
+from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
-
-ACCESS_TOKEN_RE = re.compile(br'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
 
 _next_request_seq = 0
 
@@ -69,10 +67,7 @@ class SynapseRequest(Request):
         return "%s-%i" % (self.method, self.request_seq)
 
     def get_redacted_uri(self):
-        return ACCESS_TOKEN_RE.sub(
-            br'\1<redacted>\3',
-            self.uri
-        )
+        return redact_uri(self.uri)
 
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]

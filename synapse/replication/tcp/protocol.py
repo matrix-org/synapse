@@ -622,7 +622,7 @@ tcp_inbound_commands = LaterGauge(
     lambda: {
         (k[0], p.name, p.conn_id): count
         for p in connected_connections
-        for k, count in iteritems(p.inbound_commands_counter.counts)
+        for k, count in iteritems(p.inbound_commands_counter)
     })
 
 tcp_outbound_commands = LaterGauge(
@@ -630,7 +630,7 @@ tcp_outbound_commands = LaterGauge(
     lambda: {
         (k[0], p.name, p.conn_id): count
         for p in connected_connections
-        for k, count in iteritems(p.outbound_commands_counter.counts)
+        for k, count in iteritems(p.outbound_commands_counter)
     })
 
 # number of updates received for each RDATA stream

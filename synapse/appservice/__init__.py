@@ -292,4 +292,8 @@ class ApplicationService(object):
         return self.rate_limited
 
     def __str__(self):
-        return "ApplicationService: %s" % (self.__dict__,)
+        # copy dictionary and redact token fields so they don't get logged
+        dict_copy = self.__dict__.copy()
+        dict_copy["token"] = "<redacted>"
+        dict_copy["hs_token"] = "<redacted>"
+        return "ApplicationService: %s" % (dict_copy,)

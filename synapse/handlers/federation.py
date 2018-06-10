@@ -1794,6 +1794,10 @@ class FederationHandler(BaseHandler):
             min_depth=min_depth,
         )
 
+        missing_events = yield self._filter_events_for_server(
+            origin, room_id, missing_events,
+        )
+
         defer.returnValue(missing_events)
 
     @defer.inlineCallbacks
