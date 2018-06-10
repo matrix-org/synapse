@@ -169,16 +169,12 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 yield self.store.find_first_stream_ordering_after_ts(ts)
             )
 
-            room_event_after_stream_ordering = (
+            r = (
                 yield self.store.get_room_event_after_stream_ordering(
                     room_id, stream_ordering,
                 )
             )
-            if room_event_after_stream_ordering:
-                token = yield self.store.get_topological_token_for_event(
-                    room_event_after_stream_ordering,
-                )
-            else:
+            if not r:
                 logger.warn(
                     "[purge] purging events not possible: No event found "
                     "(received_ts %i => stream_ordering %i)",
@@ -189,8 +185,10 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                     "there is no event to be purged",
                     errcode=Codes.NOT_FOUND,
                 )
+            (stream, topo, _event_id) = r
+            token = "t%d-%d" % (topo, stream)
             logger.info(
-                "[purge] purging up to token %d (received_ts %i => "
+                "[purge] purging up to token %s (received_ts %i => "
                 "stream_ordering %i)",
                 token, ts, stream_ordering,
             )

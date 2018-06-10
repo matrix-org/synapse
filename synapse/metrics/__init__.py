@@ -60,10 +60,13 @@ class LaterGauge(object):
 
         try:
             calls = self.caller()
-        except Exception as e:
-            print(e)
-            logger.err()
+        except Exception:
+            logger.exception(
+                "Exception running callback for LaterGuage(%s)",
+                self.name,
+            )
             yield g
+            return
 
         if isinstance(calls, dict):
             for k, v in calls.items():
