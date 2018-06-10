@@ -515,6 +515,9 @@ class SyncHandler(object):
             types = None
             member_state_ids = {}
             lazy_load_members = sync_config.filter_collection.lazy_load_members()
+            include_redundant_members = (
+                sync_config.filter_collection.include_redundant_members()
+            )
 
             if lazy_load_members:
                 # We only request state for the members needed to display the
@@ -528,9 +531,25 @@ class SyncHandler(object):
                     )
                 ]
 
-                # We can't remove redundant member types at this stage as it has
+                # We can't remove redundant member types at this stage as it sometimes has
                 # to be done based on event_id, and we don't have the member
                 # event ids until we've pulled them out of the DB.
+
+                # however, we can create the cache if needed:
+                if not include_redundant_members:
+                    # we can filter out redundant members based on their mxids (not
+                    # their event_ids) at this point. We know we can do it based on
+                    # mxid as this is an non-gappy incremental sync.
+
+                    cache_key = (sync_config.user.to_string(), sync_config.device_id)
+                    cache = self.lazy_loaded_members_cache.get(cache_key)
+                    if cache is None:
+                        logger.debug("creating LruCache for %r", cache_key)
+                        cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_AGE)
+                        self.lazy_loaded_members_cache[cache_key] = cache
+                    else:
+                        logger.debug("found LruCache for %r", cache_key)
+
 
                 if not types:
                     # an optimisation to stop needlessly trying to calculate
@@ -564,6 +583,11 @@ class SyncHandler(object):
                         t: state_ids[t]
                         for t in state_ids if t[0] == EventTypes.Member
                     }
+
+                    if not include_redundant_members:
+                        # add any types we are about to send into our LruCache
+                        for t in types[:-1]:
+                            cache.set(t[1], True)
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
@@ -600,6 +624,11 @@ class SyncHandler(object):
                         for t in state_at_timeline_start if t[0] == EventTypes.Member
                     }
 
+                    if not include_redundant_members:
+                        # add any types we are about to send into our LruCache
+                        for t in types[:-1]:
+                            cache.set(t[1], True)
+
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
                     for event in batch.events if event.is_state()
@@ -615,34 +644,30 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    # we can filter out redundant members based on their mxids (not their
-                    # event_ids) at this point. We know we can do it based on mxid as this
-                    # is an non-gappy incremental sync.
-
-                    cache_key = (sync_config.user, sync_config.device)
-                    cache = self.lazy_loaded_members_cache.get(cache_key)
-                    if cache is None:
-                        cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_AGE)
-                        self.lazy_loaded_members_cache[cache_key] = cache
-
-                    # if it's a new sync sequence, then assume the client has had
-                    # amnesia and doesn't want any recent lazy-loaded members
-                    # de-duplicated.
-                    if since_token is None:
-                        cache.clear()
-                    else:
-                        # only send members which aren't in our LruCache (either because
-                        # they're new to this client or have been pushed out of the cache)
-                        types = [
-                            t for t in types if not cache.get(t[1])
-                        ]
-
-                    # add any types we are about to send into our LruCache
-                    for t in types:
-                        cache.put(t[1], True)
-
                     # strip off the (None, None) and filter to just room members
                     types = types[:-1]
+
+                    if not include_redundant_members:
+                        # if it's a new sync sequence, then assume the client has had
+                        # amnesia and doesn't want any recent lazy-loaded members
+                        # de-duplicated.
+                        if since_token is None:
+                            logger.debug("clearing LruCache for %r", cache_key)
+                            cache.clear()
+                        else:
+                            # only send members which aren't in our LruCache (either
+                            # because they're new to this client or have been pushed out
+                            # of the cache)
+                            logger.debug("filtering types from %r...", types)
+                            types = [
+                                t for t in types if not cache.get(t[1])
+                            ]
+                            logger.debug("...to %r", types)
+
+                        # add any types we are about to send into our LruCache
+                        for t in types:
+                            cache.set(t[1], True)
+
                     if types:
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id, types=types
