@@ -825,6 +825,15 @@ class AuthHandler(BaseHandler):
         if medium == 'email':
             address = address.lower()
 
+        identity_handler = self.hs.get_handlers().identity_handler
+        yield identity_handler.unbind_threepid(
+            user_id,
+            {
+                'medium': medium,
+                'address': address,
+            },
+        )
+
         ret = yield self.store.user_delete_threepid(
             user_id, medium, address,
         )

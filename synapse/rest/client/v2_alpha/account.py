@@ -381,9 +381,16 @@ class ThreepidDeleteRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        yield self.auth_handler.delete_threepid(
-            user_id, body['medium'], body['address']
-        )
+        try:
+            yield self.auth_handler.delete_threepid(
+                user_id, body['medium'], body['address']
+            )
+        except Exception:
+            # NB. This endpoint should succeed if there is nothing to
+            # delete, so it should only throw if something is wrong
+            # that we ought to care about.
+            logger.exception("Failed to remove threepid")
+            raise SynapseError(500, "Failed to remove threepid")
 
         defer.returnValue((200, {}))
 
