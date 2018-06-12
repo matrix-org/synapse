@@ -100,6 +100,7 @@ class SimpleHttpClient(object):
             add_timeout_to_deferred(
                 request_deferred,
                 60, cancelled_to_request_timed_out_error,
+                reactor=self.hs.get_reactor(),
             )
             response = yield make_deferred_yieldable(request_deferred)
 
@@ -115,7 +116,7 @@ class SimpleHttpClient(object):
                 "Error sending request to  %s %s: %s %s",
                 method, redact_uri(uri), type(e).__name__, e.message
             )
-            raise e
+            raise
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}, headers=None):
