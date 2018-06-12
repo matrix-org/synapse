@@ -96,6 +96,11 @@ class ThumbnailResource(Resource):
             respond_404(request)
             return
 
+        user_erased = yield self.store.is_user_erased(media_info['user_id'])
+        if user_erased:
+            respond_404(request)
+            return
+
         thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
 
         if thumbnail_infos:
@@ -133,6 +138,11 @@ class ThumbnailResource(Resource):
             return
         if media_info["quarantined_by"]:
             logger.info("Media is quarantined")
+            respond_404(request)
+            return
+
+        user_erased = yield self.store.is_user_erased(media_info['user_id'])
+        if user_erased:
             respond_404(request)
             return
 

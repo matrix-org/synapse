@@ -187,6 +187,11 @@ class MediaRepository(object):
             respond_404(request)
             return
 
+        user_erased = yield self.store.is_user_erased(media_info['user_id'])
+        if user_erased:
+            respond_404(request)
+            return
+
         self.mark_recently_accessed(None, media_id)
 
         media_type = media_info["media_type"]

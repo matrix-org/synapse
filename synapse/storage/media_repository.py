@@ -39,7 +39,7 @@ class MediaRepositoryStore(BackgroundUpdateStore):
             {"media_id": media_id},
             (
                 "media_type", "media_length", "upload_name", "created_ts",
-                "quarantined_by", "url_cache",
+                "quarantined_by", "url_cache", "user_id",
             ),
             allow_none=True,
             desc="get_local_media",
