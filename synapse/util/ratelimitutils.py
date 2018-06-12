@@ -152,7 +152,7 @@ class _PerHostRatelimiter(object):
                 "Ratelimit [%s]: sleeping req",
                 id(request_id),
             )
-            ret_defer = run_in_background(sleep, self.sleep_msec / 1000.0)
+            ret_defer = run_in_background(self.clock.sleep, self.sleep_msec / 1000.0)
 
             self.sleeping_requests.add(request_id)
 
