@@ -43,10 +43,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 sent_pdus_destination_dist_count = Counter(
-    "synapse_federation_transaction_queue_sent_pdu_destinations:count", ""
+    "synapse_federation_client_sent_pdu_destinations:count", ""
 )
 sent_pdus_destination_dist_total = Counter(
-    "synapse_federation_transaction_queue_sent_pdu_destinations:total", ""
+    "synapse_federation_client_sent_pdu_destinations:total", ""
 )
 
 
