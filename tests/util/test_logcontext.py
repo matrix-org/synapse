@@ -3,8 +3,7 @@ from twisted.internet import defer
 from twisted.internet import reactor
 from .. import unittest
 
-from synapse.util.async import sleep
-from synapse.util import logcontext
+from synapse.util import logcontext, Clock
 from synapse.util.logcontext import LoggingContext
 
 
@@ -22,18 +21,20 @@ class LoggingContextTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_sleep(self):
+        clock = Clock(reactor)
+
         @defer.inlineCallbacks
         def competing_callback():
             with LoggingContext() as competing_context:
                 competing_context.request = "competing"
-                yield sleep(0)
+                yield clock.sleep(0)
                 self._check_test_key("competing")
 
         reactor.callLater(0, competing_callback)
 
         with LoggingContext() as context_one:
             context_one.request = "one"
-            yield sleep(0)
+            yield clock.sleep(0)
             self._check_test_key("one")
 
     def _test_run_in_background(self, function):
@@ -87,7 +88,7 @@ class LoggingContextTestCase(unittest.TestCase):
     def test_run_in_background_with_blocking_fn(self):
         @defer.inlineCallbacks
         def blocking_function():
-            yield sleep(0)
+            yield Clock(reactor).sleep(0)
 
         return self._test_run_in_background(blocking_function)
 

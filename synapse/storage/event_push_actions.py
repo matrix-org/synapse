@@ -16,7 +16,6 @@
 
 from synapse.storage._base import SQLBaseStore, LoggingTransaction
 from twisted.internet import defer
-from synapse.util.async import sleep
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 import logging
@@ -800,7 +799,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 )
                 if caught_up:
                     break
-                yield sleep(5)
+                yield self.hs.get_clock().sleep(5)
         finally:
             self._doing_notif_rotation = False
 
