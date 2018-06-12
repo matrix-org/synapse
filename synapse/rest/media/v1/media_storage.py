@@ -37,13 +37,15 @@ class MediaStorage(object):
     """Responsible for storing/fetching files from local sources.
 
     Args:
+        hs (Homeserver)
         local_media_directory (str): Base path where we store media on disk
         filepaths (MediaFilePaths)
         storage_providers ([StorageProvider]): List of StorageProvider that are
             used to fetch and store files.
     """
 
-    def __init__(self, local_media_directory, filepaths, storage_providers):
+    def __init__(self, hs, local_media_directory, filepaths, storage_providers):
+        self.hs = hs
         self.local_media_directory = local_media_directory
         self.filepaths = filepaths
         self.storage_providers = storage_providers

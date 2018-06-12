@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import MediaStorage
@@ -38,6 +38,7 @@ class MediaStorageTests(unittest.TestCase):
         self.secondary_base_path = os.path.join(self.test_dir, "secondary")
 
         hs = Mock()
+        hs.get_reactor = Mock(return_value=reactor)
         hs.config.media_store_path = self.primary_base_path
 
         storage_providers = [FileStorageProviderBackend(
@@ -46,7 +47,7 @@ class MediaStorageTests(unittest.TestCase):
 
         self.filepaths = MediaFilePaths(self.primary_base_path)
         self.media_storage = MediaStorage(
-            self.primary_base_path, self.filepaths, storage_providers,
+            hs, self.primary_base_path, self.filepaths, storage_providers,
         )
 
     def tearDown(self):

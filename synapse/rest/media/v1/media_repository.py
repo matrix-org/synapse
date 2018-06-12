@@ -58,6 +58,7 @@ UPDATE_RECENTLY_ACCESSED_TS = 60 * 1000
 
 class MediaRepository(object):
     def __init__(self, hs):
+        self.hs = hs
         self.auth = hs.get_auth()
         self.client = MatrixFederationHttpClient(hs)
         self.clock = hs.get_clock()
@@ -94,7 +95,7 @@ class MediaRepository(object):
             storage_providers.append(provider)
 
         self.media_storage = MediaStorage(
-            self.primary_base_path, self.filepaths, storage_providers,
+            self.hs, self.primary_base_path, self.filepaths, storage_providers,
         )
 
         self.clock.looping_call(
