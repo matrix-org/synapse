@@ -175,7 +175,8 @@ class MediaStorage(object):
             res = yield provider.fetch(path, file_info)
             if res:
                 with res:
-                    consumer = BackgroundFileConsumer(open(local_path, "w"))
+                    consumer = BackgroundFileConsumer(
+                        open(local_path, "w"), self.hs.get_reactor())
                     yield res.write_to_consumer(consumer)
                     yield consumer.wait()
                 defer.returnValue(local_path)

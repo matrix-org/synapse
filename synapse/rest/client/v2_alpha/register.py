@@ -191,7 +191,7 @@ class RegisterRestServlet(RestServlet):
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
+        yield run_on_reactor(self.hs.get_clock())
 
         body = parse_json_object_from_request(request)
 
