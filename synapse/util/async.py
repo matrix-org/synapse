@@ -32,24 +32,15 @@ from six.moves import range
 logger = logging.getLogger(__name__)
 
 
-@defer.inlineCallbacks
-def sleep(seconds, clock=None):
-    if not clock:
-        from twisted.internet import reactor
-        clock = Clock(reactor)
-
-    d = defer.Deferred()
-    with PreserveLoggingContext():
-        clock._reactor.callLater(seconds, d.callback, seconds)
-        res = yield d
-    defer.returnValue(res)
-
-
 def run_on_reactor(clock=None):
     """ This will cause the rest of the function to be invoked upon the next
     iteration of the main loop
     """
-    return sleep(0, clock=clock)
+    if not clock:
+        from twisted.internet import reactor
+        clock = Clock(reactor)
+
+    return clock.sleep(0)
 
 
 class ObservableDeferred(object):

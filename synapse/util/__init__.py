@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.logcontext import PreserveLoggingContext
+import logging
+from itertools import islice
 
+import attr
 from twisted.internet import defer, task
 
-import logging
-
-from itertools import islice
+from synapse.util.logcontext import PreserveLoggingContext
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +30,20 @@ def unwrapFirstError(failure):
     return failure.value.subFailure
 
 
+@attr.s
 class Clock(object):
-    """A small utility that obtains current time-of-day so that time may be
-    mocked during unit-tests.
-
-    TODO(paul): Also move the sleep() functionality into it
     """
+    A Clock wraps a Twisted reactor and provides utilities on top of it.
+    """
+    _reactor = attr.ib()
 
-    def __init__(self, reactor=None):
-        if not reactor:
-            from twisted.internet import reactor
-        self._reactor = reactor
+    @defer.inlineCallbacks
+    def sleep(self, seconds):
+        d = defer.Deferred()
+        with PreserveLoggingContext():
+            self._reactor.callLater(seconds, d.callback, seconds)
+            res = yield d
+        defer.returnValue(res)
 
     def time(self):
         """Returns the current system time in seconds since epoch."""
