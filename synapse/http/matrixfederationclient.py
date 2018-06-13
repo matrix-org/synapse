@@ -193,8 +193,8 @@ class MatrixFederationHttpClient(object):
                         add_timeout_to_deferred(
                             request_deferred,
                             timeout / 1000. if timeout else 60,
+                            self.hs.get_reactor(),
                             cancelled_to_request_timed_out_error,
-                            reactor=self.hs.get_reactor()
                         )
                         response = yield make_deferred_yieldable(
                             request_deferred,

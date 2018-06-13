@@ -341,7 +341,7 @@ class Notifier(object):
                     add_timeout_to_deferred(
                         listener.deferred,
                         (end_time - now) / 1000.,
-                        reactor=self.hs.get_reactor()
+                        self.hs.get_reactor(),
                     )
                     with PreserveLoggingContext():
                         yield listener.deferred
@@ -563,7 +563,7 @@ class Notifier(object):
             add_timeout_to_deferred(
                 listener.deferred.addTimeout,
                 (end_time - now) / 1000.,
-                reactor=self.hs.get_reactor()
+                self.hs.get_reactor(),
             )
             try:
                 with PreserveLoggingContext():

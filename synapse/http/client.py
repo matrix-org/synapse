@@ -98,9 +98,8 @@ class SimpleHttpClient(object):
                 method, uri, *args, **kwargs
             )
             add_timeout_to_deferred(
-                request_deferred,
-                60, cancelled_to_request_timed_out_error,
-                reactor=self.hs.get_reactor(),
+                request_deferred, 60, self.hs.get_reactor(),
+                cancelled_to_request_timed_out_error,
             )
             response = yield make_deferred_yieldable(request_deferred)
 
