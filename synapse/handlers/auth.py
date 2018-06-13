@@ -24,7 +24,6 @@ from synapse.api.errors import (
 )
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
-from synapse.util.async import run_on_reactor
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable
 
@@ -425,15 +424,11 @@ class AuthHandler(BaseHandler):
     def _check_msisdn(self, authdict, _):
         return self._check_threepid('msisdn', authdict)
 
-    @defer.inlineCallbacks
     def _check_dummy_auth(self, authdict, _):
-        yield run_on_reactor(self.hs.get_clock())
-        defer.returnValue(True)
+        return defer.succeed(True)
 
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict):
-        yield run_on_reactor(self.hs.get_clock())
-
         if 'threepid_creds' not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
@@ -863,7 +858,7 @@ class AuthHandler(BaseHandler):
         return make_deferred_yieldable(
             threads.deferToThreadPool(
                 self.hs.get_reactor(), self.hs.get_reactor().getThreadPool(), _do_hash
-            )
+            ),
         )
 
     def validate_hash(self, password, stored_hash):
@@ -889,7 +884,7 @@ class AuthHandler(BaseHandler):
                     self.hs.get_reactor(),
                     self.hs.get_reactor().getThreadPool(),
                     _do_validate_hash,
-                )
+                ),
             )
         else:
             return defer.succeed(False)
