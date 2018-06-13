@@ -960,7 +960,6 @@ class EventCreationHandler(object):
             event_stream_id, max_stream_id
         )
 
-        @defer.inlineCallbacks
         def _notify():
             try:
                 self.notifier.on_new_room_event(
