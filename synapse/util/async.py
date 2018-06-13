@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
@@ -175,7 +174,6 @@ class Linearizer(object):
             from twisted.internet import reactor
             clock = Clock(reactor)
         self._clock = clock
-
 
     @defer.inlineCallbacks
     def queue(self, key):
