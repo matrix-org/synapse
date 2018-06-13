@@ -18,7 +18,6 @@ import logging
 
 import mock
 from synapse.api.errors import SynapseError
-from synapse.util import async
 from synapse.util import logcontext
 from twisted.internet import defer
 from synapse.util.caches import descriptors
@@ -195,7 +194,6 @@ class DescriptorTestCase(unittest.TestCase):
             def fn(self, arg1):
                 @defer.inlineCallbacks
                 def inner_fn():
-                    yield async.run_on_reactor()
                     raise SynapseError(400, "blah")
 
                 return inner_fn()
