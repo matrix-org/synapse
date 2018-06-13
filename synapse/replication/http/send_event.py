@@ -37,7 +37,7 @@ def send_event_to_master(clock, client, host, port, requester, event, context,
     """Send event to be handled on the master
 
     Args:
-        clock (Clock)
+        clock (synapse.util.Clock)
         client (SimpleHttpClient)
         host (str): host of master
         port (int): port on master listening for HTTP replication
