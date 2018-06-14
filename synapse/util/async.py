@@ -20,7 +20,7 @@ from twisted.python import failure
 from .logcontext import (
     PreserveLoggingContext, make_deferred_yieldable, run_in_background
 )
-from synapse.util import logcontext, unwrapFirstError, Clock
+from synapse.util import logcontext, unwrapFirstError
 
 from contextlib import contextmanager
 
