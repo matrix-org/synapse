@@ -20,7 +20,6 @@ import unittest
 
 
 class EventAuthTestCase(unittest.TestCase):
-    @unittest.DEBUG
     def test_random_users_cannot_send_state_before_first_pl(self):
         """
         Check that, before the first PL lands, the creator is the only user
@@ -49,7 +48,6 @@ class EventAuthTestCase(unittest.TestCase):
             do_sig_check=False,
         ),
 
-    @unittest.DEBUG
     def test_state_default_level(self):
         """
         Check that users above the state_default level can send state and
