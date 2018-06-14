@@ -355,9 +355,24 @@ def _check_joined_room(member, user_id, room_id):
         ))
 
 
-def get_send_level(etype, state_key, auth_events):
-    key = (EventTypes.PowerLevels, "", )
-    send_level_event = auth_events.get(key)
+def get_send_level(etype, state_key, power_levels_event):
+    """Get the power level required to send an event of a given type
+
+    The federation spec [1] refers to this as "Required Power Level".
+
+    https://matrix.org/docs/spec/server_server/unstable.html#definitions
+
+    Args:
+        etype (str): type of event
+        state_key (str|None): state_key of state event, or None if it is not
+            a state event.
+        power_levels_event (synapse.events.EventBase|None): power levels event
+            in force at this point in the room
+    Returns:
+        int: power level required to send this event.
+    """
+
+    send_level_event = power_levels_event  # todo: rename refs below
     send_level = None
     if send_level_event:
         send_level = send_level_event.content.get("events", {}).get(
@@ -382,8 +397,10 @@ def get_send_level(etype, state_key, auth_events):
 
 
 def _can_send_event(event, auth_events):
+    power_levels_event = _get_power_level_event(auth_events)
+
     send_level = get_send_level(
-        event.type, event.get("state_key", None), auth_events
+        event.type, event.get("state_key"), power_levels_event,
     )
     user_level = get_user_power_level(event.user_id, auth_events)
 
@@ -524,13 +541,22 @@ def _check_power_levels(event, auth_events):
 
 
 def _get_power_level_event(auth_events):
-    key = (EventTypes.PowerLevels, "", )
-    return auth_events.get(key)
+    return auth_events.get((EventTypes.PowerLevels, ""))
 
 
 def get_user_power_level(user_id, auth_events):
-    power_level_event = _get_power_level_event(auth_events)
+    """Get a user's power level
 
+    Args:
+        user_id (str): user's id to look up in power_levels
+        auth_events (dict[(str, str), synapse.events.EventBase]):
+            state in force at this point in the room (or rather, a subset of
+            it including at least the create event and power levels event.
+
+    Returns:
+        int: the user's power level in this room.
+    """
+    power_level_event = _get_power_level_event(auth_events)
     if power_level_event:
         level = power_level_event.content.get("users", {}).get(user_id)
         if not level:
@@ -541,6 +567,11 @@ def get_user_power_level(user_id, auth_events):
         else:
             return int(level)
     else:
+        # if there is no power levels event, the creator gets 100 and everyone
+        # else gets 0.
+
+        # some things which call this don't pass the create event: hack around
+        # that.
         key = (EventTypes.Create, "", )
         create_event = auth_events.get(key)
         if (create_event is not None and
