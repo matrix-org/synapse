@@ -34,9 +34,11 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         event: the event being checked.
         auth_events (dict: event-key -> event): the existing room state.
 
+    Raises:
+        AuthError if the checks fail
 
     Returns:
-        True if the auth checks pass.
+         if the auth checks pass.
     """
     if do_size_check:
         _check_size_limits(event)
@@ -71,7 +73,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         # Oh, we don't know what the state of the room was, so we
         # are trusting that this is allowed (at least for now)
         logger.warn("Trusting event: %s", event.event_id)
-        return True
+        return
 
     if event.type == EventTypes.Create:
         room_id_domain = get_domain_from_id(event.room_id)
@@ -81,7 +83,8 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
                 "Creation event's room_id domain does not match sender's"
             )
         # FIXME
-        return True
+        logger.debug("Allowing! %s", event)
+        return
 
     creation_event = auth_events.get((EventTypes.Create, ""), None)
 
@@ -118,7 +121,8 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
                 403,
                 "Alias event's state_key does not match sender's domain"
             )
-        return True
+        logger.debug("Allowing! %s", event)
+        return
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
@@ -127,14 +131,9 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         )
 
     if event.type == EventTypes.Member:
-        allowed = _is_membership_change_allowed(
-            event, auth_events
-        )
-        if allowed:
-            logger.debug("Allowing! %s", event)
-        else:
-            logger.debug("Denying! %s", event)
-        return allowed
+        _is_membership_change_allowed(event, auth_events)
+        logger.debug("Allowing! %s", event)
+        return
 
     _check_event_sender_in_room(event, auth_events)
 
@@ -153,7 +152,8 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
                 )
             )
         else:
-            return True
+            logger.debug("Allowing! %s", event)
+            return
 
     _can_send_event(event, auth_events)
 
@@ -200,7 +200,7 @@ def _is_membership_change_allowed(event, auth_events):
         create = auth_events.get(key)
         if create and event.prev_events[0][0] == create.event_id:
             if create.content["creator"] == event.state_key:
-                return True
+                return
 
     target_user_id = event.state_key
 
@@ -265,13 +265,13 @@ def _is_membership_change_allowed(event, auth_events):
             raise AuthError(
                 403, "%s is banned from the room" % (target_user_id,)
             )
-        return True
+        return
 
     if Membership.JOIN != membership:
         if (caller_invited
                 and Membership.LEAVE == membership
                 and target_user_id == event.user_id):
-            return True
+            return
 
         if not caller_in_room:  # caller isn't joined
             raise AuthError(
@@ -333,8 +333,6 @@ def _is_membership_change_allowed(event, auth_events):
             raise AuthError(403, "You don't have permission to ban")
     else:
         raise AuthError(500, "Unknown membership %s" % membership)
-
-    return True
 
 
 def _check_event_sender_in_room(event, auth_events):
