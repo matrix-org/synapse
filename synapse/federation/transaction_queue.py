@@ -21,7 +21,6 @@ from .units import Transaction, Edu
 
 from synapse.api.errors import HttpResponseException, FederationDeniedError
 from synapse.util import logcontext, PreserveLoggingContext
-from synapse.util.async import run_on_reactor
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.util.metrics import measure_func
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
@@ -450,9 +449,6 @@ class TransactionQueue(object):
             # quickly, but we will later check this again in the http client,
             # hence why we throw the result away.
             yield get_retry_limiter(destination, self.clock, self.store)
-
-            # XXX: what's this for?
-            yield run_on_reactor()
 
             pending_pdus = []
             while True:

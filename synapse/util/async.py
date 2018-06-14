@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
@@ -39,13 +38,6 @@ def sleep(seconds):
         reactor.callLater(seconds, d.callback, seconds)
         res = yield d
     defer.returnValue(res)
-
-
-def run_on_reactor():
-    """ This will cause the rest of the function to be invoked upon the next
-    iteration of the main loop
-    """
-    return sleep(0)
 
 
 class ObservableDeferred(object):
@@ -227,7 +219,7 @@ class Linearizer(object):
             # the context manager, but it needs to happen while we hold the
             # lock, and the context manager's exit code must be synchronous,
             # so actually this is the only sensible place.
-            yield run_on_reactor()
+            yield sleep(0)
 
         else:
             logger.info("Acquired uncontended linearizer lock %r for key %r",

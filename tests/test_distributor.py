@@ -19,7 +19,6 @@ from twisted.internet import defer
 from mock import Mock, patch
 
 from synapse.util.distributor import Distributor
-from synapse.util.async import run_on_reactor
 
 
 class DistributorTestCase(unittest.TestCase):
@@ -95,7 +94,6 @@ class DistributorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def observer():
-            yield run_on_reactor()
             raise MyException("Oopsie")
 
         self.dist.observe("whail", observer)
