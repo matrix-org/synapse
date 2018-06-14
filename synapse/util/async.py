@@ -172,17 +172,12 @@ class Linearizer(object):
             # do some work.
 
     """
-    def __init__(self, name=None, clock=None):
+    def __init__(self, name=None):
         if name is None:
             self.name = id(self)
         else:
             self.name = name
         self.key_to_defer = {}
-
-        if not clock:
-            from twisted.internet import reactor
-            clock = Clock(reactor)
-        self._clock = clock
 
     @defer.inlineCallbacks
     def queue(self, key):
@@ -224,7 +219,7 @@ class Linearizer(object):
             # the context manager, but it needs to happen while we hold the
             # lock, and the context manager's exit code must be synchronous,
             # so actually this is the only sensible place.
-            yield self._clock.sleep(0)
+            yield sleep(0)
 
         else:
             logger.info("Acquired uncontended linearizer lock %r for key %r",
