@@ -370,28 +370,22 @@ def get_send_level(etype, state_key, power_levels_event):
         int: power level required to send this event.
     """
 
-    send_level_event = power_levels_event  # todo: rename refs below
-    send_level = None
-    if send_level_event:
-        send_level = send_level_event.content.get("events", {}).get(
-            etype
-        )
-        if send_level is None:
-            if state_key is not None:
-                send_level = send_level_event.content.get(
-                    "state_default", 50
-                )
-            else:
-                send_level = send_level_event.content.get(
-                    "events_default", 0
-                )
-
-    if send_level:
-        send_level = int(send_level)
+    if power_levels_event:
+        power_levels_content = power_levels_event.content
     else:
-        send_level = 0
+        power_levels_content = {}
 
-    return send_level
+    # see if we have a custom level for this event type
+    send_level = power_levels_content.get("events", {}).get(etype)
+
+    # otherwise, fall back to the state_default/events_default.
+    if send_level is None:
+        if state_key is not None:
+            send_level = power_levels_content.get("state_default", 50)
+        else:
+            send_level = power_levels_content.get("events_default", 0)
+
+    return int(send_level)
 
 
 def _can_send_event(event, auth_events):
