@@ -63,3 +63,6 @@ Christoph Witzany <christoph at web.crofting.com>
 
 Pierre Jaury <pierre at jaury.eu>
 * Docker packaging
+
+Werner Sembach <werner.sembach at fau.de>
+* Utility script to delete communities
