@@ -15,15 +15,14 @@ if len(argv) < 3 or (argv[1] != "sqlite" and argv[1] != "postgresql") or (argv[1
 db = None
 if argv[1] == "sqlite":
     db = sqlite3.connect(argv[2])
-    cur = db.cursor()
 elif argv[1] == "postgresql":
     db = psycopg2.connect('host=' + argv[2] + ' dbname=' + argv[3] + ' user=' + argv[4] + ' password=' + argv[5])
-    cur = db.cursor()
 else:
     print "This should be unreachable, report a bug."
     quit()
 
 with db:
+    cur = db.cursor()
     cur.execute('SELECT group_id FROM groups;')
     groups = cur.fetchall()
     for group in groups:
