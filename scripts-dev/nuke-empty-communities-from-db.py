@@ -23,26 +23,23 @@ else:
 
 with db:
     cur = db.cursor()
-    cur.execute('SELECT group_id FROM groups;')
+    cur.execute('SELECT g.group_id FROM groups g WHERE (SELECT count(*) from group_users u WHERE g.group_id = u.group_id) = 0;')
     groups = cur.fetchall()
     for group in groups:
         group_id = group[0]
-        cur.execute('SELECT * FROM group_users WHERE group_id = \'' + group_id + '\';')
-        users = cur.fetchall()
-        if not users:
-            print "Deleting " + group_id
-            cur.execute('DELETE FROM group_users WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_invites WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_rooms WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_summary_rooms WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_summary_room_categories WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_room_categories WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_summary_users WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_summary_roles WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_roles WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_attestations_renewals WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM group_attestations_remote WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM local_group_membership WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM local_group_updates WHERE group_id = \'' + group_id + '\';')
-            cur.execute('DELETE FROM groups WHERE group_id = \'' + group_id + '\';')
+        print "Deleting " + group_id
+        cur.execute('DELETE FROM group_users WHERE group_id = \'' + group_id + '\';') # this should not match any entry, leaving it here to be on the safe side not to produce an inconsistent state
+        cur.execute('DELETE FROM group_invites WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_rooms WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_summary_rooms WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_summary_room_categories WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_room_categories WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_summary_users WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_summary_roles WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_roles WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_attestations_renewals WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM group_attestations_remote WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM local_group_membership WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM local_group_updates WHERE group_id = \'' + group_id + '\';')
+        cur.execute('DELETE FROM groups WHERE group_id = \'' + group_id + '\';')
     db.commit()
