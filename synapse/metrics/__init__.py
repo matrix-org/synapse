@@ -62,7 +62,7 @@ class LaterGauge(object):
             calls = self.caller()
         except Exception:
             logger.exception(
-                "Exception running callback for LaterGuage(%s)",
+                "Exception running callback for LaterGauge(%s)",
                 self.name,
             )
             yield g
