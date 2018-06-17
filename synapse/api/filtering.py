@@ -354,8 +354,8 @@ class Filter(object):
 
             content = event.get("content", {})
             is_url = (
-                    "url" in content
-                    and isinstance(content["url"], basestring)
+                "url" in content
+                and isinstance(content["url"], basestring)
             )
 
         return self.check_fields(
