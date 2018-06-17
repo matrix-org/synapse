@@ -368,7 +368,12 @@ class Filter(object):
 
             room_id = event.get("room_id", None)
             ev_type = event.get("type", None)
-            is_url = "url" in event.get("content", {})
+
+            content = event.get("content", {})
+            is_url = (
+                    "url" in content
+                    and isinstance(content["url"], basestring)
+            )
 
         return self.check_fields(
             room_id,
