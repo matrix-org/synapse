@@ -221,7 +221,8 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
 
-        type = body.get("type", None)
+        auth = body.get("auth", {})
+        type = auth.get("type", None)
         appservice = None
         if has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
