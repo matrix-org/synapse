@@ -221,15 +221,25 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
 
+        type = body.get("type", None)
         appservice = None
         if has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
 
+        if type is 'm.login.application_service' and appservice is None:
+            raise SynapseError(400,
+                               "Type is 'm.login.application_service' " +
+                               "but an AS token was not provided or valid."
+                               )
         # fork off as soon as possible for ASes and shared secret auth which
         # have completely different registration flows to normal users
-
         # == Application Service Registration ==
         if appservice:
+            if type is not 'm.login.application_service':
+                logger.warn(
+                    "'type' key not specified for registration but an AS " +
+                    "token was provided so assuming AS registration."
+                )
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
