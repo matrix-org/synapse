@@ -135,7 +135,7 @@ def _get_in_flight_counts():
 
 
 LaterGauge(
-    "synapse_http_request_metrics_in_flight_requests_count",
+    "synapse_http_server_in_flight_requests_count",
     "",
     ["method", "servlet"],
     _get_in_flight_counts,
