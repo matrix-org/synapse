@@ -18,7 +18,7 @@ from twisted.web.resource import Resource
 from synapse.http.server import respond_with_json, respond_with_json_bytes
 
 
-class MediaLimitsResource(Resource):
+class MediaConfigResource(Resource):
     isLeaf = True
 
     def __init__(self, hs):
