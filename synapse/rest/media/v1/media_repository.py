@@ -25,7 +25,7 @@ from .download_resource import DownloadResource
 from .thumbnail_resource import ThumbnailResource
 from .identicon_resource import IdenticonResource
 from .preview_url_resource import PreviewUrlResource
-from .limits_resource import MediaLimitsResource
+from .config_resource import MediaConfigResource
 from .filepath import MediaFilePaths
 from .thumbnailer import Thumbnailer
 from .storage_provider import StorageProviderWrapper
