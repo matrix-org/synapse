@@ -191,6 +191,9 @@ class HomeServer(object):
         logger.info("Finished setting up.")
 
     def get_reactor(self):
+        """
+        Fetch the Twisted reactor in use by this HomeServer.
+        """
         return self._reactor
 
     def get_ip_from_request(self, request):
