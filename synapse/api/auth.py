@@ -655,7 +655,7 @@ class Auth(object):
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
         send_level = event_auth.get_send_level(
-            EventTypes.Aliases, "", auth_events
+            EventTypes.Aliases, "", power_level_event,
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
