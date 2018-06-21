@@ -140,7 +140,7 @@ gc_time = Histogram(
 class GCCounts(object):
 
     def collect(self):
-        cm = GaugeMetricFamily("python_gc_counts", "GC cycle counts", labels=["gen"])
+        cm = GaugeMetricFamily("python_gc_counts", "GC object counts", labels=["gen"])
         for n, m in enumerate(gc.get_count()):
             cm.add_metric([str(n)], m)
 
