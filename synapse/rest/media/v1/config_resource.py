@@ -25,7 +25,7 @@ class MediaConfigResource(Resource):
         Resource.__init__(self)
         config = hs.get_config()
         self.limits_dict = {
-            "upload_size": config.max_upload_size,
+            "m.upload.size": config.max_upload_size,
         }
 
     def render_GET(self, request):
