@@ -214,6 +214,19 @@ class RoomCreationHandler(BaseHandler):
                 },
                 ratelimit=False)
 
+        if "avatar" in config:
+            avatar = config["avatar"]
+            yield self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.RoomAvatar,
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "state_key": "",
+                    "content": {"url": avatar},
+                },
+                ratelimit=False)
+
         if "topic" in config:
             topic = config["topic"]
             yield self.event_creation_handler.create_and_send_nonmember_event(
