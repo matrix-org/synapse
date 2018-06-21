@@ -756,4 +756,4 @@ class MediaRepositoryResource(Resource):
             self.putChild("preview_url", PreviewUrlResource(
                 hs, media_repo, media_repo.media_storage,
             ))
-        self.putChild("limits", MediaLimitsResource(hs))
+        self.putChild("config", MediaConfigResource(hs))
