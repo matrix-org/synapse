@@ -21,6 +21,7 @@ from synapse.events.utils import prune_event
 
 from synapse.util.logcontext import (
     PreserveLoggingContext, make_deferred_yieldable, run_in_background,
+    LoggingContext,
 )
 from synapse.util.metrics import Measure
 from synapse.api.errors import SynapseError
@@ -145,6 +146,9 @@ class EventsWorkerStore(SQLBaseStore):
         missing_events_ids = [e for e in event_ids if e not in event_entry_map]
 
         if missing_events_ids:
+            log_ctx = LoggingContext.current_context()
+            log_ctx.evt_db_fetch_count += len(missing_events_ids)
+
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
                 check_redacted=check_redacted,

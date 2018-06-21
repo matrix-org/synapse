@@ -60,6 +60,7 @@ class LoggingContext(object):
     __slots__ = [
         "previous_context", "name", "ru_stime", "ru_utime",
         "db_txn_count", "db_txn_duration_sec", "db_sched_duration_sec",
+        "evt_db_fetch_count",
         "usage_start",
         "main_thread", "alive",
         "request", "tag",
@@ -108,6 +109,9 @@ class LoggingContext(object):
 
         # sec spent waiting for db txns to be scheduled
         self.db_sched_duration_sec = 0
+
+        # number of events this thread has fetched from the db
+        self.evt_db_fetch_count = 0
 
         # If alive has the thread resource usage when the logcontext last
         # became active.
