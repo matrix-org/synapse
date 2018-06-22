@@ -91,6 +91,9 @@ class LoggingContext(object):
         def add_database_scheduled(self, sched_sec):
             pass
 
+        def record_event_fetch(self, event_count):
+            pass
+
         def __nonzero__(self):
             return False
         __bool__ = __nonzero__  # python3
@@ -246,6 +249,14 @@ class LoggingContext(object):
                 connection
         """
         self.db_sched_duration_sec += sched_sec
+
+    def record_event_fetch(self, event_count):
+        """Record a number of events being fetched from the db
+
+        Args:
+            event_count (int): number of events being fetched
+        """
+        self.evt_db_fetch_count += event_count
 
 
 class LoggingContextFilter(logging.Filter):

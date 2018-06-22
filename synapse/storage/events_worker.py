@@ -147,7 +147,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         if missing_events_ids:
             log_ctx = LoggingContext.current_context()
-            log_ctx.evt_db_fetch_count += len(missing_events_ids)
+            log_ctx.record_event_fetch(len(missing_events_ids))
 
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
