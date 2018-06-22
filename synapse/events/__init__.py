@@ -47,14 +47,26 @@ class _EventInternalMetadata(object):
 
 
 def _event_dict_property(key):
+    # We want to be able to use hasattr with the event dict properties.
+    # However, (on python3) hasattr expects AttributeError to be raised. Hence,
+    # we need to transform the KeyError into an AttributeError
     def getter(self):
-        return self._event_dict[key]
+        try:
+            return self._event_dict[key]
+        except KeyError:
+            raise AttributeError(key)
 
     def setter(self, v):
-        self._event_dict[key] = v
+        try:
+            self._event_dict[key] = v
+        except KeyError:
+            raise AttributeError(key)
 
     def delete(self):
-        del self._event_dict[key]
+        try:
+            del self._event_dict[key]
+        except KeyError:
+            raise AttributeError(key)
 
     return property(
         getter,
@@ -134,7 +146,7 @@ class EventBase(object):
         return field in self._event_dict
 
     def items(self):
-        return self._event_dict.items()
+        return list(self._event_dict.items())
 
 
 class FrozenEvent(EventBase):

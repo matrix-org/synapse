@@ -1,3 +1,226 @@
+Changes in synapse v0.31.2 (2018-06-14)
+=======================================
+
+SECURITY UPDATE: Prevent unauthorised users from setting state events in a room
+when there is no ``m.room.power_levels`` event in force in the room. (PR #3397)
+
+Discussion around the Matrix Spec change proposal for this change can be
+followed at https://github.com/matrix-org/matrix-doc/issues/1304.
+
+Changes in synapse v0.31.1 (2018-06-08)
+=======================================
+
+v0.31.1 fixes a security bug in the ``get_missing_events`` federation API
+where event visibility rules were not applied correctly.
+
+We are not aware of it being actively exploited but please upgrade asap.
+
+Bug Fixes:
+
+* Fix event filtering in get_missing_events handler (PR #3371)
+
+Changes in synapse v0.31.0 (2018-06-06)
+=======================================
+
+Most notable change from v0.30.0 is to switch to the python prometheus library to improve system
+stats reporting. WARNING: this changes a number of prometheus metrics in a
+backwards-incompatible manner. For more details, see
+`docs/metrics-howto.rst <docs/metrics-howto.rst#removal-of-deprecated-metrics--time-based-counters-becoming-histograms-in-0310>`_.
+
+Bug Fixes:
+
+* Fix metric documentation tables (PR #3341)
+* Fix LaterGauge error handling (694968f)
+* Fix replication metrics (b7e7fd2)
+
+Changes in synapse v0.31.0-rc1 (2018-06-04)
+==========================================
+
+Features:
+
+* Switch to the Python Prometheus library (PR #3256, #3274)
+* Let users leave the server notice room after joining (PR #3287)
+
+
+Changes:
+
+* daily user type phone home stats (PR #3264)
+* Use iter* methods for _filter_events_for_server (PR #3267)
+* Docs on consent bits (PR #3268)
+* Remove users from user directory on deactivate (PR #3277)
+* Avoid sending consent notice to guest users (PR #3288)
+* disable CPUMetrics if no /proc/self/stat (PR #3299)
+* Consistently use six's iteritems and wrap lazy keys/values in list() if they're not meant to be lazy (PR #3307)
+* Add private IPv6 addresses to example config for url preview blacklist (PR #3317) Thanks to @thegcat!
+* Reduce stuck read-receipts: ignore depth when updating (PR #3318)
+* Put python's logs into Trial when running unit tests (PR #3319)
+
+Changes, python 3 migration:
+
+* Replace some more comparisons with six (PR #3243) Thanks to @NotAFile!
+* replace some iteritems with six (PR #3244) Thanks to @NotAFile!
+* Add batch_iter to utils (PR #3245) Thanks to @NotAFile!
+* use repr, not str (PR #3246) Thanks to @NotAFile!
+* Misc Python3 fixes (PR #3247) Thanks to @NotAFile!
+* Py3 storage/_base.py (PR #3278) Thanks to @NotAFile!
+* more six iteritems (PR #3279) Thanks to @NotAFile!
+* More Misc. py3 fixes (PR #3280) Thanks to @NotAFile!
+* remaining isintance fixes (PR #3281) Thanks to @NotAFile!
+* py3-ize state.py (PR #3283) Thanks to @NotAFile!
+* extend tox testing for py3 to avoid regressions (PR #3302) Thanks to @krombel!
+* use memoryview in py3 (PR #3303) Thanks to @NotAFile!
+
+Bugs:
+
+* Fix federation backfill bugs (PR #3261)
+* federation: fix LaterGauge usage (PR #3328) Thanks to @intelfx!
+
+
+Changes in synapse v0.30.0 (2018-05-24)
+==========================================
+
+'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
+channel whereby server administrators can send messages to users on the server.
+
+They are used as part of communication of the server policies (see ``docs/consent_tracking.md``),
+however the intention is that they may also find a use for features such
+as "Message of the day".
+
+This feature is specific to Synapse, but uses standard Matrix communication mechanisms,
+so should work with any Matrix client. For more details see ``docs/server_notices.md``
+
+Further Server Notices/Consent Tracking Support:
+
+* Allow overriding the server_notices user's avatar (PR #3273)
+* Use the localpart in the consent uri (PR #3272)
+* Support for putting %(consent_uri)s in messages (PR #3271)
+* Block attempts to send server notices to remote users (PR #3270)
+* Docs on consent bits (PR #3268)
+
+
+
+Changes in synapse v0.30.0-rc1 (2018-05-23)
+==========================================
+
+Server Notices/Consent Tracking Support:
+
+* ConsentResource to gather policy consent from users (PR #3213)
+* Move RoomCreationHandler out of synapse.handlers.Handlers (PR #3225)
+* Infrastructure for a server notices room (PR #3232)
+* Send users a server notice about consent (PR #3236)
+* Reject attempts to send event before privacy consent is given (PR #3257)
+* Add a 'has_consented' template var to consent forms (PR #3262)
+* Fix dependency on jinja2 (PR #3263)
+
+Features:
+
+* Cohort analytics (PR #3163, #3241, #3251)
+* Add lxml to docker image for web previews (PR #3239) Thanks to @ptman!
+* Add in flight request metrics (PR #3252)
+
+Changes:
+
+* Remove unused `update_external_syncs` (PR #3233)
+* Use stream rather depth ordering for push actions (PR #3212)
+* Make purge_history operate on tokens (PR #3221)
+* Don't support limitless pagination (PR #3265)
+
+Bug Fixes:
+
+* Fix logcontext resource usage tracking (PR #3258)
+* Fix error in handling receipts (PR #3235)
+* Stop the transaction cache caching failures (PR #3255)
+
+
+Changes in synapse v0.29.1 (2018-05-17)
+==========================================
+Changes:
+
+* Update docker documentation (PR #3222)
+
+Changes in synapse v0.29.0 (2018-05-16)
+===========================================
+Not changes since v0.29.0-rc1
+
+Changes in synapse v0.29.0-rc1 (2018-05-14)
+===========================================
+
+Notable changes, a docker file for running Synapse (Thanks to @kaiyou!) and a
+closed spec bug in the Client Server API. Additionally further prep for Python 3
+migration.
+
+Potentially breaking change:
+
+* Make Client-Server API return 401 for invalid token (PR #3161).
+
+  This changes the Client-server spec to return a 401 error code instead of 403
+  when the access token is unrecognised. This is the behaviour required by the
+  specification, but some clients may be relying on the old, incorrect
+  behaviour.
+
+  Thanks to @NotAFile for fixing this.
+
+Features:
+
+* Add a Dockerfile for synapse (PR #2846) Thanks to @kaiyou!
+
+Changes - General:
+
+* nuke-room-from-db.sh: added postgresql option and help (PR #2337) Thanks to @rubo77!
+* Part user from rooms on account deactivate (PR #3201)
+* Make 'unexpected logging context' into warnings (PR #3007)
+* Set Server header in SynapseRequest (PR #3208)
+* remove duplicates from groups tables (PR #3129)
+* Improve exception handling for background processes (PR #3138)
+* Add missing consumeErrors to improve exception handling (PR #3139)
+* reraise exceptions more carefully (PR #3142)
+* Remove redundant call to preserve_fn (PR #3143)
+* Trap exceptions thrown within run_in_background (PR #3144)
+
+Changes - Refactors:
+
+* Refactor /context to reuse pagination storage functions (PR #3193)
+* Refactor recent events func to use pagination func (PR #3195)
+* Refactor pagination DB API to return concrete type (PR #3196)
+* Refactor get_recent_events_for_room return type (PR #3198)
+* Refactor sync APIs to reuse pagination API (PR #3199)
+* Remove unused code path from member change DB func (PR #3200)
+* Refactor request handling wrappers (PR #3203)
+* transaction_id, destination defined twice (PR #3209) Thanks to @damir-manapov!
+* Refactor event storage to prepare for changes in state calculations (PR #3141)
+* Set Server header in SynapseRequest (PR #3208)
+* Use deferred.addTimeout instead of time_bound_deferred (PR #3127, #3178)
+* Use run_in_background in preference to preserve_fn (PR #3140)
+
+Changes - Python 3 migration:
+
+* Construct HMAC as bytes on py3 (PR #3156) Thanks to @NotAFile!
+* run config tests on py3 (PR #3159) Thanks to @NotAFile!
+* Open certificate files as bytes (PR #3084) Thanks to @NotAFile!
+* Open config file in non-bytes mode (PR #3085) Thanks to @NotAFile!
+* Make event properties raise AttributeError instead (PR #3102) Thanks to @NotAFile!
+* Use six.moves.urlparse (PR #3108) Thanks to @NotAFile!
+* Add py3 tests to tox with folders that work (PR #3145) Thanks to @NotAFile!
+* Don't yield in list comprehensions (PR #3150) Thanks to @NotAFile!
+* Move more xrange to six (PR #3151) Thanks to @NotAFile!
+* make imports local (PR #3152) Thanks to @NotAFile!
+* move httplib import to six (PR #3153) Thanks to @NotAFile!
+* Replace stringIO imports with six (PR #3154, #3168) Thanks to @NotAFile!
+* more bytes strings (PR #3155) Thanks to @NotAFile!
+
+Bug Fixes:
+
+* synapse fails to start under Twisted >= 18.4 (PR #3157)
+* Fix a class of logcontext leaks (PR #3170)
+* Fix a couple of logcontext leaks in unit tests (PR #3172)
+* Fix logcontext leak in media repo (PR #3174)
+* Escape label values in prometheus metrics (PR #3175, #3186)
+* Fix 'Unhandled Error' logs with Twisted 18.4 (PR #3182) Thanks to @Half-Shot!
+* Fix logcontext leaks in rate limiter (PR #3183)
+* notifications: Convert next_token to string according to the spec (PR #3190) Thanks to @mujx!
+* nuke-room-from-db.sh: fix deletion from search table (PR #3194) Thanks to @rubo77!
+* add guard for None on purge_history api (PR #3160) Thanks to @krombel!
+
 Changes in synapse v0.28.1 (2018-05-01)
 =======================================
 

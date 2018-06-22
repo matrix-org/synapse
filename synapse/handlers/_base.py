@@ -114,14 +114,14 @@ class BaseHandler(object):
             if guest_access != "can_join":
                 if context:
                     current_state = yield self.store.get_events(
-                        context.current_state_ids.values()
+                        list(context.current_state_ids.values())
                     )
                 else:
                     current_state = yield self.state_handler.get_current_state(
                         event.room_id
                     )
 
-                current_state = current_state.values()
+                current_state = list(current_state.values())
 
                 logger.info("maybe_kick_guest_users %r", current_state)
                 yield self.kick_guest_users(current_state)

@@ -17,11 +17,11 @@ from ._base import Config, ConfigError
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
 
-import urllib
 import yaml
 import logging
 
 from six import string_types
+from six.moves.urllib import parse as urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def _load_appservice(hostname, as_info, config_filename):
         )
 
     localpart = as_info["sender_localpart"]
-    if urllib.quote(localpart) != localpart:
+    if urlparse.quote(localpart) != localpart:
         raise ValueError(
             "sender_localpart needs characters which are not URL encoded."
         )

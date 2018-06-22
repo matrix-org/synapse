@@ -17,6 +17,7 @@ from ._base import SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 from twisted.internet import defer
+import six
 
 import OpenSSL
 from signedjson.key import decode_verify_key_bytes
@@ -25,6 +26,13 @@ import hashlib
 import logging
 
 logger = logging.getLogger(__name__)
+
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = buffer
+else:
+    db_binary_type = memoryview
 
 
 class KeyStore(SQLBaseStore):
@@ -72,7 +80,7 @@ class KeyStore(SQLBaseStore):
             values={
                 "from_server": from_server,
                 "ts_added_ms": time_now_ms,
-                "tls_certificate": buffer(tls_certificate_bytes),
+                "tls_certificate": db_binary_type(tls_certificate_bytes),
             },
             desc="store_server_certificate",
         )
@@ -92,7 +100,7 @@ class KeyStore(SQLBaseStore):
 
         if verify_key_bytes:
             defer.returnValue(decode_verify_key_bytes(
-                key_id, str(verify_key_bytes)
+                key_id, bytes(verify_key_bytes)
             ))
 
     @defer.inlineCallbacks
@@ -135,7 +143,7 @@ class KeyStore(SQLBaseStore):
                 values={
                     "from_server": from_server,
                     "ts_added_ms": time_now_ms,
-                    "verify_key": buffer(verify_key.encode()),
+                    "verify_key": db_binary_type(verify_key.encode()),
                 },
             )
             txn.call_after(
@@ -172,7 +180,7 @@ class KeyStore(SQLBaseStore):
                 "from_server": from_server,
                 "ts_added_ms": ts_now_ms,
                 "ts_valid_until_ms": ts_expires_ms,
-                "key_json": buffer(key_json_bytes),
+                "key_json": db_binary_type(key_json_bytes),
             },
             desc="store_server_keys_json",
         )

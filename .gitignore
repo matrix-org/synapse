@@ -1,5 +1,6 @@
 *.pyc
 .*.swp
+*~
 
 .DS_Store
 _trial_temp/
@@ -13,6 +14,7 @@ docs/build/
 cmdclient_config.json
 homeserver*.db
 homeserver*.log
+homeserver*.log.*
 homeserver*.pid
 homeserver*.yaml
 
@@ -32,6 +34,7 @@ demo/media_store.*
 demo/etc
 
 uploads
+cache
 
 .idea/
 media_store/
@@ -39,6 +42,7 @@ media_store/
 *.tac
 
 build/
+venv/
 
 localhost-800*/
 static/client/register/register_config.js
@@ -48,3 +52,4 @@ env/
 *.config
 
 .vscode/
+.ropeproject/

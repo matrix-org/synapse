@@ -281,15 +281,15 @@ class Config(object):
                     )
                 if not cls.path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
-                with open(config_path, "wb") as config_file:
-                    config_bytes, config = obj.generate_config(
+                with open(config_path, "w") as config_file:
+                    config_str, config = obj.generate_config(
                         config_dir_path=config_dir_path,
                         server_name=server_name,
                         report_stats=(config_args.report_stats == "yes"),
                         is_generating_file=True
                     )
                     obj.invoke_all("generate_files", config)
-                    config_file.write(config_bytes)
+                    config_file.write(config_str)
                 print((
                     "A config file has been generated in %r for server name"
                     " %r with corresponding SSL keys and self-signed"

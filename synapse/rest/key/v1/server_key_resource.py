@@ -49,7 +49,6 @@ class LocalKey(Resource):
     """
 
     def __init__(self, hs):
-        self.version_string = hs.version_string
         self.response_body = encode_canonical_json(
             self.response_json_object(hs.config)
         )
@@ -84,7 +83,6 @@ class LocalKey(Resource):
     def render_GET(self, request):
         return respond_with_json_bytes(
             request, 200, self.response_body,
-            version_string=self.version_string
         )
 
     def getChild(self, name, request):

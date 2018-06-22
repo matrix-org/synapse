@@ -34,7 +34,7 @@ from synapse.module_api import ModuleApi
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
-from synapse.metrics import register_memory_metrics
+from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
     check_requirements
@@ -140,6 +140,7 @@ class SynapseHomeServer(HomeServer):
                     site_tag,
                     listener_config,
                     root_resource,
+                    self.version_string,
                 ),
                 self.tls_server_context_factory,
             )
@@ -153,6 +154,7 @@ class SynapseHomeServer(HomeServer):
                     site_tag,
                     listener_config,
                     root_resource,
+                    self.version_string,
                 )
             )
         logger.info("Synapse now listening on port %d", port)
@@ -180,6 +182,15 @@ class SynapseHomeServer(HomeServer):
                 "/_matrix/client/unstable": client_resource,
                 "/_matrix/client/v2_alpha": client_resource,
                 "/_matrix/client/versions": client_resource,
+            })
+
+        if name == "consent":
+            from synapse.rest.consent.consent_resource import ConsentResource
+            consent_resource = ConsentResource(self)
+            if compress:
+                consent_resource = gz_wrap(consent_resource)
+            resources.update({
+                "/_matrix/consent": consent_resource,
             })
 
         if name == "federation":
@@ -219,7 +230,7 @@ class SynapseHomeServer(HomeServer):
             resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
 
         if name == "metrics" and self.get_config().enable_metrics:
-            resources[METRICS_PREFIX] = MetricsResource(self)
+            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
@@ -252,6 +263,13 @@ class SynapseHomeServer(HomeServer):
                     reactor.addSystemEventTrigger(
                         "before", "shutdown", server_listener.stopListening,
                     )
+            elif listener["type"] == "metrics":
+                if not self.get_config().enable_metrics:
+                    logger.warn(("Metrics listener configured, but "
+                                 "collect_metrics is not enabled!"))
+                else:
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -351,8 +369,6 @@ def setup(config_options):
         hs.get_datastore().start_doing_background_updates()
         hs.get_federation_client().start_get_pdu_cache()
 
-        register_memory_metrics(hs)
-
     reactor.callWhenRunning(start)
 
     return hs
@@ -423,6 +439,10 @@ def run(hs):
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
         stats["total_nonbridged_users"] = total_nonbridged_users
 
+        daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
+        for name, count in daily_user_type_results.iteritems():
+            stats["daily_user_type_" + name] = count
+
         room_count = yield hs.get_datastore().get_room_count()
         stats["total_room_count"] = room_count
 
@@ -472,6 +492,14 @@ def run(hs):
                 " Ensuring psutil is available will help matrix.org track performance"
                 " changes across releases."
             )
+
+    def generate_user_daily_visit_stats():
+        hs.get_datastore().generate_user_daily_visits()
+
+    # Rather than update on per session basis, batch up the requests.
+    # If you increase the loop period, the accuracy of user_daily_visits
+    # table will decrease
+    clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")

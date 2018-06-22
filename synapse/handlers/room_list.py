@@ -15,6 +15,9 @@
 
 from twisted.internet import defer
 
+from six import iteritems
+from six.moves import range
+
 from ._base import BaseHandler
 
 from synapse.api.constants import (
@@ -200,7 +203,7 @@ class RoomListHandler(BaseHandler):
             step = len(rooms_to_scan) if len(rooms_to_scan) != 0 else 1
 
         chunk = []
-        for i in xrange(0, len(rooms_to_scan), step):
+        for i in range(0, len(rooms_to_scan), step):
             batch = rooms_to_scan[i:i + step]
             logger.info("Processing %i rooms for result", len(batch))
             yield concurrently_execute(
@@ -305,7 +308,7 @@ class RoomListHandler(BaseHandler):
         )
 
         event_map = yield self.store.get_events([
-            event_id for key, event_id in current_state_ids.iteritems()
+            event_id for key, event_id in iteritems(current_state_ids)
             if key[0] in (
                 EventTypes.JoinRules,
                 EventTypes.Name,

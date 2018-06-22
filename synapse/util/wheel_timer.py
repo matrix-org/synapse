@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six.moves import range
+
 
 class _Entry(object):
     __slots__ = ["end_key", "queue"]
@@ -68,7 +70,7 @@ class WheelTimer(object):
         # Add empty entries between the end of the current list and when we want
         # to insert. This ensures there are no gaps.
         self.entries.extend(
-            _Entry(key) for key in xrange(last_key, then_key + 1)
+            _Entry(key) for key in range(last_key, then_key + 1)
         )
 
         self.entries[-1].queue.append(obj)

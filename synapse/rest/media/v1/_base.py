@@ -28,7 +28,7 @@ import os
 
 import logging
 import urllib
-import urlparse
+from six.moves.urllib import parse as urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +143,7 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         respond_404(request)
         return
 
+    logger.debug("Responding to media request with responder %s")
     add_file_headers(request, media_type, file_size, upload_name)
     with responder:
         yield responder.write_to_consumer(request)

@@ -47,7 +47,8 @@ import shutil
 
 import cgi
 import logging
-import urlparse
+from six.moves.urllib import parse as urlparse
+from six import iteritems
 
 logger = logging.getLogger(__name__)
 
@@ -603,7 +604,7 @@ class MediaRepository(object):
                 thumbnails[(t_width, t_height, r_type)] = r_method
 
         # Now we generate the thumbnails for each dimension, store it
-        for (t_width, t_height, t_type), t_method in thumbnails.iteritems():
+        for (t_width, t_height, t_type), t_method in iteritems(thumbnails):
             # Generate the thumbnail
             if t_method == "crop":
                 t_byte_source = yield make_deferred_yieldable(threads.deferToThread(

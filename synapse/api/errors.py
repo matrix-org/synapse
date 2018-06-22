@@ -19,6 +19,7 @@ import logging
 
 import simplejson as json
 from six import iteritems
+from six.moves import http_client
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ class Codes(object):
     THREEPID_DENIED = "M_THREEPID_DENIED"
     INVALID_USERNAME = "M_INVALID_USERNAME"
     SERVER_NOT_TRUSTED = "M_SERVER_NOT_TRUSTED"
+    CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
+    CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
 
 
 class CodeMessageException(RuntimeError):
@@ -136,6 +139,32 @@ class SynapseError(CodeMessageException):
 
         res = SynapseError(err.code, errmsg, errcode)
         return res
+
+
+class ConsentNotGivenError(SynapseError):
+    """The error returned to the client when the user has not consented to the
+    privacy policy.
+    """
+    def __init__(self, msg, consent_uri):
+        """Constructs a ConsentNotGivenError
+
+        Args:
+            msg (str): The human-readable error message
+            consent_url (str): The URL where the user can give their consent
+        """
+        super(ConsentNotGivenError, self).__init__(
+            code=http_client.FORBIDDEN,
+            msg=msg,
+            errcode=Codes.CONSENT_NOT_GIVEN
+        )
+        self._consent_uri = consent_uri
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            consent_uri=self._consent_uri
+        )
 
 
 class RegistrationError(SynapseError):
@@ -292,7 +321,7 @@ def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
 
     Args:
         msg (str): The error message.
-        code (int): The error code.
+        code (str): The error code.
         kwargs : Additional keys to add to the response.
     Returns:
         A dict representing the error response JSON.

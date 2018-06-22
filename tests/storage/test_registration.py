@@ -42,9 +42,15 @@ class RegistrationStoreTestCase(unittest.TestCase):
         yield self.store.register(self.user_id, self.tokens[0], self.pwhash)
 
         self.assertEquals(
-            # TODO(paul): Surely this field should be 'user_id', not 'name'
-            #  Additionally surely it shouldn't come in a 1-element list
-            {"name": self.user_id, "password_hash": self.pwhash, "is_guest": 0},
+            {
+                # TODO(paul): Surely this field should be 'user_id', not 'name'
+                "name": self.user_id,
+                "password_hash": self.pwhash,
+                "is_guest": 0,
+                "consent_version": None,
+                "consent_server_notice_sent": None,
+                "appservice_id": None,
+            },
             (yield self.store.get_user_by_id(self.user_id))
         )
 

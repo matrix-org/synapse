@@ -15,8 +15,7 @@
 
 import hashlib
 from inspect import getcallargs
-import urllib
-import urlparse
+from six.moves.urllib import parse as urlparse
 
 from mock import Mock, patch
 from twisted.internet import defer, reactor
@@ -65,6 +64,8 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
         config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False
         config.replicate_user_profiles_to = []
+        config.user_consent_server_notice_content = None
+        config.block_events_without_consent_error = None
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
@@ -239,7 +240,7 @@ class MockHttpResource(HttpServer):
             if matcher:
                 try:
                     args = [
-                        urllib.unquote(u).decode("UTF-8")
+                        urlparse.unquote(u).decode("UTF-8")
                         for u in matcher.groups()
                     ]
 

@@ -27,11 +27,12 @@ from synapse.federation.federation_base import (
 
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
-import synapse.metrics
 from synapse.types import get_domain_from_id
 from synapse.util import async
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logutils import log_function
+
+from prometheus_client import Counter
 
 from six import iteritems
 
@@ -41,17 +42,17 @@ TRANSACTION_CONCURRENCY_LIMIT = 10
 
 logger = logging.getLogger(__name__)
 
-# synapse.federation.federation_server is a silly name
-metrics = synapse.metrics.get_metrics_for("synapse.federation.server")
+received_pdus_counter = Counter("synapse_federation_server_received_pdus", "")
 
-received_pdus_counter = metrics.register_counter("received_pdus")
+received_edus_counter = Counter("synapse_federation_server_received_edus", "")
 
-received_edus_counter = metrics.register_counter("received_edus")
-
-received_queries_counter = metrics.register_counter("received_queries", labels=["type"])
+received_queries_counter = Counter(
+    "synapse_federation_server_received_queries", "", ["type"]
+)
 
 
 class FederationServer(FederationBase):
+
     def __init__(self, hs):
         super(FederationServer, self).__init__(hs)
 
@@ -131,7 +132,7 @@ class FederationServer(FederationBase):
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
-        received_pdus_counter.inc_by(len(transaction.pdus))
+        received_pdus_counter.inc(len(transaction.pdus))
 
         pdus_by_room = {}
 
@@ -292,7 +293,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
-        received_queries_counter.inc(query_type)
+        received_queries_counter.labels(query_type).inc()
         resp = yield self.registry.on_query(query_type, args)
         defer.returnValue((200, resp))
 

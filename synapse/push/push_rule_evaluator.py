@@ -21,6 +21,8 @@ from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
 
+from six import string_types
+
 logger = logging.getLogger(__name__)
 
 
@@ -150,7 +152,7 @@ class PushRuleEvaluatorForEvent(object):
 
 # Caches (glob, word_boundary) -> regex for push. See _glob_matches
 regex_cache = LruCache(50000 * CACHE_SIZE_FACTOR)
-register_cache("regex_push_cache", regex_cache)
+register_cache("cache", "regex_push_cache", regex_cache)
 
 
 def _glob_matches(glob, value, word_boundary=False):
@@ -238,7 +240,7 @@ def _flatten_dict(d, prefix=[], result=None):
     if result is None:
         result = {}
     for key, value in d.items():
-        if isinstance(value, basestring):
+        if isinstance(value, string_types):
             result[".".join(prefix + [key])] = value.lower()
         elif hasattr(value, "items"):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)

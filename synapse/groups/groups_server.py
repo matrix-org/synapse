@@ -20,6 +20,8 @@ from synapse.api.errors import SynapseError
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 from twisted.internet import defer
 
+from six import string_types
+
 logger = logging.getLogger(__name__)
 
 
@@ -431,7 +433,7 @@ class GroupsServerHandler(object):
                         "long_description"):
             if keyname in content:
                 value = content[keyname]
-                if not isinstance(value, basestring):
+                if not isinstance(value, string_types):
                     raise SynapseError(400, "%r value is not a string" % (keyname,))
                 profile[keyname] = value
 
