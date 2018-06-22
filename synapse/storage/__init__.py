@@ -20,7 +20,6 @@ import time
 import logging
 
 from synapse.storage.devices import DeviceStore
-from synapse.storage.user_erasure_store import UserErasureStore
 from .appservice import (
     ApplicationServiceStore, ApplicationServiceTransactionStore
 )
@@ -89,7 +88,6 @@ class DataStore(RoomMemberStore, RoomStore,
                 DeviceInboxStore,
                 UserDirectoryStore,
                 GroupServerStore,
-                UserErasureStore,
                 ):
 
     def __init__(self, db_conn, hs):
