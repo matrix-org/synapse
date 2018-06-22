@@ -99,16 +99,18 @@ class SynapseRequest(Request):
             db_txn_count = context.db_txn_count
             db_txn_duration_sec = context.db_txn_duration_sec
             db_sched_duration_sec = context.db_sched_duration_sec
+            evt_db_fetch_count = context.evt_db_fetch_count
         except Exception:
             ru_utime, ru_stime = (0, 0)
             db_txn_count, db_txn_duration_sec = (0, 0)
+            evt_db_fetch_count = 0
 
         end_time = time.time()
 
         self.site.access_logger.info(
             "%s - %s - {%s}"
             " Processed request: %.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
-            " %sB %s \"%s %s %s\" \"%s\"",
+            " %sB %s \"%s %s %s\" \"%s\" [%d dbevts]",
             self.getClientIP(),
             self.site.site_tag,
             self.authenticated_entity,
@@ -124,6 +126,7 @@ class SynapseRequest(Request):
             self.get_redacted_uri(),
             self.clientproto,
             self.get_user_agent(),
+            evt_db_fetch_count,
         )
 
         try:
