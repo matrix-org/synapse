@@ -30,7 +30,7 @@ class FileConsumerTests(unittest.TestCase):
     @defer.inlineCallbacks
     def test_pull_consumer(self):
         string_file = StringIO()
-        consumer = BackgroundFileConsumer(string_file)
+        consumer = BackgroundFileConsumer(string_file, reactor=reactor)
 
         try:
             producer = DummyPullProducer()
@@ -54,7 +54,7 @@ class FileConsumerTests(unittest.TestCase):
     @defer.inlineCallbacks
     def test_push_consumer(self):
         string_file = BlockingStringWrite()
-        consumer = BackgroundFileConsumer(string_file)
+        consumer = BackgroundFileConsumer(string_file, reactor=reactor)
 
         try:
             producer = NonCallableMock(spec_set=[])
@@ -80,7 +80,7 @@ class FileConsumerTests(unittest.TestCase):
     @defer.inlineCallbacks
     def test_push_producer_feedback(self):
         string_file = BlockingStringWrite()
-        consumer = BackgroundFileConsumer(string_file)
+        consumer = BackgroundFileConsumer(string_file, reactor=reactor)
 
         try:
             producer = NonCallableMock(spec_set=["pauseProducing", "resumeProducing"])

@@ -1,3 +1,12 @@
+Changes in synapse v0.31.2 (2018-06-14)
+=======================================
+
+SECURITY UPDATE: Prevent unauthorised users from setting state events in a room
+when there is no ``m.room.power_levels`` event in force in the room. (PR #3397)
+
+Discussion around the Matrix Spec change proposal for this change can be
+followed at https://github.com/matrix-org/matrix-doc/issues/1304.
+
 Changes in synapse v0.31.1 (2018-06-08)
 =======================================
 
