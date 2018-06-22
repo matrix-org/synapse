@@ -15,8 +15,8 @@
 # limitations under the License.
 import logging
 import re
-import simplejson as json
 from twisted.internet import defer
+from canonicaljson import json
 
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices

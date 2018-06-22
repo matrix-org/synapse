@@ -28,7 +28,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.types import get_domain_from_id
 
 import logging
-import simplejson as json
+from canonicaljson import json
 
 from six import itervalues, iteritems
 

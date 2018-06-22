@@ -19,7 +19,8 @@ from twisted.internet import defer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 import logging
-import simplejson as json
+
+from canonicaljson import json
 
 from six import iteritems
 
