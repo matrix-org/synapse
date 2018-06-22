@@ -495,7 +495,20 @@ class FederationHandler(BaseHandler):
             for e_id, key_to_eid in event_to_state_ids.iteritems()
         }
 
+        erased_senders = yield self.store.are_users_erased(
+            e.sender for e in events,
+        )
+
         def redact_disallowed(event, state):
+            # if the sender has been gdpr17ed, always return a redacted
+            # copy of the event.
+            if erased_senders[event.sender]:
+                logger.info(
+                    "Sender of %s has been erased, redacting",
+                    event.event_id,
+                )
+                return prune_event(event)
+
             if not state:
                 return event
 
