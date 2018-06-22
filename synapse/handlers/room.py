@@ -46,12 +46,14 @@ class RoomCreationHandler(BaseHandler):
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": True,
+            "encryption_alg": "m.megolm.v1.aes-sha2",
         },
         RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "shared",
             "original_invitees_have_ops": True,
             "guest_can_join": True,
+            "encryption_alg": "m.megolm.v1.aes-sha2",
         },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
@@ -371,6 +373,15 @@ class RoomCreationHandler(BaseHandler):
                 etype=etype,
                 state_key=state_key,
                 content=content,
+            )
+
+        if "encryption_alg" in config:
+            send(
+                etype="m.room.encryption",
+                state_key="",
+                content={
+                    'algorithm': config["encryption_alg"],
+                }
             )
 
 
