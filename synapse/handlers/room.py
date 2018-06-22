@@ -377,7 +377,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "encryption_alg" in config:
             send(
-                etype="m.room.encryption",
+                etype=EventTypes.Encryption,
                 state_key="",
                 content={
                     'algorithm': config["encryption_alg"],

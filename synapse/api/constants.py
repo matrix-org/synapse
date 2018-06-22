@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,6 +71,7 @@ class EventTypes(object):
     CanonicalAlias = "m.room.canonical_alias"
     RoomAvatar = "m.room.avatar"
     GuestAccess = "m.room.guest_access"
+    Encryption = "m.room.encryption"
 
     # These are used for validation
     Message = "m.room.message"
