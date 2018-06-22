@@ -42,7 +42,7 @@ class DeactivateAccountHandler(BaseHandler):
         reactor.callWhenRunning(self._start_user_parting)
 
     @defer.inlineCallbacks
-    def deactivate_account(self, user_id, erase_data):
+    def deactivate_account(self, user_id):
         """Deactivate a user's account
 
         Args:
@@ -91,11 +91,6 @@ class DeactivateAccountHandler(BaseHandler):
 
         # delete from user directory
         yield self.user_directory_handler.handle_user_deactivated(user_id)
-
-        # Mark the user as erased, if they asked for that
-        if erase_data:
-            logger.info("Marking %s as erased", user_id)
-            yield self.store.mark_user_erased(user_id)
 
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)
