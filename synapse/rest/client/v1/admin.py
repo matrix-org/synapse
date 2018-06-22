@@ -254,7 +254,9 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        yield self._deactivate_account_handler.deactivate_account(target_user_id)
+        yield self._deactivate_account_handler.deactivate_account(
+            target_user_id, False,
+        )
         defer.returnValue((200, {}))
 
 

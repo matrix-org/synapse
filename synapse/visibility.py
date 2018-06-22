@@ -12,15 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import itertools
 import logging
+import operator
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership, EventTypes
-
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
-
+from synapse.api.constants import EventTypes, Membership
+from synapse.events.utils import prune_event
+from synapse.util.logcontext import (
+    make_deferred_yieldable, preserve_fn,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,16 +97,27 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
         if ignore_dict_content else []
     )
 
+    erased_senders = yield store.are_users_erased((e.sender for e in events))
+
     def allowed(event):
         """
         Args:
             event (synapse.events.EventBase): event to check
+
+        Returns:
+            None|EventBase:
+               None if the user cannot see this event at all
+
+               a redacted copy of the event if they can only see a redacted
+               version
+
+               the original event if they can see it as normal.
         """
         if not event.is_state() and event.sender in ignore_list:
-            return False
+            return None
 
         if event.event_id in always_include_ids:
-            return True
+            return event
 
         state = event_id_to_state[event.event_id]
 
@@ -117,10 +130,6 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
 
         if visibility not in VISIBILITY_PRIORITY:
             visibility = "shared"
-
-        # if it was world_readable, it's easy: everyone can read it
-        if visibility == "world_readable":
-            return True
 
         # Always allow history visibility events on boundaries. This is done
         # by setting the effective visibility to the least restrictive
@@ -155,7 +164,7 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
             if membership == "leave" and (
                 prev_membership == "join" or prev_membership == "invite"
             ):
-                return True
+                return event
 
             new_priority = MEMBERSHIP_PRIORITY.index(membership)
             old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
@@ -166,31 +175,55 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
         if membership is None:
             membership_event = state.get((EventTypes.Member, user_id), None)
             if membership_event:
+                # XXX why do we do this?
+                # https://github.com/matrix-org/synapse/issues/3350
                 if membership_event.event_id not in event_id_forgotten:
                     membership = membership_event.membership
 
         # if the user was a member of the room at the time of the event,
         # they can see it.
         if membership == Membership.JOIN:
-            return True
+            return event
+
+        # otherwise, it depends on the room visibility.
 
         if visibility == "joined":
             # we weren't a member at the time of the event, so we can't
             # see this event.
-            return False
+            return None
 
         elif visibility == "invited":
             # user can also see the event if they were *invited* at the time
             # of the event.
-            return membership == Membership.INVITE
+            return (
+                event if membership == Membership.INVITE else None
+            )
 
-        else:
-            # visibility is shared: user can also see the event if they have
-            # become a member since the event
+        elif visibility == "shared" and is_peeking:
+            # if the visibility is shared, users cannot see the event unless
+            # they have *subequently* joined the room (or were members at the
+            # time, of course)
             #
             # XXX: if the user has subsequently joined and then left again,
             # ideally we would share history up to the point they left. But
-            # we don't know when they left.
-            return not is_peeking
+            # we don't know when they left. We just treat it as though they
+            # never joined, and restrict access.
+            return None
 
-    defer.returnValue(list(filter(allowed, events)))
+        # the visibility is either shared or world_readable, and the user was
+        # not a member at the time. We allow it, provided the original sender
+        # has not requested their data to be erased, in which case, we return
+        # a redacted version.
+        if erased_senders[event.sender]:
+            return prune_event(event)
+
+        return event
+
+    # check each event: gives an iterable[None|EventBase]
+    filtered_events = itertools.imap(allowed, events)
+
+    # remove the None entries
+    filtered_events = filter(operator.truth, filtered_events)
+
+    # we turn it into a list before returning it.
+    defer.returnValue(list(filtered_events))
