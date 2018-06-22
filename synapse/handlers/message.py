@@ -806,6 +806,7 @@ class EventCreationHandler(object):
             # If we're a worker we need to hit out to the master.
             if self.config.worker_app:
                 yield send_event_to_master(
+                    self.hs.get_clock(),
                     self.http_client,
                     host=self.config.worker_replication_host,
                     port=self.config.worker_replication_http_port,

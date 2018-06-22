@@ -19,10 +19,10 @@ import signedjson.sign
 from mock import Mock
 from synapse.api.errors import SynapseError
 from synapse.crypto import keyring
-from synapse.util import async, logcontext
+from synapse.util import logcontext, Clock
 from synapse.util.logcontext import LoggingContext
 from tests import unittest, utils
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 
 class MockPerspectiveServer(object):
@@ -118,6 +118,7 @@ class KeyringTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_verify_json_objects_for_server_awaits_previous_requests(self):
+        clock = Clock(reactor)
         key1 = signedjson.key.generate_signing_key(1)
 
         kr = keyring.Keyring(self.hs)
@@ -167,7 +168,7 @@ class KeyringTestCase(unittest.TestCase):
 
             # wait a tick for it to send the request to the perspectives server
             # (it first tries the datastore)
-            yield async.sleep(1)   # XXX find out why this takes so long!
+            yield clock.sleep(1)   # XXX find out why this takes so long!
             self.http_client.post_json.assert_called_once()
 
             self.assertIs(LoggingContext.current_context(), context_11)
@@ -183,7 +184,7 @@ class KeyringTestCase(unittest.TestCase):
                 res_deferreds_2 = kr.verify_json_objects_for_server(
                     [("server10", json1)],
                 )
-                yield async.sleep(1)
+                yield clock.sleep(1)
                 self.http_client.post_json.assert_not_called()
                 res_deferreds_2[0].addBoth(self.check_context, None)
 
