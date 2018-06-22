@@ -224,6 +224,11 @@ class Config(object):
             help="Generate a config file for the server name"
         )
         config_parser.add_argument(
+            "--check-config",
+            action="store_true",
+            help="Check configuration supplied is valid"
+        )
+        config_parser.add_argument(
             "--report-stats",
             action="store",
             help="Whether the generated config reports anonymized usage statistics",
@@ -250,6 +255,8 @@ class Config(object):
         config_files = find_config_files(search_paths=config_args.config_path)
 
         generate_keys = config_args.generate_keys
+        
+        check_config = config_args.check_config
 
         obj = cls()
 
@@ -333,7 +340,9 @@ class Config(object):
         if generate_keys:
             return None
 
-        obj.invoke_all("read_arguments", args)
+        obj.invoke_all("read_arguments", args)  
+        if check_config:
+            return None
 
         return obj
 
