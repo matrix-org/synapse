@@ -622,7 +622,14 @@ class GroupsServerHandler(object):
         )
 
         # TODO: Check if user knocked
-        # TODO: Check if user is already invited
+
+        invited_users = yield self.store.get_invited_users_in_group(group_id)
+        if user_id in invited_users:
+            raise SynapseError(400, "User already invited to group")
+
+        user_results = yield self.store.get_users_in_group(group_id, include_private=True)
+        if user_id in [user_result["user_id"] for user_result in user_results]:
+            raise SynapseError(400, "User already in group")
 
         content = {
             "profile": {
