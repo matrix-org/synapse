@@ -265,6 +265,7 @@ class JsonResource(HttpServer, resource.Resource):
         self.hs = hs
 
     def register_paths(self, method, path_patterns, callback):
+        method = method.encode("utf-8")  # method is bytes on py3
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
@@ -328,7 +329,7 @@ class JsonResource(HttpServer, resource.Resource):
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path)
+            m = path_entry.pattern.match(request.path.decode())
             if m:
                 # We found a match!
                 return path_entry.callback, m.groupdict()
@@ -384,7 +385,7 @@ class RootRedirect(resource.Resource):
         self.url = path
 
     def render_GET(self, request):
-        return redirectTo(self.url, request)
+        return redirectTo(self.url.encode(), request)
 
     def getChild(self, name, request):
         if len(name) == 0:
@@ -405,12 +406,14 @@ def respond_with_json(request, code, json_object, send_cors=False,
         return
 
     if pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object) + "\n"
+        json_bytes = (encode_pretty_printed_json(json_object) + "\n"
+                      ).encode("utf-8")
     else:
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
+            # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = simplejson.dumps(json_object)
+            json_bytes = simplejson.dumps(json_object).encode("utf-8")
 
     return respond_with_json_bytes(
         request, code, json_bytes,
