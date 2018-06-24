@@ -26,7 +26,6 @@ import time
 
 logger = logging.getLogger(__name__)
 
-
 SERVER_CACHE = {}
 
 # our record of an individual server which can be tried to reach a destination.
@@ -38,15 +37,15 @@ _Server = collections.namedtuple(
 )
 
 
-def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
+def matrix_federation_endpoint(reactor, destination, tls_client_options_factory=None,
                                timeout=None):
     """Construct an endpoint for the given matrix destination.
 
     Args:
         reactor: Twisted reactor.
         destination (bytes): The name of the server to connect to.
-        ssl_context_factory (twisted.internet.ssl.ContextFactory): Factory
-            which generates SSL contexts to use for TLS.
+        tls_client_options_factory (synapse.crypto.context_factory.ClientTLSOptionsFactory): 
+            Factory which generates TLS options for client connections.
         timeout (int): connection timeout in seconds
     """
 
@@ -59,13 +58,13 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
     if timeout is not None:
         endpoint_kw_args.update(timeout=timeout)
 
-    if ssl_context_factory is None:
+    if tls_client_options_factory is None:
         transport_endpoint = HostnameEndpoint
         default_port = 8008
     else:
         def transport_endpoint(reactor, host, port, timeout):
             return wrapClientTLS(
-                ssl_context_factory,
+                tls_client_options_factory.get_options(unicode(host)),
                 HostnameEndpoint(reactor, host, port, timeout=timeout))
         default_port = 8448
 

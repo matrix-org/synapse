@@ -14,7 +14,8 @@
 
 from twisted.internet import ssl
 from OpenSSL import SSL, crypto
-from twisted.internet._sslverify import _defaultCurveName
+from twisted.internet._sslverify import _defaultCurveName, ClientTLSOptions, OpenSSLCertificateOptions, \
+    optionsForClientTLS
 
 import logging
 
@@ -48,3 +49,34 @@ class ServerContextFactory(ssl.ContextFactory):
 
     def getContext(self):
         return self._context
+
+
+class ClientTLSOptionsNoCertVerification(ClientTLSOptions):
+    """Redefinition of ClientTLSOptions to completely ignore certificate
+    validation. Should be kept in sync with the original class in Twisted.
+    This version of ClientTLSOptions is only intended for development use."""
+
+    def __init__(self, *args, **kwargs):
+        super(ClientTLSOptionsNoCertVerification, self).__init__(*args, **kwargs)
+
+        def do_nothing(*_args, **_kwargs):
+            pass
+
+        self._ctx.set_info_callback(do_nothing)
+
+
+class ClientTLSOptionsFactory(object):
+    """Factory for Twisted ClientTLSOptions that are used to make connections
+    to remote servers for federation."""
+
+    def __init__(self, config):
+        self._ignore_certificate_validation = config.tls_ignore_certificate_validation
+
+    def get_options(self, host):
+        if self._ignore_certificate_validation:
+            return ClientTLSOptionsNoCertVerification(
+                unicode(host),
+                OpenSSLCertificateOptions(verify=False).getContext()
+            )
+        else:
+            return optionsForClientTLS(unicode(host))
