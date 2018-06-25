@@ -481,10 +481,10 @@ class FederationHandler(BaseHandler):
         if not visibility_ids:
             defer.returnValue(events)
 
-        events = yield self.store.get_events(visibility_ids)
+        event_map = yield self.store.get_events(visibility_ids)
         all_open = all(
             e.content.get("history_visibility") in (None, "shared", "world_readable")
-            for e in events
+            for e in events.itervalues()
         )
 
         if all_open:
