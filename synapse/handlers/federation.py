@@ -460,6 +460,14 @@ class FederationHandler(BaseHandler):
     @measure_func("_filter_events_for_server")
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
+        """Filter the given events for the given server, redacting those the
+        server can't see.
+
+        Assumes the server is currently in the room.
+
+        Returns
+            list[FrozenEvent]
+        """
         # First lets check to see if all the events have a history visibility
         # of "shared" or "world_readable". If thats the case then we don't
         # need to check membership (as we know the server is in the room).
