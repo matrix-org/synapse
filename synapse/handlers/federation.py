@@ -480,7 +480,7 @@ class FederationHandler(BaseHandler):
 
         visibility_ids = set()
         for sids in event_to_state_ids.itervalues():
-            hist = event_to_state_ids.get((EventTypes.RoomHistoryVisibility, ""))
+            hist = sids.get((EventTypes.RoomHistoryVisibility, ""))
             if hist:
                 visibility_ids.add(hist)
 
@@ -492,7 +492,7 @@ class FederationHandler(BaseHandler):
         event_map = yield self.store.get_events(visibility_ids)
         all_open = all(
             e.content.get("history_visibility") in (None, "shared", "world_readable")
-            for e in events.itervalues()
+            for e in event_map.itervalues()
         )
 
         if all_open:
@@ -505,7 +505,7 @@ class FederationHandler(BaseHandler):
             frozenset(e.event_id for e in events),
             types=(
                 (EventTypes.RoomHistoryVisibility, ""),
-                (EventTypes.Member, None)
+                (EventTypes.Member, None),
             )
         )
 
