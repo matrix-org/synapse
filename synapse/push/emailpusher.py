@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
 import logging
@@ -199,7 +199,7 @@ class EmailPusher(object):
                     self.timed_call = None
 
         if soonest_due_at is not None:
-            self.timed_call = reactor.callLater(
+            self.timed_call = self.hs.get_reactor().callLater(
                 self.seconds_until(soonest_due_at), self.on_timer
             )
 

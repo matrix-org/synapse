@@ -20,7 +20,7 @@ import sys
 from canonicaljson import encode_canonical_json
 import six
 from six import string_types, itervalues, iteritems
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.internet.defer import succeed
 from twisted.python.failure import Failure
 
@@ -157,7 +157,7 @@ class MessageHandler(BaseHandler):
             # remove the purge from the list 24 hours after it completes
             def clear_purge():
                 del self._purges_by_id[purge_id]
-            reactor.callLater(24 * 3600, clear_purge)
+            self.hs.get_reactor().callLater(24 * 3600, clear_purge)
 
     def get_purge_status(self, purge_id):
         """Get the current status of an active purge
