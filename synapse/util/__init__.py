@@ -34,6 +34,9 @@ def unwrapFirstError(failure):
 class Clock(object):
     """
     A Clock wraps a Twisted reactor and provides utilities on top of it.
+
+    Args:
+        reactor: The Twisted reactor to use.
     """
     _reactor = attr.ib()
 
