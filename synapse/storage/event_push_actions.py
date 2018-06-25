@@ -83,6 +83,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self.find_stream_orderings_looping_call = self._clock.looping_call(
             self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
+        self._rotate_delay = 3
+        self._rotate_count = 10000
 
     @cachedInlineCallbacks(num_args=3, tree=True, max_entries=5000)
     def get_unread_event_push_actions_by_room_for_user(
@@ -799,7 +801,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 )
                 if caught_up:
                     break
-                yield self.hs.get_clock().sleep(5)
+                yield self.hs.get_clock().sleep(self._rotate_delay)
         finally:
             self._doing_notif_rotation = False
 
@@ -820,8 +822,8 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         txn.execute("""
             SELECT stream_ordering FROM event_push_actions
             WHERE stream_ordering > ?
-            ORDER BY stream_ordering ASC LIMIT 1 OFFSET 50000
-        """, (old_rotate_stream_ordering,))
+            ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
+        """, (old_rotate_stream_ordering, self._rotate_count))
         stream_row = txn.fetchone()
         if stream_row:
             offset_stream_ordering, = stream_row

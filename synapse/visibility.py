@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.constants import Membership, EventTypes
 
 from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
-
-import logging
 
 
 logger = logging.getLogger(__name__)
@@ -43,21 +43,35 @@ MEMBERSHIP_PRIORITY = (
 
 
 @defer.inlineCallbacks
-def filter_events_for_clients(store, user_tuples, events, event_id_to_state,
-                              always_include_ids=frozenset()):
-    """ Returns dict of user_id -> list of events that user is allowed to
-    see.
+def filter_events_for_client(store, user_id, events, is_peeking=False,
+                             always_include_ids=frozenset()):
+    """
+    Check which events a user is allowed to see
 
     Args:
-        user_tuples (str, bool): (user id, is_peeking) for each user to be
-            checked. is_peeking should be true if:
-            * the user is not currently a member of the room, and:
-            * the user has not been a member of the room since the
-            given events
-        events ([synapse.events.EventBase]): list of events to filter
+        store (synapse.storage.DataStore): our datastore (can also be a worker
+            store)
+        user_id(str): user id to be checked
+        events(list[synapse.events.EventBase]): sequence of events to be checked
+        is_peeking(bool): should be True if:
+          * the user is not currently a member of the room, and:
+          * the user has not been a member of the room since the given
+            events
         always_include_ids (set(event_id)): set of event ids to specifically
             include (unless sender is ignored)
+
+    Returns:
+        Deferred[list[synapse.events.EventBase]]
     """
+    types = (
+        (EventTypes.RoomHistoryVisibility, ""),
+        (EventTypes.Member, user_id),
+    )
+    event_id_to_state = yield store.get_state_for_events(
+        frozenset(e.event_id for e in events),
+        types=types,
+    )
+
     forgotten = yield make_deferred_yieldable(defer.gatherResults([
         defer.maybeDeferred(
             preserve_fn(store.who_forgot_in_room),
@@ -71,25 +85,20 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state,
         row["event_id"] for rows in forgotten for row in rows
     )
 
-    ignore_dict_content = yield store.get_global_account_data_by_type_for_users(
-        "m.ignored_user_list", user_ids=[user_id for user_id, _ in user_tuples]
+    ignore_dict_content = yield store.get_global_account_data_by_type_for_user(
+        "m.ignored_user_list", user_id,
     )
 
     # FIXME: This will explode if people upload something incorrect.
-    ignore_dict = {
-        user_id: frozenset(
-            content.get("ignored_users", {}).keys() if content else []
-        )
-        for user_id, content in ignore_dict_content.items()
-    }
+    ignore_list = frozenset(
+        ignore_dict_content.get("ignored_users", {}).keys()
+        if ignore_dict_content else []
+    )
 
-    def allowed(event, user_id, is_peeking, ignore_list):
+    def allowed(event):
         """
         Args:
             event (synapse.events.EventBase): event to check
-            user_id (str)
-            is_peeking (bool)
-            ignore_list (list): list of users to ignore
         """
         if not event.is_state() and event.sender in ignore_list:
             return False
@@ -184,43 +193,4 @@ def filter_events_for_clients(store, user_tuples, events, event_id_to_state,
             # we don't know when they left.
             return not is_peeking
 
-    defer.returnValue({
-        user_id: [
-            event
-            for event in events
-            if allowed(event, user_id, is_peeking, ignore_dict.get(user_id, []))
-        ]
-        for user_id, is_peeking in user_tuples
-    })
-
-
-@defer.inlineCallbacks
-def filter_events_for_client(store, user_id, events, is_peeking=False,
-                             always_include_ids=frozenset()):
-    """
-    Check which events a user is allowed to see
-
-    Args:
-        user_id(str): user id to be checked
-        events([synapse.events.EventBase]): list of events to be checked
-        is_peeking(bool): should be True if:
-          * the user is not currently a member of the room, and:
-          * the user has not been a member of the room since the given
-            events
-
-    Returns:
-        [synapse.events.EventBase]
-    """
-    types = (
-        (EventTypes.RoomHistoryVisibility, ""),
-        (EventTypes.Member, user_id),
-    )
-    event_id_to_state = yield store.get_state_for_events(
-        frozenset(e.event_id for e in events),
-        types=types
-    )
-    res = yield filter_events_for_clients(
-        store, [(user_id, is_peeking)], events, event_id_to_state,
-        always_include_ids=always_include_ids,
-    )
-    defer.returnValue(res.get(user_id, []))
+    defer.returnValue(list(filter(allowed, events)))

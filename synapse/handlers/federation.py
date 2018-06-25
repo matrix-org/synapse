@@ -103,8 +103,10 @@ class FederationHandler(BaseHandler):
         """
 
         # We reprocess pdus when we have seen them only as outliers
-        existing = yield self.get_persisted_pdu(
-            origin, pdu.event_id, do_auth=False
+        existing = yield self.store.get_event(
+            pdu.event_id,
+            allow_none=True,
+            allow_rejected=True,
         )
 
         # FIXME: Currently we fetch an event again when we already have it
@@ -1464,11 +1466,20 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def get_persisted_pdu(self, origin, event_id, do_auth=True):
-        """ Get a PDU from the database with given origin and id.
+    def get_persisted_pdu(self, origin, event_id):
+        """Get an event from the database for the given server.
+
+        Args:
+            origin [str]: hostname of server which is requesting the event; we
+               will check that the server is allowed to see it.
+            event_id [str]: id of the event being requested
 
         Returns:
-            Deferred: Results in a `Pdu`.
+            Deferred[EventBase|None]: None if we know nothing about the event;
+                otherwise the (possibly-redacted) event.
+
+        Raises:
+            AuthError if the server is not currently in the room
         """
         event = yield self.store.get_event(
             event_id,
@@ -1489,20 +1500,17 @@ class FederationHandler(BaseHandler):
                     )
                 )
 
-            if do_auth:
-                in_room = yield self.auth.check_host_in_room(
-                    event.room_id,
-                    origin
-                )
-                if not in_room:
-                    raise AuthError(403, "Host not in room.")
+            in_room = yield self.auth.check_host_in_room(
+                event.room_id,
+                origin
+            )
+            if not in_room:
+                raise AuthError(403, "Host not in room.")
 
-                events = yield self._filter_events_for_server(
-                    origin, event.room_id, [event]
-                )
-
-                event = events[0]
-
+            events = yield self._filter_events_for_server(
+                origin, event.room_id, [event]
+            )
+            event = events[0]
             defer.returnValue(event)
         else:
             defer.returnValue(None)

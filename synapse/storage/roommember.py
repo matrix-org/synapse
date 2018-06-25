@@ -455,7 +455,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         defer.returnValue(joined_hosts)
 
-    @cached(max_entries=10000, iterable=True)
+    @cached(max_entries=10000)
     def _get_joined_hosts_cache(self, room_id):
         return _JoinedHostsCache(self, room_id)
 
