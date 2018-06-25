@@ -45,11 +45,6 @@ class Clock(object):
             res = yield d
         defer.returnValue(res)
 
-    def __init__(self, reactor=None):
-        if not reactor:
-            from twisted.internet import reactor
-        self._reactor = reactor
-
     def time(self):
         """Returns the current system time in seconds since epoch."""
         return self._reactor.seconds()
