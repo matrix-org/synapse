@@ -460,6 +460,47 @@ class FederationHandler(BaseHandler):
     @measure_func("_filter_events_for_server")
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
+        """Filter the given events for the given server, redacting those the
+        server can't see.
+
+        Assumes the server is currently in the room.
+
+        Returns
+            list[FrozenEvent]
+        """
+        # First lets check to see if all the events have a history visibility
+        # of "shared" or "world_readable". If thats the case then we don't
+        # need to check membership (as we know the server is in the room).
+        event_to_state_ids = yield self.store.get_state_ids_for_events(
+            frozenset(e.event_id for e in events),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+            )
+        )
+
+        visibility_ids = set()
+        for sids in event_to_state_ids.itervalues():
+            hist = sids.get((EventTypes.RoomHistoryVisibility, ""))
+            if hist:
+                visibility_ids.add(hist)
+
+        # If we failed to find any history visibility events then the default
+        # is "shared" visiblity.
+        if not visibility_ids:
+            defer.returnValue(events)
+
+        event_map = yield self.store.get_events(visibility_ids)
+        all_open = all(
+            e.content.get("history_visibility") in (None, "shared", "world_readable")
+            for e in event_map.itervalues()
+        )
+
+        if all_open:
+            defer.returnValue(events)
+
+        # Ok, so we're dealing with events that have non-trivial visibility
+        # rules, so we need to also get the memberships of the room.
+
         event_to_state_ids = yield self.store.get_state_ids_for_events(
             frozenset(e.event_id for e in events),
             types=(
