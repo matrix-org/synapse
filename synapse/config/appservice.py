@@ -19,6 +19,7 @@ from synapse.types import UserID
 
 import yaml
 import logging
+import re
 
 from six import string_types
 from six.moves.urllib import parse as urlparse
@@ -31,6 +32,18 @@ class AppServiceConfig(Config):
     def read_config(self, config):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
+        s_blacklist = config.get(
+            "app_service_server_blacklist", []
+        )
+        try:
+            self.app_service_server_blacklist = [
+                re.compile(x) for x in s_blacklist
+            ]
+        except re.error as ex:
+            raise ConfigError(
+                "Could not compile regex in app_service_server_blacklist: %s",
+                ex.message
+            )
 
     def default_config(cls, **kwargs):
         return """\

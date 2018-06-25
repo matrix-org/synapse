@@ -23,6 +23,8 @@ from synapse.util.metrics import Measure
 from synapse.util.logcontext import (
     make_deferred_yieldable, run_in_background,
 )
+from synapse.types import get_domain_from_id
+
 from prometheus_client import Counter
 
 import logging
@@ -52,6 +54,7 @@ class ApplicationServicesHandler(object):
         self.scheduler = hs.get_application_service_scheduler()
         self.started_scheduler = False
         self.clock = hs.get_clock()
+        self.server_blacklist = hs.config.app_service_server_blacklist
         self.notify_appservices = hs.config.notify_appservices
 
         self.current_max = 0
@@ -93,6 +96,14 @@ class ApplicationServicesHandler(object):
 
                     @defer.inlineCallbacks
                     def handle_event(event):
+                        ev_domain = get_domain_from_id(event.event_id)
+                        if any(srv_re.match(ev_domain) is not None for srv_re in self.server_blacklist):
+                            logger.info(
+                                "Ignoring %s from %s, matches server blacklist",
+                                event.event_id,
+                                ev_domain
+                            )
+                            return
                         # Gather interested services
                         services = yield self._get_services_for_event(event)
                         if len(services) == 0:
