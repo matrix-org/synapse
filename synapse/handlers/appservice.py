@@ -97,7 +97,8 @@ class ApplicationServicesHandler(object):
                     @defer.inlineCallbacks
                     def handle_event(event):
                         ev_domain = get_domain_from_id(event.event_id)
-                        if any(srv_re.match(ev_domain) is not None for srv_re in self.server_blacklist):
+                        if any(srv_re.match(ev_domain) is not None
+                           for srv_re in self.server_blacklist):
                             logger.info(
                                 "Ignoring %s from %s, matches server blacklist",
                                 event.event_id,
