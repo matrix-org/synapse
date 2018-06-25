@@ -44,7 +44,8 @@ def matrix_federation_endpoint(reactor, destination, tls_client_options_factory=
     Args:
         reactor: Twisted reactor.
         destination (bytes): The name of the server to connect to.
-        tls_client_options_factory (synapse.crypto.context_factory.ClientTLSOptionsFactory): 
+        tls_client_options_factory
+            (synapse.crypto.context_factory.ClientTLSOptionsFactory):
             Factory which generates TLS options for client connections.
         timeout (int): connection timeout in seconds
     """

@@ -69,7 +69,7 @@ class MatrixFederationEndpointFactory(object):
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
-            tls_client_options_factory = self.tls_client_options_factory
+            tls_client_options_factory=self.tls_client_options_factory
         )
 
 

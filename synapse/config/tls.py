@@ -47,7 +47,9 @@ class TlsConfig(Config):
 
         self.tls_fingerprints = config["tls_fingerprints"]
 
-        self.tls_ignore_certificate_validation = config.get("tls_ignore_certificate_validation", False)
+        self.tls_ignore_certificate_validation = config.get(
+            "tls_ignore_certificate_validation", False
+        )
 
         # Check that our own certificate is included in the list of fingerprints
         # and include it if it is not.

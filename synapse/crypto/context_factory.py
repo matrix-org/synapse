@@ -14,8 +14,8 @@
 
 from twisted.internet import ssl
 from OpenSSL import SSL, crypto
-from twisted.internet._sslverify import _defaultCurveName, ClientTLSOptions, OpenSSLCertificateOptions, \
-    optionsForClientTLS
+from twisted.internet._sslverify import _defaultCurveName, ClientTLSOptions, \
+    OpenSSLCertificateOptions, optionsForClientTLS
 
 import logging
 
