@@ -11,18 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from twisted.internet import ssl
-from OpenSSL import SSL, crypto
-from twisted.internet._sslverify import _defaultCurveName, ClientTLSOptions, \
-    OpenSSLCertificateOptions, optionsForClientTLS
-
 import logging
+
+import idna
+from OpenSSL import SSL, crypto
+from twisted.internet.ssl import ContextFactory, CertificateOptions
+from twisted.internet._sslverify import _defaultCurveName, _tolerateErrors
+from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
+from zope.interface import implementer
 
 logger = logging.getLogger(__name__)
 
 
-class ServerContextFactory(ssl.ContextFactory):
+class ServerContextFactory(ContextFactory):
     """Factory for PyOpenSSL SSL contexts that are used to handle incoming
     connections and to make connections to remote servers."""
 
@@ -51,18 +52,31 @@ class ServerContextFactory(ssl.ContextFactory):
         return self._context
 
 
-class ClientTLSOptionsNoCertVerification(ClientTLSOptions):
-    """Redefinition of ClientTLSOptions to completely ignore certificate
-    validation. Should be kept in sync with the original class in Twisted.
-    This version of ClientTLSOptions is only intended for development use."""
+@implementer(IOpenSSLClientConnectionCreator)
+class ClientTLSOptions(object):
+    """
+    Client creator for TLS without certificate identity verification. This is a
+    copy of twisted.internet._sslverify.ClientTLSOptions with the identity
+    verification left out. For documentation, see the twisted documentation.
+    """
 
-    def __init__(self, *args, **kwargs):
-        super(ClientTLSOptionsNoCertVerification, self).__init__(*args, **kwargs)
+    def __init__(self, hostname, ctx):
+        self._ctx = ctx
+        self._hostname = hostname
+        self._hostnameBytes = idna.encode(hostname)
+        ctx.set_info_callback(
+            _tolerateErrors(self._identityVerifyingInfoCallback)
+        )
 
-        def do_nothing(*_args, **_kwargs):
-            pass
+    def clientConnectionForTLS(self, tlsProtocol):
+        context = self._ctx
+        connection = SSL.Connection(context, None)
+        connection.set_app_data(tlsProtocol)
+        return connection
 
-        self._ctx.set_info_callback(do_nothing)
+    def _identityVerifyingInfoCallback(self, connection, where, ret):
+        if where & SSL.SSL_CB_HANDSHAKE_START:
+            connection.set_tlsext_host_name(self._hostnameBytes)
 
 
 class ClientTLSOptionsFactory(object):
@@ -70,13 +84,11 @@ class ClientTLSOptionsFactory(object):
     to remote servers for federation."""
 
     def __init__(self, config):
-        self._ignore_certificate_validation = config.tls_ignore_certificate_validation
+        # We don't use config options yet
+        pass
 
     def get_options(self, host):
-        if self._ignore_certificate_validation:
-            return ClientTLSOptionsNoCertVerification(
-                unicode(host),
-                OpenSSLCertificateOptions(verify=False).getContext()
-            )
-        else:
-            return optionsForClientTLS(unicode(host))
+        return ClientTLSOptions(
+            unicode(host),
+            CertificateOptions(verify=False).getContext()
+        )

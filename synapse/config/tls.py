@@ -47,10 +47,6 @@ class TlsConfig(Config):
 
         self.tls_fingerprints = config["tls_fingerprints"]
 
-        self.tls_ignore_certificate_validation = config.get(
-            "tls_ignore_certificate_validation", False
-        )
-
         # Check that our own certificate is included in the list of fingerprints
         # and include it if it is not.
         x509_certificate_bytes = crypto.dump_certificate(
@@ -76,8 +72,6 @@ class TlsConfig(Config):
         tls_certificate_path = base_key_name + ".tls.crt"
         tls_private_key_path = base_key_name + ".tls.key"
         tls_dh_params_path = base_key_name + ".tls.dh"
-
-        tls_ignore_certificate_validation = False
 
         return """\
         # PEM encoded X509 certificate for TLS.
@@ -123,11 +117,6 @@ class TlsConfig(Config):
         #
         tls_fingerprints: []
         # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
-
-        # Ignore certificate validation for TLS client connections to other
-        # homeservers using federation. Don't enable this in a production
-        # environment, unless you know what you are doing!
-        tls_ignore_certificate_validation: %(tls_ignore_certificate_validation)s
         """ % locals()
 
     def read_tls_certificate(self, cert_path):

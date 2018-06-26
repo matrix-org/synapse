@@ -65,7 +65,7 @@ def matrix_federation_endpoint(reactor, destination, tls_client_options_factory=
     else:
         def transport_endpoint(reactor, host, port, timeout):
             return wrapClientTLS(
-                tls_client_options_factory.get_options(unicode(host)),
+                tls_client_options_factory.get_options(host),
                 HostnameEndpoint(reactor, host, port, timeout=timeout))
         default_port = 8448
 
