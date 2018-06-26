@@ -249,7 +249,7 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
-        body = parse_json_object_from_request(request)
+        body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
             raise SynapseError(
