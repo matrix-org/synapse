@@ -47,6 +47,7 @@ class DeactivateAccountHandler(BaseHandler):
 
         Args:
             user_id (str): ID of user to be deactivated
+            erase_data (bool): whether to GDPR-erase the user's data
 
         Returns:
             Deferred
