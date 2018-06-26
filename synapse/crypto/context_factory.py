@@ -13,8 +13,8 @@
 # limitations under the License.
 import logging
 
-import idna
 from OpenSSL import SSL, crypto
+from twisted.internet._idna import _idnaBytes
 from twisted.internet.ssl import ContextFactory, CertificateOptions
 from twisted.internet._sslverify import _defaultCurveName, _tolerateErrors
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
@@ -63,7 +63,7 @@ class ClientTLSOptions(object):
     def __init__(self, hostname, ctx):
         self._ctx = ctx
         self._hostname = hostname
-        self._hostnameBytes = idna.encode(hostname)
+        self._hostnameBytes = _idnaBytes(hostname)
         ctx.set_info_callback(
             _tolerateErrors(self._identityVerifyingInfoCallback)
         )
