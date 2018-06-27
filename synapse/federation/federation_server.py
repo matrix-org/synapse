@@ -549,7 +549,9 @@ class FederationServer(FederationBase):
                 affected=pdu.event_id,
             )
 
-        yield self.handler.on_receive_pdu(origin, pdu, get_missing=True)
+        yield self.handler.on_receive_pdu(
+            origin, pdu, get_missing=True, sent_to_us_directly=True,
+        )
 
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name
