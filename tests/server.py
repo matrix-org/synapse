@@ -15,6 +15,10 @@ from tests.utils import setup_test_homeserver as _sth
 
 @attr.s
 class FakeChannel(object):
+    """
+    A fake Twisted Web Channel (the part that interfaces with the
+    wire).
+    """
 
     result = attr.ib(factory=dict)
 
@@ -51,6 +55,10 @@ class FakeChannel(object):
 
 
 class FakeSite:
+    """
+    A fake Twisted Web Site, with mocks of the extra things that
+    Synapse adds.
+    """
 
     server_version_string = b"1"
     site_tag = "test"
@@ -65,6 +73,10 @@ class FakeSite:
 
 
 def make_request(method, path, content=b""):
+    """
+    Make a web request using the given method and path, feed it the
+    content, and return the Request and the Channel underneath.
+    """
 
     if isinstance(content, text_type):
         content = content.encode('utf8')
@@ -97,7 +109,13 @@ def wait_until_result(clock, channel, timeout=100):
 
 
 class ThreadedMemoryReactorClock(MemoryReactorClock):
+    """
+    A MemoryReactorClock that supports callFromThread.
+    """
     def callFromThread(self, callback, *args, **kwargs):
+        """
+        Make the callback fire in the next reactor iteration.
+        """
         d = Deferred()
         d.addCallback(lambda x: callback(*args, **kwargs))
         self.callLater(0, d.callback, True)
@@ -105,10 +123,13 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
 
 def setup_test_homeserver(*args, **kwargs):
-
+    """
+    Set up a synchronous test server, driven by the reactor used by
+    the homeserver.
+    """
     d = _sth(*args, **kwargs).result
 
-    # Make the pool synchronous.
+    # Make the thread pool synchronous.
     clock = d.get_clock()
     pool = d.get_db_pool()
 
@@ -136,6 +157,9 @@ def setup_test_homeserver(*args, **kwargs):
     pool.runInteraction = runInteraction
 
     class ThreadPool:
+        """
+        Threadless thread pool.
+        """
         def start(self):
             pass
 
