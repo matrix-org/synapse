@@ -240,35 +240,37 @@ class FederationHandler(BaseHandler):
                     affected=pdu.event_id,
                 )
             elif prevs - seen:
-                # If we're walking back up the chain to fetch it, then
-                # try and find the states. If we can't get the states,
-                # discard it.
+                # Calculate the state of the previous events, and
+                # de-conflict them to find the current state.
                 state_groups = []
                 auth_chains = set()
                 try:
-                    # Get the ones we know about
+                    # Get the state of the events we know about
                     ours = yield self.store.get_state_groups(pdu.room_id, list(seen))
                     state_groups.append(ours)
 
+                    # Ask the remote server for the states we don't
+                    # know about
                     for p in prevs - seen:
-                        state, auth_chain = yield self.replication_layer.get_state_for_room(
+                        state, got_auth_chain = yield self.replication_layer.get_state_for_room(
                             origin, pdu.room_id, p
                         )
-                        auth_chains.update(auth_chain)
-                        state_group = {
-                            (x.type, x.state_key): x.event_id for x in state
-                        }
+                        auth_chains.update(got_auth_chain)
+                        state_group = {(x.type, x.state_key): x.event_id for x in state}
                         state_groups.append(state_group)
 
+                    # Resolve any conflicting state
                     def fetch(ev_ids):
                         return self.store.get_events(
-                            ev_ids, get_prev_content=False, check_redacted=False,
+                            ev_ids, get_prev_content=False, check_redacted=False
                         )
 
-                    state = yield resolve_events_with_factory(state_groups, {pdu.event_id: pdu}, fetch)
+                    state_map = yield resolve_events_with_factory(
+                        state_groups, {pdu.event_id: pdu}, fetch
+                    )
 
-                    state = yield self.store.get_events(state.values())
-                    state = state.values()
+                    state = (yield self.store.get_events(state_map.values())).values()
+                    auth_chain = list(auth_chains)
                 except Exception:
                     raise FederationError(
                         "ERROR",
