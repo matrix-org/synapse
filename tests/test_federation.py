@@ -35,7 +35,9 @@ class MessageAcceptTests(unittest.TestCase):
 
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
-            maybeDeferred(self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id)
+            maybeDeferred(
+                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+            )
         )[0]
 
         join_event = FrozenEvent(
@@ -72,7 +74,9 @@ class MessageAcceptTests(unittest.TestCase):
         # Make sure we actually joined the room
         self.assertEqual(
             self.successResultOf(
-                maybeDeferred(self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id)
+                maybeDeferred(
+                    self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+                )
             )[0],
             "$join:test.serv",
         )
@@ -92,7 +96,9 @@ class MessageAcceptTests(unittest.TestCase):
 
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
-            maybeDeferred(self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id)
+            maybeDeferred(
+                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+            )
         )[0]
 
         # Now lie about an event
@@ -129,7 +135,9 @@ class MessageAcceptTests(unittest.TestCase):
         )
 
         # Make sure the invalid event isn't there
-        extrem = maybeDeferred(self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id)
+        extrem = maybeDeferred(
+            self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+        )
         self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")
 
     @unittest.DEBUG
@@ -181,7 +189,9 @@ class MessageAcceptTests(unittest.TestCase):
 
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
-            maybeDeferred(self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id)
+            maybeDeferred(
+                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+            )
         )[0]
 
         # Make a good event
@@ -226,7 +236,9 @@ class MessageAcceptTests(unittest.TestCase):
         )
         self.reactor.advance(1)
 
-        extrem = maybeDeferred(self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id)
+        extrem = maybeDeferred(
+            self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+        )
         self.assertEqual(self.successResultOf(extrem)[0], "two:test.serv")
 
         state = self.homeserver.get_state_handler().get_current_state_ids(self.room_id)
