@@ -5,7 +5,7 @@ from getopt import getopt
 import sqlite3
 import psycopg2
 
-if len(argv) < 3 or (argv[1] != "sqlite" and argv[1] != "postgresql") or (argv[1] == "postgresql" and len(argv) < 6):
+if len(argv) < 3 or (argv[1] != "sqlite" and argv[1] != "postgresql"):
     print "Usage:"
     print "    " + argv[0] + " sqlite <path_to_db_file>"
     print "or"
