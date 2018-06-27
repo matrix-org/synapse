@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
 
 from sys import argv
-from os import system
 import sqlite3
 import psycopg2
 
