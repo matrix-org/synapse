@@ -232,8 +232,10 @@ class FederationHandler(BaseHandler):
                 raise FederationError(
                     "ERROR",
                     403,
-                    ("Your server isn't divulging details about prev_events "
-                     "referenced in this event."),
+                    (
+                        "Your server isn't divulging details about prev_events "
+                        "referenced in this event."
+                    ),
                     affected=pdu.event_id,
                 )
             elif prevs - seen:
@@ -252,7 +254,8 @@ class FederationHandler(BaseHandler):
                         state, got_auth_chain = (
                             yield self.replication_layer.get_state_for_room(
                                 origin, pdu.room_id, p
-                        ))
+                            )
+                        )
                         auth_chains.update(got_auth_chain)
                         state_group = {(x.type, x.state_key): x.event_id for x in state}
                         state_groups.append(state_group)
