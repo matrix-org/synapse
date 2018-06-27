@@ -16,7 +16,7 @@
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class EmailConfig(Config):
@@ -49,13 +49,13 @@ class EmailConfig(Config):
                     missing.append(k)
 
             if (len(missing) > 0):
-                raise RuntimeError(
+                raise ConfigError(
                     "email.enable_notifs is True but required keys are missing: %s" %
                     (", ".join(["email." + k for k in missing]),)
                 )
 
             if config.get("public_baseurl") is None:
-                raise RuntimeError(
+                raise ConfigError(
                     "email.enable_notifs is True but no public_baseurl is set"
                 )
 
@@ -88,11 +88,8 @@ class EmailConfig(Config):
             # make sure it's valid
             parsed = email.utils.parseaddr(self.email_notif_from)
             if parsed[1] == '':
-                raise RuntimeError("Invalid notif_from address")
-        else:
-            self.email_enable_notifs = False
-            # Not much point setting defaults for the rest: it would be an
-            # error for them to be used.
+                raise ConfigError("Invalid notif_from address")
+        
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
