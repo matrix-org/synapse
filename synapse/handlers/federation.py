@@ -169,10 +169,7 @@ class FederationHandler(BaseHandler):
                 defer.returnValue(None)
 
         state = None
-
         auth_chain = []
-
-        fetch_state = False
 
         # Get missing pdus if necessary.
         if not pdu.internal_metadata.is_outlier():
@@ -252,9 +249,10 @@ class FederationHandler(BaseHandler):
                     # Ask the remote server for the states we don't
                     # know about
                     for p in prevs - seen:
-                        state, got_auth_chain = yield self.replication_layer.get_state_for_room(
-                            origin, pdu.room_id, p
-                        )
+                        state, got_auth_chain = (
+                            yield self.replication_layer.get_state_for_room(
+                                origin, pdu.room_id, p
+                        ))
                         auth_chains.update(got_auth_chain)
                         state_group = {(x.type, x.state_key): x.event_id for x in state}
                         state_groups.append(state_group)
