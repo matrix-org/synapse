@@ -76,7 +76,7 @@ class Cache(object):
 
         self.cache = LruCache(
             max_size=max_entries, keylen=keylen, cache_type=cache_type,
-            size_callback=(lambda d: len(d) if d else 0) if iterable else None,
+            size_callback=(lambda d: len(d)) if iterable else None,
             evicted_callback=self._on_evicted,
         )
 
@@ -216,8 +216,9 @@ class Cache(object):
 class _CacheDescriptorBase(object):
     def __init__(self, orig, num_args, inlineCallbacks, cache_context=False):
         self.orig = orig
+        self.inlineCallbacks = inlineCallbacks
 
-        if inlineCallbacks:
+        if self.inlineCallbacks:
             self.function_to_call = defer.inlineCallbacks(orig)
         else:
             self.function_to_call = orig
@@ -380,8 +381,10 @@ class CacheDescriptor(_CacheDescriptorBase):
 
                 if isinstance(cached_result_d, ObservableDeferred):
                     observer = cached_result_d.observe()
-                else:
+                elif self.inlineCallbacks:
                     observer = defer.succeed(cached_result_d)
+                else:
+                    observer = cached_result_d
 
             except KeyError:
                 ret = defer.maybeDeferred(
