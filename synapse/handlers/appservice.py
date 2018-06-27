@@ -99,12 +99,12 @@ class ApplicationServicesHandler(object):
                         ev_domain = get_domain_from_id(event.sender)
                         if any(srv_re.match(ev_domain) is not None
                            for srv_re in self.server_blacklist):
-                            logger.info(
-                                "Ignoring %s from %s, matches server blacklist",
-                                event.sender,
-                                ev_domain
-                            )
-                            return
+                                logger.info(
+                                    "Ignoring %s from %s, matches server blacklist",
+                                    event.sender,
+                                    ev_domain
+                                )
+                                return
                         # Gather interested services
                         services = yield self._get_services_for_event(event)
                         if len(services) == 0:

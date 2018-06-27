@@ -20,6 +20,7 @@ from tests.utils import MockClock
 from synapse.handlers.appservice import ApplicationServicesHandler
 
 from mock import Mock
+import re
 
 
 class AppServiceHandlerTestCase(unittest.TestCase):
@@ -32,9 +33,14 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         hs = Mock()
         hs.get_datastore = Mock(return_value=self.mock_store)
         self.mock_store.get_received_ts.return_value = 0
+        self.mock_store.app_service_server_blacklist = []
         hs.get_application_service_api = Mock(return_value=self.mock_as_api)
         hs.get_application_service_scheduler = Mock(return_value=self.mock_scheduler)
         hs.get_clock.return_value = MockClock()
+        hs.config.app_service_server_blacklist = [
+            re.compile("evilplaceofevil"),
+            re.compile("bad.placeof..*")
+        ]
         self.handler = ApplicationServicesHandler(hs)
 
     @defer.inlineCallbacks
@@ -63,6 +69,34 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
             interested_service, event
         )
+
+    @defer.inlineCallbacks
+    def test_ignore_blacklisted_services(self):
+        interested_service = self._mkservice(is_interested=True)
+        services = [
+            interested_service,
+        ]
+
+        self.mock_store.get_app_services = Mock(return_value=services)
+        self.mock_store.get_user_by_id = Mock(return_value=[])
+
+        eventLiteral = Mock(
+            sender="@someone:evilplaceofevil",
+            type="m.room.message",
+            room_id="!foo:bar"
+        )
+        eventMatched = Mock(
+            sender="@someone:bad.placeof.bad",
+            type="m.room.message",
+            room_id="!foo:bar"
+        )
+        self.mock_store.get_new_events_for_appservice.side_effect = [
+            (0, [eventLiteral]),
+            (0, [eventMatched])
+        ]
+        self.mock_as_api.push = Mock()
+        yield self.handler.notify_interested_services(0)
+        assert self.mock_scheduler.submit_event_for_as.called is False
 
     @defer.inlineCallbacks
     def test_query_user_exists_unknown_user(self):
