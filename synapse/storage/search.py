@@ -16,7 +16,7 @@
 from collections import namedtuple
 import logging
 import re
-import simplejson as json
+from canonicaljson import json
 
 from six import string_types
 

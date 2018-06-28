@@ -42,7 +42,7 @@ from twisted.web._newclient import ResponseDone
 from six import StringIO
 
 from prometheus_client import Counter
-import simplejson as json
+from canonicaljson import json
 import logging
 import urllib
 

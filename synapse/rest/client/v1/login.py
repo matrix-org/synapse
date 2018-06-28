@@ -23,7 +23,8 @@ from synapse.util.msisdn import phone_number_to_msisdn
 
 from .base import ClientV1RestServlet, client_path_patterns
 
-import simplejson as json
+from canonicaljson import json
+
 import urllib
 from six.moves.urllib import parse as urlparse
 

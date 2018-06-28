@@ -16,6 +16,8 @@
 
 from twisted.internet import defer, threads
 
+from canonicaljson import json
+
 from ._base import BaseHandler
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -32,7 +34,6 @@ from twisted.web.client import PartialDownloadError
 import logging
 import bcrypt
 import pymacaroons
-import simplejson
 import attr
 
 import synapse.util.stringutils as stringutils
@@ -403,7 +404,7 @@ class AuthHandler(BaseHandler):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
-            resp_body = simplejson.loads(data)
+            resp_body = json.loads(data)
 
         if 'success' in resp_body:
             # Note that we do NOT check the hostname here: we explicitly

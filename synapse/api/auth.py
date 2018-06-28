@@ -19,6 +19,7 @@ from six import itervalues
 
 import pymacaroons
 from twisted.internet import defer
+from netaddr import IPAddress
 
 import synapse.types
 from synapse import event_auth
@@ -243,6 +244,11 @@ class Auth(object):
         )
         if app_service is None:
             defer.returnValue((None, None))
+
+        if app_service.ip_range_whitelist:
+            ip_address = IPAddress(self.hs.get_ip_from_request(request))
+            if ip_address not in app_service.ip_range_whitelist:
+                defer.returnValue((None, None))
 
         if "user_id" not in request.args:
             defer.returnValue((app_service.sender, app_service))
