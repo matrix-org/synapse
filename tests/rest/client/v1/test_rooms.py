@@ -958,6 +958,9 @@ class RoomInitialSyncTestCase(RestTestCase):
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1.room.register_deprecated_servlets(
+            hs, self.mock_resource
+        )
 
         # create the room
         self.room_id = yield self.create_room_as(self.user_id)

@@ -60,7 +60,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        synapse.rest.client.v1.register.register_servlets(hs, self.mock_resource)
+        synapse.rest.client.v1_only.register.register_servlets(hs, self.mock_resource)
         synapse.rest.client.v1.events.register_servlets(hs, self.mock_resource)
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
