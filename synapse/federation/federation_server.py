@@ -277,7 +277,7 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def on_pdu_request(self, origin, event_id):
-        pdu = yield self._get_persisted_pdu(origin, event_id)
+        pdu = yield self.handler.get_persisted_pdu(origin, event_id)
 
         if pdu:
             defer.returnValue(
@@ -469,17 +469,6 @@ class FederationServer(FederationBase):
     def on_openid_userinfo(self, token):
         ts_now_ms = self._clock.time_msec()
         return self.store.get_user_id_for_open_id_token(token, ts_now_ms)
-
-    @log_function
-    def _get_persisted_pdu(self, origin, event_id, do_auth=True):
-        """ Get a PDU from the database with given origin and id.
-
-        Returns:
-            Deferred: Results in a `Pdu`.
-        """
-        return self.handler.get_persisted_pdu(
-            origin, event_id, do_auth=do_auth
-        )
 
     def _transaction_from_pdus(self, pdu_list):
         """Returns a new Transaction containing the given PDUs suitable for

@@ -103,8 +103,10 @@ class FederationHandler(BaseHandler):
         """
 
         # We reprocess pdus when we have seen them only as outliers
-        existing = yield self.get_persisted_pdu(
-            origin, pdu.event_id, do_auth=False
+        existing = yield self.store.get_event(
+            pdu.event_id,
+            allow_none=True,
+            allow_rejected=True,
         )
 
         # FIXME: Currently we fetch an event again when we already have it
@@ -458,6 +460,47 @@ class FederationHandler(BaseHandler):
     @measure_func("_filter_events_for_server")
     @defer.inlineCallbacks
     def _filter_events_for_server(self, server_name, room_id, events):
+        """Filter the given events for the given server, redacting those the
+        server can't see.
+
+        Assumes the server is currently in the room.
+
+        Returns
+            list[FrozenEvent]
+        """
+        # First lets check to see if all the events have a history visibility
+        # of "shared" or "world_readable". If thats the case then we don't
+        # need to check membership (as we know the server is in the room).
+        event_to_state_ids = yield self.store.get_state_ids_for_events(
+            frozenset(e.event_id for e in events),
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+            )
+        )
+
+        visibility_ids = set()
+        for sids in event_to_state_ids.itervalues():
+            hist = sids.get((EventTypes.RoomHistoryVisibility, ""))
+            if hist:
+                visibility_ids.add(hist)
+
+        # If we failed to find any history visibility events then the default
+        # is "shared" visiblity.
+        if not visibility_ids:
+            defer.returnValue(events)
+
+        event_map = yield self.store.get_events(visibility_ids)
+        all_open = all(
+            e.content.get("history_visibility") in (None, "shared", "world_readable")
+            for e in event_map.itervalues()
+        )
+
+        if all_open:
+            defer.returnValue(events)
+
+        # Ok, so we're dealing with events that have non-trivial visibility
+        # rules, so we need to also get the memberships of the room.
+
         event_to_state_ids = yield self.store.get_state_ids_for_events(
             frozenset(e.event_id for e in events),
             types=(
@@ -493,7 +536,20 @@ class FederationHandler(BaseHandler):
             for e_id, key_to_eid in event_to_state_ids.iteritems()
         }
 
+        erased_senders = yield self.store.are_users_erased(
+            e.sender for e in events,
+        )
+
         def redact_disallowed(event, state):
+            # if the sender has been gdpr17ed, always return a redacted
+            # copy of the event.
+            if erased_senders[event.sender]:
+                logger.info(
+                    "Sender of %s has been erased, redacting",
+                    event.event_id,
+                )
+                return prune_event(event)
+
             if not state:
                 return event
 
@@ -1464,11 +1520,20 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def get_persisted_pdu(self, origin, event_id, do_auth=True):
-        """ Get a PDU from the database with given origin and id.
+    def get_persisted_pdu(self, origin, event_id):
+        """Get an event from the database for the given server.
+
+        Args:
+            origin [str]: hostname of server which is requesting the event; we
+               will check that the server is allowed to see it.
+            event_id [str]: id of the event being requested
 
         Returns:
-            Deferred: Results in a `Pdu`.
+            Deferred[EventBase|None]: None if we know nothing about the event;
+                otherwise the (possibly-redacted) event.
+
+        Raises:
+            AuthError if the server is not currently in the room
         """
         event = yield self.store.get_event(
             event_id,
@@ -1489,20 +1554,17 @@ class FederationHandler(BaseHandler):
                     )
                 )
 
-            if do_auth:
-                in_room = yield self.auth.check_host_in_room(
-                    event.room_id,
-                    origin
-                )
-                if not in_room:
-                    raise AuthError(403, "Host not in room.")
+            in_room = yield self.auth.check_host_in_room(
+                event.room_id,
+                origin
+            )
+            if not in_room:
+                raise AuthError(403, "Host not in room.")
 
-                events = yield self._filter_events_for_server(
-                    origin, event.room_id, [event]
-                )
-
-                event = events[0]
-
+            events = yield self._filter_events_for_server(
+                origin, event.room_id, [event]
+            )
+            event = events[0]
             defer.returnValue(event)
         else:
             defer.returnValue(None)

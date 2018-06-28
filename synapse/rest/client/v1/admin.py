@@ -16,6 +16,8 @@
 
 from twisted.internet import defer
 
+from six.moves import http_client
+
 from synapse.api.constants import Membership
 from synapse.api.errors import AuthError, SynapseError, Codes, NotFoundError
 from synapse.types import UserID, create_requester
@@ -247,6 +249,15 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
+        body = parse_json_object_from_request(request, allow_empty_body=True)
+        erase = body.get("erase", False)
+        if not isinstance(erase, bool):
+            raise SynapseError(
+                http_client.BAD_REQUEST,
+                "Param 'erase' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(requester.user)
@@ -254,7 +265,9 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        yield self._deactivate_account_handler.deactivate_account(target_user_id)
+        yield self._deactivate_account_handler.deactivate_account(
+            target_user_id, erase,
+        )
         defer.returnValue((200, {}))
 
 
