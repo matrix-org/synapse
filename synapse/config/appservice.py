@@ -157,6 +157,7 @@ def _load_appservice(hostname, as_info, config_filename):
             config_filename,
         )
 
+    ip_range_whitelist = None
     if as_info.get('ip_range_whitelist'):
         ip_range_whitelist = IPSet(
             as_info.get('ip_range_whitelist')

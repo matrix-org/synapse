@@ -86,11 +86,15 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_user_by_req_appservice_valid_token(self):
-        app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
+        app_service = Mock(
+            token="foobar", url="a_url", sender=self.test_user,
+            ip_range_whitelist=None,
+        )
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
+        request.getClientIP.return_value = "127.0.0.1"
         request.args["access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
@@ -119,12 +123,16 @@ class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_user_by_req_appservice_valid_token_valid_user_id(self):
         masquerading_user_id = "@doppelganger:matrix.org"
-        app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
+        app_service = Mock(
+            token="foobar", url="a_url", sender=self.test_user,
+            ip_range_whitelist=None,
+        )
         app_service.is_interested_in_user = Mock(return_value=True)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
+        request.getClientIP.return_value = "127.0.0.1"
         request.args["access_token"] = [self.test_token]
         request.args["user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
@@ -133,12 +141,16 @@ class AuthTestCase(unittest.TestCase):
 
     def test_get_user_by_req_appservice_valid_token_bad_user_id(self):
         masquerading_user_id = "@doppelganger:matrix.org"
-        app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
+        app_service = Mock(
+            token="foobar", url="a_url", sender=self.test_user,
+            ip_range_whitelist=None,
+        )
         app_service.is_interested_in_user = Mock(return_value=False)
         self.store.get_app_service_by_token = Mock(return_value=app_service)
         self.store.get_user_by_access_token = Mock(return_value=None)
 
         request = Mock(args={})
+        request.getClientIP.return_value = "127.0.0.1"
         request.args["access_token"] = [self.test_token]
         request.args["user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
