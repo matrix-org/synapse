@@ -20,7 +20,7 @@ from tests import unittest
 from twisted.internet import defer
 
 import synapse.rest.client.v1.events
-import synapse.rest.client.v1.register
+import synapse.rest.client.v1_only.register
 import synapse.rest.client.v1.room
 
 

@@ -26,7 +26,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         skip = "v1-only APIs not ported to Python 3"
 
     def setUp(self):
-        from synapse.rest.client.v1.register import CreateUserRestServlet
+        from synapse.rest.client.v1_only.register import CreateUserRestServlet
         # do the dance to hook up request data to self.request_data
         self.request_data = ""
         self.request = Mock(
