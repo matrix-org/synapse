@@ -15,6 +15,8 @@
 
 """Tests REST events for /rooms paths."""
 
+from six import PY3
+
 # twisted imports
 from twisted.internet import defer
 
@@ -919,6 +921,10 @@ class RoomMessagesTestCase(RestTestCase):
 
 class RoomInitialSyncTestCase(RestTestCase):
     """ Tests /rooms/$room_id/initialSync. """
+
+    if PY3:
+        skip = "Deprecated APIs are not being ported to Python 3"
+
     user_id = "@sid1:red"
 
     @defer.inlineCallbacks

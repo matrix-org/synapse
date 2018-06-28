@@ -13,20 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six import PY3
+
 from synapse.rest.client import (
     versions,
 )
 
-from synapse.rest.client.v1_only import (
-    register as v1_register,
-)
+if not PY3:
+    from synapse.rest.client.v1_only import (
+        register as v1_register,
+    )
+
+    from synapse.rest.client.v1 import (
+        events,
+        initial_sync,
+    )
 
 from synapse.rest.client.v1 import (
     room,
-    events,
     profile,
     presence,
-    initial_sync,
     directory,
     voip,
     admin,
@@ -72,8 +78,14 @@ class ClientRestResource(JsonResource):
     def register_servlets(client_resource, hs):
         versions.register_servlets(client_resource)
 
-        # "v1"
-        v1_register.register_servlets(hs, client_resource)
+        if not PY3:
+            # "v1" (Python 2 only)
+            v1_register.register_servlets(hs, client_resource)
+
+            # Deprecated in r0
+            events.register_servlets(hs, client_resource)
+            initial_sync.register_servlets(hs, client_resource)
+            room.register_deprecated_servlets(hs, client_resource)
 
         # "v1" + "r0"
         room.register_servlets(hs, client_resource)
@@ -81,7 +93,6 @@ class ClientRestResource(JsonResource):
         v1_login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
-        initial_sync.register_servlets(hs, client_resource)
         directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
         admin.register_servlets(hs, client_resource)

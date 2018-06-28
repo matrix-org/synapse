@@ -14,15 +14,13 @@
 # limitations under the License.
 
 """ Tests REST events for /events paths."""
+
+from six import PY3
+
 from tests import unittest
 
 # twisted imports
 from twisted.internet import defer
-
-import synapse.rest.client.v1.events
-import synapse.rest.client.v1_only.register
-import synapse.rest.client.v1.room
-
 
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
@@ -33,83 +31,18 @@ from mock import Mock, NonCallableMock
 PATH_PREFIX = "/_matrix/client/api/v1"
 
 
-class EventStreamPaginationApiTestCase(unittest.TestCase):
-    """ Tests event streaming query parameters and start/end keys used in the
-    Pagination stream API. """
-    user_id = "sid1"
-
-    def setUp(self):
-        # configure stream and inject items
-        pass
-
-    def tearDown(self):
-        pass
-
-    def TODO_test_long_poll(self):
-        # stream from 'end' key, send (self+other) message, expect message.
-
-        # stream from 'END', send (self+other) message, expect message.
-
-        # stream from 'end' key, send (self+other) topic, expect topic.
-
-        # stream from 'END', send (self+other) topic, expect topic.
-
-        # stream from 'end' key, send (self+other) invite, expect invite.
-
-        # stream from 'END', send (self+other) invite, expect invite.
-
-        pass
-
-    def TODO_test_stream_forward(self):
-        # stream from START, expect injected items
-
-        # stream from 'start' key, expect same content
-
-        # stream from 'end' key, expect nothing
-
-        # stream from 'END', expect nothing
-
-        # The following is needed for cases where content is removed e.g. you
-        # left a room, so the token you're streaming from is > the one that
-        # would be returned naturally from START>END.
-        # stream from very new token (higher than end key), expect same token
-        # returned as end key
-        pass
-
-    def TODO_test_limits(self):
-        # stream from a key, expect limit_num items
-
-        # stream from START, expect limit_num items
-
-        pass
-
-    def TODO_test_range(self):
-        # stream from key to key, expect X items
-
-        # stream from key to END, expect X items
-
-        # stream from START to key, expect X items
-
-        # stream from START to END, expect all items
-        pass
-
-    def TODO_test_direction(self):
-        # stream from END to START and fwds, expect newest first
-
-        # stream from END to START and bwds, expect oldest first
-
-        # stream from START to END and fwds, expect oldest first
-
-        # stream from START to END and bwds, expect newest first
-
-        pass
-
-
 class EventStreamPermissionsTestCase(RestTestCase):
     """ Tests event streaming (GET /events). """
 
+    if PY3:
+        skip = "Deprecated APIs are not being ported to Python 3."
+
     @defer.inlineCallbacks
     def setUp(self):
+        import synapse.rest.client.v1.events
+        import synapse.rest.client.v1_only.register
+        import synapse.rest.client.v1.room
+
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
         hs = yield setup_test_homeserver(
