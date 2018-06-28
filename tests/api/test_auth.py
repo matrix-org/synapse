@@ -100,6 +100,39 @@ class AuthTestCase(unittest.TestCase):
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), self.test_user)
 
+    @defer.inlineCallbacks
+    def test_get_user_by_req_appservice_valid_token_good_ip(self):
+        from netaddr import IPSet
+        app_service = Mock(
+            token="foobar", url="a_url", sender=self.test_user,
+            ip_range_whitelist=IPSet(["192.168/16"]),
+        )
+        self.store.get_app_service_by_token = Mock(return_value=app_service)
+        self.store.get_user_by_access_token = Mock(return_value=None)
+
+        request = Mock(args={})
+        request.getClientIP.return_value = "192.168.10.10"
+        request.args["access_token"] = [self.test_token]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        requester = yield self.auth.get_user_by_req(request)
+        self.assertEquals(requester.user.to_string(), self.test_user)
+
+    def test_get_user_by_req_appservice_valid_token_bad_ip(self):
+        from netaddr import IPSet
+        app_service = Mock(
+            token="foobar", url="a_url", sender=self.test_user,
+            ip_range_whitelist=IPSet(["192.168/16"]),
+        )
+        self.store.get_app_service_by_token = Mock(return_value=app_service)
+        self.store.get_user_by_access_token = Mock(return_value=None)
+
+        request = Mock(args={})
+        request.getClientIP.return_value = "131.111.8.42"
+        request.args["access_token"] = [self.test_token]
+        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
+        d = self.auth.get_user_by_req(request)
+        self.failureResultOf(d, AuthError)
+
     def test_get_user_by_req_appservice_bad_token(self):
         self.store.get_app_service_by_token = Mock(return_value=None)
         self.store.get_user_by_access_token = Mock(return_value=None)
