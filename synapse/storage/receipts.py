@@ -21,9 +21,10 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from twisted.internet import defer
 
+from canonicaljson import json
+
 import abc
 import logging
-import simplejson as json
 
 
 logger = logging.getLogger(__name__)

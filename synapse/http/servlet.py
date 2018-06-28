@@ -18,7 +18,9 @@
 from synapse.api.errors import SynapseError, Codes
 
 import logging
-import simplejson
+
+from canonicaljson import json
+
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +173,7 @@ def parse_json_value_from_request(request, allow_empty_body=False):
         return None
 
     try:
-        content = simplejson.loads(content_bytes)
+        content = json.loads(content_bytes)
     except Exception as e:
         logger.warn("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)

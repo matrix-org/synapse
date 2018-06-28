@@ -24,8 +24,6 @@ import synapse.util.stringutils as stringutils
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import create_requester
 
-from synapse.util.async import run_on_reactor
-
 from hashlib import sha1
 import hmac
 import logging
@@ -272,7 +270,6 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_password(self, request, register_json, session):
-        yield run_on_reactor()
         if (self.hs.config.enable_registration_captcha and
                 not session[LoginType.RECAPTCHA]):
             # captcha should've been done by this stage!
@@ -333,8 +330,6 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_shared_secret(self, request, register_json, session):
-        yield run_on_reactor()
-
         if not isinstance(register_json.get("mac", None), string_types):
             raise SynapseError(400, "Expected mac.")
         if not isinstance(register_json.get("user", None), string_types):
@@ -423,8 +418,6 @@ class CreateUserRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_create(self, requester, user_json):
-        yield run_on_reactor()
-
         if "localpart" not in user_json:
             raise SynapseError(400, "Expected 'localpart' key.")
 

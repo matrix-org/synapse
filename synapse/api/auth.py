@@ -488,7 +488,7 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
-            logger.warn("Unrecognised access token - not in store: %s" % (token,))
+            logger.warn("Unrecognised access token - not in store.")
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
@@ -511,7 +511,7 @@ class Auth(object):
             )
             service = self.store.get_app_service_by_token(token)
             if not service:
-                logger.warn("Unrecognised appservice access token: %s" % (token,))
+                logger.warn("Unrecognised appservice access token.")
                 raise AuthError(
                     self.TOKEN_NOT_FOUND_HTTP_STATUS,
                     "Unrecognised access token.",
@@ -655,7 +655,7 @@ class Auth(object):
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
         send_level = event_auth.get_send_level(
-            EventTypes.Aliases, "", auth_events
+            EventTypes.Aliases, "", power_level_event,
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 

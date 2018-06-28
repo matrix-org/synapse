@@ -26,7 +26,6 @@ from synapse.http.servlet import (
     RestServlet, assert_params_in_request,
     parse_json_object_from_request,
 )
-from synapse.util.async import run_on_reactor
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
 from ._base import client_v2_patterns, interactive_auth_handler
@@ -309,8 +308,6 @@ class ThreepidRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield run_on_reactor()
-
         requester = yield self.auth.get_user_by_req(request)
 
         threepids = yield self.datastore.user_get_threepids(
@@ -321,8 +318,6 @@ class ThreepidRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         body = parse_json_object_from_request(request)
 
         threePidCreds = body.get('threePidCreds')
@@ -374,8 +369,6 @@ class ThreepidDeleteRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         body = parse_json_object_from_request(request)
 
         required = ['medium', 'address']

@@ -42,7 +42,7 @@ from twisted.web._newclient import ResponseDone
 from six import StringIO
 
 from prometheus_client import Counter
-import simplejson as json
+from canonicaljson import json
 import logging
 import urllib
 
@@ -98,8 +98,8 @@ class SimpleHttpClient(object):
                 method, uri, *args, **kwargs
             )
             add_timeout_to_deferred(
-                request_deferred,
-                60, cancelled_to_request_timed_out_error,
+                request_deferred, 60, self.hs.get_reactor(),
+                cancelled_to_request_timed_out_error,
             )
             response = yield make_deferred_yieldable(request_deferred)
 
@@ -115,7 +115,7 @@ class SimpleHttpClient(object):
                 "Error sending request to  %s %s: %s %s",
                 method, redact_uri(uri), type(e).__name__, e.message
             )
-            raise e
+            raise
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}, headers=None):

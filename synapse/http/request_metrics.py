@@ -117,13 +117,17 @@ def _get_in_flight_counts():
     Returns:
         dict[tuple[str, str], int]
     """
-    for rm in _in_flight_requests:
+    # Cast to a list to prevent it changing while the Prometheus
+    # thread is collecting metrics
+    reqs = list(_in_flight_requests)
+
+    for rm in reqs:
         rm.update_metrics()
 
     # Map from (method, name) -> int, the number of in flight requests of that
     # type
     counts = {}
-    for rm in _in_flight_requests:
+    for rm in reqs:
         key = (rm.method, rm.name,)
         counts[key] = counts.get(key, 0) + 1
 
@@ -131,7 +135,7 @@ def _get_in_flight_counts():
 
 
 LaterGauge(
-    "synapse_http_request_metrics_in_flight_requests_count",
+    "synapse_http_server_in_flight_requests_count",
     "",
     ["method", "servlet"],
     _get_in_flight_counts,

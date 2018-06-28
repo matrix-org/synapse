@@ -22,7 +22,7 @@ The methods that define policy are:
     - should_notify
 """
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from contextlib import contextmanager
 
 from six import itervalues, iteritems
@@ -179,7 +179,7 @@ class PresenceHandler(object):
         # have not yet been persisted
         self.unpersisted_users_changes = set()
 
-        reactor.addSystemEventTrigger("before", "shutdown", self._on_shutdown)
+        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self._on_shutdown)
 
         self.serial_to_user = {}
         self._next_serial = 1
