@@ -20,7 +20,7 @@ from synapse.api.urls import CLIENT_PREFIX
 
 import re
 
-def v1_only_client_path_patterns(path_regex):
+def v1_only_client_path_patterns(path_regex, include_in_unstable=True):
     """Creates a regex compiled client path with the correct client path
     prefix.
 
@@ -31,4 +31,7 @@ def v1_only_client_path_patterns(path_regex):
         SRE_Pattern
     """
     patterns = [re.compile("^" + CLIENT_PREFIX + path_regex)]
+    if include_in_unstable:
+        unstable_prefix = CLIENT_PREFIX.replace("/api/v1", "/unstable")
+        patterns.append(re.compile("^" + unstable_prefix + path_regex))
     return patterns

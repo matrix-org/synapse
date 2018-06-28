@@ -52,7 +52,7 @@ class RegisterRestServlet(ClientV1RestServlet):
     handler doesn't have a concept of multi-stages or sessions.
     """
 
-    PATTERNS = v1_only_client_path_patterns("/register$")
+    PATTERNS = v1_only_client_path_patterns("/register$", include_in_unstable=True)
 
     def __init__(self, hs):
         """
