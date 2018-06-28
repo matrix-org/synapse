@@ -83,14 +83,14 @@ class FilterTestCase(unittest.TestCase):
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEqual(channel.json_body, {"filter_id": "0"})
-        filter = self.store.get_user_filter(user_localpart='apple', filter_id=0)
+        filter = self.store.get_user_filter(user_localpart="apple", filter_id=0)
         self.clock.advance(0)
         self.assertEquals(filter.result, self.EXAMPLE_FILTER)
 
     def test_add_filter_for_other_user(self):
         request, channel = make_request(
             b"POST",
-            b"/_matrix/client/r0/user/%s/filter" % (b'@watermelon:test'),
+            b"/_matrix/client/r0/user/%s/filter" % (b"@watermelon:test"),
             self.EXAMPLE_FILTER_JSON,
         )
         request.render(self.resource)
@@ -116,7 +116,7 @@ class FilterTestCase(unittest.TestCase):
 
     def test_get_filter(self):
         filter_id = self.filtering.add_user_filter(
-            user_localpart='apple', user_filter=self.EXAMPLE_FILTER
+            user_localpart="apple", user_filter=self.EXAMPLE_FILTER
         )
         self.clock.advance(1)
         filter_id = filter_id.result
