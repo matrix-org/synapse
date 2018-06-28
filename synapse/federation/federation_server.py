@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 
-import simplejson as json
+from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, FederationError, SynapseError, NotFoundError

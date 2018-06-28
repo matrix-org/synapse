@@ -19,12 +19,11 @@ from synapse.util.caches.descriptors import cached
 from twisted.internet import defer
 import six
 
-from canonicaljson import encode_canonical_json
+from canonicaljson import encode_canonical_json, json
 
 from collections import namedtuple
 
 import logging
-import simplejson as json
 
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview

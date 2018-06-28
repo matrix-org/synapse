@@ -22,8 +22,9 @@ from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
+from canonicaljson import json
+
 import abc
-import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)

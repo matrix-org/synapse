@@ -19,7 +19,8 @@ from functools import wraps
 import itertools
 import logging
 
-import simplejson as json
+from canonicaljson import json
+
 from twisted.internet import defer
 
 from synapse.storage.events_worker import EventsWorkerStore

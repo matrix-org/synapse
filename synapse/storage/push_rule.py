@@ -25,9 +25,10 @@ from synapse.push.baserules import list_with_base_rules
 from synapse.api.constants import EventTypes
 from twisted.internet import defer
 
+from canonicaljson import json
+
 import abc
 import logging
-import simplejson as json
 
 logger = logging.getLogger(__name__)
 
