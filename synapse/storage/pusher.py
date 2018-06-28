@@ -17,12 +17,11 @@
 from ._base import SQLBaseStore
 from twisted.internet import defer
 
-from canonicaljson import encode_canonical_json
+from canonicaljson import encode_canonical_json, json
 
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 
 import logging
-import simplejson as json
 import types
 
 logger = logging.getLogger(__name__)
