@@ -20,6 +20,7 @@ from synapse.api.urls import CLIENT_PREFIX
 
 import re
 
+
 def v1_only_client_path_patterns(path_regex, include_in_unstable=True):
     """Creates a regex compiled client path with the correct client path
     prefix.

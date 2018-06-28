@@ -19,16 +19,6 @@ from synapse.rest.client import (
     versions,
 )
 
-if not PY3:
-    from synapse.rest.client.v1_only import (
-        register as v1_register,
-    )
-
-    from synapse.rest.client.v1 import (
-        events,
-        initial_sync,
-    )
-
 from synapse.rest.client.v1 import (
     room,
     profile,
@@ -65,6 +55,17 @@ from synapse.rest.client.v2_alpha import (
 )
 
 from synapse.http.server import JsonResource
+
+
+if not PY3:
+    from synapse.rest.client.v1_only import (
+        register as v1_register,
+    )
+
+    from synapse.rest.client.v1 import (
+        events,
+        initial_sync,
+    )
 
 
 class ClientRestResource(JsonResource):

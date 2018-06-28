@@ -17,8 +17,6 @@
 
 from six import PY3
 
-from tests import unittest
-
 # twisted imports
 from twisted.internet import defer
 
