@@ -19,7 +19,8 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError, Codes
 from synapse.api.constants import LoginType
 from synapse.api.auth import get_access_token_from_request
-from .base import ClientV1RestServlet, client_path_patterns
+from synapse.rest.client.v1.base import ClientV1RestServlet
+from .base import v1_only_client_path_patterns
 import synapse.util.stringutils as stringutils
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import create_requester
@@ -51,7 +52,7 @@ class RegisterRestServlet(ClientV1RestServlet):
     handler doesn't have a concept of multi-stages or sessions.
     """
 
-    PATTERNS = client_path_patterns("/register$", releases=(), include_in_unstable=False)
+    PATTERNS = v1_only_client_path_patterns("/register$")
 
     def __init__(self, hs):
         """
@@ -388,7 +389,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
     """Handles user creation via a server-to-server interface
     """
 
-    PATTERNS = client_path_patterns("/createUser$", releases=())
+    PATTERNS = v1_only_client_path_patterns("/createUser$")
 
     def __init__(self, hs):
         super(CreateUserRestServlet, self).__init__(hs)

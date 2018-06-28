@@ -17,6 +17,10 @@ from synapse.rest.client import (
     versions,
 )
 
+from synapse.rest.client.v1_only import (
+    register as v1_register,
+)
+
 from synapse.rest.client.v1 import (
     room,
     events,
@@ -28,7 +32,6 @@ from synapse.rest.client.v1 import (
     admin,
     pusher,
     push_rule,
-    register as v1_register,
     login as v1_login,
     logout,
 )
@@ -70,9 +73,11 @@ class ClientRestResource(JsonResource):
         versions.register_servlets(client_resource)
 
         # "v1"
+        v1_register.register_servlets(hs, client_resource)
+
+        # "v1" + "r0"
         room.register_servlets(hs, client_resource)
         events.register_servlets(hs, client_resource)
-        v1_register.register_servlets(hs, client_resource)
         v1_login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.rest.client.v1.register import CreateUserRestServlet
+from six import PY3
 from twisted.internet import defer
 from mock import Mock
 from tests import unittest
@@ -22,8 +22,11 @@ import json
 
 
 class CreateUserServletTestCase(unittest.TestCase):
+    if PY3:
+        skip = "v1-only APIs not ported to Python 3"
 
     def setUp(self):
+        from synapse.rest.client.v1.register import CreateUserRestServlet
         # do the dance to hook up request data to self.request_data
         self.request_data = ""
         self.request = Mock(
