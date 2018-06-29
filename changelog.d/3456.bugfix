@@ -1,0 +1,1 @@
+Synapse is now stricter regarding accepting events which it cannot retrieve the prev_events for.
