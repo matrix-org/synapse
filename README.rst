@@ -362,6 +362,19 @@ Synapse is in the Fedora repositories as ``matrix-synapse``::
 Oleg Girko provides Fedora RPMs at
 https://obs.infoserver.lv/project/monitor/matrix-synapse
 
+OpenSUSE
+--------
+
+Synapse is in the OpenSUSE repositories as ``matrix-synapse``::
+
+    sudo zypper install matrix-synapse
+
+SUSE Linux Enterprise Server
+----------------------------
+
+Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 repository at
+https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/
+
 ArchLinux
 ---------
 
