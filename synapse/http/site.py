@@ -113,7 +113,9 @@ class SynapseRequest(Request):
             " %sB %s \"%s %s %s\" \"%s\" [%d dbevts]",
             self.getClientIP(),
             self.site.site_tag,
-            self.authenticated_entity,
+            # need to decode as it could be raw utf-8 bytes
+            # from a IDN servname in an auth header
+            self.authenticated_entity.decode("utf-8"),
             end_time - self.start_time,
             ru_utime,
             ru_stime,
@@ -125,7 +127,12 @@ class SynapseRequest(Request):
             self.method,
             self.get_redacted_uri(),
             self.clientproto,
-            self.get_user_agent(),
+            # need to decode as could be raw utf-8 bytes
+            # from a utf-8 user-agent.
+            # N.B. if you don't do this, the logger explodes
+            # with maximum recursion trying to log errors about
+            # the charset problem.
+            self.get_user_agent().decode("utf-8"),
             evt_db_fetch_count,
         )
 
