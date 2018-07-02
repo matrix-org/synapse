@@ -76,6 +76,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         return
 
     if event.type == EventTypes.Create:
+        sender_domain = get_domain_from_id(event.sender)
         room_id_domain = get_domain_from_id(event.room_id)
         if room_id_domain != sender_domain:
             raise AuthError(
