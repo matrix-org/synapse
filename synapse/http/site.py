@@ -111,7 +111,7 @@ class SynapseRequest(Request):
         # from a IDN servname in an auth header
         authenticated_entity = self.authenticated_entity
         if authenticated_entity is not None:
-            authenticated_entity = authenticated_entity.decode("utf-8")
+            authenticated_entity = authenticated_entity.decode("utf-8", "replace")
 
         # ...or could be raw utf-8 bytes in the User-Agent header.
         # N.B. if you don't do this, the logger explodes cryptically
@@ -120,7 +120,7 @@ class SynapseRequest(Request):
         # c.f. https://github.com/matrix-org/synapse/issues/3471
         user_agent = self.get_user_agent()
         if user_agent is not None:
-            user_agent = user_agent.decode("utf-8")
+            user_agent = user_agent.decode("utf-8", "replace")
 
         self.site.access_logger.info(
             "%s - %s - {%s}"
