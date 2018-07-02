@@ -525,7 +525,11 @@ def _check_power_levels(event, auth_events):
                     "to your own"
                 )
 
-        if old_level > user_level or new_level > user_level:
+        # Check if the old and new levels are greater than the user level
+        # (if defined)
+        old_level_too_big = old_level is not None and old_level > user_level
+        new_level_too_big = new_level is not None and new_level > user_level
+        if old_level_too_big or new_level_too_big:
             raise AuthError(
                 403,
                 "You don't have permission to add ops level greater "
