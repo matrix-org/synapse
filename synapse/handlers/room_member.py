@@ -249,11 +249,11 @@ class RoomMemberHandler(object):
         then = self.clock.time_msec()
 
         with (yield self.member_limiter.queue(as_id)):
-           diff = self.clock.time_msec() - then
+            diff = self.clock.time_msec() - then
 
-           if diff > 90 * 1000:
-               # haproxy would have timed the request out anyway...
-               raise SynapseError(504, "took to long to process")
+            if diff > 90 * 1000:
+                # haproxy would have timed the request out anyway...
+                raise SynapseError(504, "took to long to process")
 
             with (yield self.member_linearizer.queue(key)):
                 diff = self.clock.time_msec() - then
