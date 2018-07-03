@@ -60,7 +60,7 @@ def parse_server_name(server_name):
 
             return server_name, None
 
-        domain_port = server_name.split(":")
+        domain_port = server_name.rsplit(":", 1)
         domain = domain_port[0]
         port = int(domain_port[1]) if domain_port[1:] else None
         return domain, port

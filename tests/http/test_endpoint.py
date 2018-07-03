@@ -23,6 +23,8 @@ class ServerNameTestCase(unittest.TestCase):
             'my-example.com:1234': ('my-example.com', 1234),
             '1.2.3.4': ('1.2.3.4', None),
             '[0abc:1def::1234]': ('[0abc:1def::1234]', None),
+            '1.2.3.4:1': ('1.2.3.4', 1),
+            '[0abc:1def::1234]:8080': ('[0abc:1def::1234]', 8080),
         }
 
         for i, o in test_data.items():
