@@ -61,6 +61,8 @@ class EmailPusher(object):
         self.mail_throttle_max_ms = hs.config.mail_throttle_max_s * 1000;
         self.mail_throttle_multiplier = hs.config.mail_throttle_multiplier;
         self.mail_throttle_reset_after_ms = hs.config.mail_throttle_reset_after_s * 1000;
+        
+        self.mail_ignore_rooms = hs.config.mail_ignore_rooms;
 
     @defer.inlineCallbacks
     def on_started(self):
@@ -137,6 +139,10 @@ class EmailPusher(object):
             return
 
         for push_action in unprocessed:
+        
+            if(push_action['room_id'] in self.mail_ignore_rooms):
+                continue # skip this notification
+        
             received_at = push_action['received_ts']
             if received_at is None:
                 received_at = 0
