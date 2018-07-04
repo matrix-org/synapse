@@ -216,8 +216,9 @@ class Cache(object):
 class _CacheDescriptorBase(object):
     def __init__(self, orig, num_args, inlineCallbacks, cache_context=False):
         self.orig = orig
+        self.inlineCallbacks = inlineCallbacks
 
-        if inlineCallbacks:
+        if self.inlineCallbacks:
             self.function_to_call = defer.inlineCallbacks(orig)
         else:
             self.function_to_call = orig
@@ -380,6 +381,8 @@ class CacheDescriptor(_CacheDescriptorBase):
 
                 if isinstance(cached_result_d, ObservableDeferred):
                     observer = cached_result_d.observe()
+                elif self.inlineCallbacks:
+                    observer = defer.succeed(cached_result_d)
                 else:
                     observer = cached_result_d
 
