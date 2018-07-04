@@ -997,8 +997,10 @@ class SyncHandler(object):
                 )
                 for event in it:
                     if event.type == EventTypes.Member:
-                        if (event.membership == Membership.JOIN or
-                            event.membership == Membership.INVITE):
+                        if (
+                            event.membership == Membership.JOIN or
+                            event.membership == Membership.INVITE
+                        ):
                             newly_joined_or_invited_users.add(event.state_key)
                         else:
                             prev_content = event.unsigned.get("prev_content", {})
