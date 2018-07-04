@@ -16,7 +16,7 @@
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class EmailConfig(Config):
@@ -49,13 +49,13 @@ class EmailConfig(Config):
                     missing.append(k)
 
             if (len(missing) > 0):
-                raise RuntimeError(
+                raise ConfigError(
                     "email.enable_notifs is True but required keys are missing: %s" %
                     (", ".join(["email." + k for k in missing]),)
                 )
 
             if config.get("public_baseurl") is None:
-                raise RuntimeError(
+                raise ConfigError(
                     "email.enable_notifs is True but no public_baseurl is set"
                 )
 
@@ -88,11 +88,36 @@ class EmailConfig(Config):
             # make sure it's valid
             parsed = email.utils.parseaddr(self.email_notif_from)
             if parsed[1] == '':
-                raise RuntimeError("Invalid notif_from address")
-        else:
-            self.email_enable_notifs = False
-            # Not much point setting defaults for the rest: it would be an
-            # error for them to be used.
+                raise ConfigError("Invalid notif_from address")
+                
+            self.delay_before_mail_s = email_config.get(
+                "delay_before_mail_s", 600
+            )
+            
+            self.mail_throttle_start_s = email_config.get(
+                "mail_throttle_start_s", 600
+            )
+            
+            self.mail_throttle_max_s = email_config.get(
+                "mail_throttle_max_s", 86400
+            )
+            
+            self.mail_throttle_multiplier = email_config.get(
+                "mail_throttle_multiplier", 144
+            )
+            
+            self.mail_throttle_reset_after_s = email_config.get(
+                "mail_throttle_reset_after_s", 43200
+            )
+
+            self.mail_ignore_rooms = []
+            ignore_rooms_string = email_config.get("mail_ignore_rooms", None)
+            
+            if ignore_rooms_string is not None:
+                ignore_room_string_fix = ignore_rooms_string.replace(" ", "")
+                self.mail_ignore_rooms = ignore_room_string_fix.split(",")
+            
+        
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
@@ -103,6 +128,10 @@ class EmailConfig(Config):
         #
         # If your SMTP server requires authentication, the optional smtp_user &
         # smtp_pass variables should be used
+        #
+        # 
+        # The amount of time we always wait before ever emailing about a notification
+        # (to give the user a chance to respond to other push or notice the window)
         #
         #email:
         #   enable_notifs: false
@@ -118,4 +147,23 @@ class EmailConfig(Config):
         #   notif_template_text: notif_mail.txt
         #   notif_for_new_users: True
         #   riot_base_url: "http://localhost/riot"
+        #   # The amount of time we always wait before ever emailing about a notification in seconds
+        #   # (to give the user a chance to respond to other push or notice the window)
+        #   # (600s = 10 minutes)
+        #   delay_before_mail_s: 600
+        #   # THROTTLE is the minimum time between mail notifications sent for a given room.
+        #   # Each room maintains its own throttle counter, but each new mail notification
+        #   # sends the pending notifications for all rooms.
+        #   mail_throttle_start_s: 600
+        #   # (86400 = 24 hours)
+        #   mail_throttle_max_s: 86400
+        #   # 10 mins, 24h - jump straight to 1 day
+        #   mail_throttle_multiplier: 144
+        #   # If no event triggers a notification for this long after the previous,
+        #   # the throttle is released.
+        #   # 12 hours - a gap of 12 hours in conversation is surely enough to merit a new
+        #   # notification when things get going again...
+        #   mail_throttle_reset_after_s: 43200
+        #   # Ignore these room ids for mail notifications (comma separated list).
+        #   #mail_ignore_rooms: "!QtykxKocfZaZOUrTwp:matrix.org, !DgvjtOljKujDBrxyHk:matrix.org"
         """
