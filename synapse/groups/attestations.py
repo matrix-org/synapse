@@ -23,7 +23,7 @@ If a user leaves (or gets kicked out of) a group, either side can still use
 their attestation to "prove" their membership, until the attestation expires.
 Therefore attestations shouldn't be relied on to prove membership in important
 cases, but can for less important situtations, e.g. showing a users membership
-of groups on their profile, showing flairs, etc.abs
+of groups on their profile, showing flairs, etc.
 
 An attestsation is a signed blob of json that looks like:
 
