@@ -28,7 +28,7 @@ from synapse.api.constants import Membership, EventTypes
 from synapse.types import get_domain_from_id
 
 import logging
-import simplejson as json
+from canonicaljson import json
 
 from six import itervalues, iteritems
 
@@ -455,7 +455,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         defer.returnValue(joined_hosts)
 
-    @cached(max_entries=10000, iterable=True)
+    @cached(max_entries=10000)
     def _get_joined_hosts_cache(self, room_id):
         return _JoinedHostsCache(self, room_id)
 

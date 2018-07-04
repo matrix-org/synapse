@@ -21,7 +21,6 @@ from synapse.api.errors import (
 from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.util.async import sleep
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.metrics import Measure
 from synapse.types import Requester, UserID
@@ -33,11 +32,12 @@ logger = logging.getLogger(__name__)
 
 
 @defer.inlineCallbacks
-def send_event_to_master(client, host, port, requester, event, context,
+def send_event_to_master(clock, client, host, port, requester, event, context,
                          ratelimit, extra_users):
     """Send event to be handled on the master
 
     Args:
+        clock (synapse.util.Clock)
         client (SimpleHttpClient)
         host (str): host of master
         port (int): port on master listening for HTTP replication
@@ -77,7 +77,7 @@ def send_event_to_master(client, host, port, requester, event, context,
 
             # If we timed out we probably don't need to worry about backing
             # off too much, but lets just wait a little anyway.
-            yield sleep(1)
+            yield clock.sleep(1)
     except MatrixCodeMessageException as e:
         # We convert to SynapseError as we know that it was a SynapseError
         # on the master process that we should send to the client. (And

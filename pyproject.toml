@@ -1,0 +1,5 @@
+[tool.towncrier]
+    package = "synapse"
+    filename = "CHANGES.rst"
+    directory = "changelog.d"
+    issue_format = "`#{issue} <https://github.com/matrix-org/synapse/issues/{issue}>`_"

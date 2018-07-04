@@ -20,10 +20,11 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.util.id_generators import StreamIdGenerator
 
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+
+from canonicaljson import json
 
 import abc
-import simplejson as json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -113,25 +114,6 @@ class AccountDataWorkerStore(SQLBaseStore):
             defer.returnValue(json.loads(result))
         else:
             defer.returnValue(None)
-
-    @cachedList(cached_method_name="get_global_account_data_by_type_for_user",
-                num_args=2, list_name="user_ids", inlineCallbacks=True)
-    def get_global_account_data_by_type_for_users(self, data_type, user_ids):
-        rows = yield self._simple_select_many_batch(
-            table="account_data",
-            column="user_id",
-            iterable=user_ids,
-            keyvalues={
-                "account_data_type": data_type,
-            },
-            retcols=("user_id", "content",),
-            desc="get_global_account_data_by_type_for_users",
-        )
-
-        defer.returnValue({
-            row["user_id"]: json.loads(row["content"]) if row["content"] else None
-            for row in rows
-        })
 
     @cached(num_args=2)
     def get_account_data_for_room(self, user_id, room_id):

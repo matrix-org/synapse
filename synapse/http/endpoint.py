@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
 from twisted.names.error import DNSNameError, DomainError
@@ -38,6 +38,36 @@ _Server = collections.namedtuple(
 )
 
 
+def parse_server_name(server_name):
+    """Split a server name into host/port parts.
+
+    Does some basic sanity checking of the
+
+    Args:
+        server_name (str): server name to parse
+
+    Returns:
+        Tuple[str, int|None]: host/port parts.
+
+    Raises:
+        ValueError if the server name could not be parsed.
+    """
+    try:
+        if server_name[-1] == ']':
+            # ipv6 literal, hopefully
+            if server_name[0] != '[':
+                raise Exception()
+
+            return server_name, None
+
+        domain_port = server_name.rsplit(":", 1)
+        domain = domain_port[0]
+        port = int(domain_port[1]) if domain_port[1:] else None
+        return domain, port
+    except Exception:
+        raise ValueError("Invalid server name '%s'" % server_name)
+
+
 def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
                                timeout=None):
     """Construct an endpoint for the given matrix destination.
@@ -50,9 +80,7 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
         timeout (int): connection timeout in seconds
     """
 
-    domain_port = destination.split(":")
-    domain = domain_port[0]
-    port = int(domain_port[1]) if domain_port[1:] else None
+    domain, port = parse_server_name(destination)
 
     endpoint_kw_args = {}
 
@@ -74,21 +102,22 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
             reactor, "matrix", domain, protocol="tcp",
             default_port=default_port, endpoint=transport_endpoint,
             endpoint_kw_args=endpoint_kw_args
-        ))
+        ), reactor)
     else:
         return _WrappingEndpointFac(transport_endpoint(
             reactor, domain, port, **endpoint_kw_args
-        ))
+        ), reactor)
 
 
 class _WrappingEndpointFac(object):
-    def __init__(self, endpoint_fac):
+    def __init__(self, endpoint_fac, reactor):
         self.endpoint_fac = endpoint_fac
+        self.reactor = reactor
 
     @defer.inlineCallbacks
     def connect(self, protocolFactory):
         conn = yield self.endpoint_fac.connect(protocolFactory)
-        conn = _WrappedConnection(conn)
+        conn = _WrappedConnection(conn, self.reactor)
         defer.returnValue(conn)
 
 
@@ -98,9 +127,10 @@ class _WrappedConnection(object):
     """
     __slots__ = ["conn", "last_request"]
 
-    def __init__(self, conn):
+    def __init__(self, conn, reactor):
         object.__setattr__(self, "conn", conn)
         object.__setattr__(self, "last_request", time.time())
+        self._reactor = reactor
 
     def __getattr__(self, name):
         return getattr(self.conn, name)
@@ -131,14 +161,14 @@ class _WrappedConnection(object):
         # Time this connection out if we haven't send a request in the last
         # N minutes
         # TODO: Cancel the previous callLater?
-        reactor.callLater(3 * 60, self._time_things_out_maybe)
+        self._reactor.callLater(3 * 60, self._time_things_out_maybe)
 
         d = self.conn.request(request)
 
         def update_request_time(res):
             self.last_request = time.time()
             # TODO: Cancel the previous callLater?
-            reactor.callLater(3 * 60, self._time_things_out_maybe)
+            self._reactor.callLater(3 * 60, self._time_things_out_maybe)
             return res
 
         d.addCallback(update_request_time)

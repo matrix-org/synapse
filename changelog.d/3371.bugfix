@@ -1,0 +1,1 @@
+Fix event filtering in get_missing_events handler

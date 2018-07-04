@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +16,7 @@
 # limitations under the License.
 import logging
 
+from six.moves import http_client
 from twisted.internet import defer
 
 from synapse.api.auth import has_access_token
@@ -24,7 +26,6 @@ from synapse.http.servlet import (
     RestServlet, assert_params_in_request,
     parse_json_object_from_request,
 )
-from synapse.util.async import run_on_reactor
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
 from ._base import client_v2_patterns, interactive_auth_handler
@@ -187,13 +188,20 @@ class DeactivateAccountRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
+        erase = body.get("erase", False)
+        if not isinstance(erase, bool):
+            raise SynapseError(
+                http_client.BAD_REQUEST,
+                "Param 'erase' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
 
         requester = yield self.auth.get_user_by_req(request)
 
         # allow ASes to dectivate their own users
         if requester.app_service:
             yield self._deactivate_account_handler.deactivate_account(
-                requester.user.to_string()
+                requester.user.to_string(), erase,
             )
             defer.returnValue((200, {}))
 
@@ -201,7 +209,7 @@ class DeactivateAccountRestServlet(RestServlet):
             requester, body, self.hs.get_ip_from_request(request),
         )
         yield self._deactivate_account_handler.deactivate_account(
-            requester.user.to_string(),
+            requester.user.to_string(), erase,
         )
         defer.returnValue((200, {}))
 
@@ -300,8 +308,6 @@ class ThreepidRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        yield run_on_reactor()
-
         requester = yield self.auth.get_user_by_req(request)
 
         threepids = yield self.datastore.user_get_threepids(
@@ -312,8 +318,6 @@ class ThreepidRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         body = parse_json_object_from_request(request)
 
         threePidCreds = body.get('threePidCreds')
@@ -365,8 +369,6 @@ class ThreepidDeleteRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         body = parse_json_object_from_request(request)
 
         required = ['medium', 'address']
@@ -381,9 +383,16 @@ class ThreepidDeleteRestServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        yield self.auth_handler.delete_threepid(
-            user_id, body['medium'], body['address']
-        )
+        try:
+            yield self.auth_handler.delete_threepid(
+                user_id, body['medium'], body['address']
+            )
+        except Exception:
+            # NB. This endpoint should succeed if there is nothing to
+            # delete, so it should only throw if something is wrong
+            # that we ought to care about.
+            logger.exception("Failed to remove threepid")
+            raise SynapseError(500, "Failed to remove threepid")
 
         defer.returnValue((200, {}))
 

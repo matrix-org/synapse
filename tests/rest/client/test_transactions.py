@@ -1,9 +1,9 @@
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.transactions import CLEANUP_PERIOD_MS
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from mock import Mock, call
 
-from synapse.util import async
+from synapse.util import Clock
 from synapse.util.logcontext import LoggingContext
 from tests import unittest
 from tests.utils import MockClock
@@ -46,7 +46,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
     def test_logcontexts_with_async_result(self):
         @defer.inlineCallbacks
         def cb():
-            yield async.sleep(0)
+            yield Clock(reactor).sleep(0)
             defer.returnValue("yay")
 
         @defer.inlineCallbacks

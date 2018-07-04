@@ -20,9 +20,10 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.search import SearchStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
+from canonicaljson import json
+
 import collections
 import logging
-import simplejson as json
 import re
 
 logger = logging.getLogger(__name__)

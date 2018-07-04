@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +19,7 @@
 
 import logging
 
-import simplejson as json
+from canonicaljson import json
 
 from twisted.internet import defer
 
@@ -26,7 +27,6 @@ from synapse.api.errors import (
     MatrixCodeMessageException, CodeMessageException
 )
 from ._base import BaseHandler
-from synapse.util.async import run_on_reactor
 from synapse.api.errors import SynapseError, Codes
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ class IdentityHandler(BaseHandler):
         super(IdentityHandler, self).__init__(hs)
 
         self.http_client = hs.get_simple_http_client()
+        self.federation_http_client = hs.get_http_client()
 
         self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
         self.trust_any_id_server_just_for_testing_do_not_use = (
@@ -60,8 +61,6 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def threepid_from_creds(self, creds):
-        yield run_on_reactor()
-
         if 'id_server' in creds:
             id_server = creds['id_server']
         elif 'idServer' in creds:
@@ -104,7 +103,6 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def bind_threepid(self, creds, mxid):
-        yield run_on_reactor()
         logger.debug("binding threepid %r to %s", creds, mxid)
         data = None
 
@@ -139,9 +137,53 @@ class IdentityHandler(BaseHandler):
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):
-        yield run_on_reactor()
+    def unbind_threepid(self, mxid, threepid):
+        """
+        Removes a binding from an identity server
+        Args:
+            mxid (str): Matrix user ID of binding to be removed
+            threepid (dict): Dict with medium & address of binding to be removed
 
+        Returns:
+            Deferred[bool]: True on success, otherwise False
+        """
+        logger.debug("unbinding threepid %r from %s", threepid, mxid)
+        if not self.trusted_id_servers:
+            logger.warn("Can't unbind threepid: no trusted ID servers set in config")
+            defer.returnValue(False)
+
+        # We don't track what ID server we added 3pids on (perhaps we ought to)
+        # but we assume that any of the servers in the trusted list are in the
+        # same ID server federation, so we can pick any one of them to send the
+        # deletion request to.
+        id_server = next(iter(self.trusted_id_servers))
+
+        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
+        content = {
+            "mxid": mxid,
+            "threepid": threepid,
+        }
+        headers = {}
+        # we abuse the federation http client to sign the request, but we have to send it
+        # using the normal http client since we don't want the SRV lookup and want normal
+        # 'browser-like' HTTPS.
+        self.federation_http_client.sign_request(
+            destination=None,
+            method='POST',
+            url_bytes='/_matrix/identity/api/v1/3pid/unbind'.encode('ascii'),
+            headers_dict=headers,
+            content=content,
+            destination_is=id_server,
+        )
+        yield self.http_client.post_json_get_json(
+            url,
+            content,
+            headers,
+        )
+        defer.returnValue(True)
+
+    @defer.inlineCallbacks
+    def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):
         if not self._should_trust_id_server(id_server):
             raise SynapseError(
                 400, "Untrusted ID server '%s'" % id_server,
@@ -176,8 +218,6 @@ class IdentityHandler(BaseHandler):
             self, id_server, country, phone_number,
             client_secret, send_attempt, **kwargs
     ):
-        yield run_on_reactor()
-
         if not self._should_trust_id_server(id_server):
             raise SynapseError(
                 400, "Untrusted ID server '%s'" % id_server,

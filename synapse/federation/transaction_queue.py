@@ -21,7 +21,6 @@ from .units import Transaction, Edu
 
 from synapse.api.errors import HttpResponseException, FederationDeniedError
 from synapse.util import logcontext, PreserveLoggingContext
-from synapse.util.async import run_on_reactor
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 from synapse.util.metrics import measure_func
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
@@ -42,8 +41,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-sent_pdus_destination_dist = Counter(
-    "synapse_federation_transaction_queue_sent_pdu_destinations", ""
+sent_pdus_destination_dist_count = Counter(
+    "synapse_federation_client_sent_pdu_destinations:count", ""
+)
+sent_pdus_destination_dist_total = Counter(
+    "synapse_federation_client_sent_pdu_destinations:total", ""
 )
 
 
@@ -280,7 +282,8 @@ class TransactionQueue(object):
         if not destinations:
             return
 
-        sent_pdus_destination_dist.inc(len(destinations))
+        sent_pdus_destination_dist_total.inc(len(destinations))
+        sent_pdus_destination_dist_count.inc()
 
         for destination in destinations:
             self.pending_pdus_by_dest.setdefault(destination, []).append(
@@ -450,9 +453,6 @@ class TransactionQueue(object):
             # quickly, but we will later check this again in the http client,
             # hence why we throw the result away.
             yield get_retry_limiter(destination, self.clock, self.store)
-
-            # XXX: what's this for?
-            yield run_on_reactor()
 
             pending_pdus = []
             while True:
