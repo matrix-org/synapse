@@ -1,1 +1,0 @@
-Invalidate cache on correct thread to avoid race
