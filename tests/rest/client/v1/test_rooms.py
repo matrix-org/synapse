@@ -27,7 +27,7 @@ import json
 from six.moves.urllib import parse as urlparse
 
 
-from tests.server import setup_test_homeserver, make_request, wait_until_result
+from tests.server import setup_test_homeserver, make_request, wait_until_result, ThreadedMemoryReactorClock
 
 from tests import unittest
 from synapse.util import Clock
@@ -36,9 +36,8 @@ from synapse.http.server import JsonResource
 from mock import Mock, NonCallableMock
 
 from .utils import RestHelper
-from twisted.test.proto_helpers import MemoryReactorClock
 
-PATH_PREFIX = "/_matrix/client/api/v1"
+PATH_PREFIX = b"/_matrix/client/api/v1"
 
 
 class RoomPermissionsTestCase(unittest.TestCase):
@@ -49,7 +48,7 @@ class RoomPermissionsTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
 
-        self.clock = MemoryReactorClock()
+        self.clock = ThreadedMemoryReactorClock()
         self.hs_clock = Clock(self.clock)
 
         self.hs = yield setup_test_homeserver(
@@ -63,15 +62,23 @@ class RoomPermissionsTestCase(unittest.TestCase):
         self.ratelimiter = self.hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
 
-        self.hs.get_handlers().federation_handler = Mock()
+        self.hs.get_federation_handler = Mock(return_value=Mock())
 
         def get_user_by_access_token(token=None, allow_guest=False):
             return {
-                "user": UserID.from_string(self.auth_user_id),
+                "user": UserID.from_string(self.helper.auth_user_id),
                 "token_id": 1,
                 "is_guest": False,
             }
+
+        def get_user_by_req(request, allow_guest=False, rights="access"):
+            return synapse.types.create_requester(
+                UserID.from_string(self.helper.auth_user_id), 1, False, None
+            )
+
+        self.hs.get_auth().get_user_by_req = get_user_by_req
         self.hs.get_auth().get_user_by_access_token = get_user_by_access_token
+        self.hs.get_auth().get_access_token_from_request = Mock(return_value=b"1234")
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -81,16 +88,12 @@ class RoomPermissionsTestCase(unittest.TestCase):
         synapse.rest.client.v1.room.register_servlets(self.hs, self.resource)
         self.helper = RestHelper(self.hs, self.resource, self.rmcreator_id)
 
-        self.auth = self.hs.get_auth()
-
         # create some rooms under the name rmcreator_id
         self.uncreated_rmid = "!aa:test"
-
-        self.created_rmid = helper.create_room_as(self.rmcreator_id,
-                                                  is_public=False)
-
-        self.created_public_rmid = helper.create_room_as(self.rmcreator_id,
-                                                         is_public=True)
+        self.created_rmid = self.helper.create_room_as(self.rmcreator_id,
+                                                       is_public=False)
+        self.created_public_rmid = self.helper.create_room_as(self.rmcreator_id,
+                                                              is_public=True)
 
         # send a message in one of the rooms
         self.created_rmid_msg_path = (
@@ -99,7 +102,7 @@ class RoomPermissionsTestCase(unittest.TestCase):
         request, channel = make_request(
             b"PUT",
             self.created_rmid_msg_path,
-            b'{"msgtype":"m.text","body":"test msg"}'
+            b'{"msgtype":"m.text","body":"test msg"}',
         )
         request.render(self.resource)
         wait_until_result(self.clock, channel)
@@ -108,8 +111,8 @@ class RoomPermissionsTestCase(unittest.TestCase):
         # set topic for public room
         request, channel = make_request(
             b"PUT",
-            ("/rooms/%s/state/m.room.topic" % self.created_public_rmid).encode('ascii'),
-            b'{"topic":"Public Room Topic"}'
+            ("/_matrix/client/r0/rooms/%s/state/m.room.topic" % self.created_public_rmid).encode('ascii'),
+            b'{"topic":"Public Room Topic"}',
         )
         request.render(self.resource)
         wait_until_result(self.clock, channel)
@@ -118,60 +121,74 @@ class RoomPermissionsTestCase(unittest.TestCase):
         # auth as user_id now
         self.helper.auth_user_id = self.user_id
 
-
-    @defer.inlineCallbacks
     def test_send_message(self):
-        msg_content = '{"msgtype":"m.text","body":"hello"}'
-        send_msg_path = (
-            "/rooms/%s/send/m.room.message/mid1" % (self.created_rmid,)
+        msg_content = b'{"msgtype":"m.text","body":"hello"}'
+
+        seq = iter(range(100))
+        send_msg_path = lambda: (
+            PATH_PREFIX + b"/rooms/%s/send/m.room.message/mid%s" % (self.created_rmid, str(next(seq)).encode('ascii'))
         )
 
         # send message in uncreated room, expect 403
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            "/rooms/%s/send/m.room.message/mid2" % (self.uncreated_rmid,),
+        request, channel = make_request(
+            b"PUT",
+            PATH_PREFIX + b"/rooms/%s/send/m.room.message/mid2" % (self.uncreated_rmid,),
             msg_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        request.render(self.resource)
+        wait_until_result(self.clock, channel)
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # send message in created room not joined (no state), expect 403
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            send_msg_path,
+        request, channel = make_request(
+            b"PUT",
+            send_msg_path(),
             msg_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        request.render(self.resource)
+        wait_until_result(self.clock, channel)
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # send message in created room and invited, expect 403
-        yield self.invite(
+        self.helper.invite(
             room=self.created_rmid,
             src=self.rmcreator_id,
             targ=self.user_id
         )
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            send_msg_path,
+        request, channel = make_request(
+            b"PUT",
+            send_msg_path(),
             msg_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        request.render(self.resource)
+        wait_until_result(self.clock, channel)
+
+        print(channel.result)
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # send message in created room and joined, expect 200
-        yield self.join(room=self.created_rmid, user=self.user_id)
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            send_msg_path,
+        self.helper.join(room=self.created_rmid, user=self.user_id)
+        request, channel = make_request(
+            b"PUT",
+            send_msg_path(),
             msg_content
         )
-        self.assertEquals(200, code, msg=str(response))
+        request.render(self.resource)
+        wait_until_result(self.clock, channel)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # send message in created room and left, expect 403
-        yield self.leave(room=self.created_rmid, user=self.user_id)
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            send_msg_path,
+        self.helper.leave(room=self.created_rmid, user=self.user_id)
+        print("left?")
+        request, channel = make_request(
+            b"PUT",
+            send_msg_path(),
             msg_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        request.render(self.resource)
+        wait_until_result(self.clock, channel)
+        print(channel.result)
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def test_topic_perms(self):
@@ -179,74 +196,74 @@ class RoomPermissionsTestCase(unittest.TestCase):
         topic_path = "/rooms/%s/state/m.room.topic" % self.created_rmid
 
         # set/get topic in uncreated room, expect 403
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", "/rooms/%s/state/m.room.topic" % self.uncreated_rmid,
             topic_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/%s/state/m.room.topic" % self.uncreated_rmid
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # set/get topic in created PRIVATE room not joined, expect 403
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", topic_path, topic_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # set topic in created PRIVATE room and invited, expect 403
         yield self.invite(
             room=self.created_rmid, src=self.rmcreator_id, targ=self.user_id
         )
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", topic_path, topic_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # get topic in created PRIVATE room and invited, expect 403
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # set/get topic in created PRIVATE room and joined, expect 200
-        yield self.join(room=self.created_rmid, user=self.user_id)
+        self.helper.join(room=self.created_rmid, user=self.user_id)
 
         # Only room ops can set topic by default
         self.auth_user_id = self.rmcreator_id
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", topic_path, topic_content
         )
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.auth_user_id = self.user_id
 
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assert_dict(json.loads(topic_content), response)
 
         # set/get topic in created PRIVATE room and left, expect 403
-        yield self.leave(room=self.created_rmid, user=self.user_id)
-        (code, response) = yield self.mock_resource.trigger(
+        self.helper.leave(room=self.created_rmid, user=self.user_id)
+        request, channel = make_request(
             "PUT", topic_path, topic_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
         (code, response) = yield self.mock_resource.trigger_get(topic_path)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # get topic in PUBLIC room, not joined, expect 403
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/%s/state/m.room.topic" % self.created_public_rmid
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
         # set topic in PUBLIC room, not joined, expect 403
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT",
             "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
             topic_content
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def _test_get_membership(self, room=None, members=[], expect_code=None):
@@ -272,8 +289,8 @@ class RoomPermissionsTestCase(unittest.TestCase):
         # set [invite/join/left] of self, set [invite/join/left] of other,
         # expect all 404s because room doesn't exist on any server
         for usr in [self.user_id, self.rmcreator_id]:
-            yield self.join(room=room, user=usr, expect_code=404)
-            yield self.leave(room=room, user=usr, expect_code=404)
+            self.helper.join(room=room, user=usr, expect_code=404)
+            self.helper.leave(room=room, user=usr, expect_code=404)
 
     @defer.inlineCallbacks
     def test_membership_private_room_perms(self):
@@ -288,14 +305,14 @@ class RoomPermissionsTestCase(unittest.TestCase):
 
         # get membership of self, get membership of other, private room + joined
         # expect all 200s
-        yield self.join(room=room, user=self.user_id)
+        self.helper.join(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
             room=room, expect_code=200)
 
         # get membership of self, get membership of other, private room + left
         # expect all 200s
-        yield self.leave(room=room, user=self.user_id)
+        self.helper.leave(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
             room=room, expect_code=200)
@@ -313,14 +330,14 @@ class RoomPermissionsTestCase(unittest.TestCase):
 
         # get membership of self, get membership of other, public room + joined
         # expect all 200s
-        yield self.join(room=room, user=self.user_id)
+        self.helper.join(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
             room=room, expect_code=200)
 
         # get membership of self, get membership of other, public room + left
         # expect 200.
-        yield self.leave(room=room, user=self.user_id)
+        self.helper.leave(room=room, user=self.user_id)
         yield self._test_get_membership(
             members=[self.user_id, self.rmcreator_id],
             room=room, expect_code=200)
@@ -346,14 +363,14 @@ class RoomPermissionsTestCase(unittest.TestCase):
     def test_joined_permissions(self):
         room = self.created_rmid
         yield self.invite(room=room, src=self.rmcreator_id, targ=self.user_id)
-        yield self.join(room=room, user=self.user_id)
+        self.helper.join(room=room, user=self.user_id)
 
         # set invited of self, expect 403
         yield self.invite(room=room, src=self.user_id, targ=self.user_id,
                           expect_code=403)
 
         # set joined of self, expect 200 (NOOP)
-        yield self.join(room=room, user=self.user_id)
+        self.helper.join(room=room, user=self.user_id)
 
         other = "@burgundy:red"
         # set invited of other, expect 200
@@ -373,14 +390,14 @@ class RoomPermissionsTestCase(unittest.TestCase):
                                      expect_code=403)
 
         # set left of self, expect 200
-        yield self.leave(room=room, user=self.user_id)
+        self.helper.leave(room=room, user=self.user_id)
 
     @defer.inlineCallbacks
     def test_leave_permissions(self):
         room = self.created_rmid
         yield self.invite(room=room, src=self.rmcreator_id, targ=self.user_id)
-        yield self.join(room=room, user=self.user_id)
-        yield self.leave(room=room, user=self.user_id)
+        self.helper.join(room=room, user=self.user_id)
+        self.helper.leave(room=room, user=self.user_id)
 
         # set [invite/join/left] of self, set [invite/join/left] of other,
         # expect all 403s
@@ -455,14 +472,14 @@ class RoomsMemberListTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/%s/members" % room_id
         )
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def test_get_member_list_no_room(self):
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/roomdoesnotexist/members"
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def test_get_member_list_no_permission(self):
@@ -470,7 +487,7 @@ class RoomsMemberListTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger_get(
             "/rooms/%s/members" % room_id
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def test_get_member_list_mixed_memberships(self):
@@ -481,17 +498,17 @@ class RoomsMemberListTestCase(unittest.TestCase):
                           targ=self.user_id)
         # can't see list if you're just invited.
         (code, response) = yield self.mock_resource.trigger_get(room_path)
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(403, int(channel.result["code"]), msg=channel.result["body"])
 
-        yield self.join(room=room_id, user=self.user_id)
+        self.helper.join(room=room_id, user=self.user_id)
         # can see list now joined
         (code, response) = yield self.mock_resource.trigger_get(room_path)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
-        yield self.leave(room=room_id, user=self.user_id)
+        self.helper.leave(room=room_id, user=self.user_id)
         # can see old list once left
         (code, response) = yield self.mock_resource.trigger_get(room_path)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
 
 class RoomsCreateTestCase(unittest.TestCase):
@@ -531,7 +548,7 @@ class RoomsCreateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_post_room_no_keys(self):
         # POST with no config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger("POST",
+        request, channel = make_request("POST",
                                                             "/createRoom",
                                                             "{}")
         self.assertEquals(200, code, response)
@@ -540,7 +557,7 @@ class RoomsCreateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_post_room_visibility_key(self):
         # POST with visibility config key, expect new room id
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "POST",
             "/createRoom",
             '{"visibility":"private"}')
@@ -550,7 +567,7 @@ class RoomsCreateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_post_room_custom_key(self):
         # POST with custom config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "POST",
             "/createRoom",
             '{"custom":"stuff"}')
@@ -560,7 +577,7 @@ class RoomsCreateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_post_room_known_and_unknown_keys(self):
         # POST with custom + known config keys, expect new room id
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "POST",
             "/createRoom",
             '{"visibility":"private","custom":"things"}')
@@ -570,13 +587,13 @@ class RoomsCreateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_post_room_invalid_content(self):
         # POST with invalid content / paths, expect 400
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "POST",
             "/createRoom",
             '{"visibili')
         self.assertEquals(400, code)
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "POST",
             "/createRoom",
             '["hello"]')
@@ -628,73 +645,73 @@ class RoomTopicTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_invalid_puts(self):
         # missing keys or invalid json
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, '{}'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, '{"_name":"bob"}'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, '{"nao'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, '[{"_name":"bob"},{"_name":"jill"}]'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, 'text only'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, ''
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
         # valid key, wrong type
         content = '{"topic":["Topic name"]}'
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, content
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def test_rooms_topic(self):
         # nothing should be there
         (code, response) = yield self.mock_resource.trigger_get(self.path)
-        self.assertEquals(404, code, msg=str(response))
+        self.assertEquals(404, int(channel.result["code"]), msg=channel.result["body"])
 
         # valid put
         content = '{"topic":"Topic name"}'
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, content
         )
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # valid get
         (code, response) = yield self.mock_resource.trigger_get(self.path)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assert_dict(json.loads(content), response)
 
     @defer.inlineCallbacks
     def test_rooms_topic_with_extra_keys(self):
         # valid put with extra keys
         content = '{"topic":"Seasons","subtopic":"Summer"}'
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", self.path, content
         )
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # valid get
         (code, response) = yield self.mock_resource.trigger_get(self.path)
-        self.assertEquals(200, code, msg=str(response))
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assert_dict(json.loads(content), response)
 
 
@@ -741,40 +758,40 @@ class RoomMemberStateTestCase(unittest.TestCase):
     def test_invalid_puts(self):
         path = "/rooms/%s/state/m.room.member/%s" % (self.room_id, self.user_id)
         # missing keys or invalid json
-        (code, response) = yield self.mock_resource.trigger("PUT", path, '{}')
-        self.assertEquals(400, code, msg=str(response))
+        request, channel = make_request("PUT", path, '{}')
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, '{"_name":"bob"}'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, '{"nao'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, '[{"_name":"bob"},{"_name":"jill"}]'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, 'text only'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, ''
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
         # valid keys, wrong types
         content = ('{"membership":["%s","%s","%s"]}' % (
             Membership.INVITE, Membership.JOIN, Membership.LEAVE
         ))
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(400, code, msg=str(response))
+        request, channel = make_request("PUT", path, content)
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def test_rooms_members_self(self):
@@ -784,11 +801,11 @@ class RoomMemberStateTestCase(unittest.TestCase):
 
         # valid join message (NOOP since we made the room)
         content = '{"membership":"%s"}' % Membership.JOIN
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("PUT", path, content)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger("GET", path, None)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("GET", path, None)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
         expected_response = {
             "membership": Membership.JOIN,
@@ -804,11 +821,11 @@ class RoomMemberStateTestCase(unittest.TestCase):
 
         # valid invite message
         content = '{"membership":"%s"}' % Membership.INVITE
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("PUT", path, content)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger("GET", path, None)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("GET", path, None)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEquals(json.loads(content), response)
 
     @defer.inlineCallbacks
@@ -822,11 +839,11 @@ class RoomMemberStateTestCase(unittest.TestCase):
         content = ('{"membership":"%s","invite_text":"%s"}' % (
             Membership.INVITE, "Join us!"
         ))
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("PUT", path, content)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger("GET", path, None)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("GET", path, None)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEquals(json.loads(content), response)
 
 
@@ -874,35 +891,35 @@ class RoomMessagesTestCase(unittest.TestCase):
         path = "/rooms/%s/send/m.room.message/mid1" % (
             urlparse.quote(self.room_id))
         # missing keys or invalid json
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, '{}'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, '{"_name":"bob"}'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, '{"nao'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, '[{"_name":"bob"},{"_name":"jill"}]'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, 'text only'
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
-        (code, response) = yield self.mock_resource.trigger(
+        request, channel = make_request(
             "PUT", path, ''
         )
-        self.assertEquals(400, code, msg=str(response))
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
     @defer.inlineCallbacks
     def test_rooms_messages_sent(self):
@@ -910,24 +927,24 @@ class RoomMessagesTestCase(unittest.TestCase):
             urlparse.quote(self.room_id))
 
         content = '{"body":"test","msgtype":{"type":"a"}}'
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(400, code, msg=str(response))
+        request, channel = make_request("PUT", path, content)
+        self.assertEquals(400, int(channel.result["code"]), msg=channel.result["body"])
 
         # custom message types
         content = '{"body":"test","msgtype":"test.custom.text"}'
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("PUT", path, content)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
-#        (code, response) = yield self.mock_resource.trigger("GET", path, None)
-#        self.assertEquals(200, code, msg=str(response))
+#        request, channel = make_request("GET", path, None)
+                          #        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 #        self.assert_dict(json.loads(content), response)
 
         # m.text message type
         path = "/rooms/%s/send/m.room.message/mid2" % (
             urlparse.quote(self.room_id))
         content = '{"body":"test2","msgtype":"m.text"}'
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(200, code, msg=str(response))
+        request, channel = make_request("PUT", path, content)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
 
 
 class RoomInitialSyncTestCase(unittest.TestCase):

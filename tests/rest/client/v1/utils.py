@@ -21,6 +21,9 @@ from tests import unittest
 
 from synapse.api.constants import Membership
 
+from tests.server import setup_test_homeserver, make_request, wait_until_result
+
+
 import attr
 import json
 import time
@@ -148,16 +151,16 @@ class RestHelper(object):
     def create_room_as(self, room_creator, is_public=True, tok=None):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
-        path = b"_matrix/client/r0/createRoom"
-        content = b"{}"
+        path = b"/_matrix/client/r0/createRoom"
+        content = {}
         if not is_public:
-            content = b'{"visibility":"private"}'
+            content["visibility"] = "private"
         if tok:
             path = path + b"?access_token=%s" % tok.encode('ascii')
 
-        request, channel = make_request(b"POST", path, content)
+        request, channel = make_request(b"POST", path, json.dumps(content).encode('utf8'))
         request.render(self.resource)
-        wait_until_result(self.hs.get_clock(), channel)
+        wait_until_result(self.hs.get_reactor(), channel)
 
         assert channel.result["code"] == b"200", channel.result
         self.auth_user_id = temp_id
@@ -186,7 +189,7 @@ class RestHelper(object):
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
-        path = "/rooms/%s/state/m.room.member/%s" % (room, targ)
+        path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (room, targ)
         if tok:
             path = path + "?access_token=%s" % tok
 
@@ -199,10 +202,10 @@ class RestHelper(object):
         )
 
         request.render(self.resource)
-        wait_until_result(self.hs.get_clock(), channel)
+        wait_until_result(self.hs.get_reactor(), channel)
 
         assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r" % (expect_code, code, response)
+            "Expected: %d, got: %d, resp: %r" % (expect_code, int(channel.result["code"]), channel.result["body"])
         )
 
         self.auth_user_id = temp_id
@@ -211,7 +214,7 @@ class RestHelper(object):
     def register(self, user_id):
         (code, response) = yield self.mock_resource.trigger(
             "POST",
-            "/register",
+            "/_matrix/client/r0/register",
             json.dumps({
                 "user": user_id,
                 "password": "test",
@@ -228,7 +231,7 @@ class RestHelper(object):
         if body is None:
             body = "body_text_here"
 
-        path = "/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
+        path = "/_matrix/client/r0/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
         content = '{"msgtype":"m.text","body":"%s"}' % body
         if tok:
             path = path + "?access_token=%s" % tok
