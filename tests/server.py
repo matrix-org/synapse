@@ -108,6 +108,11 @@ def wait_until_result(clock, channel, timeout=100):
         clock.advance(0.1)
 
 
+def render(request, resource, clock):
+    request.render(resource)
+    wait_until_result(clock, request._channel)
+
+
 class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
     A MemoryReactorClock that supports callFromThread.

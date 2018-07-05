@@ -42,9 +42,10 @@ class SynapseRequest(Request):
     which is handling the request, and returns a context manager.
 
     """
-    def __init__(self, site, *args, **kw):
-        Request.__init__(self, *args, **kw)
+    def __init__(self, site, channel, *args, **kw):
+        Request.__init__(self, channel, *args, **kw)
         self.site = site
+        self._channel = channel
         self.authenticated_entity = None
         self.start_time = 0
 
