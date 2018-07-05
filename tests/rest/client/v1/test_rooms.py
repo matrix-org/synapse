@@ -26,33 +26,44 @@ from synapse.types import UserID
 import json
 from six.moves.urllib import parse as urlparse
 
-from ....utils import MockHttpResource, setup_test_homeserver
-from .utils import RestTestCase
+
+from tests.server import setup_test_homeserver, make_request, wait_until_result
+
+from tests import unittest
+from synapse.util import Clock
+from synapse.http.server import JsonResource
 
 from mock import Mock, NonCallableMock
+
+from .utils import RestHelper
+from twisted.test.proto_helpers import MemoryReactorClock
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
 
-class RoomPermissionsTestCase(RestTestCase):
+class RoomPermissionsTestCase(unittest.TestCase):
     """ Tests room permissions. """
-    user_id = "@sid1:red"
-    rmcreator_id = "@notme:red"
+    user_id = b"@sid1:red"
+    rmcreator_id = b"@notme:red"
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
-        hs = yield setup_test_homeserver(
+        self.clock = MemoryReactorClock()
+        self.hs_clock = Clock(self.clock)
+
+        self.hs = yield setup_test_homeserver(
             "red",
             http_client=None,
+            clock=self.hs_clock,
+            reactor=self.clock,
             federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
-        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter = self.hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
 
-        hs.get_handlers().federation_handler = Mock()
+        self.hs.get_handlers().federation_handler = Mock()
 
         def get_user_by_access_token(token=None, allow_guest=False):
             return {
@@ -60,51 +71,53 @@ class RoomPermissionsTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_auth().get_user_by_access_token = get_user_by_access_token
+        self.hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
-        hs.get_datastore().insert_client_ip = _insert_client_ip
+        self.hs.get_datastore().insert_client_ip = _insert_client_ip
 
-        self.auth_user_id = self.rmcreator_id
+        self.resource = JsonResource(self.hs)
+        synapse.rest.client.v1.room.register_servlets(self.hs, self.resource)
+        self.helper = RestHelper(self.hs, self.resource, self.rmcreator_id)
 
-        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
-
-        self.auth = hs.get_auth()
+        self.auth = self.hs.get_auth()
 
         # create some rooms under the name rmcreator_id
         self.uncreated_rmid = "!aa:test"
 
-        self.created_rmid = yield self.create_room_as(self.rmcreator_id,
-                                                      is_public=False)
+        self.created_rmid = helper.create_room_as(self.rmcreator_id,
+                                                  is_public=False)
 
-        self.created_public_rmid = yield self.create_room_as(self.rmcreator_id,
-                                                             is_public=True)
+        self.created_public_rmid = helper.create_room_as(self.rmcreator_id,
+                                                         is_public=True)
 
         # send a message in one of the rooms
         self.created_rmid_msg_path = (
-            "/rooms/%s/send/m.room.message/a1" % (self.created_rmid)
-        )
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/m.room.message/a1" % (self.created_rmid)
+        ).encode('ascii')
+        request, channel = make_request(
+            b"PUT",
             self.created_rmid_msg_path,
-            '{"msgtype":"m.text","body":"test msg"}'
+            b'{"msgtype":"m.text","body":"test msg"}'
         )
-        self.assertEquals(200, code, msg=str(response))
+        request.render(self.resource)
+        wait_until_result(self.clock, channel)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # set topic for public room
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            "/rooms/%s/state/m.room.topic" % self.created_public_rmid,
-            '{"topic":"Public Room Topic"}'
+        request, channel = make_request(
+            b"PUT",
+            ("/rooms/%s/state/m.room.topic" % self.created_public_rmid).encode('ascii'),
+            b'{"topic":"Public Room Topic"}'
         )
-        self.assertEquals(200, code, msg=str(response))
+        request.render(self.resource)
+        wait_until_result(self.clock, channel)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # auth as user_id now
-        self.auth_user_id = self.user_id
+        self.helper.auth_user_id = self.user_id
 
-    def tearDown(self):
-        pass
 
     @defer.inlineCallbacks
     def test_send_message(self):
@@ -398,7 +411,7 @@ class RoomPermissionsTestCase(RestTestCase):
         )
 
 
-class RoomsMemberListTestCase(RestTestCase):
+class RoomsMemberListTestCase(unittest.TestCase):
     """ Tests /rooms/$room_id/members/list REST events."""
     user_id = "@sid1:red"
 
@@ -481,7 +494,7 @@ class RoomsMemberListTestCase(RestTestCase):
         self.assertEquals(200, code, msg=str(response))
 
 
-class RoomsCreateTestCase(RestTestCase):
+class RoomsCreateTestCase(unittest.TestCase):
     """ Tests /rooms and /rooms/$room_id REST events. """
     user_id = "@sid1:red"
 
@@ -570,7 +583,7 @@ class RoomsCreateTestCase(RestTestCase):
         self.assertEquals(400, code)
 
 
-class RoomTopicTestCase(RestTestCase):
+class RoomTopicTestCase(unittest.TestCase):
     """ Tests /rooms/$room_id/topic REST events. """
     user_id = "@sid1:red"
 
@@ -685,7 +698,7 @@ class RoomTopicTestCase(RestTestCase):
         self.assert_dict(json.loads(content), response)
 
 
-class RoomMemberStateTestCase(RestTestCase):
+class RoomMemberStateTestCase(unittest.TestCase):
     """ Tests /rooms/$room_id/members/$user_id/state REST events. """
     user_id = "@sid1:red"
 
@@ -817,7 +830,7 @@ class RoomMemberStateTestCase(RestTestCase):
         self.assertEquals(json.loads(content), response)
 
 
-class RoomMessagesTestCase(RestTestCase):
+class RoomMessagesTestCase(unittest.TestCase):
     """ Tests /rooms/$room_id/messages/$user_id/$msg_id REST events. """
     user_id = "@sid1:red"
 
@@ -917,7 +930,7 @@ class RoomMessagesTestCase(RestTestCase):
         self.assertEquals(200, code, msg=str(response))
 
 
-class RoomInitialSyncTestCase(RestTestCase):
+class RoomInitialSyncTestCase(unittest.TestCase):
     """ Tests /rooms/$room_id/initialSync. """
     user_id = "@sid1:red"
 
@@ -991,7 +1004,7 @@ class RoomInitialSyncTestCase(RestTestCase):
         self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
 
 
-class RoomMessageListTestCase(RestTestCase):
+class RoomMessageListTestCase(unittest.TestCase):
     """ Tests /rooms/$room_id/messages REST events. """
     user_id = "@sid1:red"
 
