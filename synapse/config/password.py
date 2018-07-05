@@ -31,7 +31,7 @@ class PasswordConfig(Config):
         # Enable password for login.
         password_config:
            enabled: true
-           # set to false if you do not want to authenticate 
+           # set to false if you do not want to authenticate
            # against the local db
            localdb: true
            # Uncomment and change to a secret random string for extra security.
