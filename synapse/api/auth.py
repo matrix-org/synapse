@@ -192,7 +192,7 @@ class Auth(object):
                     synapse.types.create_requester(user_id, app_service=app_service)
                 )
 
-            access_token = get_access_token_from_request(
+            access_token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
 
@@ -238,7 +238,7 @@ class Auth(object):
     @defer.inlineCallbacks
     def _get_appservice_user_id(self, request):
         app_service = self.store.get_app_service_by_token(
-            get_access_token_from_request(
+            self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
         )
@@ -512,7 +512,7 @@ class Auth(object):
 
     def get_appservice_by_req(self, request):
         try:
-            token = get_access_token_from_request(
+            token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
             service = self.store.get_app_service_by_token(token)
