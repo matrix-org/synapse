@@ -726,9 +726,6 @@ class Auth(object):
                     errcode=Codes.MISSING_TOKEN,
                 )
         else:
-            import traceback
-            traceback.print_stack()
-
             # Try to get the access_token from the query params.
             if not query_params:
                 raise AuthError(
