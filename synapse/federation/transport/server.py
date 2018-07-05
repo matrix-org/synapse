@@ -385,7 +385,9 @@ class FederationMakeJoinServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
-        content = yield self.handler.on_make_join_request(context, user_id)
+        content = yield self.handler.on_make_join_request(
+            origin, context, user_id,
+        )
         defer.returnValue((200, content))
 
 
@@ -394,7 +396,9 @@ class FederationMakeLeaveServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
-        content = yield self.handler.on_make_leave_request(context, user_id)
+        content = yield self.handler.on_make_leave_request(
+            origin, context, user_id,
+        )
         defer.returnValue((200, content))
 
 
