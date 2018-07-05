@@ -78,6 +78,11 @@ def make_request(method, path, content=b""):
     content, and return the Request and the Channel underneath.
     """
 
+    # Decorate it to be the full path
+    if not path.startswith(b"/_matrix"):
+        path = b"/_matrix/client/r0/" + path
+        path = path.replace("//", "/")
+
     if isinstance(content, text_type):
         content = content.encode('utf8')
 
