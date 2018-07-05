@@ -1,0 +1,1 @@
+Reject invalid server names in homeserver.yaml
