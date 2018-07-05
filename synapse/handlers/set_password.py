@@ -33,7 +33,7 @@ class SetPasswordHandler(BaseHandler):
     def set_password(self, user_id, newpassword, requester=None):
         if not self.hs.config.password_localdb:
             raise SynapseError(403, "Local DB Authentication Disabled",
-                errcode=Codes.FORBIDDEN)
+                               errcode=Codes.FORBIDDEN)
 
         password_hash = yield self._auth_handler.hash(newpassword)
 
