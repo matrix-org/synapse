@@ -76,6 +76,8 @@ class EventTypes(object):
     Topic = "m.room.topic"
     Name = "m.room.name"
 
+    ServerACL = "m.room.server_acl"
+
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"

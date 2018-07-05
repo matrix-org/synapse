@@ -18,7 +18,7 @@ from twisted.internet import defer
 
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.api.errors import Codes, SynapseError, FederationDeniedError
-from synapse.http.endpoint import parse_server_name
+from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
     parse_json_object_from_request, parse_integer_from_args, parse_string_from_args,
@@ -170,8 +170,9 @@ def _parse_auth_header(header_bytes):
                 return value
 
         origin = strip_quotes(param_dict["origin"])
+
         # ensure that the origin is a valid server name
-        parse_server_name(origin)
+        parse_and_validate_server_name(origin)
 
         key = strip_quotes(param_dict["key"])
         sig = strip_quotes(param_dict["sig"])
@@ -384,7 +385,9 @@ class FederationMakeJoinServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
-        content = yield self.handler.on_make_join_request(context, user_id)
+        content = yield self.handler.on_make_join_request(
+            origin, context, user_id,
+        )
         defer.returnValue((200, content))
 
 
@@ -393,7 +396,9 @@ class FederationMakeLeaveServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, context, user_id):
-        content = yield self.handler.on_make_leave_request(context, user_id)
+        content = yield self.handler.on_make_leave_request(
+            origin, context, user_id,
+        )
         defer.returnValue((200, content))
 
 
