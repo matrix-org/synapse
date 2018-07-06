@@ -1,3 +1,12 @@
+Synapse 0.32.1 (2018-07-06)
+===========================
+
+Bugfixes
+--------
+
+- Add explicit dependency on netaddr (`#3488 <https://github.com/matrix-org/synapse/issues/3488>`_)
+
+
 Changes in synapse v0.32.0 (2018-07-06)
 ===========================================
 No changes since 0.32.0rc1
