@@ -83,7 +83,9 @@ CREATE TABLE IF NOT EXISTS room_memberships(
     UNIQUE (event_id)
 );
 
-CREATE INDEX room_memberships_room_id ON room_memberships (room_id);
+-- we used to create an index on room_id, but no longer bother, as in schema
+-- v50, we replace it with one on (room_id, forgotten)
+-- CREATE INDEX room_memberships_room_id ON room_memberships (room_id);
 CREATE INDEX room_memberships_user_id ON room_memberships (user_id);
 
 CREATE TABLE IF NOT EXISTS feedback(
