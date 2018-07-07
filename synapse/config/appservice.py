@@ -17,6 +17,8 @@ from ._base import Config, ConfigError
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
 
+from netaddr import IPSet
+
 import yaml
 import logging
 
@@ -154,6 +156,13 @@ def _load_appservice(hostname, as_info, config_filename):
             " will not receive events or queries.",
             config_filename,
         )
+
+    ip_range_whitelist = None
+    if as_info.get('ip_range_whitelist'):
+        ip_range_whitelist = IPSet(
+            as_info.get('ip_range_whitelist')
+        )
+
     return ApplicationService(
         token=as_info["as_token"],
         hostname=hostname,
@@ -163,5 +172,6 @@ def _load_appservice(hostname, as_info, config_filename):
         sender=user_id,
         id=as_info["id"],
         protocols=protocols,
-        rate_limited=rate_limited
+        rate_limited=rate_limited,
+        ip_range_whitelist=ip_range_whitelist,
     )
