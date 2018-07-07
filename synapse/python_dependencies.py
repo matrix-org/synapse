@@ -57,7 +57,7 @@ REQUIREMENTS = {
     "phonenumbers>=8.2.0": ["phonenumbers"],
     "six": ["six"],
     "prometheus_client": ["prometheus_client"],
-    "attr": ["attr"],
+    "attrs": ["attr"],
     "netaddr>=0.7.18": ["netaddr"],
 }
 
