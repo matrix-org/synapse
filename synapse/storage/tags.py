@@ -19,7 +19,8 @@ from synapse.storage.account_data import AccountDataWorkerStore
 from synapse.util.caches.descriptors import cached
 from twisted.internet import defer
 
-import simplejson as json
+from canonicaljson import json
+
 import logging
 
 from six.moves import range

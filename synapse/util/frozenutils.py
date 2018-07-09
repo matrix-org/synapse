@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from frozendict import frozendict
-import simplejson as json
+from canonicaljson import json
 
 from six import string_types
 

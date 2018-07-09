@@ -29,7 +29,8 @@ from synapse.api.errors import SynapseError
 from collections import namedtuple
 
 import logging
-import simplejson as json
+
+from canonicaljson import json
 
 # these are only included to make the type annotations work
 from synapse.events import EventBase    # noqa: F401

@@ -23,7 +23,8 @@ import re
 import shutil
 import sys
 import traceback
-import simplejson as json
+
+from canonicaljson import json
 
 from six.moves import urllib_parse as urlparse
 from six import string_types
