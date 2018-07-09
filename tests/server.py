@@ -22,7 +22,7 @@ class FakeChannel(object):
     wire).
     """
 
-    result = attr.ib(factory=dict)
+    result = attr.ib(default=attr.Factory(dict))
 
     @property
     def json_body(self):
