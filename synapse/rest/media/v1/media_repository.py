@@ -50,6 +50,7 @@ from .storage_provider import StorageProviderWrapper
 from .thumbnail_resource import ThumbnailResource
 from .thumbnailer import Thumbnailer
 from .upload_resource import UploadResource
+from .config_resource import MediaConfigResource
 
 logger = logging.getLogger(__name__)
 
