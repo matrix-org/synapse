@@ -17,8 +17,9 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, AuthError, CodeMessageException
+from synapse.api.errors import AuthError, CodeMessageException, SynapseError
 from synapse.types import UserID, get_domain_from_id
+
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)

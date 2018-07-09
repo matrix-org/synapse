@@ -13,20 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# twisted imports
-from twisted.internet import defer
+import json
+import time
 
-# trial imports
-from tests import unittest
+import attr
+
+from twisted.internet import defer
 
 from synapse.api.constants import Membership
 
-from tests.server import setup_test_homeserver, make_request, wait_until_result
-
-
-import attr
-import json
-import time
+from tests import unittest
+from tests.server import make_request, setup_test_homeserver, wait_until_result
 
 
 class RestTestCase(unittest.TestCase):

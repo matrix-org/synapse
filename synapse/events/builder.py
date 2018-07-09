@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import EventBase, FrozenEvent, _event_dict_property
+import copy
 
 from synapse.types import EventID
-
 from synapse.util.stringutils import random_string
 
-import copy
+from . import EventBase, FrozenEvent, _event_dict_property
 
 
 class EventBuilder(EventBase):

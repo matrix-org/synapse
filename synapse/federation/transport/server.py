@@ -14,26 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.api.urls import FEDERATION_PREFIX as PREFIX
-from synapse.api.errors import Codes, SynapseError, FederationDeniedError
-from synapse.http.endpoint import parse_and_validate_server_name
-from synapse.http.server import JsonResource
-from synapse.http.servlet import (
-    parse_json_object_from_request, parse_integer_from_args, parse_string_from_args,
-    parse_boolean_from_args,
-)
-from synapse.util.ratelimitutils import FederationRateLimiter
-from synapse.util.versionstring import get_version_string
-from synapse.util.logcontext import run_in_background
-from synapse.types import ThirdPartyInstanceID, get_domain_from_id
-
 import functools
 import logging
 import re
-import synapse
 
+from twisted.internet import defer
+
+import synapse
+from synapse.api.errors import Codes, FederationDeniedError, SynapseError
+from synapse.api.urls import FEDERATION_PREFIX as PREFIX
+from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.http.server import JsonResource
+from synapse.http.servlet import (
+    parse_boolean_from_args,
+    parse_integer_from_args,
+    parse_json_object_from_request,
+    parse_string_from_args,
+)
+from synapse.types import ThirdPartyInstanceID, get_domain_from_id
+from synapse.util.logcontext import run_in_background
+from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 

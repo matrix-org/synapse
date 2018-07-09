@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from frozendict import frozendict
-from canonicaljson import json
-
 from six import string_types
+
+from canonicaljson import json
+from frozendict import frozendict
 
 
 def freeze(o):

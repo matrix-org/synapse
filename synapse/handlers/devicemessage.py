@@ -18,9 +18,8 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.types import get_domain_from_id, UserID
+from synapse.types import UserID, get_domain_from_id
 from synapse.util.stringutils import random_string
-
 
 logger = logging.getLogger(__name__)
 

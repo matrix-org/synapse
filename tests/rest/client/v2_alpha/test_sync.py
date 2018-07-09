@@ -14,20 +14,14 @@
 # limitations under the License.
 
 import synapse.types
+from synapse.http.server import JsonResource
 from synapse.rest.client.v2_alpha import sync
 from synapse.types import UserID
 from synapse.util import Clock
+
 from tests import unittest
-
-from synapse.http.server import JsonResource
-
-from tests.server import (
-    make_request,
-    wait_until_result,
-    ThreadedMemoryReactorClock as MemoryReactorClock,
-    setup_test_homeserver,
-)
-
+from tests.server import ThreadedMemoryReactorClock as MemoryReactorClock
+from tests.server import make_request, setup_test_homeserver, wait_until_result
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
 

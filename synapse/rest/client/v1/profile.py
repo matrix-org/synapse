@@ -16,9 +16,10 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.types import UserID
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):

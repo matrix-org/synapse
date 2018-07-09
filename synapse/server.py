@@ -33,19 +33,30 @@ from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
 from synapse.federation.federation_client import FederationClient
-from synapse.federation.federation_server import FederationServer
+from synapse.federation.federation_server import (
+    FederationHandlerRegistry,
+    FederationServer,
+)
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.federation_server import FederationHandlerRegistry
-from synapse.federation.transport.client import TransportLayerClient
 from synapse.federation.transaction_queue import TransactionQueue
+from synapse.federation.transport.client import TransportLayerClient
+from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
+from synapse.groups.groups_server import GroupsServerHandler
 from synapse.handlers import Handlers
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
-from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
+from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
+from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.initial_sync import InitialSyncHandler
+from synapse.handlers.message import EventCreationHandler
 from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.read_marker import ReadMarkerHandler
+from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.room import RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
@@ -53,17 +64,8 @@ from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
-from synapse.handlers.events import EventHandler, EventStreamHandler
-from synapse.handlers.initial_sync import InitialSyncHandler
-from synapse.handlers.receipts import ReceiptsHandler
-from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
-from synapse.handlers.groups_local import GroupsLocalHandler
-from synapse.handlers.profile import ProfileHandler
-from synapse.handlers.message import EventCreationHandler
-from synapse.groups.groups_server import GroupsServerHandler
-from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
-from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
+from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
@@ -74,9 +76,7 @@ from synapse.rest.media.v1.media_repository import (
 )
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
-from synapse.server_notices.worker_server_notices_sender import (
-    WorkerServerNoticesSender,
-)
+from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import DataStore
 from synapse.streams.events import EventSources

@@ -13,17 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import json
+
+from mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
 
-from mock import Mock
 from synapse.http.server import JsonResource
 from synapse.rest.client.v1.register import register_servlets
 from synapse.util import Clock
+
 from tests import unittest
-from tests.server import setup_test_homeserver, make_request
+from tests.server import make_request, setup_test_homeserver
 
 
 class CreateUserServletTestCase(unittest.TestCase):

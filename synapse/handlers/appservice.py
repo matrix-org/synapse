@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
 
 from six import itervalues
 
-import synapse
-from synapse.api.constants import EventTypes
-from synapse.util.metrics import Measure
-from synapse.util.logcontext import (
-    make_deferred_yieldable, run_in_background,
-)
 from prometheus_client import Counter
 
-import logging
+from twisted.internet import defer
+
+import synapse
+from synapse.api.constants import EventTypes
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 

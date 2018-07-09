@@ -15,12 +15,15 @@
 
 """Tests REST events for /profile paths."""
 from mock import Mock
+
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.errors import SynapseError, AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.rest.client.v1 import profile
+
 from tests import unittest
+
 from ....utils import MockHttpResource, setup_test_homeserver
 
 myid = "@1234ABCD:test"

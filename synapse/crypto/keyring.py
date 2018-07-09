@@ -14,35 +14,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
+import logging
+import urllib
+from collections import namedtuple
+
+from signedjson.key import (
+    decode_verify_key_bytes,
+    encode_verify_key_base64,
+    is_signing_algorithm_supported,
+)
+from signedjson.sign import (
+    SignatureVerifyException,
+    encode_canonical_json,
+    sign_json,
+    signature_ids,
+    verify_signed_json,
+)
+from unpaddedbase64 import decode_base64, encode_base64
+
+from OpenSSL import crypto
+from twisted.internet import defer
+
+from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyclient import fetch_server_key
-from synapse.api.errors import SynapseError, Codes
-from synapse.util import unwrapFirstError, logcontext
+from synapse.util import logcontext, unwrapFirstError
 from synapse.util.logcontext import (
     PreserveLoggingContext,
     preserve_fn,
     run_in_background,
 )
 from synapse.util.metrics import Measure
-
-from twisted.internet import defer
-
-from signedjson.sign import (
-    verify_signed_json, signature_ids, sign_json, encode_canonical_json,
-    SignatureVerifyException,
-)
-from signedjson.key import (
-    is_signing_algorithm_supported, decode_verify_key_bytes,
-    encode_verify_key_base64,
-)
-from unpaddedbase64 import decode_base64, encode_base64
-
-from OpenSSL import crypto
-
-from collections import namedtuple
-import urllib
-import hashlib
-import logging
-
 
 logger = logging.getLogger(__name__)
 

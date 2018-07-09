@@ -15,30 +15,27 @@
 
 """Tests REST events for /rooms paths."""
 
+import json
+
+from mock import Mock, NonCallableMock
+from six.moves.urllib import parse as urlparse
+
 # twisted imports
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room
 from synapse.api.constants import Membership
-
+from synapse.http.server import JsonResource
 from synapse.types import UserID
-
-import json
-from six.moves.urllib import parse as urlparse
-
-
-from tests.server import (
-    setup_test_homeserver,
-    make_request,
-    render,
-    ThreadedMemoryReactorClock,
-)
+from synapse.util import Clock
 
 from tests import unittest
-from synapse.util import Clock
-from synapse.http.server import JsonResource
-
-from mock import Mock, NonCallableMock
+from tests.server import (
+    ThreadedMemoryReactorClock,
+    make_request,
+    render,
+    setup_test_homeserver,
+)
 
 from .utils import RestHelper
 

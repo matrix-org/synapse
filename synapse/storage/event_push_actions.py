@@ -14,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage._base import SQLBaseStore, LoggingTransaction
-from twisted.internet import defer
-from synapse.util.caches.descriptors import cachedInlineCallbacks
-
 import logging
+
+from six import iteritems
 
 from canonicaljson import json
 
-from six import iteritems
+from twisted.internet import defer
+
+from synapse.storage._base import LoggingTransaction, SQLBaseStore
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
 

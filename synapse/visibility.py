@@ -20,9 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.utils import prune_event
-from synapse.util.logcontext import (
-    make_deferred_yieldable, preserve_fn,
-)
+from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 
 logger = logging.getLogger(__name__)
 

@@ -18,15 +18,16 @@ import logging
 from six import itervalues
 
 import pymacaroons
-from twisted.internet import defer
 from netaddr import IPAddress
+
+from twisted.internet import defer
 
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes
 from synapse.types import UserID
-from synapse.util.caches import register_cache, CACHE_SIZE_FACTOR
+from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 

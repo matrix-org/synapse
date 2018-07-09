@@ -17,6 +17,7 @@
 import logging
 
 from synapse.http.endpoint import parse_and_validate_server_name
+
 from ._base import Config, ConfigError
 
 logger = logging.Logger(__name__)

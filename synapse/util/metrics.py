@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
+from functools import wraps
 
 from prometheus_client import Counter
+
+from twisted.internet import defer
+
 from synapse.util.logcontext import LoggingContext
-
-from functools import wraps
-import logging
-
 
 logger = logging.getLogger(__name__)
 

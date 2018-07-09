@@ -13,27 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from hashlib import sha256
 import hmac
 import logging
+from hashlib import sha256
 from os import path
+
 from six.moves import http_client
 
 import jinja2
 from jinja2 import TemplateNotFound
+
 from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
-from synapse.api.errors import NotFoundError, SynapseError, StoreError
+from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import (
-    finish_request,
-    wrap_html_request_handler,
-)
+from synapse.http.server import finish_request, wrap_html_request_handler
 from synapse.http.servlet import parse_string
 from synapse.types import UserID
-
 
 # language to use for the templates. TODO: figure this out from Accept-Language
 TEMPLATE_LANGUAGE = "en"

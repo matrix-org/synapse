@@ -14,14 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from canonicaljson import json
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 
 from ._base import SQLBaseStore
-
-from canonicaljson import json
-
 
 # The category ID for the "default" category. We don't store as null in the
 # database to avoid the fun of null != null

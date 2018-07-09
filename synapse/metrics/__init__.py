@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import functools
-import time
 import gc
+import logging
 import os
 import platform
-import attr
+import time
 
-from prometheus_client import Gauge, Histogram, Counter
-from prometheus_client.core import GaugeMetricFamily, REGISTRY
+import attr
+from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client.core import REGISTRY, GaugeMetricFamily
 
 from twisted.internet import reactor
-
 
 logger = logging.getLogger(__name__)
 
