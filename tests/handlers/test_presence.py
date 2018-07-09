@@ -14,17 +14,21 @@
 # limitations under the License.
 
 
-from tests import unittest
-
 from mock import Mock, call
 
 from synapse.api.constants import PresenceState
 from synapse.handlers.presence import (
-    handle_update, handle_timeout,
-    IDLE_TIMER, SYNC_ONLINE_TIMEOUT, LAST_ACTIVE_GRANULARITY, FEDERATION_TIMEOUT,
     FEDERATION_PING_INTERVAL,
+    FEDERATION_TIMEOUT,
+    IDLE_TIMER,
+    LAST_ACTIVE_GRANULARITY,
+    SYNC_ONLINE_TIMEOUT,
+    handle_timeout,
+    handle_update,
 )
 from synapse.storage.presence import UserPresenceState
+
+from tests import unittest
 
 
 class PresenceUpdateTestCase(unittest.TestCase):

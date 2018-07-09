@@ -13,16 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import time
+
 # twisted imports
 from twisted.internet import defer
 
-# trial imports
-from tests import unittest
-
 from synapse.api.constants import Membership
 
-import json
-import time
+# trial imports
+from tests import unittest
 
 
 class RestTestCase(unittest.TestCase):

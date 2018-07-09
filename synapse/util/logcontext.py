@@ -22,10 +22,10 @@ them.
 See doc/log_contexts.rst for details on how this works.
 """
 
-from twisted.internet import defer
-
-import threading
 import logging
+import threading
+
+from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 

@@ -16,14 +16,15 @@ import logging
 
 import six
 
+from twisted.internet import defer
+
 from synapse.api.constants import MAX_DEPTH
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_request
-from synapse.util import unwrapFirstError, logcontext
-from twisted.internet import defer
+from synapse.util import logcontext, unwrapFirstError
 
 logger = logging.getLogger(__name__)
 

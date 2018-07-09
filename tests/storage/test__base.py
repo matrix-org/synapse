@@ -14,14 +14,14 @@
 # limitations under the License.
 
 
-from tests import unittest
-from twisted.internet import defer
-
 from mock import Mock
 
-from synapse.util.async import ObservableDeferred
+from twisted.internet import defer
 
+from synapse.util.async import ObservableDeferred
 from synapse.util.caches.descriptors import Cache, cached
+
+from tests import unittest
 
 
 class CacheTestCase(unittest.TestCase):

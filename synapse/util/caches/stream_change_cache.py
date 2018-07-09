@@ -13,12 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util import caches
-
-
-from sortedcontainers import SortedDict
 import logging
 
+from sortedcontainers import SortedDict
+
+from synapse.util import caches
 
 logger = logging.getLogger(__name__)
 

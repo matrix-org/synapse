@@ -14,9 +14,9 @@
 # limitations under the License.
 
 
-from tests import unittest
-
 from synapse.util.caches.dictionary_cache import DictionaryCache
+
+from tests import unittest
 
 
 class DictCacheTestCase(unittest.TestCase):

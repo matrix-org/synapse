@@ -15,21 +15,22 @@
 # limitations under the License.
 
 import logging
+from collections import namedtuple
+
+from six import iteritems, itervalues
+
+from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from .push_rule_evaluator import PushRuleEvaluatorForEvent
-
-from synapse.event_auth import get_user_power_level
 from synapse.api.constants import EventTypes, Membership
+from synapse.event_auth import get_user_power_level
+from synapse.state import POWER_KEY
+from synapse.util.async import Linearizer
 from synapse.util.caches import register_cache
 from synapse.util.caches.descriptors import cached
-from synapse.util.async import Linearizer
-from synapse.state import POWER_KEY
 
-from collections import namedtuple
-from prometheus_client import Counter
-from six import itervalues, iteritems
+from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 logger = logging.getLogger(__name__)
 

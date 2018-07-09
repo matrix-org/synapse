@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
 from collections import namedtuple
 
 from synapse.util.module_loader import load_module
 
+from ._base import Config, ConfigError
 
 MISSING_NETADDR = (
     "Missing netaddr library. This is required for URL preview API."

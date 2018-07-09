@@ -17,15 +17,18 @@ import gc
 import logging
 import sys
 
+from daemonize import Daemonize
+
+from twisted.internet import error, reactor
+
+from synapse.util import PreserveLoggingContext
+from synapse.util.rlimit import change_resource_limit
+
 try:
     import affinity
 except Exception:
     affinity = None
 
-from daemonize import Daemonize
-from synapse.util import PreserveLoggingContext
-from synapse.util.rlimit import change_resource_limit
-from twisted.internet import error, reactor
 
 logger = logging.getLogger(__name__)
 

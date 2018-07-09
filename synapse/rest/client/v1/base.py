@@ -16,14 +16,12 @@
 """This module contains base REST classes for constructing client v1 servlets.
 """
 
-from synapse.http.servlet import RestServlet
-from synapse.api.urls import CLIENT_PREFIX
-from synapse.rest.client.transactions import HttpTransactionCache
-
+import logging
 import re
 
-import logging
-
+from synapse.api.urls import CLIENT_PREFIX
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.transactions import HttpTransactionCache
 
 logger = logging.getLogger(__name__)
 

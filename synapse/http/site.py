@@ -16,7 +16,7 @@ import contextlib
 import logging
 import time
 
-from twisted.web.server import Site, Request
+from twisted.web.server import Request, Site
 
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics

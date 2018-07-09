@@ -20,10 +20,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import SynapseError
-from synapse.http.server import (
-    respond_with_json,
-    wrap_json_request_handler,
-)
+from synapse.http.server import respond_with_json, wrap_json_request_handler
 
 logger = logging.getLogger(__name__)
 

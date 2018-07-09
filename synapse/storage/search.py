@@ -13,18 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 import logging
 import re
-from canonicaljson import json
+from collections import namedtuple
 
 from six import string_types
 
+from canonicaljson import json
+
 from twisted.internet import defer
 
-from .background_updates import BackgroundUpdateStore
 from synapse.api.errors import SynapseError
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+
+from .background_updates import BackgroundUpdateStore
 
 logger = logging.getLogger(__name__)
 

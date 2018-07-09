@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import unittest
-from twisted.internet import defer
-
 from mock import Mock, patch
 
+from twisted.internet import defer
+
 from synapse.util.distributor import Distributor
+
+from . import unittest
 
 
 class DistributorTestCase(unittest.TestCase):

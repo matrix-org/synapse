@@ -13,22 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import sys
+import threading
+import time
 
-from synapse.api.errors import StoreError
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.caches.descriptors import Cache
-from synapse.storage.engines import PostgresEngine
+from six import iteritems, iterkeys, itervalues
+from six.moves import intern, range
 
 from prometheus_client import Histogram
 
 from twisted.internet import defer
 
-import sys
-import time
-import threading
-
-from six import itervalues, iterkeys, iteritems
-from six.moves import intern, range
+from synapse.api.errors import StoreError
+from synapse.storage.engines import PostgresEngine
+from synapse.util.caches.descriptors import Cache
+from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 
 logger = logging.getLogger(__name__)
 

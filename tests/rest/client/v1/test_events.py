@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """ Tests REST events for /events paths."""
-from tests import unittest
+from mock import Mock, NonCallableMock
 
 # twisted imports
 from twisted.internet import defer
@@ -23,12 +23,10 @@ import synapse.rest.client.v1.events
 import synapse.rest.client.v1.register
 import synapse.rest.client.v1.room
 
+from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
-
-from mock import Mock, NonCallableMock
-
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 

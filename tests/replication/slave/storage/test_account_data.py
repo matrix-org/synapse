@@ -13,11 +13,11 @@
 # limitations under the License.
 
 
-from ._base import BaseSlavedStoreTestCase
+from twisted.internet import defer
 
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 
-from twisted.internet import defer
+from ._base import BaseSlavedStoreTestCase
 
 USER_ID = "@feeling:blue"
 TYPE = "my.type"

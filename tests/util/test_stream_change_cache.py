@@ -1,7 +1,8 @@
-from tests import unittest
 from mock import patch
 
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+
+from tests import unittest
 
 
 class StreamChangeCacheTests(unittest.TestCase):

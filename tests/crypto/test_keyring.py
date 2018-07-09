@@ -14,15 +14,19 @@
 # limitations under the License.
 import time
 
+from mock import Mock
+
 import signedjson.key
 import signedjson.sign
-from mock import Mock
+
+from twisted.internet import defer, reactor
+
 from synapse.api.errors import SynapseError
 from synapse.crypto import keyring
-from synapse.util import logcontext, Clock
+from synapse.util import Clock, logcontext
 from synapse.util.logcontext import LoggingContext
+
 from tests import unittest, utils
-from twisted.internet import defer, reactor
 
 
 class MockPerspectiveServer(object):

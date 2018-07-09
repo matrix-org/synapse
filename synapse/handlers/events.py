@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.util.logutils import log_function
-from synapse.types import UserID
-from synapse.events.utils import serialize_event
-from synapse.api.constants import Membership, EventTypes
-from synapse.events import EventBase
-
-from ._base import BaseHandler
-
 import logging
 import random
 
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.events import EventBase
+from synapse.events.utils import serialize_event
+from synapse.types import UserID
+from synapse.util.logutils import log_function
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

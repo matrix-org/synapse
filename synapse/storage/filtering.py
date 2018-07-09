@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from canonicaljson import encode_canonical_json, json
+
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
-from canonicaljson import encode_canonical_json, json
+from ._base import SQLBaseStore
 
 
 class FilteringStore(SQLBaseStore):

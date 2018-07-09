@@ -14,9 +14,11 @@
 # limitations under the License.
 
 import sys
+
+from synapse import python_dependencies  # noqa: E402
+
 sys.dont_write_bytecode = True
 
-from synapse import python_dependencies   # noqa: E402
 
 try:
     python_dependencies.check_requirements()
