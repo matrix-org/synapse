@@ -30,7 +30,7 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.rest.client.v1.base import ClientV1RestServlet
 from synapse.types import create_requester
 
-from .base import ClientV1RestServlet, client_path_patterns, v1_only_client_path_patterns
+from .base import v1_only_client_path_patterns
 
 logger = logging.getLogger(__name__)
 

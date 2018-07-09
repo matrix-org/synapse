@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 from mock import Mock
 from six import PY3
 
 from twisted.internet import defer
-
-from synapse.rest.client.v1.register import CreateUserRestServlet
 
 from tests import unittest
 from tests.utils import mock_getRawHeaders

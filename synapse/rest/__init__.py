@@ -15,6 +15,7 @@
 
 from six import PY3
 
+from synapse.http.server import JsonResource
 from synapse.rest.client import versions
 from synapse.rest.client.v1 import admin, directory
 from synapse.rest.client.v1 import login as v1_login

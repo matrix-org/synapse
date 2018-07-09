@@ -15,9 +15,12 @@
 
 """Tests REST events for /rooms paths."""
 
-from six import PY3
+import json
 
-# twisted imports
+from mock import Mock, NonCallableMock
+from six import PY3
+from six.moves.urllib import parse as urlparse
+
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room

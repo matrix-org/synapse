@@ -15,9 +15,9 @@
 
 """ Tests REST events for /events paths."""
 
+from mock import Mock, NonCallableMock
 from six import PY3
 
-# twisted imports
 from twisted.internet import defer
 
 from ....utils import MockHttpResource, setup_test_homeserver
