@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 import copy
+
+from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
 
 
 def list_with_base_rules(rawrules):
@@ -39,7 +40,7 @@ def list_with_base_rules(rawrules):
     rawrules = [r for r in rawrules if r['priority_class'] >= 0]
 
     # shove the server default rules for each kind onto the end of each
-    current_prio_class = PRIORITY_CLASS_INVERSE_MAP.keys()[-1]
+    current_prio_class = list(PRIORITY_CLASS_INVERSE_MAP)[-1]
 
     ruleslist.extend(make_base_prepend_rules(
         PRIORITY_CLASS_INVERSE_MAP[current_prio_class], modified_base_rules

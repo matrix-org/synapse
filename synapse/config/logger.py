@@ -12,17 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from ._base import Config
-from synapse.util.logcontext import LoggingContextFilter
-from twisted.logger import globalLogBeginner, STDLibLogObserver
 import logging
 import logging.config
-import yaml
-from string import Template
 import os
 import signal
+import sys
+from string import Template
 
+import yaml
+
+from twisted.logger import STDLibLogObserver, globalLogBeginner
+
+import synapse
+from synapse.util.logcontext import LoggingContextFilter
+from synapse.util.versionstring import get_version_string
+
+from ._base import Config
 
 DEFAULT_LOG_CONFIG = Template("""
 version: 1
@@ -117,7 +122,7 @@ class LoggingConfig(Config):
         log_config = config.get("log_config")
         if log_config and not os.path.exists(log_config):
             log_file = self.abspath("homeserver.log")
-            with open(log_config, "wb") as log_config_file:
+            with open(log_config, "w") as log_config_file:
                 log_config_file.write(
                     DEFAULT_LOG_CONFIG.substitute(log_file=log_file)
                 )
@@ -201,6 +206,15 @@ def setup_logging(config, use_worker_options=False):
     #   it around.
     if getattr(signal, "SIGHUP"):
         signal.signal(signal.SIGHUP, sighup)
+
+    # make sure that the first thing we log is a thing we can grep backwards
+    # for
+    logging.warn("***** STARTING SERVER *****")
+    logging.warn(
+        "Server %s version %s",
+        sys.argv[0], get_version_string(synapse),
+    )
+    logging.info("Server hostname: %s", config.server_name)
 
     # It's critical to point twisted's internal logging somewhere, otherwise it
     # stacks up and leaks kup to 64K object;

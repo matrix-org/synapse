@@ -16,6 +16,9 @@
 import logging
 import sys
 
+from twisted.internet import reactor
+from twisted.web.resource import NoResource
+
 import synapse
 from synapse import events
 from synapse.api.urls import FEDERATION_PREFIX
@@ -26,6 +29,7 @@ from synapse.config.logger import setup_logging
 from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.site import SynapseSite
+from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.directory import DirectoryStore
@@ -40,8 +44,6 @@ from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
-from twisted.internet import reactor
-from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.federation_reader")
 
@@ -71,7 +73,7 @@ class FederationReaderServer(HomeServer):
         for res in listener_config["resources"]:
             for name in res["names"]:
                 if name == "metrics":
-                    resources[METRICS_PREFIX] = MetricsResource(self)
+                    resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "federation":
                     resources.update({
                         FEDERATION_PREFIX: TransportLayerServer(self),
@@ -87,6 +89,7 @@ class FederationReaderServer(HomeServer):
                 site_tag,
                 listener_config,
                 root_resource,
+                self.version_string,
             )
         )
 
@@ -106,6 +109,13 @@ class FederationReaderServer(HomeServer):
                         globals={"hs": self},
                     )
                 )
+            elif listener["type"] == "metrics":
+                if not self.get_config().enable_metrics:
+                    logger.warn(("Metrics listener configured, but "
+                                 "enable_metrics is not True!"))
+                else:
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 

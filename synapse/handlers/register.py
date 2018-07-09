@@ -18,14 +18,19 @@ import logging
 
 from twisted.internet import defer
 
+from synapse import types
 from synapse.api.errors import (
-    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
+    AuthError,
+    Codes,
+    InvalidCaptchaError,
+    RegistrationError,
+    SynapseError,
 )
 from synapse.http.client import CaptchaServerHttpClient
-from synapse import types
-from synapse.types import UserID, create_requester, RoomID, RoomAlias
-from synapse.util.async import run_on_reactor, Linearizer
+from synapse.types import RoomAlias, RoomID, UserID, create_requester
+from synapse.util.async import Linearizer
 from synapse.util.threepids import check_3pid_allowed
+
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -34,6 +39,11 @@ logger = logging.getLogger(__name__)
 class RegistrationHandler(BaseHandler):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         super(RegistrationHandler, self).__init__(hs)
 
         self.auth = hs.get_auth()
@@ -49,6 +59,7 @@ class RegistrationHandler(BaseHandler):
         self._generate_user_id_linearizer = Linearizer(
             name="_generate_user_id_linearizer",
         )
+        self._server_notices_mxid = hs.config.server_notices_mxid
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
@@ -133,7 +144,6 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield run_on_reactor()
         password_hash = None
         if password:
             password_hash = yield self.auth_handler().hash(password)
@@ -338,6 +348,14 @@ class RegistrationHandler(BaseHandler):
             yield identity_handler.bind_threepid(c, user_id)
 
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
+        # don't allow people to register the server notices mxid
+        if self._server_notices_mxid is not None:
+            if user_id == self._server_notices_mxid:
+                raise SynapseError(
+                    400, "This user ID is reserved.",
+                    errcode=Codes.EXCLUSIVE
+                )
+
         # valid user IDs must not clash with any user ID namespaces claimed by
         # application services.
         services = self.store.get_app_services()
@@ -417,8 +435,6 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield run_on_reactor()
-
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
 

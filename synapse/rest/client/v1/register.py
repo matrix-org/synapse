@@ -14,21 +14,22 @@
 # limitations under the License.
 
 """This module contains REST servlets to do with registration: /register"""
+import hmac
+import logging
+from hashlib import sha1
+
+from six import string_types
+
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.api.constants import LoginType
-from synapse.api.auth import get_access_token_from_request
-from .base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
+from synapse.api.auth import get_access_token_from_request
+from synapse.api.constants import LoginType
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import create_requester
 
-from synapse.util.async import run_on_reactor
-
-from hashlib import sha1
-import hmac
-import logging
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +271,6 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_password(self, request, register_json, session):
-        yield run_on_reactor()
         if (self.hs.config.enable_registration_captcha and
                 not session[LoginType.RECAPTCHA]):
             # captcha should've been done by this stage!
@@ -331,13 +331,11 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_shared_secret(self, request, register_json, session):
-        yield run_on_reactor()
-
-        if not isinstance(register_json.get("mac", None), basestring):
+        if not isinstance(register_json.get("mac", None), string_types):
             raise SynapseError(400, "Expected mac.")
-        if not isinstance(register_json.get("user", None), basestring):
+        if not isinstance(register_json.get("user", None), string_types):
             raise SynapseError(400, "Expected 'user' key.")
-        if not isinstance(register_json.get("password", None), basestring):
+        if not isinstance(register_json.get("password", None), string_types):
             raise SynapseError(400, "Expected 'password' key.")
 
         if not self.hs.config.registration_shared_secret:
@@ -358,14 +356,14 @@ class RegisterRestServlet(ClientV1RestServlet):
         got_mac = str(register_json["mac"])
 
         want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret,
+            key=self.hs.config.registration_shared_secret.encode(),
             digestmod=sha1,
         )
         want_mac.update(user)
-        want_mac.update("\x00")
+        want_mac.update(b"\x00")
         want_mac.update(password)
-        want_mac.update("\x00")
-        want_mac.update("admin" if admin else "notadmin")
+        want_mac.update(b"\x00")
+        want_mac.update(b"admin" if admin else b"notadmin")
         want_mac = want_mac.hexdigest()
 
         if compare_digest(want_mac, got_mac):
@@ -421,8 +419,6 @@ class CreateUserRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_create(self, requester, user_json):
-        yield run_on_reactor()
-
         if "localpart" not in user_json:
             raise SynapseError(400, "Expected 'localpart' key.")
 

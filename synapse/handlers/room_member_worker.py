@@ -20,10 +20,11 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.handlers.room_member import RoomMemberHandler
 from synapse.replication.http.membership import (
-    remote_join, remote_reject_invite, get_or_register_3pid_guest,
+    get_or_register_3pid_guest,
     notify_user_membership_change,
+    remote_join,
+    remote_reject_invite,
 )
-
 
 logger = logging.getLogger(__name__)
 

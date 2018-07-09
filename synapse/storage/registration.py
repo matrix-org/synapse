@@ -15,9 +15,11 @@
 
 import re
 
+from six.moves import range
+
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError, Codes
+from synapse.api.errors import Codes, StoreError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -31,7 +33,11 @@ class RegistrationWorkerStore(SQLBaseStore):
             keyvalues={
                 "name": user_id,
             },
-            retcols=["name", "password_hash", "is_guest"],
+            retcols=[
+                "name", "password_hash", "is_guest",
+                "consent_version", "consent_server_notice_sent",
+                "appservice_id",
+            ],
             allow_none=True,
             desc="get_user_by_id",
         )
@@ -94,6 +100,13 @@ class RegistrationStore(RegistrationWorkerStore,
             index_name="access_tokens_device_id",
             table="access_tokens",
             columns=["user_id", "device_id"],
+        )
+
+        self.register_background_index_update(
+            "users_creation_ts",
+            index_name="users_creation_ts",
+            table="users",
+            columns=["creation_ts"],
         )
 
         # we no longer use refresh tokens, but it's possible that some people
@@ -284,6 +297,53 @@ class RegistrationStore(RegistrationWorkerStore,
             "user_set_password_hash", user_set_password_hash_txn
         )
 
+    def user_set_consent_version(self, user_id, consent_version):
+        """Updates the user table to record privacy policy consent
+
+        Args:
+            user_id (str): full mxid of the user to update
+            consent_version (str): version of the policy the user has consented
+                to
+
+        Raises:
+            StoreError(404) if user not found
+        """
+        def f(txn):
+            self._simple_update_one_txn(
+                txn,
+                table='users',
+                keyvalues={'name': user_id, },
+                updatevalues={'consent_version': consent_version, },
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user_id,)
+            )
+        return self.runInteraction("user_set_consent_version", f)
+
+    def user_set_consent_server_notice_sent(self, user_id, consent_version):
+        """Updates the user table to record that we have sent the user a server
+        notice about privacy policy consent
+
+        Args:
+            user_id (str): full mxid of the user to update
+            consent_version (str): version of the policy we have notified the
+                user about
+
+        Raises:
+            StoreError(404) if user not found
+        """
+        def f(txn):
+            self._simple_update_one_txn(
+                txn,
+                table='users',
+                keyvalues={'name': user_id, },
+                updatevalues={'consent_server_notice_sent': consent_version, },
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user_id,)
+            )
+        return self.runInteraction("user_set_consent_server_notice_sent", f)
+
     def user_delete_access_tokens(self, user_id, except_token_id=None,
                                   device_id=None):
         """
@@ -400,15 +460,6 @@ class RegistrationStore(RegistrationWorkerStore,
             defer.returnValue(ret['user_id'])
         defer.returnValue(None)
 
-    def user_delete_threepids(self, user_id):
-        return self._simple_delete(
-            "user_threepids",
-            keyvalues={
-                "user_id": user_id,
-            },
-            desc="user_delete_threepids",
-        )
-
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
             "user_threepids",
@@ -432,6 +483,35 @@ class RegistrationStore(RegistrationWorkerStore,
 
         ret = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(ret)
+
+    def count_daily_user_type(self):
+        """
+        Counts 1) native non guest users
+               2) native guests users
+               3) bridged users
+        who registered on the homeserver in the past 24 hours
+        """
+        def _count_daily_user_type(txn):
+            yesterday = int(self._clock.time()) - (60 * 60 * 24)
+
+            sql = """
+                SELECT user_type, COALESCE(count(*), 0) AS count FROM (
+                    SELECT
+                    CASE
+                        WHEN is_guest=0 AND appservice_id IS NULL THEN 'native'
+                        WHEN is_guest=1 AND appservice_id IS NULL THEN 'guest'
+                        WHEN is_guest=0 AND appservice_id IS NOT NULL THEN 'bridged'
+                    END AS user_type
+                    FROM users
+                    WHERE creation_ts > ?
+                ) AS t GROUP BY user_type
+            """
+            results = {'native': 0, 'guest': 0, 'bridged': 0}
+            txn.execute(sql, (yesterday,))
+            for row in txn:
+                results[row[0]] = row[1]
+            return results
+        return self.runInteraction("count_daily_user_type", _count_daily_user_type)
 
     @defer.inlineCallbacks
     def count_nonbridged_users(self):
@@ -469,7 +549,7 @@ class RegistrationStore(RegistrationWorkerStore,
                 match = regex.search(user_id)
                 if match:
                     found.add(int(match.group(1)))
-            for i in xrange(len(found) + 1):
+            for i in range(len(found) + 1):
                 if i not in found:
                     return i
 
@@ -524,3 +604,44 @@ class RegistrationStore(RegistrationWorkerStore,
         except self.database_engine.module.IntegrityError:
             ret = yield self.get_3pid_guest_access_token(medium, address)
             defer.returnValue(ret)
+
+    def add_user_pending_deactivation(self, user_id):
+        """
+        Adds a user to the table of users who need to be parted from all the rooms they're
+        in
+        """
+        return self._simple_insert(
+            "users_pending_deactivation",
+            values={
+                "user_id": user_id,
+            },
+            desc="add_user_pending_deactivation",
+        )
+
+    def del_user_pending_deactivation(self, user_id):
+        """
+        Removes the given user to the table of users who need to be parted from all the
+        rooms they're in, effectively marking that user as fully deactivated.
+        """
+        # XXX: This should be simple_delete_one but we failed to put a unique index on
+        # the table, so somehow duplicate entries have ended up in it.
+        return self._simple_delete(
+            "users_pending_deactivation",
+            keyvalues={
+                "user_id": user_id,
+            },
+            desc="del_user_pending_deactivation",
+        )
+
+    def get_user_pending_deactivation(self):
+        """
+        Gets one user from the table of users waiting to be parted from all the rooms
+        they're in.
+        """
+        return self._simple_select_one_onecol(
+            "users_pending_deactivation",
+            keyvalues={},
+            retcol="user_id",
+            allow_none=True,
+            desc="get_users_pending_deactivation",
+        )

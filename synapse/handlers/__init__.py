@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .register import RegistrationHandler
-from .room import (
-    RoomCreationHandler, RoomContextHandler,
-)
-from .message import MessageHandler
-from .federation import FederationHandler
-from .directory import DirectoryHandler
 from .admin import AdminHandler
+from .directory import DirectoryHandler
+from .federation import FederationHandler
 from .identity import IdentityHandler
+from .message import MessageHandler
+from .register import RegistrationHandler
+from .room import RoomContextHandler
 from .search import SearchHandler
 
 
@@ -47,7 +45,6 @@ class Handlers(object):
     def __init__(self, hs):
         self.registration_handler = RegistrationHandler(hs)
         self.message_handler = MessageHandler(hs)
-        self.room_creation_handler = RoomCreationHandler(hs)
         self.federation_handler = FederationHandler(hs)
         self.directory_handler = DirectoryHandler(hs)
         self.admin_handler = AdminHandler(hs)

@@ -13,19 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.push import PusherConfigException
-from synapse.http.servlet import (
-    parse_json_object_from_request, parse_string, RestServlet
-)
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.http.server import finish_request
-from synapse.api.errors import StoreError
+from synapse.http.servlet import (
+    RestServlet,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.push import PusherConfigException
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,7 @@ class PushersRemoveRestServlet(RestServlet):
         super(RestServlet, self).__init__()
         self.hs = hs
         self.notifier = hs.get_notifier()
-        self.auth = hs.get_v1auth()
+        self.auth = hs.get_auth()
         self.pusher_pool = self.hs.get_pusherpool()
 
     @defer.inlineCallbacks
@@ -176,7 +177,6 @@ class PushersRemoveRestServlet(RestServlet):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Server", self.hs.version_string)
         request.setHeader(b"Content-Length", b"%d" % (
             len(PushersRemoveRestServlet.SUCCESS_HTML),
         ))

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """ Tests REST events for /events paths."""
-from tests import unittest
+from mock import Mock, NonCallableMock
 
 # twisted imports
 from twisted.internet import defer
@@ -23,12 +23,10 @@ import synapse.rest.client.v1.events
 import synapse.rest.client.v1.register
 import synapse.rest.client.v1.room
 
+from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
-
-from mock import Mock, NonCallableMock
-
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
@@ -148,11 +146,16 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_stream_basic_permissions(self):
-        # invalid token, expect 403
+        # invalid token, expect 401
+        # note: this is in violation of the original v1 spec, which expected
+        # 403. However, since the v1 spec no longer exists and the v1
+        # implementation is now part of the r0 implementation, the newer
+        # behaviour is used instead to be consistent with the r0 spec.
+        # see issue #2602
         (code, response) = yield self.mock_resource.trigger_get(
             "/events?access_token=%s" % ("invalid" + self.token, )
         )
-        self.assertEquals(403, code, msg=str(response))
+        self.assertEquals(401, code, msg=str(response))
 
         # valid token, expect content
         (code, response) = yield self.mock_resource.trigger_get(

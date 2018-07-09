@@ -14,27 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hmac
+import logging
+from hashlib import sha1
+
+from six import string_types
+
 from twisted.internet import defer
 
 import synapse
 import synapse.types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
-from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
+from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
+    RestServlet,
+    assert_params_in_request,
+    parse_json_object_from_request,
+    parse_string,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_v2_patterns, interactive_auth_handler
-
-import logging
-import hmac
-from hashlib import sha1
-from synapse.util.async import run_on_reactor
-from synapse.util.ratelimitutils import FederationRateLimiter
-
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
 # exist. It's a _really minor_ security flaw to use plain string comparison
@@ -189,8 +192,6 @@ class RegisterRestServlet(RestServlet):
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         body = parse_json_object_from_request(request)
 
         kind = "user"
@@ -210,14 +211,14 @@ class RegisterRestServlet(RestServlet):
         # in sessions. Pull out the username/password provided to us.
         desired_password = None
         if 'password' in body:
-            if (not isinstance(body['password'], basestring) or
+            if (not isinstance(body['password'], string_types) or
                     len(body['password']) > 512):
                 raise SynapseError(400, "Invalid password")
             desired_password = body["password"]
 
         desired_username = None
         if 'username' in body:
-            if (not isinstance(body['username'], basestring) or
+            if (not isinstance(body['username'], string_types) or
                     len(body['username']) > 512):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
@@ -243,7 +244,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = get_access_token_from_request(request)
 
-            if isinstance(desired_username, basestring):
+            if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
@@ -464,7 +465,7 @@ class RegisterRestServlet(RestServlet):
         # includes the password and admin flag in the hashed text. Why are
         # these different?
         want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret,
+            key=self.hs.config.registration_shared_secret.encode(),
             msg=user,
             digestmod=sha1,
         ).hexdigest()

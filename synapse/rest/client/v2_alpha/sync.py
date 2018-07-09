@@ -13,27 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer, parse_boolean
-)
-from synapse.handlers.presence import format_user_presence_state
-from synapse.handlers.sync import SyncConfig
-from synapse.types import StreamToken
-from synapse.events.utils import (
-    serialize_event, format_event_for_client_v2_without_room_id,
-)
-from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
-from synapse.api.errors import SynapseError
-from synapse.api.constants import PresenceState
-from ._base import client_v2_patterns
-from ._base import set_timeline_upper_limit
-
 import itertools
 import logging
 
-import simplejson as json
+from canonicaljson import json
+
+from twisted.internet import defer
+
+from synapse.api.constants import PresenceState
+from synapse.api.errors import SynapseError
+from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
+from synapse.events.utils import (
+    format_event_for_client_v2_without_room_id,
+    serialize_event,
+)
+from synapse.handlers.presence import format_user_presence_state
+from synapse.handlers.sync import SyncConfig
+from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
+from synapse.types import StreamToken
+
+from ._base import client_v2_patterns, set_timeline_upper_limit
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +84,7 @@ class SyncRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
         self.presence_handler = hs.get_presence_handler()
+        self._server_notices_sender = hs.get_server_notices_sender()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -148,6 +148,9 @@ class SyncRestServlet(RestServlet):
             since_token = StreamToken.from_string(since)
         else:
             since_token = None
+
+        # send any outstanding server notices to the user.
+        yield self._server_notices_sender.on_user_syncing(user.to_string())
 
         affect_presence = set_presence != PresenceState.OFFLINE
 

@@ -33,36 +33,39 @@ from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
 from synapse.federation.federation_client import FederationClient
-from synapse.federation.federation_server import FederationServer
+from synapse.federation.federation_server import (
+    FederationHandlerRegistry,
+    FederationServer,
+)
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.federation_server import FederationHandlerRegistry
-from synapse.federation.transport.client import TransportLayerClient
 from synapse.federation.transaction_queue import TransactionQueue
+from synapse.federation.transport.client import TransportLayerClient
+from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
+from synapse.groups.groups_server import GroupsServerHandler
 from synapse.handlers import Handlers
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler, MacaroonGeneartor
+from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
-from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
+from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
+from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.initial_sync import InitialSyncHandler
+from synapse.handlers.message import EventCreationHandler
 from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.read_marker import ReadMarkerHandler
+from synapse.handlers.receipts import ReceiptsHandler
+from synapse.handlers.room import RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
-from synapse.handlers.events import EventHandler, EventStreamHandler
-from synapse.handlers.initial_sync import InitialSyncHandler
-from synapse.handlers.receipts import ReceiptsHandler
-from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
-from synapse.handlers.groups_local import GroupsLocalHandler
-from synapse.handlers.profile import ProfileHandler
-from synapse.handlers.message import EventCreationHandler
-from synapse.groups.groups_server import GroupsServerHandler
-from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
-from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
+from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
@@ -71,6 +74,9 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
+from synapse.server_notices.server_notices_manager import ServerNoticesManager
+from synapse.server_notices.server_notices_sender import ServerNoticesSender
+from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import DataStore
 from synapse.streams.events import EventSources
@@ -97,6 +103,9 @@ class HomeServer(object):
     which must be implemented by the subclass. This code may call any of the
     required "get" methods on the instance to obtain the sub-dependencies that
     one requires.
+
+    Attributes:
+        config (synapse.config.homeserver.HomeserverConfig):
     """
 
     DEPENDENCIES = [
@@ -105,8 +114,8 @@ class HomeServer(object):
         'federation_client',
         'federation_server',
         'handlers',
-        'v1auth',
         'auth',
+        'room_creation_handler',
         'state_handler',
         'state_resolution_handler',
         'presence_handler',
@@ -152,17 +161,23 @@ class HomeServer(object):
         'spam_checker',
         'room_member_handler',
         'federation_registry',
+        'server_notices_manager',
+        'server_notices_sender',
     ]
 
-    def __init__(self, hostname, **kwargs):
+    def __init__(self, hostname, reactor=None, **kwargs):
         """
         Args:
             hostname : The hostname for the server.
         """
+        if not reactor:
+            from twisted.internet import reactor
+
+        self._reactor = reactor
         self.hostname = hostname
         self._building = {}
 
-        self.clock = Clock()
+        self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
 
@@ -174,6 +189,12 @@ class HomeServer(object):
         logger.info("Setting up.")
         self.datastore = DataStore(self.get_db_conn(), self)
         logger.info("Finished setting up.")
+
+    def get_reactor(self):
+        """
+        Fetch the Twisted reactor in use by this HomeServer.
+        """
+        return self._reactor
 
     def get_ip_from_request(self, request):
         # X-Forwarded-For is handled by our custom request type.
@@ -225,14 +246,8 @@ class HomeServer(object):
     def build_simple_http_client(self):
         return SimpleHttpClient(self)
 
-    def build_v1auth(self):
-        orf = Auth(self)
-        # Matrix spec makes no reference to what HTTP status code is returned,
-        # but the V1 API uses 403 where it means 401, and the webclient
-        # relies on this behaviour, so V1 gets its own copy of the auth
-        # with backwards compat behaviour.
-        orf.TOKEN_NOT_FOUND_HTTP_STATUS = 403
-        return orf
+    def build_room_creation_handler(self):
+        return RoomCreationHandler(self)
 
     def build_state_handler(self):
         return StateHandler(self)
@@ -256,7 +271,7 @@ class HomeServer(object):
         return AuthHandler(self)
 
     def build_macaroon_generator(self):
-        return MacaroonGeneartor(self)
+        return MacaroonGenerator(self)
 
     def build_device_handler(self):
         return DeviceHandler(self)
@@ -323,6 +338,7 @@ class HomeServer(object):
 
         return adbapi.ConnectionPool(
             name,
+            cp_reactor=self.get_reactor(),
             **self.db_config.get("args", {})
         )
 
@@ -399,6 +415,16 @@ class HomeServer(object):
 
     def build_federation_registry(self):
         return FederationHandlerRegistry()
+
+    def build_server_notices_manager(self):
+        if self.config.worker_app:
+            raise Exception("Workers cannot send server notices")
+        return ServerNoticesManager(self)
+
+    def build_server_notices_sender(self):
+        if self.config.worker_app:
+            return WorkerServerNoticesSender(self)
+        return ServerNoticesSender(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

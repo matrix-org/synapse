@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 from twisted.internet import defer
-from .. import unittest
 
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import UserID, create_requester
 
 from tests.utils import setup_test_homeserver
 
-from mock import Mock
+from .. import unittest
 
 
 class RegistrationHandlers(object):

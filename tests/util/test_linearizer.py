@@ -12,13 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.util import async, logcontext
-from tests import unittest
 
-from twisted.internet import defer
-
-from synapse.util.async import Linearizer
 from six.moves import range
+
+from twisted.internet import defer, reactor
+
+from synapse.util import Clock, logcontext
+from synapse.util.async import Linearizer
+
+from tests import unittest
 
 
 class LinearizerTestCase(unittest.TestCase):
@@ -53,7 +55,7 @@ class LinearizerTestCase(unittest.TestCase):
                     self.assertEqual(
                         logcontext.LoggingContext.current_context(), lc)
                     if sleep:
-                        yield async.sleep(0)
+                        yield Clock(reactor).sleep(0)
 
                 self.assertEqual(
                     logcontext.LoggingContext.current_context(), lc)

@@ -23,28 +23,29 @@ import re
 import shutil
 import sys
 import traceback
-import simplejson as json
-import urlparse
 
-from twisted.web.server import NOT_DONE_YET
+from six import string_types
+from six.moves import urllib_parse as urlparse
+
+from canonicaljson import json
+
 from twisted.internet import defer
 from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 
-from ._base import FileInfo
-
-from synapse.api.errors import (
-    SynapseError, Codes,
-)
-from synapse.util.logcontext import preserve_fn, make_deferred_yieldable
-from synapse.util.stringutils import random_string
-from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    request_handler, respond_with_json_bytes,
     respond_with_json,
+    respond_with_json_bytes,
+    wrap_json_request_handler,
 )
 from synapse.util.async import ObservableDeferred
-from synapse.util.stringutils import is_ascii
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.util.stringutils import is_ascii, random_string
+
+from ._base import FileInfo
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,6 @@ class PreviewUrlResource(Resource):
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.version_string = hs.version_string
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname
@@ -90,7 +90,7 @@ class PreviewUrlResource(Resource):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
 
@@ -144,7 +144,8 @@ class PreviewUrlResource(Resource):
         observable = self._cache.get(url)
 
         if not observable:
-            download = preserve_fn(self._do_preview)(
+            download = run_in_background(
+                self._do_preview,
                 url, requester.user, ts,
             )
             observable = ObservableDeferred(
@@ -589,8 +590,8 @@ def _iterate_over_text(tree, *tags_to_ignore):
     # to be returned.
     elements = iter([tree])
     while True:
-        el = elements.next()
-        if isinstance(el, basestring):
+        el = next(elements)
+        if isinstance(el, string_types):
             yield el
         elif el is not None and el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately

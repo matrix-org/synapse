@@ -14,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage._base import SQLBaseStore, LoggingTransaction
-from twisted.internet import defer
-from synapse.util.async import sleep
-from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.types import RoomStreamToken
-from .stream import lower_bound
-
 import logging
-import simplejson as json
+
+from six import iteritems
+
+from canonicaljson import json
+
+from twisted.internet import defer
+
+from synapse.storage._base import LoggingTransaction, SQLBaseStore
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self.find_stream_orderings_looping_call = self._clock.looping_call(
             self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
+        self._rotate_delay = 3
+        self._rotate_count = 10000
 
     @cachedInlineCallbacks(num_args=3, tree=True, max_entries=5000)
     def get_unread_event_push_actions_by_room_for_user(
@@ -99,7 +102,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
     def _get_unread_counts_by_receipt_txn(self, txn, room_id, user_id,
                                           last_read_event_id):
         sql = (
-            "SELECT stream_ordering, topological_ordering"
+            "SELECT stream_ordering"
             " FROM events"
             " WHERE room_id = ? AND event_id = ?"
         )
@@ -111,17 +114,12 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             return {"notify_count": 0, "highlight_count": 0}
 
         stream_ordering = results[0][0]
-        topological_ordering = results[0][1]
 
         return self._get_unread_counts_by_pos_txn(
-            txn, room_id, user_id, topological_ordering, stream_ordering
+            txn, room_id, user_id, stream_ordering
         )
 
-    def _get_unread_counts_by_pos_txn(self, txn, room_id, user_id, topological_ordering,
-                                      stream_ordering):
-        token = RoomStreamToken(
-            topological_ordering, stream_ordering
-        )
+    def _get_unread_counts_by_pos_txn(self, txn, room_id, user_id, stream_ordering):
 
         # First get number of notifications.
         # We don't need to put a notif=1 clause as all rows always have
@@ -132,10 +130,10 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             " WHERE"
             " user_id = ?"
             " AND room_id = ?"
-            " AND %s"
-        ) % (lower_bound(token, self.database_engine, inclusive=False),)
+            " AND stream_ordering > ?"
+        )
 
-        txn.execute(sql, (user_id, room_id))
+        txn.execute(sql, (user_id, room_id, stream_ordering))
         row = txn.fetchone()
         notify_count = row[0] if row else 0
 
@@ -155,10 +153,10 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             " highlight = 1"
             " AND user_id = ?"
             " AND room_id = ?"
-            " AND %s"
-        ) % (lower_bound(token, self.database_engine, inclusive=False),)
+            " AND stream_ordering > ?"
+        )
 
-        txn.execute(sql, (user_id, room_id))
+        txn.execute(sql, (user_id, room_id, stream_ordering))
         row = txn.fetchone()
         highlight_count = row[0] if row else 0
 
@@ -209,7 +207,6 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "   ep.highlight "
                 " FROM ("
                 "   SELECT room_id,"
-                "       MAX(topological_ordering) as topological_ordering,"
                 "       MAX(stream_ordering) as stream_ordering"
                 "   FROM events"
                 "   INNER JOIN receipts_linearized USING (room_id, event_id)"
@@ -219,13 +216,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 " event_push_actions AS ep"
                 " WHERE"
                 "   ep.room_id = rl.room_id"
-                "   AND ("
-                "       ep.topological_ordering > rl.topological_ordering"
-                "       OR ("
-                "           ep.topological_ordering = rl.topological_ordering"
-                "           AND ep.stream_ordering > rl.stream_ordering"
-                "       )"
-                "   )"
+                "   AND ep.stream_ordering > rl.stream_ordering"
                 "   AND ep.user_id = ?"
                 "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
@@ -318,7 +309,6 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "  ep.highlight, e.received_ts"
                 " FROM ("
                 "   SELECT room_id,"
-                "       MAX(topological_ordering) as topological_ordering,"
                 "       MAX(stream_ordering) as stream_ordering"
                 "   FROM events"
                 "   INNER JOIN receipts_linearized USING (room_id, event_id)"
@@ -329,13 +319,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 " INNER JOIN events AS e USING (room_id, event_id)"
                 " WHERE"
                 "   ep.room_id = rl.room_id"
-                "   AND ("
-                "       ep.topological_ordering > rl.topological_ordering"
-                "       OR ("
-                "           ep.topological_ordering = rl.topological_ordering"
-                "           AND ep.stream_ordering > rl.stream_ordering"
-                "       )"
-                "   )"
+                "   AND ep.stream_ordering > rl.stream_ordering"
                 "   AND ep.user_id = ?"
                 "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
@@ -441,7 +425,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
             txn.executemany(sql, (
                 _gen_entry(user_id, actions)
-                for user_id, actions in user_id_actions.iteritems()
+                for user_id, actions in iteritems(user_id_actions)
             ))
 
         return self.runInteraction(
@@ -762,10 +746,10 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         )
 
     def _remove_old_push_actions_before_txn(self, txn, room_id, user_id,
-                                            topological_ordering, stream_ordering):
+                                            stream_ordering):
         """
         Purges old push actions for a user and room before a given
-        topological_ordering.
+        stream_ordering.
 
         We however keep a months worth of highlighted notifications, so that
         users can still get a list of recent highlights.
@@ -774,7 +758,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             txn: The transcation
             room_id: Room ID to delete from
             user_id: user ID to delete for
-            topological_ordering: The lowest topological ordering which will
+            stream_ordering: The lowest stream ordering which will
                                   not be deleted.
         """
         txn.call_after(
@@ -793,9 +777,9 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         txn.execute(
             "DELETE FROM event_push_actions "
             " WHERE user_id = ? AND room_id = ? AND "
-            " topological_ordering <= ?"
+            " stream_ordering <= ?"
             " AND ((stream_ordering < ? AND highlight = 1) or highlight = 0)",
-            (user_id, room_id, topological_ordering, self.stream_ordering_month_ago)
+            (user_id, room_id, stream_ordering, self.stream_ordering_month_ago)
         )
 
         txn.execute("""
@@ -819,7 +803,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 )
                 if caught_up:
                     break
-                yield sleep(5)
+                yield self.hs.get_clock().sleep(self._rotate_delay)
         finally:
             self._doing_notif_rotation = False
 
@@ -840,8 +824,8 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         txn.execute("""
             SELECT stream_ordering FROM event_push_actions
             WHERE stream_ordering > ?
-            ORDER BY stream_ordering ASC LIMIT 1 OFFSET 50000
-        """, (old_rotate_stream_ordering,))
+            ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
+        """, (old_rotate_stream_ordering, self._rotate_count))
         stream_row = txn.fetchone()
         if stream_row:
             offset_stream_ordering, = stream_row

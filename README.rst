@@ -157,8 +157,9 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a Dockerfile to automate the
-above in Docker at https://hub.docker.com/r/avhost/docker-matrix/tags/
+There is an offical synapse image available at https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with the docker-compose file available at `contrib/docker`. Further information on this including configuration options is available in `contrib/docker/README.md`.
+
+Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a Dockerfile to automate a synapse server in a single Docker image, at https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy

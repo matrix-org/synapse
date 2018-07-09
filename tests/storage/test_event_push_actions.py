@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 from twisted.internet import defer
 
 import tests.unittest
 import tests.utils
-from mock import Mock
 
 USER_ID = "@user:example.com"
 
@@ -55,7 +56,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         def _assert_counts(noitf_count, highlight_count):
             counts = yield self.store.runInteraction(
                 "", self.store._get_unread_counts_by_pos_txn,
-                room_id, user_id, 0, 0
+                room_id, user_id, 0
             )
             self.assertEquals(
                 counts,
@@ -86,7 +87,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         def _mark_read(stream, depth):
             return self.store.runInteraction(
                 "", self.store._remove_old_push_actions_before_txn,
-                room_id, user_id, depth, stream
+                room_id, user_id, stream
             )
 
         yield _assert_counts(0, 0)
@@ -128,7 +129,6 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         yield _rotate(10)
         yield _assert_counts(1, 1)
 
-    @tests.unittest.DEBUG
     @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):

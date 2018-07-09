@@ -14,13 +14,13 @@
 # limitations under the License.
 
 
-from tests import unittest
 from twisted.internet import defer
 
 from synapse.storage.presence import PresenceStore
 from synapse.types import UserID
 
-from tests.utils import setup_test_homeserver, MockClock
+from tests import unittest
+from tests.utils import MockClock, setup_test_homeserver
 
 
 class PresenceStoreTestCase(unittest.TestCase):

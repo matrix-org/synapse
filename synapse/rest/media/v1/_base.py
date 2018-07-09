@@ -13,22 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json, finish_request
-from synapse.api.errors import (
-    cs_error, Codes, SynapseError
-)
-from synapse.util import logcontext
+import logging
+import os
+import urllib
+
+from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
+from synapse.api.errors import Codes, SynapseError, cs_error
+from synapse.http.server import finish_request, respond_with_json
+from synapse.util import logcontext
 from synapse.util.stringutils import is_ascii
-
-import os
-
-import logging
-import urllib
-import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +140,7 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         respond_404(request)
         return
 
+    logger.debug("Responding to media request with responder %s")
     add_file_headers(request, media_type, file_size, upload_name)
     with responder:
         yield responder.write_to_consumer(request)

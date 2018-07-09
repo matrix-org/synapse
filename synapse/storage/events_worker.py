@@ -12,27 +12,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from ._base import SQLBaseStore
-
-from twisted.internet import defer, reactor
-
-from synapse.events import FrozenEvent
-from synapse.events.utils import prune_event
-
-from synapse.util.logcontext import (
-    preserve_fn, PreserveLoggingContext, make_deferred_yieldable
-)
-from synapse.util.metrics import Measure
-from synapse.api.errors import SynapseError
-
+import logging
 from collections import namedtuple
 
-import logging
-import simplejson as json
+from canonicaljson import json
 
+from twisted.internet import defer
+
+from synapse.api.errors import SynapseError
 # these are only included to make the type annotations work
-from synapse.events import EventBase    # noqa: F401
-from synapse.events.snapshot import EventContext   # noqa: F401
+from synapse.events import EventBase  # noqa: F401
+from synapse.events import FrozenEvent
+from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.events.utils import prune_event
+from synapse.util.logcontext import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
+from synapse.util.metrics import Measure
+
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,9 @@ class EventsWorkerStore(SQLBaseStore):
         missing_events_ids = [e for e in event_ids if e not in event_entry_map]
 
         if missing_events_ids:
+            log_ctx = LoggingContext.current_context()
+            log_ctx.record_event_fetch(len(missing_events_ids))
+
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
                 check_redacted=check_redacted,
@@ -265,7 +269,7 @@ class EventsWorkerStore(SQLBaseStore):
                             except Exception:
                                 logger.exception("Failed to callback")
                 with PreserveLoggingContext():
-                    reactor.callFromThread(fire, event_list, row_dict)
+                    self.hs.get_reactor().callFromThread(fire, event_list, row_dict)
             except Exception as e:
                 logger.exception("do_fetch")
 
@@ -278,7 +282,7 @@ class EventsWorkerStore(SQLBaseStore):
 
                 if event_list:
                     with PreserveLoggingContext():
-                        reactor.callFromThread(fire, event_list)
+                        self.hs.get_reactor().callFromThread(fire, event_list)
 
     @defer.inlineCallbacks
     def _enqueue_events(self, events, check_redacted=True, allow_rejected=False):
@@ -319,7 +323,8 @@ class EventsWorkerStore(SQLBaseStore):
 
         res = yield make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self._get_event_from_row)(
+                run_in_background(
+                    self._get_event_from_row,
                     row["internal_metadata"], row["json"], row["redacts"],
                     rejected_reason=row["rejects"],
                 )
@@ -336,7 +341,7 @@ class EventsWorkerStore(SQLBaseStore):
     def _fetch_event_rows(self, txn, events):
         rows = []
         N = 200
-        for i in range(1 + len(events) / N):
+        for i in range(1 + len(events) // N):
             evs = events[i * N:(i + 1) * N]
             if not evs:
                 break

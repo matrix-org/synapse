@@ -14,32 +14,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.crypto.keyclient import fetch_server_key
-from synapse.api.errors import SynapseError, Codes
-from synapse.util import unwrapFirstError, logcontext
-from synapse.util.logcontext import (
-    PreserveLoggingContext,
-    preserve_fn
-)
-from synapse.util.metrics import Measure
+import hashlib
+import logging
+import urllib
+from collections import namedtuple
 
-from twisted.internet import defer
-
-from signedjson.sign import (
-    verify_signed_json, signature_ids, sign_json, encode_canonical_json
-)
 from signedjson.key import (
-    is_signing_algorithm_supported, decode_verify_key_bytes
+    decode_verify_key_bytes,
+    encode_verify_key_base64,
+    is_signing_algorithm_supported,
+)
+from signedjson.sign import (
+    SignatureVerifyException,
+    encode_canonical_json,
+    sign_json,
+    signature_ids,
+    verify_signed_json,
 )
 from unpaddedbase64 import decode_base64, encode_base64
 
 from OpenSSL import crypto
+from twisted.internet import defer
 
-from collections import namedtuple
-import urllib
-import hashlib
-import logging
-
+from synapse.api.errors import Codes, SynapseError
+from synapse.crypto.keyclient import fetch_server_key
+from synapse.util import logcontext, unwrapFirstError
+from synapse.util.logcontext import (
+    PreserveLoggingContext,
+    preserve_fn,
+    run_in_background,
+)
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +60,7 @@ Attributes:
     key_ids(set(str)): The set of key_ids to that could be used to verify the
         JSON object
     json_object(dict): The JSON object to verify.
-    deferred(twisted.internet.defer.Deferred):
+    deferred(Deferred[str, str, nacl.signing.VerifyKey]):
         A deferred (server_name, key_id, verify_key) tuple that resolves when
         a verify key has been fetched. The deferreds' callbacks are run with no
         logcontext.
@@ -127,7 +132,7 @@ class Keyring(object):
 
             verify_requests.append(verify_request)
 
-        preserve_fn(self._start_key_lookups)(verify_requests)
+        run_in_background(self._start_key_lookups, verify_requests)
 
         # Pass those keys to handle_key_deferred so that the json object
         # signatures can be verified
@@ -316,7 +321,7 @@ class Keyring(object):
                     if not verify_request.deferred.called:
                         verify_request.deferred.errback(err)
 
-        preserve_fn(do_iterations)().addErrback(on_err)
+        run_in_background(do_iterations).addErrback(on_err)
 
     @defer.inlineCallbacks
     def get_keys_from_store(self, server_name_and_key_ids):
@@ -332,8 +337,9 @@ class Keyring(object):
         """
         res = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store.get_server_verify_keys)(
-                    server_name, key_ids
+                run_in_background(
+                    self.store.get_server_verify_keys,
+                    server_name, key_ids,
                 ).addCallback(lambda ks, server: (server, ks), server_name)
                 for server_name, key_ids in server_name_and_key_ids
             ],
@@ -361,7 +367,7 @@ class Keyring(object):
 
         results = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(get_key)(p_name, p_keys)
+                run_in_background(get_key, p_name, p_keys)
                 for p_name, p_keys in self.perspective_servers.items()
             ],
             consumeErrors=True,
@@ -401,7 +407,7 @@ class Keyring(object):
 
         results = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(get_key)(server_name, key_ids)
+                run_in_background(get_key, server_name, key_ids)
                 for server_name, key_ids in server_name_and_key_ids
             ],
             consumeErrors=True,
@@ -484,7 +490,8 @@ class Keyring(object):
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store_keys)(
+                run_in_background(
+                    self.store_keys,
                     server_name=server_name,
                     from_server=perspective_name,
                     verify_keys=response_keys,
@@ -542,7 +549,8 @@ class Keyring(object):
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store_keys)(
+                run_in_background(
+                    self.store_keys,
                     server_name=key_server_name,
                     from_server=server_name,
                     verify_keys=verify_keys,
@@ -618,7 +626,8 @@ class Keyring(object):
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store.store_server_keys_json)(
+                run_in_background(
+                    self.store.store_server_keys_json,
                     server_name=server_name,
                     key_id=key_id,
                     from_server=server_name,
@@ -719,7 +728,8 @@ class Keyring(object):
         # TODO(markjh): Store whether the keys have expired.
         return logcontext.make_deferred_yieldable(defer.gatherResults(
             [
-                preserve_fn(self.store.store_server_verify_key)(
+                run_in_background(
+                    self.store.store_server_verify_key,
                     server_name, server_name, key.time_added, key
                 )
                 for key_id, key in verify_keys.items()
@@ -730,6 +740,17 @@ class Keyring(object):
 
 @defer.inlineCallbacks
 def _handle_key_deferred(verify_request):
+    """Waits for the key to become available, and then performs a verification
+
+    Args:
+        verify_request (VerifyKeyRequest):
+
+    Returns:
+        Deferred[None]
+
+    Raises:
+        SynapseError if there was a problem performing the verification
+    """
     server_name = verify_request.server_name
     try:
         with PreserveLoggingContext():
@@ -762,11 +783,17 @@ def _handle_key_deferred(verify_request):
     ))
     try:
         verify_signed_json(json_object, server_name, verify_key)
-    except Exception:
+    except SignatureVerifyException as e:
+        logger.debug(
+            "Error verifying signature for %s:%s:%s with key %s: %s",
+            server_name, verify_key.alg, verify_key.version,
+            encode_verify_key_base64(verify_key),
+            str(e),
+        )
         raise SynapseError(
             401,
-            "Invalid signature for server %s with key %s:%s" % (
-                server_name, verify_key.alg, verify_key.version
+            "Invalid signature for server %s with key %s:%s: %s" % (
+                server_name, verify_key.alg, verify_key.version, str(e),
             ),
             Codes.UNAUTHORIZED,
         )

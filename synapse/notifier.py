@@ -13,37 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from collections import namedtuple
+
+from prometheus_client import Counter
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 from synapse.handlers.presence import format_user_presence_state
-
-from synapse.util.logutils import log_function
+from synapse.metrics import LaterGauge
+from synapse.types import StreamToken
 from synapse.util.async import (
-    ObservableDeferred, add_timeout_to_deferred,
     DeferredTimeoutError,
+    ObservableDeferred,
+    add_timeout_to_deferred,
 )
 from synapse.util.logcontext import PreserveLoggingContext, run_in_background
+from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
-from synapse.types import StreamToken
 from synapse.visibility import filter_events_for_client
-import synapse.metrics
-
-from collections import namedtuple
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
+notified_events_counter = Counter("synapse_notifier_notified_events", "")
 
-notified_events_counter = metrics.register_counter("notified_events")
-
-users_woken_by_stream_counter = metrics.register_counter(
-    "users_woken_by_stream", labels=["stream"]
-)
+users_woken_by_stream_counter = Counter(
+    "synapse_notifier_users_woken_by_stream", "", ["stream"])
 
 
 # TODO(paul): Should be shared somewhere
@@ -108,7 +105,7 @@ class _NotifierUserStream(object):
         self.last_notified_ms = time_now_ms
         noify_deferred = self.notify_deferred
 
-        users_woken_by_stream_counter.inc(stream_key)
+        users_woken_by_stream_counter.labels(stream_key).inc()
 
         with PreserveLoggingContext():
             self.notify_deferred = ObservableDeferred(defer.Deferred())
@@ -163,6 +160,7 @@ class Notifier(object):
         self.user_to_user_stream = {}
         self.room_to_user_streams = {}
 
+        self.hs = hs
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
         self.pending_new_room_events = []
@@ -197,14 +195,14 @@ class Notifier(object):
                 all_user_streams.add(x)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
-        metrics.register_callback("listeners", count_listeners)
+        LaterGauge("synapse_notifier_listeners", "", [], count_listeners)
 
-        metrics.register_callback(
-            "rooms",
+        LaterGauge(
+            "synapse_notifier_rooms", "", [],
             lambda: count(bool, self.room_to_user_streams.values()),
         )
-        metrics.register_callback(
-            "users",
+        LaterGauge(
+            "synapse_notifier_users", "", [],
             lambda: len(self.user_to_user_stream),
         )
 
@@ -342,6 +340,7 @@ class Notifier(object):
                     add_timeout_to_deferred(
                         listener.deferred,
                         (end_time - now) / 1000.,
+                        self.hs.get_reactor(),
                     )
                     with PreserveLoggingContext():
                         yield listener.deferred
@@ -563,6 +562,7 @@ class Notifier(object):
             add_timeout_to_deferred(
                 listener.deferred.addTimeout,
                 (end_time - now) / 1000.,
+                self.hs.get_reactor(),
             )
             try:
                 with PreserveLoggingContext():

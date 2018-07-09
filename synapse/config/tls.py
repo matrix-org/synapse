@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+import os
+import subprocess
+from hashlib import sha256
+
+from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
-import subprocess
-import os
 
-from hashlib import sha256
-from unpaddedbase64 import encode_base64
+from ._base import Config
 
 GENERATE_DH_PARAMS = False
 
@@ -133,7 +134,7 @@ class TlsConfig(Config):
         tls_dh_params_path = config["tls_dh_params_path"]
 
         if not self.path_exists(tls_private_key_path):
-            with open(tls_private_key_path, "w") as private_key_file:
+            with open(tls_private_key_path, "wb") as private_key_file:
                 tls_private_key = crypto.PKey()
                 tls_private_key.generate_key(crypto.TYPE_RSA, 2048)
                 private_key_pem = crypto.dump_privatekey(
@@ -148,7 +149,7 @@ class TlsConfig(Config):
                 )
 
         if not self.path_exists(tls_certificate_path):
-            with open(tls_certificate_path, "w") as certificate_file:
+            with open(tls_certificate_path, "wb") as certificate_file:
                 cert = crypto.X509()
                 subject = cert.get_subject()
                 subject.CN = config["server_name"]

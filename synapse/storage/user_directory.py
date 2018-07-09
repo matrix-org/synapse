@@ -13,17 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import re
+
+from six import iteritems
+
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
-
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
-import re
-import logging
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +102,7 @@ class UserDirectoryStore(SQLBaseStore):
                     user_id, get_localpart_from_id(user_id), get_domain_from_id(user_id),
                     profile.display_name,
                 )
-                for user_id, profile in users_with_profile.iteritems()
+                for user_id, profile in iteritems(users_with_profile)
             )
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = """
@@ -112,7 +114,7 @@ class UserDirectoryStore(SQLBaseStore):
                     user_id,
                     "%s %s" % (user_id, p.display_name,) if p.display_name else user_id
                 )
-                for user_id, p in users_with_profile.iteritems()
+                for user_id, p in iteritems(users_with_profile)
             )
         else:
             # This should be unreachable.
@@ -130,7 +132,7 @@ class UserDirectoryStore(SQLBaseStore):
                         "display_name": profile.display_name,
                         "avatar_url": profile.avatar_url,
                     }
-                    for user_id, profile in users_with_profile.iteritems()
+                    for user_id, profile in iteritems(users_with_profile)
                 ]
             )
             for user_id in users_with_profile:

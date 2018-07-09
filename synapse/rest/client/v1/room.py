@@ -15,22 +15,27 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
+import logging
+
+from six.moves.urllib import parse as urlparse
+
+from canonicaljson import json
+
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.api.errors import SynapseError, Codes, AuthError
-from synapse.streams.config import PaginationConfig
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.filtering import Filter
-from synapse.types import UserID, RoomID, RoomAlias, ThirdPartyInstanceID
-from synapse.events.utils import serialize_event, format_event_for_client_v2
+from synapse.events.utils import format_event_for_client_v2, serialize_event
 from synapse.http.servlet import (
-    parse_json_object_from_request, parse_string, parse_integer
+    parse_integer,
+    parse_json_object_from_request,
+    parse_string,
 )
+from synapse.streams.config import PaginationConfig
+from synapse.types import RoomAlias, RoomID, ThirdPartyInstanceID, UserID
 
-import logging
-import urllib
-import simplejson as json
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +45,7 @@ class RoomCreateRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomCreateRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self._room_creation_handler = hs.get_room_creation_handler()
 
     def register(self, http_server):
         PATTERNS = "/createRoom"
@@ -63,8 +68,7 @@ class RoomCreateRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        handler = self.handlers.room_creation_handler
-        info = yield handler.create_room(
+        info = yield self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
@@ -433,7 +437,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         as_client_event = "raw" not in request.args
         filter_bytes = request.args.get("filter", None)
         if filter_bytes:
-            filter_json = urllib.unquote(filter_bytes[-1]).decode("UTF-8")
+            filter_json = urlparse.unquote(filter_bytes[-1]).decode("UTF-8")
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
@@ -718,8 +722,8 @@ class RoomTypingRestServlet(ClientV1RestServlet):
     def on_PUT(self, request, room_id, user_id):
         requester = yield self.auth.get_user_by_req(request)
 
-        room_id = urllib.unquote(room_id)
-        target_user = UserID.from_string(urllib.unquote(user_id))
+        room_id = urlparse.unquote(room_id)
+        target_user = UserID.from_string(urlparse.unquote(user_id))
 
         content = parse_json_object_from_request(request)
 

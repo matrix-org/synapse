@@ -13,15 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.auth import get_access_token_from_request
 from synapse.api.errors import AuthError
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 

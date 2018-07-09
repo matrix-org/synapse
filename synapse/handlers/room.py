@@ -15,23 +15,20 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
-from twisted.internet import defer
-
-from ._base import BaseHandler
-
-from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
-from synapse.api.constants import (
-    EventTypes, JoinRules, RoomCreationPreset
-)
-from synapse.api.errors import AuthError, StoreError, SynapseError
-from synapse.util import stringutils
-from synapse.visibility import filter_events_for_client
-
-from collections import OrderedDict
-
 import logging
 import math
 import string
+from collections import OrderedDict
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.types import RoomAlias, RoomID, RoomStreamToken, UserID
+from synapse.util import stringutils
+from synapse.visibility import filter_events_for_client
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -68,14 +65,27 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
 
     @defer.inlineCallbacks
-    def create_room(self, requester, config, ratelimit=True):
+    def create_room(self, requester, config, ratelimit=True,
+                    creator_join_profile=None):
         """ Creates a new room.
 
         Args:
-            requester (Requester): The user who requested the room creation.
+            requester (synapse.types.Requester):
+                The user who requested the room creation.
             config (dict) : A dict of configuration options.
+            ratelimit (bool): set to False to disable the rate limiter
+
+            creator_join_profile (dict|None):
+                Set to override the displayname and avatar for the creating
+                user in this room. If unset, displayname and avatar will be
+                derived from the user's profile. If set, should contain the
+                values to go in the body of the 'join' event (typically
+                `avatar_url` and/or `displayname`.
+
         Returns:
-            The new room ID.
+            Deferred[dict]:
+                a dict containing the keys `room_id` and, if an alias was
+                requested, `room_alias`.
         Raises:
             SynapseError if the room ID couldn't be stored, or something went
             horribly wrong.
@@ -102,7 +112,11 @@ class RoomCreationHandler(BaseHandler):
             )
 
             if mapping:
-                raise SynapseError(400, "Room alias already taken")
+                raise SynapseError(
+                    400,
+                    "Room alias already taken",
+                    Codes.ROOM_IN_USE
+                )
         else:
             room_alias = None
 
@@ -112,6 +126,10 @@ class RoomCreationHandler(BaseHandler):
                 UserID.from_string(i)
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
+
+        yield self.event_creation_handler.assert_accepted_privacy_policy(
+            requester,
+        )
 
         invite_3pid_list = config.get("invite_3pid", [])
 
@@ -176,7 +194,8 @@ class RoomCreationHandler(BaseHandler):
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override", {})
+            power_level_content_override=config.get("power_level_content_override", {}),
+            creator_join_profile=creator_join_profile,
         )
 
         if "name" in config:
@@ -256,6 +275,7 @@ class RoomCreationHandler(BaseHandler):
             creation_content,
             room_alias,
             power_level_content_override,
+            creator_join_profile,
     ):
         def create(etype, content, **kwargs):
             e = {
@@ -299,6 +319,7 @@ class RoomCreationHandler(BaseHandler):
             room_id,
             "join",
             ratelimit=False,
+            content=creator_join_profile,
         )
 
         # We treat the power levels override specially as this needs to be one
@@ -435,7 +456,7 @@ class RoomContextHandler(BaseHandler):
         state = yield self.store.get_state_for_events(
             [last_event_id], None
         )
-        results["state"] = state[last_event_id].values()
+        results["state"] = list(state[last_event_id].values())
 
         results["start"] = now_token.copy_and_replace(
             "room_key", results["start"]

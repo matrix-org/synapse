@@ -14,16 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+from six.moves import http_client
+
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.errors import AuthError, SynapseError, Codes, NotFoundError
-from synapse.types import UserID, create_requester
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID, create_requester
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -151,10 +153,11 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
-            depth = event.depth
+            token = yield self.store.get_topological_token_for_event(event_id)
+
             logger.info(
-                "[purge] purging up to depth %i (event_id %s)",
-                depth, event_id,
+                "[purge] purging up to token %s (event_id %s)",
+                token, event_id,
             )
         elif 'purge_up_to_ts' in body:
             ts = body['purge_up_to_ts']
@@ -168,15 +171,28 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 yield self.store.find_first_stream_ordering_after_ts(ts)
             )
 
-            (_, depth, _) = (
+            r = (
                 yield self.store.get_room_event_after_stream_ordering(
                     room_id, stream_ordering,
                 )
             )
+            if not r:
+                logger.warn(
+                    "[purge] purging events not possible: No event found "
+                    "(received_ts %i => stream_ordering %i)",
+                    ts, stream_ordering,
+                )
+                raise SynapseError(
+                    404,
+                    "there is no event to be purged",
+                    errcode=Codes.NOT_FOUND,
+                )
+            (stream, topo, _event_id) = r
+            token = "t%d-%d" % (topo, stream)
             logger.info(
-                "[purge] purging up to depth %i (received_ts %i => "
+                "[purge] purging up to token %s (received_ts %i => "
                 "stream_ordering %i)",
-                depth, ts, stream_ordering,
+                token, ts, stream_ordering,
             )
         else:
             raise SynapseError(
@@ -186,7 +202,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             )
 
         purge_id = yield self.handlers.message_handler.start_purge_history(
-            room_id, depth,
+            room_id, token,
             delete_local_events=delete_local_events,
         )
 
@@ -233,6 +249,15 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
+        body = parse_json_object_from_request(request, allow_empty_body=True)
+        erase = body.get("erase", False)
+        if not isinstance(erase, bool):
+            raise SynapseError(
+                http_client.BAD_REQUEST,
+                "Param 'erase' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(requester.user)
@@ -240,7 +265,9 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        yield self._deactivate_account_handler.deactivate_account(target_user_id)
+        yield self._deactivate_account_handler.deactivate_account(
+            target_user_id, erase,
+        )
         defer.returnValue((200, {}))
 
 
@@ -260,8 +287,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(ShutdownRoomRestServlet, self).__init__(hs)
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
         self.state = hs.get_state_handler()
+        self._room_creation_handler = hs.get_room_creation_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
 
@@ -283,7 +310,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         message = content.get("message", self.DEFAULT_MESSAGE)
         room_name = content.get("room_name", "Content Violation Notification")
 
-        info = yield self.handlers.room_creation_handler.create_room(
+        info = yield self._room_creation_handler.create_room(
             room_creator_requester,
             config={
                 "preset": "public_chat",

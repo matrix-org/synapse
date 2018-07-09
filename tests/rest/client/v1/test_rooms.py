@@ -15,21 +15,20 @@
 
 """Tests REST events for /rooms paths."""
 
+import json
+
+from mock import Mock, NonCallableMock
+from six.moves.urllib import parse as urlparse
+
 # twisted imports
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room
 from synapse.api.constants import Membership
-
 from synapse.types import UserID
-
-import json
-import urllib
 
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
-
-from mock import Mock, NonCallableMock
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
@@ -60,7 +59,7 @@ class RoomPermissionsTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -70,7 +69,7 @@ class RoomPermissionsTestCase(RestTestCase):
 
         synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
 
-        self.auth = hs.get_v1auth()
+        self.auth = hs.get_auth()
 
         # create some rooms under the name rmcreator_id
         self.uncreated_rmid = "!aa:test"
@@ -425,7 +424,7 @@ class RoomsMemberListTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -507,7 +506,7 @@ class RoomsCreateTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -597,7 +596,7 @@ class RoomTopicTestCase(RestTestCase):
                 "is_guest": False,
             }
 
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -711,7 +710,7 @@ class RoomMemberStateTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -766,7 +765,7 @@ class RoomMemberStateTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_rooms_members_self(self):
         path = "/rooms/%s/state/m.room.member/%s" % (
-            urllib.quote(self.room_id), self.user_id
+            urlparse.quote(self.room_id), self.user_id
         )
 
         # valid join message (NOOP since we made the room)
@@ -786,7 +785,7 @@ class RoomMemberStateTestCase(RestTestCase):
     def test_rooms_members_other(self):
         self.other_id = "@zzsid1:red"
         path = "/rooms/%s/state/m.room.member/%s" % (
-            urllib.quote(self.room_id), self.other_id
+            urlparse.quote(self.room_id), self.other_id
         )
 
         # valid invite message
@@ -802,7 +801,7 @@ class RoomMemberStateTestCase(RestTestCase):
     def test_rooms_members_other_custom_keys(self):
         self.other_id = "@zzsid1:red"
         path = "/rooms/%s/state/m.room.member/%s" % (
-            urllib.quote(self.room_id), self.other_id
+            urlparse.quote(self.room_id), self.other_id
         )
 
         # valid invite message with custom key
@@ -843,7 +842,7 @@ class RoomMessagesTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -859,7 +858,7 @@ class RoomMessagesTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_invalid_puts(self):
         path = "/rooms/%s/send/m.room.message/mid1" % (
-            urllib.quote(self.room_id))
+            urlparse.quote(self.room_id))
         # missing keys or invalid json
         (code, response) = yield self.mock_resource.trigger(
             "PUT", path, '{}'
@@ -894,7 +893,7 @@ class RoomMessagesTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_rooms_messages_sent(self):
         path = "/rooms/%s/send/m.room.message/mid1" % (
-            urllib.quote(self.room_id))
+            urlparse.quote(self.room_id))
 
         content = '{"body":"test","msgtype":{"type":"a"}}'
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
@@ -911,7 +910,7 @@ class RoomMessagesTestCase(RestTestCase):
 
         # m.text message type
         path = "/rooms/%s/send/m.room.message/mid2" % (
-            urllib.quote(self.room_id))
+            urlparse.quote(self.room_id))
         content = '{"body":"test2","msgtype":"m.text"}'
         (code, response) = yield self.mock_resource.trigger("PUT", path, content)
         self.assertEquals(200, code, msg=str(response))
@@ -945,7 +944,7 @@ class RoomInitialSyncTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -1017,7 +1016,7 @@ class RoomMessageListTestCase(RestTestCase):
                 "token_id": 1,
                 "is_guest": False,
             }
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
