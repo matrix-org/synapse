@@ -18,7 +18,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError, Codes
 from synapse.api.constants import LoginType
-from synapse.api.auth import get_access_token_from_request
 from .base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
 from synapse.http.servlet import parse_json_object_from_request
@@ -66,6 +65,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         # TODO: persistent storage
         self.sessions = {}
         self.enable_registration = hs.config.enable_registration
+        self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.handlers = hs.get_handlers()
 
@@ -309,7 +309,7 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_app_service(self, request, register_json, session):
-        as_token = get_access_token_from_request(request)
+        as_token = self.auth.get_access_token_from_request(request)
 
         if "user" not in register_json:
             raise SynapseError(400, "Expected 'user' key.")
@@ -399,7 +399,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         user_json = parse_json_object_from_request(request)
 
-        access_token = get_access_token_from_request(request)
+        access_token = self.auth.get_access_token_from_request(request)
         app_service = self.store.get_app_service_by_token(
             access_token
         )
