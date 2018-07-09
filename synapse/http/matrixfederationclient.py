@@ -27,7 +27,7 @@ from synapse.util import logcontext
 from synapse.util.logcontext import make_deferred_yieldable
 import synapse.util.retryutils
 
-from canonicaljson import encode_canonical_json
+from canonicaljson import encode_canonical_json, json
 
 from synapse.api.errors import (
     SynapseError, Codes, HttpResponseException, FederationDeniedError,
@@ -36,7 +36,6 @@ from synapse.api.errors import (
 from signedjson.sign import sign_json
 
 import cgi
-import simplejson as json
 import logging
 import random
 import sys

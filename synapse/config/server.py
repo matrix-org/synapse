@@ -16,6 +16,7 @@
 
 import logging
 
+from synapse.http.endpoint import parse_and_validate_server_name
 from ._base import Config, ConfigError
 
 logger = logging.Logger(__name__)
@@ -25,6 +26,12 @@ class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
+
+        try:
+            parse_and_validate_server_name(self.server_name)
+        except ValueError as e:
+            raise ConfigError(str(e))
+
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
         self.web_client_location = config.get("web_client_location", None)
@@ -162,8 +169,8 @@ class ServerConfig(Config):
             })
 
     def default_config(self, server_name, **kwargs):
-        if ":" in server_name:
-            bind_port = int(server_name.split(":")[1])
+        _, bind_port = parse_and_validate_server_name(server_name)
+        if bind_port is not None:
             unsecure_port = bind_port - 400
         else:
             bind_port = 8448

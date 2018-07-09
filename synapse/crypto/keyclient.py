@@ -18,7 +18,7 @@ from twisted.web.http import HTTPClient
 from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor
 from synapse.http.endpoint import matrix_federation_endpoint
-import simplejson as json
+from canonicaljson import json
 import logging
 
 

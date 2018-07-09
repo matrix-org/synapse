@@ -107,13 +107,28 @@ class SynapseRequest(Request):
 
         end_time = time.time()
 
+        # need to decode as it could be raw utf-8 bytes
+        # from a IDN servname in an auth header
+        authenticated_entity = self.authenticated_entity
+        if authenticated_entity is not None:
+            authenticated_entity = authenticated_entity.decode("utf-8", "replace")
+
+        # ...or could be raw utf-8 bytes in the User-Agent header.
+        # N.B. if you don't do this, the logger explodes cryptically
+        # with maximum recursion trying to log errors about
+        # the charset problem.
+        # c.f. https://github.com/matrix-org/synapse/issues/3471
+        user_agent = self.get_user_agent()
+        if user_agent is not None:
+            user_agent = user_agent.decode("utf-8", "replace")
+
         self.site.access_logger.info(
             "%s - %s - {%s}"
             " Processed request: %.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             " %sB %s \"%s %s %s\" \"%s\" [%d dbevts]",
             self.getClientIP(),
             self.site.site_tag,
-            self.authenticated_entity,
+            authenticated_entity,
             end_time - self.start_time,
             ru_utime,
             ru_stime,
@@ -125,7 +140,7 @@ class SynapseRequest(Request):
             self.method,
             self.get_redacted_uri(),
             self.clientproto,
-            self.get_user_agent(),
+            user_agent,
             evt_db_fetch_count,
         )
 

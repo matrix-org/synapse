@@ -18,7 +18,8 @@ from . import engines
 
 from twisted.internet import defer
 
-import simplejson as json
+from canonicaljson import json
+
 import logging
 
 logger = logging.getLogger(__name__)

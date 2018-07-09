@@ -19,8 +19,7 @@ from ._base import SQLBaseStore
 from synapse.api.errors import SynapseError, Codes
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
-from canonicaljson import encode_canonical_json
-import simplejson as json
+from canonicaljson import encode_canonical_json, json
 
 
 class FilteringStore(SQLBaseStore):

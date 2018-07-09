@@ -29,7 +29,7 @@ import synapse.metrics
 import synapse.events
 
 from canonicaljson import (
-    encode_canonical_json, encode_pretty_printed_json
+    encode_canonical_json, encode_pretty_printed_json, json
 )
 
 from twisted.internet import defer
@@ -41,7 +41,6 @@ from twisted.web.util import redirectTo
 import collections
 import logging
 import urllib
-import simplejson
 
 logger = logging.getLogger(__name__)
 
@@ -410,7 +409,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = simplejson.dumps(json_object)
+            json_bytes = json.dumps(json_object)
 
     return respond_with_json_bytes(
         request, code, json_bytes,

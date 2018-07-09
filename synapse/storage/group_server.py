@@ -20,7 +20,7 @@ from synapse.api.errors import SynapseError
 
 from ._base import SQLBaseStore
 
-import simplejson as json
+from canonicaljson import json
 
 
 # The category ID for the "default" category. We don't store as null in the

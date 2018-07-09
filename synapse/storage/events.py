@@ -19,7 +19,8 @@ from functools import wraps
 import itertools
 import logging
 
-import simplejson as json
+from canonicaljson import json
+
 from twisted.internet import defer
 
 from synapse.storage.events_worker import EventsWorkerStore
@@ -800,7 +801,8 @@ class EventsStore(EventsWorkerStore):
                     ]
                 )
 
-                self._curr_state_delta_stream_cache.entity_has_changed(
+                txn.call_after(
+                    self._curr_state_delta_stream_cache.entity_has_changed,
                     room_id, max_stream_order,
                 )
 

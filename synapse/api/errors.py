@@ -17,7 +17,8 @@
 
 import logging
 
-import simplejson as json
+from canonicaljson import json
+
 from six import iteritems
 from six.moves import http_client
 
