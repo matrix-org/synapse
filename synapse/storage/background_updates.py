@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from . import engines
+import logging
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
-import simplejson as json
-import logging
+from . import engines
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

@@ -17,11 +17,11 @@
 import logging
 import re
 
+from six import string_types
+
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
-
-from six import string_types
 
 logger = logging.getLogger(__name__)
 

@@ -20,37 +20,42 @@ import itertools
 import logging
 import sys
 
+import six
+from six import iteritems
+from six.moves import http_client
+
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
-import six
-from six.moves import http_client
-from six import iteritems
-from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
-from ._base import BaseHandler
+from twisted.internet import defer
 
-from synapse.api.errors import (
-    AuthError, FederationError, StoreError, CodeMessageException, SynapseError,
-    FederationDeniedError,
-)
 from synapse.api.constants import EventTypes, Membership, RejectedReason
-from synapse.events.validator import EventValidator
-from synapse.util import unwrapFirstError, logcontext
-from synapse.util.metrics import measure_func
-from synapse.util.logutils import log_function
-from synapse.util.async import Linearizer
-from synapse.util.frozenutils import unfreeze
-from synapse.crypto.event_signing import (
-    compute_event_signature, add_hashes_and_signatures,
+from synapse.api.errors import (
+    AuthError,
+    CodeMessageException,
+    FederationDeniedError,
+    FederationError,
+    StoreError,
+    SynapseError,
 )
-from synapse.types import UserID, get_domain_from_id
-
+from synapse.crypto.event_signing import (
+    add_hashes_and_signatures,
+    compute_event_signature,
+)
 from synapse.events.utils import prune_event
-
+from synapse.events.validator import EventValidator
+from synapse.state import resolve_events_with_factory
+from synapse.types import UserID, get_domain_from_id
+from synapse.util import logcontext, unwrapFirstError
+from synapse.util.async import Linearizer
+from synapse.util.distributor import user_joined_room
+from synapse.util.frozenutils import unfreeze
+from synapse.util.logutils import log_function
+from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
 
-from synapse.util.distributor import user_joined_room
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +94,9 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_receive_pdu(self, origin, pdu, get_missing=True):
+    def on_receive_pdu(
+            self, origin, pdu, get_missing=True, sent_to_us_directly=False,
+    ):
         """ Process a PDU received via a federation /send/ transaction, or
         via backfill of missing prev_events
 
@@ -163,13 +170,10 @@ class FederationHandler(BaseHandler):
                     "Ignoring PDU %s for room %s from %s as we've left the room!",
                     pdu.event_id, pdu.room_id, origin,
                 )
-                return
+                defer.returnValue(None)
 
         state = None
-
         auth_chain = []
-
-        fetch_state = False
 
         # Get missing pdus if necessary.
         if not pdu.internal_metadata.is_outlier():
@@ -225,26 +229,60 @@ class FederationHandler(BaseHandler):
                         list(prevs - seen)[:5],
                     )
 
-            if prevs - seen:
-                logger.info(
-                    "Still missing %d events for room %r: %r...",
-                    len(prevs - seen), pdu.room_id, list(prevs - seen)[:5]
+            if sent_to_us_directly and prevs - seen:
+                # If they have sent it to us directly, and the server
+                # isn't telling us about the auth events that it's
+                # made a message referencing, we explode
+                raise FederationError(
+                    "ERROR",
+                    403,
+                    (
+                        "Your server isn't divulging details about prev_events "
+                        "referenced in this event."
+                    ),
+                    affected=pdu.event_id,
                 )
-                fetch_state = True
+            elif prevs - seen:
+                # Calculate the state of the previous events, and
+                # de-conflict them to find the current state.
+                state_groups = []
+                auth_chains = set()
+                try:
+                    # Get the state of the events we know about
+                    ours = yield self.store.get_state_groups(pdu.room_id, list(seen))
+                    state_groups.append(ours)
 
-        if fetch_state:
-            # We need to get the state at this event, since we haven't
-            # processed all the prev events.
-            logger.debug(
-                "_handle_new_pdu getting state for %s",
-                pdu.room_id
-            )
-            try:
-                state, auth_chain = yield self.replication_layer.get_state_for_room(
-                    origin, pdu.room_id, pdu.event_id,
-                )
-            except Exception:
-                logger.exception("Failed to get state for event: %s", pdu.event_id)
+                    # Ask the remote server for the states we don't
+                    # know about
+                    for p in prevs - seen:
+                        state, got_auth_chain = (
+                            yield self.replication_layer.get_state_for_room(
+                                origin, pdu.room_id, p
+                            )
+                        )
+                        auth_chains.update(got_auth_chain)
+                        state_group = {(x.type, x.state_key): x.event_id for x in state}
+                        state_groups.append(state_group)
+
+                    # Resolve any conflicting state
+                    def fetch(ev_ids):
+                        return self.store.get_events(
+                            ev_ids, get_prev_content=False, check_redacted=False
+                        )
+
+                    state_map = yield resolve_events_with_factory(
+                        state_groups, {pdu.event_id: pdu}, fetch
+                    )
+
+                    state = (yield self.store.get_events(state_map.values())).values()
+                    auth_chain = list(auth_chains)
+                except Exception:
+                    raise FederationError(
+                        "ERROR",
+                        403,
+                        "We can't get valid state history.",
+                        affected=pdu.event_id,
+                    )
 
         yield self._process_received_pdu(
             origin,
@@ -322,11 +360,17 @@ class FederationHandler(BaseHandler):
 
         for e in missing_events:
             logger.info("Handling found event %s", e.event_id)
-            yield self.on_receive_pdu(
-                origin,
-                e,
-                get_missing=False
-            )
+            try:
+                yield self.on_receive_pdu(
+                    origin,
+                    e,
+                    get_missing=False
+                )
+            except FederationError as e:
+                if e.code == 403:
+                    logger.warn("Event %s failed history check.")
+                else:
+                    raise
 
     @log_function
     @defer.inlineCallbacks

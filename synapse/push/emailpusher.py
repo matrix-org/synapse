@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
-import logging
-
-from synapse.util.metrics import Measure
 from synapse.util.logcontext import LoggingContext
-
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 

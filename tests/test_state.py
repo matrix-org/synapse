@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-from twisted.internet import defer
-
-from synapse.events import FrozenEvent
-from synapse.api.auth import Auth
-from synapse.api.constants import EventTypes, Membership
-from synapse.state import StateHandler, StateResolutionHandler
-
-from .utils import MockClock
-
 from mock import Mock
 
+from twisted.internet import defer
+
+from synapse.api.auth import Auth
+from synapse.api.constants import EventTypes, Membership
+from synapse.events import FrozenEvent
+from synapse.state import StateHandler, StateResolutionHandler
+
+from tests import unittest
+
+from .utils import MockClock
 
 _next_event_id = 1000
 

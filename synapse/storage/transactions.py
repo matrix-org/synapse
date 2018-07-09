@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
-
-from twisted.internet import defer
-import six
-
-from canonicaljson import encode_canonical_json
-
+import logging
 from collections import namedtuple
 
-import logging
-import simplejson as json
+import six
+
+from canonicaljson import encode_canonical_json, json
+
+from twisted.internet import defer
+
+from synapse.util.caches.descriptors import cached
+
+from ._base import SQLBaseStore
 
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview

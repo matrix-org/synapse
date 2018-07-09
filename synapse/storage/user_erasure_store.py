@@ -17,7 +17,7 @@ import operator
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedList, cached
+from synapse.util.caches.descriptors import cached, cachedList
 
 
 class UserErasureWorkerStore(SQLBaseStore):

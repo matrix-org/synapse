@@ -14,17 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from .util.id_generators import StreamIdGenerator
-from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList, cached
-from synapse.util.caches.stream_change_cache import StreamChangeCache
+import abc
+import logging
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
-import abc
-import logging
-import simplejson as json
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
+from ._base import SQLBaseStore
+from .util.id_generators import StreamIdGenerator
 
 logger = logging.getLogger(__name__)
 

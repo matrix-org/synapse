@@ -33,22 +33,20 @@ what sort order was used:
       and stream ordering columns respectively.
 """
 
+import abc
+import logging
+from collections import namedtuple
+
+from six.moves import range
+
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.events import EventsWorkerStore
-
 from synapse.types import RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
-from synapse.storage.engines import PostgresEngine
-
-import abc
-import logging
-
-from six.moves import range
-from collections import namedtuple
-
 
 logger = logging.getLogger(__name__)
 

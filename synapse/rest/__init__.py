@@ -33,28 +33,26 @@ from synapse.rest.client.v1 import (
 )
 
 from synapse.rest.client.v2_alpha import (
-    sync,
-    filter,
     account,
-    register,
-    auth,
-    receipts,
-    read_marker,
-    keys,
-    tokenrefresh,
-    tags,
     account_data,
-    report_event,
-    openid,
-    notifications,
+    auth,
     devices,
-    thirdparty,
-    sendtodevice,
-    user_directory,
+    filter,
     groups,
+    keys,
+    notifications,
+    openid,
+    read_marker,
+    receipts,
+    register,
+    report_event,
+    sendtodevice,
+    sync,
+    tags,
+    thirdparty,
+    tokenrefresh,
+    user_directory,
 )
-
-from synapse.http.server import JsonResource
 
 
 if not PY3:

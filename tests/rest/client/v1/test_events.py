@@ -23,9 +23,6 @@ from twisted.internet import defer
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
 
-from mock import Mock, NonCallableMock
-
-
 PATH_PREFIX = "/_matrix/client/api/v1"
 
 

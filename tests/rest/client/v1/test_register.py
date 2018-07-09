@@ -16,9 +16,13 @@
 from six import PY3
 from twisted.internet import defer
 from mock import Mock
+
+from twisted.internet import defer
+
+from synapse.rest.client.v1.register import CreateUserRestServlet
+
 from tests import unittest
 from tests.utils import mock_getRawHeaders
-import json
 
 
 class CreateUserServletTestCase(unittest.TestCase):

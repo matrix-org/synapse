@@ -18,14 +18,16 @@ import logging
 from six import itervalues
 
 import pymacaroons
+from netaddr import IPAddress
+
 from twisted.internet import defer
 
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes
 from synapse.types import UserID
-from synapse.util.caches import register_cache, CACHE_SIZE_FACTOR
+from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
@@ -243,6 +245,11 @@ class Auth(object):
         )
         if app_service is None:
             defer.returnValue((None, None))
+
+        if app_service.ip_range_whitelist:
+            ip_address = IPAddress(self.hs.get_ip_from_request(request))
+            if ip_address not in app_service.ip_range_whitelist:
+                defer.returnValue((None, None))
 
         if "user_id" not in request.args:
             defer.returnValue((app_service.sender, app_service))

@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import unittest
+from mock import Mock
+
 from twisted.internet import defer
 from twisted.names import dns, error
-
-from mock import Mock
 
 from synapse.http.endpoint import resolve_service
 
 from tests.utils import MockClock
+
+from . import unittest
 
 
 @unittest.DEBUG

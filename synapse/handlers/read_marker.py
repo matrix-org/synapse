@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseHandler
+import logging
 
 from twisted.internet import defer
 
 from synapse.util.async import Linearizer
 
-import logging
+from ._base import BaseHandler
+
 logger = logging.getLogger(__name__)
 
 
