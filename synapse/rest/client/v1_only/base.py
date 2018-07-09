@@ -16,9 +16,9 @@
 """This module contains base REST classes for constructing client v1 servlets.
 """
 
-from synapse.api.urls import CLIENT_PREFIX
-
 import re
+
+from synapse.api.urls import CLIENT_PREFIX
 
 
 def v1_only_client_path_patterns(path_regex, include_in_unstable=True):

@@ -15,23 +15,18 @@
 
 from six import PY3
 
-from synapse.rest.client import (
-    versions,
-)
-
+from synapse.rest.client import versions
+from synapse.rest.client.v1 import admin, directory
+from synapse.rest.client.v1 import login as v1_login
 from synapse.rest.client.v1 import (
-    room,
-    profile,
-    presence,
-    directory,
-    voip,
-    admin,
-    pusher,
-    push_rule,
-    login as v1_login,
     logout,
+    presence,
+    profile,
+    push_rule,
+    pusher,
+    room,
+    voip,
 )
-
 from synapse.rest.client.v2_alpha import (
     account,
     account_data,
@@ -53,7 +48,6 @@ from synapse.rest.client.v2_alpha import (
     tokenrefresh,
     user_directory,
 )
-
 
 if not PY3:
     from synapse.rest.client.v1_only import (
