@@ -13,21 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from ._base import BaseHandler
-
-from synapse.api.constants import Membership, EventTypes
-from synapse.api.filtering import Filter
-from synapse.api.errors import SynapseError
-from synapse.events.utils import serialize_event
-from synapse.visibility import filter_events_for_client
-
-from unpaddedbase64 import decode_base64, encode_base64
-
 import itertools
 import logging
 
+from unpaddedbase64 import decode_base64, encode_base64
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import SynapseError
+from synapse.api.filtering import Filter
+from synapse.events.utils import serialize_event
+from synapse.visibility import filter_events_for_client
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

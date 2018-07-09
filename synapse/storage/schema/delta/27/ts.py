@@ -14,9 +14,9 @@
 
 import logging
 
-from synapse.storage.prepare_database import get_statements
-
 import simplejson
+
+from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
 

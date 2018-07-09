@@ -17,8 +17,8 @@
 import logging
 
 from prometheus_client.core import Counter, Histogram
-from synapse.metrics import LaterGauge
 
+from synapse.metrics import LaterGauge
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)

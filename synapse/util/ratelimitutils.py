@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.api.errors import LimitExceededError
-
-from synapse.util.logcontext import (
-    run_in_background, make_deferred_yieldable,
-    PreserveLoggingContext,
-)
-
 import collections
 import contextlib
 import logging
 
+from twisted.internet import defer
+
+from synapse.api.errors import LimitExceededError
+from synapse.util.logcontext import (
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
 
 logger = logging.getLogger(__name__)
 

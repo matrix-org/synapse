@@ -13,20 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from contextlib import contextmanager
+
+from six.moves import range
+
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
 
+from synapse.util import Clock, logcontext, unwrapFirstError
+
 from .logcontext import (
-    PreserveLoggingContext, make_deferred_yieldable, run_in_background
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
 )
-from synapse.util import logcontext, unwrapFirstError, Clock
-
-from contextlib import contextmanager
-
-import logging
-
-from six.moves import range
 
 logger = logging.getLogger(__name__)
 

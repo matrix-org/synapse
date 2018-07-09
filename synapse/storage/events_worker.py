@@ -12,29 +12,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from ._base import SQLBaseStore
-
-from twisted.internet import defer
-
-from synapse.events import FrozenEvent
-from synapse.events.utils import prune_event
-
-from synapse.util.logcontext import (
-    PreserveLoggingContext, make_deferred_yieldable, run_in_background,
-    LoggingContext,
-)
-from synapse.util.metrics import Measure
-from synapse.api.errors import SynapseError
-
-from collections import namedtuple
-
 import logging
+from collections import namedtuple
 
 from canonicaljson import json
 
+from twisted.internet import defer
+
+from synapse.api.errors import SynapseError
 # these are only included to make the type annotations work
-from synapse.events import EventBase    # noqa: F401
-from synapse.events.snapshot import EventContext   # noqa: F401
+from synapse.events import EventBase  # noqa: F401
+from synapse.events import FrozenEvent
+from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.events.utils import prune_event
+from synapse.util.logcontext import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
+from synapse.util.metrics import Measure
+
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

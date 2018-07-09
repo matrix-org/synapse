@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.api import errors
 from synapse.http import servlet
+
 from ._base import client_v2_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)

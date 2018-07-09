@@ -16,16 +16,18 @@
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    SynapseError, UnrecognizedRequestError, NotFoundError, StoreError
+    NotFoundError,
+    StoreError,
+    SynapseError,
+    UnrecognizedRequestError,
 )
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.storage.push_rule import (
-    InconsistentRuleException, RuleNotFoundException
-)
-from synapse.push.clientformat import format_push_rules_for_user
-from synapse.push.baserules import BASE_RULE_IDS
-from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.http.servlet import parse_json_value_from_request
+from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.clientformat import format_push_rules_for_user
+from synapse.push.rulekinds import PRIORITY_CLASS_MAP
+from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 class PushRuleRestServlet(ClientV1RestServlet):

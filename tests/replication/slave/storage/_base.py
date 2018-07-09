@@ -12,17 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, reactor
-from tests import unittest
-
 import tempfile
 
 from mock import Mock, NonCallableMock
-from tests.utils import setup_test_homeserver
-from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
+
+from twisted.internet import defer, reactor
+
 from synapse.replication.tcp.client import (
-    ReplicationClientHandler, ReplicationClientFactory,
+    ReplicationClientFactory,
+    ReplicationClientHandler,
 )
+from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
+
+from tests import unittest
+from tests.utils import setup_test_homeserver
 
 
 class BaseSlavedStoreTestCase(unittest.TestCase):

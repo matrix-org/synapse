@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.api.errors import SynapseError
-from synapse.types import StreamToken
-
 import logging
 
+from synapse.api.errors import SynapseError
+from synapse.types import StreamToken
 
 logger = logging.getLogger(__name__)
 

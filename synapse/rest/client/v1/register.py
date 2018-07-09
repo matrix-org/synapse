@@ -14,21 +14,22 @@
 # limitations under the License.
 
 """This module contains REST servlets to do with registration: /register"""
+import hmac
+import logging
+from hashlib import sha1
+
+from six import string_types
+
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.api.constants import LoginType
-from synapse.api.auth import get_access_token_from_request
-from .base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
+from synapse.api.auth import get_access_token_from_request
+from synapse.api.constants import LoginType
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import create_requester
 
-from hashlib import sha1
-import hmac
-import logging
-
-from six import string_types
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 

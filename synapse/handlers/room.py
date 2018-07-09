@@ -15,23 +15,20 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
-from twisted.internet import defer
-
-from ._base import BaseHandler
-
-from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
-from synapse.api.constants import (
-    EventTypes, JoinRules, RoomCreationPreset
-)
-from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
-from synapse.util import stringutils
-from synapse.visibility import filter_events_for_client
-
-from collections import OrderedDict
-
 import logging
 import math
 import string
+from collections import OrderedDict
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.types import RoomAlias, RoomID, RoomStreamToken, UserID
+from synapse.util import stringutils
+from synapse.visibility import filter_events_for_client
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

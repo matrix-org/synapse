@@ -15,9 +15,10 @@
 
 import hashlib
 from inspect import getcallargs
-from six.moves.urllib import parse as urlparse
 
 from mock import Mock, patch
+from six.moves.urllib import parse as urlparse
+
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import CodeMessageException, cs_error

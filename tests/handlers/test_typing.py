@@ -14,18 +14,23 @@
 # limitations under the License.
 
 
-from tests import unittest
-from twisted.internet import defer
-
-from mock import Mock, call, ANY
 import json
 
-from ..utils import (
-    MockHttpResource, MockClock, DeferredMockCallable, setup_test_homeserver
-)
+from mock import ANY, Mock, call
+
+from twisted.internet import defer
 
 from synapse.api.errors import AuthError
 from synapse.types import UserID
+
+from tests import unittest
+
+from ..utils import (
+    DeferredMockCallable,
+    MockClock,
+    MockHttpResource,
+    setup_test_homeserver,
+)
 
 
 def _expect_edu(destination, edu_type, content, origin="test"):

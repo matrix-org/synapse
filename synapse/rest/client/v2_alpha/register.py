@@ -14,28 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hmac
+import logging
+from hashlib import sha1
+
+from six import string_types
+
 from twisted.internet import defer
 
 import synapse
 import synapse.types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
-from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
+from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
+    RestServlet,
+    assert_params_in_request,
+    parse_json_object_from_request,
+    parse_string,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_v2_patterns, interactive_auth_handler
-
-import logging
-import hmac
-from hashlib import sha1
-from synapse.util.ratelimitutils import FederationRateLimiter
-
-from six import string_types
-
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
 # exist. It's a _really minor_ security flaw to use plain string comparison

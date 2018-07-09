@@ -20,38 +20,42 @@ import itertools
 import logging
 import sys
 
+import six
+from six import iteritems
+from six.moves import http_client
+
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
-import six
-from six.moves import http_client
-from six import iteritems
-from twisted.internet import defer
 from unpaddedbase64 import decode_base64
 
-from ._base import BaseHandler
+from twisted.internet import defer
 
-from synapse.api.errors import (
-    AuthError, FederationError, StoreError, CodeMessageException, SynapseError,
-    FederationDeniedError,
-)
 from synapse.api.constants import EventTypes, Membership, RejectedReason
-from synapse.events.validator import EventValidator
-from synapse.util import unwrapFirstError, logcontext
-from synapse.util.metrics import measure_func
-from synapse.util.logutils import log_function
-from synapse.util.async import Linearizer
-from synapse.util.frozenutils import unfreeze
-from synapse.crypto.event_signing import (
-    compute_event_signature, add_hashes_and_signatures,
+from synapse.api.errors import (
+    AuthError,
+    CodeMessageException,
+    FederationDeniedError,
+    FederationError,
+    StoreError,
+    SynapseError,
 )
+from synapse.crypto.event_signing import (
+    add_hashes_and_signatures,
+    compute_event_signature,
+)
+from synapse.events.utils import prune_event
+from synapse.events.validator import EventValidator
 from synapse.state import resolve_events_with_factory
 from synapse.types import UserID, get_domain_from_id
-
-from synapse.events.utils import prune_event
-
+from synapse.util import logcontext, unwrapFirstError
+from synapse.util.async import Linearizer
+from synapse.util.distributor import user_joined_room
+from synapse.util.frozenutils import unfreeze
+from synapse.util.logutils import log_function
+from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination
 
-from synapse.util.distributor import user_joined_room
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

@@ -15,21 +15,20 @@
 
 """Tests REST events for /rooms paths."""
 
+import json
+
+from mock import Mock, NonCallableMock
+from six.moves.urllib import parse as urlparse
+
 # twisted imports
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room
 from synapse.api.constants import Membership
-
 from synapse.types import UserID
-
-import json
-from six.moves.urllib import parse as urlparse
 
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
-
-from mock import Mock, NonCallableMock
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 

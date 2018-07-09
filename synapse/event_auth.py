@@ -17,11 +17,11 @@ import logging
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json, SignatureVerifyException
+from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, SynapseError, EventSizeError
+from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.errors import AuthError, EventSizeError, SynapseError
 from synapse.types import UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
