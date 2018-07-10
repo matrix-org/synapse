@@ -426,7 +426,7 @@ class RegisterRestServlet(RestServlet):
                     if org_parts[0] == "matrix" and org_parts[1] == "org":
                         org = "Tchap Admin"
                     elif org_parts[-2] == "gouv":
-                        org = org_parts[-3] or org_parts[-2]
+                        org = org_parts[-3] if len(org_parts) > 2 else org_parts[-2]
                     else:
                         org = org_parts[-2]
 
