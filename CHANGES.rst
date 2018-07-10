@@ -1,3 +1,12 @@
+Synapse 0.32.2 (2018-07-07)
+===========================
+
+Bugfixes
+--------
+
+- Amend the Python dependencies to depend on attrs from PyPI, not attr (`#3492 <https://github.com/matrix-org/synapse/issues/3492>`_)
+
+
 Synapse 0.32.1 (2018-07-06)
 ===========================
 

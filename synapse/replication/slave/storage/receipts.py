@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.receipts import ReceiptsWorkerStore
+
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
-
-from synapse.storage.receipts import ReceiptsWorkerStore
 
 # So, um, we want to borrow a load of functions intended for reading from
 # a DataStore, but we don't want to take functions that either write to the

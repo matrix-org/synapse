@@ -16,15 +16,16 @@
 
 import argparse
 import collections
+import errno
 import glob
 import os
 import os.path
 import signal
 import subprocess
 import sys
-import yaml
-import errno
 import time
+
+import yaml
 
 SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
 

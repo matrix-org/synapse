@@ -24,11 +24,10 @@ Each stream is defined by the following information:
     update_function:    The function that returns a list of updates between two tokens
 """
 
-from twisted.internet import defer
+import logging
 from collections import namedtuple
 
-import logging
-
+from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 

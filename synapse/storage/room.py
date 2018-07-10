@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
+import logging
+import re
+
+from canonicaljson import json
+
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.search import SearchStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-
-from canonicaljson import json
-
-import collections
-import logging
-import re
 
 logger = logging.getLogger(__name__)
 

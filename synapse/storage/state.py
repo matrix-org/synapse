@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 import logging
+from collections import namedtuple
 
 from six import iteritems, itervalues
 from six.moves import range
@@ -23,10 +23,11 @@ from twisted.internet import defer
 
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine
-from synapse.util.caches import intern_string, get_cache_factor_for
+from synapse.util.caches import get_cache_factor_for, intern_string
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.stringutils import to_ascii
+
 from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)

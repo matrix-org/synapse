@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import resource
 import logging
-
+import resource
 
 logger = logging.getLogger("synapse.app.homeserver")
 

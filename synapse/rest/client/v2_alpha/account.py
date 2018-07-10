@@ -17,17 +17,20 @@
 import logging
 
 from six.moves import http_client
+
 from twisted.internet import defer
 
 from synapse.api.auth import has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
-    RestServlet, assert_params_in_request,
+    RestServlet,
+    assert_params_in_request,
     parse_json_object_from_request,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
+
 from ._base import client_v2_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)

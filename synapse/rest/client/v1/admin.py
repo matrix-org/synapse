@@ -14,18 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
 
 from six.moves import http_client
 
+from twisted.internet import defer
+
 from synapse.api.constants import Membership
-from synapse.api.errors import AuthError, SynapseError, Codes, NotFoundError
-from synapse.types import UserID, create_requester
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID, create_requester
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 

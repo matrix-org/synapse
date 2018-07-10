@@ -15,23 +15,27 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
-from twisted.internet import defer
-
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.api.errors import SynapseError, Codes, AuthError
-from synapse.streams.config import PaginationConfig
-from synapse.api.constants import EventTypes, Membership
-from synapse.api.filtering import Filter
-from synapse.types import UserID, RoomID, RoomAlias, ThirdPartyInstanceID
-from synapse.events.utils import serialize_event, format_event_for_client_v2
-from synapse.http.servlet import (
-    parse_json_object_from_request, parse_string, parse_integer
-)
+import logging
 
 from six.moves.urllib import parse as urlparse
 
-import logging
 from canonicaljson import json
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.filtering import Filter
+from synapse.events.utils import format_event_for_client_v2, serialize_event
+from synapse.http.servlet import (
+    parse_integer,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.streams.config import PaginationConfig
+from synapse.types import RoomAlias, RoomID, ThirdPartyInstanceID, UserID
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 

@@ -15,15 +15,14 @@
 
 import logging
 
-from twisted.internet import defer
+from six import iteritems
 
-from ._base import Cache
-from . import background_updates
+from twisted.internet import defer
 
 from synapse.util.caches import CACHE_SIZE_FACTOR
 
-from six import iteritems
-
+from . import background_updates
+from ._base import Cache
 
 logger = logging.getLogger(__name__)
 

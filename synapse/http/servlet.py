@@ -15,12 +15,11 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 
-from synapse.api.errors import SynapseError, Codes
-
 import logging
 
 from canonicaljson import json
 
+from synapse.api.errors import Codes, SynapseError
 
 logger = logging.getLogger(__name__)
 

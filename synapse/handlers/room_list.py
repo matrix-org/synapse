@@ -13,26 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
+from collections import namedtuple
 
 from six import iteritems
 from six.moves import range
 
-from ._base import BaseHandler
+import msgpack
+from unpaddedbase64 import decode_base64, encode_base64
 
-from synapse.api.constants import (
-    EventTypes, JoinRules,
-)
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, JoinRules
+from synapse.types import ThirdPartyInstanceID
 from synapse.util.async import concurrently_execute
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.types import ThirdPartyInstanceID
 
-from collections import namedtuple
-from unpaddedbase64 import encode_base64, decode_base64
-
-import logging
-import msgpack
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

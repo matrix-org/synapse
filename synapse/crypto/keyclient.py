@@ -13,14 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util import logcontext
-from twisted.web.http import HTTPClient
-from twisted.internet.protocol import Factory
-from twisted.internet import defer, reactor
-from synapse.http.endpoint import matrix_federation_endpoint
-from canonicaljson import json
 import logging
 
+from canonicaljson import json
+
+from twisted.internet import defer, reactor
+from twisted.internet.protocol import Factory
+from twisted.web.http import HTTPClient
+
+from synapse.http.endpoint import matrix_federation_endpoint
+from synapse.util import logcontext
 
 logger = logging.getLogger(__name__)
 

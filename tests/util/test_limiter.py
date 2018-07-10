@@ -14,11 +14,11 @@
 # limitations under the License.
 
 
-from tests import unittest
-
 from twisted.internet import defer
 
 from synapse.util.async import Limiter
+
+from tests import unittest
 
 
 class LimiterTestCase(unittest.TestCase):

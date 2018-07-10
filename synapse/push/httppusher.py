@@ -15,16 +15,16 @@
 # limitations under the License.
 import logging
 
+from prometheus_client import Counter
+
 from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
-from . import push_rule_evaluator
-from . import push_tools
 from synapse.push import PusherConfigException
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
-from prometheus_client import Counter
+from . import push_rule_evaluator, push_tools
 
 logger = logging.getLogger(__name__)
 

@@ -14,25 +14,25 @@
 # limitations under the License.
 
 
+import hashlib
+import logging
+from collections import namedtuple
+
+from six import iteritems, itervalues
+
+from frozendict import frozendict
+
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.util.logutils import log_function
-from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
 from synapse.util.async import Linearizer
 from synapse.util.caches import CACHE_SIZE_FACTOR
-
-from collections import namedtuple
-from frozendict import frozendict
-
-import logging
-import hashlib
-
-from six import iteritems, itervalues
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 

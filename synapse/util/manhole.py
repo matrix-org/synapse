@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.conch.manhole import ColoredManhole
-from twisted.conch.insults import insults
 from twisted.conch import manhole_ssh
-from twisted.cred import checkers, portal
+from twisted.conch.insults import insults
+from twisted.conch.manhole import ColoredManhole
 from twisted.conch.ssh.keys import Key
+from twisted.cred import checkers, portal
 
 PUBLIC_KEY = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAGEArzJx8OYOnJmzf4tfBEvLi8DVPrJ3/c9k2I/Az"

@@ -22,27 +22,26 @@ The methods that define policy are:
     - should_notify
 """
 
-from twisted.internet import defer
+import logging
 from contextlib import contextmanager
 
-from six import itervalues, iteritems
+from six import iteritems, itervalues
 
-from synapse.api.errors import SynapseError
+from prometheus_client import Counter
+
+from twisted.internet import defer
+
 from synapse.api.constants import PresenceState
+from synapse.api.errors import SynapseError
+from synapse.metrics import LaterGauge
 from synapse.storage.presence import UserPresenceState
-
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.types import UserID, get_domain_from_id
 from synapse.util.async import Linearizer
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.logcontext import run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
-from synapse.types import UserID, get_domain_from_id
-from synapse.metrics import LaterGauge
-
-import logging
-
-from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
 

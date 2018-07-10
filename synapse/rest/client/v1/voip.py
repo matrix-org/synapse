@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+import hashlib
+import hmac
+
 from twisted.internet import defer
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-
-import hmac
-import hashlib
-import base64
 
 
 class VoipRestServlet(ClientV1RestServlet):
