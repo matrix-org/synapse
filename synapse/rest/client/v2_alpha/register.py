@@ -423,9 +423,9 @@ class RegisterRestServlet(RestServlet):
                     parts = address.replace('.', ' ').split('@')
                     org_parts = parts[1].split(' ')
 
-                    if org_parts[0] == "matrix" and org_parts[1] == "org":
+                    if org_parts[-2] == "matrix" and org_parts[-1] == "org":
                         org = "Tchap Admin"
-                    elif org_parts[-2] == "gouv":
+                    elif org_parts[-2] == "gouv" and org_parts[-1] == "fr":
                         org = org_parts[-3] if len(org_parts) > 2 else org_parts[-2]
                     else:
                         org = org_parts[-2]
