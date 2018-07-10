@@ -341,15 +341,17 @@ class SQLBaseStore(object):
         Returns:
             Deferred: The result of func
         """
-        if LoggingContext.current_context() == LoggingContext.sentinel:
+        parent_context = LoggingContext.current_context()
+        if parent_context == LoggingContext.sentinel:
             logger.warn(
                 "Running db txn from sentinel context: metrics will be lost",
             )
+            parent_context = None
 
         start_time = time.time()
 
         def inner_func(conn, *args, **kwargs):
-            with LoggingContext("runWithConnection") as context:
+            with LoggingContext("runWithConnection", parent_context) as context:
                 sched_duration_sec = time.time() - start_time
                 sql_scheduling_timer.observe(sched_duration_sec)
                 context.add_database_scheduled(sched_duration_sec)
