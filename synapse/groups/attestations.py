@@ -25,7 +25,7 @@ Therefore attestations shouldn't be relied on to prove membership in important
 cases, but can for less important situtations, e.g. showing a users membership
 of groups on their profile, showing flairs, etc.
 
-An attestsation is a signed blob of json that looks like:
+An attestation is a signed blob of json that looks like:
 
     {
         "user_id": "@foo:a.example.com",
