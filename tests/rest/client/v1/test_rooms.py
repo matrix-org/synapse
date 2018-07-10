@@ -18,7 +18,6 @@
 import json
 
 from mock import Mock, NonCallableMock
-from six import PY3
 from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
@@ -918,9 +917,6 @@ class RoomMessagesTestCase(RestTestCase):
 
 class RoomInitialSyncTestCase(RestTestCase):
     """ Tests /rooms/$room_id/initialSync. """
-
-    if PY3:
-        skip = "Deprecated APIs are not being ported to Python 3"
 
     user_id = "@sid1:red"
 
