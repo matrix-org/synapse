@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +30,7 @@ def v1_only_client_path_patterns(path_regex, include_in_unstable=True):
         path_regex (str): The regex string to match. This should NOT have a ^
         as this will be prefixed.
     Returns:
-        SRE_Pattern
+        list of SRE_Pattern
     """
     patterns = [re.compile("^" + CLIENT_PREFIX + path_regex)]
     if include_in_unstable:
