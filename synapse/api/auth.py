@@ -683,7 +683,6 @@ class Auth(object):
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
 
-
     def get_access_token_from_request(self, request, token_not_found_http_status=401):
         """Extracts the access_token from the request.
 

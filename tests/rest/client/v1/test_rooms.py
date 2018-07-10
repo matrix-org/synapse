@@ -137,10 +137,12 @@ class RoomPermissionsTestCase(RoomBase):
         msg_content = b'{"msgtype":"m.text","body":"hello"}'
 
         seq = iter(range(100))
-        send_msg_path = lambda: (
-            b"/rooms/%s/send/m.room.message/mid%s"
-            % (self.created_rmid, str(next(seq)).encode('ascii'))
-        )
+
+        def send_msg_path():
+            return b"/rooms/%s/send/m.room.message/mid%s" % (
+                self.created_rmid,
+                str(next(seq)).encode('ascii'),
+            )
 
         # send message in uncreated room, expect 403
         request, channel = make_request(

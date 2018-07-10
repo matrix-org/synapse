@@ -23,7 +23,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver, wait_until_result
+from tests.server import make_request, wait_until_result
 
 
 class RestTestCase(unittest.TestCase):
@@ -141,6 +141,7 @@ class RestHelper(object):
     """Contains extra helper functions to quickly and clearly perform a given
     REST action, which isn't the focus of the test.
     """
+
     hs = attr.ib()
     resource = attr.ib()
     auth_user_id = attr.ib()
@@ -163,26 +164,37 @@ class RestHelper(object):
         self.auth_user_id = temp_id
         return channel.json_body["room_id"]
 
-
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
-        self.change_membership(room=room, src=src, targ=targ, tok=tok,
-                               membership=Membership.INVITE,
-                               expect_code=expect_code)
-
+        self.change_membership(
+            room=room,
+            src=src,
+            targ=targ,
+            tok=tok,
+            membership=Membership.INVITE,
+            expect_code=expect_code,
+        )
 
     def join(self, room=None, user=None, expect_code=200, tok=None):
-        self.change_membership(room=room, src=user, targ=user, tok=tok,
-                               membership=Membership.JOIN,
-                               expect_code=expect_code)
-
+        self.change_membership(
+            room=room,
+            src=user,
+            targ=user,
+            tok=tok,
+            membership=Membership.JOIN,
+            expect_code=expect_code,
+        )
 
     def leave(self, room=None, user=None, expect_code=200, tok=None):
-        self.change_membership(room=room, src=user, targ=user, tok=tok,
-                               membership=Membership.LEAVE,
-                               expect_code=expect_code)
+        self.change_membership(
+            room=room,
+            src=user,
+            targ=user,
+            tok=tok,
+            membership=Membership.LEAVE,
+            expect_code=expect_code,
+        )
 
-    def change_membership(self, room, src, targ, membership, tok=None,
-                          expect_code=200):
+    def change_membership(self, room, src, targ, membership, tok=None, expect_code=200):
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
@@ -190,9 +202,7 @@ class RestHelper(object):
         if tok:
             path = path + "?access_token=%s" % tok
 
-        data = {
-            "membership": membership
-        }
+        data = {"membership": membership}
 
         request, channel = make_request(
             b"PUT", path.encode('ascii'), json.dumps(data).encode('utf8')
@@ -202,7 +212,8 @@ class RestHelper(object):
         wait_until_result(self.hs.get_reactor(), channel)
 
         assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r" % (expect_code, int(channel.result["code"]), channel.result["body"])
+            "Expected: %d, got: %d, resp: %r"
+            % (expect_code, int(channel.result["code"]), channel.result["body"])
         )
 
         self.auth_user_id = temp_id
@@ -212,17 +223,15 @@ class RestHelper(object):
         (code, response) = yield self.mock_resource.trigger(
             "POST",
             "/_matrix/client/r0/register",
-            json.dumps({
-                "user": user_id,
-                "password": "test",
-                "type": "m.login.password"
-            }))
+            json.dumps(
+                {"user": user_id, "password": "test", "type": "m.login.password"}
+            ),
+        )
         self.assertEquals(200, code)
         defer.returnValue(response)
 
     @defer.inlineCallbacks
-    def send(self, room_id, body=None, txn_id=None, tok=None,
-             expect_code=200):
+    def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
         if body is None:

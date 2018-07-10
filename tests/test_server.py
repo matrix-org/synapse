@@ -33,7 +33,9 @@ class JsonResourceTests(unittest.TestCase):
             return (200, kwargs)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")], _callback
+        )
 
         request, channel = make_request(b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83")
         request.render(res)

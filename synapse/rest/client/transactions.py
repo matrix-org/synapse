@@ -22,9 +22,6 @@ from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
-
-
-
 CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
 
 
