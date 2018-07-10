@@ -16,12 +16,9 @@
 """ Tests REST events for /events paths."""
 
 from mock import Mock, NonCallableMock
+from six import PY3
 
 from twisted.internet import defer
-
-import synapse.rest.client.v1.events
-import synapse.rest.client.v1_only.register
-import synapse.rest.client.v1.room
 
 from ....utils import MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
@@ -32,8 +29,14 @@ PATH_PREFIX = "/_matrix/client/api/v1"
 class EventStreamPermissionsTestCase(RestTestCase):
     """ Tests event streaming (GET /events). """
 
+    if PY3:
+        skip = "Skip on Py3 until ported to use not V1 only register."
+
     @defer.inlineCallbacks
     def setUp(self):
+        import synapse.rest.client.v1.events
+        import synapse.rest.client.v1_only.register
+        import synapse.rest.client.v1.room
 
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
