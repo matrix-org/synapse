@@ -151,7 +151,7 @@ class RequestMetrics(object):
 
         # _request_stats records resource usage that we have already added
         # to the "in flight" metrics.
-        self._request_stats = self.start_context.resource_usage.copy()
+        self._request_stats = self.start_context.get_resource_usage()
 
         _in_flight_requests.add(self)
 
@@ -207,7 +207,7 @@ class RequestMetrics(object):
     def update_metrics(self):
         """Updates the in flight metrics with values from this request.
         """
-        new_stats = self.start_context.resource_usage.copy()
+        new_stats = self.start_context.get_resource_usage()
 
         diff = new_stats - self._request_stats
         self._request_stats = new_stats

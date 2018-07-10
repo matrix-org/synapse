@@ -143,7 +143,7 @@ class LoggingContext(object):
 
     __slots__ = [
         "previous_context", "name",
-        "resource_usage",
+        "_resource_usage",
         "usage_start",
         "main_thread", "alive",
         "request", "tag",
@@ -188,7 +188,7 @@ class LoggingContext(object):
         self.name = name
 
         # track the resources used by this context so far
-        self.resource_usage = ContextResourceUsage()
+        self._resource_usage = ContextResourceUsage()
 
         # If alive has the thread resource usage when the logcontext last
         # became active.
@@ -290,8 +290,8 @@ class LoggingContext(object):
 
         usage_end = get_thread_resource_usage()
 
-        self.resource_usage.ru_utime += usage_end.ru_utime - self.usage_start.ru_utime
-        self.resource_usage.ru_stime += usage_end.ru_stime - self.usage_start.ru_stime
+        self._resource_usage.ru_utime += usage_end.ru_utime - self.usage_start.ru_utime
+        self._resource_usage.ru_stime += usage_end.ru_stime - self.usage_start.ru_stime
 
         self.usage_start = None
 
@@ -299,15 +299,16 @@ class LoggingContext(object):
         """Get resources used by this logcontext so far.
 
         Returns:
-            ContextResourceUsage
+            ContextResourceUsage: a *copy* of the object tracking resource
+                usage so far
         """
-        res = self.resource_usage
+        # we always return a copy, for consistency
+        res = self._resource_usage.copy()
 
         # If we are on the correct thread and we're currently running then we
         # can include resource usage so far.
         is_main_thread = threading.current_thread() is self.main_thread
         if self.alive and self.usage_start and is_main_thread:
-            res = res.copy()
             current = get_thread_resource_usage()
             res.ru_utime += current.ru_utime - self.usage_start.ru_utime
             res.ru_stime += current.ru_stime - self.usage_start.ru_stime
@@ -315,8 +316,8 @@ class LoggingContext(object):
         return res
 
     def add_database_transaction(self, duration_sec):
-        self.resource_usage.db_txn_count += 1
-        self.resource_usage.db_txn_duration_sec += duration_sec
+        self._resource_usage.db_txn_count += 1
+        self._resource_usage.db_txn_duration_sec += duration_sec
 
     def add_database_scheduled(self, sched_sec):
         """Record a use of the database pool
@@ -325,7 +326,7 @@ class LoggingContext(object):
             sched_sec (float): number of seconds it took us to get a
                 connection
         """
-        self.resource_usage.db_sched_duration_sec += sched_sec
+        self._resource_usage.db_sched_duration_sec += sched_sec
 
     def record_event_fetch(self, event_count):
         """Record a number of events being fetched from the db
@@ -333,7 +334,7 @@ class LoggingContext(object):
         Args:
             event_count (int): number of events being fetched
         """
-        self.resource_usage.evt_db_fetch_count += event_count
+        self._resource_usage.evt_db_fetch_count += event_count
 
 
 class LoggingContextFilter(logging.Filter):
