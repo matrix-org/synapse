@@ -151,7 +151,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         defer.returnValue([ev for res in results.values() for ev in res])
 
-    @cachedInlineCallbacks(num_args=3, tree=True)
     def get_linearized_receipts_for_room(self, room_id, to_key, from_key=None):
         """Get receipts for a single room for sending to clients.
 
@@ -163,6 +162,16 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Returns:
             list: A list of receipts.
+        """
+        if from_key:
+            if not self._receipts_stream_cache.has_entity_changed(room_id, from_key):
+                defer.succeed([])
+
+        return self._get_linearized_receipts_for_room(room_id, to_key, from_key)
+
+    @cachedInlineCallbacks(num_args=3, tree=True)
+    def _get_linearized_receipts_for_room(self, room_id, to_key, from_key=None):
+        """See get_linearized_receipts_for_room
         """
         def f(txn):
             if from_key:
@@ -211,7 +220,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "content": content,
         }])
 
-    @cachedList(cached_method_name="get_linearized_receipts_for_room",
+    @cachedList(cached_method_name="_get_linearized_receipts_for_room",
                 list_name="room_ids", num_args=3, inlineCallbacks=True)
     def _get_linearized_receipts_for_rooms(self, room_ids, to_key, from_key=None):
         if not room_ids:
@@ -373,7 +382,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             self.get_receipts_for_user.invalidate, (user_id, receipt_type)
         )
         # FIXME: This shouldn't invalidate the whole cache
-        txn.call_after(self.get_linearized_receipts_for_room.invalidate_many, (room_id,))
+        txn.call_after(self._get_linearized_receipts_for_room.invalidate_many, (room_id,))
 
         txn.call_after(
             self._receipts_stream_cache.entity_has_changed,
@@ -493,7 +502,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             self.get_receipts_for_user.invalidate, (user_id, receipt_type)
         )
         # FIXME: This shouldn't invalidate the whole cache
-        txn.call_after(self.get_linearized_receipts_for_room.invalidate_many, (room_id,))
+        txn.call_after(self._get_linearized_receipts_for_room.invalidate_many, (room_id,))
 
         self._simple_delete_txn(
             txn,
