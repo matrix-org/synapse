@@ -18,7 +18,7 @@ from six import PY3
 
 from synapse.http.server import JsonResource
 from synapse.rest.client import versions
-from synapse.rest.client.v1 import admin, directory
+from synapse.rest.client.v1 import admin, directory, events, initial_sync
 from synapse.rest.client.v1 import login as v1_login
 from synapse.rest.client.v1 import (
     logout,
@@ -54,11 +54,6 @@ from synapse.rest.client.v2_alpha import (
 if not PY3:
     from synapse.rest.client.v1_only import (
         register as v1_register,
-    )
-
-    from synapse.rest.client.v1 import (
-        events,
-        initial_sync,
     )
 
 
