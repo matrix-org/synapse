@@ -49,6 +49,90 @@ except Exception:
         return None
 
 
+class ContextResourceUsage(object):
+    """Object for tracking the resources used by a log context
+
+    Attributes:
+        ru_utime (float): user CPU time (in seconds)
+        ru_stime (float): system CPU time (in seconds)
+        db_txn_count (int): number of database transactions done
+        db_sched_duration_sec (float): amount of time spent waiting for a
+            database connection
+        db_txn_duration_sec (float): amount of time spent doing database
+            transactions (excluding scheduling time)
+        evt_db_fetch_count (int): number of events requested from the database
+    """
+
+    __slots__ = [
+        "ru_stime", "ru_utime",
+        "db_txn_count", "db_txn_duration_sec", "db_sched_duration_sec",
+        "evt_db_fetch_count",
+    ]
+
+    def __init__(self, copy_from=None):
+        """Create a new ContextResourceUsage
+
+        Args:
+            copy_from (ContextResourceUsage|None): if not None, an object to
+                copy stats from
+        """
+        if copy_from is None:
+            self.reset()
+        else:
+            self.ru_utime = copy_from.ru_utime
+            self.ru_stime = copy_from.ru_stime
+            self.db_txn_count = copy_from.db_txn_count
+
+            self.db_txn_duration_sec = copy_from.db_txn_duration_sec
+            self.db_sched_duration_sec = copy_from.db_sched_duration_sec
+            self.evt_db_fetch_count = copy_from.evt_db_fetch_count
+
+    def copy(self):
+        return ContextResourceUsage(copy_from=self)
+
+    def reset(self):
+        self.ru_stime = 0.
+        self.ru_utime = 0.
+        self.db_txn_count = 0
+
+        self.db_txn_duration_sec = 0
+        self.db_sched_duration_sec = 0
+        self.evt_db_fetch_count = 0
+
+    def __iadd__(self, other):
+        """Add another ContextResourceUsage's stats to this one's.
+
+        Args:
+            other (ContextResourceUsage): the other resource usage object
+        """
+        self.ru_utime += other.ru_utime
+        self.ru_stime += other.ru_stime
+        self.db_txn_count += other.db_txn_count
+        self.db_txn_duration_sec += other.db_txn_duration_sec
+        self.db_sched_duration_sec += other.db_sched_duration_sec
+        self.evt_db_fetch_count += other.evt_db_fetch_count
+        return self
+
+    def __isub__(self, other):
+        self.ru_utime -= other.ru_utime
+        self.ru_stime -= other.ru_stime
+        self.db_txn_count -= other.db_txn_count
+        self.db_txn_duration_sec -= other.db_txn_duration_sec
+        self.db_sched_duration_sec -= other.db_sched_duration_sec
+        self.evt_db_fetch_count -= other.evt_db_fetch_count
+        return self
+
+    def __add__(self, other):
+        res = ContextResourceUsage(copy_from=self)
+        res += other
+        return res
+
+    def __sub__(self, other):
+        res = ContextResourceUsage(copy_from=self)
+        res -= other
+        return res
+
+
 class LoggingContext(object):
     """Additional context for log formatting. Contexts are scoped within a
     "with" block.
@@ -58,9 +142,8 @@ class LoggingContext(object):
     """
 
     __slots__ = [
-        "previous_context", "name", "ru_stime", "ru_utime",
-        "db_txn_count", "db_txn_duration_sec", "db_sched_duration_sec",
-        "evt_db_fetch_count",
+        "previous_context", "name",
+        "resource_usage",
         "usage_start",
         "main_thread", "alive",
         "request", "tag",
@@ -103,18 +186,9 @@ class LoggingContext(object):
     def __init__(self, name=None):
         self.previous_context = LoggingContext.current_context()
         self.name = name
-        self.ru_stime = 0.
-        self.ru_utime = 0.
-        self.db_txn_count = 0
 
-        # sec spent waiting for db txns, excluding scheduling time
-        self.db_txn_duration_sec = 0
-
-        # sec spent waiting for db txns to be scheduled
-        self.db_sched_duration_sec = 0
-
-        # number of events this thread has fetched from the db
-        self.evt_db_fetch_count = 0
+        # track the resources used by this context so far
+        self.resource_usage = ContextResourceUsage()
 
         # If alive has the thread resource usage when the logcontext last
         # became active.
@@ -207,39 +281,42 @@ class LoggingContext(object):
             logger.warning("Stopped logcontext %s on different thread", self)
             return
 
-        # When we stop, let's record the resource used since we started
-        if self.usage_start:
-            usage_end = get_thread_resource_usage()
+        # When we stop, let's record the cpu used since we started
+        if not self.usage_start:
+            logger.warning(
+                "Called stop on logcontext %s without calling start", self,
+            )
+            return
 
-            self.ru_utime += usage_end.ru_utime - self.usage_start.ru_utime
-            self.ru_stime += usage_end.ru_stime - self.usage_start.ru_stime
+        usage_end = get_thread_resource_usage()
 
-            self.usage_start = None
-        else:
-            logger.warning("Called stop on logcontext %s without calling start", self)
+        self.resource_usage.ru_utime += usage_end.ru_utime - self.usage_start.ru_utime
+        self.resource_usage.ru_stime += usage_end.ru_stime - self.usage_start.ru_stime
+
+        self.usage_start = None
 
     def get_resource_usage(self):
-        """Get CPU time used by this logcontext so far.
+        """Get resources used by this logcontext so far.
 
         Returns:
-            tuple[float, float]: The user and system CPU usage in seconds
+            ContextResourceUsage
         """
-        ru_utime = self.ru_utime
-        ru_stime = self.ru_stime
+        res = self.resource_usage
 
         # If we are on the correct thread and we're currently running then we
         # can include resource usage so far.
         is_main_thread = threading.current_thread() is self.main_thread
         if self.alive and self.usage_start and is_main_thread:
+            res = res.copy()
             current = get_thread_resource_usage()
-            ru_utime += current.ru_utime - self.usage_start.ru_utime
-            ru_stime += current.ru_stime - self.usage_start.ru_stime
+            res.ru_utime += current.ru_utime - self.usage_start.ru_utime
+            res.ru_stime += current.ru_stime - self.usage_start.ru_stime
 
-        return ru_utime, ru_stime
+        return res
 
     def add_database_transaction(self, duration_sec):
-        self.db_txn_count += 1
-        self.db_txn_duration_sec += duration_sec
+        self.resource_usage.db_txn_count += 1
+        self.resource_usage.db_txn_duration_sec += duration_sec
 
     def add_database_scheduled(self, sched_sec):
         """Record a use of the database pool
@@ -248,7 +325,7 @@ class LoggingContext(object):
             sched_sec (float): number of seconds it took us to get a
                 connection
         """
-        self.db_sched_duration_sec += sched_sec
+        self.resource_usage.db_sched_duration_sec += sched_sec
 
     def record_event_fetch(self, event_count):
         """Record a number of events being fetched from the db
@@ -256,7 +333,7 @@ class LoggingContext(object):
         Args:
             event_count (int): number of events being fetched
         """
-        self.evt_db_fetch_count += event_count
+        self.resource_usage.evt_db_fetch_count += event_count
 
 
 class LoggingContextFilter(logging.Filter):
