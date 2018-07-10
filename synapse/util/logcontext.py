@@ -137,12 +137,18 @@ class LoggingContext(object):
     """Additional context for log formatting. Contexts are scoped within a
     "with" block.
 
+    If a parent is given when creating a new context, then:
+        - logging fields are copied from the parent to the new context on entry
+        - when the new context exits, the cpu usage stats are copied from the
+          child to the parent
+
     Args:
         name (str): Name for the context for debugging.
+        parent_context (LoggingContext|None): The parent of the new context
     """
 
     __slots__ = [
-        "previous_context", "name",
+        "previous_context", "name", "parent_context",
         "_resource_usage",
         "usage_start",
         "main_thread", "alive",
@@ -183,7 +189,7 @@ class LoggingContext(object):
 
     sentinel = Sentinel()
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, parent_context=None):
         self.previous_context = LoggingContext.current_context()
         self.name = name
 
@@ -198,6 +204,8 @@ class LoggingContext(object):
         self.request = None
         self.tag = ""
         self.alive = True
+
+        self.parent_context = parent_context
 
     def __str__(self):
         return "%s@%x" % (self.name, id(self))
@@ -236,6 +244,10 @@ class LoggingContext(object):
                 self.previous_context, old_context
             )
         self.alive = True
+
+        if self.parent_context is not None:
+            self.parent_context.copy_to(self)
+
         return self
 
     def __exit__(self, type, value, traceback):
@@ -256,6 +268,15 @@ class LoggingContext(object):
                 )
         self.previous_context = None
         self.alive = False
+
+        # if we have a parent, pass our CPU usage stats on
+        if self.parent_context is not None:
+            self.parent_context.ru_utime += self.ru_utime
+            self.parent_context.ru_stime += self.ru_stime
+
+            # reset them in case we get entered again
+            self.ru_utime = 0
+            self.ru_stime = 0
 
     def copy_to(self, record):
         """Copy logging fields from this context to a log record or

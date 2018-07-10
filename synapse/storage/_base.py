@@ -220,7 +220,7 @@ class SQLBaseStore(object):
         self._clock.looping_call(loop, 10000)
 
     def _new_transaction(self, conn, desc, after_callbacks, exception_callbacks,
-                         logging_context, func, *args, **kwargs):
+                         func, *args, **kwargs):
         start = time.time()
         txn_id = self._TXN_ID
 
@@ -284,8 +284,7 @@ class SQLBaseStore(object):
             end = time.time()
             duration = end - start
 
-            if logging_context is not None:
-                logging_context.add_database_transaction(duration)
+            LoggingContext.current_context().add_database_transaction(duration)
 
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
@@ -309,19 +308,15 @@ class SQLBaseStore(object):
         Returns:
             Deferred: The result of func
         """
-        current_context = LoggingContext.current_context()
-
         after_callbacks = []
         exception_callbacks = []
 
-        def inner_func(conn, *args, **kwargs):
-            return self._new_transaction(
-                conn, desc, after_callbacks, exception_callbacks, current_context,
-                func, *args, **kwargs
-            )
-
         try:
-            result = yield self.runWithConnection(inner_func, *args, **kwargs)
+            result = yield self.runWithConnection(
+                self._new_transaction,
+                desc, after_callbacks, exception_callbacks, func,
+                *args, **kwargs
+            )
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
@@ -346,7 +341,10 @@ class SQLBaseStore(object):
         Returns:
             Deferred: The result of func
         """
-        current_context = LoggingContext.current_context()
+        if LoggingContext.current_context() == LoggingContext.sentinel:
+            logger.warn(
+                "Running db txn from sentinel context: metrics will be lost",
+            )
 
         start_time = time.time()
 
@@ -354,13 +352,11 @@ class SQLBaseStore(object):
             with LoggingContext("runWithConnection") as context:
                 sched_duration_sec = time.time() - start_time
                 sql_scheduling_timer.observe(sched_duration_sec)
-                current_context.add_database_scheduled(sched_duration_sec)
+                context.add_database_scheduled(sched_duration_sec)
 
                 if self.database_engine.is_connection_closed(conn):
                     logger.debug("Reconnecting closed database connection")
                     conn.reconnect()
-
-                current_context.copy_to(context)
 
                 return func(conn, *args, **kwargs)
 
