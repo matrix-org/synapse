@@ -140,7 +140,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """
         room_ids = set(room_ids)
 
-        if from_key:
+        if from_key is not None:
+            # Only ask the database about rooms where there have been new
+            # receipts added since `from_key`
             room_ids = yield self._receipts_stream_cache.get_entities_changed(
                 room_ids, from_key
             )
@@ -163,7 +165,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         Returns:
             list: A list of receipts.
         """
-        if from_key:
+        if from_key is not None:
+            # Check the cache first to see if any new receipts have been added
+            # since`from_key`. If not we can no-op.
             if not self._receipts_stream_cache.has_entity_changed(room_id, from_key):
                 defer.succeed([])
 
