@@ -384,7 +384,7 @@ class MessageHandler(BaseHandler):
         users_with_profile = yield self.state.get_current_user_in_room(room_id)
 
         # If this is an AS, double check that they are allowed to see the members.
-        # This can either be because the AS user is in the room or becuase there
+        # This can either be because the AS user is in the room or because there
         # is a user in the room that the AS is "interested in"
         if requester.app_service and user_id not in users_with_profile:
             for uid in users_with_profile:
