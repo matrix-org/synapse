@@ -421,9 +421,17 @@ class RegisterRestServlet(RestServlet):
                     # XXX: a nasty heuristic to turn an email address into
                     # a displayname, as part of register_mxid_from_3pid
                     parts = address.replace('.', ' ').split('@')
+                    org_parts = parts[1].split(' ')
+
+                    if org_parts[0] == "matrix" and org_parts[1] == "org":
+                        org = "Tchap Admin"
+                    elif org_parts[-2] == "gouv":
+                        org = org_parts[-3] or org_parts[-2]
+                    else:
+                        org = org_parts[-2]
+
                     desired_display_name = (
-                        capwords(parts[0]) +
-                        " [" + capwords(parts[1].split(' ')[0]) + "]"
+                        capwords(parts[0]) + " [" + capwords(org) + "]"
                     )
                 elif (
                     self.hs.config.register_mxid_from_3pid == 'msisdn' and
