@@ -271,12 +271,10 @@ class LoggingContext(object):
 
         # if we have a parent, pass our CPU usage stats on
         if self.parent_context is not None:
-            self.parent_context.ru_utime += self.ru_utime
-            self.parent_context.ru_stime += self.ru_stime
+            self.parent_context._resource_usage += self._resource_usage
 
             # reset them in case we get entered again
-            self.ru_utime = 0
-            self.ru_stime = 0
+            self._resource_usage.reset()
 
     def copy_to(self, record):
         """Copy logging fields from this context to a log record or
