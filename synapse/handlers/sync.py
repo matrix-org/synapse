@@ -145,7 +145,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
     "to_device",  # List of direct messages for the device.
-    "device_lists",  # List of user_ids whose devices have chanegd
+    "device_lists",  # List of user_ids whose devices have changed
     "device_one_time_keys_count",  # Dict of algorithm to count for one time keys
                                    # for this device
     "groups",
@@ -613,7 +613,7 @@ class SyncHandler(object):
         res = yield self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
         )
-        newly_joined_rooms, newly_joined_users, _, _ = res
+        newly_joined_rooms, newly_joined_or_invited_users, _, _ = res
         _, _, newly_left_rooms, newly_left_users = res
 
         block_all_presence_data = (
@@ -622,7 +622,7 @@ class SyncHandler(object):
         )
         if not block_all_presence_data:
             yield self._generate_sync_entry_for_presence(
-                sync_result_builder, newly_joined_rooms, newly_joined_users
+                sync_result_builder, newly_joined_rooms, newly_joined_or_invited_users
             )
 
         yield self._generate_sync_entry_for_to_device(sync_result_builder)
@@ -630,7 +630,7 @@ class SyncHandler(object):
         device_lists = yield self._generate_sync_entry_for_device_list(
             sync_result_builder,
             newly_joined_rooms=newly_joined_rooms,
-            newly_joined_users=newly_joined_users,
+            newly_joined_or_invited_users=newly_joined_or_invited_users,
             newly_left_rooms=newly_left_rooms,
             newly_left_users=newly_left_users,
         )
@@ -706,7 +706,8 @@ class SyncHandler(object):
     @measure_func("_generate_sync_entry_for_device_list")
     @defer.inlineCallbacks
     def _generate_sync_entry_for_device_list(self, sync_result_builder,
-                                             newly_joined_rooms, newly_joined_users,
+                                             newly_joined_rooms,
+                                             newly_joined_or_invited_users,
                                              newly_left_rooms, newly_left_users):
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
@@ -720,7 +721,7 @@ class SyncHandler(object):
             # share a room with?
             for room_id in newly_joined_rooms:
                 joined_users = yield self.state.get_current_user_in_room(room_id)
-                newly_joined_users.update(joined_users)
+                newly_joined_or_invited_users.update(joined_users)
 
             for room_id in newly_left_rooms:
                 left_users = yield self.state.get_current_user_in_room(room_id)
@@ -728,7 +729,7 @@ class SyncHandler(object):
 
             # TODO: Check that these users are actually new, i.e. either they
             # weren't in the previous sync *or* they left and rejoined.
-            changed.update(newly_joined_users)
+            changed.update(newly_joined_or_invited_users)
 
             if not changed and not newly_left_users:
                 defer.returnValue(DeviceLists(
@@ -846,7 +847,7 @@ class SyncHandler(object):
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_presence(self, sync_result_builder, newly_joined_rooms,
-                                          newly_joined_users):
+                                          newly_joined_or_invited_users):
         """Generates the presence portion of the sync response. Populates the
         `sync_result_builder` with the result.
 
@@ -854,8 +855,9 @@ class SyncHandler(object):
             sync_result_builder(SyncResultBuilder)
             newly_joined_rooms(list): List of rooms that the user has joined
                 since the last sync (or empty if an initial sync)
-            newly_joined_users(list): List of users that have joined rooms
-                since the last sync (or empty if an initial sync)
+            newly_joined_or_invited_users(list): List of users that have joined
+                or been invited to rooms since the last sync (or empty if an initial
+                sync)
         """
         now_token = sync_result_builder.now_token
         sync_config = sync_result_builder.sync_config
@@ -881,7 +883,7 @@ class SyncHandler(object):
             "presence_key", presence_key
         )
 
-        extra_users_ids = set(newly_joined_users)
+        extra_users_ids = set(newly_joined_or_invited_users)
         for room_id in newly_joined_rooms:
             users = yield self.state.get_current_user_in_room(room_id)
             extra_users_ids.update(users)
@@ -913,7 +915,8 @@ class SyncHandler(object):
 
         Returns:
             Deferred(tuple): Returns a 4-tuple of
-            `(newly_joined_rooms, newly_joined_users, newly_left_rooms, newly_left_users)`
+            `(newly_joined_rooms, newly_joined_or_invited_users,
+            newly_left_rooms, newly_left_users)`
         """
         user_id = sync_result_builder.sync_config.user.to_string()
         block_all_room_ephemeral = (
@@ -984,8 +987,8 @@ class SyncHandler(object):
 
         sync_result_builder.invited.extend(invited)
 
-        # Now we want to get any newly joined users
-        newly_joined_users = set()
+        # Now we want to get any newly joined or invited users
+        newly_joined_or_invited_users = set()
         newly_left_users = set()
         if since_token:
             for joined_sync in sync_result_builder.joined:
@@ -994,19 +997,22 @@ class SyncHandler(object):
                 )
                 for event in it:
                     if event.type == EventTypes.Member:
-                        if event.membership == Membership.JOIN:
-                            newly_joined_users.add(event.state_key)
+                        if (
+                            event.membership == Membership.JOIN or
+                            event.membership == Membership.INVITE
+                        ):
+                            newly_joined_or_invited_users.add(event.state_key)
                         else:
                             prev_content = event.unsigned.get("prev_content", {})
                             prev_membership = prev_content.get("membership", None)
                             if prev_membership == Membership.JOIN:
                                 newly_left_users.add(event.state_key)
 
-        newly_left_users -= newly_joined_users
+        newly_left_users -= newly_joined_or_invited_users
 
         defer.returnValue((
             newly_joined_rooms,
-            newly_joined_users,
+            newly_joined_or_invited_users,
             newly_left_rooms,
             newly_left_users,
         ))
@@ -1051,7 +1057,7 @@ class SyncHandler(object):
             where:
                 room_entries is a list [RoomSyncResultBuilder]
                 invited_rooms is a list [InvitedSyncResult]
-                newly_joined rooms is a list[str] of room ids
+                newly_joined_rooms is a list[str] of room ids
                 newly_left_rooms is a list[str] of room ids
         """
         user_id = sync_result_builder.sync_config.user.to_string()
@@ -1086,7 +1092,7 @@ class SyncHandler(object):
             if room_id in sync_result_builder.joined_room_ids and non_joins:
                 # Always include if the user (re)joined the room, especially
                 # important so that device list changes are calculated correctly.
-                # If there are non join member events, but we are still in the room,
+                # If there are non-join member events, but we are still in the room,
                 # then the user must have left and joined
                 newly_joined_rooms.append(room_id)
 
