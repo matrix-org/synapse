@@ -20,7 +20,7 @@ from twisted.web.server import Request, Site
 
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics
-from synapse.util.logcontext import LoggingContext
+from synapse.util.logcontext import LoggingContext, ContextResourceUsage
 
 logger = logging.getLogger(__name__)
 
@@ -95,15 +95,9 @@ class SynapseRequest(Request):
     def _finished_processing(self):
         try:
             context = LoggingContext.current_context()
-            ru_utime, ru_stime = context.get_resource_usage()
-            db_txn_count = context.db_txn_count
-            db_txn_duration_sec = context.db_txn_duration_sec
-            db_sched_duration_sec = context.db_sched_duration_sec
-            evt_db_fetch_count = context.evt_db_fetch_count
+            usage = context.get_resource_usage()
         except Exception:
-            ru_utime, ru_stime = (0, 0)
-            db_txn_count, db_txn_duration_sec = (0, 0)
-            evt_db_fetch_count = 0
+            usage = ContextResourceUsage()
 
         end_time = time.time()
 
@@ -130,18 +124,18 @@ class SynapseRequest(Request):
             self.site.site_tag,
             authenticated_entity,
             end_time - self.start_time,
-            ru_utime,
-            ru_stime,
-            db_sched_duration_sec,
-            db_txn_duration_sec,
-            int(db_txn_count),
+            usage.ru_utime,
+            usage.ru_stime,
+            usage.db_sched_duration_sec,
+            usage.db_txn_duration_sec,
+            int(usage.db_txn_count),
             self.sentLength,
             self.code,
             self.method,
             self.get_redacted_uri(),
             self.clientproto,
             user_agent,
-            evt_db_fetch_count,
+            usage.evt_db_fetch_count,
         )
 
         try:
