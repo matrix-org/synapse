@@ -20,7 +20,6 @@ from six.moves import http_client
 
 from twisted.internet import defer
 
-from synapse.api.auth import has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
@@ -130,7 +129,7 @@ class PasswordRestServlet(RestServlet):
         #
         # In the second case, we require a password to confirm their identity.
 
-        if has_access_token(request):
+        if self.auth.has_access_token(request):
             requester = yield self.auth.get_user_by_req(request)
             params = yield self.auth_handler.validate_user_via_ui_auth(
                 requester, body, self.hs.get_ip_from_request(request),
