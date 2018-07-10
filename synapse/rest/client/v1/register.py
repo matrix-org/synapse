@@ -23,7 +23,6 @@ from six import string_types
 from twisted.internet import defer
 
 import synapse.util.stringutils as stringutils
-from synapse.api.auth import get_access_token_from_request
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
