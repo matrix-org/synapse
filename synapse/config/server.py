@@ -169,6 +169,12 @@ class ServerConfig(Config):
                 ]
             })
 
+        self.limit_mau = config.get("limit_mau", False)
+        if self.limit_mau:
+            self.default_max_mau = config.get(
+                "default_max_mau", 0,
+            )
+
     def default_config(self, server_name, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
