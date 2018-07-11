@@ -89,6 +89,7 @@ class ServerMetricsServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(ServerMetricsServlet, self).__init__(hs)
         self.max_mau = hs.config.default_max_mau
+        self.limit_mau = hs.config.limit_mau
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -102,6 +103,7 @@ class ServerMetricsServlet(ClientV1RestServlet):
         mau = yield self.store.count_monthly_users()
         max_mau = self.max_mau
         defer.returnValue((200, {
+            'limit_mau_enabled': self.limit_mau,
             'max_mau': max_mau,
             'mau': mau,
         }))
