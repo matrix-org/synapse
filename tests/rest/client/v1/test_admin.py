@@ -89,5 +89,10 @@ class AdminTestCase(unittest.TestCase):
 
         self.assertEquals(200, code)
         self.assertEquals(
-            {"limit_mau_enabled": LIMIT_MAU, "max_mau": MAU_MAX, "mau": MAU_COUNT}, response
+            {
+                "limit_mau_enabled": LIMIT_MAU,
+                "max_mau": MAU_MAX,
+                "mau": MAU_COUNT
+            },
+            response
         )
