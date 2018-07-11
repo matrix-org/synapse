@@ -83,6 +83,30 @@ class WhoisRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class ServerMetricsServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/server_metrics$")
+
+    def __init__(self, hs):
+        super(ServerMetricsServlet, self).__init__(hs)
+        self.max_mau = hs.config.default_max_mau
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        mau = yield self.store.count_monthly_users()
+        max_mau = self.max_mau
+        defer.returnValue((200, {
+            'max_mau': max_mau,
+            'mau': mau,
+        }))
+
+
 class PurgeMediaCacheRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/admin/purge_media_cache")
 
@@ -618,6 +642,7 @@ class SearchUsersRestServlet(ClientV1RestServlet):
 
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
+    ServerMetricsServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)

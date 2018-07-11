@@ -249,22 +249,31 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         Counts the number of users who used this homeserver in the last 24 hours.
         """
-        def _count_users(txn):
-            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24)
+        return self.runInteraction("count_users", self._count_users, 1)
 
-            sql = """
-                SELECT COALESCE(count(*), 0) FROM (
-                    SELECT user_id FROM user_ips
-                    WHERE last_seen > ?
-                    GROUP BY user_id
-                ) u
-            """
+    def count_monthly_users(self):
+        """
+        Counts the number of users who used this homeserver in the last 30 days
+        """
+        return self.runInteraction("count_users", self._count_users, 30)
 
-            txn.execute(sql, (yesterday,))
-            count, = txn.fetchone()
-            return count
+    def _count_users(self, txn, period):
+        """
+        Returns a count of active users over a given period (measured in days)
+        """
+        time_to_track_from = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * period)
 
-        return self.runInteraction("count_users", _count_users)
+        sql = """
+            SELECT COALESCE(count(*), 0) FROM (
+                SELECT user_id FROM user_ips
+                WHERE last_seen > ?
+                GROUP BY user_id
+            ) u
+        """
+
+        txn.execute(sql, (time_to_track_from,))
+        count, = txn.fetchone()
+        return count
 
     def count_r30_users(self):
         """
