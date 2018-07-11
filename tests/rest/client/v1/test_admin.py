@@ -18,7 +18,6 @@ from mock import Mock
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.errors import SynapseError, AuthError
 from synapse.rest.client.v1 import admin
 from tests import unittest
 from ....utils import MockHttpResource, setup_test_homeserver
@@ -73,10 +72,8 @@ class AdminTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_server_metrics(self):
-        mocked_get = self.mock_handler.get_server_metrics
 
         mock_request = Mock(args={'user_id': ID})
-        request = '{"user_id": %s}' % (ID,)
         (code, response) = yield self.mock_resource.trigger(
             "GET", "/admin/server_metrics", None, mock_request
         )
