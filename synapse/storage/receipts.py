@@ -163,7 +163,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 from the start.
 
         Returns:
-            list: A list of receipts.
+            Deferred[list]: A list of receipts.
         """
         if from_key is not None:
             # Check the cache first to see if any new receipts have been added
