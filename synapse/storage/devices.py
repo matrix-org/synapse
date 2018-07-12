@@ -239,7 +239,6 @@ class DeviceStore(SQLBaseStore):
     def update_remote_device_list_cache_entry(self, user_id, device_id, content,
                                               stream_id):
         """Updates a single user's device in the cache.
-           If the content is null, delete the device from the cache.
         """
         return self.runInteraction(
             "update_remote_device_list_cache_entry",
@@ -249,7 +248,7 @@ class DeviceStore(SQLBaseStore):
 
     def _update_remote_device_list_cache_entry_txn(self, txn, user_id, device_id,
                                                    content, stream_id):
-        if content is None:
+        if content.get("deleted"):
             self._simple_delete_txn(
                 txn,
                 table="device_lists_remote_cache",
@@ -409,12 +408,15 @@ class DeviceStore(SQLBaseStore):
 
                 prev_id = stream_id
 
-                key_json = device.get("key_json", None)
-                if key_json:
-                    result["keys"] = json.loads(key_json)
-                device_display_name = device.get("device_display_name", None)
-                if device_display_name:
-                    result["device_display_name"] = device_display_name
+                if device is not None:
+                    key_json = device.get("key_json", None)
+                    if key_json:
+                        result["keys"] = json.loads(key_json)
+                    device_display_name = device.get("device_display_name", None)
+                    if device_display_name:
+                        result["device_display_name"] = device_display_name
+                else:
+                    result["deleted"] = True
 
                 results.append(result)
 
