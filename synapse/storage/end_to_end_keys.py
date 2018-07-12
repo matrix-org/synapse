@@ -64,12 +64,17 @@ class EndToEndKeyStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_e2e_device_keys(self, query_list, include_all_devices=False):
+    def get_e2e_device_keys(
+        self, query_list, include_all_devices=False,
+        include_deleted_devices=False
+    ):
         """Fetch a list of device keys.
         Args:
             query_list(list): List of pairs of user_ids and device_ids.
             include_all_devices (bool): whether to include entries for devices
                 that don't have device keys
+            include_deleted_devices (bool): whether to include null entries for
+                devices which no longer exist (but where in the query_list)
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             dict containing "key_json", "device_display_name".
@@ -82,9 +87,18 @@ class EndToEndKeyStore(SQLBaseStore):
             query_list, include_all_devices,
         )
 
+        if include_deleted_devices:
+            deleted_devices = set(query_list)
+
         for user_id, device_keys in iteritems(results):
             for device_id, device_info in iteritems(device_keys):
+                if include_deleted_devices:
+                    deleted_devices -= (user_id, device_id)
                 device_info["keys"] = json.loads(device_info.pop("key_json"))
+
+        if include_deleted_devices:
+            for user_id, device_id in deleted_devices:
+                results.setdefault(user_id, {})[device_id] = None
 
         defer.returnValue(results)
 
