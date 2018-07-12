@@ -13,30 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import email.mime.multipart
+import email.utils
+import logging
+import time
+import urllib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+import bleach
+import jinja2
+
 from twisted.internet import defer
 from twisted.mail.smtp import sendmail
 
-import email.utils
-import email.mime.multipart
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-from synapse.util.async import concurrently_execute
+from synapse.api.constants import EventTypes
+from synapse.api.errors import StoreError
 from synapse.push.presentable_names import (
-    calculate_room_name, name_from_member_event, descriptor_from_member_events
+    calculate_room_name,
+    descriptor_from_member_events,
+    name_from_member_event,
 )
 from synapse.types import UserID
-from synapse.api.errors import StoreError
-from synapse.api.constants import EventTypes
+from synapse.util.async import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
-import jinja2
-import bleach
-
-import time
-import urllib
-
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -229,7 +230,8 @@ class Mailer(object):
                 if room_vars['notifs'] and 'messages' in room_vars['notifs'][-1]:
                     prev_messages = room_vars['notifs'][-1]['messages']
                     for message in notifvars['messages']:
-                        pm = filter(lambda pm: pm['id'] == message['id'], prev_messages)
+                        pm = list(filter(lambda pm: pm['id'] == message['id'],
+                                         prev_messages))
                         if pm:
                             if not message["is_historical"]:
                                 pm[0]["is_historical"] = False

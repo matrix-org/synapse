@@ -14,25 +14,25 @@
 # limitations under the License.
 
 
+import hashlib
+import logging
+from collections import namedtuple
+
+from six import iteritems, itervalues
+
+from frozendict import frozendict
+
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.util.logutils import log_function
-from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.metrics import Measure
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
 from synapse.util.async import Linearizer
 from synapse.util.caches import CACHE_SIZE_FACTOR
-
-from collections import namedtuple
-from frozendict import frozendict
-
-import logging
-import hashlib
-
-from six import iteritems, itervalues
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,8 @@ class StateHandler(object):
             defer.returnValue(event)
             return
 
-        state_map = yield self.store.get_events(state.values(), get_prev_content=False)
+        state_map = yield self.store.get_events(list(state.values()),
+                                                get_prev_content=False)
         state = {
             key: state_map[e_id] for key, e_id in iteritems(state) if e_id in state_map
         }
@@ -693,10 +694,10 @@ def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_ma
     return auth_events
 
 
-def _resolve_with_state(unconflicted_state_ids, conflicted_state_ds, auth_event_ids,
+def _resolve_with_state(unconflicted_state_ids, conflicted_state_ids, auth_event_ids,
                         state_map):
     conflicted_state = {}
-    for key, event_ids in iteritems(conflicted_state_ds):
+    for key, event_ids in iteritems(conflicted_state_ids):
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
         if len(events) > 1:
             conflicted_state[key] = events

@@ -13,39 +13,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from OpenSSL import SSL
-from OpenSSL.SSL import VERIFY_NONE
-
-from synapse.api.errors import (
-    CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
-)
-from synapse.http import cancelled_to_request_timed_out_error
-from synapse.util.async import add_timeout_to_deferred
-from synapse.util.caches import CACHE_SIZE_FACTOR
-from synapse.util.logcontext import make_deferred_yieldable
-from synapse.http.endpoint import SpiderEndpoint
-
-from canonicaljson import encode_canonical_json
-
-from twisted.internet import defer, reactor, ssl, protocol, task
-from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
-from twisted.web.client import (
-    BrowserLikeRedirectAgent, ContentDecoderAgent, GzipDecoder, Agent,
-    readBody, PartialDownloadError,
-    HTTPConnectionPool,
-)
-from twisted.web.client import FileBodyProducer as TwistedFileBodyProducer
-from twisted.web.http import PotentialDataLoss
-from twisted.web.http_headers import Headers
-from twisted.web._newclient import ResponseDone
-
-from six import StringIO
-
-from prometheus_client import Counter
-import simplejson as json
 import logging
 import urllib
 
+from six import StringIO
+
+from canonicaljson import encode_canonical_json, json
+from prometheus_client import Counter
+
+from OpenSSL import SSL
+from OpenSSL.SSL import VERIFY_NONE
+from twisted.internet import defer, protocol, reactor, ssl, task
+from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
+from twisted.web._newclient import ResponseDone
+from twisted.web.client import Agent, BrowserLikeRedirectAgent, ContentDecoderAgent
+from twisted.web.client import FileBodyProducer as TwistedFileBodyProducer
+from twisted.web.client import (
+    GzipDecoder,
+    HTTPConnectionPool,
+    PartialDownloadError,
+    readBody,
+)
+from twisted.web.http import PotentialDataLoss
+from twisted.web.http_headers import Headers
+
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    MatrixCodeMessageException,
+    SynapseError,
+)
+from synapse.http import cancelled_to_request_timed_out_error, redact_uri
+from synapse.http.endpoint import SpiderEndpoint
+from synapse.util.async import add_timeout_to_deferred
+from synapse.util.caches import CACHE_SIZE_FACTOR
+from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 
@@ -90,31 +92,32 @@ class SimpleHttpClient(object):
         # counters to it
         outgoing_requests_counter.labels(method).inc()
 
-        logger.info("Sending request %s %s", method, uri)
+        # log request but strip `access_token` (AS requests for example include this)
+        logger.info("Sending request %s %s", method, redact_uri(uri))
 
         try:
             request_deferred = self.agent.request(
                 method, uri, *args, **kwargs
             )
             add_timeout_to_deferred(
-                request_deferred,
-                60, cancelled_to_request_timed_out_error,
+                request_deferred, 60, self.hs.get_reactor(),
+                cancelled_to_request_timed_out_error,
             )
             response = yield make_deferred_yieldable(request_deferred)
 
             incoming_responses_counter.labels(method, response.code).inc()
             logger.info(
                 "Received response to  %s %s: %s",
-                method, uri, response.code
+                method, redact_uri(uri), response.code
             )
             defer.returnValue(response)
         except Exception as e:
             incoming_responses_counter.labels(method, "ERR").inc()
             logger.info(
                 "Error sending request to  %s %s: %s %s",
-                method, uri, type(e).__name__, e.message
+                method, redact_uri(uri), type(e).__name__, e.message
             )
-            raise e
+            raise
 
     @defer.inlineCallbacks
     def post_urlencoded_get_json(self, uri, args={}, headers=None):

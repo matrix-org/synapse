@@ -15,9 +15,10 @@
 
 import hashlib
 from inspect import getcallargs
-from six.moves.urllib import parse as urlparse
 
 from mock import Mock, patch
+from six.moves.urllib import parse as urlparse
+
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import CodeMessageException, cs_error
@@ -37,11 +38,15 @@ USE_POSTGRES_FOR_TESTS = False
 
 
 @defer.inlineCallbacks
-def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
+def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None,
+                          **kargs):
     """Setup a homeserver suitable for running tests against. Keyword arguments
     are passed to the Homeserver constructor. If no datastore is supplied a
     datastore backed by an in-memory sqlite db will be given to the HS.
     """
+    if reactor is None:
+        from twisted.internet import reactor
+
     if config is None:
         config = Mock()
         config.signing_key = [MockKey()]
@@ -110,6 +115,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, **kargs):
             database_engine=db_engine,
             room_list_handler=object(),
             tls_server_context_factory=Mock(),
+            reactor=reactor,
             **kargs
         )
         db_conn = hs.get_db_conn()

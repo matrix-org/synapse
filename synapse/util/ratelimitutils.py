@@ -13,20 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.api.errors import LimitExceededError
-
-from synapse.util.async import sleep
-from synapse.util.logcontext import (
-    run_in_background, make_deferred_yieldable,
-    PreserveLoggingContext,
-)
-
 import collections
 import contextlib
 import logging
 
+from twisted.internet import defer
+
+from synapse.api.errors import LimitExceededError
+from synapse.util.logcontext import (
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +151,7 @@ class _PerHostRatelimiter(object):
                 "Ratelimit [%s]: sleeping req",
                 id(request_id),
             )
-            ret_defer = run_in_background(sleep, self.sleep_msec / 1000.0)
+            ret_defer = run_in_background(self.clock.sleep, self.sleep_msec / 1000.0)
 
             self.sleeping_requests.add(request_id)
 

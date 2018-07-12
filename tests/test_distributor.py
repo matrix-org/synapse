@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import unittest
-from twisted.internet import defer
-
 from mock import Mock, patch
 
+from twisted.internet import defer
+
 from synapse.util.distributor import Distributor
-from synapse.util.async import run_on_reactor
+
+from . import unittest
 
 
 class DistributorTestCase(unittest.TestCase):
@@ -95,7 +95,6 @@ class DistributorTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def observer():
-            yield run_on_reactor()
             raise MyException("Oopsie")
 
         self.dist.observe("whail", observer)

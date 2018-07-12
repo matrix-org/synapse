@@ -12,16 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.api.constants import EventTypes
-from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.types import GroupID, get_domain_from_id
-
-from twisted.internet import defer
-
 import logging
 import re
 
 from six import string_types
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes
+from synapse.types import GroupID, get_domain_from_id
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,8 @@ class ApplicationService(object):
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
     def __init__(self, token, hostname, url=None, namespaces=None, hs_token=None,
-                 sender=None, id=None, protocols=None, rate_limited=True):
+                 sender=None, id=None, protocols=None, rate_limited=True,
+                 ip_range_whitelist=None):
         self.token = token
         self.url = url
         self.hs_token = hs_token
@@ -93,6 +94,7 @@ class ApplicationService(object):
         self.server_name = hostname
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
+        self.ip_range_whitelist = ip_range_whitelist
 
         if "|" in self.id:
             raise Exception("application service ID cannot contain '|' character")
@@ -292,4 +294,8 @@ class ApplicationService(object):
         return self.rate_limited
 
     def __str__(self):
-        return "ApplicationService: %s" % (self.__dict__,)
+        # copy dictionary and redact token fields so they don't get logged
+        dict_copy = self.__dict__.copy()
+        dict_copy["token"] = "<redacted>"
+        dict_copy["hs_token"] = "<redacted>"
+        return "ApplicationService: %s" % (dict_copy,)

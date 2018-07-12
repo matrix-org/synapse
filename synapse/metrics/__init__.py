@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import functools
-import time
 import gc
+import logging
 import os
 import platform
-import attr
+import time
 
-from prometheus_client import Gauge, Histogram, Counter
-from prometheus_client.core import GaugeMetricFamily, REGISTRY
+import attr
+from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client.core import REGISTRY, GaugeMetricFamily
 
 from twisted.internet import reactor
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,8 @@ HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 class RegistryProxy(object):
 
-    def collect(self):
+    @staticmethod
+    def collect():
         for metric in REGISTRY.collect():
             if not metric.name.startswith("__"):
                 yield metric
@@ -59,10 +59,13 @@ class LaterGauge(object):
 
         try:
             calls = self.caller()
-        except Exception as e:
-            print(e)
-            logger.err()
+        except Exception:
+            logger.exception(
+                "Exception running callback for LaterGauge(%s)",
+                self.name,
+            )
             yield g
+            return
 
         if isinstance(calls, dict):
             for k, v in calls.items():
@@ -136,14 +139,15 @@ gc_time = Histogram(
 class GCCounts(object):
 
     def collect(self):
-        cm = GaugeMetricFamily("python_gc_counts", "GC cycle counts", labels=["gen"])
+        cm = GaugeMetricFamily("python_gc_counts", "GC object counts", labels=["gen"])
         for n, m in enumerate(gc.get_count()):
             cm.add_metric([str(n)], m)
 
         yield cm
 
 
-REGISTRY.register(GCCounts())
+if not running_on_pypy:
+    REGISTRY.register(GCCounts())
 
 #
 # Twisted reactor metrics
@@ -186,6 +190,22 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
 
+last_ticked = time.time()
+
+
+class ReactorLastSeenMetric(object):
+
+    def collect(self):
+        cm = GaugeMetricFamily(
+            "python_twisted_reactor_last_seen",
+            "Seconds since the Twisted reactor was last seen",
+        )
+        cm.add_metric([], time.time() - last_ticked)
+        yield cm
+
+
+REGISTRY.register(ReactorLastSeenMetric())
+
 
 def runUntilCurrentTimer(func):
 
@@ -217,6 +237,11 @@ def runUntilCurrentTimer(func):
         # reactor.
         tick_time.observe(end - start)
         pending_calls_metric.observe(num_pending)
+
+        # Update the time we last ticked, for the metric to test whether
+        # Synapse's reactor has frozen
+        global last_ticked
+        last_ticked = end
 
         if running_on_pypy:
             return ret

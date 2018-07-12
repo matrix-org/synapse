@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from pydenticon import Generator
+
 from twisted.web.resource import Resource
 
 FOREGROUND = [

@@ -14,23 +14,22 @@
 # limitations under the License.
 
 """This module contains REST servlets to do with registration: /register"""
+import hmac
+import logging
+from hashlib import sha1
+
+from six import string_types
+
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.api.constants import LoginType
-from synapse.api.auth import get_access_token_from_request
-from .base import ClientV1RestServlet, client_path_patterns
 import synapse.util.stringutils as stringutils
+from synapse.api.auth import get_access_token_from_request
+from synapse.api.constants import LoginType
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import create_requester
 
-from synapse.util.async import run_on_reactor
-
-from hashlib import sha1
-import hmac
-import logging
-
-from six import string_types
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +271,6 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_password(self, request, register_json, session):
-        yield run_on_reactor()
         if (self.hs.config.enable_registration_captcha and
                 not session[LoginType.RECAPTCHA]):
             # captcha should've been done by this stage!
@@ -333,8 +331,6 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_shared_secret(self, request, register_json, session):
-        yield run_on_reactor()
-
         if not isinstance(register_json.get("mac", None), string_types):
             raise SynapseError(400, "Expected mac.")
         if not isinstance(register_json.get("user", None), string_types):
@@ -423,8 +419,6 @@ class CreateUserRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_create(self, requester, user_json):
-        yield run_on_reactor()
-
         if "localpart" not in user_json:
             raise SynapseError(400, "Expected 'localpart' key.")
 

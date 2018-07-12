@@ -23,31 +23,29 @@ import re
 import shutil
 import sys
 import traceback
-import simplejson as json
 
-from six.moves import urllib_parse as urlparse
 from six import string_types
+from six.moves import urllib_parse as urlparse
 
-from twisted.web.server import NOT_DONE_YET
+from canonicaljson import json
+
 from twisted.internet import defer
 from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 
-from ._base import FileInfo
-
-from synapse.api.errors import (
-    SynapseError, Codes,
-)
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
-from synapse.util.stringutils import random_string
-from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    respond_with_json_bytes,
     respond_with_json,
+    respond_with_json_bytes,
     wrap_json_request_handler,
 )
 from synapse.util.async import ObservableDeferred
-from synapse.util.stringutils import is_ascii
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.util.stringutils import is_ascii, random_string
+
+from ._base import FileInfo
 
 logger = logging.getLogger(__name__)
 

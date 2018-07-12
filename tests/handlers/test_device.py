@@ -17,8 +17,8 @@ from twisted.internet import defer
 
 import synapse.api.errors
 import synapse.handlers.device
-
 import synapse.storage
+
 from tests import unittest, utils
 
 user1 = "@boris:aaa"

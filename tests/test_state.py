@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-from twisted.internet import defer
-
-from synapse.events import FrozenEvent
-from synapse.api.auth import Auth
-from synapse.api.constants import EventTypes, Membership
-from synapse.state import StateHandler, StateResolutionHandler
-
-from .utils import MockClock
-
 from mock import Mock
 
+from twisted.internet import defer
+
+from synapse.api.auth import Auth
+from synapse.api.constants import EventTypes, Membership
+from synapse.events import FrozenEvent
+from synapse.state import StateHandler, StateResolutionHandler
+
+from tests import unittest
+
+from .utils import MockClock
 
 _next_event_id = 1000
 
@@ -606,6 +606,14 @@ class StateTestCase(unittest.TestCase):
             }
         )
 
+        power_levels = create_event(
+            type=EventTypes.PowerLevels, state_key="",
+            content={"users": {
+                "@foo:bar": "100",
+                "@user_id:example.com": "100",
+            }}
+        )
+
         creation = create_event(
             type=EventTypes.Create, state_key="",
             content={"creator": "@foo:bar"}
@@ -613,12 +621,14 @@ class StateTestCase(unittest.TestCase):
 
         old_state_1 = [
             creation,
+            power_levels,
             member_event,
             create_event(type="test1", state_key="1", depth=1),
         ]
 
         old_state_2 = [
             creation,
+            power_levels,
             member_event,
             create_event(type="test1", state_key="1", depth=2),
         ]
@@ -633,7 +643,7 @@ class StateTestCase(unittest.TestCase):
         )
 
         self.assertEqual(
-            old_state_2[2].event_id, context.current_state_ids[("test1", "1")]
+            old_state_2[3].event_id, context.current_state_ids[("test1", "1")]
         )
 
         # Reverse the depth to make sure we are actually using the depths
@@ -641,12 +651,14 @@ class StateTestCase(unittest.TestCase):
 
         old_state_1 = [
             creation,
+            power_levels,
             member_event,
             create_event(type="test1", state_key="1", depth=2),
         ]
 
         old_state_2 = [
             creation,
+            power_levels,
             member_event,
             create_event(type="test1", state_key="1", depth=1),
         ]
@@ -659,7 +671,7 @@ class StateTestCase(unittest.TestCase):
         )
 
         self.assertEqual(
-            old_state_1[2].event_id, context.current_state_ids[("test1", "1")]
+            old_state_1[3].event_id, context.current_state_ids[("test1", "1")]
         )
 
     def _get_context(self, event, prev_event_id_1, old_state_1, prev_event_id_2,

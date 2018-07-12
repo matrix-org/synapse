@@ -13,20 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from six import string_types
 from six.moves import http_client
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request,
+    RestServlet,
     assert_params_in_request,
+    parse_json_object_from_request,
 )
+
 from ._base import client_v2_patterns
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 

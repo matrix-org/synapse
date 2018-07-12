@@ -22,27 +22,26 @@ The methods that define policy are:
     - should_notify
 """
 
-from twisted.internet import defer, reactor
+import logging
 from contextlib import contextmanager
 
-from six import itervalues, iteritems
+from six import iteritems, itervalues
 
-from synapse.api.errors import SynapseError
+from prometheus_client import Counter
+
+from twisted.internet import defer
+
 from synapse.api.constants import PresenceState
+from synapse.api.errors import SynapseError
+from synapse.metrics import LaterGauge
 from synapse.storage.presence import UserPresenceState
-
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.types import UserID, get_domain_from_id
 from synapse.util.async import Linearizer
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.logcontext import run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
-from synapse.types import UserID, get_domain_from_id
-from synapse.metrics import LaterGauge
-
-import logging
-
-from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +178,7 @@ class PresenceHandler(object):
         # have not yet been persisted
         self.unpersisted_users_changes = set()
 
-        reactor.addSystemEventTrigger("before", "shutdown", self._on_shutdown)
+        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self._on_shutdown)
 
         self.serial_to_user = {}
         self._next_serial = 1
@@ -325,7 +324,7 @@ class PresenceHandler(object):
 
             if to_notify:
                 notified_presence_counter.inc(len(to_notify))
-                yield self._persist_and_notify(to_notify.values())
+                yield self._persist_and_notify(list(to_notify.values()))
 
             self.unpersisted_users_changes |= set(s.user_id for s in new_states)
             self.unpersisted_users_changes -= set(to_notify.keys())
@@ -687,7 +686,7 @@ class PresenceHandler(object):
         """
 
         updates = yield self.current_state_for_users(target_user_ids)
-        updates = updates.values()
+        updates = list(updates.values())
 
         for user_id in set(target_user_ids) - set(u.user_id for u in updates):
             updates.append(UserPresenceState.default(user_id))
@@ -753,11 +752,11 @@ class PresenceHandler(object):
             self._push_to_remotes([state])
         else:
             user_ids = yield self.store.get_users_in_room(room_id)
-            user_ids = filter(self.is_mine_id, user_ids)
+            user_ids = list(filter(self.is_mine_id, user_ids))
 
             states = yield self.current_state_for_users(user_ids)
 
-            self._push_to_remotes(states.values())
+            self._push_to_remotes(list(states.values()))
 
     @defer.inlineCallbacks
     def get_presence_list(self, observer_user, accepted=None):
@@ -1051,7 +1050,7 @@ class PresenceEventSource(object):
             updates = yield presence.current_state_for_users(user_ids_changed)
 
         if include_offline:
-            defer.returnValue((updates.values(), max_token))
+            defer.returnValue((list(updates.values()), max_token))
         else:
             defer.returnValue(([
                 s for s in itervalues(updates)
@@ -1112,7 +1111,7 @@ def handle_timeouts(user_states, is_mine_fn, syncing_user_ids, now):
         if new_state:
             changes[state.user_id] = new_state
 
-    return changes.values()
+    return list(changes.values())
 
 
 def handle_timeout(state, is_mine, syncing_user_ids, now):

@@ -15,15 +15,14 @@
 
 import logging
 
-from twisted.internet import defer, reactor
+from six import iteritems
 
-from ._base import Cache
-from . import background_updates
+from twisted.internet import defer
 
 from synapse.util.caches import CACHE_SIZE_FACTOR
 
-from six import iteritems
-
+from . import background_updates
+from ._base import Cache
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +69,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self._client_ip_looper = self._clock.looping_call(
             self._update_client_ips_batch, 5 * 1000
         )
-        reactor.addSystemEventTrigger("before", "shutdown", self._update_client_ips_batch)
+        self.hs.get_reactor().addSystemEventTrigger(
+            "before", "shutdown", self._update_client_ips_batch
+        )
 
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
                          now=None):

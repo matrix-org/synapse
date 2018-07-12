@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
+from functools import wraps
 
 from prometheus_client import Counter
+
+from twisted.internet import defer
+
 from synapse.util.logcontext import LoggingContext
-
-from functools import wraps
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +60,9 @@ def measure_func(name):
 
 class Measure(object):
     __slots__ = [
-        "clock", "name", "start_context", "start", "new_context", "ru_utime",
-        "ru_stime",
-        "db_txn_count", "db_txn_duration_sec", "db_sched_duration_sec",
+        "clock", "name", "start_context", "start",
         "created_context",
+        "start_usage",
     ]
 
     def __init__(self, clock, name):
@@ -81,10 +80,7 @@ class Measure(object):
             self.start_context.__enter__()
             self.created_context = True
 
-        self.ru_utime, self.ru_stime = self.start_context.get_resource_usage()
-        self.db_txn_count = self.start_context.db_txn_count
-        self.db_txn_duration_sec = self.start_context.db_txn_duration_sec
-        self.db_sched_duration_sec = self.start_context.db_sched_duration_sec
+        self.start_usage = self.start_context.get_resource_usage()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if isinstance(exc_type, Exception) or not self.start_context:
@@ -108,15 +104,12 @@ class Measure(object):
             logger.warn("Expected context. (%r)", self.name)
             return
 
-        ru_utime, ru_stime = context.get_resource_usage()
-
-        block_ru_utime.labels(self.name).inc(ru_utime - self.ru_utime)
-        block_ru_stime.labels(self.name).inc(ru_stime - self.ru_stime)
-        block_db_txn_count.labels(self.name).inc(context.db_txn_count - self.db_txn_count)
-        block_db_txn_duration.labels(self.name).inc(
-            context.db_txn_duration_sec - self.db_txn_duration_sec)
-        block_db_sched_duration.labels(self.name).inc(
-            context.db_sched_duration_sec - self.db_sched_duration_sec)
+        usage = context.get_resource_usage() - self.start_usage
+        block_ru_utime.labels(self.name).inc(usage.ru_utime)
+        block_ru_stime.labels(self.name).inc(usage.ru_stime)
+        block_db_txn_count.labels(self.name).inc(usage.db_txn_count)
+        block_db_txn_duration.labels(self.name).inc(usage.db_txn_duration_sec)
+        block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
 
         if self.created_context:
             self.start_context.__exit__(exc_type, exc_val, exc_tb)
