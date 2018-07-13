@@ -1,1 +1,1 @@
-Fix queueing of federation requests
+Fix queued federation requests being processed in the wrong order
