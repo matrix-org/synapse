@@ -1,1 +1,1 @@
-add simple query to send a server notice to all rooms
+add admin api to send a server notice to one or all users

@@ -730,6 +730,68 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class ServerNoticeRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/send_server_notice(/(?P<user_id>[^/]+))?")
+
+    def __init__(self, hs):
+        super(ServerNoticeRestServlet, self).__init__(hs)
+        self._notice_manager = hs.get_server_notices_manager()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, user_id):
+        """
+        This lets you send a server_notice to one or all users
+        Example:
+            http://localhost:8008/_matrix/client/r0/admin/send_server_notice/@user:host
+        JsonBodyToSend:
+            {
+                "event": {'msgtype':'m.text', 'body':'This is my message'}
+            }
+            or simply
+            {
+                'event_body': 'This is my message'
+            }
+        Returns:
+            200 OK.
+
+        """
+        body = parse_json_object_from_request(request, allow_empty_body=False)
+        event = body.get("event", None)
+        if event is None:
+            event_body = body.get("event_body", None)
+            if event_body is None:
+                raise SynapseError(
+                    http_client.BAD_REQUEST,
+                    "Either 'event' or 'event_body' is required",
+                    Codes.BAD_JSON,
+                )
+            event = {
+                "msgtype": "m.text",
+                "body": event_body
+            }
+        else:
+            if event.get("msgtype") is None or event.get("body") is None:
+                raise SynapseError(
+                    http_client.BAD_REQUEST,
+                    "event needs 'msgtype' and 'body' as content",
+                    Codes.BAD_JSON,
+                )
+
+        if user_id is not None:
+            UserID.from_string(user_id)
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        if user_id is not None:
+            yield self._notice_manager.send_notice(user_id, event)
+        else:
+            yield self._notice_manager.send_notice_to_all_users(event)
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
@@ -744,3 +806,4 @@ def register_servlets(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
+    ServerNoticeRestServlet(hs).register(http_server)
