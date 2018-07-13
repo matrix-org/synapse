@@ -438,7 +438,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         as_client_event = "raw" not in request.args
         filter_bytes = parse_string(request, "filter")
         if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes[-1]).decode("UTF-8")
+            filter_json = urlparse.unquote(filter_bytes).decode("UTF-8")
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
