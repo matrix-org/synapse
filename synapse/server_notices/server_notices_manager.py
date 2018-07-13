@@ -46,6 +46,37 @@ class ServerNoticesManager(object):
         return self._config.server_notices_mxid is not None
 
     @defer.inlineCallbacks
+    def send_notice_to_all_users(self, event_content):
+        """Send a notice to all users on the server
+
+        Creates the server notices rooms, if none exists.
+
+        Args:
+            event_content (dict): content of event to send
+
+        Returns:
+            Deferred[None]
+        """
+
+        system_mxid = self._config.server_notices_mxid
+        requester = create_requester(system_mxid)
+
+        user_ids = yield self._store.get_all_local_users()
+        for user_id in user_ids:
+            logger.info("Sending server notice to %s", user_id)
+
+            room_id = yield self.get_notice_room_for_user(user_id)
+            yield self._event_creation_handler.create_and_send_nonmember_event(
+                requester, {
+                    "type": EventTypes.Message,
+                    "room_id": room_id,
+                    "sender": system_mxid,
+                    "content": event_content,
+                },
+                ratelimit=False,
+            )
+
+    @defer.inlineCallbacks
     def send_notice(self, user_id, event_content):
         """Send a notice to the given user
 

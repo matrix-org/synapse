@@ -72,3 +72,12 @@ sent with something like:
 ```
 >>> hs.get_server_notices_manager().send_notice('@user:server.com', {'msgtype':'m.text', 'body':'foo'})
 ```
+
+To send a notice to all users can be send with the following query:
+
+```
+>>> hs.get_server_notices_manager().send_notice_to_all_users({'msgtype':'m.text', 'body':'foo'})
+```
+Note: This query sends a message to all users (with creating a room for each one
+if it was not done before). So please be aware that you will put your server unter heavy
+load if you have a lots of users
