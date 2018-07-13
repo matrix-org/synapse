@@ -23,7 +23,7 @@ from twisted.internet import defer
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
-    assert_params_in_request,
+    assert_params_in_dict,
     parse_json_object_from_request,
 )
 
@@ -50,7 +50,7 @@ class ReportEventRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         body = parse_json_object_from_request(request)
-        assert_params_in_request(body, ("reason", "score"))
+        assert_params_in_dict(body, ("reason", "score"))
 
         if not isinstance(body["reason"], string_types):
             raise SynapseError(
