@@ -557,7 +557,7 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
     """Post request to allow an administrator reset password for a user.
     This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/reset_password/
+            http://localhost:8008/_matrix/client/r0/admin/reset_password/
             @user:to_reset_password?access_token=admin_access_token
         JsonBodyToSend:
             {
@@ -603,7 +603,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
     """Get request to get specific number of users from Synapse.
     This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/users_paginate/
+            http://localhost:8008/_matrix/client/r0/admin/users_paginate/
             @admin:user?access_token=admin_access_token&start=0&limit=10
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
@@ -652,7 +652,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
         """Post request to get specific number of users from Synapse..
         This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/users_paginate/
+            http://localhost:8008/_matrix/client/r0/admin/users_paginate/
             @admin:user?access_token=admin_access_token
         JsonBodyToSend:
             {
@@ -687,7 +687,7 @@ class SearchUsersRestServlet(ClientV1RestServlet):
     search term.
     This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/search_users/
+            http://localhost:8008/_matrix/client/r0/admin/search_users/
             @admin:user?access_token=admin_access_token&term=alice
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
