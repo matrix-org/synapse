@@ -539,7 +539,7 @@ class DeviceListEduUpdater(object):
                 yield self.device_handler.notify_device_update(user_id, device_ids)
             else:
                 # Simply update the single device, since we know that is the only
-                # change (becuase of the single prev_id matching the current cache)
+                # change (because of the single prev_id matching the current cache)
                 for device_id, stream_id, prev_ids, content in pending_updates:
                     yield self.store.update_remote_device_list_cache_entry(
                         user_id, device_id, content, stream_id,

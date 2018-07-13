@@ -673,7 +673,8 @@ class Auth(object):
                 " edit its room list entry"
             )
 
-    def has_access_token(self, request):
+    @staticmethod
+    def has_access_token(request):
         """Checks if the request has an access_token.
 
         Returns:
@@ -683,7 +684,8 @@ class Auth(object):
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
 
-    def get_access_token_from_request(self, request, token_not_found_http_status=401):
+    @staticmethod
+    def get_access_token_from_request(request, token_not_found_http_status=401):
         """Extracts the access_token from the request.
 
         Args:
