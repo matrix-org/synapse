@@ -14,7 +14,10 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
 
     def setUp(self):
         self.clock = MockClock()
-        self.cache = HttpTransactionCache(self.clock)
+        self.hs = Mock()
+        self.hs.get_clock = Mock(return_value=self.clock)
+        self.hs.get_auth = Mock()
+        self.cache = HttpTransactionCache(self.hs)
 
         self.mock_http_response = (200, "GOOD JOB!")
         self.mock_key = "foo"

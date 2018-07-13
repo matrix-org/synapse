@@ -24,7 +24,6 @@ from twisted.internet import defer
 
 import synapse
 import synapse.types
-from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
 from synapse.http.servlet import (
@@ -224,7 +223,7 @@ class RegisterRestServlet(RestServlet):
             desired_username = body['username']
 
         appservice = None
-        if has_access_token(request):
+        if self.auth.has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
 
         # fork off as soon as possible for ASes and shared secret auth which
@@ -242,7 +241,7 @@ class RegisterRestServlet(RestServlet):
             # because the IRC bridges rely on being able to register stupid
             # IDs.
 
-            access_token = get_access_token_from_request(request)
+            access_token = self.auth.get_access_token_from_request(request)
 
             if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
