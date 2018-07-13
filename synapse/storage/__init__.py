@@ -61,6 +61,12 @@ from .util.id_generators import ChainedIdGenerator, IdGenerator, StreamIdGenerat
 
 logger = logging.getLogger(__name__)
 
+# Gauges too expose monthly active user control metrics
+current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
+max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
+limit_usage_by_mau_gauge = Gauge(
+    "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
+)
 
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore,
@@ -217,13 +223,7 @@ class DataStore(RoomMemberStore, RoomStore,
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
 
-        self.current_mau = 0
-        self.current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
-
-        self.max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
-        self.limit_usage_by_mau_gauge = Gauge(
-            "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
-        )
+        self._current_mau = 0
 
         super(DataStore, self).__init__(db_conn, hs)
 
@@ -294,11 +294,12 @@ class DataStore(RoomMemberStore, RoomStore,
 
             txn.execute(sql, (yesterday,))
             count, = txn.fetchone()
-            self.current_mau = count
-            self.current_mau_gauge.set(self.current_mau)
-            self.max_mau_value_gauge.set(self.hs.config.max_mau_value)
-            self.limit_usage_by_mau_gauge.set(self.hs.config.limit_usage_by_mau)
 
+            self._current_mau = count
+            current_mau_gauge.set(self._current_mau)
+            max_mau_value_gauge.set(self.hs.config.max_mau_value)
+            limit_usage_by_mau_gauge.set(self.hs.config.limit_usage_by_mau)
+            logger.info("calling monthly stats")
             return count
         return self.runInteraction("count_users", _count_users)
 
@@ -524,6 +525,18 @@ class DataStore(RoomMemberStore, RoomStore,
             ],
             desc="search_users",
         )
+
+    def get_current_mau(self):
+        """
+        Return current monthly active user figure, intended to be used for code that
+        limits behaviour based MAU usage. If value is 0, explicitly checks
+        the db to guard against race conditions. If the MAU is genuinely 0, then it
+        will be a quick query :)
+        """
+        if self._current_mau > 0:
+            return self._current_mau
+        else:
+            return self.count_monthly_users()
 
 
 def are_all_users_on_domain(txn, database_engine, domain):

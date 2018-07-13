@@ -506,6 +506,7 @@ def run(hs):
     def generate_monthly_active_users():
         hs.get_datastore().count_monthly_users()
 
+    generate_monthly_active_users()
     clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
 
     if hs.config.report_stats:
