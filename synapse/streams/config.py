@@ -78,7 +78,7 @@ class PaginationConfig(object):
 
         limit = parse_integer(request, "limit", default=default_limit)
 
-        if limit < 0:
+        if limit and limit < 0:
             raise SynapseError(400, "Limit must be 0 or above")
 
         try:
