@@ -18,7 +18,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import RoomAlias
 
