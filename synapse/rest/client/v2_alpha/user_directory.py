@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ class UserDirectorySearchRestServlet(RestServlet):
 
         try:
             search_term = body["search_term"]
-        except:
+        except Exception:
             raise SynapseError(400, "`search_term` is required field")
 
         results = yield self.user_directory_handler.search_users(

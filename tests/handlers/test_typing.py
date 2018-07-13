@@ -14,18 +14,23 @@
 # limitations under the License.
 
 
-from tests import unittest
-from twisted.internet import defer
-
-from mock import Mock, call, ANY
 import json
 
-from ..utils import (
-    MockHttpResource, MockClock, DeferredMockCallable, setup_test_homeserver
-)
+from mock import ANY, Mock, call
+
+from twisted.internet import defer
 
 from synapse.api.errors import AuthError
 from synapse.types import UserID
+
+from tests import unittest
+
+from ..utils import (
+    DeferredMockCallable,
+    MockClock,
+    MockHttpResource,
+    setup_test_homeserver,
+)
 
 
 def _expect_edu(destination, edu_type, content, origin="test"):
@@ -58,7 +63,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.mock_federation_resource = MockHttpResource()
 
-        mock_notifier = Mock(spec=["on_new_event"])
+        mock_notifier = Mock()
         self.on_new_event = mock_notifier.on_new_event
 
         self.auth = Mock(spec=[])
@@ -76,9 +81,12 @@ class TypingNotificationsTestCase(unittest.TestCase):
                 "set_received_txn_response",
                 "get_destination_retry_timings",
                 "get_devices_by_remote",
+                # Bits that user_directory needs
+                "get_user_directory_stream_pos",
+                "get_current_state_deltas",
             ]),
             state_handler=self.state_handler,
-            handlers=None,
+            handlers=Mock(),
             notifier=mock_notifier,
             resource_for_client=Mock(),
             resource_for_federation=self.mock_federation_resource,
@@ -121,6 +129,15 @@ class TypingNotificationsTestCase(unittest.TestCase):
         def get_current_user_in_room(room_id):
             return set(str(u) for u in self.room_members)
         self.state_handler.get_current_user_in_room = get_current_user_in_room
+
+        self.datastore.get_user_directory_stream_pos.return_value = (
+            # we deliberately return a non-None stream pos to avoid doing an initial_spam
+            defer.succeed(1)
+        )
+
+        self.datastore.get_current_state_deltas.return_value = (
+            None
+        )
 
         self.auth.check_joined_room = check_joined_room
 

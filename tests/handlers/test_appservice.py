@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 from twisted.internet import defer
-from .. import unittest
-from tests.utils import MockClock
 
 from synapse.handlers.appservice import ApplicationServicesHandler
 
-from mock import Mock
+from tests.utils import MockClock
+
+from .. import unittest
 
 
 class AppServiceHandlerTestCase(unittest.TestCase):
@@ -31,6 +33,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastore = Mock(return_value=self.mock_store)
+        self.mock_store.get_received_ts.return_value = 0
         hs.get_application_service_api = Mock(return_value=self.mock_as_api)
         hs.get_application_service_scheduler = Mock(return_value=self.mock_scheduler)
         hs.get_clock.return_value = MockClock()
@@ -53,7 +56,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             type="m.room.message",
             room_id="!foo:bar"
         )
-        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        self.mock_store.get_new_events_for_appservice.side_effect = [
+            (0, [event]),
+            (0, [])
+        ]
         self.mock_as_api.push = Mock()
         yield self.handler.notify_interested_services(0)
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
@@ -75,7 +81,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        self.mock_store.get_new_events_for_appservice.side_effect = [
+            (0, [event]),
+            (0, [])
+        ]
         yield self.handler.notify_interested_services(0)
         self.mock_as_api.query_user.assert_called_once_with(
             services[0], user_id
@@ -98,7 +107,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         )
         self.mock_as_api.push = Mock()
         self.mock_as_api.query_user = Mock()
-        self.mock_store.get_new_events_for_appservice.return_value = (0, [event])
+        self.mock_store.get_new_events_for_appservice.side_effect = [
+            (0, [event]),
+            (0, [])
+        ]
         yield self.handler.notify_interested_services(0)
         self.assertFalse(
             self.mock_as_api.query_user.called,

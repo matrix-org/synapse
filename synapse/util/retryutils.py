@@ -12,20 +12,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import synapse.util.logcontext
-from twisted.internet import defer
-
-from synapse.api.errors import CodeMessageException
-
 import logging
 import random
 
+from twisted.internet import defer
+
+import synapse.util.logcontext
+from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
 
 
 class NotRetryingDestination(Exception):
     def __init__(self, retry_last_ts, retry_interval, destination):
+        """Raised by the limiter (and federation client) to indicate that we are
+        are deliberately not attempting to contact a given server.
+
+        Args:
+            retry_last_ts (int): the unix ts in milliseconds of our last attempt
+                to contact the server.  0 indicates that the last attempt was
+                successful or that we've never actually attempted to connect.
+            retry_interval (int): the time in milliseconds to wait until the next
+                attempt.
+            destination (str): the domain in question
+        """
+
         msg = "Not retrying server %s." % (destination,)
         super(NotRetryingDestination, self).__init__(msg)
 
@@ -189,10 +200,10 @@ class RetryDestinationLimiter(object):
                 yield self.store.set_destination_retry_timings(
                     self.destination, retry_last_ts, self.retry_interval
                 )
-            except:
+            except Exception:
                 logger.exception(
-                    "Failed to store set_destination_retry_timings",
+                    "Failed to store destination_retry_timings",
                 )
 
         # we deliberately do this in the background.
-        synapse.util.logcontext.preserve_fn(store_retry_timings)()
+        synapse.util.logcontext.run_in_background(store_retry_timings)

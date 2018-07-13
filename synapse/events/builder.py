@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import EventBase, FrozenEvent, _event_dict_property
+import copy
 
 from synapse.types import EventID
-
 from synapse.util.stringutils import random_string
 
-import copy
+from . import EventBase, FrozenEvent, _event_dict_property
 
 
 class EventBuilder(EventBase):
@@ -55,7 +54,7 @@ class EventBuilderFactory(object):
 
         local_part = str(int(self.clock.time())) + i + random_string(5)
 
-        e_id = EventID.create(local_part, self.hostname)
+        e_id = EventID(local_part, self.hostname)
 
         return e_id.to_string()
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,40 +15,40 @@
 # limitations under the License.
 
 import logging
+from collections import namedtuple
+
+from six import iteritems, itervalues
+
+from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from .push_rule_evaluator import PushRuleEvaluatorForEvent
-
 from synapse.api.constants import EventTypes, Membership
-from synapse.metrics import get_metrics_for
-from synapse.util.caches import metrics as cache_metrics
-from synapse.util.caches.descriptors import cached
+from synapse.event_auth import get_user_power_level
+from synapse.state import POWER_KEY
 from synapse.util.async import Linearizer
+from synapse.util.caches import register_cache
+from synapse.util.caches.descriptors import cached
 
-from collections import namedtuple
-
+from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 logger = logging.getLogger(__name__)
 
 
 rules_by_room = {}
 
-push_metrics = get_metrics_for(__name__)
 
-push_rules_invalidation_counter = push_metrics.register_counter(
-    "push_rules_invalidation_counter"
-)
-push_rules_state_size_counter = push_metrics.register_counter(
-    "push_rules_state_size_counter"
-)
+push_rules_invalidation_counter = Counter(
+    "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter", "")
+push_rules_state_size_counter = Counter(
+    "synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter", "")
 
 # Measures whether we use the fast path of using state deltas, or if we have to
 # recalculate from scratch
-push_rules_delta_state_cache_metric = cache_metrics.register_cache(
+push_rules_delta_state_cache_metric = register_cache(
     "cache",
-    size_callback=lambda: 0,  # Meaningless size, as this isn't a cache that stores values
-    cache_name="push_rules_delta_state_cache_metric",
+    "push_rules_delta_state_cache_metric",
+    cache=[],  # Meaningless size, as this isn't a cache that stores values
 )
 
 
@@ -59,11 +60,12 @@ class BulkPushRuleEvaluator(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
-        self.room_push_rule_cache_metrics = cache_metrics.register_cache(
+        self.room_push_rule_cache_metrics = register_cache(
             "cache",
-            size_callback=lambda: 0,  # There's not good value for this
-            cache_name="room_push_rule_cache",
+            "room_push_rule_cache",
+            cache=[],  # Meaningless size, as this isn't a cache that stores values
         )
 
     @defer.inlineCallbacks
@@ -109,12 +111,35 @@ class BulkPushRuleEvaluator(object):
         )
 
     @defer.inlineCallbacks
+    def _get_power_levels_and_sender_level(self, event, context):
+        pl_event_id = context.prev_state_ids.get(POWER_KEY)
+        if pl_event_id:
+            # fastpath: if there's a power level event, that's all we need, and
+            # not having a power level event is an extreme edge case
+            pl_event = yield self.store.get_event(pl_event_id)
+            auth_events = {POWER_KEY: pl_event}
+        else:
+            auth_events_ids = yield self.auth.compute_auth_events(
+                event, context.prev_state_ids, for_verification=False,
+            )
+            auth_events = yield self.store.get_events(auth_events_ids)
+            auth_events = {
+                (e.type, e.state_key): e for e in itervalues(auth_events)
+            }
+
+        sender_level = get_user_power_level(event.sender, auth_events)
+
+        pl_event = auth_events.get(POWER_KEY)
+
+        defer.returnValue((pl_event.content if pl_event else {}, sender_level))
+
+    @defer.inlineCallbacks
     def action_for_event_by_user(self, event, context):
-        """Given an event and context, evaluate the push rules and return
-        the results
+        """Given an event and context, evaluate the push rules and insert the
+        results into the event_push_actions_staging table.
 
         Returns:
-            dict of user_id -> action
+            Deferred
         """
         rules_by_user = yield self._get_rules_for_event(event, context)
         actions_by_user = {}
@@ -123,11 +148,17 @@ class BulkPushRuleEvaluator(object):
             event, context
         )
 
-        evaluator = PushRuleEvaluatorForEvent(event, len(room_members))
+        (power_levels, sender_power_level) = (
+            yield self._get_power_levels_and_sender_level(event, context)
+        )
+
+        evaluator = PushRuleEvaluatorForEvent(
+            event, len(room_members), sender_power_level, power_levels,
+        )
 
         condition_cache = {}
 
-        for uid, rules in rules_by_user.iteritems():
+        for uid, rules in iteritems(rules_by_user):
             if event.sender == uid:
                 continue
 
@@ -157,9 +188,16 @@ class BulkPushRuleEvaluator(object):
                 if matches:
                     actions = [x for x in rule['actions'] if x != 'dont_notify']
                     if actions and 'notify' in actions:
+                        # Push rules say we should notify the user of this event
                         actions_by_user[uid] = actions
                     break
-        defer.returnValue(actions_by_user)
+
+        # Mark in the DB staging area the push actions for users who should be
+        # notified for this event. (This will then get handled when we persist
+        # the event)
+        yield self.store.add_push_actions_to_staging(
+            event.event_id, actions_by_user,
+        )
 
 
 def _condition_checker(evaluator, conditions, uid, display_name, cache):
@@ -269,7 +307,7 @@ class RulesForRoom(object):
                 current_state_ids = context.current_state_ids
                 push_rules_delta_state_cache_metric.inc_misses()
 
-            push_rules_state_size_counter.inc_by(len(current_state_ids))
+            push_rules_state_size_counter.inc(len(current_state_ids))
 
             logger.debug(
                 "Looking for member changes in %r %r", state_group, current_state_ids
@@ -366,7 +404,7 @@ class RulesForRoom(object):
         # If the event is a join event then it will be in current state evnts
         # map but not in the DB, so we have to explicitly insert it.
         if event.type == EventTypes.Member:
-            for event_id in member_event_ids.itervalues():
+            for event_id in itervalues(member_event_ids):
                 if event_id == event.event_id:
                     members[event_id] = (event.state_key, event.membership)
 
@@ -374,7 +412,7 @@ class RulesForRoom(object):
             logger.debug("Found members %r: %r", self.room_id, members.values())
 
         interested_in_user_ids = set(
-            user_id for user_id, membership in members.itervalues()
+            user_id for user_id, membership in itervalues(members)
             if membership == Membership.JOIN
         )
 
@@ -386,7 +424,7 @@ class RulesForRoom(object):
         )
 
         user_ids = set(
-            uid for uid, have_pusher in if_users_with_pushers.iteritems() if have_pusher
+            uid for uid, have_pusher in iteritems(if_users_with_pushers) if have_pusher
         )
 
         logger.debug("With pushers: %r", user_ids)
@@ -407,7 +445,7 @@ class RulesForRoom(object):
         )
 
         ret_rules_by_user.update(
-            item for item in rules_by_user.iteritems() if item[0] is not None
+            item for item in iteritems(rules_by_user) if item[0] is not None
         )
 
         self.update_cache(sequence, members, ret_rules_by_user, state_group)

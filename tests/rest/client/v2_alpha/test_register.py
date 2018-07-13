@@ -1,10 +1,15 @@
-from synapse.rest.client.v2_alpha.register import RegisterRestServlet
-from synapse.api.errors import SynapseError
-from twisted.internet import defer
+import json
+
 from mock import Mock
+
+from twisted.internet import defer
+from twisted.python import failure
+
+from synapse.api.errors import InteractiveAuthIncompleteError, SynapseError
+from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+
 from tests import unittest
 from tests.utils import mock_getRawHeaders
-import json
 
 
 class RegisterRestServletTestCase(unittest.TestCase):
@@ -24,7 +29,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             side_effect=lambda x: self.appservice)
         )
 
-        self.auth_result = (False, None, None, None)
+        self.auth_result = failure.Failure(InteractiveAuthIncompleteError(None))
         self.auth_handler = Mock(
             check_auth=Mock(side_effect=lambda x, y, z: self.auth_result),
             get_session_data=Mock(return_value=None)
@@ -47,6 +52,8 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
         self.hs.get_device_handler = Mock(return_value=self.device_handler)
         self.hs.config.enable_registration = True
+        self.hs.config.registrations_require_3pid = []
+        self.hs.config.auto_join_rooms = []
 
         # init the thing we're testing
         self.servlet = RegisterRestServlet(self.hs)
@@ -85,6 +92,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.request.args = {
             "access_token": "i_am_an_app_service"
         }
+
         self.request_data = json.dumps({
             "username": "kermit"
         })
@@ -119,7 +127,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "device_id": device_id,
         })
         self.registration_handler.check_username = Mock(return_value=True)
-        self.auth_result = (True, None, {
+        self.auth_result = (None, {
             "username": "kermit",
             "password": "monkey"
         }, None)
@@ -149,7 +157,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "password": "monkey"
         })
         self.registration_handler.check_username = Mock(return_value=True)
-        self.auth_result = (True, None, {
+        self.auth_result = (None, {
             "username": "kermit",
             "password": "monkey"
         }, None)

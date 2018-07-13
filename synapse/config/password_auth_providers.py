@@ -13,44 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
+from synapse.util.module_loader import load_module
 
-import importlib
+from ._base import Config
+
+LDAP_PROVIDER = 'ldap_auth_provider.LdapAuthProvider'
 
 
 class PasswordAuthProviderConfig(Config):
     def read_config(self, config):
         self.password_providers = []
+        providers = []
 
         # We want to be backwards compatible with the old `ldap_config`
         # param.
         ldap_config = config.get("ldap_config", {})
-        self.ldap_enabled = ldap_config.get("enabled", False)
-        if self.ldap_enabled:
-            from ldap_auth_provider import LdapAuthProvider
-            parsed_config = LdapAuthProvider.parse_config(ldap_config)
-            self.password_providers.append((LdapAuthProvider, parsed_config))
+        if ldap_config.get("enabled", False):
+            providers.append({
+                'module': LDAP_PROVIDER,
+                'config': ldap_config,
+            })
 
-        providers = config.get("password_providers", [])
+        providers.extend(config.get("password_providers", []))
         for provider in providers:
+            mod_name = provider['module']
+
             # This is for backwards compat when the ldap auth provider resided
             # in this package.
-            if provider['module'] == "synapse.util.ldap_auth_provider.LdapAuthProvider":
-                from ldap_auth_provider import LdapAuthProvider
-                provider_class = LdapAuthProvider
-            else:
-                # We need to import the module, and then pick the class out of
-                # that, so we split based on the last dot.
-                module, clz = provider['module'].rsplit(".", 1)
-                module = importlib.import_module(module)
-                provider_class = getattr(module, clz)
+            if mod_name == "synapse.util.ldap_auth_provider.LdapAuthProvider":
+                mod_name = LDAP_PROVIDER
 
-            try:
-                provider_config = provider_class.parse_config(provider["config"])
-            except Exception as e:
-                raise ConfigError(
-                    "Failed to parse config for %r: %r" % (provider['module'], e)
-                )
+            (provider_class, provider_config) = load_module({
+                "module": mod_name,
+                "config": provider['config'],
+            })
+
             self.password_providers.append((provider_class, provider_config))
 
     def default_config(self, **kwargs):

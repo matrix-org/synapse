@@ -14,25 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hmac
+import logging
+from hashlib import sha1
+
+from six import string_types
+
 from twisted.internet import defer
 
 import synapse
+import synapse.types
 from synapse.api.auth import get_access_token_from_request, has_access_token
 from synapse.api.constants import LoginType
-from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
+from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
+    RestServlet,
+    assert_params_in_request,
+    parse_json_object_from_request,
+    parse_string,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
-
-from ._base import client_v2_patterns
-
-import logging
-import hmac
-from hashlib import sha1
-from synapse.util.async import run_on_reactor
 from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.threepids import check_3pid_allowed
 
+from ._base import client_v2_patterns, interactive_auth_handler
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
 # exist. It's a _really minor_ security flaw to use plain string comparison
@@ -68,6 +73,11 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
+        if not check_3pid_allowed(self.hs, "email", body['email']):
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+            )
+
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'email', body['email']
         )
@@ -102,6 +112,11 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         ])
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
+
+        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+            raise SynapseError(
+                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+            )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
             'msisdn', msisdn
@@ -170,13 +185,13 @@ class RegisterRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
+        self.room_member_handler = hs.get_room_member_handler()
         self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         body = parse_json_object_from_request(request)
 
         kind = "user"
@@ -196,14 +211,14 @@ class RegisterRestServlet(RestServlet):
         # in sessions. Pull out the username/password provided to us.
         desired_password = None
         if 'password' in body:
-            if (not isinstance(body['password'], basestring) or
+            if (not isinstance(body['password'], string_types) or
                     len(body['password']) > 512):
                 raise SynapseError(400, "Invalid password")
             desired_password = body["password"]
 
         desired_username = None
         if 'username' in body:
-            if (not isinstance(body['username'], basestring) or
+            if (not isinstance(body['username'], string_types) or
                     len(body['username']) > 512):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
@@ -221,14 +236,29 @@ class RegisterRestServlet(RestServlet):
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
             desired_username = body.get("user", desired_username)
+
+            # XXX we should check that desired_username is valid. Currently
+            # we give appservices carte blanche for any insanity in mxids,
+            # because the IRC bridges rely on being able to register stupid
+            # IDs.
+
             access_token = get_access_token_from_request(request)
 
-            if isinstance(desired_username, basestring):
+            if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
                     desired_username, access_token, body
                 )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
+
+        # for either shared secret or regular registration, downcase the
+        # provided username before attempting to register it. This should mean
+        # that people who try to register with upper-case in their usernames
+        # don't get a nasty surprise. (Note that we treat username
+        # case-insenstively in login, so they are free to carry on imagining
+        # that their username is CrAzYh4cKeR if that keeps them happy)
+        if desired_username is not None:
+            desired_username = desired_username.lower()
 
         # == Shared Secret Registration == (e.g. create new user scripts)
         if 'mac' in body:
@@ -286,34 +316,66 @@ class RegisterRestServlet(RestServlet):
         if 'x_show_msisdn' in body and body['x_show_msisdn']:
             show_msisdn = True
 
+        # FIXME: need a better error than "no auth flow found" for scenarios
+        # where we required 3PID for registration but the user didn't give one
+        require_email = 'email' in self.hs.config.registrations_require_3pid
+        require_msisdn = 'msisdn' in self.hs.config.registrations_require_3pid
+
+        flows = []
         if self.hs.config.enable_registration_captcha:
-            flows = [
-                [LoginType.RECAPTCHA],
-                [LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
-            ]
+            # only support 3PIDless registration if no 3PIDs are required
+            if not require_email and not require_msisdn:
+                flows.extend([[LoginType.RECAPTCHA]])
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
+                flows.extend([[LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]])
+
             if show_msisdn:
+                # only support the MSISDN-only flow if we don't require email 3PIDs
+                if not require_email:
+                    flows.extend([[LoginType.MSISDN, LoginType.RECAPTCHA]])
+                # always let users provide both MSISDN & email
                 flows.extend([
-                    [LoginType.MSISDN, LoginType.RECAPTCHA],
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA],
                 ])
         else:
-            flows = [
-                [LoginType.DUMMY],
-                [LoginType.EMAIL_IDENTITY],
-            ]
+            # only support 3PIDless registration if no 3PIDs are required
+            if not require_email and not require_msisdn:
+                flows.extend([[LoginType.DUMMY]])
+            # only support the email-only flow if we don't require MSISDN 3PIDs
+            if not require_msisdn:
+                flows.extend([[LoginType.EMAIL_IDENTITY]])
+
             if show_msisdn:
+                # only support the MSISDN-only flow if we don't require email 3PIDs
+                if not require_email or require_msisdn:
+                    flows.extend([[LoginType.MSISDN]])
+                # always let users provide both MSISDN & email
                 flows.extend([
-                    [LoginType.MSISDN],
-                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY],
+                    [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
                 ])
 
-        authed, auth_result, params, session_id = yield self.auth_handler.check_auth(
+        auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
 
-        if not authed:
-            defer.returnValue((401, auth_result))
-            return
+        # Check that we're not trying to register a denied 3pid.
+        #
+        # the user-facing checks will probably already have happened in
+        # /register/email/requestToken when we requested a 3pid, but that's not
+        # guaranteed.
+
+        if auth_result:
+            for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
+                if login_type in auth_result:
+                    medium = auth_result[login_type]['medium']
+                    address = auth_result[login_type]['address']
+
+                    if not check_3pid_allowed(self.hs, medium, address):
+                        raise SynapseError(
+                            403, "Third party identifier is not allowed",
+                            Codes.THREEPID_DENIED,
+                        )
 
         if registered_user_id is not None:
             logger.info(
@@ -332,6 +394,9 @@ class RegisterRestServlet(RestServlet):
             desired_username = params.get("username", None)
             new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+
+            if desired_username is not None:
+                desired_username = desired_username.lower()
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
@@ -383,15 +448,24 @@ class RegisterRestServlet(RestServlet):
     def _do_shared_secret_registration(self, username, password, body):
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
+        if not username:
+            raise SynapseError(
+                400, "username must be specified", errcode=Codes.BAD_JSON,
+            )
 
-        user = username.encode("utf-8")
+        # use the username from the original request rather than the
+        # downcased one in `username` for the mac calculation
+        user = body["username"].encode("utf-8")
 
         # str() because otherwise hmac complains that 'unicode' does not
         # have the buffer interface
         got_mac = str(body["mac"])
 
+        # FIXME this is different to the /v1/register endpoint, which
+        # includes the password and admin flag in the hashed text. Why are
+        # these different?
         want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret,
+            key=self.hs.config.registration_shared_secret.encode(),
             msg=user,
             digestmod=sha1,
         ).hexdigest()
@@ -523,25 +597,28 @@ class RegisterRestServlet(RestServlet):
         Args:
             (str) user_id: full canonical @user:id
             (object) params: registration parameters, from which we pull
-                device_id and initial_device_name
+                device_id, initial_device_name and inhibit_login
         Returns:
             defer.Deferred: (object) dictionary for response from /register
         """
-        device_id = yield self._register_device(user_id, params)
-
-        access_token = (
-            yield self.auth_handler.get_access_token_for_user_id(
-                user_id, device_id=device_id,
-                initial_display_name=params.get("initial_device_display_name")
-            )
-        )
-
-        defer.returnValue({
+        result = {
             "user_id": user_id,
-            "access_token": access_token,
             "home_server": self.hs.hostname,
-            "device_id": device_id,
-        })
+        }
+        if not params.get("inhibit_login", False):
+            device_id = yield self._register_device(user_id, params)
+
+            access_token = (
+                yield self.auth_handler.get_access_token_for_user_id(
+                    user_id, device_id=device_id,
+                )
+            )
+
+            result.update({
+                "access_token": access_token,
+                "device_id": device_id,
+            })
+        defer.returnValue(result)
 
     def _register_device(self, user_id, params):
         """Register a device for a user.

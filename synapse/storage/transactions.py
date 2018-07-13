@@ -13,17 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+import logging
+from collections import namedtuple
+
+import six
+
+from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 
-from canonicaljson import encode_canonical_json
+from synapse.util.caches.descriptors import cached
 
-from collections import namedtuple
+from ._base import SQLBaseStore
 
-import logging
-import ujson as json
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = buffer
+else:
+    db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +54,8 @@ class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
 
-    def __init__(self, hs):
-        super(TransactionStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(TransactionStore, self).__init__(db_conn, hs)
 
         self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
 
@@ -110,7 +118,7 @@ class TransactionStore(SQLBaseStore):
                 "transaction_id": transaction_id,
                 "origin": origin,
                 "response_code": code,
-                "response_json": buffer(encode_canonical_json(response_dict)),
+                "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
             or_ignore=True,

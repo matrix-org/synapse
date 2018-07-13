@@ -13,22 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.trial import unittest
-
 import logging
 
-# logging doesn't have a "don't log anything at all EVARRRR setting,
-# but since the highest value is 50, 1000000 should do ;)
-NEVER = 1000000
+import twisted
+import twisted.logger
+from twisted.trial import unittest
 
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter(
-    "%(levelname)s:%(name)s:%(message)s  [%(pathname)s:%(lineno)d]"
-))
-logging.getLogger().addHandler(handler)
-logging.getLogger().setLevel(NEVER)
-logging.getLogger("synapse.storage.SQL").setLevel(NEVER)
-logging.getLogger("synapse.storage.txn").setLevel(NEVER)
+from synapse.util.logcontext import LoggingContextFilter
+
+# Set up putting Synapse's logs into Trial's.
+rootLogger = logging.getLogger()
+
+log_format = (
+    "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s"
+)
+
+
+class ToTwistedHandler(logging.Handler):
+    tx_log = twisted.logger.Logger()
+
+    def emit(self, record):
+        log_entry = self.format(record)
+        log_level = record.levelname.lower().replace('warning', 'warn')
+        self.tx_log.emit(
+            twisted.logger.LogLevel.levelWithName(log_level),
+            log_entry.replace("{", r"(").replace("}", r")"),
+        )
+
+
+handler = ToTwistedHandler()
+formatter = logging.Formatter(log_format)
+handler.setFormatter(formatter)
+handler.addFilter(LoggingContextFilter(request=""))
+rootLogger.addHandler(handler)
 
 
 def around(target):
@@ -61,10 +78,14 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel", getattr(self, "loglevel", NEVER))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.ERROR))
 
         @around(self)
         def setUp(orig):
+            # enable debugging of delayed calls - this means that we get a
+            # traceback when a unit test exits leaving things on the reactor.
+            twisted.internet.base.DelayedCall.debug = True
+
             old_level = logging.getLogger().level
 
             if old_level != level:

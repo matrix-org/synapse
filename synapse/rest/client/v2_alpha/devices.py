@@ -17,15 +17,16 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api import constants, errors
+from synapse.api import errors
 from synapse.http import servlet
-from ._base import client_v2_patterns
+
+from ._base import client_v2_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
 
 
 class DevicesRestServlet(servlet.RestServlet):
-    PATTERNS = client_v2_patterns("/devices$", releases=[], v2_alpha=False)
+    PATTERNS = client_v2_patterns("/devices$", v2_alpha=False)
 
     def __init__(self, hs):
         """
@@ -51,7 +52,7 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
     API for bulk deletion of devices. Accepts a JSON object with a devices
     key which lists the device_ids to delete. Requires user interactive auth.
     """
-    PATTERNS = client_v2_patterns("/delete_devices", releases=[], v2_alpha=False)
+    PATTERNS = client_v2_patterns("/delete_devices", v2_alpha=False)
 
     def __init__(self, hs):
         super(DeleteDevicesRestServlet, self).__init__()
@@ -60,8 +61,11 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
         self.device_handler = hs.get_device_handler()
         self.auth_handler = hs.get_auth_handler()
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+
         try:
             body = servlet.parse_json_object_from_request(request)
         except errors.SynapseError as e:
@@ -77,14 +81,10 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
                 400, "No devices supplied", errcode=errors.Codes.MISSING_PARAM
             )
 
-        authed, result, params, _ = yield self.auth_handler.check_auth([
-            [constants.LoginType.PASSWORD],
-        ], body, self.hs.get_ip_from_request(request))
+        yield self.auth_handler.validate_user_via_ui_auth(
+            requester, body, self.hs.get_ip_from_request(request),
+        )
 
-        if not authed:
-            defer.returnValue((401, result))
-
-        requester = yield self.auth.get_user_by_req(request)
         yield self.device_handler.delete_devices(
             requester.user.to_string(),
             body['devices'],
@@ -93,8 +93,7 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
 
 
 class DeviceRestServlet(servlet.RestServlet):
-    PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$",
-                                  releases=[], v2_alpha=False)
+    PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$", v2_alpha=False)
 
     def __init__(self, hs):
         """
@@ -116,8 +115,11 @@ class DeviceRestServlet(servlet.RestServlet):
         )
         defer.returnValue((200, device))
 
+    @interactive_auth_handler
     @defer.inlineCallbacks
     def on_DELETE(self, request, device_id):
+        requester = yield self.auth.get_user_by_req(request)
+
         try:
             body = servlet.parse_json_object_from_request(request)
 
@@ -129,17 +131,12 @@ class DeviceRestServlet(servlet.RestServlet):
             else:
                 raise
 
-        authed, result, params, _ = yield self.auth_handler.check_auth([
-            [constants.LoginType.PASSWORD],
-        ], body, self.hs.get_ip_from_request(request))
+        yield self.auth_handler.validate_user_via_ui_auth(
+            requester, body, self.hs.get_ip_from_request(request),
+        )
 
-        if not authed:
-            defer.returnValue((401, result))
-
-        requester = yield self.auth.get_user_by_req(request)
         yield self.device_handler.delete_device(
-            requester.user.to_string(),
-            device_id,
+            requester.user.to_string(), device_id,
         )
         defer.returnValue((200, {}))
 

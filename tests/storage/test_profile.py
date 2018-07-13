@@ -14,12 +14,12 @@
 # limitations under the License.
 
 
-from tests import unittest
 from twisted.internet import defer
 
 from synapse.storage.profile import ProfileStore
 from synapse.types import UserID
 
+from tests import unittest
 from tests.utils import setup_test_homeserver
 
 
@@ -29,7 +29,7 @@ class ProfileStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver()
 
-        self.store = ProfileStore(hs)
+        self.store = ProfileStore(None, hs)
 
         self.u_frank = UserID.from_string("@frank:test")
 

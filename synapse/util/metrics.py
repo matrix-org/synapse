@@ -13,40 +13,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from functools import wraps
+
+from prometheus_client import Counter
+
 from twisted.internet import defer
 
 from synapse.util.logcontext import LoggingContext
-import synapse.metrics
-
-from functools import wraps
-import logging
-
 
 logger = logging.getLogger(__name__)
 
+block_counter = Counter("synapse_util_metrics_block_count", "", ["block_name"])
 
-metrics = synapse.metrics.get_metrics_for(__name__)
+block_timer = Counter("synapse_util_metrics_block_time_seconds", "", ["block_name"])
 
-block_timer = metrics.register_distribution(
-    "block_timer",
-    labels=["block_name"]
-)
+block_ru_utime = Counter(
+    "synapse_util_metrics_block_ru_utime_seconds", "", ["block_name"])
 
-block_ru_utime = metrics.register_distribution(
-    "block_ru_utime", labels=["block_name"]
-)
+block_ru_stime = Counter(
+    "synapse_util_metrics_block_ru_stime_seconds", "", ["block_name"])
 
-block_ru_stime = metrics.register_distribution(
-    "block_ru_stime", labels=["block_name"]
-)
+block_db_txn_count = Counter(
+    "synapse_util_metrics_block_db_txn_count", "", ["block_name"])
 
-block_db_txn_count = metrics.register_distribution(
-    "block_db_txn_count", labels=["block_name"]
-)
+# seconds spent waiting for db txns, excluding scheduling time, in this block
+block_db_txn_duration = Counter(
+    "synapse_util_metrics_block_db_txn_duration_seconds", "", ["block_name"])
 
-block_db_txn_duration = metrics.register_distribution(
-    "block_db_txn_duration", labels=["block_name"]
-)
+# seconds spent waiting for a db connection, in this block
+block_db_sched_duration = Counter(
+    "synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"])
 
 
 def measure_func(name):
@@ -63,8 +60,9 @@ def measure_func(name):
 
 class Measure(object):
     __slots__ = [
-        "clock", "name", "start_context", "start", "new_context", "ru_utime",
-        "ru_stime", "db_txn_count", "db_txn_duration", "created_context"
+        "clock", "name", "start_context", "start",
+        "created_context",
+        "start_usage",
     ]
 
     def __init__(self, clock, name):
@@ -75,23 +73,23 @@ class Measure(object):
         self.created_context = False
 
     def __enter__(self):
-        self.start = self.clock.time_msec()
+        self.start = self.clock.time()
         self.start_context = LoggingContext.current_context()
         if not self.start_context:
             self.start_context = LoggingContext("Measure")
             self.start_context.__enter__()
             self.created_context = True
 
-        self.ru_utime, self.ru_stime = self.start_context.get_resource_usage()
-        self.db_txn_count = self.start_context.db_txn_count
-        self.db_txn_duration = self.start_context.db_txn_duration
+        self.start_usage = self.start_context.get_resource_usage()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if isinstance(exc_type, Exception) or not self.start_context:
             return
 
-        duration = self.clock.time_msec() - self.start
-        block_timer.inc_by(duration, self.name)
+        duration = self.clock.time() - self.start
+
+        block_counter.labels(self.name).inc()
+        block_timer.labels(self.name).inc(duration)
 
         context = LoggingContext.current_context()
 
@@ -106,16 +104,12 @@ class Measure(object):
             logger.warn("Expected context. (%r)", self.name)
             return
 
-        ru_utime, ru_stime = context.get_resource_usage()
-
-        block_ru_utime.inc_by(ru_utime - self.ru_utime, self.name)
-        block_ru_stime.inc_by(ru_stime - self.ru_stime, self.name)
-        block_db_txn_count.inc_by(
-            context.db_txn_count - self.db_txn_count, self.name
-        )
-        block_db_txn_duration.inc_by(
-            context.db_txn_duration - self.db_txn_duration, self.name
-        )
+        usage = context.get_resource_usage() - self.start_usage
+        block_ru_utime.labels(self.name).inc(usage.ru_utime)
+        block_ru_stime.labels(self.name).inc(usage.ru_stime)
+        block_db_txn_count.labels(self.name).inc(usage.db_txn_count)
+        block_db_txn_duration.labels(self.name).inc(usage.db_txn_duration_sec)
+        block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
 
         if self.created_context:
             self.start_context.__exit__(exc_type, exc_val, exc_tb)

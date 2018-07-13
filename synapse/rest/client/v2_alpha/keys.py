@@ -19,10 +19,13 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, parse_integer
+    RestServlet,
+    parse_integer,
+    parse_json_object_from_request,
+    parse_string,
 )
-from synapse.http.servlet import parse_string
 from synapse.types import StreamToken
+
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
@@ -53,8 +56,7 @@ class KeyUploadServlet(RestServlet):
       },
     }
     """
-    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$",
-                                  releases=())
+    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
     def __init__(self, hs):
         """
@@ -128,10 +130,7 @@ class KeyQueryServlet(RestServlet):
     } } } } } }
     """
 
-    PATTERNS = client_v2_patterns(
-        "/keys/query$",
-        releases=()
-    )
+    PATTERNS = client_v2_patterns("/keys/query$")
 
     def __init__(self, hs):
         """
@@ -160,10 +159,7 @@ class KeyChangesServlet(RestServlet):
         200 OK
         { "changed": ["@foo:example.com"] }
     """
-    PATTERNS = client_v2_patterns(
-        "/keys/changes$",
-        releases=()
-    )
+    PATTERNS = client_v2_patterns("/keys/changes$")
 
     def __init__(self, hs):
         """
@@ -188,13 +184,11 @@ class KeyChangesServlet(RestServlet):
 
         user_id = requester.user.to_string()
 
-        changed = yield self.device_handler.get_user_ids_changed(
+        results = yield self.device_handler.get_user_ids_changed(
             user_id, from_token,
         )
 
-        defer.returnValue((200, {
-            "changed": list(changed),
-        }))
+        defer.returnValue((200, results))
 
 
 class OneTimeKeyServlet(RestServlet):
@@ -215,10 +209,7 @@ class OneTimeKeyServlet(RestServlet):
     } } } }
 
     """
-    PATTERNS = client_v2_patterns(
-        "/keys/claim$",
-        releases=()
-    )
+    PATTERNS = client_v2_patterns("/keys/claim$")
 
     def __init__(self, hs):
         super(OneTimeKeyServlet, self).__init__()

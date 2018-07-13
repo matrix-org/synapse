@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import request_handler, respond_with_json_bytes
-from synapse.http.servlet import parse_integer, parse_json_object_from_request
-from synapse.api.errors import SynapseError, Codes
-from synapse.crypto.keyring import KeyLookupError
+import logging
+from io import BytesIO
 
+from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
-from twisted.internet import defer
 
+from synapse.api.errors import Codes, SynapseError
+from synapse.crypto.keyring import KeyLookupError
+from synapse.http.server import respond_with_json_bytes, wrap_json_request_handler
+from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
-from io import BytesIO
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -91,14 +91,14 @@ class RemoteKey(Resource):
     def __init__(self, hs):
         self.keyring = hs.get_keyring()
         self.store = hs.get_datastore()
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
+        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
     def render_GET(self, request):
         self.async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def async_render_GET(self, request):
         if len(request.postpath) == 1:
@@ -123,7 +123,7 @@ class RemoteKey(Resource):
         self.async_render_POST(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def async_render_POST(self, request):
         content = parse_json_object_from_request(request)
@@ -137,6 +137,13 @@ class RemoteKey(Resource):
         logger.info("Handling query for keys %r", query)
         store_queries = []
         for server_name, key_ids in query.items():
+            if (
+                self.federation_domain_whitelist is not None and
+                server_name not in self.federation_domain_whitelist
+            ):
+                logger.debug("Federation denied with %s", server_name)
+                continue
+
             if not key_ids:
                 key_ids = (None,)
             for key_id in key_ids:
@@ -213,7 +220,7 @@ class RemoteKey(Resource):
                     )
                 except KeyLookupError as e:
                     logger.info("Failed to fetch key: %s", e)
-                except:
+                except Exception:
                     logger.exception("Failed to get key for %r", server_name)
             yield self.query_keys(
                 request, query, query_remote_on_cache_miss=False
@@ -232,5 +239,4 @@ class RemoteKey(Resource):
 
             respond_with_json_bytes(
                 request, 200, result_io.getvalue(),
-                version_string=self.version_string
             )

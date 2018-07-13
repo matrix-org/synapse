@@ -15,15 +15,12 @@
 
 from twisted.internet import defer
 
-from tests import unittest
-
-from synapse.rest.client.v2_alpha import filter
-
-from synapse.api.errors import Codes
-
 import synapse.types
-
+from synapse.api.errors import Codes
+from synapse.rest.client.v2_alpha import filter
 from synapse.types import UserID
+
+from tests import unittest
 
 from ....utils import MockHttpResource, setup_test_homeserver
 

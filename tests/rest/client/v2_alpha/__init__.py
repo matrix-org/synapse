@@ -13,16 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-
 from mock import Mock
-
-from ....utils import MockHttpResource, setup_test_homeserver
-
-from synapse.types import UserID
 
 from twisted.internet import defer
 
+from synapse.types import UserID
+
+from tests import unittest
+
+from ....utils import MockHttpResource, setup_test_homeserver
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
 

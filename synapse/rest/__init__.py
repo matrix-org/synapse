@@ -13,48 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.rest.client import (
-    versions,
-)
-
-from synapse.rest.client.v1 import (
-    room,
-    events,
-    profile,
-    presence,
-    initial_sync,
-    directory,
-    voip,
-    admin,
-    pusher,
-    push_rule,
-    register as v1_register,
-    login as v1_login,
-    logout,
-)
-
+from synapse.http.server import JsonResource
+from synapse.rest.client import versions
+from synapse.rest.client.v1 import admin, directory, events, initial_sync
+from synapse.rest.client.v1 import login as v1_login
+from synapse.rest.client.v1 import logout, presence, profile, push_rule, pusher
+from synapse.rest.client.v1 import register as v1_register
+from synapse.rest.client.v1 import room, voip
 from synapse.rest.client.v2_alpha import (
-    sync,
-    filter,
     account,
-    register,
-    auth,
-    receipts,
-    read_marker,
-    keys,
-    tokenrefresh,
-    tags,
     account_data,
-    report_event,
-    openid,
-    notifications,
+    auth,
     devices,
-    thirdparty,
+    filter,
+    groups,
+    keys,
+    notifications,
+    openid,
+    read_marker,
+    receipts,
+    register,
+    report_event,
     sendtodevice,
+    sync,
+    tags,
+    thirdparty,
+    tokenrefresh,
     user_directory,
 )
-
-from synapse.http.server import JsonResource
 
 
 class ClientRestResource(JsonResource):
@@ -102,3 +88,4 @@ class ClientRestResource(JsonResource):
         thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
+        groups.register_servlets(hs, client_resource)

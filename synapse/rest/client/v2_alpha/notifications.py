@@ -13,24 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer
-)
 from synapse.events.utils import (
-    serialize_event, format_event_for_client_v2_without_room_id,
+    format_event_for_client_v2_without_room_id,
+    serialize_event,
 )
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 
 from ._base import client_v2_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/notifications$", releases=())
+    PATTERNS = client_v2_patterns("/notifications$")
 
     def __init__(self, hs):
         super(NotificationsServlet, self).__init__()
@@ -88,7 +87,7 @@ class NotificationsServlet(RestServlet):
                     pa["topological_ordering"], pa["stream_ordering"]
                 )
             returned_push_actions.append(returned_pa)
-            next_token = pa["stream_ordering"]
+            next_token = str(pa["stream_ordering"])
 
         defer.returnValue((200, {
             "notifications": returned_push_actions,

@@ -12,14 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mock import Mock
+
+from twisted.internet import defer
+
 from synapse.appservice import ApplicationServiceState
 from synapse.appservice.scheduler import (
-    _ServiceQueuer, _TransactionController, _Recoverer
+    _Recoverer,
+    _ServiceQueuer,
+    _TransactionController,
 )
-from twisted.internet import defer
-from ..utils import MockClock
-from mock import Mock
+from synapse.util.logcontext import make_deferred_yieldable
+
 from tests import unittest
+
+from ..utils import MockClock
 
 
 class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
@@ -204,7 +211,9 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
 
     def test_send_single_event_with_queue(self):
         d = defer.Deferred()
-        self.txn_ctrl.send = Mock(return_value=d)
+        self.txn_ctrl.send = Mock(
+            side_effect=lambda x, y: make_deferred_yieldable(d),
+        )
         service = Mock(id=4)
         event = Mock(event_id="first")
         event2 = Mock(event_id="second")
@@ -235,7 +244,10 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.TestCase):
         srv_2_event2 = Mock(event_id="srv2b")
 
         send_return_list = [srv_1_defer, srv_2_defer]
-        self.txn_ctrl.send = Mock(side_effect=lambda x, y: send_return_list.pop(0))
+
+        def do_send(x, y):
+            return make_deferred_yieldable(send_return_list.pop(0))
+        self.txn_ctrl.send = Mock(side_effect=do_send)
 
         # send events for different ASes and make sure they are sent
         self.queuer.enqueue(srv1, srv_1_event)

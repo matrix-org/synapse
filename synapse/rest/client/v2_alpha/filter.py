@@ -13,17 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, SynapseError, StoreError, Codes
+from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
-from ._base import client_v2_patterns
-from ._base import set_timeline_upper_limit
-
-import logging
-
+from ._base import client_v2_patterns, set_timeline_upper_limit
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +48,7 @@ class GetFilterRestServlet(RestServlet):
 
         try:
             filter_id = int(filter_id)
-        except:
+        except Exception:
             raise SynapseError(400, "Invalid filter_id")
 
         try:

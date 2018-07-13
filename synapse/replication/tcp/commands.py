@@ -19,8 +19,14 @@ allowed to be sent by which side.
 """
 
 import logging
-import ujson as json
+import platform
 
+if platform.python_implementation() == "PyPy":
+    import json
+    _json_encoder = json.JSONEncoder()
+else:
+    import simplejson as json
+    _json_encoder = json.JSONEncoder(namedtuple_as_object=False)
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +113,7 @@ class RdataCommand(Command):
         return " ".join((
             self.stream_name,
             str(self.token) if self.token is not None else "batch",
-            json.dumps(self.row),
+            _json_encoder.encode(self.row),
         ))
 
 
@@ -301,7 +307,9 @@ class InvalidateCacheCommand(Command):
         return cls(cache_func, json.loads(keys_json))
 
     def to_line(self):
-        return " ".join((self.cache_func, json.dumps(self.keys)))
+        return " ".join((
+            self.cache_func, _json_encoder.encode(self.keys),
+        ))
 
 
 class UserIpCommand(Command):
@@ -332,7 +340,7 @@ class UserIpCommand(Command):
         )
 
     def to_line(self):
-        return self.user_id + " " + json.dumps((
+        return self.user_id + " " + _json_encoder.encode((
             self.access_token, self.ip, self.user_agent, self.device_id,
             self.last_seen,
         ))

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
 import logging
 import re
 
+from six import string_types
+
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -29,6 +32,21 @@ INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
 def _room_member_count(ev, condition, room_member_count):
+    return _test_ineq_condition(condition, room_member_count)
+
+
+def _sender_notification_permission(ev, condition, sender_power_level, power_levels):
+    notif_level_key = condition.get('key')
+    if notif_level_key is None:
+        return False
+
+    notif_levels = power_levels.get('notifications', {})
+    room_notif_level = notif_levels.get(notif_level_key, 50)
+
+    return sender_power_level >= room_notif_level
+
+
+def _test_ineq_condition(condition, number):
     if 'is' not in condition:
         return False
     m = INEQUALITY_EXPR.match(condition['is'])
@@ -41,15 +59,15 @@ def _room_member_count(ev, condition, room_member_count):
     rhs = int(rhs)
 
     if ineq == '' or ineq == '==':
-        return room_member_count == rhs
+        return number == rhs
     elif ineq == '<':
-        return room_member_count < rhs
+        return number < rhs
     elif ineq == '>':
-        return room_member_count > rhs
+        return number > rhs
     elif ineq == '>=':
-        return room_member_count >= rhs
+        return number >= rhs
     elif ineq == '<=':
-        return room_member_count <= rhs
+        return number <= rhs
     else:
         return False
 
@@ -65,9 +83,11 @@ def tweaks_for_actions(actions):
 
 
 class PushRuleEvaluatorForEvent(object):
-    def __init__(self, event, room_member_count):
+    def __init__(self, event, room_member_count, sender_power_level, power_levels):
         self._event = event
         self._room_member_count = room_member_count
+        self._sender_power_level = sender_power_level
+        self._power_levels = power_levels
 
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
@@ -80,6 +100,10 @@ class PushRuleEvaluatorForEvent(object):
         elif condition['kind'] == 'room_member_count':
             return _room_member_count(
                 self._event, condition, self._room_member_count
+            )
+        elif condition['kind'] == 'sender_notification_permission':
+            return _sender_notification_permission(
+                self._event, condition, self._sender_power_level, self._power_levels,
             )
         else:
             return True
@@ -128,7 +152,7 @@ class PushRuleEvaluatorForEvent(object):
 
 # Caches (glob, word_boundary) -> regex for push. See _glob_matches
 regex_cache = LruCache(50000 * CACHE_SIZE_FACTOR)
-register_cache("regex_push_cache", regex_cache)
+register_cache("cache", "regex_push_cache", regex_cache)
 
 
 def _glob_matches(glob, value, word_boundary=False):
@@ -183,7 +207,7 @@ def _glob_to_re(glob, word_boundary):
             r,
         )
         if word_boundary:
-            r = r"\b%s\b" % (r,)
+            r = _re_word_boundary(r)
 
             return re.compile(r, flags=re.IGNORECASE)
         else:
@@ -192,7 +216,7 @@ def _glob_to_re(glob, word_boundary):
             return re.compile(r, flags=re.IGNORECASE)
     elif word_boundary:
         r = re.escape(glob)
-        r = r"\b%s\b" % (r,)
+        r = _re_word_boundary(r)
 
         return re.compile(r, flags=re.IGNORECASE)
     else:
@@ -200,11 +224,23 @@ def _glob_to_re(glob, word_boundary):
         return re.compile(r, flags=re.IGNORECASE)
 
 
+def _re_word_boundary(r):
+    """
+    Adds word boundary characters to the start and end of an
+    expression to require that the match occur as a whole word,
+    but do so respecting the fact that strings starting or ending
+    with non-word characters will change word boundaries.
+    """
+    # we can't use \b as it chokes on unicode. however \W seems to be okay
+    # as shorthand for [^0-9A-Za-z_].
+    return r"(^|\W)%s(\W|$)" % (r,)
+
+
 def _flatten_dict(d, prefix=[], result=None):
     if result is None:
         result = {}
     for key, value in d.items():
-        if isinstance(value, basestring):
+        if isinstance(value, string_types):
             result[".".join(prefix + [key])] = value.lower()
         elif hasattr(value, "items"):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)

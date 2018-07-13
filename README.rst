@@ -157,8 +157,9 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-Alternatively, Silvio Fricke has contributed a Dockerfile to automate the
-above in Docker at https://registry.hub.docker.com/u/silviof/docker-matrix/.
+There is an offical synapse image available at https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with the docker-compose file available at `contrib/docker`. Further information on this including configuration options is available in `contrib/docker/README.md`.
+
+Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a Dockerfile to automate a synapse server in a single Docker image, at https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
 tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
@@ -200,11 +201,11 @@ different. See `the spec`__ for more information on key management.)
 .. __: `key_management`_
 
 The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
-configured without TLS; it is not recommended this be exposed outside your
-local network. Port 8448 is configured to use TLS with a self-signed
-certificate. This is fine for testing with but, to avoid your clients
-complaining about the certificate, you will almost certainly want to use
-another certificate for production purposes. (Note that a self-signed
+configured without TLS; it should be behind a reverse proxy for TLS/SSL
+termination on port 443 which in turn should be used for clients. Port 8448
+is configured to use TLS with a self-signed certificate. If you would like
+to do initial test with a client without having to setup a reverse proxy,
+you can temporarly use another certificate. (Note that a self-signed
 certificate is fine for `Federation`_). You can do so by changing
 ``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
 in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
@@ -283,9 +284,15 @@ Connecting to Synapse from a client
 The easiest way to try out your new Synapse installation is by connecting to it
 from a web client. The easiest option is probably the one at
 http://riot.im/app. You will need to specify a "Custom server" when you log on
-or register: set this to ``https://localhost:8448`` - remember to specify the
-port (``:8448``) unless you changed the configuration. (Leave the identity
+or register: set this to ``https://domain.tld`` if you setup a reverse proxy
+following the recommended setup, or ``https://localhost:8448`` - remember to specify the
+port (``:8448``) if not ``:443`` unless you changed the configuration. (Leave the identity
 server as the default - see `Identity servers`_.)
+
+If using port 8448 you will run into errors until you accept the self-signed
+certificate. You can easily do this by going to ``https://localhost:8448``
+directly with your browser and accept the presented certificate. You can then
+go back in your web client and proceed further.
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
@@ -347,6 +354,10 @@ https://matrix.org/docs/projects/try-matrix-now.html (or build your own with one
 
 Fedora
 ------
+
+Synapse is in the Fedora repositories as ``matrix-synapse``::
+
+    sudo dnf install matrix-synapse
 
 Oleg Girko provides Fedora RPMs at
 https://obs.infoserver.lv/project/monitor/matrix-synapse
@@ -593,8 +604,9 @@ you to run your server on a machine that might not have the same name as your
 domain name. For example, you might want to run your server at
 ``synapse.example.com``, but have your Matrix user-ids look like
 ``@user:example.com``. (A SRV record also allows you to change the port from
-the default 8448. However, if you are thinking of using a reverse-proxy, be
-sure to read `Reverse-proxying the federation port`_ first.)
+the default 8448. However, if you are thinking of using a reverse-proxy on the
+federation port, which is not recommended, be sure to read
+`Reverse-proxying the federation port`_ first.)
 
 To use a SRV record, first create your SRV record and publish it in DNS. This
 should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
@@ -602,6 +614,9 @@ should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
 
     $ dig -t srv _matrix._tcp.example.com
     _matrix._tcp.example.com. 3600    IN      SRV     10 0 8448 synapse.example.com.
+
+Note that the server hostname cannot be an alias (CNAME record): it has to point
+directly to the server hosting the synapse instance.
 
 You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
 its user-ids, by setting ``server_name``::
@@ -625,6 +640,11 @@ largest boxes pause for thought.)
 
 Troubleshooting
 ---------------
+
+You can use the federation tester to check if your homeserver is all set:
+``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``
+If any of the attributes under "checks" is false, federation won't work.
+
 The typical failure mode with federation is that when you try to join a room,
 it is rejected with "401: Unauthorized". Generally this means that other
 servers in the room couldn't access yours. (Joining a room over federation is a
@@ -674,7 +694,7 @@ For information on how to install and use PostgreSQL, please see
 Using a reverse proxy with Synapse
 ==================================
 
-It is possible to put a reverse proxy such as
+It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
 `Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
 `HAProxy <http://www.haproxy.org/>`_ in front of Synapse. One advantage of
@@ -692,9 +712,9 @@ federation port has a number of pitfalls. It is possible, but be sure to read
 `Reverse-proxying the federation port`_.
 
 The recommended setup is therefore to configure your reverse-proxy on port 443
-for client connections, but to also expose port 8448 for server-server
-connections. All the Matrix endpoints begin ``/_matrix``, so an example nginx
-configuration might look like::
+to port 8008 of synapse for client connections, but to also directly expose port
+8448 for server-server connections. All the Matrix endpoints begin ``/_matrix``,
+so an example nginx configuration might look like::
 
   server {
       listen 443 ssl;
@@ -816,7 +836,9 @@ spidering 'internal' URLs on your network.  At the very least we recommend that
 your loopback and RFC1918 IP addresses are blacklisted.
 
 This also requires the optional lxml and netaddr python dependencies to be
-installed.
+installed.  This in turn requires the libxml2 library to be available - on
+Debian/Ubuntu this means ``apt-get install libxml2-dev``, or equivalent for
+your OS.
 
 
 Password reset
@@ -876,6 +898,17 @@ This should end with a 'PASSED' result::
 
     PASSED (successes=143)
 
+Running the Integration Tests
+=============================
+
+Synapse is accompanied by `SyTest <https://github.com/matrix-org/sytest>`_,
+a Matrix homeserver integration testing suite, which uses HTTP requests to
+access the API as a Matrix client would. It is able to run Synapse directly from
+the source tree, so installation of the server is not required.
+
+Testing with SyTest is recommended for verifying that changes related to the
+Client-Server API are functioning correctly. See the `installation instructions
+<https://github.com/matrix-org/sytest#installing>`_ for details.
 
 Building Internal API Documentation
 ===================================

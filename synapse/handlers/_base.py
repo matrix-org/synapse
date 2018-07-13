@@ -18,10 +18,9 @@ import logging
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.constants import Membership, EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import LimitExceededError
 from synapse.types import UserID
-
 
 logger = logging.getLogger(__name__)
 
@@ -114,14 +113,14 @@ class BaseHandler(object):
             if guest_access != "can_join":
                 if context:
                     current_state = yield self.store.get_events(
-                        context.current_state_ids.values()
+                        list(context.current_state_ids.values())
                     )
                 else:
                     current_state = yield self.state_handler.get_current_state(
                         event.room_id
                     )
 
-                current_state = current_state.values()
+                current_state = list(current_state.values())
 
                 logger.info("maybe_kick_guest_users %r", current_state)
                 yield self.kick_guest_users(current_state)
@@ -158,7 +157,7 @@ class BaseHandler(object):
                 # homeserver.
                 requester = synapse.types.create_requester(
                     target_user, is_guest=True)
-                handler = self.hs.get_handlers().room_member_handler
+                handler = self.hs.get_room_member_handler()
                 yield handler.update_membership(
                     requester,
                     target_user,

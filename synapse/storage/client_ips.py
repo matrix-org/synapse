@@ -15,13 +15,14 @@
 
 import logging
 
-from twisted.internet import defer, reactor
+from six import iteritems
 
-from ._base import Cache
-from . import background_updates
+from twisted.internet import defer
 
 from synapse.util.caches import CACHE_SIZE_FACTOR
 
+from . import background_updates
+from ._base import Cache
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +33,14 @@ LAST_SEEN_GRANULARITY = 120 * 1000
 
 
 class ClientIpStore(background_updates.BackgroundUpdateStore):
-    def __init__(self, hs):
+    def __init__(self, db_conn, hs):
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",
             keylen=4,
             max_entries=50000 * CACHE_SIZE_FACTOR,
         )
 
-        super(ClientIpStore, self).__init__(hs)
+        super(ClientIpStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             "user_ips_device_index",
@@ -48,13 +49,29 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             columns=["user_id", "device_id", "last_seen"],
         )
 
+        self.register_background_index_update(
+            "user_ips_last_seen_index",
+            index_name="user_ips_last_seen",
+            table="user_ips",
+            columns=["user_id", "last_seen"],
+        )
+
+        self.register_background_index_update(
+            "user_ips_last_seen_only_index",
+            index_name="user_ips_last_seen_only",
+            table="user_ips",
+            columns=["last_seen"],
+        )
+
         # (user_id, access_token, ip) -> (user_agent, device_id, last_seen)
         self._batch_row_update = {}
 
         self._client_ip_looper = self._clock.looping_call(
             self._update_client_ips_batch, 5 * 1000
         )
-        reactor.addSystemEventTrigger("before", "shutdown", self._update_client_ips_batch)
+        self.hs.get_reactor().addSystemEventTrigger(
+            "before", "shutdown", self._update_client_ips_batch
+        )
 
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
                          now=None):
@@ -85,7 +102,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
     def _update_client_ips_batch_txn(self, txn, to_update):
         self.database_engine.lock_table(txn, "user_ips")
 
-        for entry in to_update.iteritems():
+        for entry in iteritems(to_update):
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             self._simple_upsert_txn(
@@ -217,5 +234,5 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 "user_agent": user_agent,
                 "last_seen": last_seen,
             }
-            for (access_token, ip), (user_agent, last_seen) in results.iteritems()
+            for (access_token, ip), (user_agent, last_seen) in iteritems(results)
         ))

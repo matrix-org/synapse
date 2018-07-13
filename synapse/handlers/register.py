@@ -15,16 +15,22 @@
 
 """Contains functions for registering clients."""
 import logging
-import urllib
 
 from twisted.internet import defer
 
+from synapse import types
 from synapse.api.errors import (
-    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
+    AuthError,
+    Codes,
+    InvalidCaptchaError,
+    RegistrationError,
+    SynapseError,
 )
 from synapse.http.client import CaptchaServerHttpClient
-from synapse.types import UserID
-from synapse.util.async import run_on_reactor
+from synapse.types import RoomAlias, RoomID, UserID, create_requester
+from synapse.util.async import Linearizer
+from synapse.util.threepids import check_3pid_allowed
+
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -33,24 +39,35 @@ logger = logging.getLogger(__name__)
 class RegistrationHandler(BaseHandler):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
         super(RegistrationHandler, self).__init__(hs)
 
         self.auth = hs.get_auth()
+        self._auth_handler = hs.get_auth_handler()
+        self.profile_handler = hs.get_profile_handler()
+        self.user_directory_handler = hs.get_user_directory_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
 
         self._next_generated_user_id = None
 
         self.macaroon_gen = hs.get_macaroon_generator()
 
+        self._generate_user_id_linearizer = Linearizer(
+            name="_generate_user_id_linearizer",
+        )
+        self._server_notices_mxid = hs.config.server_notices_mxid
+
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
                        assigned_user_id=None):
-        yield run_on_reactor()
-
-        if urllib.quote(localpart.encode('utf-8')) != localpart:
+        if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                "User ID can only contain characters a-z, 0-9, or '_-./'",
+                "User ID can only contain characters a-z, 0-9, or '=_-./'",
                 Codes.INVALID_USERNAME
             )
 
@@ -80,7 +97,7 @@ class RegistrationHandler(BaseHandler):
                     "A different user ID has already been registered for this session",
                 )
 
-        yield self.check_user_id_not_appservice_exclusive(user_id)
+        self.check_user_id_not_appservice_exclusive(user_id)
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
@@ -127,10 +144,9 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield run_on_reactor()
         password_hash = None
         if password:
-            password_hash = self.auth_handler().hash(password)
+            password_hash = yield self.auth_handler().hash(password)
 
         if localpart:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
@@ -165,6 +181,13 @@ class RegistrationHandler(BaseHandler):
                 ),
                 admin=admin,
             )
+
+            if self.hs.config.user_directory_search_all_users:
+                profile = yield self.store.get_profileinfo(localpart)
+                yield self.user_directory_handler.handle_local_profile_change(
+                    user_id, profile
+                )
+
         else:
             # autogen a sequential user ID
             attempts = 0
@@ -192,10 +215,17 @@ class RegistrationHandler(BaseHandler):
                     token = None
                     attempts += 1
 
+        # auto-join the user to any rooms we're supposed to dump them into
+        fake_requester = create_requester(user_id)
+        for r in self.hs.config.auto_join_rooms:
+            try:
+                yield self._join_user_to_room(fake_requester, r)
+            except Exception as e:
+                logger.error("Failed to join new user to %r: %r", r, e)
+
         # We used to generate default identicons here, but nowadays
         # we want clients to generate their own as part of their branding
         # rather than there being consistent matrix-wide ones, so we don't.
-
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
@@ -253,11 +283,10 @@ class RegistrationHandler(BaseHandler):
         """
         Registers email_id as SAML2 Based Auth.
         """
-        if urllib.quote(localpart) != localpart:
+        if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
-                "User ID must only contain characters which do not"
-                " require URL encoding."
+                "User ID can only contain characters a-z, 0-9, or '=_-./'",
             )
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
@@ -286,12 +315,12 @@ class RegistrationHandler(BaseHandler):
         """
 
         for c in threepidCreds:
-            logger.info("validating theeepidcred sid %s on id server %s",
+            logger.info("validating threepidcred sid %s on id server %s",
                         c['sid'], c['idServer'])
             try:
                 identity_handler = self.hs.get_handlers().identity_handler
                 threepid = yield identity_handler.threepid_from_creds(c)
-            except:
+            except Exception:
                 logger.exception("Couldn't validate 3pid")
                 raise RegistrationError(400, "Couldn't validate 3pid")
 
@@ -299,6 +328,11 @@ class RegistrationHandler(BaseHandler):
                 raise RegistrationError(400, "Couldn't validate 3pid")
             logger.info("got threepid with medium '%s' and address '%s'",
                         threepid['medium'], threepid['address'])
+
+            if not check_3pid_allowed(self.hs, threepid['medium'], threepid['address']):
+                raise RegistrationError(
+                    403, "Third party identifier is not allowed"
+                )
 
     @defer.inlineCallbacks
     def bind_emails(self, user_id, threepidCreds):
@@ -314,6 +348,14 @@ class RegistrationHandler(BaseHandler):
             yield identity_handler.bind_threepid(c, user_id)
 
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
+        # don't allow people to register the server notices mxid
+        if self._server_notices_mxid is not None:
+            if user_id == self._server_notices_mxid:
+                raise SynapseError(
+                    400, "This user ID is reserved.",
+                    errcode=Codes.EXCLUSIVE
+                )
+
         # valid user IDs must not clash with any user ID namespaces claimed by
         # application services.
         services = self.store.get_app_services()
@@ -332,9 +374,11 @@ class RegistrationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _generate_user_id(self, reseed=False):
         if reseed or self._next_generated_user_id is None:
-            self._next_generated_user_id = (
-                yield self.store.find_next_generated_user_id_localpart()
-            )
+            with (yield self._generate_user_id_linearizer.queue(())):
+                if reseed or self._next_generated_user_id is None:
+                    self._next_generated_user_id = (
+                        yield self.store.find_next_generated_user_id_localpart()
+                    )
 
         id = self._next_generated_user_id
         self._next_generated_user_id += 1
@@ -391,8 +435,6 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield run_on_reactor()
-
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
 
@@ -418,13 +460,12 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_localpart=user.localpart,
             )
         else:
-            yield self.store.user_delete_access_tokens(user_id=user_id)
+            yield self._auth_handler.delete_access_tokens_for_user(user_id)
             yield self.store.add_access_token_to_user(user_id=user_id, token=token)
 
         if displayname is not None:
             logger.info("setting user display name: %s -> %s", user_id, displayname)
-            profile_handler = self.hs.get_handlers().profile_handler
-            yield profile_handler.set_displayname(
+            yield self.profile_handler.set_displayname(
                 user, requester, displayname, by_admin=True,
             )
 
@@ -434,16 +475,59 @@ class RegistrationHandler(BaseHandler):
         return self.hs.get_auth_handler()
 
     @defer.inlineCallbacks
-    def guest_access_token_for(self, medium, address, inviter_user_id):
+    def get_or_register_3pid_guest(self, medium, address, inviter_user_id):
+        """Get a guest access token for a 3PID, creating a guest account if
+        one doesn't already exist.
+
+        Args:
+            medium (str)
+            address (str)
+            inviter_user_id (str): The user ID who is trying to invite the
+                3PID
+
+        Returns:
+            Deferred[(str, str)]: A 2-tuple of `(user_id, access_token)` of the
+            3PID guest account.
+        """
         access_token = yield self.store.get_3pid_guest_access_token(medium, address)
         if access_token:
-            defer.returnValue(access_token)
+            user_info = yield self.auth.get_user_by_access_token(
+                access_token
+            )
 
-        _, access_token = yield self.register(
+            defer.returnValue((user_info["user"].to_string(), access_token))
+
+        user_id, access_token = yield self.register(
             generate_token=True,
             make_guest=True
         )
         access_token = yield self.store.save_or_get_3pid_guest_access_token(
             medium, address, access_token, inviter_user_id
         )
-        defer.returnValue(access_token)
+
+        defer.returnValue((user_id, access_token))
+
+    @defer.inlineCallbacks
+    def _join_user_to_room(self, requester, room_identifier):
+        room_id = None
+        room_member_handler = self.hs.get_room_member_handler()
+        if RoomID.is_valid(room_identifier):
+            room_id = room_identifier
+        elif RoomAlias.is_valid(room_identifier):
+            room_alias = RoomAlias.from_string(room_identifier)
+            room_id, remote_room_hosts = (
+                yield room_member_handler.lookup_room_alias(room_alias)
+            )
+            room_id = room_id.to_string()
+        else:
+            raise SynapseError(400, "%s was not legal room ID or room alias" % (
+                room_identifier,
+            ))
+
+        yield room_member_handler.update_membership(
+            requester=requester,
+            target=requester.user,
+            room_id=room_id,
+            remote_room_hosts=remote_room_hosts,
+            action="join",
+        )

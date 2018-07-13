@@ -14,12 +14,12 @@
 # limitations under the License.
 
 
-from tests import unittest
 from twisted.internet import defer
 
 from synapse.storage.directory import DirectoryStore
-from synapse.types import RoomID, RoomAlias
+from synapse.types import RoomAlias, RoomID
 
+from tests import unittest
 from tests.utils import setup_test_homeserver
 
 
@@ -29,7 +29,7 @@ class DirectoryStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver()
 
-        self.store = DirectoryStore(hs)
+        self.store = DirectoryStore(None, hs)
 
         self.room = RoomID.from_string("!abcde:test")
         self.alias = RoomAlias.from_string("#my-room:test")

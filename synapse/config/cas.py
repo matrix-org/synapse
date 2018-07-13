@@ -41,7 +41,7 @@ class CasConfig(Config):
         #cas_config:
         #   enabled: true
         #   server_url: "https://cas-server.com"
-        #   service_url: "https://homesever.domain.com:8448"
+        #   service_url: "https://homeserver.domain.com:8448"
         #   #required_attributes:
         #   #    name: value
         """

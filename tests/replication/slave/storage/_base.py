@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, reactor
-from tests import unittest
+import tempfile
 
 from mock import Mock, NonCallableMock
-from tests.utils import setup_test_homeserver
-from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
+
+from twisted.internet import defer, reactor
+
 from synapse.replication.tcp.client import (
-    ReplicationClientHandler, ReplicationClientFactory,
+    ReplicationClientFactory,
+    ReplicationClientHandler,
 )
+from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
+
+from tests import unittest
+from tests.utils import setup_test_homeserver
 
 
 class BaseSlavedStoreTestCase(unittest.TestCase):
@@ -29,7 +34,7 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
         self.hs = yield setup_test_homeserver(
             "blue",
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
@@ -41,7 +46,9 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
         self.event_id = 0
 
         server_factory = ReplicationStreamProtocolFactory(self.hs)
-        listener = reactor.listenUNIX("\0xxx", server_factory)
+        # XXX: mktemp is unsafe and should never be used. but we're just a test.
+        path = tempfile.mktemp(prefix="base_slaved_store_test_case_socket")
+        listener = reactor.listenUNIX(path, server_factory)
         self.addCleanup(listener.stopListening)
         self.streamer = server_factory.streamer
 
@@ -49,7 +56,7 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
         client_factory = ReplicationClientFactory(
             self.hs, "client_name", self.replication_handler
         )
-        client_connector = reactor.connectUNIX("\0xxx", client_factory)
+        client_connector = reactor.connectUNIX(path, client_factory)
         self.addCleanup(client_factory.stopTrying)
         self.addCleanup(client_connector.disconnect)
 

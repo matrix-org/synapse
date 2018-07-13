@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.caches import register_cache
-
-from collections import OrderedDict
 import logging
+from collections import OrderedDict
 
+from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +51,11 @@ class ExpiringCache(object):
 
         self._cache = OrderedDict()
 
-        self.metrics = register_cache(cache_name, self)
-
         self.iterable = iterable
 
         self._size_estimate = 0
+
+        self.metrics = register_cache("expiring", cache_name, self)
 
     def start(self):
         if not self._expiry_ms:
@@ -79,7 +78,11 @@ class ExpiringCache(object):
         while self._max_len and len(self) > self._max_len:
             _key, value = self._cache.popitem(last=False)
             if self.iterable:
-                self._size_estimate -= len(value.value)
+                removed_len = len(value.value)
+                self.metrics.inc_evictions(removed_len)
+                self._size_estimate -= removed_len
+            else:
+                self.metrics.inc_evictions()
 
     def __getitem__(self, key):
         try:
