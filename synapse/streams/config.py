@@ -78,6 +78,9 @@ class PaginationConfig(object):
 
         limit = parse_integer(request, "limit", default=default_limit)
 
+        if limit and limit < 0:
+            raise SynapseError(400, "Limit must be 0 or above")
+
         try:
             return PaginationConfig(from_tok, to_tok, direction, limit)
         except Exception:

@@ -77,11 +77,11 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         before = parse_string(request, "before")
         if before:
-            before = _namespaced_rule_id(spec, before[0])
+            before = _namespaced_rule_id(spec, before)
 
         after = parse_string(request, "after")
         if after:
-            after = _namespaced_rule_id(spec, after[0])
+            after = _namespaced_rule_id(spec, after)
 
         try:
             yield self.store.add_push_rule(
