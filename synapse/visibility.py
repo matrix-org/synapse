@@ -16,6 +16,7 @@ import itertools
 import logging
 import operator
 
+import six
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -230,14 +231,6 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
 
 @defer.inlineCallbacks
 def filter_events_for_server(store, server_name, events):
-    """Filter the given events for the given server, redacting those the
-    server can't see.
-
-    Assumes the server is currently in the room.
-
-    Returns
-        list[FrozenEvent]
-    """
     # First lets check to see if all the events have a history visibility
     # of "shared" or "world_readable". If thats the case then we don't
     # need to check membership (as we know the server is in the room).
@@ -271,6 +264,8 @@ def filter_events_for_server(store, server_name, events):
     # Ok, so we're dealing with events that have non-trivial visibility
     # rules, so we need to also get the memberships of the room.
 
+    # first, for each event we're wanting to return, get the event_ids
+    # of the history vis and membership state at those events.
     event_to_state_ids = yield store.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
         types=(
@@ -281,20 +276,30 @@ def filter_events_for_server(store, server_name, events):
 
     # We only want to pull out member events that correspond to the
     # server's domain.
+    #
+    # event_to_state_ids contains lots of duplicates, so it turns out to be
+    # cheaper to build a complete set of unique
+    # ((type, state_key), event_id) tuples, and then filter out the ones we
+    # don't want.
+    #
+    state_key_to_event_id_set = {
+        e
+        for key_to_eid in six.itervalues(event_to_state_ids)
+        for e in key_to_eid.items()
+    }
 
-    def check_match(id):
-        try:
-            return server_name == get_domain_from_id(id)
-        except Exception:
+    def include(typ, state_key):
+        if typ != EventTypes.Member:
+            return True
+        idx = state_key.find(":")
+        if idx == -1:
             return False
+        return state_key[idx + 1:] == server_name
 
-    # Parses mapping `event_id -> (type, state_key) -> state event_id`
-    # to get all state ids that we're interested in.
     event_map = yield store.get_events([
         e_id
-        for key_to_eid in list(event_to_state_ids.values())
-        for key, e_id in key_to_eid.items()
-        if key[0] != EventTypes.Member or check_match(key[1])
+        for key, e_id in state_key_to_event_id_set
+        if include(key[0], key[1])
     ])
 
     event_to_state = {
@@ -349,6 +354,7 @@ def filter_events_for_server(store, server_name, events):
                         if visibility == "invited":
                             return event
                 else:
+                    # server has no users in the room: redact
                     return prune_event(event)
 
         return event
