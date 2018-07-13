@@ -19,6 +19,7 @@ import logging
 import time
 
 from dateutil import tz
+from prometheus_client import Gauge
 
 from synapse.api.constants import PresenceState
 from synapse.storage.devices import DeviceStore
@@ -216,6 +217,14 @@ class DataStore(RoomMemberStore, RoomStore,
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
 
+        self.current_mau = 0
+        self.current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
+
+        self.max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
+        self.limit_usage_by_mau_gauge = Gauge(
+            "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
+        )
+
         super(DataStore, self).__init__(db_conn, hs)
 
     def take_presence_startup_info(self):
@@ -264,6 +273,33 @@ class DataStore(RoomMemberStore, RoomStore,
             count, = txn.fetchone()
             return count
 
+        return self.runInteraction("count_users", _count_users)
+
+    def count_monthly_users(self):
+        """
+        Counts the number of users who used this homeserver in the last 30 days
+        This method should be refactored with count_daily_users - the only
+        reason not to is waiting on definition of mau
+        """
+        def _count_users(txn):
+            yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
+
+            sql = """
+                SELECT COALESCE(count(*), 0) FROM (
+                    SELECT user_id FROM user_ips
+                    WHERE last_seen > ?
+                    GROUP BY user_id
+                ) u
+            """
+
+            txn.execute(sql, (yesterday,))
+            count, = txn.fetchone()
+            self.current_mau = count
+            self.current_mau_gauge.set(self.current_mau)
+            self.max_mau_value_gauge.set(self.hs.config.max_mau_value)
+            self.limit_usage_by_mau_gauge.set(self.hs.config.limit_usage_by_mau)
+
+            return count
         return self.runInteraction("count_users", _count_users)
 
     def count_r30_users(self):
