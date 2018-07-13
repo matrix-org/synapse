@@ -160,11 +160,10 @@ class PasswordRestServlet(RestServlet):
                     raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
                 user_id = threepid_user_id
             else:
-                logger.error("Auth succeeded but no known type!", result.keys())
+                logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        if 'new_password' not in params:
-            raise SynapseError(400, "", Codes.MISSING_PARAM)
+        assert_params_in_request(params, ["new_password"])
         new_password = params['new_password']
 
         yield self._set_password_handler.set_password(
@@ -229,15 +228,10 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-
-        required = ['id_server', 'client_secret', 'email', 'send_attempt']
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if absent:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        assert_params_in_request(
+            body,
+            ['id_server', 'client_secret', 'email', 'send_attempt'],
+        )
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
             raise SynapseError(
@@ -267,18 +261,10 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-
-        required = [
+        assert_params_in_request(body, [
             'id_server', 'client_secret',
             'country', 'phone_number', 'send_attempt',
-        ]
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if absent:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        ])
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
@@ -373,15 +359,7 @@ class ThreepidDeleteRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-
-        required = ['medium', 'address']
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if absent:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        assert_params_in_request(body, ['medium', 'address'])
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()

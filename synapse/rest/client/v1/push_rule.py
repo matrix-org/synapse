@@ -21,7 +21,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
-from synapse.http.servlet import parse_json_value_from_request
+from synapse.http.servlet import parse_json_value_from_request, parse_string
 from synapse.push.baserules import BASE_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
@@ -75,11 +75,11 @@ class PushRuleRestServlet(ClientV1RestServlet):
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
 
-        before = request.args.get("before", None)
+        before = parse_string(request, "before")
         if before:
             before = _namespaced_rule_id(spec, before[0])
 
-        after = request.args.get("after", None)
+        after = parse_string(request, "after")
         if after:
             after = _namespaced_rule_id(spec, after[0])
 

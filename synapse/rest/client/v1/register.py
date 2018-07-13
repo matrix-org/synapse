@@ -18,15 +18,13 @@ import hmac
 import logging
 from hashlib import sha1
 
-from six import string_types
-
 from twisted.internet import defer
 
 import synapse.util.stringutils as stringutils
 from synapse.api.auth import get_access_token_from_request
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import assert_params_in_request, parse_json_object_from_request
 from synapse.types import create_requester
 
 from .base import ClientV1RestServlet, client_path_patterns
@@ -124,8 +122,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         session = (register_json["session"]
                    if "session" in register_json else None)
         login_type = None
-        if "type" not in register_json:
-            raise SynapseError(400, "Missing 'type' key.")
+        assert_params_in_request(register_json, ["type"])
 
         try:
             login_type = register_json["type"]
@@ -312,9 +309,7 @@ class RegisterRestServlet(ClientV1RestServlet):
     def _do_app_service(self, request, register_json, session):
         as_token = get_access_token_from_request(request)
 
-        if "user" not in register_json:
-            raise SynapseError(400, "Expected 'user' key.")
-
+        assert_params_in_request(register_json, ["user"])
         user_localpart = register_json["user"].encode("utf-8")
 
         handler = self.handlers.registration_handler
@@ -331,12 +326,7 @@ class RegisterRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_shared_secret(self, request, register_json, session):
-        if not isinstance(register_json.get("mac", None), string_types):
-            raise SynapseError(400, "Expected mac.")
-        if not isinstance(register_json.get("user", None), string_types):
-            raise SynapseError(400, "Expected 'user' key.")
-        if not isinstance(register_json.get("password", None), string_types):
-            raise SynapseError(400, "Expected 'password' key.")
+        assert_params_in_request(register_json, ["mac", "user", "password"])
 
         if not self.hs.config.registration_shared_secret:
             raise SynapseError(400, "Shared secret registration is not enabled")
@@ -419,11 +409,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def _do_create(self, requester, user_json):
-        if "localpart" not in user_json:
-            raise SynapseError(400, "Expected 'localpart' key.")
-
-        if "displayname" not in user_json:
-            raise SynapseError(400, "Expected 'displayname' key.")
+        assert_params_in_request(user_json, ["localpart", "displayname"])
 
         localpart = user_json["localpart"].encode("utf-8")
         displayname = user_json["displayname"].encode("utf-8")
