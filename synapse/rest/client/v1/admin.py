@@ -23,7 +23,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
-    assert_params_in_request,
+    assert_params_in_dict,
     parse_json_object_from_request,
     parse_integer,
     parse_string
@@ -297,7 +297,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             raise AuthError(403, "You are not a server admin")
 
         content = parse_json_object_from_request(request)
-        assert_params_in_request(content, ["new_room_user_id"])
+        assert_params_in_dict(content, ["new_room_user_id"])
         new_room_user_id = content["new_room_user_id"]
 
         room_creator_requester = create_requester(new_room_user_id)
@@ -459,7 +459,7 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
             raise AuthError(403, "You are not a server admin")
 
         params = parse_json_object_from_request(request)
-        assert_params_in_request(params, ["new_password"])
+        assert_params_in_dict(params, ["new_password"])
         new_password = params['new_password']
 
         logger.info("new_password: %r", new_password)
@@ -542,7 +542,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
 
         order = "name"  # order by name in user table
         params = parse_json_object_from_request(request)
-        assert_params_in_request(params, ["limit", "start"])
+        assert_params_in_dict(params, ["limit", "start"])
         limit = params['limit']
         start = params['start']
         logger.info("limit: %s, start: %s", limit, start)

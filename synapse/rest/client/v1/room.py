@@ -28,7 +28,7 @@ from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2, serialize_event
 from synapse.http.servlet import (
-    assert_params_in_request,
+    assert_params_in_dict,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -637,7 +637,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
-            assert_params_in_request(content, ["user_id"])
+            assert_params_in_dict(content, ["user_id"])
             target = UserID.from_string(content["user_id"])
 
         event_content = None

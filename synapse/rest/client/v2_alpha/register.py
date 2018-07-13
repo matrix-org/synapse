@@ -29,7 +29,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
 from synapse.http.servlet import (
     RestServlet,
-    assert_params_in_request,
+    assert_params_in_dict,
     parse_json_object_from_request,
     parse_string,
 )
@@ -69,7 +69,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
@@ -105,7 +105,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret',
             'country', 'phone_number',
             'send_attempt',
@@ -387,7 +387,7 @@ class RegisterRestServlet(RestServlet):
             add_msisdn = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
-            assert_params_in_request(params, ["password"])
+            assert_params_in_dict(params, ["password"])
 
             desired_username = params.get("username", None)
             new_password = params.get("password", None)
@@ -565,7 +565,7 @@ class RegisterRestServlet(RestServlet):
             defer.Deferred:
         """
         try:
-            assert_params_in_request(threepid, ['medium', 'address', 'validated_at'])
+            assert_params_in_dict(threepid, ['medium', 'address', 'validated_at'])
         except SynapseError as ex:
             if ex.errcode == Codes.MISSING_PARAM:
                 # This will only happen if the ID server returns a malformed response

@@ -21,7 +21,7 @@ from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
-    assert_params_in_request,
+    assert_params_in_dict,
     parse_json_object_from_request,
     parse_string,
 )
@@ -92,7 +92,7 @@ class PushersSetRestServlet(ClientV1RestServlet):
             )
             defer.returnValue((200, {}))
 
-        assert_params_in_request(
+        assert_params_in_dict(
             content,
             ['kind', 'app_id', 'app_display_name',
              'device_display_name', 'pushkey', 'lang', 'data']

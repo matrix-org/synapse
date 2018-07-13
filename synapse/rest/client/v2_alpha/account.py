@@ -25,7 +25,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
-    assert_params_in_request,
+    assert_params_in_dict,
     parse_json_object_from_request,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
@@ -48,7 +48,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
@@ -81,7 +81,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret',
             'country', 'phone_number', 'send_attempt',
         ])
@@ -163,7 +163,7 @@ class PasswordRestServlet(RestServlet):
                 logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        assert_params_in_request(params, ["new_password"])
+        assert_params_in_dict(params, ["new_password"])
         new_password = params['new_password']
 
         yield self._set_password_handler.set_password(
@@ -228,7 +228,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-        assert_params_in_request(
+        assert_params_in_dict(
             body,
             ['id_server', 'client_secret', 'email', 'send_attempt'],
         )
@@ -261,7 +261,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret',
             'country', 'phone_number', 'send_attempt',
         ])
@@ -359,7 +359,7 @@ class ThreepidDeleteRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-        assert_params_in_request(body, ['medium', 'address'])
+        assert_params_in_dict(body, ['medium', 'address'])
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()

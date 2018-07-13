@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api import errors
 from synapse.http.servlet import (
-    assert_params_in_request,
+    assert_params_in_dict,
     parse_json_object_from_request,
     RestServlet
 )
@@ -81,7 +81,7 @@ class DeleteDevicesRestServlet(RestServlet):
             else:
                 raise e
 
-        assert_params_in_request(body, ["devices"])
+        assert_params_in_dict(body, ["devices"])
 
         yield self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request),

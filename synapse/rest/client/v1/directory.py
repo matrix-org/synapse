@@ -19,7 +19,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
-from synapse.http.servlet import assert_params_in_request, parse_json_object_from_request
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import RoomAlias
 
 from .base import ClientV1RestServlet, client_path_patterns

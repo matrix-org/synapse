@@ -206,7 +206,7 @@ def parse_json_object_from_request(request, allow_empty_body=False):
     return content
 
 
-def assert_params_in_request(body, required):
+def assert_params_in_dict(body, required):
     absent = []
     for k in required:
         if k not in body:
