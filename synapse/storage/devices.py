@@ -14,15 +14,16 @@
 # limitations under the License.
 import logging
 
-from twisted.internet import defer
-
-from synapse.api.errors import StoreError
-from ._base import SQLBaseStore, Cache
-from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
+from six import iteritems, itervalues
 
 from canonicaljson import json
 
-from six import itervalues, iteritems
+from twisted.internet import defer
+
+from synapse.api.errors import StoreError
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
+
+from ._base import Cache, SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

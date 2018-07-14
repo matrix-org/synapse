@@ -15,9 +15,10 @@
 
 import hashlib
 from inspect import getcallargs
-from six.moves.urllib import parse as urlparse
 
 from mock import Mock, patch
+from six.moves.urllib import parse as urlparse
+
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import CodeMessageException, cs_error
@@ -64,6 +65,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         config.federation_domain_whitelist = None
         config.federation_rc_reject_limit = 10
         config.federation_rc_sleep_limit = 10
+        config.federation_rc_sleep_delay = 100
         config.federation_rc_concurrent = 10
         config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False

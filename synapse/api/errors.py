@@ -17,10 +17,10 @@
 
 import logging
 
-from canonicaljson import json
-
 from six import iteritems
 from six.moves import http_client
+
+from canonicaljson import json
 
 logger = logging.getLogger(__name__)
 

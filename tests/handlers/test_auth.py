@@ -14,11 +14,13 @@
 # limitations under the License.
 
 import pymacaroons
+
 from twisted.internet import defer
 
 import synapse
 import synapse.api.errors
 from synapse.handlers.auth import AuthHandler
+
 from tests import unittest
 from tests.utils import setup_test_homeserver
 

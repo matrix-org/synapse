@@ -12,15 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from six import iteritems
+
+from canonicaljson import encode_canonical_json, json
+
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached
 
-from canonicaljson import encode_canonical_json, json
-
 from ._base import SQLBaseStore
-
-from six import iteritems
 
 
 class EndToEndKeyStore(SQLBaseStore):

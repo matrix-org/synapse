@@ -15,8 +15,8 @@
 # limitations under the License.
 
 """Contains the URL paths to prefix various aspects of the server with. """
-from hashlib import sha256
 import hmac
+from hashlib import sha256
 
 from six.moves.urllib.parse import urlencode
 

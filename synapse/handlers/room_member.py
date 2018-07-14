@@ -21,19 +21,17 @@ from six.moves import http_client
 
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
-from twisted.internet import defer
 from unpaddedbase64 import decode_base64
+
+from twisted.internet import defer
 
 import synapse.server
 import synapse.types
-from synapse.api.constants import (
-    EventTypes, Membership,
-)
-from synapse.api.errors import AuthError, SynapseError, Codes
-from synapse.types import UserID, RoomID
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.types import RoomID, UserID
 from synapse.util.async import Linearizer
-from synapse.util.distributor import user_left_room, user_joined_room
-
+from synapse.util.distributor import user_joined_room, user_left_room
 
 logger = logging.getLogger(__name__)
 

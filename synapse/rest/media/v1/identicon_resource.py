@@ -13,6 +13,9 @@
 # limitations under the License.
 
 from pydenticon import Generator
+
+from synapse.http.servlet import parse_integer
+
 from twisted.web.resource import Resource
 
 FOREGROUND = [
@@ -55,8 +58,8 @@ class IdenticonResource(Resource):
 
     def render_GET(self, request):
         name = "/".join(request.postpath)
-        width = int(request.args.get("width", [96])[0])
-        height = int(request.args.get("height", [96])[0])
+        width = parse_integer(request, "width", default=96)
+        height = parse_integer(request, "height", default=96)
         identicon_bytes = self.generate_identicon(name, width, height)
         request.setHeader(b"Content-Type", b"image/png")
         request.setHeader(

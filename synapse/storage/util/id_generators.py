@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import deque
 import contextlib
 import threading
+from collections import deque
 
 
 class IdGenerator(object):

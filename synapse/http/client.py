@@ -13,39 +13,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from OpenSSL import SSL
-from OpenSSL.SSL import VERIFY_NONE
-
-from synapse.api.errors import (
-    CodeMessageException, MatrixCodeMessageException, SynapseError, Codes,
-)
-from synapse.http import cancelled_to_request_timed_out_error, redact_uri
-from synapse.util.async import add_timeout_to_deferred
-from synapse.util.caches import CACHE_SIZE_FACTOR
-from synapse.util.logcontext import make_deferred_yieldable
-from synapse.http.endpoint import SpiderEndpoint
-
-from canonicaljson import encode_canonical_json
-
-from twisted.internet import defer, reactor, ssl, protocol, task
-from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
-from twisted.web.client import (
-    BrowserLikeRedirectAgent, ContentDecoderAgent, GzipDecoder, Agent,
-    readBody, PartialDownloadError,
-    HTTPConnectionPool,
-)
-from twisted.web.client import FileBodyProducer as TwistedFileBodyProducer
-from twisted.web.http import PotentialDataLoss
-from twisted.web.http_headers import Headers
-from twisted.web._newclient import ResponseDone
-
-from six import StringIO
-
-from prometheus_client import Counter
-from canonicaljson import json
 import logging
 import urllib
 
+from six import StringIO
+
+from canonicaljson import encode_canonical_json, json
+from prometheus_client import Counter
+
+from OpenSSL import SSL
+from OpenSSL.SSL import VERIFY_NONE
+from twisted.internet import defer, protocol, reactor, ssl, task
+from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
+from twisted.web._newclient import ResponseDone
+from twisted.web.client import Agent, BrowserLikeRedirectAgent, ContentDecoderAgent
+from twisted.web.client import FileBodyProducer as TwistedFileBodyProducer
+from twisted.web.client import (
+    GzipDecoder,
+    HTTPConnectionPool,
+    PartialDownloadError,
+    readBody,
+)
+from twisted.web.http import PotentialDataLoss
+from twisted.web.http_headers import Headers
+
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    MatrixCodeMessageException,
+    SynapseError,
+)
+from synapse.http import cancelled_to_request_timed_out_error, redact_uri
+from synapse.http.endpoint import SpiderEndpoint
+from synapse.util.async import add_timeout_to_deferred
+from synapse.util.caches import CACHE_SIZE_FACTOR
+from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 

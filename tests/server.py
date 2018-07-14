@@ -1,15 +1,17 @@
+import json
 from io import BytesIO
 
-import attr
-import json
 from six import text_type
 
-from twisted.python.failure import Failure
+import attr
+
+from twisted.internet import threads
 from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.http.site import SynapseRequest
-from twisted.internet import threads
+
 from tests.utils import setup_test_homeserver as _sth
 
 
@@ -20,7 +22,7 @@ class FakeChannel(object):
     wire).
     """
 
-    result = attr.ib(factory=dict)
+    result = attr.ib(default=attr.Factory(dict))
 
     @property
     def json_body(self):

@@ -15,8 +15,8 @@
 
 from twisted.internet import defer
 
-from synapse.storage.roommember import ProfileInfo
 from synapse.api.errors import StoreError
+from synapse.storage.roommember import ProfileInfo
 
 from ._base import SQLBaseStore
 

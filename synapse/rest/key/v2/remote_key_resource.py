@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import (
-    respond_with_json_bytes, wrap_json_request_handler,
-)
-from synapse.http.servlet import parse_integer, parse_json_object_from_request
-from synapse.api.errors import SynapseError, Codes
-from synapse.crypto.keyring import KeyLookupError
+import logging
+from io import BytesIO
 
+from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
-from twisted.internet import defer
 
+from synapse.api.errors import Codes, SynapseError
+from synapse.crypto.keyring import KeyLookupError
+from synapse.http.server import respond_with_json_bytes, wrap_json_request_handler
+from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
-from io import BytesIO
-import logging
 logger = logging.getLogger(__name__)
 
 

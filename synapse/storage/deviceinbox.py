@@ -19,10 +19,9 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from .background_updates import BackgroundUpdateStore
-
 from synapse.util.caches.expiringcache import ExpiringCache
 
+from .background_updates import BackgroundUpdateStore
 
 logger = logging.getLogger(__name__)
 

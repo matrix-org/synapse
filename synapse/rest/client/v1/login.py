@@ -13,30 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
+import urllib
+import xml.etree.ElementTree as ET
 
-from synapse.api.errors import SynapseError, LoginError, Codes
-from synapse.types import UserID
+from six.moves.urllib import parse as urlparse
+
+from canonicaljson import json
+from saml2 import BINDING_HTTP_POST, config
+from saml2.client import Saml2Client
+
+from twisted.internet import defer
+from twisted.web.client import PartialDownloadError
+
+from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.http.server import finish_request
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-from canonicaljson import json
-
-import urllib
-from six.moves.urllib import parse as urlparse
-
-import logging
-from saml2 import BINDING_HTTP_POST
-from saml2 import config
-from saml2.client import Saml2Client
-
-import xml.etree.ElementTree as ET
-
-from twisted.web.client import PartialDownloadError
-
 
 logger = logging.getLogger(__name__)
 

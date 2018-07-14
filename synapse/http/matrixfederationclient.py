@@ -13,38 +13,38 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer, reactor, protocol
-from twisted.internet.error import DNSLookupError
-from twisted.web.client import readBody, HTTPConnectionPool, Agent
-from twisted.web.http_headers import Headers
-from twisted.web._newclient import ResponseDone
-
-from synapse.http import cancelled_to_request_timed_out_error
-from synapse.http.endpoint import matrix_federation_endpoint
-import synapse.metrics
-from synapse.util.async import add_timeout_to_deferred
-from synapse.util import logcontext
-from synapse.util.logcontext import make_deferred_yieldable
-import synapse.util.retryutils
-
-from canonicaljson import encode_canonical_json, json
-
-from synapse.api.errors import (
-    SynapseError, Codes, HttpResponseException, FederationDeniedError,
-)
-
-from signedjson.sign import sign_json
-
 import cgi
 import logging
 import random
 import sys
 import urllib
-from six.moves.urllib import parse as urlparse
+
 from six import string_types
+from six.moves.urllib import parse as urlparse
 
-
+from canonicaljson import encode_canonical_json, json
 from prometheus_client import Counter
+from signedjson.sign import sign_json
+
+from twisted.internet import defer, protocol, reactor
+from twisted.internet.error import DNSLookupError
+from twisted.web._newclient import ResponseDone
+from twisted.web.client import Agent, HTTPConnectionPool, readBody
+from twisted.web.http_headers import Headers
+
+import synapse.metrics
+import synapse.util.retryutils
+from synapse.api.errors import (
+    Codes,
+    FederationDeniedError,
+    HttpResponseException,
+    SynapseError,
+)
+from synapse.http import cancelled_to_request_timed_out_error
+from synapse.http.endpoint import matrix_federation_endpoint
+from synapse.util import logcontext
+from synapse.util.async import add_timeout_to_deferred
+from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 outbound_logger = logging.getLogger("synapse.http.outbound")

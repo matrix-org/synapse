@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .admin import AdminHandler
+from .directory import DirectoryHandler
+from .federation import FederationHandler
+from .identity import IdentityHandler
+from .message import MessageHandler
 from .register import RegistrationHandler
 from .room import RoomContextHandler
-from .message import MessageHandler
-from .federation import FederationHandler
-from .directory import DirectoryHandler
-from .admin import AdminHandler
-from .identity import IdentityHandler
 from .search import SearchHandler
 
 

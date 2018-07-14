@@ -14,12 +14,12 @@
 # limitations under the License.
 
 
-from .. import unittest
+from mock import Mock
 
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
 
-from mock import Mock
+from .. import unittest
 
 
 class LruCacheTestCase(unittest.TestCase):

@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-
 from synapse.api.errors import SynapseError
 from synapse.server import HomeServer
-from synapse.types import UserID, RoomAlias, GroupID
+from synapse.types import GroupID, RoomAlias, UserID
+
+from tests import unittest
 
 mock_homeserver = HomeServer(hostname="my.domain")
 

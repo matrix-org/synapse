@@ -16,19 +16,19 @@
 import logging
 import re
 
-from canonicaljson import json
 import six
+from six import iteritems
+
+from canonicaljson import json
+from prometheus_client import Counter
+
 from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, FederationError, SynapseError, NotFoundError
+from synapse.api.errors import AuthError, FederationError, NotFoundError, SynapseError
 from synapse.crypto.event_signing import compute_event_signature
-from synapse.federation.federation_base import (
-    FederationBase,
-    event_from_pdu_json,
-)
-
+from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.endpoint import parse_server_name
@@ -36,10 +36,6 @@ from synapse.types import get_domain_from_id
 from synapse.util import async
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logutils import log_function
-
-from prometheus_client import Counter
-
-from six import iteritems
 
 # when processing incoming transactions, we try to handle multiple rooms in
 # parallel, up to this limit.

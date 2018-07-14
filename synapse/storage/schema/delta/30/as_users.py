@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from synapse.config.appservice import load_appservices
 
 from six.moves import range
 
+from synapse.config.appservice import load_appservices
 
 logger = logging.getLogger(__name__)
 

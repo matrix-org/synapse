@@ -20,10 +20,8 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import SynapseError
-from synapse.http.server import (
-    respond_with_json,
-    wrap_json_request_handler,
-)
+from synapse.http.server import respond_with_json, wrap_json_request_handler
+from synapse.http.servlet import parse_string
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +66,10 @@ class UploadResource(Resource):
                 code=413,
             )
 
-        upload_name = request.args.get("filename", None)
+        upload_name = parse_string(request, "filename")
         if upload_name:
             try:
-                upload_name = upload_name[0].decode('UTF-8')
+                upload_name = upload_name.decode('UTF-8')
             except UnicodeDecodeError:
                 raise SynapseError(
                     msg="Invalid UTF-8 filename parameter: %r" % (upload_name),

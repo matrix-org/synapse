@@ -14,13 +14,11 @@
 # limitations under the License.
 
 
-from inspect import getcallargs
-from functools import wraps
-
-import logging
 import inspect
+import logging
 import time
-
+from functools import wraps
+from inspect import getcallargs
 
 _TIME_FUNC_ID = 0
 

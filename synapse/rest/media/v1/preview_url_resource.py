@@ -24,31 +24,29 @@ import shutil
 import sys
 import traceback
 
+from six import string_types
+from six.moves import urllib_parse as urlparse
+
 from canonicaljson import json
 
-from six.moves import urllib_parse as urlparse
-from six import string_types
-
-from twisted.web.server import NOT_DONE_YET
 from twisted.internet import defer
 from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 
-from ._base import FileInfo
-
-from synapse.api.errors import (
-    SynapseError, Codes,
-)
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
-from synapse.util.stringutils import random_string
-from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    respond_with_json_bytes,
     respond_with_json,
+    respond_with_json_bytes,
     wrap_json_request_handler,
 )
+from synapse.http.servlet import parse_integer, parse_string
 from synapse.util.async import ObservableDeferred
-from synapse.util.stringutils import is_ascii
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.util.stringutils import is_ascii, random_string
+
+from ._base import FileInfo
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +97,9 @@ class PreviewUrlResource(Resource):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = yield self.auth.get_user_by_req(request)
-        url = request.args.get("url")[0]
+        url = parse_string(request, "url")
         if "ts" in request.args:
-            ts = int(request.args.get("ts")[0])
+            ts = parse_integer(request, "ts")
         else:
             ts = self.clock.time_msec()
 
