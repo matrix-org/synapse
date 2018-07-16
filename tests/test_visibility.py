@@ -73,6 +73,51 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertEqual(filtered[i].content["a"], "b")
 
+    @tests.unittest.DEBUG
+    @defer.inlineCallbacks
+    def test_erased_user(self):
+        # 4 message events, from erased and unerased users, with a membership
+        # change in the middle of them.
+        events_to_filter = []
+
+        evt = yield self.inject_message("@unerased:local_hs")
+        events_to_filter.append(evt)
+
+        evt = yield self.inject_message("@erased:local_hs")
+        events_to_filter.append(evt)
+
+        evt = yield self.inject_room_member("@joiner:remote_hs")
+        events_to_filter.append(evt)
+
+        evt = yield self.inject_message("@unerased:local_hs")
+        events_to_filter.append(evt)
+
+        evt = yield self.inject_message("@erased:local_hs")
+        events_to_filter.append(evt)
+
+        # the erasey user gets erased
+        self.hs.get_datastore().mark_user_erased("@erased:local_hs")
+
+        # ... and the filtering happens.
+        filtered = yield filter_events_for_server(
+            self.store, "test_server", events_to_filter,
+        )
+
+        for i in range(0, len(events_to_filter)):
+            self.assertEqual(
+                events_to_filter[i].event_id, filtered[i].event_id,
+                "Unexpected event at result position %i" % (i, )
+            )
+
+        for i in (0, 3):
+            self.assertEqual(
+                events_to_filter[i].content["body"], filtered[i].content["body"],
+                "Unexpected event content at result position %i" % (i,)
+            )
+
+        for i in (1, 4):
+            self.assertNotIn("body", filtered[i].content)
+
     @defer.inlineCallbacks
     def inject_visibility(self, user_id, visibility):
         content = {"history_visibility": visibility}
@@ -98,6 +143,24 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             "type": "m.room.member",
             "sender": user_id,
             "state_key": user_id,
+            "room_id": TEST_ROOM_ID,
+            "content": content,
+        })
+
+        event, context = yield self.event_creation_handler.create_new_client_event(
+            builder
+        )
+
+        yield self.hs.get_datastore().persist_event(event, context)
+        defer.returnValue(event)
+
+    @defer.inlineCallbacks
+    def inject_message(self, user_id, content=None):
+        if content is None:
+            content = {"body": "testytest"}
+        builder = self.event_builder_factory.new({
+            "type": "m.room.message",
+            "sender": user_id,
             "room_id": TEST_ROOM_ID,
             "content": content,
         })
