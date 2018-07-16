@@ -15,21 +15,11 @@
 
 from synapse.http.server import JsonResource
 from synapse.rest.client import versions
+from synapse.rest.client.v1 import admin, directory, events, initial_sync
 from synapse.rest.client.v1 import login as v1_login
+from synapse.rest.client.v1 import logout, presence, profile, push_rule, pusher
 from synapse.rest.client.v1 import register as v1_register
-from synapse.rest.client.v1 import (
-    admin,
-    directory,
-    events,
-    initial_sync,
-    logout,
-    presence,
-    profile,
-    push_rule,
-    pusher,
-    room,
-    voip,
-)
+from synapse.rest.client.v1 import room, voip
 from synapse.rest.client.v2_alpha import (
     account,
     account_data,

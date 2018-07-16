@@ -15,7 +15,6 @@
 
 from ._base import Config
 
-
 DEFAULT_CONFIG = """\
 # User Consent configuration
 #

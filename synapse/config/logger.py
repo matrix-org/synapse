@@ -29,7 +29,6 @@ from synapse.util.versionstring import get_version_string
 
 from ._base import Config
 
-
 DEFAULT_LOG_CONFIG = Template("""
 version: 1
 

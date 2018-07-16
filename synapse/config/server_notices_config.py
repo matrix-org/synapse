@@ -16,7 +16,6 @@ from synapse.types import UserID
 
 from ._base import Config
 
-
 DEFAULT_CONFIG = """\
 # Server Notices room configuration
 #

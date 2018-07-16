@@ -15,7 +15,6 @@
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.prepare_database import get_statements
 
-
 FIX_INDEXES = """
 -- rebuild indexes as uniques
 DROP INDEX groups_invites_g_idx;

@@ -26,11 +26,9 @@ from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, protocol, reactor, ssl, task
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.web._newclient import ResponseDone
+from twisted.web.client import Agent, BrowserLikeRedirectAgent, ContentDecoderAgent
 from twisted.web.client import FileBodyProducer as TwistedFileBodyProducer
 from twisted.web.client import (
-    Agent,
-    BrowserLikeRedirectAgent,
-    ContentDecoderAgent,
     GzipDecoder,
     HTTPConnectionPool,
     PartialDownloadError,
