@@ -15,9 +15,11 @@
 import logging
 
 from twisted.internet import defer
+from twisted.internet.defer import succeed
 
+from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
-from tests import unittest
+import tests.unittest
 from tests.utils import setup_test_homeserver
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 TEST_ROOM_ID = "!TEST:ROOM"
 
 
-class FilterEventsForServerTestCase(unittest.TestCase):
+class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver()
@@ -105,3 +107,154 @@ class FilterEventsForServerTestCase(unittest.TestCase):
 
         yield self.hs.get_datastore().persist_event(event, context)
         defer.returnValue(event)
+
+    @defer.inlineCallbacks
+    def test_large_room(self):
+        # see what happens when we have a large room with hundreds of thousands
+        # of membership events
+
+        # As above, the events to be filtered consist of 10 membership events,
+        # where one of them is for a user on the server we are filtering for.
+
+        import cProfile
+        import pstats
+        import time
+
+        # we stub out the store, because building up all that state the normal
+        # way is very slow.
+        test_store = _TestStore()
+
+        # our initial state is 100000 membership events and one
+        # history_visibility event.
+        room_state = []
+
+        history_visibility_evt = FrozenEvent({
+            "event_id": "$history_vis",
+            "type": "m.room.history_visibility",
+            "sender": "@resident_user_0:test.com",
+            "state_key": "",
+            "room_id": TEST_ROOM_ID,
+            "content": {"history_visibility": "joined"},
+        })
+        room_state.append(history_visibility_evt)
+        test_store.add_event(history_visibility_evt)
+
+        for i in range(0, 100000):
+            user = "@resident_user_%i:test.com" % (i, )
+            evt = FrozenEvent({
+                "event_id": "$res_event_%i" % (i, ),
+                "type": "m.room.member",
+                "state_key": user,
+                "sender": user,
+                "room_id": TEST_ROOM_ID,
+                "content": {
+                    "membership": "join",
+                    "extra": "zzz,"
+                },
+            })
+            room_state.append(evt)
+            test_store.add_event(evt)
+
+        events_to_filter = []
+        for i in range(0, 10):
+            user = "@user%i:%s" % (
+                i, "test_server" if i == 5 else "other_server"
+            )
+            evt = FrozenEvent({
+                "event_id": "$evt%i" % (i, ),
+                "type": "m.room.member",
+                "state_key": user,
+                "sender": user,
+                "room_id": TEST_ROOM_ID,
+                "content": {
+                    "membership": "join",
+                    "extra": "zzz",
+                },
+            })
+            events_to_filter.append(evt)
+            room_state.append(evt)
+
+            test_store.add_event(evt)
+            test_store.set_state_ids_for_event(evt, {
+                (e.type, e.state_key): e.event_id for e in room_state
+            })
+
+        pr = cProfile.Profile()
+        pr.enable()
+
+        logger.info("Starting filtering")
+        start = time.time()
+        filtered = yield filter_events_for_server(
+            test_store, "test_server", events_to_filter,
+        )
+        logger.info("Filtering took %f seconds", time.time() - start)
+
+        pr.disable()
+        with open("filter_events_for_server.profile", "w+") as f:
+            ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
+            ps.print_stats()
+
+        # the result should be 5 redacted events, and 5 unredacted events.
+        for i in range(0, 5):
+            self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
+            self.assertNotIn("extra", filtered[i].content)
+
+        for i in range(5, 10):
+            self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
+            self.assertEqual(filtered[i].content["extra"], "zzz")
+
+    test_large_room.skip = "Disabled by default because it's slow"
+
+
+class _TestStore(object):
+    """Implements a few methods of the DataStore, so that we can test
+    filter_events_for_server
+
+    """
+    def __init__(self):
+        # data for get_events: a map from event_id to event
+        self.events = {}
+
+        # data for get_state_ids_for_events mock: a map from event_id to
+        # a map from (type_state_key) -> event_id for the state at that
+        # event
+        self.state_ids_for_events = {}
+
+    def add_event(self, event):
+        self.events[event.event_id] = event
+
+    def set_state_ids_for_event(self, event, state):
+        self.state_ids_for_events[event.event_id] = state
+
+    def get_state_ids_for_events(self, events, types):
+        res = {}
+        include_memberships = False
+        for (type, state_key) in types:
+            if type == "m.room.history_visibility":
+                continue
+            if type != "m.room.member" or state_key is not None:
+                raise RuntimeError(
+                    "Unimplemented: get_state_ids with type (%s, %s)" %
+                    (type, state_key),
+                )
+            include_memberships = True
+
+        if include_memberships:
+            for event_id in events:
+                res[event_id] = self.state_ids_for_events[event_id]
+
+        else:
+            k = ("m.room.history_visibility", "")
+            for event_id in events:
+                hve = self.state_ids_for_events[event_id][k]
+                res[event_id] = {k: hve}
+
+        return succeed(res)
+
+    def get_events(self, events):
+        return succeed({
+            event_id: self.events[event_id] for event_id in events
+        })
+
+    def are_users_erased(self, users):
+        return succeed({u: False for u in users})
