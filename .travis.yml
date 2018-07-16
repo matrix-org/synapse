@@ -24,7 +24,7 @@ matrix:
     env: TOX_ENV=py36
 
   - python: 3.6
-    env: TOX_ENV=isort
+    env: TOX_ENV=check_isort
 
   - python: 3.6
     env: TOX_ENV=check-newsfragment
