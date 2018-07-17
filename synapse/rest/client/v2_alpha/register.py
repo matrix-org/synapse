@@ -643,7 +643,7 @@ class RegisterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def _do_guest_registration(self, params):
         if not self.hs.config.allow_guest_access:
-            defer.returnValue((403, "Guest access is disabled"))
+            raise SynapseError(403, "Guest access is disabled")
         user_id, _ = yield self.registration_handler.register(
             generate_token=False,
             make_guest=True

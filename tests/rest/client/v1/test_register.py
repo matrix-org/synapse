@@ -17,26 +17,22 @@ import json
 
 from mock import Mock
 
-from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactorClock
 
-from synapse.rest.client.v1.register import CreateUserRestServlet
+from synapse.http.server import JsonResource
+from synapse.rest.client.v1.register import register_servlets
+from synapse.util import Clock
 
 from tests import unittest
-from tests.utils import mock_getRawHeaders
+from tests.server import make_request, setup_test_homeserver
 
 
 class CreateUserServletTestCase(unittest.TestCase):
+    """
+    Tests for CreateUserRestServlet.
+    """
 
     def setUp(self):
-        # do the dance to hook up request data to self.request_data
-        self.request_data = ""
-        self.request = Mock(
-            content=Mock(read=Mock(side_effect=lambda: self.request_data)),
-            path='/_matrix/client/api/v1/createUser'
-        )
-        self.request.args = {}
-        self.request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-
         self.registration_handler = Mock()
 
         self.appservice = Mock(sender="@as:test")
@@ -44,39 +40,49 @@ class CreateUserServletTestCase(unittest.TestCase):
             get_app_service_by_token=Mock(return_value=self.appservice)
         )
 
-        # do the dance to hook things up to the hs global
-        handlers = Mock(
-            registration_handler=self.registration_handler,
+        handlers = Mock(registration_handler=self.registration_handler)
+        self.clock = MemoryReactorClock()
+        self.hs_clock = Clock(self.clock)
+
+        self.hs = self.hs = setup_test_homeserver(
+            http_client=None, clock=self.hs_clock, reactor=self.clock
         )
-        self.hs = Mock()
-        self.hs.hostname = "superbig~testing~thing.com"
         self.hs.get_datastore = Mock(return_value=self.datastore)
         self.hs.get_handlers = Mock(return_value=handlers)
-        self.servlet = CreateUserRestServlet(self.hs)
 
-    @defer.inlineCallbacks
     def test_POST_createuser_with_valid_user(self):
+
+        res = JsonResource(self.hs)
+        register_servlets(self.hs, res)
+
+        request_data = json.dumps(
+            {
+                "localpart": "someone",
+                "displayname": "someone interesting",
+                "duration_seconds": 200,
+            }
+        )
+
+        url = b'/_matrix/client/api/v1/createUser?access_token=i_am_an_app_service'
+
         user_id = "@someone:interesting"
         token = "my token"
-        self.request.args = {
-            "access_token": "i_am_an_app_service"
-        }
-        self.request_data = json.dumps({
-            "localpart": "someone",
-            "displayname": "someone interesting",
-            "duration_seconds": 200
-        })
 
         self.registration_handler.get_or_create_user = Mock(
             return_value=(user_id, token)
         )
 
-        (code, result) = yield self.servlet.on_POST(self.request)
-        self.assertEquals(code, 200)
+        request, channel = make_request(b"POST", url, request_data)
+        request.render(res)
+
+        # Advance the clock because it waits
+        self.clock.advance(1)
+
+        self.assertEquals(channel.result["code"], b"200")
 
         det_data = {
             "user_id": user_id,
             "access_token": token,
-            "home_server": self.hs.hostname
+            "home_server": self.hs.hostname,
         }
-        self.assertDictContainsSubset(det_data, result)
+        self.assertDictContainsSubset(det_data, json.loads(channel.result["body"]))
