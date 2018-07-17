@@ -106,14 +106,20 @@ class BaseHandler(object):
 
     @defer.inlineCallbacks
     def maybe_kick_guest_users(self, event, context=None):
+        """
+        Args:
+            event (FrozenEvent)
+            context (StatelessContext)
+        """
         # Technically this function invalidates current_state by changing it.
         # Hopefully this isn't that important to the caller.
         if event.type == EventTypes.GuestAccess:
             guest_access = event.content.get("guest_access", "forbidden")
             if guest_access != "can_join":
                 if context:
+                    current_state_ids = yield context.get_current_state_ids(self.store)
                     current_state = yield self.store.get_events(
-                        list(context.current_state_ids.values())
+                        list(current_state_ids.values())
                     )
                 else:
                     current_state = yield self.state_handler.get_current_state(

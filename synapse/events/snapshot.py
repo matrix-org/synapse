@@ -15,28 +15,19 @@
 
 from frozendict import frozendict
 
+import abc
+
 from twisted.internet import defer
 
 
-class EventContext(object):
+class StatelessContext(object):
     """
     Attributes:
-        current_state_ids (dict[(str, str), str]):
-            The current state map including the current event.
-            (type, state_key) -> event_id
-
-        prev_state_ids (dict[(str, str), str]):
-            The current state map excluding the current event.
-            (type, state_key) -> event_id
-
         state_group (int|None): state group id, if the state has been stored
             as a state group. This is usually only None if e.g. the event is
             an outlier.
         rejected (bool|str): A rejection reason if the event was rejected, else
             False
-
-        push_actions (list[(str, list[object])]): list of (user_id, actions)
-            tuples
 
         prev_group (int): Previously persisted state group. ``None`` for an
             outlier.
@@ -45,24 +36,31 @@ class EventContext(object):
 
         prev_state_events (?): XXX: is this ever set to anything other than
             the empty list?
+
+        current_state_ids (dict[(str, str), str]|None):
+            The current state map including the current event.
+            (type, state_key) -> event_id
+
+        prev_state_ids (dict[(str, str), str]|None):
+            The current state map excluding the current event.
+            (type, state_key) -> event_id
     """
 
+    __metaclass__ = abc.ABCMeta
+
     __slots__ = [
-        "current_state_ids",
-        "prev_state_ids",
         "state_group",
         "rejected",
         "prev_group",
         "delta_ids",
         "prev_state_events",
         "app_service",
+
+        "current_state_ids",
+        "prev_state_ids",
     ]
 
     def __init__(self):
-        # The current state including the current event
-        self.current_state_ids = None
-        # The current state excluding the current event
-        self.prev_state_ids = None
         self.state_group = None
 
         self.rejected = False
@@ -76,9 +74,39 @@ class EventContext(object):
 
         self.app_service = None
 
+        # The current state including the current event
+        self.current_state_ids = None
+        # The current state excluding the current event
+        self.prev_state_ids = None
+
+    @abc.abstractmethod
+    def get_current_state_ids(self, store):
+        """Gets the current state IDs
+
+        Returns:
+            Deferred[dict[(str, str), str]|None]
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_prev_state_ids(self, store):
+        """Gets the prev state IDs
+
+        Returns:
+            Deferred[dict[(str, str), str]|None]
+        """
+        raise NotImplementedError()
+
+
+class EventContext(StatelessContext):
+    """This is the same as StatelessContext, except guarantees that
+    current_state_ids and prev_state_ids are set.
+    """
+    __slots__ = []
+
     def serialize(self, event):
         """Converts self to a type that can be serialized as JSON, and then
-        deserialized by `deserialize`
+        deserialized by `DeserializedContext.deserialize`
 
         Args:
             event (FrozenEvent): The event that this context relates to
@@ -108,20 +136,52 @@ class EventContext(object):
             "app_service_id": self.app_service.id if self.app_service else None
         }
 
+    def get_current_state_ids(self, store):
+        """Implements StatelessContext"""
+        return defer.succeed(self.current_state_ids)
+
+    def get_prev_state_ids(self, store):
+        """Implements StatelessContext"""
+        return defer.succeed(self.prev_state_ids)
+
+
+class DeserializedContext(StatelessContext):
+    """A context that comes from a serialized version of a StatelessContext.
+
+    It does not necessarily have current_state_ids and prev_state_ids filled
+    out (unlike EventContext), but does cache the results of
+    `get_current_state_ids` and `get_prev_state_ids`.
+
+    Attributes:
+        _have_fetched_state (bool): Whether we attempted to fill out
+            current_state_ids
+        _prev_state_id (str|None): If set then the event associated with the
+            context overrode the _prev_state_id
+        _event_type (str): The type of the event the context is associated with
+        _event_state_key (str|None): The state_key of the event the context is
+            associated with
+    """
+
+    __slots__ = [
+        "_have_fetched_state",
+        "_prev_state_id",
+        "_event_type",
+        "_event_state_key",
+    ]
+
     @staticmethod
-    @defer.inlineCallbacks
     def deserialize(store, input):
         """Converts a dict that was produced by `serialize` back into a
-        EventContext.
+        StatelessContext.
 
         Args:
             store (DataStore): Used to convert AS ID to AS object
             input (dict): A dict produced by `serialize`
 
         Returns:
-            EventContext
+            StatelessContext
         """
-        context = EventContext()
+        context = DeserializedContext()
         context.state_group = input["state_group"]
         context.rejected = input["rejected"]
         context.prev_group = input["prev_group"]
@@ -130,24 +190,56 @@ class EventContext(object):
 
         # We use the state_group and prev_state_id stuff to pull the
         # current_state_ids out of the DB and construct prev_state_ids.
-        prev_state_id = input["prev_state_id"]
-        event_type = input["event_type"]
-        event_state_key = input["event_state_key"]
+        context._prev_state_id = input["prev_state_id"]
+        context._event_type = input["event_type"]
+        context._event_state_key = input["event_state_key"]
 
-        context.current_state_ids = yield store.get_state_ids_for_group(
-            context.state_group,
-        )
-        if prev_state_id and event_state_key:
-            context.prev_state_ids = dict(context.current_state_ids)
-            context.prev_state_ids[(event_type, event_state_key)] = prev_state_id
-        else:
-            context.prev_state_ids = context.current_state_ids
+        context._have_fetched_state = False
 
         app_service_id = input["app_service_id"]
         if app_service_id:
             context.app_service = store.get_app_service_by_id(app_service_id)
 
-        defer.returnValue(context)
+        return context
+
+    @defer.inlineCallbacks
+    def get_current_state_ids(self, store):
+        """Implements StatelessContext"""
+
+        if not self._have_fetched_state:
+            yield self._fill_out_state(store)
+
+        defer.returnValue(self.current_state_ids)
+
+    @defer.inlineCallbacks
+    def get_prev_state_ids(self, store):
+        """Implements StatelessContext"""
+
+        if not self._have_fetched_state:
+            yield self._fill_out_state(store)
+
+        defer.returnValue(self.current_state_ids)
+
+    @defer.inlineCallbacks
+    def _fill_out_state(self, store):
+        """Called to populate the current_state_ids and prev_state_ids
+        attributes by loading from the database.
+        """
+        self._have_fetched_state = True
+
+        if self.state_group is None:
+            return
+
+        self.current_state_ids = yield store.get_state_ids_for_group(
+            self.state_group,
+        )
+        if self._prev_state_id:
+            self.prev_state_ids = dict(self.current_state_ids)
+
+            key = (self._event_type, self._event_state_key)
+            self.prev_state_ids[key] = self._prev_state_id
+        else:
+            self.prev_state_ids = self.current_state_ids
 
 
 def _encode_state_dict(state_dict):

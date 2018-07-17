@@ -24,7 +24,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.events import FrozenEvent
-from synapse.events.snapshot import EventContext
+from synapse.events.snapshot import DeserializedContext
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import Requester, UserID
 from synapse.util.caches.response_cache import ResponseCache
@@ -136,7 +136,9 @@ class ReplicationSendEventRestServlet(RestServlet):
             event = FrozenEvent(event_dict, internal_metadata, rejected_reason)
 
             requester = Requester.deserialize(self.store, content["requester"])
-            context = yield EventContext.deserialize(self.store, content["context"])
+            context = yield DeserializedContext.deserialize(
+                self.store, content["context"],
+            )
 
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]
