@@ -19,6 +19,7 @@ from twisted.internet.defer import succeed
 
 from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
+
 import tests.unittest
 from tests.utils import setup_test_homeserver
 

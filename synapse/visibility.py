@@ -17,6 +17,7 @@ import logging
 import operator
 
 import six
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
