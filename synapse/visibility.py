@@ -248,6 +248,8 @@ def filter_events_for_server(store, server_name, events):
             )
             return prune_event(event)
 
+        # state will be None if we decided we didn't need to filter by
+        # room membership.
         if not state:
             return event
 
