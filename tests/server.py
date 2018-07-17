@@ -80,6 +80,11 @@ def make_request(method, path, content=b""):
     content, and return the Request and the Channel underneath.
     """
 
+    # Decorate it to be the full path
+    if not path.startswith(b"/_matrix"):
+        path = b"/_matrix/client/r0/" + path
+        path = path.replace("//", "/")
+
     if isinstance(content, text_type):
         content = content.encode('utf8')
 
@@ -108,6 +113,11 @@ def wait_until_result(clock, channel, timeout=100):
             raise Exception("Timed out waiting for request to finish.")
 
         clock.advance(0.1)
+
+
+def render(request, resource, clock):
+    request.render(resource)
+    wait_until_result(clock, request._channel)
 
 
 class ThreadedMemoryReactorClock(MemoryReactorClock):
