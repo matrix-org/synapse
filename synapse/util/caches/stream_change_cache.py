@@ -80,10 +80,7 @@ class StreamChangeCache(object):
                 )
             }
 
-            result = {
-                e for e in entities
-                if e in changed_entities
-            }
+            result = changed_entities.intersection(entities)
 
             self.metrics.inc_hits()
         else:
