@@ -232,7 +232,59 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
 
 @defer.inlineCallbacks
 def filter_events_for_server(store, server_name, events):
-    # First lets check to see if all the events have a history visibility
+    # Whatever else we do, we need to check for senders which have requested
+    # erasure of their data.
+    erased_senders = yield store.are_users_erased(
+        e.sender for e in events,
+    )
+
+    def redact_disallowed(event, state):
+        # if the sender has been gdpr17ed, always return a redacted
+        # copy of the event.
+        if erased_senders[event.sender]:
+            logger.info(
+                "Sender of %s has been erased, redacting",
+                event.event_id,
+            )
+            return prune_event(event)
+
+        # state will be None if we decided we didn't need to filter by
+        # room membership.
+        if not state:
+            return event
+
+        history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
+        if history:
+            visibility = history.content.get("history_visibility", "shared")
+            if visibility in ["invited", "joined"]:
+                # We now loop through all state events looking for
+                # membership states for the requesting server to determine
+                # if the server is either in the room or has been invited
+                # into the room.
+                for ev in state.itervalues():
+                    if ev.type != EventTypes.Member:
+                        continue
+                    try:
+                        domain = get_domain_from_id(ev.state_key)
+                    except Exception:
+                        continue
+
+                    if domain != server_name:
+                        continue
+
+                    memtype = ev.membership
+                    if memtype == Membership.JOIN:
+                        return event
+                    elif memtype == Membership.INVITE:
+                        if visibility == "invited":
+                            return event
+                else:
+                    # server has no users in the room: redact
+                    return prune_event(event)
+
+        return event
+
+    # Next lets check to see if all the events have a history visibility
     # of "shared" or "world_readable". If thats the case then we don't
     # need to check membership (as we know the server is in the room).
     event_to_state_ids = yield store.get_state_ids_for_events(
@@ -251,15 +303,24 @@ def filter_events_for_server(store, server_name, events):
     # If we failed to find any history visibility events then the default
     # is "shared" visiblity.
     if not visibility_ids:
-        defer.returnValue(events)
-
-    event_map = yield store.get_events(visibility_ids)
-    all_open = all(
-        e.content.get("history_visibility") in (None, "shared", "world_readable")
-        for e in event_map.itervalues()
-    )
+        all_open = True
+    else:
+        event_map = yield store.get_events(visibility_ids)
+        all_open = all(
+            e.content.get("history_visibility") in (None, "shared", "world_readable")
+            for e in event_map.itervalues()
+        )
 
     if all_open:
+        # all the history_visibility state affecting these events is open, so
+        # we don't need to filter by membership state. We *do* need to check
+        # for user erasure, though.
+        if erased_senders:
+            events = [
+                redact_disallowed(e, None)
+                for e in events
+            ]
+
         defer.returnValue(events)
 
     # Ok, so we're dealing with events that have non-trivial visibility
@@ -313,54 +374,6 @@ def filter_events_for_server(store, server_name, events):
         }
         for e_id, key_to_eid in event_to_state_ids.iteritems()
     }
-
-    erased_senders = yield store.are_users_erased(
-        e.sender for e in events,
-    )
-
-    def redact_disallowed(event, state):
-        # if the sender has been gdpr17ed, always return a redacted
-        # copy of the event.
-        if erased_senders[event.sender]:
-            logger.info(
-                "Sender of %s has been erased, redacting",
-                event.event_id,
-            )
-            return prune_event(event)
-
-        if not state:
-            return event
-
-        history = state.get((EventTypes.RoomHistoryVisibility, ''), None)
-        if history:
-            visibility = history.content.get("history_visibility", "shared")
-            if visibility in ["invited", "joined"]:
-                # We now loop through all state events looking for
-                # membership states for the requesting server to determine
-                # if the server is either in the room or has been invited
-                # into the room.
-                for ev in state.itervalues():
-                    if ev.type != EventTypes.Member:
-                        continue
-                    try:
-                        domain = get_domain_from_id(ev.state_key)
-                    except Exception:
-                        continue
-
-                    if domain != server_name:
-                        continue
-
-                    memtype = ev.membership
-                    if memtype == Membership.JOIN:
-                        return event
-                    elif memtype == Membership.INVITE:
-                        if visibility == "invited":
-                            return event
-                else:
-                    # server has no users in the room: redact
-                    return prune_event(event)
-
-        return event
 
     defer.returnValue([
         redact_disallowed(e, event_to_state[e.event_id])
