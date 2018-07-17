@@ -37,13 +37,15 @@ class MediaStorage(object):
     """Responsible for storing/fetching files from local sources.
 
     Args:
+        hs (synapse.server.Homeserver)
         local_media_directory (str): Base path where we store media on disk
         filepaths (MediaFilePaths)
         storage_providers ([StorageProvider]): List of StorageProvider that are
             used to fetch and store files.
     """
 
-    def __init__(self, local_media_directory, filepaths, storage_providers):
+    def __init__(self, hs, local_media_directory, filepaths, storage_providers):
+        self.hs = hs
         self.local_media_directory = local_media_directory
         self.filepaths = filepaths
         self.storage_providers = storage_providers
@@ -175,7 +177,8 @@ class MediaStorage(object):
             res = yield provider.fetch(path, file_info)
             if res:
                 with res:
-                    consumer = BackgroundFileConsumer(open(local_path, "w"))
+                    consumer = BackgroundFileConsumer(
+                        open(local_path, "w"), self.hs.get_reactor())
                     yield res.write_to_consumer(consumer)
                     yield consumer.wait()
                 defer.returnValue(local_path)

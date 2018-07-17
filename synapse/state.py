@@ -694,10 +694,10 @@ def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_ma
     return auth_events
 
 
-def _resolve_with_state(unconflicted_state_ids, conflicted_state_ds, auth_event_ids,
+def _resolve_with_state(unconflicted_state_ids, conflicted_state_ids, auth_event_ids,
                         state_map):
     conflicted_state = {}
-    for key, event_ids in iteritems(conflicted_state_ds):
+    for key, event_ids in iteritems(conflicted_state_ids):
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
         if len(events) > 1:
             conflicted_state[key] = events

@@ -62,7 +62,7 @@ class LaterGauge(object):
             calls = self.caller()
         except Exception:
             logger.exception(
-                "Exception running callback for LaterGuage(%s)",
+                "Exception running callback for LaterGauge(%s)",
                 self.name,
             )
             yield g
@@ -140,14 +140,15 @@ gc_time = Histogram(
 class GCCounts(object):
 
     def collect(self):
-        cm = GaugeMetricFamily("python_gc_counts", "GC cycle counts", labels=["gen"])
+        cm = GaugeMetricFamily("python_gc_counts", "GC object counts", labels=["gen"])
         for n, m in enumerate(gc.get_count()):
             cm.add_metric([str(n)], m)
 
         yield cm
 
 
-REGISTRY.register(GCCounts())
+if not running_on_pypy:
+    REGISTRY.register(GCCounts())
 
 #
 # Twisted reactor metrics
@@ -190,6 +191,22 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
 
+last_ticked = time.time()
+
+
+class ReactorLastSeenMetric(object):
+
+    def collect(self):
+        cm = GaugeMetricFamily(
+            "python_twisted_reactor_last_seen",
+            "Seconds since the Twisted reactor was last seen",
+        )
+        cm.add_metric([], time.time() - last_ticked)
+        yield cm
+
+
+REGISTRY.register(ReactorLastSeenMetric())
+
 
 def runUntilCurrentTimer(func):
 
@@ -221,6 +238,11 @@ def runUntilCurrentTimer(func):
         # reactor.
         tick_time.observe(end - start)
         pending_calls_metric.observe(num_pending)
+
+        # Update the time we last ticked, for the metric to test whether
+        # Synapse's reactor has frozen
+        global last_ticked
+        last_ticked = end
 
         if running_on_pypy:
             return ret

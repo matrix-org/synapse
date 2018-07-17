@@ -34,7 +34,6 @@ import hmac
 import re
 from string import capwords
 from hashlib import sha1
-from synapse.util.async import run_on_reactor
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from six import string_types
@@ -193,8 +192,6 @@ class RegisterRestServlet(RestServlet):
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         body = parse_json_object_from_request(request)
 
         kind = "user"

@@ -14,17 +14,15 @@
 
 import contextlib
 import logging
-import re
 import time
 
 from twisted.web.server import Site, Request
 
+from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
-
-ACCESS_TOKEN_RE = re.compile(br'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
 
 _next_request_seq = 0
 
@@ -69,10 +67,7 @@ class SynapseRequest(Request):
         return "%s-%i" % (self.method, self.request_seq)
 
     def get_redacted_uri(self):
-        return ACCESS_TOKEN_RE.sub(
-            br'\1<redacted>\3',
-            self.uri
-        )
+        return redact_uri(self.uri)
 
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
@@ -104,19 +99,36 @@ class SynapseRequest(Request):
             db_txn_count = context.db_txn_count
             db_txn_duration_sec = context.db_txn_duration_sec
             db_sched_duration_sec = context.db_sched_duration_sec
+            evt_db_fetch_count = context.evt_db_fetch_count
         except Exception:
             ru_utime, ru_stime = (0, 0)
             db_txn_count, db_txn_duration_sec = (0, 0)
+            evt_db_fetch_count = 0
 
         end_time = time.time()
+
+        # need to decode as it could be raw utf-8 bytes
+        # from a IDN servname in an auth header
+        authenticated_entity = self.authenticated_entity
+        if authenticated_entity is not None:
+            authenticated_entity = authenticated_entity.decode("utf-8", "replace")
+
+        # ...or could be raw utf-8 bytes in the User-Agent header.
+        # N.B. if you don't do this, the logger explodes cryptically
+        # with maximum recursion trying to log errors about
+        # the charset problem.
+        # c.f. https://github.com/matrix-org/synapse/issues/3471
+        user_agent = self.get_user_agent()
+        if user_agent is not None:
+            user_agent = user_agent.decode("utf-8", "replace")
 
         self.site.access_logger.info(
             "%s - %s - {%s}"
             " Processed request: %.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
-            " %sB %s \"%s %s %s\" \"%s\"",
+            " %sB %s \"%s %s %s\" \"%s\" [%d dbevts]",
             self.getClientIP(),
             self.site.site_tag,
-            self.authenticated_entity,
+            authenticated_entity,
             end_time - self.start_time,
             ru_utime,
             ru_stime,
@@ -128,7 +140,8 @@ class SynapseRequest(Request):
             self.method,
             self.get_redacted_uri(),
             self.clientproto,
-            self.get_user_agent(),
+            user_agent,
+            evt_db_fetch_count,
         )
 
         try:

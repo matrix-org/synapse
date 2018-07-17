@@ -17,7 +17,7 @@ import logging
 
 from synapse.util.async import ObservableDeferred
 from synapse.util import unwrapFirstError, logcontext
-from synapse.util.caches import CACHE_SIZE_FACTOR
+from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from synapse.util.stringutils import to_ascii
@@ -313,7 +313,7 @@ class CacheDescriptor(_CacheDescriptorBase):
             orig, num_args=num_args, inlineCallbacks=inlineCallbacks,
             cache_context=cache_context)
 
-        max_entries = int(max_entries * CACHE_SIZE_FACTOR)
+        max_entries = int(max_entries * get_cache_factor_for(orig.__name__))
 
         self.max_entries = max_entries
         self.tree = tree

@@ -18,13 +18,18 @@ import logging
 
 import mock
 from synapse.api.errors import SynapseError
-from synapse.util import async
 from synapse.util import logcontext
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from synapse.util.caches import descriptors
 from tests import unittest
 
 logger = logging.getLogger(__name__)
+
+
+def run_on_reactor():
+    d = defer.Deferred()
+    reactor.callLater(0, d.callback, 0)
+    return logcontext.make_deferred_yieldable(d)
 
 
 class CacheTestCase(unittest.TestCase):
@@ -195,7 +200,8 @@ class DescriptorTestCase(unittest.TestCase):
             def fn(self, arg1):
                 @defer.inlineCallbacks
                 def inner_fn():
-                    yield async.run_on_reactor()
+                    # we want this to behave like an asynchronous function
+                    yield run_on_reactor()
                     raise SynapseError(400, "blah")
 
                 return inner_fn()
@@ -205,7 +211,12 @@ class DescriptorTestCase(unittest.TestCase):
             with logcontext.LoggingContext() as c1:
                 c1.name = "c1"
                 try:
-                    yield obj.fn(1)
+                    d = obj.fn(1)
+                    self.assertEqual(
+                        logcontext.LoggingContext.current_context(),
+                        logcontext.LoggingContext.sentinel,
+                    )
+                    yield d
                     self.fail("No exception thrown")
                 except SynapseError:
                     pass

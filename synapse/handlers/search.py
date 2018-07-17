@@ -64,6 +64,13 @@ class SearchHandler(BaseHandler):
             except Exception:
                 raise SynapseError(400, "Invalid batch")
 
+        logger.info(
+            "Search batch properties: %r, %r, %r",
+            batch_group, batch_group_key, batch_token,
+        )
+
+        logger.info("Search content: %s", content)
+
         try:
             room_cat = content["search_categories"]["room_events"]
 
@@ -271,6 +278,8 @@ class SearchHandler(BaseHandler):
             # We should never get here due to the guard earlier.
             raise NotImplementedError()
 
+        logger.info("Found %d events to return", len(allowed_events))
+
         # If client has asked for "context" for each event (i.e. some surrounding
         # events and state), fetch that
         if event_context is not None:
@@ -280,6 +289,11 @@ class SearchHandler(BaseHandler):
             for event in allowed_events:
                 res = yield self.store.get_events_around(
                     event.room_id, event.event_id, before_limit, after_limit
+                )
+
+                logger.info(
+                    "Context for search returned %d and %d events",
+                    len(res["events_before"]), len(res["events_after"]),
                 )
 
                 res["events_before"] = yield filter_events_for_client(

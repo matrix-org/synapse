@@ -12,11 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 from ._base import BaseHandler
 from synapse.types import UserID, create_requester
 from synapse.util.logcontext import run_in_background
+from synapse.api.errors import SynapseError
 
 import logging
 
@@ -30,6 +31,7 @@ class DeactivateAccountHandler(BaseHandler):
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
         self._room_member_handler = hs.get_room_member_handler()
+        self._identity_handler = hs.get_handlers().identity_handler
         self.user_directory_handler = hs.get_user_directory_handler()
 
         # Flag that indicates whether the process to part users from rooms is running
@@ -37,14 +39,15 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
-        reactor.callWhenRunning(self._start_user_parting)
+        hs.get_reactor().callWhenRunning(self._start_user_parting)
 
     @defer.inlineCallbacks
-    def deactivate_account(self, user_id):
+    def deactivate_account(self, user_id, erase_data):
         """Deactivate a user's account
 
         Args:
             user_id (str): ID of user to be deactivated
+            erase_data (bool): whether to GDPR-erase the user's data
 
         Returns:
             Deferred
@@ -52,14 +55,35 @@ class DeactivateAccountHandler(BaseHandler):
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
 
-        # first delete any devices belonging to the user, which will also
+        # delete threepids first. We remove these from the IS so if this fails,
+        # leave the user still active so they can try again.
+        # Ideally we would prevent password resets and then do this in the
+        # background thread.
+        threepids = yield self.store.user_get_threepids(user_id)
+        for threepid in threepids:
+            try:
+                yield self._identity_handler.unbind_threepid(
+                    user_id,
+                    {
+                        'medium': threepid['medium'],
+                        'address': threepid['address'],
+                    },
+                )
+            except Exception:
+                # Do we want this to be a fatal error or should we carry on?
+                logger.exception("Failed to remove threepid from ID server")
+                raise SynapseError(400, "Failed to remove threepid from ID server")
+            yield self.store.user_delete_threepid(
+                user_id, threepid['medium'], threepid['address'],
+            )
+
+        # delete any devices belonging to the user, which will also
         # delete corresponding access tokens.
         yield self._device_handler.delete_all_devices_for_user(user_id)
         # then delete any remaining access tokens which weren't associated with
         # a device.
         yield self._auth_handler.delete_access_tokens_for_user(user_id)
 
-        yield self.store.user_delete_threepids(user_id)
         yield self.store.user_set_password_hash(user_id, None)
 
         # Add the user to a table of users pending deactivation (ie.
@@ -68,6 +92,11 @@ class DeactivateAccountHandler(BaseHandler):
 
         # delete from user directory
         yield self.user_directory_handler.handle_user_deactivated(user_id)
+
+        # Mark the user as erased, if they asked for that
+        if erase_data:
+            logger.info("Marking %s as erased", user_id)
+            yield self.store.mark_user_erased(user_id)
 
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)

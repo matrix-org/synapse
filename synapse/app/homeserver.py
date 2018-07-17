@@ -266,7 +266,7 @@ class SynapseHomeServer(HomeServer):
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warn(("Metrics listener configured, but "
-                                 "collect_metrics is not enabled!"))
+                                 "enable_metrics is not True!"))
                 else:
                     _base.listen_metrics(listener["bind_addresses"],
                                          listener["port"])
@@ -318,11 +318,6 @@ def setup(config_options):
     # check any extra requirements we have now we have a config
     check_requirements(config)
 
-    version_string = "Synapse/" + get_version_string(synapse)
-
-    logger.info("Server hostname: %s", config.server_name)
-    logger.info("Server version: %s", version_string)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
@@ -335,7 +330,7 @@ def setup(config_options):
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
         config=config,
-        version_string=version_string,
+        version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 

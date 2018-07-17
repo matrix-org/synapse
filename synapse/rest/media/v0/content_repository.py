@@ -22,8 +22,9 @@ from synapse.api.errors import (
 from twisted.protocols.basic import FileSender
 from twisted.web import server, resource
 
+from canonicaljson import json
+
 import base64
-import simplejson as json
 import logging
 import os
 import re

@@ -40,7 +40,7 @@ from synapse.federation.transport.client import TransportLayerClient
 from synapse.federation.transaction_queue import TransactionQueue
 from synapse.handlers import Handlers
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler, MacaroonGeneartor
+from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.device import DeviceHandler
@@ -165,15 +165,19 @@ class HomeServer(object):
         'server_notices_sender',
     ]
 
-    def __init__(self, hostname, **kwargs):
+    def __init__(self, hostname, reactor=None, **kwargs):
         """
         Args:
             hostname : The hostname for the server.
         """
+        if not reactor:
+            from twisted.internet import reactor
+
+        self._reactor = reactor
         self.hostname = hostname
         self._building = {}
 
-        self.clock = Clock()
+        self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
 
@@ -185,6 +189,12 @@ class HomeServer(object):
         logger.info("Setting up.")
         self.datastore = DataStore(self.get_db_conn(), self)
         logger.info("Finished setting up.")
+
+    def get_reactor(self):
+        """
+        Fetch the Twisted reactor in use by this HomeServer.
+        """
+        return self._reactor
 
     def get_ip_from_request(self, request):
         # X-Forwarded-For is handled by our custom request type.
@@ -261,7 +271,7 @@ class HomeServer(object):
         return AuthHandler(self)
 
     def build_macaroon_generator(self):
-        return MacaroonGeneartor(self)
+        return MacaroonGenerator(self)
 
     def build_device_handler(self):
         return DeviceHandler(self)
@@ -328,6 +338,7 @@ class HomeServer(object):
 
         return adbapi.ConnectionPool(
             name,
+            cp_reactor=self.get_reactor(),
             **self.db_config.get("args", {})
         )
 

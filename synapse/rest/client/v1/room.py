@@ -31,7 +31,7 @@ from synapse.http.servlet import (
 from six.moves.urllib import parse as urlparse
 
 import logging
-import simplejson as json
+from canonicaljson import json
 
 logger = logging.getLogger(__name__)
 

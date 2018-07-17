@@ -19,12 +19,16 @@ allowed to be sent by which side.
 """
 
 import logging
-import simplejson
+import platform
 
+if platform.python_implementation() == "PyPy":
+    import json
+    _json_encoder = json.JSONEncoder()
+else:
+    import simplejson as json
+    _json_encoder = json.JSONEncoder(namedtuple_as_object=False)
 
 logger = logging.getLogger(__name__)
-
-_json_encoder = simplejson.JSONEncoder(namedtuple_as_object=False)
 
 
 class Command(object):
@@ -102,7 +106,7 @@ class RdataCommand(Command):
         return cls(
             stream_name,
             None if token == "batch" else int(token),
-            simplejson.loads(row_json)
+            json.loads(row_json)
         )
 
     def to_line(self):
@@ -300,7 +304,7 @@ class InvalidateCacheCommand(Command):
     def from_line(cls, line):
         cache_func, keys_json = line.split(" ", 1)
 
-        return cls(cache_func, simplejson.loads(keys_json))
+        return cls(cache_func, json.loads(keys_json))
 
     def to_line(self):
         return " ".join((
@@ -329,7 +333,7 @@ class UserIpCommand(Command):
     def from_line(cls, line):
         user_id, jsn = line.split(" ", 1)
 
-        access_token, ip, user_agent, device_id, last_seen = simplejson.loads(jsn)
+        access_token, ip, user_agent, device_id, last_seen = json.loads(jsn)
 
         return cls(
             user_id, access_token, ip, user_agent, device_id, last_seen
