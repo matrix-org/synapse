@@ -14,9 +14,9 @@
 
 from pydenticon import Generator
 
-from synapse.http.servlet import parse_integer
-
 from twisted.web.resource import Resource
+
+from synapse.http.servlet import parse_integer
 
 FOREGROUND = [
     "rgb(45,79,255)",

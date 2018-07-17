@@ -24,9 +24,9 @@ from synapse.api.constants import Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     assert_params_in_dict,
-    parse_json_object_from_request,
     parse_integer,
-    parse_string
+    parse_json_object_from_request,
+    parse_string,
 )
 from synapse.types import UserID, create_requester
 
