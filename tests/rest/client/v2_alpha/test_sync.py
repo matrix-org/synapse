@@ -41,11 +41,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
             set(
                 [
                     "next_batch",
-                    "rooms",
-                    "presence",
-                    "account_data",
-                    "to_device",
-                    "device_lists",
+                    "device_one_time_keys_count",
                 ]
             ).issubset(set(channel.json_body.keys()))
         )
@@ -62,6 +58,9 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertTrue(
             set(
-                ["next_batch", "rooms", "account_data", "to_device", "device_lists"]
+                [
+                    "next_batch",
+                    "device_one_time_keys_count",
+                ]
             ).issubset(set(channel.json_body.keys()))
         )
