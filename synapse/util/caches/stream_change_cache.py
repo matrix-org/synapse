@@ -74,17 +74,10 @@ class StreamChangeCache(object):
         assert type(stream_pos) is int
 
         if stream_pos >= self._earliest_known_stream_pos:
-            changed_entities = {
+            result = {
                 self._cache[k] for k in self._cache.islice(
                     start=self._cache.bisect_right(stream_pos),
                 )
-            }
-
-            # we need to include entities which we don't know about, as well as
-            # those which are known to have changed since the stream pos.
-            result = {
-                e for e in entities
-                if e in changed_entities or e not in self._entity_to_key
             }
 
             self.metrics.inc_hits()
