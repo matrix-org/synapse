@@ -74,11 +74,13 @@ class StreamChangeCache(object):
         assert type(stream_pos) is int
 
         if stream_pos >= self._earliest_known_stream_pos:
-            result = {
+            changed_entities = {
                 self._cache[k] for k in self._cache.islice(
                     start=self._cache.bisect_right(stream_pos),
                 )
             }
+
+            result = changed_entities.intersection(entities)
 
             self.metrics.inc_hits()
         else:
