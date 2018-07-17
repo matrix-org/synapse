@@ -291,6 +291,8 @@ def filter_events_for_server(store, server_name, events):
     def include(typ, state_key):
         if typ != EventTypes.Member:
             return True
+
+        # we avoid using get_domain_from_id here for efficiency.
         idx = state_key.find(":")
         if idx == -1:
             return False
