@@ -37,3 +37,94 @@ class StatsStore(StateDeltasStore):
             updatevalues={"stream_id": stream_id},
             desc="update_stats_stream_pos",
         )
+
+    def update_room_state(self, room_id, fields):
+        return self._simple_upsert(
+            table="room_state",
+            keyvalues={
+                "room_id": room_id,
+            },
+            values=fields,
+            desc="update_room_state",
+        )
+
+    def update_stats(self, stats_type, stats_id, ts, fields):
+        return self._simple_upsert(
+            table=("%s_stats" % stats_type),
+            keyvalues={
+                ("%s_id" % stats_type): stats_id,
+                "ts": ts,
+            },
+            updatevalues=fields,
+            desc="update_stats",
+        )
+
+    # these fields track relative numbers (e.g. number of events sent in this timeslice)
+    RELATIVE_STATS_FIELDS = {
+        "room": {
+            "sent_events": True
+        }
+    }
+
+    # these fields track rather than absolutes (e.g. total number of rooms on the server)
+    ABSOLUTE_STATS_FIELDS = {
+        "room": (
+            "current_state_events",
+            "joined_members",
+            "invited_members",
+            "left_members",
+            "banned_members",
+            "state_events",
+            "local_events",
+            "remote_events",
+        )
+    }
+
+    def update_stats_delta(self, stats_type, stats_id, field, value):
+        def _update_stats_delta(txn):
+            table = "%s_stats" % stats_type
+            id_col = "%s_id" % stats_type
+
+            sql = (
+                "SELECT * FROM %s"
+                " WHERE %s=? and ts=("
+                "  SELECT MAX(ts) FROM %s"
+                "  WHERE where %s=?"
+                ")"
+            ) % (table, id_col, table, id_col)
+            txn.execute(sql, (stats_id, stats_id))
+            rows = self.cursor_to_dict(txn)
+            if len(rows) == 0:
+                # silently skip as we don't have anything to apply a delta to yet.
+                return
+
+            latest_ts = rows[0]["ts"]
+            if ts != latest_ts:
+                # we have to copy our absolute counters over to the new entry.
+                self._simple_insert_txn(
+                    txn,
+                    table=table,
+                    values={
+                        id_col: stats_id,
+                        "ts": ts,
+                        key: rows[0][key]
+                        for key in ABSOLUTE_STATS_FIELDS[stats_type],
+                    }
+                )
+
+            # actually update the new value
+            self._simple_update_txn(
+                txn,
+                table=table,
+                keyvalues={
+                    id_col: stats_id,
+                    "ts": ts,
+                }
+                updatevalues={
+                    field: value
+                }
+            )
+
+        return self.runInteraction(
+            "update_stats_delta", _update_stats_delta
+        )

@@ -210,8 +210,8 @@ class StatsHandler(object):
 
         self.store.update_room_stats(
             room_id,
+            now,
             {
-                "ts": now,
                 "bucket_size": self.stats_bucket_size,
                 "current_state_events": current_state_events,
                 "joined_members": joined_members,
