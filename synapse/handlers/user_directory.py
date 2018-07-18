@@ -531,7 +531,7 @@ class UserDirectoryHandler(object):
 
     @defer.inlineCallbacks
     def _handle_remove_user(self, room_id, user_id):
-        """Called when we might need to remove user to directory
+        """Called when we might need to remove user from directory
 
         Args:
             room_id (str): room_id that user left or stopped being public that
