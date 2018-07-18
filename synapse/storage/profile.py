@@ -80,7 +80,7 @@ class ProfileWorkerStore(SQLBaseStore):
             keyvalues={
                 "batch": batchnum,
             },
-            retcols=("user_id", "displayname", "avatar_url"),
+            retcols=("user_id", "displayname", "avatar_url", "active"),
             desc="get_profile_batch",
         )
 
@@ -146,6 +146,22 @@ class ProfileStore(ProfileWorkerStore):
                 "batch": batchnum,
             },
             desc="set_profile_avatar_url",
+            lock=False  # we can do this because user_id has a unique index
+        )
+
+    def set_profile_active(self, user_localpart, active, batchnum):
+        values = {
+            "active": active,
+            "batch": batchnum,
+        }
+        if not active:
+            values["avatar_url"] = None
+            values["displayname"] = None
+        return self._simple_upsert(
+            table="profiles",
+            keyvalues={"user_id": user_localpart},
+            values=values,
+            desc="set_profile_active",
             lock=False  # we can do this because user_id has a unique index
         )
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,13 +100,13 @@ class ProfileHandler(BaseHandler):
         logger.info("Replicating profile batch %d to %s", batchnum, host)
         batch_rows = yield self.store.get_profile_batch(batchnum)
         batch = {
-            UserID(r["user_id"], self.hs.hostname).to_string(): {
+            UserID(r["user_id"], self.hs.hostname).to_string(): ({
                 "display_name": r["displayname"],
                 "avatar_url": r["avatar_url"],
-            } for r in batch_rows
+            } if r["active"] else None) for r in batch_rows
         }
 
-        url = "https://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
+        url = "http://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
         body = {
             "batchnum": batchnum,
             "batch": batch,
@@ -241,6 +242,26 @@ class ProfileHandler(BaseHandler):
 
         if requester:
             yield self._update_join_states(requester, target_user)
+
+        # start a profile replication push
+        run_in_background(self._replicate_profiles)
+
+    @defer.inlineCallbacks
+    def set_active(self, target_user, active):
+        """
+        Sets the 'active' flag on a user profile. If set to false, the user account is
+        considered deactivated.
+        Note that unlike set_displayname and set_avatar_url, this does *not* perform
+        authorization checks!
+        """
+        if len(self.hs.config.replicate_user_profiles_to) > 0:
+            cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+            new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
+        else:
+            new_batchnum = None
+        yield self.store.set_profile_active(
+            target_user.localpart, active, new_batchnum
+        )
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)
