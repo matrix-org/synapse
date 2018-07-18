@@ -26,7 +26,7 @@ CREATE TABLE user_stats (
     ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
     sent_events INT NOT NULL,
-    stored_events INT NOT NULL, -- delta or absolute?
+    local_events INT NOT NULL,
     public_rooms INT NOT NULL,
     private_rooms INT NOT NULL,
     sent_file_count INT NOT NULL,
@@ -60,6 +60,7 @@ CREATE TABLE room_state (
     encrypted BOOLEAN,
     name TEXT NOT NULL,
     topic TEXT NOT NULL,
+    avatar TEXT NOT NULL,
     canonical_alias TEXT NOT NULL,
     -- get aliases straight from the right table
 );
