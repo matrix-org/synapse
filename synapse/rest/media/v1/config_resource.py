@@ -15,7 +15,7 @@
 #
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.resource import Resource
-from synapse.http.server import respond_with_json, respond_with_json_bytes
+from synapse.http.server import respond_with_json, respond_with_json_bytes, wrap_json_request_handler
 
 
 class MediaConfigResource(Resource):
@@ -28,6 +28,7 @@ class MediaConfigResource(Resource):
             "m.upload.size": config.max_upload_size,
         }
 
+    @wrap_json_request_handler
     def render_GET(self, request):
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
         return NOT_DONE_YET
