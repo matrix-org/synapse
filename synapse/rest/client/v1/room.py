@@ -523,7 +523,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomEventContextServlet, self).__init__(hs)
         self.clock = hs.get_clock()
-        self.handlers = hs.get_handlers()
+        self.room_context_handler = hs.get_room_context_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
@@ -531,7 +531,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
 
         limit = parse_integer(request, "limit", default=10)
 
-        results = yield self.handlers.room_context_handler.get_event_context(
+        results = yield self.room_context_handler.get_event_context(
             requester.user,
             room_id,
             event_id,

@@ -18,7 +18,6 @@ from .directory import DirectoryHandler
 from .federation import FederationHandler
 from .identity import IdentityHandler
 from .register import RegistrationHandler
-from .room import RoomContextHandler
 from .search import SearchHandler
 
 
@@ -48,4 +47,3 @@ class Handlers(object):
         self.admin_handler = AdminHandler(hs)
         self.identity_handler = IdentityHandler(hs)
         self.search_handler = SearchHandler(hs)
-        self.room_context_handler = RoomContextHandler(hs)

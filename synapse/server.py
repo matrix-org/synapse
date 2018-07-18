@@ -61,7 +61,7 @@ from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
-from synapse.handlers.room import RoomCreationHandler
+from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -169,6 +169,7 @@ class HomeServer(object):
         'server_notices_sender',
         'message_handler',
         'pagination_handler',
+        'room_context_handler',
     ]
 
     def __init__(self, hostname, reactor=None, **kwargs):
@@ -437,6 +438,9 @@ class HomeServer(object):
 
     def build_pagination_handler(self):
         return PaginationHandler(self)
+
+    def build_room_context_handler(self):
+        return RoomContextHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
