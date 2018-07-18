@@ -252,7 +252,8 @@ class ProfileHandler(BaseHandler):
         Sets the 'active' flag on a user profile. If set to false, the user account is
         considered deactivated.
         Note that unlike set_displayname and set_avatar_url, this does *not* perform
-        authorization checks!
+        authorization checks! This is because the only place it's used currently is
+        in account deactivation where we've already done these checks anyway.
         """
         if len(self.hs.config.replicate_user_profiles_to) > 0:
             cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
