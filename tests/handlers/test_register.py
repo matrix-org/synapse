@@ -19,6 +19,10 @@ from twisted.internet import defer
 
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import UserID, create_requester
+from synapse.api.errors import (
+    Codes,
+    RegistrationError,
+)
 
 from tests.utils import setup_test_homeserver
 
@@ -77,3 +81,38 @@ class RegistrationTestCase(unittest.TestCase):
             requester, local_part, display_name)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
+
+    @defer.inlineCallbacks
+    def test_cannot_register_when_mau_limits_exceeded(self):
+        local_part = "someone"
+        display_name = "someone"
+        user_id = "@someone:test"
+        requester = create_requester("@as:test")
+        store = self.hs.get_datastore()
+        self.hs.config.limit_usage_by_mau = False
+        self.hs.config.max_mau_value = 50
+        store.count_monthly_users = Mock(return_value=87)
+        #
+        # try:
+        #     yield self.handler.get_or_create_user(requester, 'a', display_name)
+        # except Exception as e:
+        #     self.fail(e)
+
+        self.hs.config.limit_usage_by_mau = True
+        try:
+            yield self.handler.get_or_create_user(requester, 'a', display_name)
+            print("XXXXXX in the try block")
+        #except synapse.api.errors.RegistrationError as e:
+        except:
+            print("XXXXXX I have found an ERROROOOOOOOOO")
+            return
+        #self.assertRaises(RegistrationError,  self.handler.get_or_create_user, requester, 'a', display_name)
+        # with self.assertRaises(RegistrationError) as context:
+        #     a,b = yield self.handler.get_or_create_user(requester, 'a', display_name)
+        #     print "XXXXXXXXXX "
+        # print context.exception
+        # self.assertTrue('This is broken' in str(context.exception))
+    # def macaroon_mock_generator(self, secret):
+    #     self.macaroon_generator = Mock(
+    #         generate_access_token=Mock(return_value=secret))
+    #     self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
