@@ -15,6 +15,8 @@
 
 from ._base import Config
 
+import sys
+
 
 class StatsConfig(Config):
     """Stats Configuration
@@ -24,16 +26,21 @@ class StatsConfig(Config):
     def read_config(self, config):
         self.stats_enable = False
         self.stats_bucket_size = 86400
+        self.stats_retention = sys.maxint
         stats_config = config.get("stats", None)
-        if stats:
+        if stats_config:
             self.stats_enable = stats_config.get("enable", self.stats_enable)
-            self.stats_bucket_size = stats_config.get("enable", self.stats_bucket_size)
+            self.stats_bucket_size = stats_config.get(
+                "bucket_size", self.stats_bucket_size
+            )
+            self.stats_retention = stats_config.get("retention", self.stats_retention)
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Stats configuration
         #
         # stats:
-        #    enable: true
+        #    enable: false
         #    bucket_size: 86400 # 1 day
+        #    retention: 31536000 # 1 year
         """

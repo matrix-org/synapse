@@ -1817,7 +1817,7 @@ class EventsStore(EventsWorkerStore):
                 " FROM state_events"
                 " WHERE room_id=?"
             )
-            txn.execute(sql, (local_server, room_id,))
+            txn.execute(sql, (room_id,))
             row = txn.fetchone()
             return row[0] if row else 0
 
@@ -1843,7 +1843,6 @@ class EventsStore(EventsWorkerStore):
             return (results.get("local", 0), results.get("remote", 0))
 
         return self.runInteraction("get_event_counts", f)
-
 
     def purge_history(
         self, room_id, token, delete_local_events,

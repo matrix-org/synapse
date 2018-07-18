@@ -25,7 +25,7 @@ from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
-from ._base import SQLBaseStore
+from .StateDeltasStore import StateDeltasStore
 
 logger = logging.getLogger(__name__)
 

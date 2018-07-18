@@ -14,16 +14,8 @@
 # limitations under the License.
 
 import logging
-import re
-
-from six import iteritems
 
 from twisted.internet import defer
-
-from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import get_domain_from_id, get_localpart_from_id
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from ._base import SQLBaseStore
 
@@ -104,4 +96,3 @@ class StateDeltasStore(SQLBaseStore):
             retcol="COALESCE(MAX(stream_id), -1)",
             desc="get_max_stream_id_in_current_state_deltas",
         )
-

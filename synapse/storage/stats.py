@@ -14,18 +14,8 @@
 # limitations under the License.
 
 import logging
-import re
 
-from six import iteritems
-
-from twisted.internet import defer
-
-from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import get_domain_from_id, get_localpart_from_id
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-
-from ._base import SQLBaseStore
+from .StateDeltasStore import StateDeltasStore
 
 logger = logging.getLogger(__name__)
 
@@ -47,5 +37,3 @@ class StatsStore(StateDeltasStore):
             updatevalues={"stream_id": stream_id},
             desc="update_stats_stream_pos",
         )
-
-    def update_room_state(self, )

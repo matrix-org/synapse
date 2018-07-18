@@ -15,12 +15,9 @@
 
 import logging
 
-from six import iteritems
-
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
-from synapse.storage.roommember import ProfileInfo
+from synapse.api.constants import EventTypes, Membership
 from synapse.types import get_localpart_from_id
 from synapse.util.metrics import Measure
 
@@ -124,6 +121,7 @@ class StatsHandler(object):
 
         logger.info("Processed all rooms.")
 
+        num_processed_users = 0
         user_ids = yield self.store.get_all_local_users()
         logger.info("Doing initial update user_stats. %d users", len(user_ids))
         for user_id in user_ids:
@@ -169,19 +167,19 @@ class StatsHandler(object):
             room_id,
             {
                 "join_rules": join_rules.content.get("join_rule")
-                              if join_rules else None,
+                if join_rules else None,
                 "history_visibility": history_visibility.content.get("history_visibility")
-                                      if history_visibility else None,
+                if history_visibility else None,
                 "encryption": encryption.content.get("algorithm")
-                              if encryption else None,
+                if encryption else None,
                 "name": name.content.get("name")
-                              if name else None,
+                if name else None,
                 "topic": name.content.get("topic")
-                              if canonical_alias else None,
+                if topic else None,
                 "avatar": name.content.get("url")
-                              if avatar else None,
+                if avatar else None,
                 "canonical_alias": name.content.get("alias")
-                              if canonical_alias else None,
+                if canonical_alias else None,
             }
         )
 
@@ -191,11 +189,19 @@ class StatsHandler(object):
         now = int(now / (self.stats_bucket_size * 1000)) * self.stats_bucket_size * 1000
 
         current_state_events = len(current_state_ids)
-        joined_members  = yield self.store.get_user_count_in_room(room_id, Membership.JOIN)
-        invited_members = yield self.store.get_user_count_in_room(room_id, Membership.INVITE)
-        left_members    = yield self.store.get_user_count_in_room(room_id, Membership.LEAVE)
-        banned_members  = yield self.store.get_user_count_in_room(room_id, Membership.BAN)
-        state_events    = yield self.store.get_state_event_counts(room_id)
+        joined_members = yield self.store.get_user_count_in_room(
+            room_id, Membership.JOIN
+        )
+        invited_members = yield self.store.get_user_count_in_room(
+            room_id, Membership.INVITE
+        )
+        left_members = yield self.store.get_user_count_in_room(
+            room_id, Membership.LEAVE
+        )
+        banned_members = yield self.store.get_user_count_in_room(
+            room_id, Membership.BAN
+        )
+        state_events = yield self.store.get_state_event_counts(room_id)
         (local_events, remote_events) = yield self.store.get_event_counts(
             room_id, self.server_name
         )
@@ -231,8 +237,6 @@ class StatsHandler(object):
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
-
-
     @defer.inlineCallbacks
     def _handle_local_user(self, user_id):
         """Adds a new local roomless user into the user_directory_search table.
@@ -246,4 +250,3 @@ class StatsHandler(object):
         row = yield self.store.get_user_in_directory(user_id)
         if not row:
             yield self.store.add_profiles_to_user_dir(None, {user_id: profile})
-
