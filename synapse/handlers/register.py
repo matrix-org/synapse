@@ -144,7 +144,7 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        self._check_mau_limits()
+        yield self._check_mau_limits()
 
         password_hash = None
         if password:
@@ -290,7 +290,7 @@ class RegistrationHandler(BaseHandler):
                 400,
                 "User ID can only contain characters a-z, 0-9, or '=_-./'",
             )
-        self._check_mau_limits()
+        yield self._check_mau_limits()
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
@@ -440,8 +440,10 @@ class RegistrationHandler(BaseHandler):
         """
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
-
-        self._check_mau_limits()
+        # raise RegistrationError(
+        #     403, "MAU Limit Exceeded", Codes.MAU_LIMIT_EXCEEDED
+        # )
+        yield self._check_mau_limits()
         need_register = True
 
         try:
@@ -544,7 +546,7 @@ class RegistrationHandler(BaseHandler):
         """
         if self.hs.config.limit_usage_by_mau is True:
             current_mau = yield self.store.get_current_mau()
-            if current_mau >= self.hs.config.limit_usage_by_mau:
+            if current_mau >= self.hs.config.max_mau_value:
                 raise RegistrationError(
                     403, "MAU Limit Exceeded", Codes.MAU_LIMIT_EXCEEDED
                 )
