@@ -38,7 +38,8 @@ outgoing_responses_counter = Counter(
 )
 
 response_timer = Histogram(
-    "synapse_http_server_response_time_seconds", "sec", ["method", "servlet", "tag", "code"]
+    "synapse_http_server_response_time_seconds", "sec",
+    ["method", "servlet", "tag", "code"],
 )
 
 response_ru_utime = Counter(
