@@ -106,7 +106,7 @@ class ProfileHandler(BaseHandler):
             } if r["active"] else None) for r in batch_rows
         }
 
-        url = "http://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
+        url = "https://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
         body = {
             "batchnum": batchnum,
             "batch": batch,
