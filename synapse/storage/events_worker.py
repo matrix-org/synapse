@@ -25,6 +25,7 @@ from synapse.events import EventBase  # noqa: F401
 from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.logcontext import (
     LoggingContext,
     PreserveLoggingContext,
@@ -322,10 +323,11 @@ class EventsWorkerStore(SQLBaseStore):
                 should_start = False
 
         if should_start:
-            with PreserveLoggingContext():
-                self.runWithConnection(
-                    self._do_fetch
-                )
+            run_as_background_process(
+                "fetch_events",
+                self.runWithConnection,
+                self._do_fetch,
+            )
 
         logger.debug("Loading %d events", len(events))
         with PreserveLoggingContext():
