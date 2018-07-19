@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
 from synapse.storage import DataStore
 from synapse.storage.transactions import TransactionStore
+
+from ._base import BaseSlavedStore
 
 
 class TransactionStore(BaseSlavedStore):

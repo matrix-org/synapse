@@ -18,10 +18,9 @@ import logging
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.constants import Membership, EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import LimitExceededError
 from synapse.types import UserID
-
 
 logger = logging.getLogger(__name__)
 

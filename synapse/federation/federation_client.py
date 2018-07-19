@@ -21,24 +21,24 @@ import random
 
 from six.moves import range
 
+from prometheus_client import Counter
+
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
 from synapse.api.errors import (
-    CodeMessageException, HttpResponseException, SynapseError, FederationDeniedError
+    CodeMessageException,
+    FederationDeniedError,
+    HttpResponseException,
+    SynapseError,
 )
 from synapse.events import builder
-from synapse.federation.federation_base import (
-    FederationBase,
-    event_from_pdu_json,
-)
+from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.retryutils import NotRetryingDestination
-
-from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
 

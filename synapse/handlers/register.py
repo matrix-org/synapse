@@ -18,14 +18,19 @@ import logging
 
 from twisted.internet import defer
 
+from synapse import types
 from synapse.api.errors import (
-    AuthError, Codes, SynapseError, RegistrationError, InvalidCaptchaError
+    AuthError,
+    Codes,
+    InvalidCaptchaError,
+    RegistrationError,
+    SynapseError,
 )
 from synapse.http.client import CaptchaServerHttpClient
-from synapse import types
-from synapse.types import UserID, create_requester, RoomID, RoomAlias
-from synapse.util.async import run_on_reactor, Linearizer
+from synapse.types import RoomAlias, RoomID, UserID, create_requester
+from synapse.util.async import Linearizer
 from synapse.util.threepids import check_3pid_allowed
+
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
@@ -139,7 +144,6 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield run_on_reactor()
         password_hash = None
         if password:
             password_hash = yield self.auth_handler().hash(password)
@@ -431,8 +435,6 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield run_on_reactor()
-
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
 

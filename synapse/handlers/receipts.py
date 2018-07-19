@@ -12,17 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.util import logcontext
-
-from ._base import BaseHandler
+import logging
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import PreserveLoggingContext
 from synapse.types import get_domain_from_id
+from synapse.util import logcontext
+from synapse.util.logcontext import PreserveLoggingContext
 
-import logging
-
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

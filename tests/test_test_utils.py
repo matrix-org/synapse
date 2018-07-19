@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from tests import unittest
-
 from tests.utils import MockClock
 
 

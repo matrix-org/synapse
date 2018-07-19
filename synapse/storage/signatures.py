@@ -13,14 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
 import six
 
-from ._base import SQLBaseStore
-
 from unpaddedbase64 import encode_base64
+
+from twisted.internet import defer
+
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.util.caches.descriptors import cached, cachedList
+
+from ._base import SQLBaseStore
 
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview
