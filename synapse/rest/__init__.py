@@ -84,7 +84,6 @@ class ClientRestResource(JsonResource):
 
         # "v1" + "r0"
         room.register_servlets(hs, client_resource)
-        events.register_servlets(hs, client_resource)
         v1_login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
