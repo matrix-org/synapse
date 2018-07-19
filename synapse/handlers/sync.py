@@ -433,38 +433,44 @@ class SyncHandler(object):
         ))
 
     @defer.inlineCallbacks
-    def get_state_after_event(self, event, types=None):
+    def get_state_after_event(self, event, types=None, filtered_types=None):
         """
         Get the room state after the given event
 
         Args:
             event(synapse.events.EventBase): event of interest
-            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+            types(list[(str, str|None)]|None): List of (type, state_key) tuples
                 which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.  Presence of type of `None`
-                indicates that types not in the list should not be filtered out.
+                all events are returned of the given type.
                 May be None, which matches any key.
+            filtered_types(list[str]|None): Only apply filtering via `types` to this
+                list of event types.  Other types of events are returned unfiltered.
+                If None, `types` filtering is applied to all events.
+
         Returns:
             A Deferred map from ((type, state_key)->Event)
         """
-        state_ids = yield self.store.get_state_ids_for_event(event.event_id, types)
+        state_ids = yield self.store.get_state_ids_for_event(
+            event.event_id, types, filtered_types=filtered_types,
+        )
         if event.is_state():
             state_ids = state_ids.copy()
             state_ids[(event.type, event.state_key)] = event.event_id
         defer.returnValue(state_ids)
 
     @defer.inlineCallbacks
-    def get_state_at(self, room_id, stream_position, types=None):
+    def get_state_at(self, room_id, stream_position, types=None, filtered_types=None):
         """ Get the room state at a particular stream position
 
         Args:
             room_id(str): room for which to get state
             stream_position(StreamToken): point at which to get state
-            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+            types(list[(str, str|None)]|None): List of (type, state_key) tuples
                 which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.  Presence of type of `None`
-                indicates that types not in the list should not be filtered out.
-                May be None, which matches any key.
+                all events are returned of the given type.
+            filtered_types(list[str]|None): Only apply filtering via `types` to this
+                list of event types.  Other types of events are returned unfiltered.
+                If None, `types` filtering is applied to all events.
 
         Returns:
             A Deferred map from ((type, state_key)->Event)
@@ -479,7 +485,9 @@ class SyncHandler(object):
 
         if last_events:
             last_event = last_events[-1]
-            state = yield self.get_state_after_event(last_event, types)
+            state = yield self.get_state_after_event(
+                last_event, types, filtered_types=filtered_types,
+            )
 
         else:
             # no events in this room - so presumably no state
@@ -513,7 +521,8 @@ class SyncHandler(object):
         with Measure(self.clock, "compute_state_delta"):
 
             types = None
-            member_state_ids = {}
+            filtered_types = None
+
             lazy_load_members = sync_config.filter_collection.lazy_load_members()
             include_redundant_members = (
                 sync_config.filter_collection.include_redundant_members()
@@ -531,11 +540,6 @@ class SyncHandler(object):
                     )
                 ]
 
-                # We can't remove redundant member types at this stage as it sometimes has
-                # to be done based on event_id, and we don't have the member
-                # event ids until we've pulled them out of the DB.
-
-                # however, we can create the cache if needed:
                 if not include_redundant_members:
                     # we can filter out redundant members based on their mxids (not
                     # their event_ids) at this point. We know we can do it based on
@@ -550,43 +554,43 @@ class SyncHandler(object):
                     else:
                         logger.debug("found LruCache for %r", cache_key)
 
-
-                if not types:
-                    # an optimisation to stop needlessly trying to calculate
-                    # member_state_ids
-                    #
-                    # XXX: i can't remember what this trying to do. why would
-                    # types ever be []? --matthew
-                    lazy_load_members = False
-
-                types.append((None, None))  # don't just filter to room members
+                # only apply the filtering to room members
+                filtered_types = [EventTypes.Member]
 
             if full_state:
                 if batch:
                     current_state_ids = yield self.store.get_state_ids_for_event(
-                        batch.events[-1].event_id, types=types
+                        batch.events[-1].event_id, types=types,
+                        filtered_types=filtered_types,
                     )
 
                     state_ids = yield self.store.get_state_ids_for_event(
-                        batch.events[0].event_id, types=types
+                        batch.events[0].event_id, types=types,
+                        filtered_types=filtered_types,
                     )
 
                 else:
                     current_state_ids = yield self.get_state_at(
-                        room_id, stream_position=now_token, types=types
+                        room_id, stream_position=now_token, types=types,
+                        filtered_types=filtered_types,
                     )
 
                     state_ids = current_state_ids
 
+                # track the membership state events as of the beginning of this
+                # timeline sequence, so they can be filtered out of the state
+                # if we are lazy loading members.
                 if lazy_load_members:
                     member_state_ids = {
                         t: state_ids[t]
                         for t in state_ids if t[0] == EventTypes.Member
                     }
+                else:
+                    member_state_ids = {}
 
                     if not include_redundant_members:
                         # add any types we are about to send into our LruCache
-                        for t in types[:-1]:
+                        for t in types:
                             cache.set(t[1], True)
 
                 timeline_state = {
@@ -603,30 +607,43 @@ class SyncHandler(object):
                 )
             elif batch.limited:
                 state_at_previous_sync = yield self.get_state_at(
-                    room_id, stream_position=since_token, types=types
+                    room_id, stream_position=since_token, types=types,
+                    filtered_types=filtered_types,
                 )
 
                 current_state_ids = yield self.store.get_state_ids_for_event(
-                    batch.events[-1].event_id, types=types
+                    batch.events[-1].event_id, types=types,
+                    filtered_types=filtered_types,
                 )
 
                 state_at_timeline_start = yield self.store.get_state_ids_for_event(
-                    batch.events[0].event_id, types=types
+                    batch.events[0].event_id, types=types,
+                    filtered_types=filtered_types,
                 )
 
+                # track the membership state events as of the beginning of this
+                # timeline sequence, so they can be filtered out of the state
+                # if we are lazy loading members.
                 if lazy_load_members:
-                    # TODO: filter out redundant members based on their event_ids
-                    # (not mxids) at this point. In practice, limited syncs are
+                    # TODO: optionally filter out redundant membership events at this
+                    # point, to stop repeatedly sending members in every /sync as if
+                    # the client isn't tracking them.
+                    # When implement, this should filter using event_ids (not mxids).
+                    # In practice, limited syncs are
                     # relatively rare so it's not a total disaster to send redundant
-                    # members down at this point.
+                    # members down at this point. Redundant members are ones which
+                    # repeatedly get sent down /sync because we don't know if the client
+                    # is caching them or not.
                     member_state_ids = {
                         t: state_at_timeline_start[t]
                         for t in state_at_timeline_start if t[0] == EventTypes.Member
                     }
+                else:
+                    member_state_ids = {}
 
                     if not include_redundant_members:
                         # add any types we are about to send into our LruCache
-                        for t in types[:-1]:
+                        for t in types:
                             cache.set(t[1], True)
 
                 timeline_state = {
@@ -644,9 +661,6 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    # strip off the (None, None) and filter to just room members
-                    types = types[:-1]
-
                     if not include_redundant_members:
                         # if it's a new sync sequence, then assume the client has had
                         # amnesia and doesn't want any recent lazy-loaded members
@@ -670,7 +684,8 @@ class SyncHandler(object):
 
                     if types:
                         state_ids = yield self.store.get_state_ids_for_event(
-                            batch.events[0].event_id, types=types
+                            batch.events[0].event_id, types=types,
+                            filtered_types=filtered_types,
                         )
 
         state = {}
