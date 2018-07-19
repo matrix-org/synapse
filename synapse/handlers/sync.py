@@ -417,38 +417,44 @@ class SyncHandler(object):
         ))
 
     @defer.inlineCallbacks
-    def get_state_after_event(self, event, types=None):
+    def get_state_after_event(self, event, types=None, filtered_types=None):
         """
         Get the room state after the given event
 
         Args:
             event(synapse.events.EventBase): event of interest
-            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+            types(list[(str, str|None)]|None): List of (type, state_key) tuples
                 which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.  Presence of type of `None`
-                indicates that types not in the list should not be filtered out.
+                all events are returned of the given type.
                 May be None, which matches any key.
+            filtered_types(list[str]|None): Only apply filtering via `types` to this
+                list of event types.  Other types of events are returned unfiltered.
+                If None, `types` filtering is applied to all events.
+
         Returns:
             A Deferred map from ((type, state_key)->Event)
         """
-        state_ids = yield self.store.get_state_ids_for_event(event.event_id, types)
+        state_ids = yield self.store.get_state_ids_for_event(
+            event.event_id, types, filtered_types=filtered_types
+        )
         if event.is_state():
             state_ids = state_ids.copy()
             state_ids[(event.type, event.state_key)] = event.event_id
         defer.returnValue(state_ids)
 
     @defer.inlineCallbacks
-    def get_state_at(self, room_id, stream_position, types=None):
+    def get_state_at(self, room_id, stream_position, types=None, filtered_types=None):
         """ Get the room state at a particular stream position
 
         Args:
             room_id(str): room for which to get state
             stream_position(StreamToken): point at which to get state
-            types(list[(str|None, str|None)]|None): List of (type, state_key) tuples
+            types(list[(str, str|None)]|None): List of (type, state_key) tuples
                 which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.  Presence of type of `None`
-                indicates that types not in the list should not be filtered out.
-                May be None, which matches any key.
+                all events are returned of the given type.
+            filtered_types(list[str]|None): Only apply filtering via `types` to this
+                list of event types.  Other types of events are returned unfiltered.
+                If None, `types` filtering is applied to all events.
 
         Returns:
             A Deferred map from ((type, state_key)->Event)
@@ -463,7 +469,9 @@ class SyncHandler(object):
 
         if last_events:
             last_event = last_events[-1]
-            state = yield self.get_state_after_event(last_event, types)
+            state = yield self.get_state_after_event(
+                last_event, types, filtered_types=filtered_types
+            )
 
         else:
             # no events in this room - so presumably no state
@@ -499,6 +507,7 @@ class SyncHandler(object):
             types = None
             member_state_ids = {}
             lazy_load_members = sync_config.filter_collection.lazy_load_members()
+            filtered_types = None
 
             if lazy_load_members:
                 # We only request state for the members needed to display the
@@ -516,29 +525,25 @@ class SyncHandler(object):
                 # to be done based on event_id, and we don't have the member
                 # event ids until we've pulled them out of the DB.
 
-                if not types:
-                    # an optimisation to stop needlessly trying to calculate
-                    # member_state_ids
-                    #
-                    # XXX: i can't remember what this trying to do. why would
-                    # types ever be []? --matthew
-                    lazy_load_members = False
-
-                types.append((None, None))  # don't just filter to room members
+                # only apply the filtering to room members
+                filtered_types = [EventTypes.Member]
 
             if full_state:
                 if batch:
                     current_state_ids = yield self.store.get_state_ids_for_event(
-                        batch.events[-1].event_id, types=types
+                        batch.events[-1].event_id, types=types,
+                        filtered_types=filtered_types
                     )
 
                     state_ids = yield self.store.get_state_ids_for_event(
-                        batch.events[0].event_id, types=types
+                        batch.events[0].event_id, types=types,
+                        filtered_types=filtered_types
                     )
 
                 else:
                     current_state_ids = yield self.get_state_at(
-                        room_id, stream_position=now_token, types=types
+                        room_id, stream_position=now_token, types=types,
+                        filtered_types=filtered_types
                     )
 
                     state_ids = current_state_ids
@@ -563,15 +568,18 @@ class SyncHandler(object):
                 )
             elif batch.limited:
                 state_at_previous_sync = yield self.get_state_at(
-                    room_id, stream_position=since_token, types=types
+                    room_id, stream_position=since_token, types=types,
+                    filtered_types=filtered_types
                 )
 
                 current_state_ids = yield self.store.get_state_ids_for_event(
-                    batch.events[-1].event_id, types=types
+                    batch.events[-1].event_id, types=types,
+                    filtered_types=filtered_types
                 )
 
                 state_at_timeline_start = yield self.store.get_state_ids_for_event(
-                    batch.events[0].event_id, types=types
+                    batch.events[0].event_id, types=types,
+                    filtered_types=filtered_types
                 )
 
                 if lazy_load_members:
@@ -603,11 +611,10 @@ class SyncHandler(object):
                     # event_ids) at this point. We know we can do it based on mxid as this
                     # is an non-gappy incremental sync.
 
-                    # strip off the (None, None) and filter to just room members
-                    types = types[:-1]
                     if types:
                         state_ids = yield self.store.get_state_ids_for_event(
-                            batch.events[0].event_id, types=types
+                            batch.events[0].event_id, types=types,
+                            filtered_types=filtered_types
                         )
 
         state = {}
