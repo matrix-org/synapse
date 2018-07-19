@@ -15,19 +15,20 @@
 """The server side of the replication stream.
 """
 
+import logging
+
+from six import itervalues
+
+from prometheus_client import Counter
+
 from twisted.internet import defer
 from twisted.internet.protocol import Factory
 
-from .streams import STREAMS_MAP, FederationStream
-from .protocol import ServerReplicationStreamProtocol
-
-from synapse.util.metrics import Measure, measure_func
 from synapse.metrics import LaterGauge
+from synapse.util.metrics import Measure, measure_func
 
-import logging
-
-from prometheus_client import Counter
-from six import itervalues
+from .protocol import ServerReplicationStreamProtocol
+from .streams import STREAMS_MAP, FederationStream
 
 stream_updates_counter = Counter("synapse_replication_tcp_resource_stream_updates",
                                  "", ["stream_name"])

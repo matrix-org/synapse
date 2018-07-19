@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStoreTestCase
+from twisted.internet import defer
 
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.roommember import RoomsForUser
 
-from twisted.internet import defer
-
+from ._base import BaseSlavedStoreTestCase
 
 USER_ID = "@feeling:blue"
 USER_ID_2 = "@bright:blue"

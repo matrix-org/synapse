@@ -14,16 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.account_data import AccountDataWorkerStore
-
-from synapse.util.caches.descriptors import cached
-from twisted.internet import defer
-
-from canonicaljson import json
-
 import logging
 
 from six.moves import range
+
+from canonicaljson import json
+
+from twisted.internet import defer
+
+from synapse.storage.account_data import AccountDataWorkerStore
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 

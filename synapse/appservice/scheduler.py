@@ -48,13 +48,13 @@ UP & quit           +---------- YES                       SUCCESS
 This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
+import logging
+
 from twisted.internet import defer
 
 from synapse.appservice import ApplicationServiceState
 from synapse.util.logcontext import run_in_background
 from synapse.util.metrics import Measure
-
-import logging
 
 logger = logging.getLogger(__name__)
 

@@ -14,37 +14,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import OrderedDict, deque, namedtuple
-from functools import wraps
 import itertools
 import logging
+from collections import OrderedDict, deque, namedtuple
+from functools import wraps
+
+from six import iteritems, itervalues
+from six.moves import range
 
 from canonicaljson import json
+from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.storage.events_worker import EventsWorkerStore
-from synapse.util.async import ObservableDeferred
-from synapse.util.frozenutils import frozendict_json_encoder
-from synapse.util.logcontext import (
-    PreserveLoggingContext, make_deferred_yieldable,
-)
-from synapse.util.logutils import log_function
-from synapse.util.metrics import Measure
+import synapse.metrics
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-from synapse.types import get_domain_from_id, RoomStreamToken
-import synapse.metrics
-
 # these are only included to make the type annotations work
-from synapse.events import EventBase    # noqa: F401
-from synapse.events.snapshot import EventContext   # noqa: F401
-
-from six.moves import range
-from six import itervalues, iteritems
-
-from prometheus_client import Counter
+from synapse.events import EventBase  # noqa: F401
+from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.storage.events_worker import EventsWorkerStore
+from synapse.types import RoomStreamToken, get_domain_from_id
+from synapse.util.async import ObservableDeferred
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.frozenutils import frozendict_json_encoder
+from synapse.util.logcontext import PreserveLoggingContext, make_deferred_yieldable
+from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 

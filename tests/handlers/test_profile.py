@@ -14,16 +14,16 @@
 # limitations under the License.
 
 
-from tests import unittest
-from twisted.internet import defer
-
 from mock import Mock, NonCallableMock
+
+from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import AuthError
 from synapse.handlers.profile import ProfileHandler
 from synapse.types import UserID
 
+from tests import unittest
 from tests.utils import setup_test_homeserver
 
 

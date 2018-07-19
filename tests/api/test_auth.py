@@ -13,16 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pymacaroons
 from mock import Mock
+
+import pymacaroons
+
 from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
 from synapse.types import UserID
+
 from tests import unittest
-from tests.utils import setup_test_homeserver, mock_getRawHeaders
+from tests.utils import mock_getRawHeaders, setup_test_homeserver
 
 
 class TestHandlers(object):

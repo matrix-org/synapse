@@ -17,10 +17,9 @@
 server protocol.
 """
 
-from synapse.util.jsonobject import JsonEncodedObject
-
 import logging
 
+from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
 

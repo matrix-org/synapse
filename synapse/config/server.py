@@ -17,6 +17,7 @@
 import logging
 
 from synapse.http.endpoint import parse_and_validate_server_name
+
 from ._base import Config, ConfigError
 
 logger = logging.Logger(__name__)
@@ -207,6 +208,8 @@ class ServerConfig(Config):
         # if the scheduler happens to schedule the underlying threads across
         # different cores. See
         # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
+        #
+        # This setting requires the affinity package to be installed!
         #
         # cpu_affinity: 0xFFFFFFFF
 

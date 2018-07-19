@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-from twisted.internet import defer
-
 from mock import Mock
-from tests.utils import (
-    MockHttpResource, DeferredMockCallable, setup_test_homeserver
-)
-
-from synapse.api.filtering import Filter
-from synapse.events import FrozenEvent
-from synapse.api.errors import SynapseError
 
 import jsonschema
+
+from twisted.internet import defer
+
+from synapse.api.errors import SynapseError
+from synapse.api.filtering import Filter
+from synapse.events import FrozenEvent
+
+from tests import unittest
+from tests.utils import DeferredMockCallable, MockHttpResource, setup_test_homeserver
 
 user_localpart = "test_user"
 

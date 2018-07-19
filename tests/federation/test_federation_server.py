@@ -16,6 +16,7 @@ import logging
 
 from synapse.events import FrozenEvent
 from synapse.federation.federation_server import server_matches_acl_event
+
 from tests import unittest
 
 

@@ -14,30 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-import synapse
-from synapse import types
-from synapse.api.auth import get_access_token_from_request, has_access_token
-from synapse.api.constants import LoginType
-from synapse.api.errors import SynapseError, Codes, UnrecognizedRequestError
-from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, assert_params_in_request, parse_string
-)
-from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.threepids import check_3pid_allowed
-
-from ._base import client_v2_patterns, interactive_auth_handler
-
-import logging
 import hmac
 import re
-from string import capwords
+import logging
 from hashlib import sha1
-from synapse.util.ratelimitutils import FederationRateLimiter
 
 from six import string_types
 
+from twisted.internet import defer
+
+import synapse
+import synapse.types
+from synapse.api.constants import LoginType
+from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.threepids import check_3pid_allowed
+
+from ._base import client_v2_patterns, interactive_auth_handler
 
 # We ought to be using hmac.compare_digest() but on older pythons it doesn't
 # exist. It's a _really minor_ security flaw to use plain string comparison
@@ -69,7 +69,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
@@ -105,7 +105,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret',
             'country', 'phone_number',
             'send_attempt',
@@ -226,7 +226,7 @@ class RegisterRestServlet(RestServlet):
         desired_display_name = None
 
         appservice = None
-        if has_access_token(request):
+        if self.auth.has_access_token(request):
             appservice = yield self.auth.get_appservice_by_req(request)
 
         # fork off as soon as possible for ASes and shared secret auth which
@@ -244,7 +244,7 @@ class RegisterRestServlet(RestServlet):
             # because the IRC bridges rely on being able to register stupid
             # IDs.
 
-            access_token = get_access_token_from_request(request)
+            access_token = self.auth.get_access_token_from_request(request)
 
             if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
@@ -387,7 +387,7 @@ class RegisterRestServlet(RestServlet):
                     LoginType.EMAIL_IDENTITY in auth_result
                 ):
                     address = auth_result[LoginType.EMAIL_IDENTITY]['address']
-                    desired_username = types.strip_invalid_mxid_characters(
+                    desired_username = synapse.types.strip_invalid_mxid_characters(
                         address.replace('@', '-').lower()
                     )
 
@@ -457,9 +457,7 @@ class RegisterRestServlet(RestServlet):
             add_msisdn = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
-            if 'password' not in params:
-                raise SynapseError(400, "Missing password.",
-                                   Codes.MISSING_PARAM)
+            assert_params_in_dict(params, ["password"])
 
             if not self.hs.config.register_mxid_from_3pid:
                 desired_username = params.get("username", None)
@@ -645,11 +643,14 @@ class RegisterRestServlet(RestServlet):
         Returns:
             defer.Deferred:
         """
-        reqd = ('medium', 'address', 'validated_at')
-        if any(x not in threepid for x in reqd):
-            # This will only happen if the ID server returns a malformed response
-            logger.info("Can't add incomplete 3pid")
-            defer.returnValue()
+        try:
+            assert_params_in_dict(threepid, ['medium', 'address', 'validated_at'])
+        except SynapseError as ex:
+            if ex.errcode == Codes.MISSING_PARAM:
+                # This will only happen if the ID server returns a malformed response
+                logger.info("Can't add incomplete 3pid")
+                defer.returnValue(None)
+            raise
 
         yield self.auth_handler.add_threepid(
             user_id,
@@ -722,7 +723,7 @@ class RegisterRestServlet(RestServlet):
     @defer.inlineCallbacks
     def _do_guest_registration(self, params):
         if not self.hs.config.allow_guest_access:
-            defer.returnValue((403, "Guest access is disabled"))
+            raise SynapseError(403, "Guest access is disabled")
         user_id, _ = yield self.registration_handler.register(
             generate_token=False,
             make_guest=True
