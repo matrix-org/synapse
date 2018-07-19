@@ -14,15 +14,16 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
-from ._base import BaseHandler
-
-from synapse.api.errors import SynapseError, Codes, CodeMessageException, AuthError
-from synapse.api.constants import EventTypes
-from synapse.types import RoomAlias, UserID, get_domain_from_id
-
 import logging
 import string
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes
+from synapse.api.errors import AuthError, CodeMessageException, Codes, SynapseError
+from synapse.types import RoomAlias, UserID, get_domain_from_id
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 

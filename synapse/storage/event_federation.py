@@ -12,23 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 import random
+
+from six.moves import range
+from six.moves.queue import Empty, PriorityQueue
+
+from unpaddedbase64 import encode_base64
 
 from twisted.internet import defer
 
+from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.events import EventsWorkerStore
 from synapse.storage.signatures import SignatureWorkerStore
-
-from synapse.api.errors import StoreError
 from synapse.util.caches.descriptors import cached
-from unpaddedbase64 import encode_base64
-
-import logging
-from six.moves.queue import PriorityQueue, Empty
-
-from six.moves import range
-
 
 logger = logging.getLogger(__name__)
 

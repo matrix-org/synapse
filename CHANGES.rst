@@ -1,3 +1,108 @@
+Synapse 0.33.0rc1 (2018-07-18)
+==============================
+
+Features
+--------
+
+- Enforce the specified API for report_event (`#3316 <https://github.com/matrix-org/synapse/issues/3316>`_)
+- Include CPU time from database threads in request/block metrics. (`#3496 <https://github.com/matrix-org/synapse/issues/3496>`_)
+- Add CPU metrics for _fetch_event_list (`#3497 <https://github.com/matrix-org/synapse/issues/3497>`_)
+- Reduce database consumption when processing large numbers of receipts (`#3505 <https://github.com/matrix-org/synapse/issues/3505>`_)
+- Cache optimisation for /sync requests (`#3521 <https://github.com/matrix-org/synapse/issues/3521>`_)
+- Optimisation to make handling incoming federation requests more efficient. (`#3541 <https://github.com/matrix-org/synapse/issues/3541>`_)
+
+
+Bugfixes
+--------
+
+- Fix queued federation requests being processed in the wrong order (`#3533 <https://github.com/matrix-org/synapse/issues/3533>`_)
+- Ensure that erasure requests are correctly honoured for publicly accessible rooms when accessed over federation. (`#3546 <https://github.com/matrix-org/synapse/issues/3546>`_)
+
+
+Misc
+----
+
+- `#3351 <https://github.com/matrix-org/synapse/issues/3351>`_, `#3463 <https://github.com/matrix-org/synapse/issues/3463>`_, `#3464 <https://github.com/matrix-org/synapse/issues/3464>`_, `#3498 <https://github.com/matrix-org/synapse/issues/3498>`_, `#3499 <https://github.com/matrix-org/synapse/issues/3499>`_, `#3501 <https://github.com/matrix-org/synapse/issues/3501>`_, `#3530 <https://github.com/matrix-org/synapse/issues/3530>`_, `#3534 <https://github.com/matrix-org/synapse/issues/3534>`_, `#3535 <https://github.com/matrix-org/synapse/issues/3535>`_, `#3540 <https://github.com/matrix-org/synapse/issues/3540>`_, `#3544 <https://github.com/matrix-org/synapse/issues/3544>`_
+
+
+Synapse 0.32.2 (2018-07-07)
+===========================
+
+Bugfixes
+--------
+
+- Amend the Python dependencies to depend on attrs from PyPI, not attr (`#3492 <https://github.com/matrix-org/synapse/issues/3492>`_)
+
+
+Synapse 0.32.1 (2018-07-06)
+===========================
+
+Bugfixes
+--------
+
+- Add explicit dependency on netaddr (`#3488 <https://github.com/matrix-org/synapse/issues/3488>`_)
+
+
+Changes in synapse v0.32.0 (2018-07-06)
+===========================================
+No changes since 0.32.0rc1
+
+Synapse 0.32.0rc1 (2018-07-05)
+==============================
+
+Features
+--------
+
+- Add blacklist & whitelist of servers allowed to send events to a room via ``m.room.server_acl`` event.
+- Cache factor override system for specific caches (`#3334 <https://github.com/matrix-org/synapse/issues/3334>`_)
+- Add metrics to track appservice transactions (`#3344 <https://github.com/matrix-org/synapse/issues/3344>`_)
+- Try to log more helpful info when a sig verification fails (`#3372 <https://github.com/matrix-org/synapse/issues/3372>`_)
+- Synapse now uses the best performing JSON encoder/decoder according to your runtime (simplejson on CPython, stdlib json on PyPy). (`#3462 <https://github.com/matrix-org/synapse/issues/3462>`_)
+- Add optional ip_range_whitelist param to AS registration files to lock AS IP access (`#3465 <https://github.com/matrix-org/synapse/issues/3465>`_)
+- Reject invalid server names in federation requests (`#3480 <https://github.com/matrix-org/synapse/issues/3480>`_)
+- Reject invalid server names in homeserver.yaml (`#3483 <https://github.com/matrix-org/synapse/issues/3483>`_)
+
+
+Bugfixes
+--------
+
+- Strip access_token from outgoing requests (`#3327 <https://github.com/matrix-org/synapse/issues/3327>`_)
+- Redact AS tokens in logs (`#3349 <https://github.com/matrix-org/synapse/issues/3349>`_)
+- Fix federation backfill from SQLite servers (`#3355 <https://github.com/matrix-org/synapse/issues/3355>`_)
+- Fix event-purge-by-ts admin API (`#3363 <https://github.com/matrix-org/synapse/issues/3363>`_)
+- Fix event filtering in get_missing_events handler (`#3371 <https://github.com/matrix-org/synapse/issues/3371>`_)
+- Synapse is now stricter regarding accepting events which it cannot retrieve the prev_events for. (`#3456 <https://github.com/matrix-org/synapse/issues/3456>`_)
+- Fix bug where synapse would explode when receiving unicode in HTTP User-Agent header (`#3470 <https://github.com/matrix-org/synapse/issues/3470>`_)
+- Invalidate cache on correct thread to avoid race (`#3473 <https://github.com/matrix-org/synapse/issues/3473>`_)
+
+
+Improved Documentation
+----------------------
+
+- ``doc/postgres.rst``: fix display of the last command block. Thanks to @ArchangeGabriel! (`#3340 <https://github.com/matrix-org/synapse/issues/3340>`_)
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove was_forgotten_at (`#3324 <https://github.com/matrix-org/synapse/issues/3324>`_)
+
+
+Misc
+----
+
+- `#3332 <https://github.com/matrix-org/synapse/issues/3332>`_, `#3341 <https://github.com/matrix-org/synapse/issues/3341>`_, `#3347 <https://github.com/matrix-org/synapse/issues/3347>`_, `#3348 <https://github.com/matrix-org/synapse/issues/3348>`_, `#3356 <https://github.com/matrix-org/synapse/issues/3356>`_, `#3385 <https://github.com/matrix-org/synapse/issues/3385>`_, `#3446 <https://github.com/matrix-org/synapse/issues/3446>`_, `#3447 <https://github.com/matrix-org/synapse/issues/3447>`_, `#3467 <https://github.com/matrix-org/synapse/issues/3467>`_, `#3474 <https://github.com/matrix-org/synapse/issues/3474>`_
+
+
+Changes in synapse v0.31.2 (2018-06-14)
+=======================================
+
+SECURITY UPDATE: Prevent unauthorised users from setting state events in a room
+when there is no ``m.room.power_levels`` event in force in the room. (PR #3397)
+
+Discussion around the Matrix Spec change proposal for this change can be
+followed at https://github.com/matrix-org/matrix-doc/issues/1304.
+
 Changes in synapse v0.31.1 (2018-06-08)
 =======================================
 

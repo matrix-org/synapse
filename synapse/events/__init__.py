@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.frozenutils import freeze
 from synapse.util.caches import intern_dict
-
+from synapse.util.frozenutils import freeze
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
 # bugs where we accidentally share e.g. signature dicts. However, converting

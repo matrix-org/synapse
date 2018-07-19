@@ -35,7 +35,10 @@ class ToTwistedHandler(logging.Handler):
     def emit(self, record):
         log_entry = self.format(record)
         log_level = record.levelname.lower().replace('warning', 'warn')
-        self.tx_log.emit(twisted.logger.LogLevel.levelWithName(log_level), log_entry)
+        self.tx_log.emit(
+            twisted.logger.LogLevel.levelWithName(log_level),
+            log_entry.replace("{", r"(").replace("}", r")"),
+        )
 
 
 handler = ToTwistedHandler()
@@ -105,6 +108,17 @@ class TestCase(unittest.TestCase):
                 self.assertEquals(attrs[key], getattr(obj, key))
             except AssertionError as e:
                 raise (type(e))(e.message + " for '.%s'" % key)
+
+    def assert_dict(self, required, actual):
+        """Does a partial assert of a dict.
+
+        Args:
+            required (dict): The keys and value which MUST be in 'actual'.
+            actual (dict): The test result. Extra keys will not be checked.
+        """
+        for key in required:
+            self.assertEquals(required[key], actual[key],
+                              msg="%s mismatch. %s" % (key, actual))
 
 
 def DEBUG(target):

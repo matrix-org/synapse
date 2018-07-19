@@ -18,27 +18,39 @@ import logging
 import os
 import sys
 
+from twisted.application import service
+from twisted.internet import defer, reactor
+from twisted.web.resource import EncodingResourceWrapper, NoResource
+from twisted.web.server import GzipEncoderFactory
+from twisted.web.static import File
+
 import synapse
 import synapse.config.logger
 from synapse import events
-from synapse.api.urls import CONTENT_REPO_PREFIX, FEDERATION_PREFIX, \
-    LEGACY_MEDIA_PREFIX, MEDIA_PREFIX, SERVER_KEY_PREFIX, SERVER_KEY_V2_PREFIX, \
-    STATIC_PREFIX, WEB_CLIENT_PREFIX
+from synapse.api.urls import (
+    CONTENT_REPO_PREFIX,
+    FEDERATION_PREFIX,
+    LEGACY_MEDIA_PREFIX,
+    MEDIA_PREFIX,
+    SERVER_KEY_PREFIX,
+    SERVER_KEY_V2_PREFIX,
+    STATIC_PREFIX,
+    WEB_CLIENT_PREFIX,
+)
 from synapse.app import _base
-from synapse.app._base import quit_with_error, listen_ssl, listen_tcp
+from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.module_api import ModuleApi
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
-from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
-    check_requirements
-from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
+from synapse.module_api import ModuleApi
+from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, check_requirements
+from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
@@ -55,11 +67,6 @@ from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
-from twisted.application import service
-from twisted.internet import defer, reactor
-from twisted.web.resource import EncodingResourceWrapper, NoResource
-from twisted.web.server import GzipEncoderFactory
-from twisted.web.static import File
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -266,7 +273,7 @@ class SynapseHomeServer(HomeServer):
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warn(("Metrics listener configured, but "
-                                 "collect_metrics is not enabled!"))
+                                 "enable_metrics is not True!"))
                 else:
                     _base.listen_metrics(listener["bind_addresses"],
                                          listener["port"])
@@ -318,11 +325,6 @@ def setup(config_options):
     # check any extra requirements we have now we have a config
     check_requirements(config)
 
-    version_string = "Synapse/" + get_version_string(synapse)
-
-    logger.info("Server hostname: %s", config.server_name)
-    logger.info("Server version: %s", version_string)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
@@ -335,7 +337,7 @@ def setup(config_options):
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
         config=config,
-        version_string=version_string,
+        version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 

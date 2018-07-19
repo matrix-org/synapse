@@ -1,7 +1,8 @@
-from tests import unittest
 from mock import patch
 
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+
+from tests import unittest
 
 
 class StreamChangeCacheTests(unittest.TestCase):
@@ -140,8 +141,8 @@ class StreamChangeCacheTests(unittest.TestCase):
         )
 
         # Query all the entries mid-way through the stream, but include one
-        # that doesn't exist in it. We should get back the one that doesn't
-        # exist, too.
+        # that doesn't exist in it. We shouldn't get back the one that doesn't
+        # exist.
         self.assertEqual(
             cache.get_entities_changed(
                 [
@@ -152,7 +153,7 @@ class StreamChangeCacheTests(unittest.TestCase):
                 ],
                 stream_pos=2,
             ),
-            set(["bar@baz.net", "user@elsewhere.org", "not@here.website"]),
+            set(["bar@baz.net", "user@elsewhere.org"]),
         )
 
         # Query all the entries, but before the first known point. We will get
@@ -173,6 +174,22 @@ class StreamChangeCacheTests(unittest.TestCase):
                     "bar@baz.net",
                     "user@elsewhere.org",
                     "not@here.website",
+                ]
+            ),
+        )
+
+        # Query a subset of the entries mid-way through the stream. We should
+        # only get back the subset.
+        self.assertEqual(
+            cache.get_entities_changed(
+                [
+                    "bar@baz.net",
+                ],
+                stream_pos=2,
+            ),
+            set(
+                [
+                    "bar@baz.net",
                 ]
             ),
         )

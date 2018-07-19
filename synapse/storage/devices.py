@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import simplejson as json
+
+from six import iteritems, itervalues
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from ._base import SQLBaseStore, Cache
-from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 
-from six import itervalues, iteritems
+from ._base import Cache, SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

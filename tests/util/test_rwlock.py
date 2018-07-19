@@ -14,9 +14,9 @@
 # limitations under the License.
 
 
-from tests import unittest
-
 from synapse.util.async import ReadWriteLock
+
+from tests import unittest
 
 
 class ReadWriteLockTestCase(unittest.TestCase):

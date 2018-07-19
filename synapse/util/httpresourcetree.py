@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.web.resource import NoResource
-
 import logging
+
+from twisted.web.resource import NoResource
 
 logger = logging.getLogger(__name__)
 

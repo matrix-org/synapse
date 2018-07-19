@@ -16,16 +16,18 @@
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    SynapseError, UnrecognizedRequestError, NotFoundError, StoreError
+    NotFoundError,
+    StoreError,
+    SynapseError,
+    UnrecognizedRequestError,
 )
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.storage.push_rule import (
-    InconsistentRuleException, RuleNotFoundException
-)
-from synapse.push.clientformat import format_push_rules_for_user
+from synapse.http.servlet import parse_json_value_from_request, parse_string
 from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
-from synapse.http.servlet import parse_json_value_from_request
+from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 class PushRuleRestServlet(ClientV1RestServlet):
@@ -73,13 +75,13 @@ class PushRuleRestServlet(ClientV1RestServlet):
         except InvalidRuleException as e:
             raise SynapseError(400, e.message)
 
-        before = request.args.get("before", None)
+        before = parse_string(request, "before")
         if before:
-            before = _namespaced_rule_id(spec, before[0])
+            before = _namespaced_rule_id(spec, before)
 
-        after = request.args.get("after", None)
+        after = parse_string(request, "after")
         if after:
-            after = _namespaced_rule_id(spec, after[0])
+            after = _namespaced_rule_id(spec, after)
 
         try:
             yield self.store.add_push_rule(

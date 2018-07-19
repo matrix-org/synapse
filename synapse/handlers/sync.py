@@ -14,24 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.api.constants import Membership, EventTypes
-from synapse.util.async import concurrently_execute
-from synapse.util.logcontext import LoggingContext
-from synapse.util.metrics import Measure, measure_func
-from synapse.util.caches.response_cache import ResponseCache
-from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.caches.lrucache import LruCache
-from synapse.push.clientformat import format_push_rules_for_user
-from synapse.visibility import filter_events_for_client
-from synapse.types import RoomStreamToken
+import collections
+import itertools
+import logging
+
+from six import iteritems, itervalues
 
 from twisted.internet import defer
 
-import collections
-import logging
-import itertools
-
-from six import itervalues, iteritems
+from synapse.api.constants import EventTypes, Membership
+from synapse.push.clientformat import format_push_rules_for_user
+from synapse.types import RoomStreamToken
+from synapse.util.async import concurrently_execute
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.logcontext import LoggingContext
+from synapse.util.metrics import Measure, measure_func
+from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ class SyncResult(collections.namedtuple("SyncResult", [
     "invited",  # InvitedSyncResult for each invited room.
     "archived",  # ArchivedSyncResult for each archived room.
     "to_device",  # List of direct messages for the device.
-    "device_lists",  # List of user_ids whose devices have chanegd
+    "device_lists",  # List of user_ids whose devices have changed
     "device_one_time_keys_count",  # Dict of algorithm to count for one time keys
                                    # for this device
     "groups",

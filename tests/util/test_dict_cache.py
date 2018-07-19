@@ -14,9 +14,9 @@
 # limitations under the License.
 
 
-from tests import unittest
-
 from synapse.util.caches.dictionary_cache import DictionaryCache
+
+from tests import unittest
 
 
 class DictCacheTestCase(unittest.TestCase):
@@ -32,7 +32,7 @@ class DictCacheTestCase(unittest.TestCase):
 
         seq = self.cache.sequence
         test_value = {"test": "test_simple_cache_hit_full"}
-        self.cache.update(seq, key, test_value, full=True)
+        self.cache.update(seq, key, test_value)
 
         c = self.cache.get(key)
         self.assertEqual(test_value, c.value)
@@ -44,7 +44,7 @@ class DictCacheTestCase(unittest.TestCase):
         test_value = {
             "test": "test_simple_cache_hit_partial"
         }
-        self.cache.update(seq, key, test_value, full=True)
+        self.cache.update(seq, key, test_value)
 
         c = self.cache.get(key, ["test"])
         self.assertEqual(test_value, c.value)
@@ -56,7 +56,7 @@ class DictCacheTestCase(unittest.TestCase):
         test_value = {
             "test": "test_simple_cache_miss_partial"
         }
-        self.cache.update(seq, key, test_value, full=True)
+        self.cache.update(seq, key, test_value)
 
         c = self.cache.get(key, ["test2"])
         self.assertEqual({}, c.value)
@@ -70,7 +70,7 @@ class DictCacheTestCase(unittest.TestCase):
             "test2": "test_simple_cache_hit_miss_partial2",
             "test3": "test_simple_cache_hit_miss_partial3",
         }
-        self.cache.update(seq, key, test_value, full=True)
+        self.cache.update(seq, key, test_value)
 
         c = self.cache.get(key, ["test2"])
         self.assertEqual({"test2": "test_simple_cache_hit_miss_partial2"}, c.value)
@@ -82,13 +82,13 @@ class DictCacheTestCase(unittest.TestCase):
         test_value_1 = {
             "test": "test_simple_cache_hit_miss_partial",
         }
-        self.cache.update(seq, key, test_value_1, full=False)
+        self.cache.update(seq, key, test_value_1, fetched_keys=set("test"))
 
         seq = self.cache.sequence
         test_value_2 = {
             "test2": "test_simple_cache_hit_miss_partial2",
         }
-        self.cache.update(seq, key, test_value_2, full=False)
+        self.cache.update(seq, key, test_value_2, fetched_keys=set("test2"))
 
         c = self.cache.get(key)
         self.assertEqual(

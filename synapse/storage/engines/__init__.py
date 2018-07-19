@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import IncorrectDatabaseSetup
-from .postgres import PostgresEngine
-from .sqlite3 import Sqlite3Engine
-
 import importlib
 import platform
 
+from ._base import IncorrectDatabaseSetup
+from .postgres import PostgresEngine
+from .sqlite3 import Sqlite3Engine
 
 SUPPORTED_MODULE = {
     "sqlite3": Sqlite3Engine,

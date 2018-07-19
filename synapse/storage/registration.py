@@ -15,14 +15,14 @@
 
 import re
 
+from six.moves import range
+
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError, Codes
+from synapse.api.errors import Codes, StoreError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-
-from six.moves import range
 
 
 class RegistrationWorkerStore(SQLBaseStore):
@@ -460,15 +460,6 @@ class RegistrationStore(RegistrationWorkerStore,
             defer.returnValue(ret['user_id'])
         defer.returnValue(None)
 
-    def user_delete_threepids(self, user_id):
-        return self._simple_delete(
-            "user_threepids",
-            keyvalues={
-                "user_id": user_id,
-            },
-            desc="user_delete_threepids",
-        )
-
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
             "user_threepids",
@@ -632,7 +623,9 @@ class RegistrationStore(RegistrationWorkerStore,
         Removes the given user to the table of users who need to be parted from all the
         rooms they're in, effectively marking that user as fully deactivated.
         """
-        return self._simple_delete_one(
+        # XXX: This should be simple_delete_one but we failed to put a unique index on
+        # the table, so somehow duplicate entries have ended up in it.
+        return self._simple_delete(
             "users_pending_deactivation",
             keyvalues={
                 "user_id": user_id,

@@ -14,14 +14,16 @@
 # limitations under the License.
 
 
-from twisted.web.resource import Resource
-from synapse.http.server import respond_with_json_bytes
-from signedjson.sign import sign_json
-from unpaddedbase64 import encode_base64
-from canonicaljson import encode_canonical_json
-from OpenSSL import crypto
 import logging
 
+from canonicaljson import encode_canonical_json
+from signedjson.sign import sign_json
+from unpaddedbase64 import encode_base64
+
+from OpenSSL import crypto
+from twisted.web.resource import Resource
+
+from synapse.http.server import respond_with_json_bytes
 
 logger = logging.getLogger(__name__)
 
