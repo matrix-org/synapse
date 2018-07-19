@@ -16,11 +16,12 @@
 import json
 
 from mock import Mock
+from six import PY3
 
 from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.http.server import JsonResource
-from synapse.rest.client.v1.register import register_servlets
+from synapse.rest.client.v1_only.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
@@ -31,6 +32,8 @@ class CreateUserServletTestCase(unittest.TestCase):
     """
     Tests for CreateUserRestServlet.
     """
+    if PY3:
+        skip = "Not ported to Python 3."
 
     def setUp(self):
         self.registration_handler = Mock()
