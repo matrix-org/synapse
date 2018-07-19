@@ -9,6 +9,8 @@ RUN cd /synapse \
  && pip install --upgrade pip setuptools psycopg2 lxml \
  && mkdir -p /synapse/cache \
  && pip install -f /synapse/cache --upgrade --process-dependency-links . \
+ # Update Twisted to add IPv6 support (see #3551)
+ && pip install Twisted>=17.1.0 \
  && mv /synapse/contrib/docker/start.py /synapse/contrib/docker/conf / \
  && rm -rf setup.py setup.cfg synapse
 
