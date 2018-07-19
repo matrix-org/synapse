@@ -151,7 +151,7 @@ class ProfileStore(ProfileWorkerStore):
 
     def set_profile_active(self, user_localpart, active, batchnum):
         values = {
-            "active": active,
+            "active": int(active),
             "batch": batchnum,
         }
         if not active:
