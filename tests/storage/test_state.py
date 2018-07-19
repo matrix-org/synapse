@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -20,6 +22,8 @@ from synapse.types import RoomID, UserID
 
 import tests.unittest
 import tests.utils
+
+logger = logging.getLogger(__name__)
 
 
 class StateStoreTestCase(tests.unittest.TestCase):
@@ -37,9 +41,6 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         self.u_alice = UserID.from_string("@alice:test")
         self.u_bob = UserID.from_string("@bob:test")
-
-        # User elsewhere on another host
-        self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
         self.room = RoomID.from_string("!abc123:test")
 
@@ -67,85 +68,93 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         defer.returnValue(event)
 
+    def assertStateMapEqual(self, s1, s2):
+        for t in s1:
+            # just compare event IDs for simplicity
+            self.assertEqual(s1[t].event_id, s2[t].event_id)
+        self.assertEqual(len(s1), len(s2))
+
     @defer.inlineCallbacks
-    def test_get_state_for_events(self):
+    def test_get_state_for_event(self):
 
         # this defaults to a linear DAG as each new injection defaults to whatever
         # forward extremities are currently in the DB for this room.
-        (e1, c1) = yield self.inject_state_event(
+        e1 = yield self.inject_state_event(
             self.room, self.u_alice, EventTypes.Create, '', {},
         )
-        (e2, c2) = yield self.inject_state_event(
+        e2 = yield self.inject_state_event(
             self.room, self.u_alice, EventTypes.Name, '', {
                 "name": "test room"
             },
         )
-        (e3, c3) = yield self.inject_state_event(
-            self.room, self.u_alice, EventTypes.Member, self.u_alice, {
+        e3 = yield self.inject_state_event(
+            self.room, self.u_alice, EventTypes.Member, self.u_alice.to_string(), {
                 "membership": Membership.JOIN
             },
         )
-        (e4, c4) = yield self.inject_state_event(
-            self.room, self.u_bob, EventTypes.Member, self.u_bob, {
+        e4 = yield self.inject_state_event(
+            self.room, self.u_bob, EventTypes.Member, self.u_bob.to_string(), {
                 "membership": Membership.JOIN
             },
         )
-        (e5, c5) = yield self.inject_state_event(
-            self.room, self.u_bob, EventTypes.Member, self.u_bob, {
+        e5 = yield self.inject_state_event(
+            self.room, self.u_bob, EventTypes.Member, self.u_bob.to_string(), {
                 "membership": Membership.LEAVE
             },
         )
 
         # check we get the full state as of the final event
-        state = yield self.store.get_state_for_events(
+        state = yield self.store.get_state_for_event(
             e5.event_id, None, filtered_types=None
         )
 
-        self.assertDictEqual({
-            (e1.type, e1.state_key): e1.event_id,
-            (e2.type, e2.state_key): e2.event_id,
-            (e3.type, e3.state_key): e3.event_id,
+        self.assertIsNotNone(e4)
+
+        self.assertStateMapEqual({
+            (e1.type, e1.state_key): e1,
+            (e2.type, e2.state_key): e2,
+            (e3.type, e3.state_key): e3,
             # e4 is overwritten by e5
-            (e5.type, e5.state_key): e5.event_id,
+            (e5.type, e5.state_key): e5,
         }, state)
 
         # check we can filter to the m.room.name event (with a '' state key)
-        state = yield self.store.get_state_for_events(
-            e5.event_id, ((EventTypes.Name, '')), filtered_types=None
+        state = yield self.store.get_state_for_event(
+            e5.event_id, [(EventTypes.Name, '')], filtered_types=None
         )
 
-        self.assertDictEqual({
-            (e2.type, e2.state_key): e2.event_id,
+        self.assertStateMapEqual({
+            (e2.type, e2.state_key): e2,
         }, state)
 
         # check we can filter to the m.room.name event (with a wildcard None state key)
-        state = yield self.store.get_state_for_events(
-            e5.event_id, ((EventTypes.Name, None)), filtered_types=None
+        state = yield self.store.get_state_for_event(
+            e5.event_id, [(EventTypes.Name, None)], filtered_types=None
         )
 
-        self.assertDictEqual({
-            (e2.type, e2.state_key): e2.event_id,
+        self.assertStateMapEqual({
+            (e2.type, e2.state_key): e2,
         }, state)
 
         # check we can grab the m.room.member events (with a wildcard None state key)
-        state = yield self.store.get_state_for_events(
-            e5.event_id, ((EventTypes.Member, None)), filtered_types=None
+        state = yield self.store.get_state_for_event(
+            e5.event_id, [(EventTypes.Member, None)], filtered_types=None
         )
 
-        self.assertDictEqual({
-            (e3.type, e3.state_key): e3.event_id,
-            (e5.type, e5.state_key): e5.event_id,
+        self.assertStateMapEqual({
+            (e3.type, e3.state_key): e3,
+            (e5.type, e5.state_key): e5,
         }, state)
 
         # check we can use filter_types to grab a specific room member
         # without filtering out the other event types
-        state = yield self.store.get_state_for_events(
-            e5.event_id, ((EventTypes.Member, self.u_alice)),
+        state = yield self.store.get_state_for_event(
+            e5.event_id, [(EventTypes.Member, self.u_alice.to_string())],
             filtered_types=[EventTypes.Member],
         )
 
-        self.assertDictEqual({
-            (e1.type, e1.state_key): e3.event_id,
-            (e2.type, e2.state_key): e3.event_id,
-            (e3.type, e3.state_key): e5.event_id,
+        self.assertStateMapEqual({
+            (e1.type, e1.state_key): e1,
+            (e2.type, e2.state_key): e2,
+            (e3.type, e3.state_key): e3,
         }, state)
