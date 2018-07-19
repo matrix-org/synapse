@@ -1,1 +1,1 @@
-Cache optimisation for /sync requests
+optimisation for /sync

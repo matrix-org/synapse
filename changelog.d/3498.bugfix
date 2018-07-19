@@ -1,0 +1,1 @@
+Use more portable syntax in our use of the attrs package, widening the supported versions
