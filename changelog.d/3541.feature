@@ -1,0 +1,1 @@
+Optimisation to make handling incoming federation requests more efficient.
