@@ -20,4 +20,4 @@
  * so we can't easily join between the two tables. Plus, the batch number
  * realy ought to represent data in this table that has changed.
  */
-ALTER TABLE profiles ADD COLUMN active BOOLEAN DEFAULT 1 NOT NULL;
+ALTER TABLE profiles ADD COLUMN active SMALLINT DEFAULT 1 NOT NULL;
