@@ -18,7 +18,7 @@ import hashlib
 import logging
 from collections import namedtuple
 
-from six import iteritems, itervalues
+from six import iteritems, itervalues, iterkeys
 
 from frozendict import frozendict
 

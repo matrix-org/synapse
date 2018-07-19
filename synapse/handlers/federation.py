@@ -21,7 +21,7 @@ import logging
 import sys
 
 import six
-from six import iteritems
+from six import iteritems, itervalues
 from six.moves import http_client
 
 from signedjson.key import decode_verify_key_bytes
@@ -827,7 +827,7 @@ class FederationHandler(BaseHandler):
         states = dict(zip(event_ids, [s.state for s in states]))
 
         state_map = yield self.store.get_events(
-            [e_id for ids in states.itervalues() for e_id in ids.itervalues()],
+            [e_id for ids in itervalues(states) for e_id in itervalues(ids)],
             get_prev_content=False
         )
         states = {
