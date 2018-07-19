@@ -74,7 +74,8 @@ class EndToEndKeyStore(SQLBaseStore):
             include_all_devices (bool): whether to include entries for devices
                 that don't have device keys
             include_deleted_devices (bool): whether to include null entries for
-                devices which no longer exist (but were in the query_list)
+                devices which no longer exist (but were in the query_list).
+                This option only takes effect if include_all_devices is true.
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             dict containing "key_json", "device_display_name".
@@ -99,6 +100,9 @@ class EndToEndKeyStore(SQLBaseStore):
     ):
         query_clauses = []
         query_params = []
+
+        if include_all_devices is False:
+            include_deleted_devices = False
 
         if include_deleted_devices:
             deleted_devices = set(query_list)
