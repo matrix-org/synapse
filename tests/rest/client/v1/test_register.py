@@ -32,6 +32,8 @@ class CreateUserServletTestCase(unittest.TestCase):
     """
     Tests for CreateUserRestServlet.
     """
+    if PY3:
+        skip = "Not ported to Python 3."
 
     def setUp(self):
         self.registration_handler = Mock()
