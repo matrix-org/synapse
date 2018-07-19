@@ -373,8 +373,6 @@ class ThreepidDeleteRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield run_on_reactor()
-
         if self.hs.config.disable_3pid_changes:
             raise SynapseError(400, "3PID changes disabled on this server")
 
