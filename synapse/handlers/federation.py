@@ -22,7 +22,7 @@ import sys
 
 import six
 from six import iteritems, itervalues
-from six.moves import http_client
+from six.moves import http_client, zip
 
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
