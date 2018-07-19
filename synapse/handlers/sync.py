@@ -585,13 +585,13 @@ class SyncHandler(object):
                         t: state_ids[t]
                         for t in state_ids if t[0] == EventTypes.Member
                     }
-                else:
-                    member_state_ids = {}
 
                     if not include_redundant_members:
                         # add any types we are about to send into our LruCache
                         for t in types:
                             cache.set(t[1], True)
+                else:
+                    member_state_ids = {}
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
@@ -638,13 +638,13 @@ class SyncHandler(object):
                         t: state_at_timeline_start[t]
                         for t in state_at_timeline_start if t[0] == EventTypes.Member
                     }
-                else:
-                    member_state_ids = {}
 
                     if not include_redundant_members:
                         # add any types we are about to send into our LruCache
                         for t in types:
                             cache.set(t[1], True)
+                else:
+                    member_state_ids = {}
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
