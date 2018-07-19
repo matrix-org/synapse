@@ -24,9 +24,10 @@ import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request
+from synapse.rest.client.v1.base import ClientV1RestServlet
 from synapse.types import create_requester
 
-from .base import ClientV1RestServlet, client_path_patterns
+from .base import v1_only_client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class RegisterRestServlet(ClientV1RestServlet):
     handler doesn't have a concept of multi-stages or sessions.
     """
 
-    PATTERNS = client_path_patterns("/register$", releases=(), include_in_unstable=False)
+    PATTERNS = v1_only_client_path_patterns("/register$", include_in_unstable=False)
 
     def __init__(self, hs):
         """
@@ -379,7 +380,7 @@ class CreateUserRestServlet(ClientV1RestServlet):
     """Handles user creation via a server-to-server interface
     """
 
-    PATTERNS = client_path_patterns("/createUser$", releases=())
+    PATTERNS = v1_only_client_path_patterns("/createUser$")
 
     def __init__(self, hs):
         super(CreateUserRestServlet, self).__init__(hs)

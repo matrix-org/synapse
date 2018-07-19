@@ -20,8 +20,12 @@ from synapse.types import UserID
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import ThreadedMemoryReactorClock as MemoryReactorClock
-from tests.server import make_request, setup_test_homeserver, wait_until_result
+from tests.server import (
+    ThreadedMemoryReactorClock as MemoryReactorClock,
+    make_request,
+    setup_test_homeserver,
+    wait_until_result,
+)
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
 
