@@ -118,7 +118,7 @@ class UserRegisterTestCase(unittest.TestCase):
         render(request, self.resource, self.clock)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('nonce cannot be reused', channel.json_body["error"])
+        self.assertEqual('unrecognised nonce', channel.json_body["error"])
 
     def test_register_incorrect_nonce(self):
         """
@@ -177,7 +177,7 @@ class UserRegisterTestCase(unittest.TestCase):
 
     def test_nonce_reuse(self):
         """
-        A valid nonce cannot be reused.
+        A valid unrecognised nonce.
         """
         request, channel = make_request("GET", self.url)
         render(request, self.resource, self.clock)
@@ -207,7 +207,7 @@ class UserRegisterTestCase(unittest.TestCase):
         render(request, self.resource, self.clock)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual('nonce cannot be reused', channel.json_body["error"])
+        self.assertEqual('unrecognised nonce', channel.json_body["error"])
 
     def test_missing_parts(self):
         """

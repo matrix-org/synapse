@@ -66,8 +66,14 @@ class UsersRestServlet(ClientV1RestServlet):
 
 
 class UserRegisterServlet(ClientV1RestServlet):
+    """
+    Attributes:
+         NONCE_TIMEOUT (int): Seconds until a generated nonce won't be accepted
+         nonces (dict): The nonces that we will accept. A dict of nonce to the
+                        time it was generated, in int seconds.
+    """
     PATTERNS = client_path_patterns("/admin/register")
-    SALT_TIMEOUT = 60
+    NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
         super(UserRegisterServlet, self).__init__(hs)
@@ -78,15 +84,18 @@ class UserRegisterServlet(ClientV1RestServlet):
 
     def _clear_old_nonces(self):
         """
-        Clear out old nonces that have expired.
+        Clear out old nonces that are older than NONCE_TIMEOUT.
         """
         now = int(self.reactor.seconds())
 
         for k, v in list(self.nonces.items()):
-            if now - v > self.SALT_TIMEOUT:
+            if now - v > self.NONCE_TIMEOUT:
                 del self.nonces[k]
 
     def on_GET(self, request):
+        """
+        Generate a new nonce.
+        """
         self._clear_old_nonces()
 
         nonce = self.hs.get_secrets().token_hex(64)
@@ -111,7 +120,7 @@ class UserRegisterServlet(ClientV1RestServlet):
 
         if nonce not in self.nonces:
             raise SynapseError(
-                400, "nonce cannot be reused",
+                400, "unrecognised nonce",
             )
 
         # Delete the nonce, so it can't be reused, even if it's invalid
