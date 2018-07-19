@@ -14,18 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
 
 from six.moves import http_client
 
+from twisted.internet import defer
+
 from synapse.api.constants import Membership
-from synapse.api.errors import AuthError, SynapseError, Codes, NotFoundError
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.servlet import (
+    assert_params_in_dict,
+    parse_integer,
+    parse_json_object_from_request,
+    parse_string,
+)
 from synapse.types import UserID, create_requester
-from synapse.http.servlet import parse_json_object_from_request
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -98,16 +103,8 @@ class PurgeMediaCacheRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        before_ts = request.args.get("before_ts", None)
-        if not before_ts:
-            raise SynapseError(400, "Missing 'before_ts' arg")
-
-        logger.info("before_ts: %r", before_ts[0])
-
-        try:
-            before_ts = int(before_ts[0])
-        except Exception:
-            raise SynapseError(400, "Invalid 'before_ts' arg")
+        before_ts = parse_integer(request, "before_ts", required=True)
+        logger.info("before_ts: %r", before_ts)
 
         ret = yield self.media_repository.delete_old_remote_media(before_ts)
 
@@ -300,10 +297,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             raise AuthError(403, "You are not a server admin")
 
         content = parse_json_object_from_request(request)
-
-        new_room_user_id = content.get("new_room_user_id")
-        if not new_room_user_id:
-            raise SynapseError(400, "Please provide field `new_room_user_id`")
+        assert_params_in_dict(content, ["new_room_user_id"])
+        new_room_user_id = content["new_room_user_id"]
 
         room_creator_requester = create_requester(new_room_user_id)
 
@@ -464,9 +459,8 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
             raise AuthError(403, "You are not a server admin")
 
         params = parse_json_object_from_request(request)
+        assert_params_in_dict(params, ["new_password"])
         new_password = params['new_password']
-        if not new_password:
-            raise SynapseError(400, "Missing 'new_password' arg")
 
         logger.info("new_password: %r", new_password)
 
@@ -514,12 +508,9 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Can only users a local user")
 
         order = "name"  # order by name in user table
-        start = request.args.get("start")[0]
-        limit = request.args.get("limit")[0]
-        if not limit:
-            raise SynapseError(400, "Missing 'limit' arg")
-        if not start:
-            raise SynapseError(400, "Missing 'start' arg")
+        start = parse_integer(request, "start", required=True)
+        limit = parse_integer(request, "limit", required=True)
+
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(
@@ -551,12 +542,9 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
 
         order = "name"  # order by name in user table
         params = parse_json_object_from_request(request)
+        assert_params_in_dict(params, ["limit", "start"])
         limit = params['limit']
         start = params['start']
-        if not limit:
-            raise SynapseError(400, "Missing 'limit' arg")
-        if not start:
-            raise SynapseError(400, "Missing 'start' arg")
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(
@@ -604,10 +592,7 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
 
-        term = request.args.get("term")[0]
-        if not term:
-            raise SynapseError(400, "Missing 'term' arg")
-
+        term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
         ret = yield self.handlers.admin_handler.search_users(

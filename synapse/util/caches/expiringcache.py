@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.caches import register_cache
-
-from collections import OrderedDict
 import logging
+from collections import OrderedDict
 
+from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
 

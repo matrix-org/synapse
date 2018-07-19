@@ -18,15 +18,16 @@ import logging
 from six import itervalues
 
 import pymacaroons
-from twisted.internet import defer
 from netaddr import IPAddress
+
+from twisted.internet import defer
 
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes
 from synapse.types import UserID
-from synapse.util.caches import register_cache, CACHE_SIZE_FACTOR
+from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
@@ -192,7 +193,7 @@ class Auth(object):
                     synapse.types.create_requester(user_id, app_service=app_service)
                 )
 
-            access_token = get_access_token_from_request(
+            access_token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
 
@@ -238,7 +239,7 @@ class Auth(object):
     @defer.inlineCallbacks
     def _get_appservice_user_id(self, request):
         app_service = self.store.get_app_service_by_token(
-            get_access_token_from_request(
+            self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
         )
@@ -512,7 +513,7 @@ class Auth(object):
 
     def get_appservice_by_req(self, request):
         try:
-            token = get_access_token_from_request(
+            token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
             service = self.store.get_app_service_by_token(token)
@@ -672,67 +673,67 @@ class Auth(object):
                 " edit its room list entry"
             )
 
+    @staticmethod
+    def has_access_token(request):
+        """Checks if the request has an access_token.
 
-def has_access_token(request):
-    """Checks if the request has an access_token.
+        Returns:
+            bool: False if no access_token was given, True otherwise.
+        """
+        query_params = request.args.get("access_token")
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+        return bool(query_params) or bool(auth_headers)
 
-    Returns:
-        bool: False if no access_token was given, True otherwise.
-    """
-    query_params = request.args.get("access_token")
-    auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
-    return bool(query_params) or bool(auth_headers)
+    @staticmethod
+    def get_access_token_from_request(request, token_not_found_http_status=401):
+        """Extracts the access_token from the request.
 
+        Args:
+            request: The http request.
+            token_not_found_http_status(int): The HTTP status code to set in the
+                AuthError if the token isn't found. This is used in some of the
+                legacy APIs to change the status code to 403 from the default of
+                401 since some of the old clients depended on auth errors returning
+                403.
+        Returns:
+            str: The access_token
+        Raises:
+            AuthError: If there isn't an access_token in the request.
+        """
 
-def get_access_token_from_request(request, token_not_found_http_status=401):
-    """Extracts the access_token from the request.
-
-    Args:
-        request: The http request.
-        token_not_found_http_status(int): The HTTP status code to set in the
-            AuthError if the token isn't found. This is used in some of the
-            legacy APIs to change the status code to 403 from the default of
-            401 since some of the old clients depended on auth errors returning
-            403.
-    Returns:
-        str: The access_token
-    Raises:
-        AuthError: If there isn't an access_token in the request.
-    """
-
-    auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
-    query_params = request.args.get(b"access_token")
-    if auth_headers:
-        # Try the get the access_token from a "Authorization: Bearer"
-        # header
-        if query_params is not None:
-            raise AuthError(
-                token_not_found_http_status,
-                "Mixing Authorization headers and access_token query parameters.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-        if len(auth_headers) > 1:
-            raise AuthError(
-                token_not_found_http_status,
-                "Too many Authorization headers.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-        parts = auth_headers[0].split(" ")
-        if parts[0] == "Bearer" and len(parts) == 2:
-            return parts[1]
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+        query_params = request.args.get(b"access_token")
+        if auth_headers:
+            # Try the get the access_token from a "Authorization: Bearer"
+            # header
+            if query_params is not None:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Mixing Authorization headers and access_token query parameters.",
+                    errcode=Codes.MISSING_TOKEN,
+                )
+            if len(auth_headers) > 1:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Too many Authorization headers.",
+                    errcode=Codes.MISSING_TOKEN,
+                )
+            parts = auth_headers[0].split(" ")
+            if parts[0] == "Bearer" and len(parts) == 2:
+                return parts[1]
+            else:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Invalid Authorization header.",
+                    errcode=Codes.MISSING_TOKEN,
+                )
         else:
-            raise AuthError(
-                token_not_found_http_status,
-                "Invalid Authorization header.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-    else:
-        # Try to get the access_token from the query params.
-        if not query_params:
-            raise AuthError(
-                token_not_found_http_status,
-                "Missing access token.",
-                errcode=Codes.MISSING_TOKEN
-            )
+            # Try to get the access_token from the query params.
+            if not query_params:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Missing access token.",
+                    errcode=Codes.MISSING_TOKEN
+                )
 
-        return query_params[0]
+            return query_params[0]

@@ -14,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from twisted.internet import defer
+import logging
+import types
 
 from canonicaljson import encode_canonical_json, json
 
+from twisted.internet import defer
+
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 
-import logging
-import types
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

@@ -14,41 +14,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, threads
-import twisted.internet.error
-import twisted.web.http
-from twisted.web.resource import Resource
-
-from ._base import respond_404, FileInfo, respond_with_responder
-from .upload_resource import UploadResource
-from .download_resource import DownloadResource
-from .thumbnail_resource import ThumbnailResource
-from .identicon_resource import IdenticonResource
-from .preview_url_resource import PreviewUrlResource
-from .filepath import MediaFilePaths
-from .thumbnailer import Thumbnailer
-from .storage_provider import StorageProviderWrapper
-from .media_storage import MediaStorage
-
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-from synapse.util.stringutils import random_string
-from synapse.api.errors import (
-    SynapseError, HttpResponseException, NotFoundError, FederationDeniedError,
-)
-
-from synapse.util.async import Linearizer
-from synapse.util.stringutils import is_ascii
-from synapse.util.logcontext import make_deferred_yieldable
-from synapse.util.retryutils import NotRetryingDestination
-
-import os
+import cgi
 import errno
+import logging
+import os
 import shutil
 
-import cgi
-import logging
-from six.moves.urllib import parse as urlparse
 from six import iteritems
+from six.moves.urllib import parse as urlparse
+
+import twisted.internet.error
+import twisted.web.http
+from twisted.internet import defer, threads
+from twisted.web.resource import Resource
+
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    NotFoundError,
+    SynapseError,
+)
+from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.util.async import Linearizer
+from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.stringutils import is_ascii, random_string
+
+from ._base import FileInfo, respond_404, respond_with_responder
+from .download_resource import DownloadResource
+from .filepath import MediaFilePaths
+from .identicon_resource import IdenticonResource
+from .media_storage import MediaStorage
+from .preview_url_resource import PreviewUrlResource
+from .storage_provider import StorageProviderWrapper
+from .thumbnail_resource import ThumbnailResource
+from .thumbnailer import Thumbnailer
+from .upload_resource import UploadResource
 
 logger = logging.getLogger(__name__)
 

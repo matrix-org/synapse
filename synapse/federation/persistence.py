@@ -19,12 +19,11 @@ package.
 These actions are mostly only used by the :py:mod:`.replication` module.
 """
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.util.logutils import log_function
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 

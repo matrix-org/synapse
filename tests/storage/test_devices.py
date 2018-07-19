@@ -16,6 +16,7 @@
 from twisted.internet import defer
 
 import synapse.api.errors
+
 import tests.unittest
 import tests.utils
 

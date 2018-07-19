@@ -15,14 +15,16 @@
 # limitations under the License.
 import logging
 import re
-from twisted.internet import defer
+
 from canonicaljson import json
+
+from twisted.internet import defer
 
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
 from synapse.storage.events import EventsWorkerStore
-from ._base import SQLBaseStore
 
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

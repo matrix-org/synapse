@@ -15,23 +15,28 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
-from twisted.internet import defer
-
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.api.errors import SynapseError, Codes, AuthError
-from synapse.streams.config import PaginationConfig
-from synapse.api.constants import EventTypes, Membership
-from synapse.api.filtering import Filter
-from synapse.types import UserID, RoomID, RoomAlias, ThirdPartyInstanceID
-from synapse.events.utils import serialize_event, format_event_for_client_v2
-from synapse.http.servlet import (
-    parse_json_object_from_request, parse_string, parse_integer
-)
+import logging
 
 from six.moves.urllib import parse as urlparse
 
-import logging
 from canonicaljson import json
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.filtering import Filter
+from synapse.events.utils import format_event_for_client_v2, serialize_event
+from synapse.http.servlet import (
+    assert_params_in_dict,
+    parse_integer,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.streams.config import PaginationConfig
+from synapse.types import RoomAlias, RoomID, ThirdPartyInstanceID, UserID
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -431,9 +436,9 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
             request, default_limit=10,
         )
         as_client_event = "raw" not in request.args
-        filter_bytes = request.args.get("filter", None)
+        filter_bytes = parse_string(request, "filter")
         if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes[-1]).decode("UTF-8")
+            filter_json = urlparse.unquote(filter_bytes).decode("UTF-8")
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
@@ -526,7 +531,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
-        limit = int(request.args.get("limit", [10])[0])
+        limit = parse_integer(request, "limit", default=10)
 
         results = yield self.handlers.room_context_handler.get_event_context(
             requester.user,
@@ -632,8 +637,7 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:
-            if "user_id" not in content:
-                raise SynapseError(400, "Missing user_id key.")
+            assert_params_in_dict(content, ["user_id"])
             target = UserID.from_string(content["user_id"])
 
         event_content = None
@@ -760,7 +764,7 @@ class SearchRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        batch = request.args.get("next_batch", [None])[0]
+        batch = parse_string(request, "next_batch")
         results = yield self.handlers.search_handler.search(
             requester.user,
             content,

@@ -14,14 +14,15 @@
 # limitations under the License.
 
 import logging
+
+from six import iteritems
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.storage.roommember import ProfileInfo
-from synapse.util.metrics import Measure
 from synapse.types import get_localpart_from_id
-
-from six import iteritems
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 

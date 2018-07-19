@@ -16,32 +16,29 @@
 import logging
 import sys
 
-from canonicaljson import encode_canonical_json, json
 import six
-from six import string_types, itervalues, iteritems
+from six import iteritems, itervalues, string_types
+
+from canonicaljson import encode_canonical_json, json
+
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes, Membership, MAX_DEPTH
-from synapse.api.errors import (
-    AuthError, Codes, SynapseError,
-    ConsentNotGivenError,
-)
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.api.urls import ConsentURIBuilder
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
-from synapse.types import (
-    UserID, RoomAlias, RoomStreamToken,
-)
-from synapse.util.async import ReadWriteLock, Limiter
+from synapse.replication.http.send_event import send_event_to_master
+from synapse.types import RoomAlias, RoomStreamToken, UserID
+from synapse.util.async import Limiter, ReadWriteLock
+from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.logcontext import run_in_background
 from synapse.util.metrics import measure_func
-from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
-from synapse.replication.http.send_event import send_event_to_master
 
 from ._base import BaseHandler
 
@@ -387,7 +384,7 @@ class MessageHandler(BaseHandler):
         users_with_profile = yield self.state.get_current_user_in_room(room_id)
 
         # If this is an AS, double check that they are allowed to see the members.
-        # This can either be because the AS user is in the room or becuase there
+        # This can either be because the AS user is in the room or because there
         # is a user in the room that the AS is "interested in"
         if requester.app_service and user_id not in users_with_profile:
             for uid in users_with_profile:

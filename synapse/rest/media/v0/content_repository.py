@@ -13,21 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json_bytes, finish_request
-
-from synapse.api.errors import (
-    Codes, cs_error
-)
-
-from twisted.protocols.basic import FileSender
-from twisted.web import server, resource
-
-from canonicaljson import json
-
 import base64
 import logging
 import os
 import re
+
+from canonicaljson import json
+
+from twisted.protocols.basic import FileSender
+from twisted.web import resource, server
+
+from synapse.api.errors import Codes, cs_error
+from synapse.http.server import finish_request, respond_with_json_bytes
 
 logger = logging.getLogger(__name__)
 

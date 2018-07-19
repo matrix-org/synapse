@@ -1,14 +1,14 @@
 
-from twisted.internet.defer import succeed, maybeDeferred
+from mock import Mock
 
-from synapse.util import Clock
+from twisted.internet.defer import maybeDeferred, succeed
+
 from synapse.events import FrozenEvent
 from synapse.types import Requester, UserID
+from synapse.util import Clock
 
 from tests import unittest
-from tests.server import setup_test_homeserver, ThreadedMemoryReactorClock
-
-from mock import Mock
+from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
 
 
 class MessageAcceptTests(unittest.TestCase):

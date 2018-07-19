@@ -14,33 +14,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import cgi
-from six.moves import http_client
-
-from synapse.api.errors import (
-    cs_exception, SynapseError, CodeMessageException, UnrecognizedRequestError, Codes
-)
-from synapse.http.request_metrics import (
-    requests_counter,
-)
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.caches import intern_dict
-from synapse.util.metrics import Measure
-import synapse.metrics
-import synapse.events
-
-from canonicaljson import (
-    encode_canonical_json, encode_pretty_printed_json, json
-)
-
-from twisted.internet import defer
-from twisted.python import failure
-from twisted.web import server, resource
-from twisted.web.server import NOT_DONE_YET
-from twisted.web.util import redirectTo
-
 import collections
 import logging
 import urllib
+
+from six.moves import http_client
+
+from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+
+from twisted.internet import defer
+from twisted.python import failure
+from twisted.web import resource, server
+from twisted.web.server import NOT_DONE_YET
+from twisted.web.util import redirectTo
+
+import synapse.events
+import synapse.metrics
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    SynapseError,
+    UnrecognizedRequestError,
+    cs_exception,
+)
+from synapse.http.request_metrics import requests_counter
+from synapse.util.caches import intern_dict
+from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 

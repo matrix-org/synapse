@@ -12,15 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.api.errors import SynapseError
-from synapse.storage.presence import UserPresenceState
-from synapse.types import UserID, RoomID
+import jsonschema
+from canonicaljson import json
+from jsonschema import FormatChecker
+
 from twisted.internet import defer
 
-from canonicaljson import json
-
-import jsonschema
-from jsonschema import FormatChecker
+from synapse.api.errors import SynapseError
+from synapse.storage.presence import UserPresenceState
+from synapse.types import RoomID, UserID
 
 FILTER_SCHEMA = {
     "additionalProperties": False,

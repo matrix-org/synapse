@@ -14,12 +14,12 @@
 # limitations under the License.
 
 
-from tests import unittest
 from twisted.internet import defer
 
 from synapse.storage.directory import DirectoryStore
-from synapse.types import RoomID, RoomAlias
+from synapse.types import RoomAlias, RoomID
 
+from tests import unittest
 from tests.utils import setup_test_homeserver
 
 

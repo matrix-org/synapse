@@ -18,10 +18,10 @@ import re
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, MatrixCodeMessageException
+from synapse.api.errors import MatrixCodeMessageException, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import Requester, UserID
-from synapse.util.distributor import user_left_room, user_joined_room
+from synapse.util.distributor import user_joined_room, user_left_room
 
 logger = logging.getLogger(__name__)
 
