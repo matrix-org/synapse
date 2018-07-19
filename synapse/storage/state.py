@@ -545,9 +545,10 @@ class StateGroupWorkerStore(SQLBaseStore):
 
             if state_key is None:
                 type_to_key[typ] = None
-                # XXX: why do we mark the type as missing from our cache just
-                # because we weren't filtering on a specific value of state_key?
-                # is it because the cache doesn't handle wildcards?
+                # we mark the type as missing from the cache because
+                # when the cache was populated it might have been done with a
+                # restricted set of state_keys, so the wildcard will not work
+                # and the cache may be incomplete.
                 missing_types.add(key)
             else:
                 if type_to_key.get(typ, object()) is not None:

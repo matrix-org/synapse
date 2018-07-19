@@ -435,7 +435,7 @@ class SyncHandler(object):
             A Deferred map from ((type, state_key)->Event)
         """
         state_ids = yield self.store.get_state_ids_for_event(
-            event.event_id, types, filtered_types=filtered_types
+            event.event_id, types, filtered_types=filtered_types,
         )
         if event.is_state():
             state_ids = state_ids.copy()
@@ -470,7 +470,7 @@ class SyncHandler(object):
         if last_events:
             last_event = last_events[-1]
             state = yield self.get_state_after_event(
-                last_event, types, filtered_types=filtered_types
+                last_event, types, filtered_types=filtered_types,
             )
 
         else:
@@ -505,7 +505,6 @@ class SyncHandler(object):
         with Measure(self.clock, "compute_state_delta"):
 
             types = None
-            member_state_ids = {}
             lazy_load_members = sync_config.filter_collection.lazy_load_members()
             filtered_types = None
 
@@ -521,10 +520,6 @@ class SyncHandler(object):
                     )
                 ]
 
-                # We can't remove redundant member types at this stage as it has
-                # to be done based on event_id, and we don't have the member
-                # event ids until we've pulled them out of the DB.
-
                 # only apply the filtering to room members
                 filtered_types = [EventTypes.Member]
 
@@ -532,27 +527,32 @@ class SyncHandler(object):
                 if batch:
                     current_state_ids = yield self.store.get_state_ids_for_event(
                         batch.events[-1].event_id, types=types,
-                        filtered_types=filtered_types
+                        filtered_types=filtered_types,
                     )
 
                     state_ids = yield self.store.get_state_ids_for_event(
                         batch.events[0].event_id, types=types,
-                        filtered_types=filtered_types
+                        filtered_types=filtered_types,
                     )
 
                 else:
                     current_state_ids = yield self.get_state_at(
                         room_id, stream_position=now_token, types=types,
-                        filtered_types=filtered_types
+                        filtered_types=filtered_types,
                     )
 
                     state_ids = current_state_ids
 
+                # track the membership state events as of the beginning of this
+                # timeline sequence, so they can be filtered out of the state
+                # if we are lazy loading members.
                 if lazy_load_members:
                     member_state_ids = {
                         t: state_ids[t]
                         for t in state_ids if t[0] == EventTypes.Member
                     }
+                else:
+                    member_state_ids = {}
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
@@ -569,28 +569,38 @@ class SyncHandler(object):
             elif batch.limited:
                 state_at_previous_sync = yield self.get_state_at(
                     room_id, stream_position=since_token, types=types,
-                    filtered_types=filtered_types
+                    filtered_types=filtered_types,
                 )
 
                 current_state_ids = yield self.store.get_state_ids_for_event(
                     batch.events[-1].event_id, types=types,
-                    filtered_types=filtered_types
+                    filtered_types=filtered_types,
                 )
 
                 state_at_timeline_start = yield self.store.get_state_ids_for_event(
                     batch.events[0].event_id, types=types,
-                    filtered_types=filtered_types
+                    filtered_types=filtered_types,
                 )
 
+                # track the membership state events as of the beginning of this
+                # timeline sequence, so they can be filtered out of the state
+                # if we are lazy loading members.
                 if lazy_load_members:
-                    # TODO: filter out redundant members based on their event_ids
-                    # (not mxids) at this point. In practice, limited syncs are
+                    # TODO: optionally filter out redundant membership events at this
+                    # point, to stop repeatedly sending members in every /sync as if
+                    # the client isn't tracking them.
+                    # When implement, this should filter using event_ids (not mxids).
+                    # In practice, limited syncs are
                     # relatively rare so it's not a total disaster to send redundant
-                    # members down at this point.
+                    # members down at this point. Redundant members are ones which
+                    # repeatedly get sent down /sync because we don't know if the client
+                    # is caching them or not.
                     member_state_ids = {
                         t: state_at_timeline_start[t]
                         for t in state_at_timeline_start if t[0] == EventTypes.Member
                     }
+                else:
+                    member_state_ids = {}
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
@@ -614,7 +624,7 @@ class SyncHandler(object):
                     if types:
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id, types=types,
-                            filtered_types=filtered_types
+                            filtered_types=filtered_types,
                         )
 
         state = {}
