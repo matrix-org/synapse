@@ -14,7 +14,10 @@
 # limitations under the License.
 
 """
-Secrets generation -- shh!
+Injectable secrets module for Synapse.
+
+See https://docs.python.org/3/library/secrets.html#module-secrets for the API
+used in Python 3.6, and the API emulated in Python 2.7.
 """
 
 import six
