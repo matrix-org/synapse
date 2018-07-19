@@ -1,29 +1,39 @@
 Synapse 0.33.0 (2018-07-19)
 ===========================
 
+Bugfixes
+--------
+
+- Disable a noisy warning about logcontexts. (`#3561 <https://github.com/matrix-org/synapse/issues/3561>`_)
+
+
+Synapse 0.33.0rc1 (2018-07-18)
+==============================
+
 Features
 --------
 
-- Enforce the specified API for report_event (`#3316 <https://github.com/matrix-org/synapse/issues/3316>`_)
+- Enforce the specified API for report_event. (`#3316 <https://github.com/matrix-org/synapse/issues/3316>`_)
 - Include CPU time from database threads in request/block metrics. (`#3496 <https://github.com/matrix-org/synapse/issues/3496>`_, `#3501 <https://github.com/matrix-org/synapse/issues/3501>`_)
-- Add CPU metrics for _fetch_event_list (`#3497 <https://github.com/matrix-org/synapse/issues/3497>`_)
-- optimisation for /sync (`#3505 <https://github.com/matrix-org/synapse/issues/3505>`_, `#3521 <https://github.com/matrix-org/synapse/issues/3521>`_)
+- Add CPU metrics for _fetch_event_list. (`#3497 <https://github.com/matrix-org/synapse/issues/3497>`_)
 - Optimisation to make handling incoming federation requests more efficient. (`#3541 <https://github.com/matrix-org/synapse/issues/3541>`_)
 
 
 Bugfixes
 --------
 
-- Use more portable syntax in our use of the attrs package, widening the supported versions (`#3498 <https://github.com/matrix-org/synapse/issues/3498>`_)
-- Fix queued federation requests being processed in the wrong order (`#3533 <https://github.com/matrix-org/synapse/issues/3533>`_)
+- Fix a significant performance regression in /sync. (`#3505 <https://github.com/matrix-org/synapse/issues/3505>`_, `#3521 <https://github.com/matrix-org/synapse/issues/3521>`_, `#3530 <https://github.com/matrix-org/synapse/issues/3530>`_, `#3544 <https://github.com/matrix-org/synapse/issues/3544>`_)
+- Use more portable syntax in our use of the attrs package, widening the supported versions. (`#3498 <https://github.com/matrix-org/synapse/issues/3498>`_)
+- Fix queued federation requests being processed in the wrong order. (`#3533 <https://github.com/matrix-org/synapse/issues/3533>`_)
 - Ensure that erasure requests are correctly honoured for publicly accessible rooms when accessed over federation. (`#3546 <https://github.com/matrix-org/synapse/issues/3546>`_)
-- Disable a noisy warning about logcontexts (`#3561 <https://github.com/matrix-org/synapse/issues/3561>`_)
 
 
 Misc
 ----
 
-- `#3351 <https://github.com/matrix-org/synapse/issues/3351>`_, `#3463 <https://github.com/matrix-org/synapse/issues/3463>`_, `#3464 <https://github.com/matrix-org/synapse/issues/3464>`_, `#3499 <https://github.com/matrix-org/synapse/issues/3499>`_, `#3530 <https://github.com/matrix-org/synapse/issues/3530>`_, `#3534 <https://github.com/matrix-org/synapse/issues/3534>`_, `#3535 <https://github.com/matrix-org/synapse/issues/3535>`_, `#3540 <https://github.com/matrix-org/synapse/issues/3540>`_, `#3544 <https://github.com/matrix-org/synapse/issues/3544>`_
+- Refactoring to improve testability. (`#3351 <https://github.com/matrix-org/synapse/issues/3351>`_, `#3499 <https://github.com/matrix-org/synapse/issues/3499>`_)
+- Use ``isort`` to sort imports. (`#3463 <https://github.com/matrix-org/synapse/issues/3463>`_, `#3464 <https://github.com/matrix-org/synapse/issues/3464>`_, `#3540 <https://github.com/matrix-org/synapse/issues/3540>`_)
+- Use parse and asserts from http.servlet. (`#3534 <https://github.com/matrix-org/synapse/issues/3534>`_, `#3535 <https://github.com/matrix-org/synapse/issues/3535>`_).
 
 
 Synapse 0.32.2 (2018-07-07)
