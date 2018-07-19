@@ -369,7 +369,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         return results
 
     @defer.inlineCallbacks
-    def get_state_for_events(self, event_ids, types, filtered_types):
+    def get_state_for_events(self, event_ids, types, filtered_types=None):
         """Given a list of event_ids and type tuples, return a list of state
         dicts for each event. The state dicts will only have the type/state_keys
         that are in the `types` list.
@@ -538,7 +538,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         # tracks which of the requested types are missing from our cache
         missing_types = set()
 
-        include_other_types = True if filtered_types is None else False
+        include_other_types = False if filtered_types is None else True
 
         for typ, state_key in types:
             key = (typ, state_key)
