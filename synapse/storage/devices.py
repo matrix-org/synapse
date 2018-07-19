@@ -258,7 +258,6 @@ class DeviceStore(SQLBaseStore):
                 },
             )
 
-            # Do we need this?
             txn.call_after(
                 self.device_id_exists_cache.invalidate, (user_id, device_id,)
             )
