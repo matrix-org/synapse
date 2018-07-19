@@ -343,9 +343,10 @@ class SQLBaseStore(object):
         """
         parent_context = LoggingContext.current_context()
         if parent_context == LoggingContext.sentinel:
-            logger.warn(
-                "Running db txn from sentinel context: metrics will be lost",
-            )
+            # warning disabled for 0.33.0 release; proper fixes will land imminently.
+            # logger.warn(
+            #    "Running db txn from sentinel context: metrics will be lost",
+            # )
             parent_context = None
 
         start_time = time.time()
