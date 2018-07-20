@@ -17,6 +17,7 @@
 from six.moves import range
 
 from twisted.internet import defer, reactor
+from twisted.internet.defer import CancelledError
 
 from synapse.util import Clock, logcontext
 from synapse.util.async import Linearizer
@@ -111,4 +112,34 @@ class LinearizerTestCase(unittest.TestCase):
 
         d6 = limiter.queue(key)
         with (yield d6):
+            pass
+
+    @defer.inlineCallbacks
+    def test_cancellation(self):
+        linearizer = Linearizer()
+
+        key = object()
+
+        d1 = linearizer.queue(key)
+        cm1 = yield d1
+
+        d2 = linearizer.queue(key)
+        self.assertFalse(d2.called)
+
+        d3 = linearizer.queue(key)
+        self.assertFalse(d3.called)
+
+        d2.cancel()
+
+        with cm1:
+            pass
+
+        self.assertTrue(d2.called)
+        try:
+            yield d2
+            self.fail("Expected d2 to raise CancelledError")
+        except CancelledError:
+            pass
+
+        with (yield d3):
             pass
