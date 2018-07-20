@@ -397,7 +397,7 @@ class RoomCreationHandler(BaseHandler):
 
 class RoomContextHandler(BaseHandler):
     @defer.inlineCallbacks
-    def get_event_context(self, user, room_id, event_id, limit):
+    def get_event_context(self, user, room_id, event_id, limit, event_filter):
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
@@ -407,6 +407,8 @@ class RoomContextHandler(BaseHandler):
             event_id (str)
             limit (int): The maximum number of events to return in total
                 (excluding state).
+            event_filter (Filter): the filter to apply to the events returned
+                (excluding the target event_id)
 
         Returns:
             dict, or None if the event isn't found
@@ -441,7 +443,7 @@ class RoomContextHandler(BaseHandler):
             )
 
         results = yield self.store.get_events_around(
-            room_id, event_id, before_limit, after_limit
+            room_id, event_id, before_limit, after_limit, event_filter
         )
 
         results["events_before"] = yield filter_evts(results["events_before"])
@@ -453,8 +455,24 @@ class RoomContextHandler(BaseHandler):
         else:
             last_event_id = event_id
 
+        types = None
+        filtered_types = None
+        if event_filter and event_filter.lazy_load_members():
+            members = {}
+            for ev in (
+                results["events_before"] +
+                results["event"] +
+                results["events_after"]
+            ):
+                members[ev.sender] = True
+            filtered_types = [EventTypes.Member]
+            types = [(EventTypes.Member, member) for member in members.keys()]
+
+        # XXX: why do we return the state as of the last event rather than the
+        # first? Shouldn't we be consistent with /sync?
+
         state = yield self.store.get_state_for_events(
-            [last_event_id], None
+            [last_event_id], types, filtered_types=filtered_types
         )
         results["state"] = list(state[last_event_id].values())
 
