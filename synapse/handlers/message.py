@@ -97,7 +97,7 @@ class MessageHandler(object):
         Raises:
             SynapseError if something went wrong.
         """
-        membership, membership_event_id = yield self._check_in_room_or_world_readable(
+        membership, membership_event_id = yield self.auth.check_in_room_or_world_readable(
             room_id, user_id
         )
 
@@ -115,31 +115,6 @@ class MessageHandler(object):
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def _check_in_room_or_world_readable(self, room_id, user_id):
-        try:
-            # check_user_was_in_room will return the most recent membership
-            # event for the user if:
-            #  * The user is a non-guest user, and was ever in the room
-            #  * The user is a guest user, and has joined the room
-            # else it will throw.
-            member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
-            defer.returnValue((member_event.membership, member_event.event_id))
-            return
-        except AuthError:
-            visibility = yield self.state.get_current_state(
-                room_id, EventTypes.RoomHistoryVisibility, ""
-            )
-            if (
-                visibility and
-                visibility.content["history_visibility"] == "world_readable"
-            ):
-                defer.returnValue((Membership.JOIN, None))
-                return
-            raise AuthError(
-                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
-            )
-
-    @defer.inlineCallbacks
     def get_state_events(self, user_id, room_id, is_guest=False):
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
@@ -151,7 +126,7 @@ class MessageHandler(object):
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         """
-        membership, membership_event_id = yield self._check_in_room_or_world_readable(
+        membership, membership_event_id = yield self.auth.check_in_room_or_world_readable(
             room_id, user_id
         )
 
@@ -184,7 +159,7 @@ class MessageHandler(object):
         if not requester.app_service:
             # We check AS auth after fetching the room membership, as it
             # requires us to pull out all joined members anyway.
-            membership, _ = yield self._check_in_room_or_world_readable(
+            membership, _ = yield self.auth.check_in_room_or_world_readable(
                 room_id, user_id
             )
             if membership != Membership.JOIN:
@@ -214,19 +189,16 @@ class MessageHandler(object):
         })
 
 
-class PaginationHandler(MessageHandler):
+class PaginationHandler(object):
     """Handles pagination and purge history requests.
 
     These are in the same handler due to the fact we need to block clients
     paginating during a purge.
-
-    This subclasses MessageHandler to get at _check_in_room_or_world_readable
     """
 
     def __init__(self, hs):
-        super(PaginationHandler, self).__init__(hs)
-
         self.hs = hs
+        self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
@@ -349,7 +321,7 @@ class PaginationHandler(MessageHandler):
         source_config = pagin_config.get_source_config("room")
 
         with (yield self.pagination_lock.read(room_id)):
-            membership, member_event_id = yield self._check_in_room_or_world_readable(
+            membership, member_event_id = yield self.auth.check_in_room_or_world_readable(
                 room_id, user_id
             )
 
