@@ -90,8 +90,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         )
 
     # FIXME: how should this be cached?
-    @defer.inlineCallbacks
-    def get_current_state(self, room_id, types, filtered_types=None):
+    def get_filtered_current_state_ids(self, room_id, types, filtered_types=None):
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
         of doing a fresh state resolution as per state_handler.get_current_state
@@ -107,9 +106,10 @@ class StateGroupWorkerStore(SQLBaseStore):
 
         include_other_types = False if filtered_types is None else True
 
-        def _get_current_state_txn(txn):
+        def _get_filtered_current_state_ids_txn(txn):
+            results = {}
             sql = """SELECT type, state_key, event_id FROM current_state_events
-                     WHERE room_id = ? and %s"""
+                     WHERE room_id = ? %s"""
             # Turns out that postgres doesn't like doing a list of OR's and
             # is about 1000x slower, so we just issue a query for each specific
             # type seperately.
@@ -143,18 +143,14 @@ class StateGroupWorkerStore(SQLBaseStore):
                 txn.execute(sql % (where_clause,), args)
                 for row in txn:
                     typ, state_key, event_id = row
-                    key = (typ, state_key)
-                    results[intern_string(key)] = event_id
+                    key = (intern_string(typ), intern_string(state_key))
+                    results[key] = event_id
             return results
 
-        results = self.runInteraction(
-            "get_current_state",
-            _get_current_state_txn,
+        return self.runInteraction(
+            "get_filtered_current_state_ids",
+            _get_filtered_current_state_ids_txn,
         )
-        for (key, event_id) in iteritems(results):
-            results[key] = yield self.store.get_event(event_id, allow_none=True)
-
-        defer.returnValue(results)
 
     @cached(max_entries=10000, iterable=True)
     def get_state_group_delta(self, state_group):
@@ -452,8 +448,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            deferred: A list of dicts corresponding to the event_ids given.
-            The dicts are mappings from (type, state_key) -> state_events
+            deferred: A dict of (event_id) -> (type, state_key) -> [state_events]
         """
         event_to_groups = yield self._get_state_group_for_events(
             event_ids,
