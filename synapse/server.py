@@ -74,6 +74,7 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
+from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
@@ -158,6 +159,7 @@ class HomeServer(object):
         'groups_server_handler',
         'groups_attestation_signing',
         'groups_attestation_renewer',
+        'secrets',
         'spam_checker',
         'room_member_handler',
         'federation_registry',
@@ -404,6 +406,9 @@ class HomeServer(object):
 
     def build_groups_attestation_renewer(self):
         return GroupAttestionRenewer(self)
+
+    def build_secrets(self):
+        return Secrets()
 
     def build_spam_checker(self):
         return SpamChecker(self)
