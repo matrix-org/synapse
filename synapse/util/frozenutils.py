@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six import string_types
+from six import binary_type, text_type
 
 from canonicaljson import json
 from frozendict import frozendict

@@ -18,6 +18,7 @@ import cgi
 import collections
 import logging
 
+from six import PY3
 from six.moves import http_client, urllib
 
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
@@ -297,8 +298,14 @@ class JsonResource(HttpServer, resource.Resource):
         # here. If it throws an exception, that is handled by the wrapper
         # installed by @request_handler.
 
+        def _parse(s):
+            if PY3:
+                return urllib.parse.unquote(s)
+            else:
+                return urllib.parse.unquote(s.encode('utf8')).decode('utf8')
+
         kwargs = intern_dict({
-            name: urllib.parse.unquote(value) if value else value
+            name: _parse(value) if value else value
             for name, value in group_dict.items()
         })
 
