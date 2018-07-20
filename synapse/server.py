@@ -52,11 +52,8 @@ from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
-from synapse.handlers.message import (
-    EventCreationHandler,
-    MessageHandler,
-    PaginationHandler,
-)
+from synapse.handlers.message import EventCreationHandler, MessageHandler
+from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
