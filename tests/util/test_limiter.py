@@ -48,21 +48,21 @@ class LimiterTestCase(unittest.TestCase):
             self.assertFalse(d4.called)
             self.assertFalse(d5.called)
 
-        self.assertTrue(d4.called)
+        cm4 = yield d4
         self.assertFalse(d5.called)
 
         with cm3:
             self.assertFalse(d5.called)
 
-        self.assertTrue(d5.called)
+        cm5 = yield d5
 
         with cm2:
             pass
 
-        with (yield d4):
+        with cm4:
             pass
 
-        with (yield d5):
+        with cm5:
             pass
 
         d6 = limiter.queue(key)
