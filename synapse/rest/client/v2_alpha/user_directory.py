@@ -15,8 +15,9 @@
 
 import logging
 
-from twisted.internet import defer
 from signedjson.sign import sign_json
+
+from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request

@@ -15,9 +15,10 @@
 # limitations under the License.
 
 import hmac
-import re
 import logging
+import re
 from hashlib import sha1
+from string import capwords
 
 from six import string_types
 

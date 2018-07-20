@@ -16,15 +16,15 @@
 
 import logging
 
+from signedjson.sign import sign_json
+
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import AuthError, CodeMessageException, SynapseError
-from synapse.util.logcontext import run_in_background
 from synapse.types import UserID, get_domain_from_id
+from synapse.util.logcontext import run_in_background
 
 from ._base import BaseHandler
-
-from signedjson.sign import sign_json
 
 logger = logging.getLogger(__name__)
 
