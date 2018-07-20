@@ -857,10 +857,10 @@ class AuthHandler(BaseHandler):
         """
         def _do_hash():
             # Ensure that we normalise the password
-            password = unicodedata.normalize("NFKC", password).encode('utf8')
+            pw = unicodedata.normalize("NFKC", password).encode('utf8')
 
             return bcrypt.hashpw(
-                password + self.hs.config.password_pepper.encode("utf8"),
+                pw + self.hs.config.password_pepper.encode("utf8"),
                 bcrypt.gensalt(self.bcrypt_rounds),
             )
 
@@ -882,9 +882,9 @@ class AuthHandler(BaseHandler):
         """
 
         def _do_validate_hash():
-            password = unicodedata.normalize("NFKC", password).encode('utf8')
+            pw = unicodedata.normalize("NFKC", password).encode('utf8')
             return bcrypt.checkpw(
-                password + self.hs.config.password_pepper.encode("utf8"),
+                pw + self.hs.config.password_pepper.encode("utf8"),
                 stored_hash
             )
 
