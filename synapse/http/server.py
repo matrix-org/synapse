@@ -13,12 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import cgi
 import collections
 import logging
-import urllib
 
-from six.moves import http_client
+from six.moves import http_client, urllib
 
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
 
