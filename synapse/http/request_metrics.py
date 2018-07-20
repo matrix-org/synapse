@@ -38,7 +38,8 @@ outgoing_responses_counter = Counter(
 )
 
 response_timer = Histogram(
-    "synapse_http_server_response_time_seconds", "sec", ["method", "servlet", "tag"]
+    "synapse_http_server_response_time_seconds", "sec",
+    ["method", "servlet", "tag", "code"],
 )
 
 response_ru_utime = Counter(
@@ -171,11 +172,13 @@ class RequestMetrics(object):
                 )
                 return
 
-        outgoing_responses_counter.labels(request.method, str(request.code)).inc()
+        response_code = str(request.code)
+
+        outgoing_responses_counter.labels(request.method, response_code).inc()
 
         response_count.labels(request.method, self.name, tag).inc()
 
-        response_timer.labels(request.method, self.name, tag).observe(
+        response_timer.labels(request.method, self.name, tag, response_code).observe(
             time_sec - self.start
         )
 

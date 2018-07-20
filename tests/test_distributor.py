@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +16,6 @@
 
 from mock import Mock, patch
 
-from twisted.internet import defer
-
 from synapse.util.distributor import Distributor
 
 from . import unittest
@@ -27,38 +26,15 @@ class DistributorTestCase(unittest.TestCase):
     def setUp(self):
         self.dist = Distributor()
 
-    @defer.inlineCallbacks
     def test_signal_dispatch(self):
         self.dist.declare("alert")
 
         observer = Mock()
         self.dist.observe("alert", observer)
 
-        d = self.dist.fire("alert", 1, 2, 3)
-        yield d
-        self.assertTrue(d.called)
+        self.dist.fire("alert", 1, 2, 3)
         observer.assert_called_with(1, 2, 3)
 
-    @defer.inlineCallbacks
-    def test_signal_dispatch_deferred(self):
-        self.dist.declare("whine")
-
-        d_inner = defer.Deferred()
-
-        def observer():
-            return d_inner
-
-        self.dist.observe("whine", observer)
-
-        d_outer = self.dist.fire("whine")
-
-        self.assertFalse(d_outer.called)
-
-        d_inner.callback(None)
-        yield d_outer
-        self.assertTrue(d_outer.called)
-
-    @defer.inlineCallbacks
     def test_signal_catch(self):
         self.dist.declare("alarm")
 
@@ -71,9 +47,7 @@ class DistributorTestCase(unittest.TestCase):
         with patch(
             "synapse.util.distributor.logger", spec=["warning"]
         ) as mock_logger:
-            d = self.dist.fire("alarm", "Go")
-            yield d
-            self.assertTrue(d.called)
+            self.dist.fire("alarm", "Go")
 
             observers[0].assert_called_once_with("Go")
             observers[1].assert_called_once_with("Go")
@@ -83,34 +57,12 @@ class DistributorTestCase(unittest.TestCase):
                 mock_logger.warning.call_args[0][0], str
             )
 
-    @defer.inlineCallbacks
-    def test_signal_catch_no_suppress(self):
-        # Gut-wrenching
-        self.dist.suppress_failures = False
-
-        self.dist.declare("whail")
-
-        class MyException(Exception):
-            pass
-
-        @defer.inlineCallbacks
-        def observer():
-            raise MyException("Oopsie")
-
-        self.dist.observe("whail", observer)
-
-        d = self.dist.fire("whail")
-
-        yield self.assertFailure(d, MyException)
-        self.dist.suppress_failures = True
-
-    @defer.inlineCallbacks
     def test_signal_prereg(self):
         observer = Mock()
         self.dist.observe("flare", observer)
 
         self.dist.declare("flare")
-        yield self.dist.fire("flare", 4, 5)
+        self.dist.fire("flare", 4, 5)
 
         observer.assert_called_with(4, 5)
 

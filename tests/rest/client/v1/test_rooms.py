@@ -20,7 +20,6 @@ import json
 from mock import Mock, NonCallableMock
 from six.moves.urllib import parse as urlparse
 
-# twisted imports
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room
@@ -86,6 +85,7 @@ class RoomBase(unittest.TestCase):
 
         self.resource = JsonResource(self.hs)
         synapse.rest.client.v1.room.register_servlets(self.hs, self.resource)
+        synapse.rest.client.v1.room.register_deprecated_servlets(self.hs, self.resource)
         self.helper = RestHelper(self.hs, self.resource, self.user_id)
 
 
