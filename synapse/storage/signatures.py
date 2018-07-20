@@ -94,7 +94,6 @@ class SignatureWorkerStore(SQLBaseStore):
             return done
 
 
-
 class SignatureStore(SignatureWorkerStore):
     """Persistence for event signatures and hashes"""
 
