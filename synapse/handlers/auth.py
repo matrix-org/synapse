@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import unicodedata
 
 import attr
 import bcrypt
