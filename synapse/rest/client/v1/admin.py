@@ -69,8 +69,8 @@ class UserRegisterServlet(ClientV1RestServlet):
     """
     Attributes:
          NONCE_TIMEOUT (int): Seconds until a generated nonce won't be accepted
-         nonces (dict): The nonces that we will accept. A dict of nonce to the
-                        time it was generated, in int seconds.
+         nonces (dict[str, int]): The nonces that we will accept. A dict of
+             nonce to the time it was generated, in int seconds.
     """
     PATTERNS = client_path_patterns("/admin/register")
     NONCE_TIMEOUT = 60

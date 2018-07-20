@@ -1,9 +1,14 @@
 Shared-Secret Registration
 ==========================
 
-This API allows for the creation of users in an administrative and non-interactive way. This is generally used for bootstrapping a Synapse instance with administrator accounts.
+This API allows for the creation of users in an administrative and
+non-interactive way. This is generally used for bootstrapping a Synapse
+instance with administrator accounts.
 
-To authenticate yourself to the server, you will need both the shared secret (``registration_shared_secret`` in the homeserver configuration), and a one-time nonce. If the registration shared secret is not configured, this API is not enabled.
+To authenticate yourself to the server, you will need both the shared secret
+(``registration_shared_secret`` in the homeserver configuration), and a
+one-time nonce. If the registration shared secret is not configured, this API
+is not enabled.
 
 To fetch the nonce, you need to request one from the API::
 
@@ -11,7 +16,9 @@ To fetch the nonce, you need to request one from the API::
 
   < {"nonce": "thisisanonce"}
 
-Once you have the nonce, you can make a ``POST`` to the same URL with a JSON body containing the nonce, username, password, whether they are an admin (optional, False by default), and a HMAC digest of the content.
+Once you have the nonce, you can make a ``POST`` to the same URL with a JSON
+body containing the nonce, username, password, whether they are an admin
+(optional, False by default), and a HMAC digest of the content.
 
 As an example::
 
@@ -31,7 +38,10 @@ As an example::
      "device_id": "device_id_here"
     }
 
-The MAC is the hex digest output of the HMAC-SHA1 algorithm, with the key being the shared secret and the content being the nonce, user, password, and either the string "admin" or "notadmin", each separated by NULLs. For an example of generation in Python::
+The MAC is the hex digest output of the HMAC-SHA1 algorithm, with the key being
+the shared secret and the content being the nonce, user, password, and either
+the string "admin" or "notadmin", each separated by NULs. For an example of
+generation in Python::
 
   import hmac, hashlib
 
