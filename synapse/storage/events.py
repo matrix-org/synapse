@@ -19,7 +19,7 @@ import logging
 from collections import OrderedDict, deque, namedtuple
 from functools import wraps
 
-from six import iteritems, itervalues, PY3
+from six import PY3, iteritems, itervalues
 from six.moves import range
 
 from canonicaljson import json
