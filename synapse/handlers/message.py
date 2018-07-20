@@ -329,7 +329,10 @@ class MessageHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def get_state_events(self, user_id, room_id, is_guest=False):
+    def get_state_events(
+        self, user_id, room_id, types=None, filter_types=None,
+        at_event=None, is_guest=False
+    ):
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
         left the room return the state events from when they left.
@@ -337,6 +340,12 @@ class MessageHandler(BaseHandler):
         Args:
             user_id(str): The user requesting state events.
             room_id(str): The room ID to get all state events from.
+            types(list[(Str, (Str|None))]): the (type, state_key)s to return
+                results for.
+            filter_types(list[Str]): the list of types to apply the types filter
+                to.
+            at_event(str): the event_id we are requesting the state as of
+            is_guest(Boolean): whether this user is a guest
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         """
@@ -345,10 +354,17 @@ class MessageHandler(BaseHandler):
         )
 
         if membership == Membership.JOIN:
-            room_state = yield self.state_handler.get_current_state(room_id)
+            if at_event:
+                room_state = yield self.store.get_state_for_events(
+                    [at_event], types, filter_types=filter_types
+                )
+            else:
+                room_state = yield self.store.get_current_state(
+                    room_id, types, filter_types=filter_types
+                )
         elif membership == Membership.LEAVE:
             room_state = yield self.store.get_state_for_events(
-                [membership_event_id], None
+                [membership_event_id], types, filter_types=filter_types
             )
             room_state = room_state[membership_event_id]
 

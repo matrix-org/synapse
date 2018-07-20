@@ -384,15 +384,32 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
         # TODO support Pagination stream API (limit/tokens)
         requester = yield self.auth.get_user_by_req(request)
         handler = self.handlers.message_handler
+
+        # request the state as of a given event
+        # useful for synchronising with /messages
+        at_event = parse_string(request, "at")
+
+        # let you filter down on particular memberships
+        membership = parse_string(request, "membership")
+        not_membership = parse_string(request, "not_membership")
+
         events = yield handler.get_state_events(
             room_id=room_id,
             user_id=requester.user.to_string(),
+            at_event=at_event,
+            types=[(EventTypes.Member, None)],
         )
 
         chunk = []
 
         for event in events:
-            if event["type"] != EventTypes.Member:
+            if (
+                membership and
+                (
+                    event.content.get("membership") != membership or
+                    event.content.get("membership") == not_membership
+                )
+            ):
                 continue
             chunk.append(event)
 
@@ -401,6 +418,8 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
         }))
 
 
+# deprecated in favour of /members?membership=join?
+# except it does custom AS logic and has a simpler return format
 class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$")
 
