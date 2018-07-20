@@ -407,7 +407,7 @@ class RoomContextHandler(BaseHandler):
             event_id (str)
             limit (int): The maximum number of events to return in total
                 (excluding state).
-            event_filter (Filter): the filter to apply to the events returned
+            event_filter (Filter|None): the filter to apply to the events returned
                 (excluding the target event_id)
 
         Returns:
@@ -461,7 +461,7 @@ class RoomContextHandler(BaseHandler):
             members = {}
             for ev in (
                 results["events_before"] +
-                results["event"] +
+                [results["event"]] +
                 results["events_after"]
             ):
                 members[ev.sender] = True
