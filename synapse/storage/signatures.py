@@ -82,7 +82,17 @@ class SignatureWorkerStore(SQLBaseStore):
             " WHERE event_id = ?"
         )
         txn.execute(query, (event_id, ))
-        return {k: v for k, v in txn}
+        if six.PY2:
+            return {k: v for k, v in txn}
+        else:
+            done = {}
+            for k, v in txn:
+                if not isinstance(v, bytes):
+                    done[k] = v.encode('ascii')
+                else:
+                    done[k] = v
+            return done
+
 
 
 class SignatureStore(SignatureWorkerStore):
