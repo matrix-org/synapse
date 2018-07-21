@@ -404,11 +404,8 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
 
         for event in events:
             if (
-                membership and
-                (
-                    event.content.get("membership") != membership or
-                    event.content.get("membership") == not_membership
-                )
+                (membership and event['content'].get("membership") != membership) or
+                (not_membership and event['content'].get("membership") == not_membership)
             ):
                 continue
             chunk.append(event)
