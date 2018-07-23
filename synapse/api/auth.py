@@ -65,8 +65,9 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
         auth_events_ids = yield self.compute_auth_events(
-            event, context.prev_state_ids, for_verification=True,
+            event, prev_state_ids, for_verification=True,
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {
@@ -544,7 +545,8 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def add_auth_events(self, builder, context):
-        auth_ids = yield self.compute_auth_events(builder, context.prev_state_ids)
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        auth_ids = yield self.compute_auth_events(builder, prev_state_ids)
 
         auth_events_entries = yield self.store.add_event_hashes(
             auth_ids
