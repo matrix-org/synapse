@@ -65,11 +65,6 @@ class StatelessContext(object):
 
         self.app_service = None
 
-        # The current state including the current event
-        self.current_state_ids = None
-        # The current state excluding the current event
-        self.prev_state_ids = None
-
     @abc.abstractmethod
     def get_current_state_ids(self, store):
         """Gets the current state IDs
@@ -234,7 +229,7 @@ class DeserializedContext(StatelessContext):
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self.current_state_ids)
+        defer.returnValue(self._current_state_ids)
 
     @defer.inlineCallbacks
     def get_prev_state_ids(self, store):
@@ -247,7 +242,7 @@ class DeserializedContext(StatelessContext):
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self.current_state_ids)
+        defer.returnValue(self._prev_state_ids)
 
     @defer.inlineCallbacks
     def _fill_out_state(self, store):
@@ -257,16 +252,16 @@ class DeserializedContext(StatelessContext):
         if self.state_group is None:
             return
 
-        self.current_state_ids = yield store.get_state_ids_for_group(
+        self._current_state_ids = yield store.get_state_ids_for_group(
             self.state_group,
         )
         if self._prev_state_id and self._event_state_key is not None:
-            self.prev_state_ids = dict(self.current_state_ids)
+            self._prev_state_ids = dict(self._current_state_ids)
 
             key = (self._event_type, self._event_state_key)
-            self.prev_state_ids[key] = self._prev_state_id
+            self._prev_state_ids[key] = self._prev_state_id
         else:
-            self.prev_state_ids = self.current_state_ids
+            self._prev_state_ids = self._current_state_ids
 
 
 def _encode_state_dict(state_dict):
