@@ -261,7 +261,8 @@ class MessageHandler(BaseHandler):
             is_peeking=(member_event_id is None),
         )
 
-        if event_filter.lazy_loaded_members():
+        state = None
+        if event_filter and event_filter.lazy_load_members():
             # TODO: remove redundant members
 
             types = [
