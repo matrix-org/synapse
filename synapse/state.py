@@ -18,7 +18,7 @@ import hashlib
 import logging
 from collections import namedtuple
 
-from six import iteritems, itervalues
+from six import iteritems, iterkeys, itervalues
 
 from frozendict import frozendict
 
@@ -647,7 +647,7 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
         for event_id in event_ids
     )
     if event_map is not None:
-        needed_events -= set(event_map.iterkeys())
+        needed_events -= set(iterkeys(event_map))
 
     logger.info("Asking for %d conflicted events", len(needed_events))
 
@@ -668,7 +668,7 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
     new_needed_events = set(itervalues(auth_events))
     new_needed_events -= needed_events
     if event_map is not None:
-        new_needed_events -= set(event_map.iterkeys())
+        new_needed_events -= set(iterkeys(event_map))
 
     logger.info("Asking for %d auth events", len(new_needed_events))
 

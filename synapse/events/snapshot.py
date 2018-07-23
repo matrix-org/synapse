@@ -15,6 +15,8 @@
 
 import abc
 
+from six import iteritems
+
 from frozendict import frozendict
 
 from twisted.internet import defer
@@ -273,7 +275,7 @@ def _encode_state_dict(state_dict):
 
     return [
         (etype, state_key, v)
-        for (etype, state_key), v in state_dict.iteritems()
+        for (etype, state_key), v in iteritems(state_dict)
     ]
 
 
