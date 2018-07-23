@@ -20,7 +20,7 @@ from twisted.web.server import Request, Site
 
 from synapse.http import redact_uri
 from synapse.http.request_metrics import RequestMetrics
-from synapse.util.logcontext import LoggingContext, ContextResourceUsage
+from synapse.util.logcontext import ContextResourceUsage, LoggingContext
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +42,10 @@ class SynapseRequest(Request):
     which is handling the request, and returns a context manager.
 
     """
-    def __init__(self, site, *args, **kw):
-        Request.__init__(self, *args, **kw)
+    def __init__(self, site, channel, *args, **kw):
+        Request.__init__(self, channel, *args, **kw)
         self.site = site
+        self._channel = channel
         self.authenticated_entity = None
         self.start_time = 0
 

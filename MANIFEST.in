@@ -2,6 +2,7 @@ include synctl
 include LICENSE
 include VERSION
 include *.rst
+include *.md
 include demo/README
 include demo/demo.tls.dh
 include demo/*.py

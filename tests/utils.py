@@ -65,11 +65,14 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         config.federation_domain_whitelist = None
         config.federation_rc_reject_limit = 10
         config.federation_rc_sleep_limit = 10
+        config.federation_rc_sleep_delay = 100
         config.federation_rc_concurrent = 10
         config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False
         config.user_consent_server_notice_content = None
         config.block_events_without_consent_error = None
+        config.media_storage_providers = []
+        config.auto_join_rooms = []
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
@@ -135,6 +138,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
             database_engine=db_engine,
             room_list_handler=object(),
             tls_server_context_factory=Mock(),
+            reactor=reactor,
             **kargs
         )
 
