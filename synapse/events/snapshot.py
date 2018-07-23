@@ -163,6 +163,9 @@ class EventContext(object):
         context._prev_state_id = input["prev_state_id"]
         context._event_type = input["event_type"]
         context._event_state_key = input["event_state_key"]
+
+        context._current_state_ids = None
+        context._prev_state_ids = None
         context._fetching_state_deferred = None
 
         context.state_group = input["state_group"]
@@ -213,6 +216,16 @@ class EventContext(object):
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
         defer.returnValue(self._prev_state_ids)
+
+    def get_cached_current_state_ids(self):
+        """Gets the current state IDs if we have them already cached.
+
+        Returns:
+            dict[(str, str), str]|None: Returns None if state_group
+            is None, which happens when the associated event is an outlier.
+        """
+
+        return self._current_state_ids
 
     @defer.inlineCallbacks
     def _fill_out_state(self, store):

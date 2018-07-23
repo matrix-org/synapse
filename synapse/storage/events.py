@@ -549,7 +549,9 @@ class EventsStore(EventsWorkerStore):
             if ctx.state_group in state_groups_map:
                 continue
 
-            state_groups_map[ctx.state_group] = yield ctx.get_current_state_ids(self)
+            current_state_ids = ctx.get_cached_current_state_ids()
+            if current_state_ids is not None:
+                state_groups_map[ctx.state_group] = current_state_ids
 
         # We need to map the event_ids to their state groups. First, let's
         # check if the event is one we're persisting, in which case we can
