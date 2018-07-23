@@ -418,7 +418,10 @@ class EventsStore(EventsWorkerStore):
                                 "Calculating state delta for room %s", room_id,
                             )
 
-                            with Measure("persist_events.get_new_state_after_events"):
+                            with Measure(
+                                    self._clock,
+                                    "persist_events.get_new_state_after_events",
+                            ):
                                 current_state = yield self._get_new_state_after_events(
                                     room_id,
                                     ev_ctx_rm,
@@ -428,7 +431,10 @@ class EventsStore(EventsWorkerStore):
 
                             if current_state is not None:
                                 current_state_for_room[room_id] = current_state
-                                with Measure("persist_events.calculate_state_delta"):
+                                with Measure(
+                                        self._clock,
+                                        "persist_events.calculate_state_delta",
+                                ):
                                     delta = yield self._calculate_state_delta(
                                         room_id, current_state,
                                     )
