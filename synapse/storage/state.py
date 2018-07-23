@@ -476,7 +476,7 @@ class StateGroupWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_state_ids_for_events(self, event_ids, types=None, filtered_types=None):
         """
-        Get the state dicts corresponding to a list of events
+        Get the state ids corresponding to a list of events
 
         Args:
             event_ids(list(str)): events whose state should be returned
@@ -489,7 +489,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            A deferred dict from event_id -> (type, state_key) -> state_event
+            A deferred dict from event_id -> (type, state_key) -> event_id
         """
         event_to_groups = yield self._get_state_group_for_events(
             event_ids,

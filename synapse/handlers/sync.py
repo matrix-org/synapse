@@ -75,6 +75,7 @@ class JoinedSyncResult(collections.namedtuple("JoinedSyncResult", [
     "ephemeral",
     "account_data",
     "unread_notifications",
+    "summary",
 ])):
     __slots__ = []
 
@@ -495,9 +496,104 @@ class SyncHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
+    def compute_summary(self, room_id, sync_config, batch, state, now_token):
+        """ Works out a room summary block for this room, summarising the number
+        of joined members in the room, and providing the 'hero' members if the
+        room has no name so clients can consistently name rooms.  Also adds
+        state events to 'state' if needed to describe the heros.
+
+        Args:
+            room_id(str):
+            sync_config(synapse.handlers.sync.SyncConfig):
+            batch(synapse.handlers.sync.TimelineBatch): The timeline batch for
+                the room that will be sent to the user.
+            state(dict): dict of (type, state_key) -> Event as returned by
+                compute_state_delta
+            now_token(str): Token of the end of the current batch.
+            full_state(bool): Whether to force returning the full state.
+
+        Returns:
+             A deferred dict describing the room summary
+        """
+
+        # FIXME: this promulgates https://github.com/matrix-org/synapse/issues/3305
+        last_events, _ = yield self.store.get_recent_events_for_room(
+            room_id, end_token=now_token.room_key, limit=1,
+        )
+
+        if not last_events:
+            defer.returnValue(None)
+            return
+
+        last_event = last_events[-1]
+        state_ids = yield self.store.get_state_ids_for_event(
+            last_event.event_id, [
+                (EventTypes.Member, None),
+                (EventTypes.Name, ''),
+                (EventTypes.CanonicalAlias, ''),
+            ]
+        )
+
+        logger.warn("got state_ids %r", state_ids)
+
+        member_ids = {
+            state_key: event_id
+            for (t, state_key), event_id in state_ids.iteritems()
+            if t == EventTypes.Member
+        }
+        name_id = state_ids.get((EventTypes.Name, ''))
+        canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ''))
+
+        summary = {}
+
+        # ideally we could do this, but the actual events haven't been loaded...
+        # summary['joined_member_count'] = len([
+        #     s for s in member_ids if s.content.get("membership") == 'join'
+        # ])
+
+        # FIXME: this includes left/banned/invited users
+        summary['joined_member_count'] = len(member_ids)
+
+        if not name_id and not canonical_alias_id:
+            # FIXME: this includes left/banned/invited users
+            # FIXME: if joined_member_count is 0, return left users instead
+            summary['heros'] = sorted(member_ids.keys())[0:5]
+
+            # ensure we send membership events for heros if needed
+            cache_key = (sync_config.user.to_string(), sync_config.device_id)
+            cache = self.lazy_loaded_members_cache.get(cache_key)
+
+            existing_members = {
+                user_id: True for (typ, user_id) in state.keys()
+                if typ == EventTypes.Member
+            }
+
+            for ev in batch.events:
+                if ev.type == EventTypes.Member:
+                    existing_members[ev.state_key] = True
+
+            missing_hero_event_ids = [
+                member_ids[hero_id]
+                for hero_id in summary['heros']
+                if (
+                    not cache.get(hero_id) and
+                    hero_id not in existing_members
+                )
+            ]
+
+            missing_hero_state = yield self.store.get_events(missing_hero_event_ids)
+            missing_hero_state = missing_hero_state.values()
+
+            for s in missing_hero_state:
+                cache.set(s.state_key, True)
+                state[(EventTypes.Member, s.state_key)] = s
+
+        defer.returnValue(summary)
+
+    @defer.inlineCallbacks
     def compute_state_delta(self, room_id, batch, sync_config, since_token, now_token,
                             full_state):
-        """ Works out the differnce in state between the start of the timeline
+        """ Works out the difference in state between the start of the timeline
         and the previous sync.
 
         Args:
@@ -511,7 +607,7 @@ class SyncHandler(object):
             full_state(bool): Whether to force returning the full state.
 
         Returns:
-             A deferred new event dictionary
+             A deferred dict of (type, state_key) -> Event
         """
         # TODO(mjark) Check if the state events were received by the server
         # after the previous sync, since we need to include those state
@@ -1504,6 +1600,15 @@ class SyncHandler(object):
             full_state=full_state
         )
 
+        summary = None
+        if (
+            sync_config.filter_collection.lazy_load_members() and
+            any(ev.type == EventTypes.Member for ev in batch.events)
+        ):
+            summary = yield self.compute_summary(
+                room_id, sync_config, batch, state, now_token
+            )
+
         if room_builder.rtype == "joined":
             unread_notifications = {}
             room_sync = JoinedSyncResult(
@@ -1513,6 +1618,7 @@ class SyncHandler(object):
                 ephemeral=ephemeral,
                 account_data=account_data_events,
                 unread_notifications=unread_notifications,
+                summary=summary,
             )
 
             if room_sync or always_include:

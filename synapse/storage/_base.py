@@ -1144,7 +1144,7 @@ class SQLBaseStore(object):
         defer.returnValue(retval)
 
     def get_user_count_txn(self, txn):
-        """Get a total number of registerd users in the users list.
+        """Get a total number of registered users in the users list.
 
         Args:
             txn : Transaction object
@@ -1153,8 +1153,7 @@ class SQLBaseStore(object):
         """
         sql_count = "SELECT COUNT(*) FROM users WHERE is_guest = 0;"
         txn.execute(sql_count)
-        count = txn.fetchone()[0]
-        defer.returnValue(count)
+        return txn.fetchone()[0]
 
     def _simple_search_list(self, table, term, col, retcols,
                             desc="_simple_search_list"):
