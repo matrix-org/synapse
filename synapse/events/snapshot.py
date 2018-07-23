@@ -110,7 +110,8 @@ class EventContext(object):
 
         return context
 
-    def serialize(self, event):
+    @defer.inlineCallbacks
+    def serialize(self, event, store):
         """Converts self to a type that can be serialized as JSON, and then
         deserialized by `deserialize`
 
@@ -126,11 +127,12 @@ class EventContext(object):
         # the prev_state_ids, so if we're a state event we include the event
         # id that we replaced in the state.
         if event.is_state():
-            prev_state_id = self.prev_state_ids.get((event.type, event.state_key))
+            prev_state_ids = yield self.get_prev_state_ids(store)
+            prev_state_id = prev_state_ids.get((event.type, event.state_key))
         else:
             prev_state_id = None
 
-        return {
+        defer.returnValue({
             "prev_state_id": prev_state_id,
             "event_type": event.type,
             "event_state_key": event.state_key if event.is_state() else None,
@@ -140,7 +142,7 @@ class EventContext(object):
             "delta_ids": _encode_state_dict(self.delta_ids),
             "prev_state_events": self.prev_state_events,
             "app_service_id": self.app_service.id if self.app_service else None
-        }
+        })
 
     @staticmethod
     def deserialize(store, input):
