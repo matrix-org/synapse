@@ -145,7 +145,7 @@ class EventContext(object):
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
             prev_group=input["prev_group"],
-            delta_ids = _decode_state_dict(input["delta_ids"]),
+            delta_ids=_decode_state_dict(input["delta_ids"]),
         )
 
         context.rejected = input["rejected"]
