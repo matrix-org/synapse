@@ -574,7 +574,7 @@ class SyncHandler(object):
 
             missing_hero_event_ids = [
                 member_ids[hero_id]
-                for hero_id in summary['heros']
+                for hero_id in summary['m.heros']
                 if (
                     not cache.get(hero_id) and
                     hero_id not in existing_members
