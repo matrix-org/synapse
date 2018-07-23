@@ -66,7 +66,7 @@ class EndToEndKeyStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_e2e_device_keys(
         self, query_list, include_all_devices=False,
-        include_deleted_devices=False
+        include_deleted_devices=False,
     ):
         """Fetch a list of device keys.
         Args:
