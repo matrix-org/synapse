@@ -199,7 +199,7 @@ class EmailPusher(object):
         )
 
     def seconds_until(self, ts_msec):
-        secs = (ts_msec - self.clock.time_msec()) / 1000
+        secs = (ts_msec - self.clock.time_msec()) / 1000.0
         return max(secs, 0)
 
     def get_room_throttle_ms(self, room_id):
