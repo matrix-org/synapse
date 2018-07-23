@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix home server.
+"""
+Injectable secrets module for Synapse.
+
+See https://docs.python.org/3/library/secrets.html#module-secrets for the API
+used in Python 3.6, and the API emulated in Python 2.7.
 """
 
-__version__ = "0.33.0"
+import six
+
+if six.PY3:
+    import secrets
+
+    def Secrets():
+        return secrets
+
+
+else:
+
+    import os
+    import binascii
+
+    class Secrets(object):
+        def token_bytes(self, nbytes=32):
+            return os.urandom(nbytes)
+
+        def token_hex(self, nbytes=32):
+            return binascii.hexlify(self.token_bytes(nbytes))
