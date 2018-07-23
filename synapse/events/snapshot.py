@@ -166,7 +166,7 @@ class DeserializedContext(StatelessContext):
     `get_current_state_ids` and `get_prev_state_ids`.
 
     Attributes:
-        _have_fetched_state (Deferred|None): Resolves when *_state_ids have
+        _fetching_state_deferred (Deferred|None): Resolves when *_state_ids have
             been calculated. None if we haven't started calculating yet
         _prev_state_id (str|None): If set then the event associated with the
             context overrode the _prev_state_id
@@ -184,7 +184,7 @@ class DeserializedContext(StatelessContext):
     __slots__ = [
         "_current_state_ids",
         "_prev_state_ids",
-        "_have_fetched_state",
+        "_fetching_state_deferred",
         "_prev_state_id",
         "_event_type",
         "_event_state_key",
@@ -213,7 +213,7 @@ class DeserializedContext(StatelessContext):
         context._event_type = input["event_type"]
         context._event_state_key = input["event_state_key"]
 
-        context._have_fetched_state = None
+        context._fetching_state_deferred = None
         context._current_state_ids = None
         context._prev_state_ids = None
 
@@ -227,10 +227,10 @@ class DeserializedContext(StatelessContext):
     def get_current_state_ids(self, store):
         """Implements StatelessContext"""
 
-        if not self._have_fetched_state:
-            self._have_fetched_state = self._fill_out_state(store)
+        if not self._fetching_state_deferred:
+            self._fetching_state_deferred = self._fill_out_state(store)
 
-        yield make_deferred_yieldable(self._have_fetched_state)
+        yield make_deferred_yieldable(self._fetching_state_deferred)
 
         defer.returnValue(self.current_state_ids)
 
@@ -238,10 +238,10 @@ class DeserializedContext(StatelessContext):
     def get_prev_state_ids(self, store):
         """Implements StatelessContext"""
 
-        if not self._have_fetched_state:
-            self._have_fetched_state = self._fill_out_state(store)
+        if not self._fetching_state_deferred:
+            self._fetching_state_deferred = self._fill_out_state(store)
 
-        yield make_deferred_yieldable(self._have_fetched_state)
+        yield make_deferred_yieldable(self._fetching_state_deferred)
 
         defer.returnValue(self.current_state_ids)
 
