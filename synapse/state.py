@@ -219,7 +219,7 @@ class StateHandler(object):
 
             # We don't store state for outliers, so we don't generate a state
             # group for it.
-            context = EventContext(
+            context = EventContext.with_state(
                 state_group=None,
                 current_state_ids=current_state_ids,
                 prev_state_ids=prev_state_ids,
@@ -255,7 +255,7 @@ class StateHandler(object):
                 current_state_ids=current_state_ids,
             )
 
-            context = EventContext(
+            context = EventContext.with_state(
                 state_group=state_group,
                 current_state_ids=current_state_ids,
                 prev_state_ids=prev_state_ids,
@@ -322,7 +322,7 @@ class StateHandler(object):
 
             state_group = entry.state_group
 
-        context = EventContext(
+        context = EventContext.with_state(
             state_group=state_group,
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
