@@ -82,6 +82,11 @@ class EventContext(object):
         "_fetching_state_deferred",
     ]
 
+    def __init__(self):
+        self.prev_state_events = []
+        self.rejected = False
+        self.app_service = None
+
     @staticmethod
     def with_state(state_group, current_state_ids, prev_state_ids,
                    prev_group=None, delta_ids=None):
@@ -102,11 +107,6 @@ class EventContext(object):
         # and this state.
         context.prev_group = prev_group
         context.delta_ids = delta_ids
-
-        context.prev_state_events = []
-
-        context.rejected = False
-        context.app_service = None
 
         return context
 
@@ -143,7 +143,6 @@ class EventContext(object):
         }
 
     @staticmethod
-    @defer.inlineCallbacks
     def deserialize(store, input):
         """Converts a dict that was produced by `serialize` back into a
         EventContext.
@@ -162,6 +161,7 @@ class EventContext(object):
         context._prev_state_id = input["prev_state_id"]
         context._event_type = input["event_type"]
         context._event_state_key = input["event_state_key"]
+        context._fetching_state_deferred = None
 
         context.state_group = input["state_group"]
         context.prev_group = input["prev_group"]
@@ -174,7 +174,7 @@ class EventContext(object):
         if app_service_id:
             context.app_service = store.get_app_service_by_id(app_service_id)
 
-        defer.returnValue(context)
+        return context
 
     @defer.inlineCallbacks
     def get_current_state_ids(self, store):
