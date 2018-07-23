@@ -545,17 +545,19 @@ class SyncHandler(object):
         summary = {}
 
         # ideally we could do this, but the actual events haven't been loaded...
-        # summary['joined_member_count'] = len([
+        # summary['m.joined_member_count'] = len([
         #     s for s in member_ids if s.content.get("membership") == 'join'
         # ])
 
         # FIXME: this includes left/banned/invited users
-        summary['joined_member_count'] = len(member_ids)
+        summary['m.joined_member_count'] = len(member_ids)
 
         if not name_id and not canonical_alias_id:
             # FIXME: this includes left/banned/invited users
             # FIXME: if joined_member_count is 0, return left users instead
-            summary['heros'] = sorted(member_ids.keys())[0:5]
+            # FIXME: order by stream ordering, not alphabetic
+            # FIXME: exclude the current logged in user
+            summary['m.heros'] = sorted(member_ids.keys())[0:5]
 
             # ensure we send membership events for heros if needed
             cache_key = (sync_config.user.to_string(), sync_config.device_id)
