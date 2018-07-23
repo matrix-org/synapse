@@ -55,13 +55,16 @@ class EventContext(object):
         _fetching_state_deferred (Deferred|None): Resolves when *_state_ids have
             been calculated. None if we haven't started calculating yet
 
-        _prev_state_id (str|None): If set then the event associated with the
-            context overrode the _prev_state_id
-
-        _event_type (str): The type of the event the context is associated with
+        _event_type (str): The type of the event the context is associated with.
+            Only set when state has not been fetched yet.
 
         _event_state_key (str|None): The state_key of the event the context is
-            associated with
+            associated with. Only set when state has not been fetched yet.
+
+        _prev_state_id (str|None): If the event associated with the context is
+            a state event, then `_prev_state_id` is the event_id of the state
+            that was replaced.
+            Only set when state has not been fetched yet.
     """
 
     __slots__ = [
