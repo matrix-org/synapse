@@ -30,7 +30,7 @@ import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.types import RoomID, UserID
-from synapse.util.async import Limiter, Linearizer
+from synapse.util.async import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class RoomMemberHandler(object):
         self.event_creation_hander = hs.get_event_creation_handler()
 
         self.member_linearizer = Linearizer(name="member")
-        self.member_limiter = Limiter(10)
+        self.member_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
