@@ -222,9 +222,11 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             state_ids = {
                 key: e.event_id for key, e in state.items()
             }
-            context = EventContext()
-            context.current_state_ids = state_ids
-            context.prev_state_ids = state_ids
+            context = EventContext.with_state(
+                state_group=None,
+                current_state_ids=state_ids,
+                prev_state_ids=state_ids
+            )
         else:
             state_handler = self.hs.get_state_handler()
             context = yield state_handler.compute_event_context(event)
