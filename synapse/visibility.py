@@ -12,11 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import itertools
+
 import logging
 import operator
 
-import six
+from six import iteritems, itervalues
+from six.moves import map
 
 from twisted.internet import defer
 
@@ -221,7 +222,7 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
         return event
 
     # check each event: gives an iterable[None|EventBase]
-    filtered_events = itertools.imap(allowed, events)
+    filtered_events = map(allowed, events)
 
     # remove the None entries
     filtered_events = filter(operator.truth, filtered_events)
@@ -261,7 +262,7 @@ def filter_events_for_server(store, server_name, events):
                 # membership states for the requesting server to determine
                 # if the server is either in the room or has been invited
                 # into the room.
-                for ev in state.itervalues():
+                for ev in itervalues(state):
                     if ev.type != EventTypes.Member:
                         continue
                     try:
@@ -295,7 +296,7 @@ def filter_events_for_server(store, server_name, events):
     )
 
     visibility_ids = set()
-    for sids in event_to_state_ids.itervalues():
+    for sids in itervalues(event_to_state_ids):
         hist = sids.get((EventTypes.RoomHistoryVisibility, ""))
         if hist:
             visibility_ids.add(hist)
@@ -308,7 +309,7 @@ def filter_events_for_server(store, server_name, events):
         event_map = yield store.get_events(visibility_ids)
         all_open = all(
             e.content.get("history_visibility") in (None, "shared", "world_readable")
-            for e in event_map.itervalues()
+            for e in itervalues(event_map)
         )
 
     if all_open:
@@ -346,7 +347,7 @@ def filter_events_for_server(store, server_name, events):
     #
     state_key_to_event_id_set = {
         e
-        for key_to_eid in six.itervalues(event_to_state_ids)
+        for key_to_eid in itervalues(event_to_state_ids)
         for e in key_to_eid.items()
     }
 
@@ -369,10 +370,10 @@ def filter_events_for_server(store, server_name, events):
     event_to_state = {
         e_id: {
             key: event_map[inner_e_id]
-            for key, inner_e_id in key_to_eid.iteritems()
+            for key, inner_e_id in iteritems(key_to_eid)
             if inner_e_id in event_map
         }
-        for e_id, key_to_eid in event_to_state_ids.iteritems()
+        for e_id, key_to_eid in iteritems(event_to_state_ids)
     }
 
     defer.returnValue([
