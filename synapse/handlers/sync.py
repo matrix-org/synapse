@@ -534,8 +534,6 @@ class SyncHandler(object):
             ]
         )
 
-        logger.warn("got state_ids %r", state_ids)
-
         member_ids = {
             state_key: event_id
             for (t, state_key), event_id in state_ids.iteritems()
