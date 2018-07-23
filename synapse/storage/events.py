@@ -32,7 +32,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 # these are only included to make the type annotations work
 from synapse.events import EventBase  # noqa: F401
-from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.events.snapshot import StatelessContext  # noqa: F401
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.events_worker import EventsWorkerStore
 from synapse.types import RoomStreamToken, get_domain_from_id
@@ -90,7 +90,7 @@ class _EventPeristenceQueue(object):
 
         Args:
             room_id (str):
-            events_and_contexts (list[(EventBase, EventContext)]):
+            events_and_contexts (list[(EventBase, StatelessContext)]):
             backfilled (bool):
 
         Returns:
@@ -264,7 +264,7 @@ class EventsStore(EventsWorkerStore):
 
         Args:
             event (EventBase):
-            context (EventContext):
+            context (StatelessContext):
             backfilled (bool):
 
         Returns:
@@ -301,7 +301,7 @@ class EventsStore(EventsWorkerStore):
         """Persist events to db
 
         Args:
-            events_and_contexts (list[(EventBase, EventContext)]):
+            events_and_contexts (list[(EventBase, StatelessContext)]):
             backfilled (bool):
             delete_existing (bool):
 
@@ -518,7 +518,7 @@ class EventsStore(EventsWorkerStore):
             room_id (str):
                 room to which the events are being added. Used for logging etc
 
-            events_context (list[(EventBase, EventContext)]):
+            events_context (list[(EventBase, StatelessContext)]):
                 events and contexts which are being added to the room
 
             old_latest_event_ids (iterable[str]):
@@ -549,7 +549,7 @@ class EventsStore(EventsWorkerStore):
             if ctx.state_group in state_groups_map:
                 continue
 
-            state_groups_map[ctx.state_group] = ctx.current_state_ids
+            state_groups_map[ctx.state_group] = yield ctx.get_current_state_ids(self)
 
         # We need to map the event_ids to their state groups. First, let's
         # check if the event is one we're persisting, in which case we can
@@ -670,7 +670,7 @@ class EventsStore(EventsWorkerStore):
 
         Args:
             txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]):
+            events_and_contexts (list[(EventBase, StatelessContext)]):
                 events to persist
             backfilled (bool): True if the events were backfilled
             delete_existing (bool): True to purge existing table rows for the
@@ -882,9 +882,9 @@ class EventsStore(EventsWorkerStore):
         Pick the earliest non-outlier if there is one, else the earliest one.
 
         Args:
-            events_and_contexts (list[(EventBase, EventContext)]):
+            events_and_contexts (list[(EventBase, StatelessContext)]):
         Returns:
-            list[(EventBase, EventContext)]: filtered list
+            list[(EventBase, StatelessContext)]: filtered list
         """
         new_events_and_contexts = OrderedDict()
         for event, context in events_and_contexts:
@@ -905,7 +905,7 @@ class EventsStore(EventsWorkerStore):
 
         Args:
             txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
+            events_and_contexts (list[(EventBase, StatelessContext)]): events
                 we are persisting
             backfilled (bool): True if the events were backfilled
         """
@@ -935,11 +935,11 @@ class EventsStore(EventsWorkerStore):
 
         Args:
             txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
+            events_and_contexts (list[(EventBase, StatelessContext)]): events
                 we are persisting
 
         Returns:
-            list[(EventBase, EventContext)] new list, without events which
+            list[(EventBase, StatelessContext)] new list, without events which
             are already in the events table.
         """
         txn.execute(
@@ -1072,7 +1072,7 @@ class EventsStore(EventsWorkerStore):
 
         Args:
             txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
+            events_and_contexts (list[(EventBase, StatelessContext)]): events
                 we are persisting
         """
 
@@ -1134,11 +1134,11 @@ class EventsStore(EventsWorkerStore):
 
         Args:
             txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
+            events_and_contexts (list[(EventBase, StatelessContext)]): events
                 we are persisting
 
         Returns:
-            list[(EventBase, EventContext)] new list, without the rejected
+            list[(EventBase, StatelessContext)] new list, without the rejected
                 events.
         """
         # Remove the rejected events from the list now that we've added them
@@ -1162,9 +1162,9 @@ class EventsStore(EventsWorkerStore):
 
         Args:
             txn (twisted.enterprise.adbapi.Connection): db connection
-            events_and_contexts (list[(EventBase, EventContext)]): events
+            events_and_contexts (list[(EventBase, StatelessContext)]): events
                 we are persisting
-            all_events_and_contexts (list[(EventBase, EventContext)]): all
+            all_events_and_contexts (list[(EventBase, StatelessContext)]): all
                 events that we were going to persist. This includes events
                 we've already persisted, etc, that wouldn't appear in
                 events_and_context.
