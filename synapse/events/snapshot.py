@@ -19,7 +19,7 @@ from frozendict import frozendict
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 
 class StatelessContext(object):
@@ -228,7 +228,9 @@ class DeserializedContext(StatelessContext):
         """Implements StatelessContext"""
 
         if not self._fetching_state_deferred:
-            self._fetching_state_deferred = self._fill_out_state(store)
+            self._fetching_state_deferred = run_in_background(
+                self._fill_out_state, store,
+            )
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
@@ -239,7 +241,9 @@ class DeserializedContext(StatelessContext):
         """Implements StatelessContext"""
 
         if not self._fetching_state_deferred:
-            self._fetching_state_deferred = self._fill_out_state(store)
+            self._fetching_state_deferred = run_in_background(
+                self._fill_out_state, store,
+            )
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
