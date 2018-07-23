@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
+import hmac
 import logging
 
 from six.moves import http_client
@@ -61,6 +63,125 @@ class UsersRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.admin_handler.get_users()
 
         defer.returnValue((200, ret))
+
+
+class UserRegisterServlet(ClientV1RestServlet):
+    """
+    Attributes:
+         NONCE_TIMEOUT (int): Seconds until a generated nonce won't be accepted
+         nonces (dict[str, int]): The nonces that we will accept. A dict of
+             nonce to the time it was generated, in int seconds.
+    """
+    PATTERNS = client_path_patterns("/admin/register")
+    NONCE_TIMEOUT = 60
+
+    def __init__(self, hs):
+        super(UserRegisterServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+        self.reactor = hs.get_reactor()
+        self.nonces = {}
+        self.hs = hs
+
+    def _clear_old_nonces(self):
+        """
+        Clear out old nonces that are older than NONCE_TIMEOUT.
+        """
+        now = int(self.reactor.seconds())
+
+        for k, v in list(self.nonces.items()):
+            if now - v > self.NONCE_TIMEOUT:
+                del self.nonces[k]
+
+    def on_GET(self, request):
+        """
+        Generate a new nonce.
+        """
+        self._clear_old_nonces()
+
+        nonce = self.hs.get_secrets().token_hex(64)
+        self.nonces[nonce] = int(self.reactor.seconds())
+        return (200, {"nonce": nonce.encode('ascii')})
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        self._clear_old_nonces()
+
+        if not self.hs.config.registration_shared_secret:
+            raise SynapseError(400, "Shared secret registration is not enabled")
+
+        body = parse_json_object_from_request(request)
+
+        if "nonce" not in body:
+            raise SynapseError(
+                400, "nonce must be specified", errcode=Codes.BAD_JSON,
+            )
+
+        nonce = body["nonce"]
+
+        if nonce not in self.nonces:
+            raise SynapseError(
+                400, "unrecognised nonce",
+            )
+
+        # Delete the nonce, so it can't be reused, even if it's invalid
+        del self.nonces[nonce]
+
+        if "username" not in body:
+            raise SynapseError(
+                400, "username must be specified", errcode=Codes.BAD_JSON,
+            )
+        else:
+            if (not isinstance(body['username'], str) or len(body['username']) > 512):
+                raise SynapseError(400, "Invalid username")
+
+            username = body["username"].encode("utf-8")
+            if b"\x00" in username:
+                raise SynapseError(400, "Invalid username")
+
+        if "password" not in body:
+            raise SynapseError(
+                400, "password must be specified", errcode=Codes.BAD_JSON,
+            )
+        else:
+            if (not isinstance(body['password'], str) or len(body['password']) > 512):
+                raise SynapseError(400, "Invalid password")
+
+            password = body["password"].encode("utf-8")
+            if b"\x00" in password:
+                raise SynapseError(400, "Invalid password")
+
+        admin = body.get("admin", None)
+        got_mac = body["mac"]
+
+        want_mac = hmac.new(
+            key=self.hs.config.registration_shared_secret.encode(),
+            digestmod=hashlib.sha1,
+        )
+        want_mac.update(nonce)
+        want_mac.update(b"\x00")
+        want_mac.update(username)
+        want_mac.update(b"\x00")
+        want_mac.update(password)
+        want_mac.update(b"\x00")
+        want_mac.update(b"admin" if admin else b"notadmin")
+        want_mac = want_mac.hexdigest()
+
+        if not hmac.compare_digest(want_mac, got_mac):
+            raise SynapseError(
+                403, "HMAC incorrect",
+            )
+
+        # Reuse the parts of RegisterRestServlet to reduce code duplication
+        from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+        register = RegisterRestServlet(self.hs)
+
+        (user_id, _) = yield register.registration_handler.register(
+            localpart=username.lower(), password=password, admin=bool(admin),
+            generate_token=False,
+        )
+
+        result = yield register._create_registration_details(user_id, body)
+        defer.returnValue((200, result))
 
 
 class WhoisRestServlet(ClientV1RestServlet):
@@ -614,3 +735,4 @@ def register_servlets(hs, http_server):
     ShutdownRoomRestServlet(hs).register(http_server)
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
+    UserRegisterServlet(hs).register(http_server)

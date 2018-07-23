@@ -673,21 +673,10 @@ class SyncHandler(object):
 
                     state_ids = current_state_ids
 
-                # track the membership state events as of the beginning of this
-                # timeline sequence, so they can be filtered out of the state
-                # if we are lazy loading members.
-                if lazy_load_members:
-                    member_state_ids = {
-                        t: state_ids[t]
-                        for t in state_ids if t[0] == EventTypes.Member
-                    }
-
-                    if not include_redundant_members:
-                        # add any types we are about to send into our LruCache
-                        for t in types:
-                            cache.set(t[1], True)
-                else:
-                    member_state_ids = {}
+                if lazy_load_members and not include_redundant_members:
+                    # add any types we are about to send into our LruCache
+                    for t in types:
+                        cache.set(t[1], True)
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
@@ -697,9 +686,9 @@ class SyncHandler(object):
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
                     timeline_start=state_ids,
-                    timeline_start_members=member_state_ids,
                     previous={},
                     current=current_state_ids,
+                    lazy_load_members=lazy_load_members,
                 )
             elif batch.limited:
                 state_at_previous_sync = yield self.get_state_at(
@@ -717,42 +706,32 @@ class SyncHandler(object):
                     filtered_types=filtered_types,
                 )
 
-                # track the membership state events as of the beginning of this
-                # timeline sequence, so they can be filtered out of the state
-                # if we are lazy loading members.
-                if lazy_load_members:
-                    # TODO: optionally filter out redundant membership events at this
-                    # point, to stop repeatedly sending members in every /sync as if
-                    # the client isn't tracking them.
-                    # When implement, this should filter using event_ids (not mxids).
-                    # In practice, limited syncs are
-                    # relatively rare so it's not a total disaster to send redundant
-                    # members down at this point. Redundant members are ones which
-                    # repeatedly get sent down /sync because we don't know if the client
-                    # is caching them or not.
-                    member_state_ids = {
-                        t: state_at_timeline_start[t]
-                        for t in state_at_timeline_start if t[0] == EventTypes.Member
-                    }
-
-                    if not include_redundant_members:
-                        # add any types we are about to send into our LruCache
-                        for t in types:
-                            cache.set(t[1], True)
-                else:
-                    member_state_ids = {}
+                if lazy_load_members and not include_redundant_members:
+                    # add any types we are about to send into our LruCache
+                    for t in types:
+                        cache.set(t[1], True)
 
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
                     for event in batch.events if event.is_state()
                 }
 
+                # TODO: optionally filter out redundant membership events at this
+                # point, to stop repeatedly sending members in every /sync as if
+                # the client isn't tracking them.
+                # When implemented, this should filter using event_ids (not mxids).
+                # In practice, limited syncs are
+                # relatively rare so it's not a total disaster to send redundant
+                # members down at this point. Redundant members are ones which
+                # repeatedly get sent down /sync because we don't know if the client
+                # is caching them or not.
+
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
                     timeline_start=state_at_timeline_start,
-                    timeline_start_members=member_state_ids,
                     previous=state_at_previous_sync,
                     current=current_state_ids,
+                    lazy_load_members=lazy_load_members,
                 )
             else:
                 state_ids = {}
@@ -1703,16 +1682,14 @@ def _action_has_highlight(actions):
     return False
 
 
-def _calculate_state(timeline_contains, timeline_start, timeline_start_members,
-                     previous, current):
+def _calculate_state(
+    timeline_contains, timeline_start, previous, current, lazy_load_members,
+):
     """Works out what state to include in a sync response.
 
     Args:
         timeline_contains (dict): state in the timeline
         timeline_start (dict): state at the start of the timeline
-        timeline_start_members (dict): state at the start of the timeline
-            for room members who participate in this chunk of timeline.
-            Should always be a subset of timeline_start.
         previous (dict): state at the end of the previous sync (or empty dict
             if this is an initial sync)
         current (dict): state at the end of the timeline
@@ -1732,11 +1709,21 @@ def _calculate_state(timeline_contains, timeline_start, timeline_start_members,
 
     c_ids = set(e for e in current.values())
     ts_ids = set(e for e in timeline_start.values())
-    tsm_ids = set(e for e in timeline_start_members.values())
     p_ids = set(e for e in previous.values())
     tc_ids = set(e for e in timeline_contains.values())
 
-    state_ids = (((c_ids | ts_ids) - p_ids) - tc_ids) | tsm_ids
+    # track the membership events in the state as of the start of the timeline
+    # so we can add them back in to the state if we're lazyloading.  We don't
+    # add them into state if they're already contained in the timeline.
+    if lazy_load_members:
+        ll_ids = set(
+            e for t, e in timeline_start.iteritems()
+            if t[0] == EventTypes.Member and e not in tc_ids
+        )
+    else:
+        ll_ids = set()
+
+    state_ids = (((c_ids | ts_ids) - p_ids) - tc_ids) | ll_ids
 
     return {
         event_id_to_key[e]: e for e in state_ids
