@@ -191,10 +191,10 @@ class StateGroupWorkerStore(SQLBaseStore):
 
         Args:
             groups(list[int]): list of state group IDs to query
-            types(list[str|None, str|None])|None: List of 2-tuples of the form
+            types (Iterable[str, str|None]|None): list of 2-tuples of the form
                 (`type`, `state_key`), where a `state_key` of `None` matches all
                 state_keys for the `type`. If None, all types are returned.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
+            filtered_types(Iterable[str]|None): Only apply filtering via `types` to this
                 list of event types.  Other types of events are returned unfiltered.
                 If None, `types` filtering is applied to all events.
 
@@ -207,18 +207,16 @@ class StateGroupWorkerStore(SQLBaseStore):
         for chunk in chunks:
             res = yield self.runInteraction(
                 "_get_state_groups_from_groups",
-                self._get_state_groups_from_groups_txn, chunk, types, filtered_types
+                self._get_state_groups_from_groups_txn, chunk, types, filtered_types,
             )
             results.update(res)
 
         defer.returnValue(results)
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, types=None, filtered_types=None
+        self, txn, groups, types=None, filtered_types=None,
     ):
         results = {group: {} for group in groups}
-
-        include_other_types = False if filtered_types is None else True
 
         if types is not None:
             types = list(set(types))  # deduplicate types list
@@ -269,7 +267,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                     for etype, state_key in types
                 ]
 
-                if include_other_types:
+                if filtered_types is not None:
                     # XXX: check whether this slows postgres down like a list of
                     # ORs does too?
                     unique_types = set(filtered_types)
@@ -308,7 +306,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                         where_clauses.append("(type = ? AND state_key = ?)")
                         where_args.extend([typ[0], typ[1]])
 
-                if include_other_types:
+                if filtered_types is not None:
                     unique_types = set(filtered_types)
                     where_clauses.append(
                         "(" + " AND ".join(["type <> ?"] * len(unique_types)) + ")"
@@ -538,8 +536,6 @@ class StateGroupWorkerStore(SQLBaseStore):
         # tracks which of the requested types are missing from our cache
         missing_types = set()
 
-        include_other_types = False if filtered_types is None else True
-
         for typ, state_key in types:
             key = (typ, state_key)
 
@@ -562,7 +558,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         def include(typ, state_key):
             valid_state_keys = type_to_key.get(typ, sentinel)
             if valid_state_keys is sentinel:
-                return include_other_types and typ not in filtered_types
+                return filtered_types is not None and typ not in filtered_types
             if valid_state_keys is None:
                 return True
             if state_key in valid_state_keys:
@@ -598,7 +594,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         Args:
             groups (iterable[int]): list of state groups for which we want
                 to get the state.
-            types (None|iterable[(None, None|str)]):
+            types (None|iterable[(str, None|str)]):
                 indicates the state type/keys required. If None, the whole
                 state is fetched and returned.
 
