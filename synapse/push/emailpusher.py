@@ -50,8 +50,7 @@ class EmailPusher(object):
         self.timed_call = None
         self.throttle_params = None
 
-        # See httppusher
-        self.max_stream_ordering = None
+        self.max_stream_ordering = self.last_stream_ordering
 
         self.processing = False
         
