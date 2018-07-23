@@ -417,19 +417,23 @@ class EventsStore(EventsWorkerStore):
                             logger.info(
                                 "Calculating state delta for room %s", room_id,
                             )
-                            current_state = yield self._get_new_state_after_events(
-                                room_id,
-                                ev_ctx_rm,
-                                latest_event_ids,
-                                new_latest_event_ids,
-                            )
+
+                            with Measure("persist_events.get_new_state_after_events"):
+                                current_state = yield self._get_new_state_after_events(
+                                    room_id,
+                                    ev_ctx_rm,
+                                    latest_event_ids,
+                                    new_latest_event_ids,
+                                )
+
                             if current_state is not None:
                                 current_state_for_room[room_id] = current_state
-                                delta = yield self._calculate_state_delta(
-                                    room_id, current_state,
-                                )
-                                if delta is not None:
-                                    state_delta_for_room[room_id] = delta
+                                with Measure("persist_events.calculate_state_delta"):
+                                    delta = yield self._calculate_state_delta(
+                                        room_id, current_state,
+                                    )
+                                    if delta is not None:
+                                        state_delta_for_room[room_id] = delta
 
                 yield self.runInteraction(
                     "persist_events",
