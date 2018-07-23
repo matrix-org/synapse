@@ -549,6 +549,9 @@ class EventsStore(EventsWorkerStore):
             if ctx.state_group in state_groups_map:
                 continue
 
+            # We're only interested in pulling out state that has already
+            # been cached in the context. We'll pull stuff out of the DB later
+            # if necessary.
             current_state_ids = ctx.get_cached_current_state_ids()
             if current_state_ids is not None:
                 state_groups_map[ctx.state_group] = current_state_ids

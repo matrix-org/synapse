@@ -221,8 +221,9 @@ class EventContext(object):
         """Gets the current state IDs if we have them already cached.
 
         Returns:
-            dict[(str, str), str]|None: Returns None if state_group
-            is None, which happens when the associated event is an outlier.
+            dict[(str, str), str]|None: Returns None if we haven't cached the
+            state or if state_group is None, which happens when the associated
+            event is an outlier.
         """
 
         return self._current_state_ids
