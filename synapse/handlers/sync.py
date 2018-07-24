@@ -193,7 +193,7 @@ class SyncHandler(object):
         self.response_cache = ResponseCache(hs, "sync")
         self.state = hs.get_state_handler()
 
-        # ExpiringCache((User, Device)) -> LruCache(member mxid string)
+        # ExpiringCache((User, Device)) -> LruCache(membership event_id)
         self.lazy_loaded_members_cache = ExpiringCache(
             "lazy_loaded_members_cache", self.clock,
             max_len=0, expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE
@@ -657,21 +657,22 @@ class SyncHandler(object):
                 ]
 
                 if not include_redundant_members:
-                    # we can filter out redundant members based on their mxids (not
-                    # their event_ids) at this point. We know we can do it based on
-                    # mxid as this is an non-gappy incremental sync.
-
                     cache_key = (sync_config.user.to_string(), sync_config.device_id)
                     cache = self.lazy_loaded_members_cache.get(cache_key)
                     if cache is None:
                         logger.debug("creating LruCache for %r", cache_key)
-                        cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_AGE)
+                        cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
                         self.lazy_loaded_members_cache[cache_key] = cache
                     else:
                         logger.debug("found LruCache for %r", cache_key)
 
                 # only apply the filtering to room members
                 filtered_types = [EventTypes.Member]
+
+            timeline_state = {
+                (event.type, event.state_key): event.event_id
+                for event in batch.events if event.is_state()
+            }
 
             if full_state:
                 if batch:
@@ -692,16 +693,6 @@ class SyncHandler(object):
                     )
 
                     state_ids = current_state_ids
-
-                if lazy_load_members and not include_redundant_members:
-                    # add any types we are about to send into our LruCache
-                    for t in types:
-                        cache.set(t[1], True)
-
-                timeline_state = {
-                    (event.type, event.state_key): event.event_id
-                    for event in batch.events if event.is_state()
-                }
 
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
@@ -726,16 +717,6 @@ class SyncHandler(object):
                     filtered_types=filtered_types,
                 )
 
-                if lazy_load_members and not include_redundant_members:
-                    # add any types we are about to send into our LruCache
-                    for t in types:
-                        cache.set(t[1], True)
-
-                timeline_state = {
-                    (event.type, event.state_key): event.event_id
-                    for event in batch.events if event.is_state()
-                }
-
                 # TODO: optionally filter out redundant membership events at this
                 # point, to stop repeatedly sending members in every /sync as if
                 # the client isn't tracking them.
@@ -756,32 +737,38 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    if not include_redundant_members:
-                        # if it's a new sync sequence, then assume the client has had
-                        # amnesia and doesn't want any recent lazy-loaded members
-                        # de-duplicated.
-                        if since_token is None:
-                            logger.debug("clearing LruCache for %r", cache_key)
-                            cache.clear()
-                        else:
-                            # only send members which aren't in our LruCache (either
-                            # because they're new to this client or have been pushed out
-                            # of the cache)
-                            logger.debug("filtering types from %r...", types)
-                            types = [
-                                t for t in types if not cache.get(t[1])
-                            ]
-                            logger.debug("...to %r", types)
-
-                        # add any types we are about to send into our LruCache
-                        for t in types:
-                            cache.set(t[1], True)
-
                     if types:
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id, types=types,
                             filtered_types=filtered_types,
                         )
+
+            if lazy_load_members and not include_redundant_members:
+                # if it's a new sync sequence, then assume the client has had
+                # amnesia and doesn't want any recent lazy-loaded members
+                # de-duplicated.
+                if since_token is None:
+                    logger.debug("clearing LruCache for %r", cache_key)
+                    cache.clear()
+                else:
+                    # only send members which aren't in our LruCache (either
+                    # because they're new to this client or have been pushed out
+                    # of the cache)
+                    logger.debug("filtering state from %r...", state_ids)
+                    state_ids = {
+                        t: state_id
+                        for t, state_id in state_ids.iteritems()
+                        if not cache.get(state_id)
+                    }
+                    logger.debug("...to %r", state_ids)
+
+                # add any member IDs we are about to send into our LruCache
+                for t, event_id in itertools.chain(
+                    state_ids.items(),
+                    timeline_state.items(),
+                ):
+                    if t[0] == EventTypes.Member:
+                        cache.set(event_id, True)
 
         state = {}
         if state_ids:
@@ -1713,6 +1700,9 @@ def _calculate_state(
         previous (dict): state at the end of the previous sync (or empty dict
             if this is an initial sync)
         current (dict): state at the end of the timeline
+        lazy_load_members (bool): whether to return members from timeline_start
+            or not.  assumes that timeline_start has already been filtered to
+            include only the members the client needs to know about.
 
     Returns:
         dict
@@ -1732,18 +1722,23 @@ def _calculate_state(
     p_ids = set(e for e in previous.values())
     tc_ids = set(e for e in timeline_contains.values())
 
-    # track the membership events in the state as of the start of the timeline
-    # so we can add them back in to the state if we're lazyloading.  We don't
-    # add them into state if they're already contained in the timeline.
-    if lazy_load_members:
-        ll_ids = set(
-            e for t, e in timeline_start.iteritems()
-            if t[0] == EventTypes.Member and e not in tc_ids
-        )
-    else:
-        ll_ids = set()
+    # If we are lazyloading room members, we explicitly add the membership events
+    # for the senders in the timeline into the state block returned by /sync,
+    # as we may not have sent them to the client before.  We find these membership
+    # events by filtering them out of timeline_start, which has already been filtered
+    # to only include membership events for the senders in the timeline.
+    # In practice, we can do this by removing them from the p_ids list,
+    # which is the list of relevant state we know we have already sent to the client.
+    # see https://github.com/matrix-org/synapse/pull/2970
+    #            /files/efcdacad7d1b7f52f879179701c7e0d9b763511f#r204732809
 
-    state_ids = (((c_ids | ts_ids) - p_ids) - tc_ids) | ll_ids
+    if lazy_load_members:
+        p_ids.difference_update(
+            e for t, e in timeline_start.iteritems()
+            if t[0] == EventTypes.Member
+        )
+
+    state_ids = ((c_ids | ts_ids) - p_ids) - tc_ids
 
     return {
         event_id_to_key[e]: e for e in state_ids
