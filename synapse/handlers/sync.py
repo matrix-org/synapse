@@ -1553,16 +1553,17 @@ def _calculate_state(
     # as we may not have sent them to the client before.  We find these membership
     # events by filtering them out of timeline_start, which has already been filtered
     # to only include membership events for the senders in the timeline.
+    # In practice, we can do this by removing them from the p_ids list.
+    # see https://github.com/matrix-org/synapse/pull/2970
+    #            /files/efcdacad7d1b7f52f879179701c7e0d9b763511f#r204732809
 
     if lazy_load_members:
-        ll_ids = set(
+        p_ids.difference_update(
             e for t, e in timeline_start.iteritems()
-            if t[0] == EventTypes.Member and e not in tc_ids
+            if t[0] == EventTypes.Member
         )
-    else:
-        ll_ids = set()
 
-    state_ids = (((c_ids | ts_ids) - p_ids) - tc_ids) | ll_ids
+    state_ids = ((c_ids | ts_ids) - p_ids) - tc_ids
 
     return {
         event_id_to_key[e]: e for e in state_ids
