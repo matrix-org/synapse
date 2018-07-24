@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, CodeMessageException, SynapseError
+from synapse.api.errors import AuthError, CodeMessageException, SynapseError, StoreError, Codes
 from synapse.types import UserID, get_domain_from_id
 
 from ._base import BaseHandler
@@ -212,16 +212,20 @@ class ProfileHandler(BaseHandler):
         just_field = args.get("field", None)
 
         response = {}
+        try:
+            if just_field is None or just_field == "displayname":
+                response["displayname"] = yield self.store.get_profile_displayname(
+                    user.localpart
+                )
 
-        if just_field is None or just_field == "displayname":
-            response["displayname"] = yield self.store.get_profile_displayname(
-                user.localpart
-            )
-
-        if just_field is None or just_field == "avatar_url":
-            response["avatar_url"] = yield self.store.get_profile_avatar_url(
-                user.localpart
-            )
+            if just_field is None or just_field == "avatar_url":
+                response["avatar_url"] = yield self.store.get_profile_avatar_url(
+                    user.localpart
+                )
+        except StoreError as e:
+            if e.code === 404:
+                raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+            raise e
 
         defer.returnValue(response)
 
