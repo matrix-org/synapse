@@ -39,7 +39,7 @@ from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util.async import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.frozenutils import frozendict_json_encoder
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.logcontext import PreserveLoggingContext, make_deferred_yieldable
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 
@@ -147,7 +147,8 @@ class _EventPeristenceQueue(object):
                     # callbacks on the deferred.
                     try:
                         ret = yield per_item_callback(item)
-                        item.deferred.callback(ret)
+                        with PreserveLoggingContext():
+                            item.deferred.callback(ret)
                     except Exception:
                         item.deferred.errback()
             finally:
