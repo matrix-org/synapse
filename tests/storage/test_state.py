@@ -158,3 +158,12 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e2.type, e2.state_key): e2,
             (e3.type, e3.state_key): e3,
         }, state)
+
+        state = yield self.store.get_state_for_event(
+            e5.event_id, [], filtered_types=[EventTypes.Member],
+        )
+
+        self.assertStateMapEqual({
+            (e1.type, e1.state_key): e1,
+            (e2.type, e2.state_key): e2,
+        }, state)

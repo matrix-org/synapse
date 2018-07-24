@@ -1526,6 +1526,9 @@ def _calculate_state(
         previous (dict): state at the end of the previous sync (or empty dict
             if this is an initial sync)
         current (dict): state at the end of the timeline
+        lazy_load_members (bool): whether to return members from timeline_start
+            or not.  assumes that timeline_start has already been filtered to
+            include only the members the client needs to know about.
 
     Returns:
         dict
@@ -1545,9 +1548,12 @@ def _calculate_state(
     p_ids = set(e for e in previous.values())
     tc_ids = set(e for e in timeline_contains.values())
 
-    # track the membership events in the state as of the start of the timeline
-    # so we can add them back in to the state if we're lazyloading.  We don't
-    # add them into state if they're already contained in the timeline.
+    # If we are lazyloading room members, we explicitly add the membership events
+    # for the senders in the timeline into the state block returned by /sync,
+    # as we may not have sent them to the client before.  We find these membership
+    # events by filtering them out of timeline_start, which has already been filtered
+    # to only include membership events for the senders in the timeline.
+
     if lazy_load_members:
         ll_ids = set(
             e for t, e in timeline_start.iteritems()
