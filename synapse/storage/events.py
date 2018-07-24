@@ -644,21 +644,14 @@ class EventsStore(EventsWorkerStore):
         """
         existing_state = yield self.get_current_state_ids(room_id)
 
-        existing_events = set(itervalues(existing_state))
-        new_events = set(ev_id for ev_id in itervalues(current_state))
-        changed_events = existing_events ^ new_events
-
-        if not changed_events:
-            return
-
         to_delete = {
             key: ev_id for key, ev_id in iteritems(existing_state)
-            if ev_id in changed_events
+            if ev_id != current_state.get(key)
         }
-        events_to_insert = (new_events - existing_events)
+
         to_insert = {
             key: ev_id for key, ev_id in iteritems(current_state)
-            if ev_id in events_to_insert
+            if ev_id != existing_state.get(key)
         }
 
         defer.returnValue((to_delete, to_insert))
