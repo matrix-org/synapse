@@ -565,6 +565,7 @@ class EventsStore(EventsWorkerStore):
         # map from state_group to ((type, key) -> event_id) state map
         state_groups_map = {}
 
+        # Map from (prev state group, new state group) -> delta state dict
         state_group_deltas = {}
 
         for ev, ctx in events_context:
@@ -631,23 +632,24 @@ class EventsStore(EventsWorkerStore):
         if old_state_groups == new_state_groups:
             defer.returnValue((None, None))
 
-        if len(new_state_groups) == 1:
-            # If there is only one state group, then we know what the current
-            # state is.
-            if len(old_state_groups) == 1:
-                new_state_group = next(iter(new_state_groups))
-                old_state_group = next(iter(old_state_groups))
+        if len(new_state_groups) == 1 and len(old_state_groups) == 1:
+            # If we're going from one state group to another, lets check if
+            # we have a delta for that transition. If we do then we can just
+            # return that.
 
-                delta_ids = state_group_deltas.get(
-                    (old_state_group, new_state_group,), None
-                )
-                if delta_ids is not None:
-                    # We have a delta from the existing to new current state,
-                    # so lets just return that. If we happen to already have
-                    # the current state in memory then lets also return that,
-                    # but it doesn't matter if we don't.
-                    new_state = state_groups_map.get(new_state_group)
-                    defer.returnValue((new_state, delta_ids))
+            new_state_group = next(iter(new_state_groups))
+            old_state_group = next(iter(old_state_groups))
+
+            delta_ids = state_group_deltas.get(
+                (old_state_group, new_state_group,), None
+            )
+            if delta_ids is not None:
+                # We have a delta from the existing to new current state,
+                # so lets just return that. If we happen to already have
+                # the current state in memory then lets also return that,
+                # but it doesn't matter if we don't.
+                new_state = state_groups_map.get(new_state_group)
+                defer.returnValue((new_state, delta_ids))
 
         # Now that we have calculated new_state_groups we need to get
         # their state IDs so we can resolve to a single state set.
@@ -657,6 +659,8 @@ class EventsStore(EventsWorkerStore):
             state_groups_map.update(group_to_state)
 
         if len(new_state_groups) == 1:
+            # If there is only one state group, then we know what the current
+            # state is.
             defer.returnValue((state_groups_map[new_state_groups.pop()], None))
 
         # Ok, we need to defer to the state handler to resolve our state sets.
