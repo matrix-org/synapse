@@ -500,7 +500,7 @@ class SyncHandler(object):
         """ Works out a room summary block for this room, summarising the number
         of joined members in the room, and providing the 'hero' members if the
         room has no name so clients can consistently name rooms.  Also adds
-        state events to 'state' if needed to describe the heros.
+        state events to 'state' if needed to describe the heroes.
 
         Args:
             room_id(str):
@@ -568,15 +568,15 @@ class SyncHandler(object):
 
             me = sync_config.user.to_string()
             if summary["m.joined_member_count"] == 0:
-                summary['m.heros'] = sorted(
+                summary['m.heroes'] = sorted(
                     [user_id for user_id in member_ids.keys() if user_id != me]
                 )[0:5]
             else:
-                summary['m.heros'] = sorted(
+                summary['m.heroes'] = sorted(
                     [user_id for user_id in joined_user_ids if user_id != me]
                 )[0:5]
 
-            # ensure we send membership events for heros if needed
+            # ensure we send membership events for heroes if needed
             cache_key = (sync_config.user.to_string(), sync_config.device_id)
             cache = self.lazy_loaded_members_cache.get(cache_key)
 
@@ -591,7 +591,7 @@ class SyncHandler(object):
 
             missing_hero_event_ids = [
                 member_ids[hero_id]
-                for hero_id in summary['m.heros']
+                for hero_id in summary['m.heroes']
                 if (
                     not cache.get(hero_id) and
                     hero_id not in existing_members
