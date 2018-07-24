@@ -224,6 +224,7 @@ class DataStore(RoomMemberStore, RoomStore,
         self._last_user_visit_update = self._get_start_of_day()
 
         self._current_mau = 0
+        self._valid_mau_users = ()
 
         super(DataStore, self).__init__(db_conn, hs)
 
@@ -285,22 +286,26 @@ class DataStore(RoomMemberStore, RoomStore,
             yesterday = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
 
             sql = """
-                SELECT COALESCE(count(*), 0) FROM (
-                    SELECT user_id FROM user_ips
-                    WHERE last_seen > ?
-                    GROUP BY user_id
-                ) u
+                SELECT user_id FROM user_ips
+                WHERE last_seen > ?
+                GROUP BY user_id
+                ORDER BY last_seen DESC
             """
 
             txn.execute(sql, (yesterday,))
-            count, = txn.fetchone()
+            mau_users = txn.fetchall()
 
+            count = len(user_tuple)
+            if count > self.hs.config.max_mau_value:
+                mau_users = mau_users[0:self.hs.config.max_mau_value]
+            logger.info("user tuple is %s" % (user_tuple,))
             self._current_mau = count
+            self._valid_mau_users = mau_users
             current_mau_gauge.set(self._current_mau)
             max_mau_value_gauge.set(self.hs.config.max_mau_value)
             limit_usage_by_mau_gauge.set(self.hs.config.limit_usage_by_mau)
-            logger.info("calling monthly stats")
-            return count
+            logger.info("calling mau stats")
+            return count, mau_users
         return self.runInteraction("count_users", _count_users)
 
     def count_r30_users(self):
@@ -528,13 +533,13 @@ class DataStore(RoomMemberStore, RoomStore,
 
     def get_current_mau(self):
         """
-        Return current monthly active user figure, intended to be used for code that
-        limits behaviour based MAU usage. If value is 0, explicitly checks
-        the db to guard against race conditions. If the MAU is genuinely 0, then it
-        will be a quick query :)
+        Return current monthly active user figure and list of active users,
+        intended to be used for code that limits behaviour based MAU usage.
+        If value is 0, explicitly checks the db to guard against race conditions.
+        If the MAU is genuinely 0, then it will be a quick query :)
         """
         if self._current_mau > 0:
-            return self._current_mau
+            return self._current_mau, self._valid_mau_users
         else:
             return self.count_monthly_users()
 

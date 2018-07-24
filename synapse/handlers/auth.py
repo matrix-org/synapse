@@ -517,7 +517,10 @@ class AuthHandler(BaseHandler):
         Raises:
             StoreError if there was a problem storing the token.
         """
+
         logger.info("Logging in user %s on device %s", user_id, device_id)
+
+        yield self._check_mau_limits(user_id)
         access_token = yield self.issue_access_token(user_id, device_id)
 
         # the device *should* have been registered before we got here; however,
@@ -730,13 +733,15 @@ class AuthHandler(BaseHandler):
 
     def validate_short_term_login_token_and_get_user_id(self, login_token):
         auth_api = self.hs.get_auth()
+        user_id = ""
         try:
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
             user_id = auth_api.get_user_id_from_macaroon(macaroon)
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
-            return user_id
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+        self._check_mau_limits(user_id)
+        return user_id
 
     @defer.inlineCallbacks
     def delete_access_token(self, access_token):
@@ -892,6 +897,18 @@ class AuthHandler(BaseHandler):
         else:
             return defer.succeed(False)
 
+    def _check_mau_limits(self, user_id):
+        """
+        Ensure that if mau blocking is enabled that invalid users cannot
+        log in.
+        """
+        if self.hs.config.limit_usage_by_mau is True:
+            current_mau, valid_users = self.store.get_current_mau()
+            if current_mau >= self.hs.config.max_mau_value:
+                if user_id not in valid_users:
+                    raise AuthError(
+                        403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+                    )
 
 @attr.s
 class MacaroonGenerator(object):

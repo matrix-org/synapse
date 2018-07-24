@@ -19,10 +19,7 @@ from twisted.internet import defer
 
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import UserID, create_requester
-from synapse.api.errors import (
-    Codes,
-    RegistrationError,
-)
+from synapse.api.errors import RegistrationError
 
 from tests.utils import setup_test_homeserver
 
@@ -81,8 +78,6 @@ class RegistrationTestCase(unittest.TestCase):
             requester, local_part, display_name)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
-
-
 
     @defer.inlineCallbacks
     def test_cannot_register_when_mau_limits_exceeded(self):
