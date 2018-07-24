@@ -249,7 +249,7 @@ class EventContext(object):
 
     @defer.inlineCallbacks
     def update_state(self, state_group, prev_state_ids, current_state_ids,
-                     delta_ids):
+                     prev_group, delta_ids):
         """Replace the state in the context
         """
 
@@ -260,6 +260,7 @@ class EventContext(object):
 
         self.state_group = state_group
         self._prev_state_ids = prev_state_ids
+        self.prev_group = prev_group
         self._current_state_ids = current_state_ids
         self.delta_ids = delta_ids
 
