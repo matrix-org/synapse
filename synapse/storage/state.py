@@ -518,7 +518,10 @@ class StateGroupWorkerStore(SQLBaseStore):
         for typ, state_key in types:
             key = (typ, state_key)
 
-            if state_key is None:
+            if (
+                state_key is None or
+                filtered_types is not None and typ not in filtered_types
+            ):
                 type_to_key[typ] = None
                 # we mark the type as missing from the cache because
                 # when the cache was populated it might have been done with a
