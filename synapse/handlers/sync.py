@@ -544,20 +544,37 @@ class SyncHandler(object):
 
         summary = {}
 
-        # ideally we could do this, but the actual events haven't been loaded...
-        # summary['m.joined_member_count'] = len([
-        #     s for s in member_ids if s.content.get("membership") == 'join'
-        # ])
+        # FIXME: it feels very heavy to load up every single membership event
+        # just to calculate the counts. get_joined_users_from_context might
+        # help us, but we don't have an EventContext at this point, and we need
+        # to know more than just the joined user stats.
+        member_events = yield self.store.get_events(member_ids.values())
 
-        # FIXME: this includes left/banned/invited users
-        summary['m.joined_member_count'] = len(member_ids)
+        joined_user_ids = []
+        invited_user_ids = []
+
+        for ev in member_events.values():
+            if ev.content.get("membership") == Membership.JOIN:
+                joined_user_ids.append(ev.state_key)
+            elif ev.content.get("membership") == Membership.INVITE:
+                invited_user_ids.append(ev.state_key)
+
+        summary["m.joined_member_count"] = len(joined_user_ids)
+        if invited_user_ids:
+            summary["m.invited_member_count"] = len(invited_user_ids)
 
         if not name_id and not canonical_alias_id:
-            # FIXME: this includes left/banned/invited users
-            # FIXME: if joined_member_count is 0, return left users instead
             # FIXME: order by stream ordering, not alphabetic
-            # FIXME: exclude the current logged in user
-            summary['m.heros'] = sorted(member_ids.keys())[0:5]
+
+            me = sync_config.user.to_string()
+            if summary["m.joined_member_count"] == 0:
+                summary['m.heros'] = sorted(
+                    [user_id for user_id in member_ids.keys() if user_id != me]
+                )[0:5]
+            else:
+                summary['m.heros'] = sorted(
+                    [user_id for user_id in joined_user_ids if user_id != me]
+                )[0:5]
 
             # ensure we send membership events for heros if needed
             cache_key = (sync_config.user.to_string(), sync_config.device_id)
