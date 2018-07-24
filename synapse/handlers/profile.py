@@ -17,7 +17,8 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, CodeMessageException, SynapseError, StoreError, Codes
+from synapse.api.errors import AuthError, CodeMessageException, SynapseError
+from synapse.api.errors import StoreError, Codes
 from synapse.types import UserID, get_domain_from_id
 
 from ._base import BaseHandler
@@ -242,7 +243,7 @@ class ProfileHandler(BaseHandler):
                     user.localpart
                 )
         except StoreError as e:
-            if e.code === 404:
+            if e.code == 404:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
             raise e
 
