@@ -280,6 +280,13 @@ class MessageHandler(BaseHandler):
             if state_ids:
                 state = yield self.store.get_events(list(state_ids.values()))
 
+            state = yield filter_events_for_client(
+                self.store,
+                user_id,
+                state.values(),
+                is_peeking=(member_event_id is None),
+            )
+
         time_now = self.clock.time_msec()
 
         chunk = {
@@ -294,7 +301,7 @@ class MessageHandler(BaseHandler):
         if state:
             chunk["state"] = [
                 serialize_event(e, time_now, as_client_event)
-                for e in state.values()
+                for e in state
             ]
 
         defer.returnValue(chunk)
