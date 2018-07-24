@@ -244,7 +244,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             hs (synapse.server.HomeServer)
         """
         super(PurgeHistoryRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -319,7 +319,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = yield self.handlers.message_handler.start_purge_history(
+        purge_id = yield self.pagination_handler.start_purge_history(
             room_id, token,
             delete_local_events=delete_local_events,
         )
@@ -341,7 +341,7 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
             hs (synapse.server.HomeServer)
         """
         super(PurgeHistoryStatusRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, purge_id):
@@ -351,7 +351,7 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        purge_status = self.handlers.message_handler.get_purge_status(purge_id)
+        purge_status = self.pagination_handler.get_purge_status(purge_id)
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 

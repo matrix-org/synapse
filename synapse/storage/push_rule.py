@@ -21,7 +21,6 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
 from synapse.push.baserules import list_with_base_rules
 from synapse.storage.appservice import ApplicationServiceWorkerStore
 from synapse.storage.pusher import PusherWorkerStore
@@ -249,18 +248,6 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         for uid in users_with_receipts:
             if uid in local_users_in_room:
                 user_ids.add(uid)
-
-        forgotten = yield self.who_forgot_in_room(
-            event.room_id, on_invalidate=cache_context.invalidate,
-        )
-
-        for row in forgotten:
-            user_id = row["user_id"]
-            event_id = row["event_id"]
-
-            mem_id = current_state_ids.get((EventTypes.Member, user_id), None)
-            if event_id == mem_id:
-                user_ids.discard(user_id)
 
         rules_by_user = yield self.bulk_get_push_rules(
             user_ids, on_invalidate=cache_context.invalidate,

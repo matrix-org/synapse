@@ -24,7 +24,6 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.utils import prune_event
 from synapse.types import get_domain_from_id
-from synapse.util.logcontext import make_deferred_yieldable, preserve_fn
 
 logger = logging.getLogger(__name__)
 
@@ -74,19 +73,6 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
     event_id_to_state = yield store.get_state_for_events(
         frozenset(e.event_id for e in events),
         types=types,
-    )
-
-    forgotten = yield make_deferred_yieldable(defer.gatherResults([
-        defer.maybeDeferred(
-            preserve_fn(store.who_forgot_in_room),
-            room_id,
-        )
-        for room_id in frozenset(e.room_id for e in events)
-    ], consumeErrors=True))
-
-    # Set of membership event_ids that have been forgotten
-    event_id_forgotten = frozenset(
-        row["event_id"] for rows in forgotten for row in rows
     )
 
     ignore_dict_content = yield store.get_global_account_data_by_type_for_user(
@@ -177,10 +163,7 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
         if membership is None:
             membership_event = state.get((EventTypes.Member, user_id), None)
             if membership_event:
-                # XXX why do we do this?
-                # https://github.com/matrix-org/synapse/issues/3350
-                if membership_event.event_id not in event_id_forgotten:
-                    membership = membership_event.membership
+                membership = membership_event.membership
 
         # if the user was a member of the room at the time of the event,
         # they can see it.
