@@ -739,3 +739,37 @@ class Auth(object):
                 )
 
             return query_params[0]
+
+    @defer.inlineCallbacks
+    def check_in_room_or_world_readable(self, room_id, user_id):
+        """Checks that the user is or was in the room or the room is world
+        readable. If it isn't then an exception is raised.
+
+        Returns:
+            Deferred[tuple[str, str|None]]: Resolves to the current membership of
+            the user in the room and the membership event ID of the user. If
+            the user is not in the room and never has been, then
+            `(Membership.JOIN, None)` is returned.
+        """
+
+        try:
+            # check_user_was_in_room will return the most recent membership
+            # event for the user if:
+            #  * The user is a non-guest user, and was ever in the room
+            #  * The user is a guest user, and has joined the room
+            # else it will throw.
+            member_event = yield self.check_user_was_in_room(room_id, user_id)
+            defer.returnValue((member_event.membership, member_event.event_id))
+        except AuthError:
+            visibility = yield self.state.get_current_state(
+                room_id, EventTypes.RoomHistoryVisibility, ""
+            )
+            if (
+                visibility and
+                visibility.content["history_visibility"] == "world_readable"
+            ):
+                defer.returnValue((Membership.JOIN, None))
+                return
+            raise AuthError(
+                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+            )
