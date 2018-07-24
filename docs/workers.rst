@@ -209,7 +209,7 @@ following regular expressions::
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$   # GET only
 
 ``synapse.app.user_dir``
 ~~~~~~~~~~~~~~~~~~~~~~~~
