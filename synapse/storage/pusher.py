@@ -233,7 +233,7 @@ class PusherStore(PusherWorkerStore):
             )
 
             if newly_inserted:
-                self.runInteraction(
+                yield self.runInteraction(
                     "add_pusher",
                     self._invalidate_cache_and_stream,
                     self.get_if_user_has_pusher, (user_id,)

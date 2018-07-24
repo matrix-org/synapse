@@ -1587,6 +1587,9 @@ def _calculate_state(
         previous (dict): state at the end of the previous sync (or empty dict
             if this is an initial sync)
         current (dict): state at the end of the timeline
+        lazy_load_members (bool): whether to return members from timeline_start
+            or not.  assumes that timeline_start has already been filtered to
+            include only the members the client needs to know about.
 
     Returns:
         dict
@@ -1606,18 +1609,23 @@ def _calculate_state(
     p_ids = set(e for e in previous.values())
     tc_ids = set(e for e in timeline_contains.values())
 
-    # track the membership events in the state as of the start of the timeline
-    # so we can add them back in to the state if we're lazyloading.  We don't
-    # add them into state if they're already contained in the timeline.
-    if lazy_load_members:
-        ll_ids = set(
-            e for t, e in timeline_start.iteritems()
-            if t[0] == EventTypes.Member and e not in tc_ids
-        )
-    else:
-        ll_ids = set()
+    # If we are lazyloading room members, we explicitly add the membership events
+    # for the senders in the timeline into the state block returned by /sync,
+    # as we may not have sent them to the client before.  We find these membership
+    # events by filtering them out of timeline_start, which has already been filtered
+    # to only include membership events for the senders in the timeline.
+    # In practice, we can do this by removing them from the p_ids list,
+    # which is the list of relevant state we know we have already sent to the client.
+    # see https://github.com/matrix-org/synapse/pull/2970
+    #            /files/efcdacad7d1b7f52f879179701c7e0d9b763511f#r204732809
 
-    state_ids = (((c_ids | ts_ids) - p_ids) - tc_ids) | ll_ids
+    if lazy_load_members:
+        p_ids.difference_update(
+            e for t, e in timeline_start.iteritems()
+            if t[0] == EventTypes.Member
+        )
+
+    state_ids = ((c_ids | ts_ids) - p_ids) - tc_ids
 
     return {
         event_id_to_key[e]: e for e in state_ids
