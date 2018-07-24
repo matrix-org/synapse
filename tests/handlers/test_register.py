@@ -17,9 +17,9 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.api.errors import RegistrationError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import UserID, create_requester
-from synapse.api.errors import RegistrationError
 
 from tests.utils import setup_test_homeserver
 
@@ -83,7 +83,6 @@ class RegistrationTestCase(unittest.TestCase):
     def test_cannot_register_when_mau_limits_exceeded(self):
         local_part = "someone"
         display_name = "someone"
-        user_id = "@someone:test"
         requester = create_requester("@as:test")
         store = self.hs.get_datastore()
         self.hs.config.limit_usage_by_mau = False

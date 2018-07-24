@@ -13,21 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 import pymacaroons
-import traceback
 
 from twisted.internet import defer
 
 import synapse
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-)
+from synapse.api.errors import AuthError
 from synapse.handlers.auth import AuthHandler
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
-from mock import Mock
 
 
 class AuthHandlers(object):
@@ -42,7 +39,7 @@ class AuthTestCase(unittest.TestCase):
         self.hs.handlers = AuthHandlers(self.hs)
         self.auth_handler = self.hs.handlers.auth_handler
         self.macaroon_generator = self.hs.get_macaroon_generator()
-        #MAU tests
+        # MAU tests
         self.hs.config.max_mau_value = 50
         self.small_number_of_users = 1
         self.large_number_of_users = 100
@@ -162,7 +159,6 @@ class AuthTestCase(unittest.TestCase):
         except AuthError as e:
             self.fail("Should not throw an exception %s" % e)
 
-
     @defer.inlineCallbacks
     def test_mau_limits_exceeded_old_user(self):
         """
@@ -179,12 +175,12 @@ class AuthTestCase(unittest.TestCase):
                 self._get_macaroon().serialize()
             )
             self.fail("Auth exception expected")
-        except AuthError as e:
+        except AuthError:
             pass
         try:
             yield self.auth_handler.get_access_token_for_user_id('user_a')
             self.fail("Auth exception expected")
-        except AuthError as e:
+        except AuthError:
             pass
 
     @defer.inlineCallbacks

@@ -910,6 +910,7 @@ class AuthHandler(BaseHandler):
                         403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
                     )
 
+
 @attr.s
 class MacaroonGenerator(object):
 

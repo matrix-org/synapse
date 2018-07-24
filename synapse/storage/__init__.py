@@ -68,6 +68,7 @@ limit_usage_by_mau_gauge = Gauge(
     "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
 )
 
+
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore,
                 PresenceStore, TransactionStore,
@@ -295,10 +296,9 @@ class DataStore(RoomMemberStore, RoomStore,
             txn.execute(sql, (yesterday,))
             mau_users = txn.fetchall()
 
-            count = len(user_tuple)
+            count = len(mau_users)
             if count > self.hs.config.max_mau_value:
                 mau_users = mau_users[0:self.hs.config.max_mau_value]
-            logger.info("user tuple is %s" % (user_tuple,))
             self._current_mau = count
             self._valid_mau_users = mau_users
             current_mau_gauge.set(self._current_mau)
