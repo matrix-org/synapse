@@ -696,7 +696,7 @@ class EventsStore(EventsWorkerStore):
         existing_state = yield self.get_current_state_ids(room_id)
 
         to_delete = [
-            key for key, ev_id in iteritems(existing_state)
+            key for key in existing_state
             if key not in current_state
         ]
 
