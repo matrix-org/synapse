@@ -26,6 +26,7 @@ import sys
 
 from six import iteritems
 
+from autobahn.twisted.resource import WebSocketResource
 from prometheus_client import Gauge
 
 from twisted.application import service
@@ -75,10 +76,7 @@ from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
-
-from autobahn.twisted.resource import WebSocketResource
 from synapse.websocket.websocket import SynapseWebsocketFactory
-
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -103,9 +101,11 @@ class SynapseHomeServer(HomeServer):
                     # Skip loading openid resource if federation is defined
                     # since federation resource will include openid
                     continue
-                resources.update(
-                    self._configure_named_resource(name, res.get("compress", False))
-                )
+                resources.update(self._configure_named_resource(
+                    name,
+                    res.get("compress", False),
+                    listener_config.get("x_forwarded", False),
+                ))
 
         additional_resources = listener_config.get("additional_resources", {})
         logger.debug("Configuring additional resources: %r", additional_resources)
@@ -167,7 +167,7 @@ class SynapseHomeServer(HomeServer):
 
         return ports
 
-    def _configure_named_resource(self, name, compress=False):
+    def _configure_named_resource(self, name, compress=False, proxied=False):
         """Build a resource map for a named resource
 
         Args:
@@ -263,7 +263,7 @@ class SynapseHomeServer(HomeServer):
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
         if name == "websocket":
-            ws_factory = SynapseWebsocketFactory(self, listener_config, compress)
+            ws_factory = SynapseWebsocketFactory(self, compress, proxied)
             ws_factory.startFactory()
             websocket_resource = WebSocketResource(ws_factory)
             resources.update({

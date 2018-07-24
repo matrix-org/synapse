@@ -1,21 +1,25 @@
-from twisted.internet import defer, reactor
-from autobahn.twisted.websocket import WebSocketServerProtocol, \
-    WebSocketServerFactory
-from autobahn.websocket.compress import PerMessageDeflateOffer, \
-    PerMessageDeflateOfferAccept
+import json
+import logging
+
+from autobahn.twisted.websocket import WebSocketServerFactory, WebSocketServerProtocol
+from autobahn.websocket.compress import (
+    PerMessageDeflateOffer,
+    PerMessageDeflateOfferAccept,
+)
+
+from twisted.internet import defer
+
 from synapse.api.constants import EventTypes, PresenceState
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.api.filtering import FilterCollection, DEFAULT_FILTER_COLLECTION
+from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
 from synapse.handlers.sync import SyncConfig
-import synapse.metrics
+from synapse.metrics import LaterGauge
+from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import set_timeline_upper_limit
 from synapse.rest.client.v2_alpha.sync import SyncRestServlet
-from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import StreamToken, UserID, create_requester
-import logging
-import json
+
 logger = logging.getLogger("synapse.websocket")
-metrics = synapse.metrics.get_metrics_for("synapse.websocket")
 
 # Close Reason Codes:
 # 3001 - No Access Token
@@ -31,6 +35,7 @@ SYNC_TIMEOUT = 90000
 class SynapseWebsocketProtocol(WebSocketServerProtocol):
     @defer.inlineCallbacks
     def onConnect(self, request):
+        self.reactor = self.factory.hs.get_reactor()
         self.filter = DEFAULT_FILTER_COLLECTION
         self.since = None
         self.full_state = False
@@ -70,22 +75,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             self.sendClose(3003, ERR_UNKNOWN_FAIL)
             logger.info("Closing due to unknown error %s" % ex)
             return
-
-        if self.factory.proxied:
-            ip_addr = request.headers.get('x-forwarded-for', request.host)
-        else:
-            ip_addr = request.host
-
-        user_agent = request.headers.get("user-agent", [""])[0]
-
-        if user and access_token and ip_addr:
-            self.factory.hs.get_datastore().insert_client_ip(
-                user_id=user["user"].to_string(),
-                access_token=access_token,
-                ip=ip_addr,
-                user_agent=user_agent,
-                device_id=user.get("device_id"),
-            )
+        logger.info("authenticated {0} ({1}) okay".format(user['user'], ip_addr))
 
         full_state = request.params.get("full_state", None)
         if full_state is not None:
@@ -217,8 +207,6 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         logger.info("Started syncing for %s." % self.peer)
         self.shouldSync = True
         self._sync(initial=True)
-        if not reactor.running:
-            reactor.run()
 
     def _sync(self, initial=False):
         sync_handler = self.factory.hs.get_sync_handler()
@@ -276,7 +264,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             )), False)
 
             # start new call of _sync - use reactor to avoid endless recursion
-            reactor.callLater(0, self._sync)
+            self.reactor.callLater(0, self._sync)
 
             logger.debug("Returning from _sync_callback")
 
@@ -441,12 +429,11 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
 
 
 class SynapseWebsocketFactory(WebSocketServerFactory):
-    def __init__(self, hs, config, compress):
+    def __init__(self, hs, compress=False, proxied=False):
         super(SynapseWebsocketFactory, self).__init__()
         self.protocol = SynapseWebsocketProtocol
         self.hs = hs
-        self.config = config
-        self.proxied = config.get("x_forwarded", False)
+        self.proxied = proxied
 
         if compress:
             self.setProtocolOptions(perMessageCompressionAccept=self.accept_compress)
@@ -458,13 +445,13 @@ class SynapseWebsocketFactory(WebSocketServerFactory):
         self.presence_handler = hs.get_presence_handler()
         self.receipts_handler = hs.get_receipts_handler()
         self.read_marker_handler = hs.get_read_marker_handler()
-        self.txns = HttpTransactionCache(hs.get_clock())
+        self.txns = HttpTransactionCache(hs)
         self.typing_handler = hs.get_typing_handler()
         self.clients = []
 
-        metrics.register_callback(
-            "connection_count",
-            self.getConnectionCount
+        LaterGauge(
+            "synapse_websocket_connection_count",
+            "", [], self.getConnectionCount
         )
 
     @staticmethod
