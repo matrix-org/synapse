@@ -428,8 +428,7 @@ class EventsStore(EventsWorkerStore):
                                 delta = yield self._calculate_state_delta(
                                     room_id, current_state,
                                 )
-                                if delta is not None:
-                                    state_delta_for_room[room_id] = delta
+                                state_delta_for_room[room_id] = delta
 
                 yield self.runInteraction(
                     "persist_events",
