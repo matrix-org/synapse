@@ -206,6 +206,10 @@ Handles client API endpoints. It can handle REST endpoints matching the
 following regular expressions::
 
     ^/_matrix/client/(api/v1|r0|unstable)/publicRooms$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
 
 ``synapse.app.user_dir``
 ~~~~~~~~~~~~~~~~~~~~~~~~
