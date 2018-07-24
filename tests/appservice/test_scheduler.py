@@ -12,16 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.appservice import ApplicationServiceState
-from synapse.appservice.scheduler import (
-    _ServiceQueuer, _TransactionController, _Recoverer
-)
+from mock import Mock
+
 from twisted.internet import defer
 
+from synapse.appservice import ApplicationServiceState
+from synapse.appservice.scheduler import (
+    _Recoverer,
+    _ServiceQueuer,
+    _TransactionController,
+)
 from synapse.util.logcontext import make_deferred_yieldable
-from ..utils import MockClock
-from mock import Mock
+
 from tests import unittest
+
+from ..utils import MockClock
 
 
 class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):

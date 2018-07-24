@@ -14,16 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from twisted.internet import defer
+import logging
+import types
 
-from canonicaljson import encode_canonical_json
+from canonicaljson import encode_canonical_json, json
+
+from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 
-import logging
-import simplejson as json
-import types
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ class PusherStore(PusherWorkerStore):
             )
 
             if newly_inserted:
-                self.runInteraction(
+                yield self.runInteraction(
                     "add_pusher",
                     self._invalidate_cache_and_stream,
                     self.get_if_user_has_pusher, (user_id,)

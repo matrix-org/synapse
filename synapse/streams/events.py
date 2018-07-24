@@ -15,13 +15,12 @@
 
 from twisted.internet import defer
 
-from synapse.types import StreamToken
-
+from synapse.handlers.account_data import AccountDataEventSource
 from synapse.handlers.presence import PresenceEventSource
+from synapse.handlers.receipts import ReceiptEventSource
 from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
-from synapse.handlers.receipts import ReceiptEventSource
-from synapse.handlers.account_data import AccountDataEventSource
+from synapse.types import StreamToken
 
 
 class EventSources(object):

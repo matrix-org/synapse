@@ -29,18 +29,18 @@ dead worker doesn't cause the queues to grow limitlessly.
 Events are replicated via a separate events stream.
 """
 
-from .units import Edu
-
-from synapse.storage.presence import UserPresenceState
-from synapse.util.metrics import Measure
-from synapse.metrics import LaterGauge
-
-from sortedcontainers import SortedDict
+import logging
 from collections import namedtuple
 
-import logging
+from six import iteritems, itervalues
 
-from six import itervalues, iteritems
+from sortedcontainers import SortedDict
+
+from synapse.metrics import LaterGauge
+from synapse.storage.presence import UserPresenceState
+from synapse.util.metrics import Measure
+
+from .units import Edu
 
 logger = logging.getLogger(__name__)
 

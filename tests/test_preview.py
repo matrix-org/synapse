@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import unittest
-
 from synapse.rest.media.v1.preview_url_resource import (
-    summarize_paragraphs, decode_and_calc_og
+    decode_and_calc_og,
+    summarize_paragraphs,
 )
+
+from . import unittest
 
 
 class PreviewTestCase(unittest.TestCase):

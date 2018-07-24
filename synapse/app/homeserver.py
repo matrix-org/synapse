@@ -18,27 +18,41 @@ import logging
 import os
 import sys
 
+from six import iteritems
+
+from twisted.application import service
+from twisted.internet import defer, reactor
+from twisted.web.resource import EncodingResourceWrapper, NoResource
+from twisted.web.server import GzipEncoderFactory
+from twisted.web.static import File
+
 import synapse
 import synapse.config.logger
 from synapse import events
-from synapse.api.urls import CONTENT_REPO_PREFIX, FEDERATION_PREFIX, \
-    LEGACY_MEDIA_PREFIX, MEDIA_PREFIX, SERVER_KEY_PREFIX, SERVER_KEY_V2_PREFIX, \
-    STATIC_PREFIX, WEB_CLIENT_PREFIX
+from synapse.api.urls import (
+    CONTENT_REPO_PREFIX,
+    FEDERATION_PREFIX,
+    LEGACY_MEDIA_PREFIX,
+    MEDIA_PREFIX,
+    SERVER_KEY_PREFIX,
+    SERVER_KEY_V2_PREFIX,
+    STATIC_PREFIX,
+    WEB_CLIENT_PREFIX,
+)
 from synapse.app import _base
-from synapse.app._base import quit_with_error, listen_ssl, listen_tcp
+from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.module_api import ModuleApi
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
-from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, \
-    check_requirements
-from synapse.replication.http import ReplicationRestResource, REPLICATION_PREFIX
+from synapse.module_api import ModuleApi
+from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, check_requirements
+from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.key.v1.server_key_resource import LocalKey
@@ -55,11 +69,6 @@ from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
-from twisted.application import service
-from twisted.internet import defer, reactor
-from twisted.web.resource import EncodingResourceWrapper, NoResource
-from twisted.web.server import GzipEncoderFactory
-from twisted.web.static import File
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -435,7 +444,7 @@ def run(hs):
         stats["total_nonbridged_users"] = total_nonbridged_users
 
         daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
-        for name, count in daily_user_type_results.iteritems():
+        for name, count in iteritems(daily_user_type_results):
             stats["daily_user_type_" + name] = count
 
         room_count = yield hs.get_datastore().get_room_count()
@@ -446,7 +455,7 @@ def run(hs):
         stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
 
         r30_results = yield hs.get_datastore().count_r30_users()
-        for name, count in r30_results.iteritems():
+        for name, count in iteritems(r30_results):
             stats["r30_users_" + name] = count
 
         daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()

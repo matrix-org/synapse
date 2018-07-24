@@ -14,12 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, threads
+import logging
 
-from ._base import BaseHandler
+import attr
+import bcrypt
+import pymacaroons
+from canonicaljson import json
+
+from twisted.internet import defer, threads
+from twisted.web.client import PartialDownloadError
+
+import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
-    AuthError, Codes, InteractiveAuthIncompleteError, LoginError, StoreError,
+    AuthError,
+    Codes,
+    InteractiveAuthIncompleteError,
+    LoginError,
+    StoreError,
     SynapseError,
 )
 from synapse.module_api import ModuleApi
@@ -27,16 +39,7 @@ from synapse.types import UserID
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable
 
-from twisted.web.client import PartialDownloadError
-
-import logging
-import bcrypt
-import pymacaroons
-import simplejson
-import attr
-
-import synapse.util.stringutils as stringutils
-
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -403,7 +406,7 @@ class AuthHandler(BaseHandler):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
-            resp_body = simplejson.loads(data)
+            resp_body = json.loads(data)
 
         if 'success' in resp_body:
             # Note that we do NOT check the hostname here: we explicitly

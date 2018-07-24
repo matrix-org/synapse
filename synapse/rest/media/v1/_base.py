@@ -13,22 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json, finish_request
-from synapse.api.errors import (
-    cs_error, Codes, SynapseError
-)
-from synapse.util import logcontext
+import logging
+import os
+import urllib
+
+from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
+from synapse.api.errors import Codes, SynapseError, cs_error
+from synapse.http.server import finish_request, respond_with_json
+from synapse.util import logcontext
 from synapse.util.stringutils import is_ascii
-
-import os
-
-import logging
-import urllib
-from six.moves.urllib import parse as urlparse
 
 logger = logging.getLogger(__name__)
 

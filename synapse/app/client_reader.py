@@ -16,6 +16,9 @@
 import logging
 import sys
 
+from twisted.internet import reactor
+from twisted.web.resource import NoResource
+
 import synapse
 from synapse import events
 from synapse.app import _base
@@ -37,15 +40,19 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import TransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
-from synapse.rest.client.v1.room import PublicRoomListRestServlet
+from synapse.rest.client.v1.room import (
+    JoinedRoomMemberListRestServlet,
+    PublicRoomListRestServlet,
+    RoomEventContextServlet,
+    RoomMemberListRestServlet,
+    RoomStateRestServlet,
+)
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
-from twisted.internet import reactor
-from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.client_reader")
 
@@ -81,7 +88,13 @@ class ClientReaderServer(HomeServer):
                     resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
+
                     PublicRoomListRestServlet(self).register(resource)
+                    RoomMemberListRestServlet(self).register(resource)
+                    JoinedRoomMemberListRestServlet(self).register(resource)
+                    RoomStateRestServlet(self).register(resource)
+                    RoomEventContextServlet(self).register(resource)
+
                     resources.update({
                         "/_matrix/client/r0": resource,
                         "/_matrix/client/unstable": resource,

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from twisted.web.resource import Resource
+
 from .local_key_resource import LocalKey
 from .remote_key_resource import RemoteKey
 

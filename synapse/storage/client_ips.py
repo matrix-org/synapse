@@ -15,15 +15,15 @@
 
 import logging
 
-from twisted.internet import defer
-
-from ._base import Cache
-from . import background_updates
-
-from synapse.util.caches import CACHE_SIZE_FACTOR
-
 from six import iteritems
 
+from twisted.internet import defer
+
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.caches import CACHE_SIZE_FACTOR
+
+from . import background_updates
+from ._base import Cache
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +94,16 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self._batch_row_update[key] = (user_agent, device_id, now)
 
     def _update_client_ips_batch(self):
-        to_update = self._batch_row_update
-        self._batch_row_update = {}
-        return self.runInteraction(
-            "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
+        def update():
+            to_update = self._batch_row_update
+            self._batch_row_update = {}
+            return self.runInteraction(
+                "_update_client_ips_batch", self._update_client_ips_batch_txn,
+                to_update,
+            )
+
+        run_as_background_process(
+            "update_client_ips", update,
         )
 
     def _update_client_ips_batch_txn(self, txn, to_update):

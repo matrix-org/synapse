@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import ssl
-from OpenSSL import SSL, crypto
-from twisted.internet._sslverify import _defaultCurveName
-
 import logging
+
+from OpenSSL import SSL, crypto
+from twisted.internet import ssl
+from twisted.internet._sslverify import _defaultCurveName
 
 logger = logging.getLogger(__name__)
 

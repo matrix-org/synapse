@@ -19,15 +19,18 @@
 
 import logging
 
-import simplejson as json
+from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    MatrixCodeMessageException, CodeMessageException
+    CodeMessageException,
+    Codes,
+    MatrixCodeMessageException,
+    SynapseError,
 )
+
 from ._base import BaseHandler
-from synapse.api.errors import SynapseError, Codes
 
 logger = logging.getLogger(__name__)
 

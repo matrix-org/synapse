@@ -14,13 +14,14 @@
 # limitations under the License.
 
 import mock
-from synapse.api import errors
+
 from twisted.internet import defer
 
 import synapse.api.errors
 import synapse.handlers.e2e_keys
-
 import synapse.storage
+from synapse.api import errors
+
 from tests import unittest, utils
 
 

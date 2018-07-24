@@ -12,14 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer, reactor
+import logging
 
-from ._base import BaseHandler
+from twisted.internet import defer
+
+from synapse.api.errors import SynapseError
 from synapse.types import UserID, create_requester
 from synapse.util.logcontext import run_in_background
-from synapse.api.errors import SynapseError
 
-import logging
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +40,15 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
-        reactor.callWhenRunning(self._start_user_parting)
+        hs.get_reactor().callWhenRunning(self._start_user_parting)
 
     @defer.inlineCallbacks
-    def deactivate_account(self, user_id):
+    def deactivate_account(self, user_id, erase_data):
         """Deactivate a user's account
 
         Args:
             user_id (str): ID of user to be deactivated
+            erase_data (bool): whether to GDPR-erase the user's data
 
         Returns:
             Deferred
@@ -91,6 +93,11 @@ class DeactivateAccountHandler(BaseHandler):
 
         # delete from user directory
         yield self.user_directory_handler.handle_user_deactivated(user_id)
+
+        # Mark the user as erased, if they asked for that
+        if erase_data:
+            logger.info("Marking %s as erased", user_id)
+            yield self.store.mark_user_erased(user_id)
 
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)

@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
 
-from .bulk_push_rule_evaluator import BulkPushRuleEvaluator
+from twisted.internet import defer
 
 from synapse.util.metrics import Measure
 
-import logging
+from .bulk_push_rule_evaluator import BulkPushRuleEvaluator
 
 logger = logging.getLogger(__name__)
 
