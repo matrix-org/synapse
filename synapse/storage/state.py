@@ -547,7 +547,13 @@ class StateGroupWorkerStore(SQLBaseStore):
                 return True
             return False
 
-        got_all = is_all or not missing_types
+        if types == [] and filtered_types is not None:
+            # special wildcard case for empty type-list but an explicit filtered_types
+            # which means that we'll try to return all types which aren't in the
+            # filtered_types list.  missing_types will always be empty, so we ignore it.
+            got_all = is_all
+        else:
+            got_all = is_all or not missing_types
 
         return {
             k: v for k, v in iteritems(state_dict_ids)
