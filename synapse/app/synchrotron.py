@@ -55,7 +55,6 @@ from synapse.rest.client.v2_alpha import sync
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.storage.presence import UserPresenceState
-from synapse.storage.roommember import RoomMemberStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, run_in_background
 from synapse.util.manhole import manhole
@@ -81,9 +80,7 @@ class SynchrotronSlavedStore(
     RoomStore,
     BaseSlavedStore,
 ):
-    did_forget = (
-        RoomMemberStore.__dict__["did_forget"]
-    )
+    pass
 
 
 UPDATE_SYNCING_USERS_MS = 10 * 1000
