@@ -39,7 +39,7 @@ from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util.async import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.frozenutils import frozendict_json_encoder
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.logcontext import PreserveLoggingContext, make_deferred_yieldable
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 
@@ -147,7 +147,8 @@ class _EventPeristenceQueue(object):
                     # callbacks on the deferred.
                     try:
                         ret = yield per_item_callback(item)
-                        item.deferred.callback(ret)
+                        with PreserveLoggingContext():
+                            item.deferred.callback(ret)
                     except Exception:
                         item.deferred.errback()
             finally:
@@ -417,19 +418,29 @@ class EventsStore(EventsWorkerStore):
                             logger.info(
                                 "Calculating state delta for room %s", room_id,
                             )
-                            current_state = yield self._get_new_state_after_events(
-                                room_id,
-                                ev_ctx_rm,
-                                latest_event_ids,
-                                new_latest_event_ids,
-                            )
+
+                            with Measure(
+                                    self._clock,
+                                    "persist_events.get_new_state_after_events",
+                            ):
+                                current_state = yield self._get_new_state_after_events(
+                                    room_id,
+                                    ev_ctx_rm,
+                                    latest_event_ids,
+                                    new_latest_event_ids,
+                                )
+
                             if current_state is not None:
                                 current_state_for_room[room_id] = current_state
-                                delta = yield self._calculate_state_delta(
-                                    room_id, current_state,
-                                )
-                                if delta is not None:
-                                    state_delta_for_room[room_id] = delta
+                                with Measure(
+                                        self._clock,
+                                        "persist_events.calculate_state_delta",
+                                ):
+                                    delta = yield self._calculate_state_delta(
+                                        room_id, current_state,
+                                    )
+                                    if delta is not None:
+                                        state_delta_for_room[room_id] = delta
 
                 yield self.runInteraction(
                     "persist_events",
@@ -549,7 +560,12 @@ class EventsStore(EventsWorkerStore):
             if ctx.state_group in state_groups_map:
                 continue
 
-            state_groups_map[ctx.state_group] = yield ctx.get_current_state_ids(self)
+            # We're only interested in pulling out state that has already
+            # been cached in the context. We'll pull stuff out of the DB later
+            # if necessary.
+            current_state_ids = ctx.get_cached_current_state_ids()
+            if current_state_ids is not None:
+                state_groups_map[ctx.state_group] = current_state_ids
 
         # We need to map the event_ids to their state groups. First, let's
         # check if the event is one we're persisting, in which case we can
