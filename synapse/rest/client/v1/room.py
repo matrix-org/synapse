@@ -384,7 +384,7 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
         requester = yield self.auth.get_user_by_req(request)
-        handler = self.handlers.message_handler
+        handler = self.message_handler
 
         # request the state as of a given event
         # useful for synchronising with /messages
