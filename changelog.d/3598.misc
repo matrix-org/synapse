@@ -1,0 +1,1 @@
+Specify in the worker documentation that only the GET version of /state is supported on the client_reader
