@@ -20,13 +20,14 @@ from twisted.internet import defer
 
 from synapse.api.constants import ThirdPartyEntityKind
 from synapse.http.servlet import RestServlet
+
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class ThirdPartyProtocolsServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/protocols", releases=())
+    PATTERNS = client_v2_patterns("/thirdparty/protocols")
 
     def __init__(self, hs):
         super(ThirdPartyProtocolsServlet, self).__init__()
@@ -43,8 +44,7 @@ class ThirdPartyProtocolsServlet(RestServlet):
 
 
 class ThirdPartyProtocolServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$",
-                                  releases=())
+    PATTERNS = client_v2_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$")
 
     def __init__(self, hs):
         super(ThirdPartyProtocolServlet, self).__init__()
@@ -66,8 +66,7 @@ class ThirdPartyProtocolServlet(RestServlet):
 
 
 class ThirdPartyUserServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$",
-                                  releases=())
+    PATTERNS = client_v2_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$")
 
     def __init__(self, hs):
         super(ThirdPartyUserServlet, self).__init__()
@@ -90,8 +89,7 @@ class ThirdPartyUserServlet(RestServlet):
 
 
 class ThirdPartyLocationServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$",
-                                  releases=())
+    PATTERNS = client_v2_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$")
 
     def __init__(self, hs):
         super(ThirdPartyLocationServlet, self).__init__()

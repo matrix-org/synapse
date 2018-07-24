@@ -13,29 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
+import urllib
+import xml.etree.ElementTree as ET
 
-from synapse.api.errors import SynapseError, LoginError, Codes
-from synapse.types import UserID
+from six.moves.urllib import parse as urlparse
+
+from canonicaljson import json
+from saml2 import BINDING_HTTP_POST, config
+from saml2.client import Saml2Client
+
+from twisted.internet import defer
+from twisted.web.client import PartialDownloadError
+
+from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.http.server import finish_request
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import simplejson as json
-import urllib
-import urlparse
-
-import logging
-from saml2 import BINDING_HTTP_POST
-from saml2 import config
-from saml2.client import Saml2Client
-
-import xml.etree.ElementTree as ET
-
-from twisted.web.client import PartialDownloadError
-
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +82,6 @@ def login_id_thirdparty_from_phone(identifier):
 
 class LoginRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/login$")
-    PASS_TYPE = "m.login.password"
     SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
     TOKEN_TYPE = "m.login.token"
@@ -94,7 +90,6 @@ class LoginRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
         self.idp_redirect_url = hs.config.saml2_idp_redirect_url
-        self.password_enabled = hs.config.password_enabled
         self.saml2_enabled = hs.config.saml2_enabled
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
@@ -121,8 +116,10 @@ class LoginRestServlet(ClientV1RestServlet):
             # fall back to the fallback API if they don't understand one of the
             # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
-        if self.password_enabled:
-            flows.append({"type": LoginRestServlet.PASS_TYPE})
+
+        flows.extend((
+            {"type": t} for t in self.auth_handler.get_supported_login_types()
+        ))
 
         return (200, {"flows": flows})
 
@@ -133,14 +130,8 @@ class LoginRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         login_submission = parse_json_object_from_request(request)
         try:
-            if login_submission["type"] == LoginRestServlet.PASS_TYPE:
-                if not self.password_enabled:
-                    raise SynapseError(400, "Password login has been disabled.")
-
-                result = yield self.do_password_login(login_submission)
-                defer.returnValue(result)
-            elif self.saml2_enabled and (login_submission["type"] ==
-                                         LoginRestServlet.SAML2_TYPE):
+            if self.saml2_enabled and (login_submission["type"] ==
+                                       LoginRestServlet.SAML2_TYPE):
                 relay_state = ""
                 if "relay_state" in login_submission:
                     relay_state = "&RelayState=" + urllib.quote(
@@ -157,15 +148,31 @@ class LoginRestServlet(ClientV1RestServlet):
                 result = yield self.do_token_login(login_submission)
                 defer.returnValue(result)
             else:
-                raise SynapseError(400, "Bad login type.")
+                result = yield self._do_other_login(login_submission)
+                defer.returnValue(result)
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
 
     @defer.inlineCallbacks
-    def do_password_login(self, login_submission):
-        if "password" not in login_submission:
-            raise SynapseError(400, "Missing parameter: password")
+    def _do_other_login(self, login_submission):
+        """Handle non-token/saml/jwt logins
 
+        Args:
+            login_submission:
+
+        Returns:
+            (int, object): HTTP code/response
+        """
+        # Log the request we got, but only certain fields to minimise the chance of
+        # logging someone's password (even if they accidentally put it in the wrong
+        # field)
+        logger.info(
+            "Got login request with identifier: %r, medium: %r, address: %r, user: %r",
+            login_submission.get('identifier'),
+            login_submission.get('medium'),
+            login_submission.get('address'),
+            login_submission.get('user'),
+        )
         login_submission_legacy_convert(login_submission)
 
         if "identifier" not in login_submission:
@@ -181,19 +188,25 @@ class LoginRestServlet(ClientV1RestServlet):
 
         # convert threepid identifiers to user IDs
         if identifier["type"] == "m.id.thirdparty":
-            if 'medium' not in identifier or 'address' not in identifier:
+            address = identifier.get('address')
+            medium = identifier.get('medium')
+
+            if medium is None or address is None:
                 raise SynapseError(400, "Invalid thirdparty identifier")
 
-            address = identifier['address']
-            if identifier['medium'] == 'email':
+            if medium == 'email':
                 # For emails, transform the address to lowercase.
                 # We store all email addreses as lowercase in the DB.
                 # (See add_threepid in synapse/handlers/auth.py)
                 address = address.lower()
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                identifier['medium'], address
+                medium, address,
             )
             if not user_id:
+                logger.warn(
+                    "unknown 3pid identifier medium %s, address %r",
+                    medium, address,
+                )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
             identifier = {
@@ -208,29 +221,28 @@ class LoginRestServlet(ClientV1RestServlet):
         if "user" not in identifier:
             raise SynapseError(400, "User identifier is missing 'user' key")
 
-        user_id = identifier["user"]
-
-        if not user_id.startswith('@'):
-            user_id = UserID.create(
-                user_id, self.hs.hostname
-            ).to_string()
-
         auth_handler = self.auth_handler
-        user_id = yield auth_handler.validate_password_login(
-            user_id=user_id,
-            password=login_submission["password"],
+        canonical_user_id, callback = yield auth_handler.validate_login(
+            identifier["user"],
+            login_submission,
         )
-        device_id = yield self._register_device(user_id, login_submission)
+
+        device_id = yield self._register_device(
+            canonical_user_id, login_submission,
+        )
         access_token = yield auth_handler.get_access_token_for_user_id(
-            user_id, device_id,
-            login_submission.get("initial_device_display_name"),
+            canonical_user_id, device_id,
         )
+
         result = {
-            "user_id": user_id,  # may have changed
+            "user_id": canonical_user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
+
+        if callback is not None:
+            yield callback(result)
 
         defer.returnValue((200, result))
 
@@ -244,7 +256,6 @@ class LoginRestServlet(ClientV1RestServlet):
         device_id = yield self._register_device(user_id, login_submission)
         access_token = yield auth_handler.get_access_token_for_user_id(
             user_id, device_id,
-            login_submission.get("initial_device_display_name"),
         )
         result = {
             "user_id": user_id,  # may have changed
@@ -278,7 +289,7 @@ class LoginRestServlet(ClientV1RestServlet):
         if user is None:
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
-        user_id = UserID.create(user, self.hs.hostname).to_string()
+        user_id = UserID(user, self.hs.hostname).to_string()
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if registered_user_id:
@@ -287,7 +298,6 @@ class LoginRestServlet(ClientV1RestServlet):
             )
             access_token = yield auth_handler.get_access_token_for_user_id(
                 registered_user_id, device_id,
-                login_submission.get("initial_device_display_name"),
             )
 
             result = {
@@ -444,7 +454,7 @@ class CasTicketServlet(ClientV1RestServlet):
                 if required_value != actual_value:
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
-        user_id = UserID.create(user, self.hs.hostname).to_string()
+        user_id = UserID(user, self.hs.hostname).to_string()
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if not registered_user_id:

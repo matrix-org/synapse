@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,13 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+from synapse.http.endpoint import parse_and_validate_server_name
+
 from ._base import Config, ConfigError
+
+logger = logging.Logger(__name__)
 
 
 class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
+
+        try:
+            parse_and_validate_server_name(self.server_name)
+        except ValueError as e:
+            raise ConfigError(str(e))
+
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client = config["web_client"]
         self.web_client_location = config.get("web_client_location", None)
@@ -29,6 +42,7 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
+        self.cpu_affinity = config.get("cpu_affinity")
 
         # Whether to send federation traffic out in this process. This only
         # applies to some federation traffic, and so shouldn't be used to
@@ -39,7 +53,30 @@ class ServerConfig(Config):
         # false only if we are updating the user directory in a worker
         self.update_user_directory = config.get("update_user_directory", True)
 
+        # whether to enable the media repository endpoints. This should be set
+        # to false if the media repository is running as a separate endpoint;
+        # doing so ensures that we will not run cache cleanup jobs on the
+        # master, potentially causing inconsistency.
+        self.enable_media_repo = config.get("enable_media_repo", True)
+
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
+
+        # Whether we should block invites sent to users on this server
+        # (other than those sent by local server admins)
+        self.block_non_admin_invites = config.get(
+            "block_non_admin_invites", False,
+        )
+
+        # FIXME: federation_domain_whitelist needs sytests
+        self.federation_domain_whitelist = None
+        federation_domain_whitelist = config.get(
+            "federation_domain_whitelist", None
+        )
+        # turn the whitelist into a hash for speed of lookup
+        if federation_domain_whitelist is not None:
+            self.federation_domain_whitelist = {}
+            for domain in federation_domain_whitelist:
+                self.federation_domain_whitelist[domain] = True
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -113,6 +150,12 @@ class ServerConfig(Config):
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
+            logger.warn(
+                ("The metrics_port configuration option is deprecated in Synapse 0.31 "
+                 "in favour of a listener. Please see "
+                 "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
+                 " on how to configure the new listener."))
+
             self.listeners.append({
                 "port": metrics_port,
                 "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
@@ -127,8 +170,8 @@ class ServerConfig(Config):
             })
 
     def default_config(self, server_name, **kwargs):
-        if ":" in server_name:
-            bind_port = int(server_name.split(":")[1])
+        _, bind_port = parse_and_validate_server_name(server_name)
+        if bind_port is not None:
             unsecure_port = bind_port - 400
         else:
             bind_port = 8448
@@ -146,6 +189,27 @@ class ServerConfig(Config):
 
         # When running as a daemon, the file to store the pid in
         pid_file: %(pid_file)s
+
+        # CPU affinity mask. Setting this restricts the CPUs on which the
+        # process will be scheduled. It is represented as a bitmask, with the
+        # lowest order bit corresponding to the first logical CPU and the
+        # highest order bit corresponding to the last logical CPU. Not all CPUs
+        # may exist on a given system but a mask may specify more CPUs than are
+        # present.
+        #
+        # For example:
+        #    0x00000001  is processor #0,
+        #    0x00000003  is processors #0 and #1,
+        #    0xFFFFFFFF  is all processors (#0 through #31).
+        #
+        # Pinning a Python process to a single CPU is desirable, because Python
+        # is inherently single-threaded due to the GIL, and can suffer a
+        # 30-40%% slowdown due to cache blow-out and thread context switching
+        # if the scheduler happens to schedule the underlying threads across
+        # different cores. See
+        # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
+        #
+        # cpu_affinity: 0xFFFFFFFF
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.
         web_client: True
@@ -171,6 +235,21 @@ class ServerConfig(Config):
         # and sync operations. The default value is -1, means no upper limit.
         # filter_timeline_limit: 5000
 
+        # Whether room invites to users on this server should be blocked
+        # (except those sent by local server admins). The default is False.
+        # block_non_admin_invites: True
+
+        # Restrict federation to the following whitelist of domains.
+        # N.B. we recommend also firewalling your federation listener to limit
+        # inbound federation traffic as early as possible, rather than relying
+        # purely on this application-layer restriction.  If not specified, the
+        # default is to whitelist everything.
+        #
+        # federation_domain_whitelist:
+        #  - lon.example.com
+        #  - nyc.example.com
+        #  - syd.example.com
+
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
         listeners:
@@ -181,13 +260,12 @@ class ServerConfig(Config):
             port: %(bind_port)s
 
             # Local addresses to listen on.
-            # This will listen on all IPv4 addresses by default.
+            # On Linux and Mac OS, `::` will listen on all IPv4 and IPv6
+            # addresses by default. For most other OSes, this will only listen
+            # on IPv6.
             bind_addresses:
+              - '::'
               - '0.0.0.0'
-              # Uncomment to listen on all IPv6 interfaces
-              # N.B: On at least Linux this will also listen on all IPv4
-              # addresses, so you will need to comment out the line above.
-              # - '::'
 
             # This is a 'http' listener, allows us to specify 'resources'.
             type: http
@@ -214,11 +292,18 @@ class ServerConfig(Config):
               - names: [federation]  # Federation APIs
                 compress: false
 
+            # optional list of additional endpoints which can be loaded via
+            # dynamic modules
+            # additional_resources:
+            #   "/_matrix/my/custom/endpoint":
+            #     module: my_module.CustomRequestHandler
+            #     config: {}
+
           # Unsecure HTTP listener,
           # For when matrix traffic passes through loadbalancer that unwraps TLS.
           - port: %(unsecure_port)s
             tls: false
-            bind_addresses: ['0.0.0.0']
+            bind_addresses: ['::', '0.0.0.0']
             type: http
 
             x_forwarded: false
@@ -232,7 +317,7 @@ class ServerConfig(Config):
           # Turn on the twisted ssh manhole service on localhost on the given
           # port.
           # - port: 9000
-          #   bind_address: 127.0.0.1
+          #   bind_addresses: ['::1', '127.0.0.1']
           #   type: manhole
         """ % locals()
 
@@ -270,7 +355,7 @@ def read_gc_thresholds(thresholds):
         return (
             int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
         )
-    except:
+    except Exception:
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"
         )

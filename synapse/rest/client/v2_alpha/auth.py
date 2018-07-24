@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
@@ -22,9 +24,6 @@ from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,6 @@ class AuthRestServlet(RestServlet):
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Server", self.hs.version_string)
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
             request.write(html_bytes)
@@ -175,7 +173,6 @@ class AuthRestServlet(RestServlet):
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Server", self.hs.version_string)
             request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
             request.write(html_bytes)

@@ -13,21 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.registration import RegistrationWorkerStore
+
 from ._base import BaseSlavedStore
-from synapse.storage import DataStore
-from synapse.storage.registration import RegistrationStore
 
 
-class SlavedRegistrationStore(BaseSlavedStore):
-    def __init__(self, db_conn, hs):
-        super(SlavedRegistrationStore, self).__init__(db_conn, hs)
-
-    # TODO: use the cached version and invalidate deleted tokens
-    get_user_by_access_token = RegistrationStore.__dict__[
-        "get_user_by_access_token"
-    ]
-
-    _query_for_auth = DataStore._query_for_auth.__func__
-    get_user_by_id = RegistrationStore.__dict__[
-        "get_user_by_id"
-    ]
+class SlavedRegistrationStore(RegistrationWorkerStore, BaseSlavedStore):
+    pass

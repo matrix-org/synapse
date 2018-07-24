@@ -15,8 +15,11 @@
 import os.path
 import shutil
 import tempfile
+
 import yaml
+
 from synapse.config.homeserver import HomeServerConfig
+
 from tests import unittest
 
 
@@ -24,7 +27,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        print self.dir
+        print(self.dir)
         self.file = os.path.join(self.dir, "homeserver.yaml")
 
     def tearDown(self):

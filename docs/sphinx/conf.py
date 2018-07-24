@@ -50,7 +50,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Synapse'
-copyright = u'2014, TNG'
+copyright = u'Copyright 2014-2017 OpenMarket Ltd, 2017 Vector Creations Ltd, 2017 New Vector Ltd'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

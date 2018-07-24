@@ -24,11 +24,10 @@ Each stream is defined by the following information:
     update_function:    The function that returns a list of updates between two tokens
 """
 
-from twisted.internet import defer
+import logging
 from collections import namedtuple
 
-import logging
-
+from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +116,12 @@ CurrentStateDeltaStreamRow = namedtuple("CurrentStateDeltaStream", (
     "type",  # str
     "state_key",  # str
     "event_id",  # str, optional
+))
+GroupsStreamRow = namedtuple("GroupsStreamRow", (
+    "group_id",  # str
+    "user_id",  # str
+    "type",  # str
+    "content",  # dict
 ))
 
 
@@ -464,6 +469,19 @@ class CurrentStateDeltaStream(Stream):
         super(CurrentStateDeltaStream, self).__init__(hs)
 
 
+class GroupServerStream(Stream):
+    NAME = "groups"
+    ROW_TYPE = GroupsStreamRow
+
+    def __init__(self, hs):
+        store = hs.get_datastore()
+
+        self.current_token = store.get_group_stream_token
+        self.update_function = store.get_all_groups_changes
+
+        super(GroupServerStream, self).__init__(hs)
+
+
 STREAMS_MAP = {
     stream.NAME: stream
     for stream in (
@@ -482,5 +500,6 @@ STREAMS_MAP = {
         TagAccountDataStream,
         AccountDataStream,
         CurrentStateDeltaStream,
+        GroupServerStream,
     )
 }

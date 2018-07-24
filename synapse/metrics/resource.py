@@ -13,27 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.web.resource import Resource
-
-import synapse.metrics
-
+from prometheus_client.twisted import MetricsResource
 
 METRICS_PREFIX = "/_synapse/metrics"
 
-
-class MetricsResource(Resource):
-    isLeaf = True
-
-    def __init__(self, hs):
-        Resource.__init__(self)  # Resource is old-style, so no super()
-
-        self.hs = hs
-
-    def render_GET(self, request):
-        response = synapse.metrics.render_all()
-
-        request.setHeader("Content-Type", "text/plain")
-        request.setHeader("Content-Length", str(len(response)))
-
-        # Encode as UTF-8 (default)
-        return response.encode()
+__all__ = ["MetricsResource", "METRICS_PREFIX"]

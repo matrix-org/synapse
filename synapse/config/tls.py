@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+import os
+import subprocess
+from hashlib import sha256
+
+from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
-import subprocess
-import os
 
-from hashlib import sha256
-from unpaddedbase64 import encode_base64
+from ._base import Config
 
 GENERATE_DH_PARAMS = False
 
@@ -96,7 +97,7 @@ class TlsConfig(Config):
         # certificates returned by this server match one of the fingerprints.
         #
         # Synapse automatically adds the fingerprint of its own certificate
-        # to the list. So if federation traffic is handle directly by synapse
+        # to the list. So if federation traffic is handled directly by synapse
         # then no modification to the list is required.
         #
         # If synapse is run behind a load balancer that handles the TLS then it
@@ -109,6 +110,12 @@ class TlsConfig(Config):
         # key. It may be necessary to publish the fingerprints of a new
         # certificate and wait until the "valid_until_ts" of the previous key
         # responses have passed before deploying it.
+        #
+        # You can calculate a fingerprint from a given TLS listener via:
+        # openssl s_client -connect $host:$port < /dev/null 2> /dev/null |
+        #   openssl x509 -outform DER | openssl sha256 -binary | base64 | tr -d '='
+        # or by checking matrix.org/federationtester/api/report?server_name=$host
+        #
         tls_fingerprints: []
         # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
         """ % locals()
@@ -126,8 +133,8 @@ class TlsConfig(Config):
         tls_private_key_path = config["tls_private_key_path"]
         tls_dh_params_path = config["tls_dh_params_path"]
 
-        if not os.path.exists(tls_private_key_path):
-            with open(tls_private_key_path, "w") as private_key_file:
+        if not self.path_exists(tls_private_key_path):
+            with open(tls_private_key_path, "wb") as private_key_file:
                 tls_private_key = crypto.PKey()
                 tls_private_key.generate_key(crypto.TYPE_RSA, 2048)
                 private_key_pem = crypto.dump_privatekey(
@@ -141,8 +148,8 @@ class TlsConfig(Config):
                     crypto.FILETYPE_PEM, private_key_pem
                 )
 
-        if not os.path.exists(tls_certificate_path):
-            with open(tls_certificate_path, "w") as certificate_file:
+        if not self.path_exists(tls_certificate_path):
+            with open(tls_certificate_path, "wb") as certificate_file:
                 cert = crypto.X509()
                 subject = cert.get_subject()
                 subject.CN = config["server_name"]
@@ -159,7 +166,7 @@ class TlsConfig(Config):
 
                 certificate_file.write(cert_pem)
 
-        if not os.path.exists(tls_dh_params_path):
+        if not self.path_exists(tls_dh_params_path):
             if GENERATE_DH_PARAMS:
                 subprocess.check_call([
                     "openssl", "dhparam",

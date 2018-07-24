@@ -12,20 +12,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+import urllib
+
+from prometheus_client import Counter
+
 from twisted.internet import defer
 
 from synapse.api.constants import ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
-from synapse.http.client import SimpleHttpClient
 from synapse.events.utils import serialize_event
-from synapse.util.caches.response_cache import ResponseCache
+from synapse.http.client import SimpleHttpClient
 from synapse.types import ThirdPartyInstanceID
-
-import logging
-import urllib
+from synapse.util.caches.response_cache import ResponseCache
 
 logger = logging.getLogger(__name__)
 
+sent_transactions_counter = Counter(
+    "synapse_appservice_api_sent_transactions",
+    "Number of /transactions/ requests sent",
+    ["service"]
+)
+
+failed_transactions_counter = Counter(
+    "synapse_appservice_api_failed_transactions",
+    "Number of /transactions/ requests that failed to send",
+    ["service"]
+)
+
+sent_events_counter = Counter(
+    "synapse_appservice_api_sent_events",
+    "Number of events sent to the AS",
+    ["service"]
+)
 
 HOUR_IN_MS = 60 * 60 * 1000
 
@@ -72,7 +91,8 @@ class ApplicationServiceApi(SimpleHttpClient):
         super(ApplicationServiceApi, self).__init__(hs)
         self.clock = hs.get_clock()
 
-        self.protocol_meta_cache = ResponseCache(hs, timeout_ms=HOUR_IN_MS)
+        self.protocol_meta_cache = ResponseCache(hs, "as_protocol_meta",
+                                                 timeout_ms=HOUR_IN_MS)
 
     @defer.inlineCallbacks
     def query_user(self, service, user_id):
@@ -192,9 +212,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 defer.returnValue(None)
 
         key = (service.id, protocol)
-        return self.protocol_meta_cache.get(key) or (
-            self.protocol_meta_cache.set(key, _get())
-        )
+        return self.protocol_meta_cache.wrap(key, _get)
 
     @defer.inlineCallbacks
     def push_bulk(self, service, events, txn_id=None):
@@ -220,12 +238,15 @@ class ApplicationServiceApi(SimpleHttpClient):
                 args={
                     "access_token": service.hs_token
                 })
+            sent_transactions_counter.labels(service.id).inc()
+            sent_events_counter.labels(service.id).inc(len(events))
             defer.returnValue(True)
             return
         except CodeMessageException as e:
             logger.warning("push_bulk to %s received %s", uri, e.code)
         except Exception as ex:
             logger.warning("push_bulk to %s threw exception %s", uri, ex)
+        failed_transactions_counter.labels(service.id).inc()
         defer.returnValue(False)
 
     def _serialize(self, events):

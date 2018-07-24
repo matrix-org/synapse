@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseHandler
+import logging
 
 from twisted.internet import defer
 
 from synapse.util.async import Linearizer
 
-import logging
+from ._base import BaseHandler
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,9 +42,9 @@ class ReadMarkerHandler(BaseHandler):
         """
 
         with (yield self.read_marker_linearizer.queue((room_id, user_id))):
-            account_data = yield self.store.get_account_data_for_room(user_id, room_id)
-
-            existing_read_marker = account_data.get("m.fully_read", None)
+            existing_read_marker = yield self.store.get_account_data_for_room_and_type(
+                user_id, room_id, "m.fully_read",
+            )
 
             should_update = True
 

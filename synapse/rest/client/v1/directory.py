@@ -14,16 +14,15 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
-
-from synapse.api.errors import AuthError, SynapseError, Codes
-from synapse.types import RoomAlias
-from synapse.http.servlet import parse_json_object_from_request
-
-from .base import ClientV1RestServlet, client_path_patterns
-
 import logging
 
+from twisted.internet import defer
+
+from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import RoomAlias
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +52,14 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
+        room_alias = RoomAlias.from_string(room_alias)
+
         content = parse_json_object_from_request(request)
         if "room_id" not in content:
-            raise SynapseError(400, "Missing room_id key",
+            raise SynapseError(400, 'Missing params: ["room_id"]',
                                errcode=Codes.BAD_JSON)
 
         logger.debug("Got content: %s", content)
-
-        room_alias = RoomAlias.from_string(room_alias)
-
         logger.debug("Got room name: %s", room_alias.to_string())
 
         room_id = content["room_id"]
@@ -93,7 +91,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
                 )
             except SynapseError as e:
                 raise e
-            except:
+            except Exception:
                 logger.exception("Failed to create association")
                 raise
         except AuthError:

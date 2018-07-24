@@ -12,80 +12,98 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from twisted.web.server import NOT_DONE_YET
-from twisted.internet import defer
-from twisted.web.resource import Resource
-
-from synapse.api.errors import (
-    SynapseError, Codes,
-)
-from synapse.util.stringutils import random_string
-from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.http.client import SpiderHttpClient
-from synapse.http.server import (
-    request_handler, respond_with_json_bytes
-)
-from synapse.util.async import ObservableDeferred
-from synapse.util.stringutils import is_ascii
-
+import cgi
+import datetime
+import errno
+import fnmatch
+import itertools
+import logging
 import os
 import re
-import fnmatch
-import cgi
-import ujson as json
-import urlparse
-import itertools
+import shutil
+import sys
+import traceback
 
-import logging
+from six import string_types
+from six.moves import urllib_parse as urlparse
+
+from canonicaljson import json
+
+from twisted.internet import defer
+from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
+
+from synapse.api.errors import Codes, SynapseError
+from synapse.http.client import SpiderHttpClient
+from synapse.http.server import (
+    respond_with_json,
+    respond_with_json_bytes,
+    wrap_json_request_handler,
+)
+from synapse.http.servlet import parse_integer, parse_string
+from synapse.util.async import ObservableDeferred
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.util.stringutils import is_ascii, random_string
+
+from ._base import FileInfo
+
 logger = logging.getLogger(__name__)
 
 
 class PreviewUrlResource(Resource):
     isLeaf = True
 
-    def __init__(self, hs, media_repo):
+    def __init__(self, hs, media_repo, media_storage):
         Resource.__init__(self)
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
-        self.version_string = hs.version_string
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.client = SpiderHttpClient(hs)
         self.media_repo = media_repo
+        self.primary_base_path = media_repo.primary_base_path
+        self.media_storage = media_storage
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
 
-        # simple memory cache mapping urls to OG metadata
-        self.cache = ExpiringCache(
+        # memory cache mapping urls to an ObservableDeferred returning
+        # JSON-encoded OG metadata
+        self._cache = ExpiringCache(
             cache_name="url_previews",
             clock=self.clock,
             # don't spider URLs more often than once an hour
             expiry_ms=60 * 60 * 1000,
         )
-        self.cache.start()
+        self._cache.start()
 
-        self.downloads = {}
+        self._cleaner_loop = self.clock.looping_call(
+            self._expire_url_cache_data, 10 * 1000
+        )
+
+    def render_OPTIONS(self, request):
+        return respond_with_json(request, 200, {}, send_cors=True)
 
     def render_GET(self, request):
         self._async_render_GET(request)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = yield self.auth.get_user_by_req(request)
-        url = request.args.get("url")[0]
+        url = parse_string(request, "url")
         if "ts" in request.args:
-            ts = int(request.args.get("ts")[0])
+            ts = parse_integer(request, "ts")
         else:
             ts = self.clock.time_msec()
 
+        # XXX: we could move this into _do_preview if we wanted.
         url_tuple = urlparse.urlsplit(url)
         for entry in self.url_preview_url_blacklist:
             match = True
@@ -118,53 +136,62 @@ class PreviewUrlResource(Resource):
                     Codes.UNKNOWN
                 )
 
-        # first check the memory cache - good to handle all the clients on this
-        # HS thundering away to preview the same URL at the same time.
-        og = self.cache.get(url)
-        if og:
-            respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
-            return
+        # the in-memory cache:
+        # * ensures that only one request is active at a time
+        # * takes load off the DB for the thundering herds
+        # * also caches any failures (unlike the DB) so we don't keep
+        #    requesting the same endpoint
 
-        # then check the URL cache in the DB (which will also provide us with
+        observable = self._cache.get(url)
+
+        if not observable:
+            download = run_in_background(
+                self._do_preview,
+                url, requester.user, ts,
+            )
+            observable = ObservableDeferred(
+                download,
+                consumeErrors=True
+            )
+            self._cache[url] = observable
+        else:
+            logger.info("Returning cached response")
+
+        og = yield make_deferred_yieldable(observable.observe())
+        respond_with_json_bytes(request, 200, og, send_cors=True)
+
+    @defer.inlineCallbacks
+    def _do_preview(self, url, user, ts):
+        """Check the db, and download the URL and build a preview
+
+        Args:
+            url (str):
+            user (str):
+            ts (int):
+
+        Returns:
+            Deferred[str]: json-encoded og data
+        """
+        # check the URL cache in the DB (which will also provide us with
         # historical previews, if we have any)
         cache_result = yield self.store.get_url_cache(url, ts)
         if (
             cache_result and
-            cache_result["download_ts"] + cache_result["expires"] > ts and
+            cache_result["expires_ts"] > ts and
             cache_result["response_code"] / 100 == 2
         ):
-            respond_with_json_bytes(
-                request, 200, cache_result["og"].encode('utf-8'),
-                send_cors=True
-            )
+            defer.returnValue(cache_result["og"])
             return
 
-        # Ensure only one download for a given URL is active at a time
-        download = self.downloads.get(url)
-        if download is None:
-            download = self._download_url(url, requester.user)
-            download = ObservableDeferred(
-                download,
-                consumeErrors=True
-            )
-            self.downloads[url] = download
-
-            @download.addBoth
-            def callback(media_info):
-                del self.downloads[url]
-                return media_info
-        media_info = yield download.observe()
-
-        # FIXME: we should probably update our cache now anyway, so that
-        # even if the OG calculation raises, we don't keep hammering on the
-        # remote server.  For now, leave it uncached to aid debugging OG
-        # calculation problems
+        media_info = yield self._download_url(url, user)
 
         logger.debug("got media_info of '%s'" % media_info)
 
         if _is_media(media_info['media_type']):
-            dims = yield self.media_repo._generate_local_thumbnails(
-                media_info['filesystem_id'], media_info, url_cache=True,
+            file_id = media_info['filesystem_id']
+            dims = yield self.media_repo._generate_thumbnails(
+                None, file_id, file_id, media_info["media_type"],
+                url_cache=True,
             )
 
             og = {
@@ -204,13 +231,15 @@ class PreviewUrlResource(Resource):
             # just rely on the caching on the master request to speed things up.
             if 'og:image' in og and og['og:image']:
                 image_info = yield self._download_url(
-                    _rebase_url(og['og:image'], media_info['uri']), requester.user
+                    _rebase_url(og['og:image'], media_info['uri']), user
                 )
 
                 if _is_media(image_info['media_type']):
                     # TODO: make sure we don't choke on white-on-transparent images
-                    dims = yield self.media_repo._generate_local_thumbnails(
-                        image_info['filesystem_id'], image_info, url_cache=True,
+                    file_id = image_info['filesystem_id']
+                    dims = yield self.media_repo._generate_thumbnails(
+                        None, file_id, file_id, image_info["media_type"],
+                        url_cache=True,
                     )
                     if dims:
                         og["og:image:width"] = dims['width']
@@ -231,21 +260,20 @@ class PreviewUrlResource(Resource):
 
         logger.debug("Calculated OG for %s as %s" % (url, og))
 
-        # store OG in ephemeral in-memory cache
-        self.cache[url] = og
+        jsonog = json.dumps(og)
 
         # store OG in history-aware DB cache
         yield self.store.store_url_cache(
             url,
             media_info["response_code"],
             media_info["etag"],
-            media_info["expires"],
-            json.dumps(og),
+            media_info["expires"] + media_info["created_ts"],
+            jsonog,
             media_info["filesystem_id"],
             media_info["created_ts"],
         )
 
-        respond_with_json_bytes(request, 200, json.dumps(og), send_cors=True)
+        defer.returnValue(jsonog)
 
     @defer.inlineCallbacks
     def _download_url(self, url, user):
@@ -253,21 +281,36 @@ class PreviewUrlResource(Resource):
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
 
-        # XXX: horrible duplication with base_resource's _download_remote_file()
-        file_id = random_string(24)
+        file_id = datetime.date.today().isoformat() + '_' + random_string(16)
 
-        fname = self.filepaths.url_cache_filepath(file_id)
-        self.media_repo._makedirs(fname)
+        file_info = FileInfo(
+            server_name=None,
+            file_id=file_id,
+            url_cache=True,
+        )
 
-        try:
-            with open(fname, "wb") as f:
+        with self.media_storage.store_into_file(file_info) as (f, fname, finish):
+            try:
                 logger.debug("Trying to get url '%s'" % url)
                 length, headers, uri, code = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
+            except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
+                logger.warn("Error downloading %s: %r", url, e)
+                raise SynapseError(
+                    500, "Failed to download content: %s" % (
+                        traceback.format_exception_only(sys.exc_type, e),
+                    ),
+                    Codes.UNKNOWN,
+                )
+            yield finish()
 
-            media_type = headers["Content-Type"][0]
+        try:
+            if "Content-Type" in headers:
+                media_type = headers["Content-Type"][0]
+            else:
+                media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
 
             content_disposition = headers.get("Content-Disposition", None)
@@ -307,11 +350,11 @@ class PreviewUrlResource(Resource):
             )
 
         except Exception as e:
-            os.remove(fname)
-            raise SynapseError(
-                500, ("Failed to download content: %s" % e),
-                Codes.UNKNOWN
-            )
+            logger.error("Error handling downloaded %s: %r", url, e)
+            # TODO: we really ought to delete the downloaded file in this
+            # case, since we won't have recorded it in the db, and will
+            # therefore not expire it.
+            raise
 
         defer.returnValue({
             "media_type": media_type,
@@ -327,6 +370,95 @@ class PreviewUrlResource(Resource):
             "expires": 60 * 60 * 1000,
             "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
+
+    @defer.inlineCallbacks
+    def _expire_url_cache_data(self):
+        """Clean up expired url cache content, media and thumbnails.
+        """
+        # TODO: Delete from backup media store
+
+        now = self.clock.time_msec()
+
+        logger.info("Running url preview cache expiry")
+
+        if not (yield self.store.has_completed_background_updates()):
+            logger.info("Still running DB updates; skipping expiry")
+            return
+
+        # First we delete expired url cache entries
+        media_ids = yield self.store.get_expired_url_cache(now)
+
+        removed_media = []
+        for media_id in media_ids:
+            fname = self.filepaths.url_cache_filepath(media_id)
+            try:
+                os.remove(fname)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            removed_media.append(media_id)
+
+            try:
+                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except Exception:
+                pass
+
+        yield self.store.delete_url_cache(removed_media)
+
+        if removed_media:
+            logger.info("Deleted %d entries from url cache", len(removed_media))
+
+        # Now we delete old images associated with the url cache.
+        # These may be cached for a bit on the client (i.e., they
+        # may have a room open with a preview url thing open).
+        # So we wait a couple of days before deleting, just in case.
+        expire_before = now - 2 * 24 * 60 * 60 * 1000
+        media_ids = yield self.store.get_url_cache_media_before(expire_before)
+
+        removed_media = []
+        for media_id in media_ids:
+            fname = self.filepaths.url_cache_filepath(media_id)
+            try:
+                os.remove(fname)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            try:
+                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except Exception:
+                pass
+
+            thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
+            try:
+                shutil.rmtree(thumbnail_dir)
+            except OSError as e:
+                # If the path doesn't exist, meh
+                if e.errno != errno.ENOENT:
+                    logger.warn("Failed to remove media: %r: %s", media_id, e)
+                    continue
+
+            removed_media.append(media_id)
+
+            try:
+                dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
+                for dir in dirs:
+                    os.rmdir(dir)
+            except Exception:
+                pass
+
+        yield self.store.delete_url_cache_media(removed_media)
+
+        logger.info("Deleted %d media from url cache", len(removed_media))
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):
@@ -425,7 +557,14 @@ def _calc_og(tree, media_uri):
             from lxml import etree
 
             TAGS_TO_REMOVE = (
-                "header", "nav", "aside", "footer", "script", "style", etree.Comment
+                "header",
+                "nav",
+                "aside",
+                "footer",
+                "script",
+                "noscript",
+                "style",
+                etree.Comment
             )
 
             # Split all the text nodes into paragraphs (by splitting on new
@@ -452,8 +591,8 @@ def _iterate_over_text(tree, *tags_to_ignore):
     # to be returned.
     elements = iter([tree])
     while True:
-        el = elements.next()
-        if isinstance(el, basestring):
+        el = next(elements)
+        if isinstance(el, string_types):
             yield el
         elif el is not None and el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately

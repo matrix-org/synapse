@@ -15,8 +15,12 @@
 
 """Contains exceptions and error codes."""
 
-import json
 import logging
+
+from six import iteritems
+from six.moves import http_client
+
+from canonicaljson import json
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +50,11 @@ class Codes(object):
     THREEPID_AUTH_FAILED = "M_THREEPID_AUTH_FAILED"
     THREEPID_IN_USE = "M_THREEPID_IN_USE"
     THREEPID_NOT_FOUND = "M_THREEPID_NOT_FOUND"
+    THREEPID_DENIED = "M_THREEPID_DENIED"
     INVALID_USERNAME = "M_INVALID_USERNAME"
     SERVER_NOT_TRUSTED = "M_SERVER_NOT_TRUSTED"
+    CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
+    CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
 
 
 class CodeMessageException(RuntimeError):
@@ -135,9 +142,77 @@ class SynapseError(CodeMessageException):
         return res
 
 
+class ConsentNotGivenError(SynapseError):
+    """The error returned to the client when the user has not consented to the
+    privacy policy.
+    """
+    def __init__(self, msg, consent_uri):
+        """Constructs a ConsentNotGivenError
+
+        Args:
+            msg (str): The human-readable error message
+            consent_url (str): The URL where the user can give their consent
+        """
+        super(ConsentNotGivenError, self).__init__(
+            code=http_client.FORBIDDEN,
+            msg=msg,
+            errcode=Codes.CONSENT_NOT_GIVEN
+        )
+        self._consent_uri = consent_uri
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            consent_uri=self._consent_uri
+        )
+
+
 class RegistrationError(SynapseError):
     """An error raised when a registration event fails."""
     pass
+
+
+class FederationDeniedError(SynapseError):
+    """An error raised when the server tries to federate with a server which
+    is not on its federation whitelist.
+
+    Attributes:
+        destination (str): The destination which has been denied
+    """
+
+    def __init__(self, destination):
+        """Raised by federation client or server to indicate that we are
+        are deliberately not attempting to contact a given server because it is
+        not on our federation whitelist.
+
+        Args:
+            destination (str): the domain in question
+        """
+
+        self.destination = destination
+
+        super(FederationDeniedError, self).__init__(
+            code=403,
+            msg="Federation denied with %s." % (self.destination,),
+            errcode=Codes.FORBIDDEN,
+        )
+
+
+class InteractiveAuthIncompleteError(Exception):
+    """An error raised when UI auth is not yet complete
+
+    (This indicates we should return a 401 with 'result' as the body)
+
+    Attributes:
+        result (dict): the server response to the request, which should be
+            passed back to the client
+    """
+    def __init__(self, result):
+        super(InteractiveAuthIncompleteError, self).__init__(
+            "Interactive auth not yet complete",
+        )
+        self.result = result
 
 
 class UnrecognizedRequestError(SynapseError):
@@ -247,13 +322,13 @@ def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
 
     Args:
         msg (str): The error message.
-        code (int): The error code.
+        code (str): The error code.
         kwargs : Additional keys to add to the response.
     Returns:
         A dict representing the error response JSON.
     """
     err = {"error": msg, "errcode": code}
-    for key, value in kwargs.iteritems():
+    for key, value in iteritems(kwargs):
         err[key] = value
     return err
 

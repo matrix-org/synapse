@@ -14,15 +14,15 @@
 # limitations under the License.
 
 
-from tests import unittest
+from mock import Mock
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.types import UserID, RoomID
+from synapse.types import RoomID, UserID
 
+from tests import unittest
 from tests.utils import setup_test_homeserver
-
-from mock import Mock
 
 
 class RoomMemberStoreTestCase(unittest.TestCase):
@@ -37,8 +37,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         # storage logic
         self.store = hs.get_datastore()
         self.event_builder_factory = hs.get_event_builder_factory()
-        self.handlers = hs.get_handlers()
-        self.message_handler = self.handlers.message_handler
+        self.event_creation_handler = hs.get_event_creation_handler()
 
         self.u_alice = UserID.from_string("@alice:test")
         self.u_bob = UserID.from_string("@bob:test")
@@ -58,7 +57,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
             "content": {"membership": membership},
         })
 
-        event, context = yield self.message_handler._create_new_client_event(
+        event, context = yield self.event_creation_handler.create_new_client_event(
             builder
         )
 

@@ -13,19 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
-
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 class BaseSlavedStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
-        super(BaseSlavedStore, self).__init__(hs)
+        super(BaseSlavedStore, self).__init__(db_conn, hs)
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = SlavedIdTracker(
                 db_conn, "cache_invalidation_stream", "stream_id",

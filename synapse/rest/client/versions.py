@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.servlet import RestServlet
-
 import logging
 import re
+
+from synapse.http.servlet import RestServlet
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ class VersionsRestServlet(RestServlet):
                 "r0.0.1",
                 "r0.1.0",
                 "r0.2.0",
+                "r0.3.0",
             ]
         })
 

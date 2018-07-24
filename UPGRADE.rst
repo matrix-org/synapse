@@ -5,39 +5,60 @@ Before upgrading check if any special steps are required to upgrade from the
 what you currently have installed to current version of synapse. The extra
 instructions that may be required are listed later in this document.
 
-If synapse was installed in a virtualenv then active that virtualenv before
-upgrading. If synapse is installed in a virtualenv in ``~/.synapse/`` then run:
+1. If synapse was installed in a virtualenv then active that virtualenv before
+   upgrading. If synapse is installed in a virtualenv in ``~/.synapse/`` then
+   run:
+
+   .. code:: bash
+
+       source ~/.synapse/bin/activate
+
+2. If synapse was installed using pip then upgrade to the latest version by
+   running:
+
+   .. code:: bash
+
+       pip install --upgrade --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+
+       # restart synapse
+       synctl restart
+
+
+   If synapse was installed using git then upgrade to the latest version by
+   running:
+
+   .. code:: bash
+
+       # Pull the latest version of the master branch.
+       git pull
+       # Update the versions of synapse's python dependencies.
+       python synapse/python_dependencies.py | xargs pip install --upgrade
+
+       # restart synapse
+       ./synctl restart
+
+
+To check whether your update was sucessful, you can check the Server header
+returned by the Client-Server API:
 
 .. code:: bash
 
-    source ~/.synapse/bin/activate
+    # replace <host.name> with the hostname of your synapse homeserver.
+    # You may need to specify a port (eg, :8448) if your server is not
+    # configured on port 443.
+    curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
-If synapse was installed using pip then upgrade to the latest version by
-running:
+Upgrading to $NEXT_VERSION
+====================
 
-.. code:: bash
+This release expands the anonymous usage stats sent if the opt-in
+``report_stats`` configuration is set to ``true``. We now capture RSS memory 
+and cpu use at a very coarse level. This requires administrators to install
+the optional ``psutil`` python module.
 
-    pip install --upgrade --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
-
-If synapse was installed using git then upgrade to the latest version by
-running:
-
-.. code:: bash
-
-    # Pull the latest version of the master branch.
-    git pull
-    # Update the versions of synapse's python dependencies.
-    python synapse/python_dependencies.py | xargs -n1 pip install --upgrade
-	
-To check whether your update was sucessfull, run:
-
-.. code:: bash
-
-	 # replace your.server.domain with ther domain of your synapse homeserver
-	 curl https://<your.server.domain>/_matrix/federation/v1/version 
-
-So for the Matrix.org HS server the URL would be: https://matrix.org/_matrix/federation/v1/version.
-
+We would appreciate it if you could assist by ensuring this module is available
+and ``report_stats`` is enabled. This will let us see if performance changes to
+synapse are having an impact to the general community.
 
 Upgrading to v0.15.0
 ====================
@@ -77,7 +98,7 @@ It has been replaced by specifying a list of application service registrations i
 ``homeserver.yaml``::
 
   app_service_config_files: ["registration-01.yaml", "registration-02.yaml"]
-  
+
 Where ``registration-01.yaml`` looks like::
 
   url: <String>  # e.g. "https://my.application.service.com"
@@ -166,7 +187,7 @@ This release completely changes the database schema and so requires upgrading
 it before starting the new version of the homeserver.
 
 The script "database-prepare-for-0.5.0.sh" should be used to upgrade the
-database. This will save all user information, such as logins and profiles, 
+database. This will save all user information, such as logins and profiles,
 but will otherwise purge the database. This includes messages, which
 rooms the home server was a member of and room alias mappings.
 
@@ -175,18 +196,18 @@ file and ask for help in #matrix:matrix.org. The upgrade process is,
 unfortunately, non trivial and requires human intervention to resolve any
 resulting conflicts during the upgrade process.
 
-Before running the command the homeserver should be first completely 
+Before running the command the homeserver should be first completely
 shutdown. To run it, simply specify the location of the database, e.g.:
 
   ./scripts/database-prepare-for-0.5.0.sh "homeserver.db"
 
-Once this has successfully completed it will be safe to restart the 
-homeserver. You may notice that the homeserver takes a few seconds longer to 
+Once this has successfully completed it will be safe to restart the
+homeserver. You may notice that the homeserver takes a few seconds longer to
 restart than usual as it reinitializes the database.
 
 On startup of the new version, users can either rejoin remote rooms using room
 aliases or by being reinvited. Alternatively, if any other homeserver sends a
-message to a room that the homeserver was previously in the local HS will 
+message to a room that the homeserver was previously in the local HS will
 automatically rejoin the room.
 
 Upgrading to v0.4.0
@@ -245,7 +266,7 @@ automatically generate default config use::
         --config-path homeserver.config \
         --generate-config
 
-This config can be edited if desired, for example to specify a different SSL 
+This config can be edited if desired, for example to specify a different SSL
 certificate to use. Once done you can run the home server using::
 
     $ python synapse/app/homeserver.py --config-path homeserver.config
@@ -266,20 +287,20 @@ This release completely changes the database schema and so requires upgrading
 it before starting the new version of the homeserver.
 
 The script "database-prepare-for-0.0.1.sh" should be used to upgrade the
-database. This will save all user information, such as logins and profiles, 
+database. This will save all user information, such as logins and profiles,
 but will otherwise purge the database. This includes messages, which
 rooms the home server was a member of and room alias mappings.
 
-Before running the command the homeserver should be first completely 
+Before running the command the homeserver should be first completely
 shutdown. To run it, simply specify the location of the database, e.g.:
 
   ./scripts/database-prepare-for-0.0.1.sh "homeserver.db"
 
-Once this has successfully completed it will be safe to restart the 
-homeserver. You may notice that the homeserver takes a few seconds longer to 
+Once this has successfully completed it will be safe to restart the
+homeserver. You may notice that the homeserver takes a few seconds longer to
 restart than usual as it reinitializes the database.
 
 On startup of the new version, users can either rejoin remote rooms using room
 aliases or by being reinvited. Alternatively, if any other homeserver sends a
-message to a room that the homeserver was previously in the local HS will 
+message to a room that the homeserver was previously in the local HS will
 automatically rejoin the room.

@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
 from synapse.storage.client_ips import LAST_SEEN_GRANULARITY
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.descriptors import Cache
+
+from ._base import BaseSlavedStore
 
 
 class SlavedClientIpStore(BaseSlavedStore):
@@ -29,9 +30,8 @@ class SlavedClientIpStore(BaseSlavedStore):
             max_entries=50000 * CACHE_SIZE_FACTOR,
         )
 
-    def insert_client_ip(self, user, access_token, ip, user_agent, device_id):
+    def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):
         now = int(self._clock.time_msec())
-        user_id = user.to_string()
         key = (user_id, access_token, ip)
 
         try:

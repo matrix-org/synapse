@@ -15,17 +15,16 @@
 
 """Tests REST events for /rooms paths."""
 
+from mock import Mock, NonCallableMock
+
 # twisted imports
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room
 from synapse.types import UserID
 
-from ....utils import MockHttpResource, MockClock, setup_test_homeserver
+from ....utils import MockClock, MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
-
-from mock import Mock, NonCallableMock
-
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
@@ -47,7 +46,7 @@ class RoomTypingTestCase(RestTestCase):
             "red",
             clock=self.clock,
             http_client=None,
-            replication_layer=Mock(),
+            federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=[
                 "send_message",
             ]),
@@ -68,7 +67,7 @@ class RoomTypingTestCase(RestTestCase):
                 "is_guest": False,
             }
 
-        hs.get_v1auth().get_user_by_access_token = get_user_by_access_token
+        hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
@@ -95,7 +94,7 @@ class RoomTypingTestCase(RestTestCase):
                 else:
                     if remotedomains is not None:
                         remotedomains.add(member.domain)
-        hs.get_handlers().room_member_handler.fetch_room_distributions_into = (
+        hs.get_room_member_handler().fetch_room_distributions_into = (
             fetch_room_distributions_into
         )
 

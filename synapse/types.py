@@ -12,26 +12,65 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import string
+from collections import namedtuple
 
 from synapse.api.errors import SynapseError
 
-from collections import namedtuple
 
-
-Requester = namedtuple("Requester", [
+class Requester(namedtuple("Requester", [
     "user", "access_token_id", "is_guest", "device_id", "app_service",
-])
-"""
-Represents the user making a request
+])):
+    """
+    Represents the user making a request
 
-Attributes:
-    user (UserID):  id of the user making the request
-    access_token_id (int|None):  *ID* of the access token used for this
-        request, or None if it came via the appservice API or similar
-    is_guest (bool):  True if the user making this request is a guest user
-    device_id (str|None):  device_id which was set at authentication time
-    app_service (ApplicationService|None):  the AS requesting on behalf of the user
-"""
+    Attributes:
+        user (UserID):  id of the user making the request
+        access_token_id (int|None):  *ID* of the access token used for this
+            request, or None if it came via the appservice API or similar
+        is_guest (bool):  True if the user making this request is a guest user
+        device_id (str|None):  device_id which was set at authentication time
+        app_service (ApplicationService|None):  the AS requesting on behalf of the user
+    """
+
+    def serialize(self):
+        """Converts self to a type that can be serialized as JSON, and then
+        deserialized by `deserialize`
+
+        Returns:
+            dict
+        """
+        return {
+            "user_id": self.user.to_string(),
+            "access_token_id": self.access_token_id,
+            "is_guest": self.is_guest,
+            "device_id": self.device_id,
+            "app_server_id": self.app_service.id if self.app_service else None,
+        }
+
+    @staticmethod
+    def deserialize(store, input):
+        """Converts a dict that was produced by `serialize` back into a
+        Requester.
+
+        Args:
+            store (DataStore): Used to convert AS ID to AS object
+            input (dict): A dict produced by `serialize`
+
+        Returns:
+            Requester
+        """
+        appservice = None
+        if input["app_server_id"]:
+            appservice = store.get_app_service_by_id(input["app_server_id"])
+
+        return Requester(
+            user=UserID.from_string(input["user_id"]),
+            access_token_id=input["access_token_id"],
+            is_guest=input["is_guest"],
+            device_id=input["device_id"],
+            app_service=appservice,
+        )
 
 
 def create_requester(user_id, access_token_id=None, is_guest=False,
@@ -126,14 +165,10 @@ class DomainSpecificString(
         try:
             cls.from_string(s)
             return True
-        except:
+        except Exception:
             return False
 
-    __str__ = to_string
-
-    @classmethod
-    def create(cls, localpart, domain,):
-        return cls(localpart=localpart, domain=domain)
+    __repr__ = to_string
 
 
 class UserID(DomainSpecificString):
@@ -156,6 +191,43 @@ class EventID(DomainSpecificString):
     SIGIL = "$"
 
 
+class GroupID(DomainSpecificString):
+    """Structure representing a group ID."""
+    SIGIL = "+"
+
+    @classmethod
+    def from_string(cls, s):
+        group_id = super(GroupID, cls).from_string(s)
+        if not group_id.localpart:
+            raise SynapseError(
+                400,
+                "Group ID cannot be empty",
+            )
+
+        if contains_invalid_mxid_characters(group_id.localpart):
+            raise SynapseError(
+                400,
+                "Group ID can only contain characters a-z, 0-9, or '=_-./'",
+            )
+
+        return group_id
+
+
+mxid_localpart_allowed_characters = set("_-./=" + string.ascii_lowercase + string.digits)
+
+
+def contains_invalid_mxid_characters(localpart):
+    """Check for characters not allowed in an mxid or groupid localpart
+
+    Args:
+        localpart (basestring): the localpart to be checked
+
+    Returns:
+        bool: True if there are any naughty characters
+    """
+    return any(c not in mxid_localpart_allowed_characters for c in localpart)
+
+
 class StreamToken(
     namedtuple("Token", (
         "room_key",
@@ -166,6 +238,7 @@ class StreamToken(
         "push_rules_key",
         "to_device_key",
         "device_list_key",
+        "groups_key",
     ))
 ):
     _SEPARATOR = "_"
@@ -178,7 +251,7 @@ class StreamToken(
                 # i.e. old token from before receipt_key
                 keys.append("0")
             return cls(*keys)
-        except:
+        except Exception:
             raise SynapseError(400, "Invalid Token")
 
     def to_string(self):
@@ -204,6 +277,7 @@ class StreamToken(
             or (int(other.push_rules_key) < int(self.push_rules_key))
             or (int(other.to_device_key) < int(self.to_device_key))
             or (int(other.device_list_key) < int(self.device_list_key))
+            or (int(other.groups_key) < int(self.groups_key))
         )
 
     def copy_and_advance(self, key, new_value):
@@ -263,7 +337,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             if string[0] == 't':
                 parts = string[1:].split('-', 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
-        except:
+        except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
@@ -272,7 +346,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
         try:
             if string[0] == 's':
                 return cls(topological=None, stream=int(string[1:]))
-        except:
+        except Exception:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 

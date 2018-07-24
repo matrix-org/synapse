@@ -12,14 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.appservice import ApplicationService
+import re
+
+from mock import Mock
 
 from twisted.internet import defer
 
-from mock import Mock
-from tests import unittest
+from synapse.appservice import ApplicationService
 
-import re
+from tests import unittest
 
 
 def _regex(regex, exclusive=True):
@@ -36,6 +37,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
             id="unique_identifier",
             url="some_url",
             token="some_token",
+            hostname="matrix.org",  # only used by get_groups_for_user
             namespaces={
                 ApplicationService.NS_USERS: [],
                 ApplicationService.NS_ROOMS: [],

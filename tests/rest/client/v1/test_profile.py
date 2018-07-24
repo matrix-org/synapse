@@ -15,12 +15,15 @@
 
 """Tests REST events for /profile paths."""
 from mock import Mock
+
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.errors import SynapseError, AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.rest.client.v1 import profile
+
 from tests import unittest
+
 from ....utils import MockHttpResource, setup_test_homeserver
 
 myid = "@1234ABCD:test"
@@ -45,15 +48,14 @@ class ProfileTestCase(unittest.TestCase):
             http_client=None,
             resource_for_client=self.mock_resource,
             federation=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
+            profile_handler=self.mock_handler
         )
 
         def _get_user_by_req(request=None, allow_guest=False):
             return synapse.types.create_requester(myid)
 
-        hs.get_v1auth().get_user_by_req = _get_user_by_req
-
-        hs.get_handlers().profile_handler = self.mock_handler
+        hs.get_auth().get_user_by_req = _get_user_by_req
 
         profile.register_servlets(hs, self.mock_resource)
 

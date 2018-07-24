@@ -14,15 +14,16 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
-from ._base import BaseHandler
-
-from synapse.api.errors import SynapseError, Codes, CodeMessageException, AuthError
-from synapse.api.constants import EventTypes
-from synapse.types import RoomAlias, UserID, get_domain_from_id
-
 import logging
 import string
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes
+from synapse.api.errors import AuthError, CodeMessageException, Codes, SynapseError
+from synapse.types import RoomAlias, UserID, get_domain_from_id
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,14 @@ class DirectoryHandler(BaseHandler):
 
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
-        self.federation = hs.get_replication_layer()
-        self.federation.register_query_handler(
+        self.federation = hs.get_federation_client()
+        hs.get_federation_registry().register_query_handler(
             "directory", self.on_directory_query
         )
+
+        self.spam_checker = hs.get_spam_checker()
 
     @defer.inlineCallbacks
     def _create_association(self, room_alias, room_id, servers=None, creator=None):
@@ -72,6 +76,11 @@ class DirectoryHandler(BaseHandler):
     def create_association(self, user_id, room_alias, room_id, servers=None):
         # association creation for human users
         # TODO(erikj): Do user auth.
+
+        if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
+            raise SynapseError(
+                403, "This user is not permitted to create this alias",
+            )
 
         can_create = yield self.can_modify_alias(
             room_alias,
@@ -242,8 +251,7 @@ class DirectoryHandler(BaseHandler):
     def send_room_alias_update_event(self, requester, user_id, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
-        msg_handler = self.hs.get_handlers().message_handler
-        yield msg_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.Aliases,
@@ -265,8 +273,7 @@ class DirectoryHandler(BaseHandler):
         if not alias_event or alias_event.content.get("alias", "") != alias_str:
             return
 
-        msg_handler = self.hs.get_handlers().message_handler
-        yield msg_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.CanonicalAlias,
@@ -327,6 +334,14 @@ class DirectoryHandler(BaseHandler):
         room_id (str)
         visibility (str): "public" or "private"
         """
+        if not self.spam_checker.user_may_publish_room(
+            requester.user.to_string(), room_id
+        ):
+            raise AuthError(
+                403,
+                "This user is not permitted to publish rooms to the room list"
+            )
+
         if requester.is_guest:
             raise AuthError(403, "Guests cannot edit the published room list")
 

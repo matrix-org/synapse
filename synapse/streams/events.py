@@ -15,13 +15,12 @@
 
 from twisted.internet import defer
 
-from synapse.types import StreamToken
-
+from synapse.handlers.account_data import AccountDataEventSource
 from synapse.handlers.presence import PresenceEventSource
+from synapse.handlers.receipts import ReceiptEventSource
 from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
-from synapse.handlers.receipts import ReceiptEventSource
-from synapse.handlers.account_data import AccountDataEventSource
+from synapse.types import StreamToken
 
 
 class EventSources(object):
@@ -45,6 +44,7 @@ class EventSources(object):
         push_rules_key, _ = self.store.get_push_rules_stream_token()
         to_device_key = self.store.get_to_device_stream_token()
         device_list_key = self.store.get_device_stream_token()
+        groups_key = self.store.get_group_stream_token()
 
         token = StreamToken(
             room_key=(
@@ -65,6 +65,7 @@ class EventSources(object):
             push_rules_key=push_rules_key,
             to_device_key=to_device_key,
             device_list_key=device_list_key,
+            groups_key=groups_key,
         )
         defer.returnValue(token)
 
@@ -73,6 +74,7 @@ class EventSources(object):
         push_rules_key, _ = self.store.get_push_rules_stream_token()
         to_device_key = self.store.get_to_device_stream_token()
         device_list_key = self.store.get_device_stream_token()
+        groups_key = self.store.get_group_stream_token()
 
         token = StreamToken(
             room_key=(
@@ -93,5 +95,6 @@ class EventSources(object):
             push_rules_key=push_rules_key,
             to_device_key=to_device_key,
             device_list_key=device_list_key,
+            groups_key=groups_key,
         )
         defer.returnValue(token)

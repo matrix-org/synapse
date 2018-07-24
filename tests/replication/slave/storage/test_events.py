@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStoreTestCase
+from twisted.internet import defer
 
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.roommember import RoomsForUser
 
-from twisted.internet import defer
-
+from ._base import BaseSlavedStoreTestCase
 
 USER_ID = "@feeling:blue"
 USER_ID_2 = "@bright:blue"
@@ -223,16 +222,21 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             state_ids = {
                 key: e.event_id for key, e in state.items()
             }
-            context = EventContext()
-            context.current_state_ids = state_ids
-            context.prev_state_ids = state_ids
-        elif not backfill:
+            context = EventContext.with_state(
+                state_group=None,
+                current_state_ids=state_ids,
+                prev_state_ids=state_ids
+            )
+        else:
             state_handler = self.hs.get_state_handler()
             context = yield state_handler.compute_event_context(event)
-        else:
-            context = EventContext()
 
-        context.push_actions = push_actions
+        yield self.master_store.add_push_actions_to_staging(
+            event.event_id, {
+                user_id: actions
+                for user_id, actions in push_actions
+            },
+        )
 
         ordering = None
         if backfill:

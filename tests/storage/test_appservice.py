@@ -12,21 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import tempfile
-from synapse.config._base import ConfigError
-from tests import unittest
-from twisted.internet import defer
-
-from tests.utils import setup_test_homeserver
-from synapse.appservice import ApplicationService, ApplicationServiceState
-from synapse.storage.appservice import (
-    ApplicationServiceStore, ApplicationServiceTransactionStore
-)
-
 import json
 import os
-import yaml
+import tempfile
+
 from mock import Mock
+
+import yaml
+
+from twisted.internet import defer
+
+from synapse.appservice import ApplicationService, ApplicationServiceState
+from synapse.config._base import ConfigError
+from synapse.storage.appservice import (
+    ApplicationServiceStore,
+    ApplicationServiceTransactionStore,
+)
+
+from tests import unittest
+from tests.utils import setup_test_homeserver
 
 
 class ApplicationServiceStoreTestCase(unittest.TestCase):
@@ -42,7 +46,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             config=config,
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
         self.as_token = "token1"
@@ -58,14 +62,14 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self._add_appservice("token2", "as2", "some_url", "some_hs_token", "bob")
         self._add_appservice("token3", "as3", "some_url", "some_hs_token", "bob")
         # must be done after inserts
-        self.store = ApplicationServiceStore(hs)
+        self.store = ApplicationServiceStore(None, hs)
 
     def tearDown(self):
         # TODO: suboptimal that we need to create files for tests!
         for f in self.as_yaml_files:
             try:
                 os.remove(f)
-            except:
+            except Exception:
                 pass
 
     def _add_appservice(self, as_token, id, url, hs_token, sender):
@@ -119,7 +123,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         hs = yield setup_test_homeserver(
             config=config,
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
         self.db_pool = hs.get_db_pool()
 
@@ -150,7 +154,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
         self.as_yaml_files = []
 
-        self.store = TestTransactionStore(hs)
+        self.store = TestTransactionStore(None, hs)
 
     def _add_service(self, url, as_token, id):
         as_yaml = dict(url=url, as_token=as_token, hs_token="something",
@@ -420,8 +424,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 class TestTransactionStore(ApplicationServiceTransactionStore,
                            ApplicationServiceStore):
 
-    def __init__(self, hs):
-        super(TestTransactionStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(TestTransactionStore, self).__init__(db_conn, hs)
 
 
 class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
@@ -455,10 +459,10 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
-        ApplicationServiceStore(hs)
+        ApplicationServiceStore(None, hs)
 
     @defer.inlineCallbacks
     def test_duplicate_ids(self):
@@ -473,16 +477,16 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
         with self.assertRaises(ConfigError) as cm:
-            ApplicationServiceStore(hs)
+            ApplicationServiceStore(None, hs)
 
         e = cm.exception
-        self.assertIn(f1, e.message)
-        self.assertIn(f2, e.message)
-        self.assertIn("id", e.message)
+        self.assertIn(f1, str(e))
+        self.assertIn(f2, str(e))
+        self.assertIn("id", str(e))
 
     @defer.inlineCallbacks
     def test_duplicate_as_tokens(self):
@@ -497,13 +501,13 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
-            replication_layer=Mock(),
+            federation_client=Mock(),
         )
 
         with self.assertRaises(ConfigError) as cm:
-            ApplicationServiceStore(hs)
+            ApplicationServiceStore(None, hs)
 
         e = cm.exception
-        self.assertIn(f1, e.message)
-        self.assertIn(f2, e.message)
-        self.assertIn("as_token", e.message)
+        self.assertIn(f1, str(e))
+        self.assertIn(f2, str(e))
+        self.assertIn("as_token", str(e))

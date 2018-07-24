@@ -15,10 +15,11 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 
-from synapse.api.errors import SynapseError, Codes
-
 import logging
-import simplejson
+
+from canonicaljson import json
+
+from synapse.api.errors import Codes, SynapseError
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def parse_integer_from_args(args, name, default=None, required=False):
     if name in args:
         try:
             return int(args[name][0])
-        except:
+        except Exception:
             message = "Query parameter %r must be an integer" % (name,)
             raise SynapseError(400, message)
     else:
@@ -88,7 +89,7 @@ def parse_boolean_from_args(args, name, default=None, required=False):
                 "true": True,
                 "false": False,
             }[args[name][0]]
-        except:
+        except Exception:
             message = (
                 "Boolean query parameter %r must be one of"
                 " ['true', 'false']"
@@ -148,11 +149,13 @@ def parse_string_from_args(args, name, default=None, required=False,
             return default
 
 
-def parse_json_value_from_request(request):
+def parse_json_value_from_request(request, allow_empty_body=False):
     """Parse a JSON value from the body of a twisted HTTP request.
 
     Args:
         request: the twisted HTTP request.
+        allow_empty_body (bool): if True, an empty body will be accepted and
+            turned into None
 
     Returns:
         The JSON value.
@@ -162,28 +165,39 @@ def parse_json_value_from_request(request):
     """
     try:
         content_bytes = request.content.read()
-    except:
+    except Exception:
         raise SynapseError(400, "Error reading JSON content.")
 
+    if not content_bytes and allow_empty_body:
+        return None
+
     try:
-        content = simplejson.loads(content_bytes)
-    except simplejson.JSONDecodeError:
+        content = json.loads(content_bytes)
+    except Exception as e:
+        logger.warn("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
     return content
 
 
-def parse_json_object_from_request(request):
+def parse_json_object_from_request(request, allow_empty_body=False):
     """Parse a JSON object from the body of a twisted HTTP request.
 
     Args:
         request: the twisted HTTP request.
+        allow_empty_body (bool): if True, an empty body will be accepted and
+            turned into an empty dict.
 
     Raises:
         SynapseError if the request body couldn't be decoded as JSON or
             if it wasn't a JSON object.
     """
-    content = parse_json_value_from_request(request)
+    content = parse_json_value_from_request(
+        request, allow_empty_body=allow_empty_body,
+    )
+
+    if allow_empty_body and content is None:
+        return {}
 
     if type(content) != dict:
         message = "Content must be a JSON object."
@@ -192,7 +206,7 @@ def parse_json_object_from_request(request):
     return content
 
 
-def assert_params_in_request(body, required):
+def assert_params_in_dict(body, required):
     absent = []
     for k in required:
         if k not in body:

@@ -16,14 +16,12 @@
 """This module contains base REST classes for constructing client v1 servlets.
 """
 
-from synapse.http.servlet import RestServlet
-from synapse.api.urls import CLIENT_PREFIX
-from synapse.rest.client.transactions import HttpTransactionCache
-
+import logging
 import re
 
-import logging
-
+from synapse.api.urls import CLIENT_PREFIX
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.transactions import HttpTransactionCache
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +50,10 @@ class ClientV1RestServlet(RestServlet):
     """A base Synapse REST Servlet for the client version 1 API.
     """
 
+    # This subclass was presumably created to allow the auth for the v1
+    # protocol version to be different, however this behaviour was removed.
+    # it may no longer be necessary
+
     def __init__(self, hs):
         """
         Args:
@@ -59,5 +61,5 @@ class ClientV1RestServlet(RestServlet):
         """
         self.hs = hs
         self.builder_factory = hs.get_event_builder_factory()
-        self.auth = hs.get_v1auth()
-        self.txns = HttpTransactionCache(hs.get_clock())
+        self.auth = hs.get_auth()
+        self.txns = HttpTransactionCache(hs)

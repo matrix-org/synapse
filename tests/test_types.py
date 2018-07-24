@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-
 from synapse.api.errors import SynapseError
 from synapse.server import HomeServer
-from synapse.types import UserID, RoomAlias
+from synapse.types import GroupID, RoomAlias, UserID
+
+from tests import unittest
 
 mock_homeserver = HomeServer(hostname="my.domain")
 
@@ -60,3 +60,25 @@ class RoomAliasTestCase(unittest.TestCase):
         room = RoomAlias("channel", "my.domain")
 
         self.assertEquals(room.to_string(), "#channel:my.domain")
+
+
+class GroupIDTestCase(unittest.TestCase):
+    def test_parse(self):
+        group_id = GroupID.from_string("+group/=_-.123:my.domain")
+        self.assertEqual("group/=_-.123", group_id.localpart)
+        self.assertEqual("my.domain", group_id.domain)
+
+    def test_validate(self):
+        bad_ids = [
+            "$badsigil:domain",
+            "+:empty",
+        ] + [
+            "+group" + c + ":domain" for c in "A%?æ£"
+        ]
+        for id_string in bad_ids:
+            try:
+                GroupID.from_string(id_string)
+                self.fail("Parsing '%s' should raise exception" % id_string)
+            except SynapseError as exc:
+                self.assertEqual(400, exc.code)
+                self.assertEqual("M_UNKNOWN", exc.errcode)
