@@ -567,7 +567,10 @@ class SyncHandler(object):
             # FIXME: order by stream ordering, not alphabetic
 
             me = sync_config.user.to_string()
-            if summary["m.joined_member_count"] == 0:
+            if (
+                summary["m.joined_member_count"] == 0 and
+                summary["m.invited_member_count"] == 0
+            ):
                 summary['m.heroes'] = sorted(
                     [user_id for user_id in member_ids.keys() if user_id != me]
                 )[0:5]
