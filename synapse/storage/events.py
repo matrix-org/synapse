@@ -39,7 +39,7 @@ from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util.async import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.frozenutils import frozendict_json_encoder
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.logcontext import PreserveLoggingContext, make_deferred_yieldable
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 
@@ -147,7 +147,8 @@ class _EventPeristenceQueue(object):
                     # callbacks on the deferred.
                     try:
                         ret = yield per_item_callback(item)
-                        item.deferred.callback(ret)
+                        with PreserveLoggingContext():
+                            item.deferred.callback(ret)
                     except Exception:
                         item.deferred.errback()
             finally:
@@ -417,18 +418,27 @@ class EventsStore(EventsWorkerStore):
                             logger.info(
                                 "Calculating state delta for room %s", room_id,
                             )
-                            current_state = yield self._get_new_state_after_events(
-                                room_id,
-                                ev_ctx_rm,
-                                latest_event_ids,
-                                new_latest_event_ids,
-                            )
+
+                            with Measure(
+                                    self._clock,
+                                    "persist_events.get_new_state_after_events",
+                            ):
+                                current_state = yield self._get_new_state_after_events(
+                                    room_id,
+                                    ev_ctx_rm,
+                                    latest_event_ids,
+                                    new_latest_event_ids,
+                                )
+
                             if current_state is not None:
                                 current_state_for_room[room_id] = current_state
-                                delta = yield self._calculate_state_delta(
-                                    room_id, current_state,
-                                )
-                                if delta is not None:
+                                with Measure(
+                                        self._clock,
+                                        "persist_events.calculate_state_delta",
+                                ):
+                                    delta = yield self._calculate_state_delta(
+                                        room_id, current_state,
+                                    )
                                     state_delta_for_room[room_id] = delta
 
                 yield self.runInteraction(
@@ -644,21 +654,14 @@ class EventsStore(EventsWorkerStore):
         """
         existing_state = yield self.get_current_state_ids(room_id)
 
-        existing_events = set(itervalues(existing_state))
-        new_events = set(ev_id for ev_id in itervalues(current_state))
-        changed_events = existing_events ^ new_events
-
-        if not changed_events:
-            return
-
         to_delete = {
             key: ev_id for key, ev_id in iteritems(existing_state)
-            if ev_id in changed_events
+            if ev_id != current_state.get(key)
         }
-        events_to_insert = (new_events - existing_events)
+
         to_insert = {
             key: ev_id for key, ev_id in iteritems(current_state)
-            if ev_id in events_to_insert
+            if ev_id != existing_state.get(key)
         }
 
         defer.returnValue((to_delete, to_insert))
