@@ -185,7 +185,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def _get_state_groups_from_groups(self, groups, types, filtered_types=None):
+    def _get_state_groups_from_groups(self, groups, types):
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
@@ -194,9 +194,6 @@ class StateGroupWorkerStore(SQLBaseStore):
             types (Iterable[str, str|None]|None): list of 2-tuples of the form
                 (`type`, `state_key`), where a `state_key` of `None` matches all
                 state_keys for the `type`. If None, all types are returned.
-            filtered_types(Iterable[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
 
         Returns:
             dictionary state_group -> (dict of (type, state_key) -> event id)
@@ -207,14 +204,14 @@ class StateGroupWorkerStore(SQLBaseStore):
         for chunk in chunks:
             res = yield self.runInteraction(
                 "_get_state_groups_from_groups",
-                self._get_state_groups_from_groups_txn, chunk, types, filtered_types,
+                self._get_state_groups_from_groups_txn, chunk, types,
             )
             results.update(res)
 
         defer.returnValue(results)
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, types=None, filtered_types=None,
+        self, txn, groups, types=None,
     ):
         results = {group: {} for group in groups}
 
@@ -255,7 +252,7 @@ class StateGroupWorkerStore(SQLBaseStore):
             # Turns out that postgres doesn't like doing a list of OR's and
             # is about 1000x slower, so we just issue a query for each specific
             # type seperately.
-            if types:
+            if types is not None:
                 clause_to_args = [
                     (
                         "AND type = ? AND state_key = ?",
@@ -266,17 +263,6 @@ class StateGroupWorkerStore(SQLBaseStore):
                     )
                     for etype, state_key in types
                 ]
-
-                if filtered_types is not None:
-                    # XXX: check whether this slows postgres down like a list of
-                    # ORs does too?
-                    unique_types = set(filtered_types)
-                    clause_to_args.append(
-                        (
-                            "AND type <> ? " * len(unique_types),
-                            list(unique_types)
-                        )
-                    )
             else:
                 # If types is None we fetch all the state, and so just use an
                 # empty where clause with no extra args.
@@ -305,13 +291,6 @@ class StateGroupWorkerStore(SQLBaseStore):
                     else:
                         where_clauses.append("(type = ? AND state_key = ?)")
                         where_args.extend([typ[0], typ[1]])
-
-                if filtered_types is not None:
-                    unique_types = set(filtered_types)
-                    where_clauses.append(
-                        "(" + " AND ".join(["type <> ?"] * len(unique_types)) + ")"
-                    )
-                    where_args.extend(list(unique_types))
 
                 where_clause = "AND (%s)" % (" OR ".join(where_clauses))
             else:
@@ -539,7 +518,10 @@ class StateGroupWorkerStore(SQLBaseStore):
         for typ, state_key in types:
             key = (typ, state_key)
 
-            if state_key is None:
+            if (
+                state_key is None or
+                filtered_types is not None and typ not in filtered_types
+            ):
                 type_to_key[typ] = None
                 # we mark the type as missing from the cache because
                 # when the cache was populated it might have been done with a
@@ -565,7 +547,13 @@ class StateGroupWorkerStore(SQLBaseStore):
                 return True
             return False
 
-        got_all = is_all or not missing_types
+        if types == [] and filtered_types is not None:
+            # special wildcard case for empty type-list but an explicit filtered_types
+            # which means that we'll try to return all types which aren't in the
+            # filtered_types list.  missing_types will always be empty, so we ignore it.
+            got_all = is_all
+        else:
+            got_all = is_all or not missing_types
 
         return {
             k: v for k, v in iteritems(state_dict_ids)
@@ -643,13 +631,13 @@ class StateGroupWorkerStore(SQLBaseStore):
             # cache. Hence, if we are doing a wildcard lookup, populate the
             # cache fully so that we can do an efficient lookup next time.
 
-            if types and any(k is None for (t, k) in types):
+            if filtered_types or (types and any(k is None for (t, k) in types)):
                 types_to_fetch = None
             else:
                 types_to_fetch = types
 
             group_to_state_dict = yield self._get_state_groups_from_groups(
-                missing_groups, types_to_fetch, filtered_types
+                missing_groups, types_to_fetch
             )
 
             for group, group_state_dict in iteritems(group_to_state_dict):
@@ -659,7 +647,10 @@ class StateGroupWorkerStore(SQLBaseStore):
                 if types:
                     for k, v in iteritems(group_state_dict):
                         (typ, _) = k
-                        if k in types or (typ, None) in types:
+                        if (
+                            (k in types or (typ, None) in types) or
+                            (filtered_types and typ not in filtered_types)
+                        ):
                             state_dict[k] = v
                 else:
                     state_dict.update(group_state_dict)
