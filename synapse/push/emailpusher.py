@@ -23,24 +23,6 @@ from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
-# The amount of time we always wait before ever emailing about a notification
-# (to give the user a chance to respond to other push or notice the window)
-DELAY_BEFORE_MAIL_MS = 10 * 60 * 1000
-
-# THROTTLE is the minimum time between mail notifications sent for a given room.
-# Each room maintains its own throttle counter, but each new mail notification
-# sends the pending notifications for all rooms.
-THROTTLE_START_MS = 10 * 60 * 1000
-THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # 24h
-# THROTTLE_MULTIPLIER = 6              # 10 mins, 1 hour, 6 hours, 24 hours
-THROTTLE_MULTIPLIER = 144              # 10 mins, 24 hours - i.e. jump straight to 1 day
-
-# If no event triggers a notification for this long after the previous,
-# the throttle is released.
-# 12 hours - a gap of 12 hours in conversation is surely enough to merit a new
-# notification when things get going again...
-THROTTLE_RESET_AFTER_MS = (12 * 60 * 60 * 1000)
-
 # does each email include all unread notifs, or just the ones which have happened
 # since the last mail?
 # XXX: this is currently broken as it includes ones from parted rooms(!)
@@ -72,6 +54,12 @@ class EmailPusher(object):
         self.max_stream_ordering = None
 
         self.processing = False
+        
+        self.delay_before_mail_ms = hs.config.delay_before_mail_s * 1000;
+        self.mail_throttle_start_ms = hs.config.mail_throttle_start_s * 1000;
+        self.mail_throttle_max_ms = hs.config.mail_throttle_max_s * 1000;
+        self.mail_throttle_multiplier = hs.config.mail_throttle_multiplier;
+        self.mail_throttle_reset_after_ms = hs.config.mail_throttle_reset_after_s * 1000;
 
     @defer.inlineCallbacks
     def on_started(self):
@@ -151,7 +139,7 @@ class EmailPusher(object):
             received_at = push_action['received_ts']
             if received_at is None:
                 received_at = 0
-            notif_ready_at = received_at + DELAY_BEFORE_MAIL_MS
+            notif_ready_at = received_at + self.delay_before_mail_ms
 
             room_ready_at = self.room_ready_to_notify_at(
                 push_action['room_id']
@@ -169,7 +157,7 @@ class EmailPusher(object):
                     'room_id': push_action['room_id'],
                     'now': self.clock.time_msec(),
                     'received_at': received_at,
-                    'delay_before_mail_ms': DELAY_BEFORE_MAIL_MS,
+                    'delay_before_mail_ms': self.delay_before_mail_ms,
                     'last_sent_ts': self.get_room_last_sent_ts(push_action['room_id']),
                     'throttle_ms': self.get_room_throttle_ms(push_action['room_id']),
                 }
@@ -243,7 +231,7 @@ class EmailPusher(object):
     def sent_notif_update_throttle(self, room_id, notified_push_action):
         # We have sent a notification, so update the throttle accordingly.
         # If the event that triggered the notif happened more than
-        # THROTTLE_RESET_AFTER_MS after the previous one that triggered a
+        # self.mail_throttle_reset_after_ms after the previous one that triggered a
         # notif, we release the throttle. Otherwise, the throttle is increased.
         time_of_previous_notifs = yield self.store.get_time_of_last_push_action_before(
             notified_push_action['stream_ordering']
@@ -261,15 +249,15 @@ class EmailPusher(object):
 
         current_throttle_ms = self.get_room_throttle_ms(room_id)
 
-        if gap > THROTTLE_RESET_AFTER_MS:
-            new_throttle_ms = THROTTLE_START_MS
+        if gap > self.mail_throttle_reset_after_ms:
+            new_throttle_ms = self.mail_throttle_start_ms
         else:
             if current_throttle_ms == 0:
-                new_throttle_ms = THROTTLE_START_MS
+                new_throttle_ms = self.mail_throttle_start_ms
             else:
                 new_throttle_ms = min(
-                    current_throttle_ms * THROTTLE_MULTIPLIER,
-                    THROTTLE_MAX_MS
+                    current_throttle_ms * self.mail_throttle_multiplier,
+                    self.mail_throttle_max_ms
                 )
         self.throttle_params[room_id] = {
             "last_sent_ts": self.clock.time_msec(),

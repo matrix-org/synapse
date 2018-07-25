@@ -89,6 +89,26 @@ class EmailConfig(Config):
             parsed = email.utils.parseaddr(self.email_notif_from)
             if parsed[1] == '':
                 raise ConfigError("Invalid notif_from address")
+                
+            self.delay_before_mail_s = email_config.get(
+                "delay_before_mail_s", 600
+            )
+            
+            self.mail_throttle_start_s = email_config.get(
+                "mail_throttle_start_s", 600
+            )
+            
+            self.mail_throttle_max_s = email_config.get(
+                "mail_throttle_max_s", 86400
+            )
+            
+            self.mail_throttle_multiplier = email_config.get(
+                "mail_throttle_multiplier", 144
+            )
+            
+            self.mail_throttle_reset_after_s = email_config.get(
+                "mail_throttle_reset_after_s", 43200
+            )
         
 
     def default_config(self, config_dir_path, server_name, **kwargs):
@@ -115,4 +135,21 @@ class EmailConfig(Config):
         #   notif_template_text: notif_mail.txt
         #   notif_for_new_users: True
         #   riot_base_url: "http://localhost/riot"
+        #   # The amount of time we always wait before ever emailing about a notification in seconds
+        #   # (to give the user a chance to respond to other push or notice the window)
+        #   # (600s = 10 minutes)
+        #   delay_before_mail_s : 600
+        #   # THROTTLE is the minimum time between mail notifications sent for a given room.
+        #   # Each room maintains its own throttle counter, but each new mail notification
+        #   # sends the pending notifications for all rooms.
+        #   mail_throttle_start_s : 600
+        #   # (86400 = 24 hours)
+        #   mail_throttle_max_s : 86400
+        #   # 10 mins, 24h - jump straight to 1 day
+        #   mail_throttle_multiplier : 144
+        #   # If no event triggers a notification for this long after the previous,
+        #   # the throttle is released.
+        #   # 12 hours - a gap of 12 hours in conversation is surely enough to merit a new
+        #   # notification when things get going again...
+        #   mail_throttle_reset_after_s : 43200
         """
