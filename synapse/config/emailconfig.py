@@ -90,6 +90,14 @@ class EmailConfig(Config):
             if parsed[1] == '':
                 raise ConfigError("Invalid notif_from address")
                 
+            self.mail_notif_amount = email_config.get(
+                "mail_notif_amount", 26
+            )
+                
+            self.mail_notif_inv_amount = email_config.get(
+                "mail_notif_inv_amount", 4
+            )
+                
             self.delay_before_mail_s = email_config.get(
                 "delay_before_mail_s", 600
             )
@@ -135,6 +143,13 @@ class EmailConfig(Config):
         #   notif_template_text: notif_mail.txt
         #   notif_for_new_users: True
         #   riot_base_url: "http://localhost/riot"
+        #   # The max amount of notifications that should be contained in a mail
+        #   # (a mail includes the oldest amount/2 and most recent amount/2 notifications)
+        #   # (should be divisible by 2)
+        #   mail_notif_amount: 26
+        #   # The max amount of room invite notifications that should be contained in a mail
+        #   # (should be divisible by 2, see mail_notif_amount explanation)
+        #   mail_notif_inv_amount: 4
         #   # The amount of time we always wait before ever emailing about a notification in seconds
         #   # (to give the user a chance to respond to other push or notice the window)
         #   # (600s = 10 minutes)
