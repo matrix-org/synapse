@@ -18,7 +18,7 @@ import hmac
 import logging
 from hashlib import sha1
 
-from six import string_types
+from six import string_types, PY2
 
 from twisted.internet import defer
 
@@ -389,8 +389,11 @@ class RegisterRestServlet(RestServlet):
             assert_params_in_dict(params, ["password"])
 
             desired_username = params.get("username", None)
-            new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+            new_password = params.get("password", None)
+
+            if PY2:
+                new_password = new_password.decode('utf8')
 
             if desired_username is not None:
                 desired_username = desired_username.lower()

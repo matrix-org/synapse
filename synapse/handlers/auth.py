@@ -629,6 +629,10 @@ class AuthHandler(BaseHandler):
         # special case to check for "password" for the check_password interface
         # for the auth providers
         password = login_submission.get("password")
+
+        if PY2:
+            password = password.decode('utf8')
+
         if login_type == LoginType.PASSWORD:
             if not self._password_enabled:
                 raise SynapseError(400, "Password login has been disabled.")
@@ -711,6 +715,7 @@ class AuthHandler(BaseHandler):
 
         Args:
             user_id (str): complete @user:id
+            password (unicode): the provided password
         Returns:
             (str) the canonical_user_id, or None if unknown user / bad password
         """
@@ -852,19 +857,14 @@ class AuthHandler(BaseHandler):
         """Computes a secure hash of password.
 
         Args:
-            password (str): Password to hash.
+            password (unicode): Password to hash.
 
         Returns:
             Deferred(str): Hashed password.
         """
         def _do_hash():
-            if PY2:
-                pw = password.decode('utf8')
-            else:
-                pw = password
-
             # Normalise the Unicode in the password
-            pw = unicodedata.normalize("NFKC", pw)
+            pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.hashpw(
                 pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
@@ -881,7 +881,7 @@ class AuthHandler(BaseHandler):
         """Validates that self.hash(password) == stored_hash.
 
         Args:
-            password (str): Password to hash.
+            password (unicode): Password to hash.
             stored_hash (str): Expected hash value.
 
         Returns:
@@ -889,13 +889,8 @@ class AuthHandler(BaseHandler):
         """
 
         def _do_validate_hash():
-            if PY2:
-                pw = password.decode('utf8')
-            else:
-                pw = password
-
             # Normalise the Unicode in the password
-            pw = unicodedata.normalize("NFKC", pw)
+            pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.checkpw(
                 pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
