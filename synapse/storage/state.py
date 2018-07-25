@@ -511,8 +511,8 @@ class StateGroupWorkerStore(SQLBaseStore):
 
         type_to_key = {}
 
-        # tracks which of the requested types are missing from our cache
-        missing_types = set()
+        # tracks whether any of ourrequested types are missing from the cache
+        missing_types = False
 
         for typ, state_key in types:
             key = (typ, state_key)
@@ -526,13 +526,13 @@ class StateGroupWorkerStore(SQLBaseStore):
                 # when the cache was populated it might have been done with a
                 # restricted set of state_keys, so the wildcard will not work
                 # and the cache may be incomplete.
-                missing_types.add(key)
+                missing_types = True
             else:
                 if type_to_key.get(typ, object()) is not None:
                     type_to_key.setdefault(typ, set()).add(state_key)
 
                 if key not in state_dict_ids and key not in known_absent:
-                    missing_types.add(key)
+                    missing_types = True
 
         sentinel = object()
 
