@@ -18,6 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, CodeMessageException, SynapseError
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID, get_domain_from_id
 
 from ._base import BaseHandler
@@ -41,7 +42,7 @@ class ProfileHandler(BaseHandler):
 
         if hs.config.worker_app is None:
             self.clock.looping_call(
-                self._update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+                self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
             )
 
     @defer.inlineCallbacks
@@ -254,6 +255,12 @@ class ProfileHandler(BaseHandler):
                     room_id, str(e.message)
                 )
 
+    def _start_update_remote_profile_cache(self):
+        run_as_background_process(
+            "Update remote profile", self._update_remote_profile_cache,
+        )
+
+    @defer.inlineCallbacks
     def _update_remote_profile_cache(self):
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
