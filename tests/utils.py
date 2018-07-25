@@ -71,6 +71,8 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         config.user_directory_search_all_users = False
         config.user_consent_server_notice_content = None
         config.block_events_without_consent_error = None
+        config.media_storage_providers = []
+        config.auto_join_rooms = []
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
@@ -136,6 +138,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
             database_engine=db_engine,
             room_list_handler=object(),
             tls_server_context_factory=Mock(),
+            reactor=reactor,
             **kargs
         )
 
