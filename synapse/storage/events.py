@@ -581,6 +581,7 @@ class EventsStore(EventsWorkerStore):
                         "Context for new event %s has no state "
                         "group" % (ev.event_id, ),
                     )
+                continue
 
             if ctx.state_group in state_groups_map:
                 continue
