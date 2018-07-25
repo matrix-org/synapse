@@ -74,6 +74,10 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         config.media_storage_providers = []
         config.auto_join_rooms = []
 
+        # we need a sane default_room_version, otherwise attempts to create rooms will
+        # fail.
+        config.default_room_version = "1"
+
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         config.update_user_directory = False

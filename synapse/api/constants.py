@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,3 +95,8 @@ class RoomCreationPreset(object):
 class ThirdPartyEntityKind(object):
     USER = "user"
     LOCATION = "location"
+
+
+# vdh-test-version is a placeholder to get room versioning support working and tested
+# until we have a working v2.
+KNOWN_ROOM_VERSIONS = {"1", "vdh-test-version"}

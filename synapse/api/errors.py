@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,6 +57,7 @@ class Codes(object):
     CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
     CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
     MAU_LIMIT_EXCEEDED = "M_MAU_LIMIT_EXCEEDED"
+    UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
 
 
 class CodeMessageException(RuntimeError):

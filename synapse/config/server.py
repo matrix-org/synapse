@@ -16,6 +16,7 @@
 
 import logging
 
+from synapse.api.constants import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
@@ -75,6 +76,16 @@ class ServerConfig(Config):
             )
         else:
             self.max_mau_value = 0
+
+        # the version of rooms created by default on this server
+        self.default_room_version = str(config.get(
+            "default_room_version", "1",
+        ))
+        if self.default_room_version not in KNOWN_ROOM_VERSIONS:
+            raise ConfigError("Unrecognised value '%s' for default_room_version" % (
+                self.default_room_version,
+            ))
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
@@ -248,6 +259,9 @@ class ServerConfig(Config):
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
         # block_non_admin_invites: True
+
+        # The room_version of rooms which are created by default by this server.
+        # default_room_version: 1
 
         # Restrict federation to the following whitelist of domains.
         # N.B. we recommend also firewalling your federation listener to limit
