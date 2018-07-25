@@ -35,6 +35,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.async import Linearizer
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.retryutils import NotRetryingDestination
@@ -100,8 +101,13 @@ class MediaRepository(object):
         )
 
         self.clock.looping_call(
-            self._update_recently_accessed,
+            self._start_update_recently_accessed,
             UPDATE_RECENTLY_ACCESSED_TS,
+        )
+
+    def _start_update_recently_accessed(self):
+        run_as_background_process(
+            "update_recently_accessed_media", self._update_recently_accessed,
         )
 
     @defer.inlineCallbacks
