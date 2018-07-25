@@ -74,7 +74,7 @@ class SignatureWorkerStore(SQLBaseStore):
             txn (cursor):
             event_id (str): Id for the Event.
         Returns:
-            A dict of algorithm -> hash.
+            A dict[str, bytes] of algorithm -> hash.
         """
         query = (
             "SELECT algorithm, hash"
@@ -87,10 +87,7 @@ class SignatureWorkerStore(SQLBaseStore):
         else:
             done = {}
             for k, v in txn:
-                if not isinstance(v, bytes):
-                    done[k] = v.encode('ascii')
-                else:
-                    done[k] = v
+                done[k] = v.encode('ascii')
             return done
 
 

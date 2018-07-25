@@ -298,14 +298,14 @@ class JsonResource(HttpServer, resource.Resource):
         # here. If it throws an exception, that is handled by the wrapper
         # installed by @request_handler.
 
-        def _parse(s):
+        def _unquote(s):
             if PY3:
                 return urllib.parse.unquote(s)
             else:
-                return urllib.parse.unquote(s.encode('utf8')).decode('utf8')
+                return urllib.parse.unquote(s.encode('ascii')).decode('utf8')
 
         kwargs = intern_dict({
-            name: _parse(value) if value else value
+            name: _unquote(value) if value else value
             for name, value in group_dict.items()
         })
 
@@ -335,7 +335,7 @@ class JsonResource(HttpServer, resource.Resource):
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path.decode())
+            m = path_entry.pattern.match(request.path.decode('ascii'))
             if m:
                 # We found a match!
                 return path_entry.callback, m.groupdict()
@@ -391,7 +391,7 @@ class RootRedirect(resource.Resource):
         self.url = path
 
     def render_GET(self, request):
-        return redirectTo(self.url.encode(), request)
+        return redirectTo(self.url.encode('ascii'), request)
 
     def getChild(self, name, request):
         if len(name) == 0:

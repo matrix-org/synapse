@@ -22,6 +22,8 @@ import bcrypt
 import pymacaroons
 from canonicaljson import json
 
+from six import PY2
+
 from twisted.internet import defer, threads
 from twisted.web.client import PartialDownloadError
 
@@ -856,11 +858,13 @@ class AuthHandler(BaseHandler):
             Deferred(str): Hashed password.
         """
         def _do_hash():
-            # Ensure that we normalise the password
-            if isinstance(password, bytes):
-                pw = unicodedata.normalize("NFKC", password.decode('utf8'))
+            if PY2:
+                pw = password.decode('utf8')
             else:
-                pw = unicodedata.normalize("NFKC", password)
+                pw = password
+
+            # Normalise the Unicode in the password
+            pw = unicodedata.normalize("NFKC", pw)
 
             return bcrypt.hashpw(
                 pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
@@ -885,10 +889,14 @@ class AuthHandler(BaseHandler):
         """
 
         def _do_validate_hash():
-            if isinstance(password, bytes):
-                pw = unicodedata.normalize("NFKC", password.decode('utf8'))
+            if PY2:
+                pw = password.decode('utf8')
             else:
-                pw = unicodedata.normalize("NFKC", password)
+                pw = password
+
+            # Normalise the Unicode in the password
+            pw = unicodedata.normalize("NFKC", pw)
+
             return bcrypt.checkpw(
                 pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
                 stored_hash.encode('utf8')
