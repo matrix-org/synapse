@@ -170,15 +170,15 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e2.type, e2.state_key): e2,
         }, state)
 
-        ##################################
-        # _get_some_state_from_cache tests
-        ##################################
+        #######################################################
+        # _get_some_state_from_cache tests against a full cache
+        #######################################################
 
         room_id = self.room.to_string()
         group_ids = yield self.store.get_state_groups_ids(room_id, [e5.event_id])
         group = group_ids.keys()[0]
 
-        # test that _get_some_state_from_cache correctly filters out members with types=[]
+        # test _get_some_state_from_cache correctly filters out members with types=[]
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [], filtered_types=[EventTypes.Member]
         )
@@ -189,7 +189,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e2.type, e2.state_key): e2.event_id,
         }, state_dict)
 
-        # test that _get_some_state_from_cache correctly filters out members with types=wildcard
+        # test _get_some_state_from_cache correctly filters in members with wildcard types
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [(EventTypes.Member, None)], filtered_types=[EventTypes.Member]
         )
@@ -203,7 +203,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e5.type, e5.state_key): e5.event_id,
         }, state_dict)
 
-        # test that _get_some_state_from_cache correctly filters out members with types=specific
+        # test _get_some_state_from_cache correctly filters in members with specific types
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [(EventTypes.Member, e5.state_key)], filtered_types=[EventTypes.Member]
         )
@@ -215,7 +215,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e5.type, e5.state_key): e5.event_id,
         }, state_dict)
 
-        # test that _get_some_state_from_cache correctly filters out members with types=specific
+        # test _get_some_state_from_cache correctly filters in members with specific types
         # and no filtered_types
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [(EventTypes.Member, e5.state_key)], filtered_types=None
@@ -269,10 +269,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e5.type, e5.state_key): e5.event_id,
         })
 
-        ###################################################
+        ############################################
         # test that things work with a partial cache
 
-        # test that _get_some_state_from_cache correctly filters out members with types=[]
+        # test _get_some_state_from_cache correctly filters out members with types=[]
         room_id = self.room.to_string()
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [], filtered_types=[EventTypes.Member]
@@ -283,7 +283,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e1.type, e1.state_key): e1.event_id,
         }, state_dict)
 
-        # test that _get_some_state_from_cache correctly filters out members with types=wildcard
+        # test _get_some_state_from_cache correctly filters in members wildcard types
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [(EventTypes.Member, None)], filtered_types=[EventTypes.Member]
         )
@@ -296,7 +296,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e5.type, e5.state_key): e5.event_id,
         }, state_dict)
 
-        # test that _get_some_state_from_cache correctly filters out members with types=specific
+        # test _get_some_state_from_cache correctly filters in members with specific types
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [(EventTypes.Member, e5.state_key)], filtered_types=[EventTypes.Member]
         )
@@ -307,7 +307,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             (e5.type, e5.state_key): e5.event_id,
         }, state_dict)
 
-        # test that _get_some_state_from_cache correctly filters out members with types=specific
+        # test _get_some_state_from_cache correctly filters in members with specific types
         # and no filtered_types
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(
             group, [(EventTypes.Member, e5.state_key)], filtered_types=None
