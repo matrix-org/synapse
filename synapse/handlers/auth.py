@@ -630,7 +630,7 @@ class AuthHandler(BaseHandler):
         # for the auth providers
         password = login_submission.get("password")
 
-        if PY2:
+        if password and PY2:
             password = password.decode('utf8')
 
         if login_type == LoginType.PASSWORD:
