@@ -18,7 +18,7 @@ import hmac
 import logging
 from hashlib import sha1
 
-from six import string_types, PY2
+from six import string_types
 
 from twisted.internet import defer
 

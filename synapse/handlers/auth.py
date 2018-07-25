@@ -17,12 +17,12 @@
 import logging
 import unicodedata
 
+from six import PY2
+
 import attr
 import bcrypt
 import pymacaroons
 from canonicaljson import json
-
-from six import PY2
 
 from twisted.internet import defer, threads
 from twisted.web.client import PartialDownloadError
