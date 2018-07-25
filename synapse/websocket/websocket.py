@@ -33,13 +33,27 @@ SYNC_TIMEOUT = 90000
 
 
 class SynapseWebsocketProtocol(WebSocketServerProtocol):
+    def __init__(self):
+        super(SynapseWebsocketProtocol, self).__init__()
+        """
+        This is run per each connection.
+        """
+        self.since = None
+        self.currentSync = None
+        self.filter = DEFAULT_FILTER_COLLECTION
+
     @defer.inlineCallbacks
     def onConnect(self, request):
-        self.reactor = self.factory.hs.get_reactor()
-        self.filter = DEFAULT_FILTER_COLLECTION
-        self.since = None
-        self.full_state = False
-        self.currentSync = None
+        # these are here as factory is not available in __init__
+        self.hs = self.factory.hs
+        self.auth = self.hs.get_auth()
+        self.clock = self.hs.get_clock()
+        self.datastore = self.hs.get_datastore()
+        self.filtering = self.hs.get_filtering()
+        self.presence_handler = self.hs.get_presence_handler()
+        self.reactor = self.hs.get_reactor()
+        self.sync_handler = self.hs.get_sync_handler()
+
         logger.info("connecting: {0}".format(request.peer))
 
         if self.factory.proxied:
@@ -50,16 +64,15 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         user_agent = request.headers.get("user-agent", [""])[0]
 
         logger.info("Checking access_token for {0}".format(ip_addr))
-        access_token = request.params.get("access_token", None)
+        access_token = request.params.get("access_token", [None])[0]
         if access_token is None:
             self.sendClose(3001, ERR_NO_AT)
             return
-        access_token = access_token[0].decode('utf-8')
+        access_token = access_token.decode('utf-8')
 
         user = None
-        auth = self.factory.hs.get_auth()
         try:
-            user = yield auth.get_user_by_access_token(access_token)
+            user = yield self.auth.get_user_by_access_token(access_token)
             self.requester = create_requester(
                 user["user"],
                 user["token_id"],
@@ -77,13 +90,11 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             return
         logger.info("authenticated {0} ({1}) okay".format(user['user'], ip_addr))
 
-        full_state = request.params.get("full_state", None)
-        if full_state is not None:
-            self.full_state = full_state[0]
+        self.full_state = request.params.get("full_state", [False])[0]
 
-        since = request.params.get("since", None)
+        since = request.params.get("since", [None])[0]
         if since is not None:
-            since = since[0].decode('utf-8')
+            since = since.decode('utf-8')
             self.since = StreamToken.from_string(since)
 
         filter_id = request.params.get("filter", [None])[0]
@@ -106,7 +117,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
             self.filter_id = filter_id
 
         if user and access_token and ip_addr:
-            self.factory.hs.get_datastore().insert_client_ip(
+            self.datastore.insert_client_ip(
                 user_id=user["user"].to_string(),
                 access_token=access_token,
                 ip=ip_addr,
@@ -117,7 +128,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         presence = request.params.get("presence", [PresenceState.ONLINE])[0]
         logger.debug("Presence should be: %s" % presence)
         if presence != PresenceState.OFFLINE:
-            yield self.factory.presence_handler.set_state(
+            yield self.presence_handler.set_state(
                 user['user'], {"presence": presence}, True
             )
         self.presence = presence
@@ -197,6 +208,10 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 }
             }))
 
+    def _genTxnKey(self, msg_id):
+        return self.requester.user.to_string() + "/" + \
+            str(self.requester.access_token_id) + "/" + msg_id
+
     def onClose(self, wasClean, code, reason):
         logger.info("WebSocket connection closed: {0} {1}".format(code, reason))
         self.shouldSync = False
@@ -209,7 +224,6 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         self._sync(initial=True)
 
     def _sync(self, initial=False):
-        sync_handler = self.factory.hs.get_sync_handler()
         request_key = (
             self.requester.user,
             0,  # timeout
@@ -232,16 +246,20 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
 
         @defer.inlineCallbacks
         def sync_with_presence_context():
-            context = yield self.factory.presence_handler.user_syncing(
+            context = yield self.presence_handler.user_syncing(
                 self.requester.user.to_string(), affect_presence=affect_presence,
             )
             with context:
-                sync_result = yield sync_handler.wait_for_sync_for_user(
-                    sync_config,
-                    since_token=self.since,
-                    timeout=0 if initial else SYNC_TIMEOUT,
-                    full_state=self.full_state if initial else False
-                )
+                try:
+                    sync_result = yield self.sync_handler.wait_for_sync_for_user(
+                        sync_config,
+                        since_token=self.since,
+                        timeout=0 if initial else SYNC_TIMEOUT,
+                        full_state=self.full_state if initial else False
+                    )
+                except Exception as ex:
+                    logger.warn("Something went wrong when getting sync response: %s", ex)
+
                 defer.returnValue(sync_result)
 
         sync = defer.maybeDeferred(sync_with_presence_context)
@@ -253,7 +271,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         logger.debug("Got sync")
         if self.shouldSync:
             self.since = result.next_batch
-            time_now = self.factory.clock.time_msec()
+            time_now = self.clock.time_msec()
 
             logger.debug("Sending sync")
             self.sendMessage(json.dumps(SyncRestServlet.encode_response(
@@ -294,7 +312,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         except Exception:
             raise SynapseError(400, "Unable to parse state")
 
-        yield self.factory.presence_handler.set_state(self.requester.user, state)
+        yield self.presence_handler.set_state(self.requester.user, state)
         self.presence = state["presence"]
         defer.returnValue(bytes('{"id":"' + msg["id"] + '","result":{}}'))
 
@@ -302,12 +320,12 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
     def _handle_read_markers(self, msg):
         yield logger.debug("Execute _handle_read_markers")
 
-        yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
+        yield self.presence_handler.bump_presence_active_time(self.requester.user)
 
         params = msg["params"]
         read_event_id = params.get("m.read", None)
         if read_event_id:
-            yield self.factory.receipts_handler.received_client_receipt(
+            yield self.hs.get_receipts_handler().received_client_receipt(
                 params["room_id"],
                 "m.read",
                 user_id=self.requester.user.to_string(),
@@ -316,7 +334,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
 
         read_marker_event_id = params.get("m.fully_read", None)
         if read_marker_event_id:
-            yield self.factory.read_marker_handler.received_client_read_marker(
+            yield self.hs.get_read_marker_handler().received_client_read_marker(
                 params["room_id"],
                 user_id=self.requester.user.to_string(),
                 event_id=read_marker_event_id
@@ -329,15 +347,19 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         logger.debug("Execute _handle_send")
         if use_cached:
             result = yield self.factory.txns.fetch_or_execute(
-                msg["id"], self._handle_send, msg, use_cached=False,
+                self._genTxnKey(msg["id"]),
+                self._handle_send,
+                msg,
+                use_cached=False,
             )
             defer.returnValue(result)
 
         params = msg["params"]
 
-        yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
+        yield self.presence_handler.bump_presence_active_time(self.requester.user)
 
-        event = yield self.factory.event_creation_handler.create_and_send_nonmember_event(
+        event = yield self.hs.get_event_creation_handler()\
+            .create_and_send_nonmember_event(
             self.requester,
             {
                 "type": params["event_type"],
@@ -360,11 +382,14 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         logger.debug("Execute _handle_state")
         if use_cached:
             result = yield self.factory.txns.fetch_or_execute(
-                msg["id"], self._handle_state, msg, use_cached=False,
+                self._genTxnKey(msg["id"]),
+                self._handle_state,
+                msg,
+                use_cached=False,
             )
             defer.returnValue(result)
 
-        yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
+        yield self.presence_handler.bump_presence_active_time(self.requester.user)
 
         params = msg["params"]
         event_dict = {
@@ -378,7 +403,7 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
 
         if params["event_type"] == EventTypes.Member:
             membership = params["content"].get("membership", None)
-            event = yield self.handlers.room_member_handler.update_membership(
+            event = yield self.hs.get_room_member_handler().update_membership(
                 self.requester,
                 target=UserID.from_string(params["state_key"]),
                 room_id=params["room_id"],
@@ -386,8 +411,8 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
                 content=params["content"],
             )
         else:
-            event_creation_handler = self.factory.event_creation_handler
-            event = yield event_creation_handler.create_and_send_nonmember_event(
+            event = yield self.hs.get_event_creation_handler()\
+                .create_and_send_nonmember_event(
                 self.requester,
                 event_dict,
                 txn_id=msg["id"],
@@ -409,17 +434,17 @@ class SynapseWebsocketProtocol(WebSocketServerProtocol):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(params.get("timeout", 30000), 120000)
 
-        yield self.factory.presence_handler.bump_presence_active_time(self.requester.user)
+        yield self.presence_handler.bump_presence_active_time(self.requester.user)
 
         if params["typing"]:
-            yield self.factory.typing_handler.started_typing(
+            yield self.hs.get_typing_handler().started_typing(
                 target_user=self.requester.user,
                 auth_user=self.requester.user,
                 room_id=params["room_id"],
                 timeout=timeout,
             )
         else:
-            yield self.factory.typing_handler.stopped_typing(
+            yield self.hs.get_typing_handler().stopped_typing(
                 target_user=self.requester.user,
                 auth_user=self.requester.user,
                 room_id=params["room_id"],
@@ -438,16 +463,8 @@ class SynapseWebsocketFactory(WebSocketServerFactory):
         if compress:
             self.setProtocolOptions(perMessageCompressionAccept=self.accept_compress)
 
-        self.clock = hs.get_clock()
-        self.filtering = hs.get_filtering()
-        self.handlers = hs.get_handlers()
-        self.event_creation_handler = hs.get_event_creation_handler()
-        self.presence_handler = hs.get_presence_handler()
-        self.receipts_handler = hs.get_receipts_handler()
-        self.read_marker_handler = hs.get_read_marker_handler()
+        # this should be shared between all connections
         self.txns = HttpTransactionCache(hs)
-        self.typing_handler = hs.get_typing_handler()
-        self.clients = []
 
         LaterGauge(
             "synapse_websocket_connection_count",
