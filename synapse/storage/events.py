@@ -576,7 +576,7 @@ class EventsStore(EventsWorkerStore):
         for ev, ctx in events_context:
             if ctx.state_group is None:
                 # This should only happen for outlier events.
-                if not event.internal_metadata.is_outlier():
+                if not ev.internal_metadata.is_outlier():
                     raise Exception(
                         "Context for new event %s has no state "
                         "group" % (ev.event_id, ),
