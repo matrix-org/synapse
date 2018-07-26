@@ -14,7 +14,6 @@
 # limitations under the License.
 import itertools
 import logging
-
 from collections import namedtuple
 
 from canonicaljson import json
