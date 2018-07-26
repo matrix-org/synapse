@@ -59,8 +59,8 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         self.notifier = hs.get_notifier()
         self.pusher_pool = hs.get_pusherpool()
 
-    @defer.inlineCallbacks
     @staticmethod
+    @defer.inlineCallbacks
     def _serialize_payload(store, event_and_contexts, backfilled):
         """
         Args:

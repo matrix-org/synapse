@@ -44,8 +44,10 @@ from synapse.crypto.event_signing import (
     compute_event_signature,
 )
 from synapse.events.validator import EventValidator
-from synapse.replication.http.federation import send_federation_events_to_master
-from synapse.replication.http.membership import notify_user_membership_change
+from synapse.replication.http.federation import (
+    ReplicationFederationSendEventsRestServlet,
+)
+from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import resolve_events_with_factory
 from synapse.types import UserID, get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
@@ -90,6 +92,13 @@ class FederationHandler(BaseHandler):
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_simple_http_client()
+
+        self._send_events_to_master = (
+            ReplicationFederationSendEventsRestServlet.make_client(hs)
+        )
+        self._notify_user_membership_change = (
+            ReplicationUserJoinedLeftRoomRestServlet.make_client(hs)
+        )
 
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
@@ -2318,12 +2327,8 @@ class FederationHandler(BaseHandler):
             Deferred
         """
         if self.config.worker_app:
-            yield send_federation_events_to_master(
-                clock=self.hs.get_clock(),
+            yield self._send_events_to_master(
                 store=self.store,
-                client=self.http_client,
-                host=self.config.worker_replication_host,
-                port=self.config.worker_replication_http_port,
                 event_and_contexts=event_and_contexts,
                 backfilled=backfilled
             )
@@ -2381,10 +2386,7 @@ class FederationHandler(BaseHandler):
         """Called when a new user has joined the room
         """
         if self.config.worker_app:
-            return notify_user_membership_change(
-                client=self.http_client,
-                host=self.config.worker_replication_host,
-                port=self.config.worker_replication_http_port,
+            return self._notify_user_membership_change(
                 room_id=room_id,
                 user_id=user.to_string(),
                 change="joined",
