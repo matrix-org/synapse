@@ -540,16 +540,6 @@ class SyncHandler(object):
                     )
                 ]
 
-                if not include_redundant_members:
-                    cache_key = (sync_config.user.to_string(), sync_config.device_id)
-                    cache = self.lazy_loaded_members_cache.get(cache_key)
-                    if cache is None:
-                        logger.debug("creating LruCache for %r", cache_key)
-                        cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
-                        self.lazy_loaded_members_cache[cache_key] = cache
-                    else:
-                        logger.debug("found LruCache for %r", cache_key)
-
                 # only apply the filtering to room members
                 filtered_types = [EventTypes.Member]
 
@@ -619,7 +609,7 @@ class SyncHandler(object):
 
             if lazy_load_members and not include_redundant_members:
 
-              cache_key = (sync_config.user.to_string(), sync_config.device_id)
+                cache_key = (sync_config.user.to_string(), sync_config.device_id)
                 cache = self.lazy_loaded_members_cache.get(cache_key)
                 if cache is None:
                     logger.debug("creating LruCache for %r", cache_key)
