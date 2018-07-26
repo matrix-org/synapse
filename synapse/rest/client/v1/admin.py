@@ -132,7 +132,10 @@ class UserRegisterServlet(ClientV1RestServlet):
                 400, "username must be specified", errcode=Codes.BAD_JSON,
             )
         else:
-            if (not isinstance(body['username'], text_type) or len(body['username']) > 512):
+            if (
+                not isinstance(body['username'], text_type)
+                or len(body['username']) > 512
+            ):
                 raise SynapseError(400, "Invalid username")
 
             username = body["username"].encode("utf-8")
@@ -144,7 +147,10 @@ class UserRegisterServlet(ClientV1RestServlet):
                 400, "password must be specified", errcode=Codes.BAD_JSON,
             )
         else:
-            if (not isinstance(body['password'], text_type) or len(body['password']) > 512):
+            if (
+                not isinstance(body['password'], text_type)
+                or len(body['password']) > 512
+            ):
                 raise SynapseError(400, "Invalid password")
 
             password = body["password"].encode("utf-8")
@@ -168,17 +174,18 @@ class UserRegisterServlet(ClientV1RestServlet):
         want_mac = want_mac.hexdigest()
 
         if not hmac.compare_digest(want_mac, got_mac.encode('ascii')):
-            raise SynapseError(
-                403, "HMAC incorrect",
-            )
+            raise SynapseError(403, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
         from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+
         register = RegisterRestServlet(self.hs)
 
         (user_id, _) = yield register.registration_handler.register(
-            localpart=body['username'].lower(), password=body["password"],
-            admin=bool(admin), generate_token=False,
+            localpart=body['username'].lower(),
+            password=body["password"],
+            admin=bool(admin),
+            generate_token=False,
         )
 
         result = yield register._create_registration_details(user_id, body)
