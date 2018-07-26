@@ -153,7 +153,7 @@ class GroupAttestionRenewer(object):
         defer.returnValue({})
 
     def _start_renew_attestations(self):
-        run_as_background_process("renew_attestations", self._renew_attestations)
+        return run_as_background_process("renew_attestations", self._renew_attestations)
 
     @defer.inlineCallbacks
     def _renew_attestations(self):

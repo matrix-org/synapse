@@ -256,7 +256,7 @@ class ProfileHandler(BaseHandler):
                 )
 
     def _start_update_remote_profile_cache(self):
-        run_as_background_process(
+        return run_as_background_process(
             "Update remote profile", self._update_remote_profile_cache,
         )
 

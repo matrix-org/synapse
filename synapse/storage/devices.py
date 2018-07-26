@@ -712,7 +712,7 @@ class DeviceStore(SQLBaseStore):
 
             logger.info("Pruned %d device list outbound pokes", txn.rowcount)
 
-        run_as_background_process(
+        return run_as_background_process(
             "prune_old_outbound_device_pokes",
             self.runInteraction,
             "_prune_old_outbound_device_pokes",
