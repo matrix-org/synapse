@@ -19,6 +19,8 @@ import logging
 import urllib
 from collections import namedtuple
 
+from six.moves.urllib import parse as urlparse
+
 from signedjson.key import (
     decode_verify_key_bytes,
     encode_verify_key_base64,
@@ -781,6 +783,14 @@ def _handle_key_deferred(verify_request):
     logger.debug("Got key %s %s:%s for server %s, verifying" % (
         key_id, verify_key.alg, verify_key.version, server_name,
     ))
+    if 'uri' in json_object:
+        parts = urlparse.urlsplit(json_object.get('uri'))
+        path = '/'.join(
+            tuple(
+                urllib.quote(urllib.unquote(arg), safe='') for arg in parts[2].split('/')
+            )
+        )
+        json_object['uri'] = urlparse.urlunparse(('', '', path, '', parts[3],  ''))
     try:
         verify_signed_json(json_object, server_name, verify_key)
     except SignatureVerifyException as e:
