@@ -53,16 +53,16 @@ class EmailPusher(object):
         self.max_stream_ordering = self.last_stream_ordering
 
         self.processing = False
-        
+
         self.mail_notif_amount = hs.config.mail_notif_amount;
         self.mail_notif_inv_amount = hs.config.mail_notif_inv_amount;
-        
+
         self.delay_before_mail_ms = hs.config.delay_before_mail_s * 1000;
         self.mail_throttle_start_ms = hs.config.mail_throttle_start_s * 1000;
         self.mail_throttle_max_ms = hs.config.mail_throttle_max_s * 1000;
         self.mail_throttle_multiplier = hs.config.mail_throttle_multiplier;
         self.mail_throttle_reset_after_ms = hs.config.mail_throttle_reset_after_s * 1000;
-        
+
         self.mail_ignore_rooms = hs.config.mail_ignore_rooms;
 
     @defer.inlineCallbacks

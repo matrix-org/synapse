@@ -89,42 +89,42 @@ class EmailConfig(Config):
             parsed = email.utils.parseaddr(self.email_notif_from)
             if parsed[1] == '':
                 raise ConfigError("Invalid notif_from address")
-                
+
             self.mail_notif_amount = email_config.get(
                 "mail_notif_amount", 26
             )
-                
+
             self.mail_notif_inv_amount = email_config.get(
                 "mail_notif_inv_amount", 4
             )
-                
+
             self.delay_before_mail_s = email_config.get(
                 "delay_before_mail_s", 600
             )
-            
+
             self.mail_throttle_start_s = email_config.get(
                 "mail_throttle_start_s", 600
             )
-            
+
             self.mail_throttle_max_s = email_config.get(
                 "mail_throttle_max_s", 86400
             )
-            
+
             self.mail_throttle_multiplier = email_config.get(
                 "mail_throttle_multiplier", 144
             )
-            
+
             self.mail_throttle_reset_after_s = email_config.get(
                 "mail_throttle_reset_after_s", 43200
             )
-            
+
             self.mail_ignore_rooms = []
             ignore_rooms_string = email_config.get("mail_ignore_rooms", None)
-            
+
             if ignore_rooms_string is not None:
                 ignore_room_string_fix = ignore_rooms_string.replace(" ", "")
                 self.mail_ignore_rooms = ignore_room_string_fix.split(",")
-        
+
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
