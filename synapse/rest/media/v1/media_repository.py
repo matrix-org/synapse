@@ -106,7 +106,7 @@ class MediaRepository(object):
         )
 
     def _start_update_recently_accessed(self):
-        run_as_background_process(
+        return run_as_background_process(
             "update_recently_accessed_media", self._update_recently_accessed,
         )
 

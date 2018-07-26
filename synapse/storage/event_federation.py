@@ -549,7 +549,7 @@ class EventFederationStore(EventFederationWorkerStore):
                 sql,
                 (self.stream_ordering_month_ago, self.stream_ordering_month_ago,)
             )
-        run_as_background_process(
+        return run_as_background_process(
             "delete_old_forward_extrem_cache",
             self.runInteraction,
             "_delete_old_forward_extrem_cache",
