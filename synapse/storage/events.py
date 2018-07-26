@@ -520,7 +520,6 @@ class EventsStore(EventsWorkerStore):
             iterable=list(new_latest_event_ids),
             retcols=["prev_event_id"],
             keyvalues={
-                "room_id": room_id,
                 "is_state": False,
             },
             desc="_calculate_new_extremeties",
