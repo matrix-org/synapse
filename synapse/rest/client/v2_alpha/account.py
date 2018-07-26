@@ -16,7 +16,6 @@
 # limitations under the License.
 import logging
 
-from six import PY2
 from six.moves import http_client
 
 from twisted.internet import defer

@@ -17,8 +17,6 @@
 import logging
 import unicodedata
 
-from six import PY2
-
 import attr
 import bcrypt
 import pymacaroons
