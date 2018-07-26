@@ -60,6 +60,10 @@ logger = logging.getLogger(__name__)
 
 
 def run_create(cur, database_engine, *args, **kwargs):
+    pass
+
+
+def run_upgrade(cur, database_engine, *args, **kwargs):
     if isinstance(database_engine, PostgresEngine):
         cur.execute("""
             ALTER TABLE events ALTER COLUMN content DROP NOT NULL;
@@ -67,27 +71,22 @@ def run_create(cur, database_engine, *args, **kwargs):
         return
 
     # sqlite is an arse about this. ref: https://www.sqlite.org/lang_altertable.html
-    cur.execute("PRAGMA schema_version")
-    (oldver,) = cur.fetchone()
 
     cur.execute("SELECT sql FROM sqlite_master WHERE tbl_name='events' AND type='table'")
     (oldsql,) = cur.fetchone()
+
     sql = oldsql.replace("content TEXT NOT NULL", "content TEXT")
     if sql == oldsql:
         raise Exception("Couldn't find null constraint to drop in %s" % oldsql)
 
     logger.info("Replacing definition of 'events' with: %s", sql)
 
+    cur.execute("PRAGMA schema_version")
+    (oldver,) = cur.fetchone()
     cur.execute("PRAGMA writable_schema=ON")
-
     cur.execute(
         "UPDATE sqlite_master SET sql=? WHERE tbl_name='events' AND type='table'",
         (sql, ),
     )
-
     cur.execute("PRAGMA schema_version=%i" % (oldver+1,))
     cur.execute("PRAGMA writable_schema=OFF")
-
-
-def run_upgrade(*args, **kwargs):
-    pass
