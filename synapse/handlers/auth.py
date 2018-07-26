@@ -630,9 +630,6 @@ class AuthHandler(BaseHandler):
         # for the auth providers
         password = login_submission.get("password")
 
-        if password and PY2:
-            password = password.decode('utf8')
-
         if login_type == LoginType.PASSWORD:
             if not self._password_enabled:
                 raise SynapseError(400, "Password login has been disabled.")

@@ -175,10 +175,9 @@ class UserRegisterServlet(ClientV1RestServlet):
         from synapse.rest.client.v2_alpha.register import RegisterRestServlet
         register = RegisterRestServlet(self.hs)
 
-        password = password.decode('utf-8')
         (user_id, _) = yield register.registration_handler.register(
-            localpart=username.lower(), password=password, admin=bool(admin),
-            generate_token=False,
+            localpart=body['username'].lower(), password=body["password"],
+            admin=bool(admin), generate_token=False,
         )
 
         result = yield register._create_registration_details(user_id, body)

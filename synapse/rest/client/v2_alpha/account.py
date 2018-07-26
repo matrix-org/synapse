@@ -166,9 +166,6 @@ class PasswordRestServlet(RestServlet):
         assert_params_in_dict(params, ["new_password"])
         new_password = params['new_password']
 
-        if PY2:
-            new_password = new_password.decode('utf8')
-
         yield self._set_password_handler.set_password(
             user_id, new_password, requester
         )

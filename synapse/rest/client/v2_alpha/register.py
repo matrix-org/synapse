@@ -392,11 +392,6 @@ class RegisterRestServlet(RestServlet):
             guest_access_token = params.get("guest_access_token", None)
             new_password = params.get("password", None)
 
-            if new_password and isinstance(new_password, bytes):
-                # We may not need to decode the password, if it came from the
-                # session -- we've decoded it before then.
-                new_password = new_password.decode('utf8')
-
             if desired_username is not None:
                 desired_username = desired_username.lower()
 
