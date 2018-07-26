@@ -284,7 +284,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range_for_email(
-        self, user_id, min_stream_ordering, max_stream_ordering, msglimit=26, invlimit=4
+        self, user_id, min_stream_ordering, max_stream_ordering, msglimit=26, invlimit=4, room_ignore_list=[]
     ):
         """Get a list of the oldest and most recent unread push actions for a given user,
         within the given stream ordering range. Called by the emailpusher
@@ -302,7 +302,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             "room_id", "stream_ordering", "actions", "received_ts".
             The list will be ordered by descending received_ts.
             The list will have between 0~(msglimit+invlimit) entries.
-        """        
+        """
         # find rooms that have a read receipt in them and return the most recent
         # as well as the oldest push actions (otherwise we might never send notifications
         # because of roll-over effects)
@@ -316,6 +316,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "   FROM events"
                 "   INNER JOIN receipts_linearized USING (room_id, event_id)"
                 "   WHERE receipt_type = 'm.read' AND user_id = ?"
+                "   AND room_id NOT IN ("
+                + ",".join("?" * len(room_ignore_list)) + ")"
                 "   GROUP BY room_id"
                 ") AS rl,"
                 " event_push_actions AS ep"
@@ -328,14 +330,14 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "   AND ep.stream_ordering <= ?"
                 " ORDER BY ep.stream_ordering " + order + " LIMIT ?"
             )
-            args = [
-                user_id, user_id,
+            args = [user_id] + room_ignore_list + [
+                user_id,
                 min_stream_ordering, max_stream_ordering, msglimit/2,
             ]
             txn.execute(sql, args)
             return txn.fetchall()
-        
-        order = "DESC"        
+
+        order = "DESC"
         after_read_receipt_desc = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
         )
@@ -370,11 +372,11 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             ]
             txn.execute(sql, args)
             return txn.fetchall()
-        order = "DESC"    
+        order = "DESC"
         no_read_receipt_desc = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
         )
-        order = "ASC"    
+        order = "ASC"
         no_read_receipt_asc = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
         )
@@ -389,7 +391,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "received_ts": row[5],
             } for row in after_read_receipt_desc + after_read_receipt_asc + no_read_receipt_desc + no_read_receipt_asc
         ]
-         
+
         # Remove duplicates
         notifs = []
         event_ids = []
@@ -398,7 +400,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 continue
             notifs.append(notif)
             event_ids.append(notif["event_id"])
-        
+
         # Now sort it so it's ordered correctly, since currently it will
         # contain results from the first query, correctly ordered, followed
         # by results from the second query, but we want them all ordered

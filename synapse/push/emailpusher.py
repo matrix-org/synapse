@@ -62,6 +62,8 @@ class EmailPusher(object):
         self.mail_throttle_max_ms = hs.config.mail_throttle_max_s * 1000;
         self.mail_throttle_multiplier = hs.config.mail_throttle_multiplier;
         self.mail_throttle_reset_after_ms = hs.config.mail_throttle_reset_after_s * 1000;
+        
+        self.mail_ignore_rooms = hs.config.mail_ignore_rooms;
 
     @defer.inlineCallbacks
     def on_started(self):
@@ -129,7 +131,7 @@ class EmailPusher(object):
         """
         start = 0 if INCLUDE_ALL_UNREAD_NOTIFS else self.last_stream_ordering
         fn = self.store.get_unread_push_actions_for_user_in_range_for_email
-        unprocessed = yield fn(self.user_id, start, self.max_stream_ordering, self.mail_notif_amount, self.mail_notif_inv_amount)
+        unprocessed = yield fn(self.user_id, start, self.max_stream_ordering, self.mail_notif_amount, self.mail_notif_inv_amount, self.mail_ignore_rooms)
 
         soonest_due_at = None
 

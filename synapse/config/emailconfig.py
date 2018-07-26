@@ -117,6 +117,13 @@ class EmailConfig(Config):
             self.mail_throttle_reset_after_s = email_config.get(
                 "mail_throttle_reset_after_s", 43200
             )
+            
+            self.mail_ignore_rooms = []
+            ignore_rooms_string = email_config.get("mail_ignore_rooms", None)
+            
+            if ignore_rooms_string is not None:
+                ignore_room_string_fix = ignore_rooms_string.replace(" ", "")
+                self.mail_ignore_rooms = ignore_room_string_fix.split(",")
         
 
     def default_config(self, config_dir_path, server_name, **kwargs):
@@ -167,4 +174,6 @@ class EmailConfig(Config):
         #   # 12 hours - a gap of 12 hours in conversation is surely enough to merit a new
         #   # notification when things get going again...
         #   mail_throttle_reset_after_s : 43200
+        #   # Ignore these room ids for mail notifications (comma separated list).
+        #   #mail_ignore_rooms: "!QtykxKocfZaZOUrTwp:matrix.org, !DgvjtOljKujDBrxyHk:matrix.org"
         """
