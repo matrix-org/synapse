@@ -102,7 +102,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 to_update,
             )
 
-        run_as_background_process(
+        return run_as_background_process(
             "update_client_ips", update,
         )
 

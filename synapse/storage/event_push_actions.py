@@ -460,7 +460,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             )
 
     def _find_stream_orderings_for_times(self):
-        run_as_background_process(
+        return run_as_background_process(
             "event_push_action_stream_orderings",
             self.runInteraction,
             "_find_stream_orderings_for_times",
@@ -790,7 +790,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         """, (room_id, user_id, stream_ordering))
 
     def _start_rotate_notifs(self):
-        run_as_background_process("rotate_notifs", self._rotate_notifs)
+        return run_as_background_process("rotate_notifs", self._rotate_notifs)
 
     @defer.inlineCallbacks
     def _rotate_notifs(self):
