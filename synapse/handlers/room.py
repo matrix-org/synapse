@@ -474,7 +474,7 @@ class RoomContextHandler(object):
         # first? Shouldn't we be consistent with /sync?
 
         state = yield self.store.get_state_for_events(
-            [last_event_id], types, filtered_types=filtered_types
+            [last_event_id], types, filtered_types=filtered_types,
         )
         results["state"] = list(state[last_event_id].values())
 

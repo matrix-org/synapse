@@ -608,7 +608,6 @@ class SyncHandler(object):
                         )
 
             if lazy_load_members and not include_redundant_members:
-
                 cache_key = (sync_config.user.to_string(), sync_config.device_id)
                 cache = self.lazy_loaded_members_cache.get(cache_key)
                 if cache is None:
