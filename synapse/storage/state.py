@@ -493,12 +493,6 @@ class StateGroupWorkerStore(SQLBaseStore):
     def _get_some_state_from_cache(self, group, types, filtered_types=None):
         """Checks if group is in cache. See `_get_state_for_groups`
 
-        Returns 3-tuple (`state_dict`, `missing_types`, `got_all`).
-        `missing_types` is the list of types that aren't in the cache for that
-        group. `got_all` is a bool indicating if we successfully retrieved all
-        requests state from the cache, if False we need to query the DB for the
-        missing state.
-
         Args:
             group(int): The state group to lookup
             types(list[str, str|None]): List of 2-tuples of the form
@@ -507,33 +501,38 @@ class StateGroupWorkerStore(SQLBaseStore):
             filtered_types(list[str]|None): Only apply filtering via `types` to this
                 list of event types.  Other types of events are returned unfiltered.
                 If None, `types` filtering is applied to all events.
+
+        Returns 2-tuple (`state_dict`, `got_all`).
+        `got_all` is a bool indicating if we successfully retrieved all
+        requests state from the cache, if False we need to query the DB for the
+        missing state.
         """
         is_all, known_absent, state_dict_ids = self._state_group_cache.get(group)
 
         type_to_key = {}
 
-        # tracks which of the requested types are missing from our cache
-        missing_types = set()
+        # tracks whether any of ourrequested types are missing from the cache
+        missing_types = False
 
         for typ, state_key in types:
             key = (typ, state_key)
 
             if (
                 state_key is None or
-                filtered_types is not None and typ not in filtered_types
+                (filtered_types is not None and typ not in filtered_types)
             ):
                 type_to_key[typ] = None
                 # we mark the type as missing from the cache because
                 # when the cache was populated it might have been done with a
                 # restricted set of state_keys, so the wildcard will not work
                 # and the cache may be incomplete.
-                missing_types.add(key)
+                missing_types = True
             else:
                 if type_to_key.get(typ, object()) is not None:
                     type_to_key.setdefault(typ, set()).add(state_key)
 
                 if key not in state_dict_ids and key not in known_absent:
-                    missing_types.add(key)
+                    missing_types = True
 
         sentinel = object()
 
@@ -547,18 +546,17 @@ class StateGroupWorkerStore(SQLBaseStore):
                 return True
             return False
 
-        if types == [] and filtered_types is not None:
-            # special wildcard case for empty type-list but an explicit filtered_types
-            # which means that we'll try to return all types which aren't in the
-            # filtered_types list.  missing_types will always be empty, so we ignore it.
-            got_all = is_all
-        else:
-            got_all = is_all or not missing_types
+        got_all = is_all
+        if not got_all:
+            # the cache is incomplete. We may still have got all the results we need, if
+            # we don't have any wildcards in the match list.
+            if not missing_types and filtered_types is None:
+                got_all = True
 
         return {
             k: v for k, v in iteritems(state_dict_ids)
             if include(k[0], k[1])
-        }, missing_types, got_all
+        }, got_all
 
     def _get_all_state_from_cache(self, group):
         """Checks if group is in cache. See `_get_state_for_groups`
@@ -603,7 +601,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         missing_groups = []
         if types is not None:
             for group in set(groups):
-                state_dict_ids, _, got_all = self._get_some_state_from_cache(
+                state_dict_ids, got_all = self._get_some_state_from_cache(
                     group, types, filtered_types
                 )
                 results[group] = state_dict_ids

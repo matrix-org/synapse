@@ -43,6 +43,7 @@ from signedjson.sign import sign_json
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
 from synapse.util.logcontext import run_in_background
 
@@ -129,7 +130,7 @@ class GroupAttestionRenewer(object):
         self.attestations = hs.get_groups_attestation_signing()
 
         self._renew_attestations_loop = self.clock.looping_call(
-            self._renew_attestations, 30 * 60 * 1000,
+            self._start_renew_attestations, 30 * 60 * 1000,
         )
 
     @defer.inlineCallbacks
@@ -150,6 +151,9 @@ class GroupAttestionRenewer(object):
         yield self.store.update_remote_attestion(group_id, user_id, attestation)
 
         defer.returnValue({})
+
+    def _start_renew_attestations(self):
+        return run_as_background_process("renew_attestations", self._renew_attestations)
 
     @defer.inlineCallbacks
     def _renew_attestations(self):

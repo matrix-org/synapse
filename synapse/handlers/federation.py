@@ -1279,7 +1279,7 @@ class FederationHandler(BaseHandler):
     @log_function
     def on_make_leave_request(self, room_id, user_id):
         """ We've received a /make_leave/ request, so we create a partial
-        join event for the room and return that. We do *not* persist or
+        leave event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
         """
         builder = self.event_builder_factory.new({
@@ -1980,10 +1980,6 @@ class FederationHandler(BaseHandler):
 
         current_state_ids.update(state_updates)
 
-        if context.delta_ids is not None:
-            delta_ids = dict(context.delta_ids)
-            delta_ids.update(state_updates)
-
         prev_state_ids = yield context.get_prev_state_ids(self.store)
         prev_state_ids = dict(prev_state_ids)
 
@@ -1991,11 +1987,13 @@ class FederationHandler(BaseHandler):
             k: a.event_id for k, a in iteritems(auth_events)
         })
 
+        # create a new state group as a delta from the existing one.
+        prev_group = context.state_group
         state_group = yield self.store.store_state_group(
             event.event_id,
             event.room_id,
-            prev_group=context.prev_group,
-            delta_ids=delta_ids,
+            prev_group=prev_group,
+            delta_ids=state_updates,
             current_state_ids=current_state_ids,
         )
 
@@ -2003,7 +2001,8 @@ class FederationHandler(BaseHandler):
             state_group=state_group,
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
-            delta_ids=delta_ids,
+            prev_group=prev_group,
+            delta_ids=state_updates,
         )
 
     @defer.inlineCallbacks
