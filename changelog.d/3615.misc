@@ -1,0 +1,1 @@
+Added more email notification settings to config file, also fixed issue with email notifications sometimes not sending because of roll-over effects.
