@@ -125,7 +125,6 @@ class EmailConfig(Config):
                 ignore_room_string_fix = ignore_rooms_string.replace(" ", "")
                 self.mail_ignore_rooms = ignore_room_string_fix.split(",")
 
-
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable sending emails for notification events
@@ -151,19 +150,21 @@ class EmailConfig(Config):
         #   notif_for_new_users: True
         #   riot_base_url: "http://localhost/riot"
         #   # The max amount of notifications that should be contained in a mail
-        #   # (a mail includes the oldest amount/2 and most recent amount/2 notifications)
-        #   # (should be divisible by 2)
+        #   # (a mail includes the oldest amount/2 and
+        #   # most recent amount/2 notifications - should be divisible by 2)
         #   mail_notif_amount: 26
-        #   # The max amount of room invite notifications that should be contained in a mail
+        #   # The max amount of room invite notifications
+        #   # that should be contained in a mail
         #   # (should be divisible by 2, see mail_notif_amount explanation)
         #   mail_notif_inv_amount: 4
-        #   # The amount of time we always wait before ever emailing about a notification in seconds
+        #   # The amount of time we always wait
+        #   # before ever emailing about a notification in seconds
         #   # (to give the user a chance to respond to other push or notice the window)
         #   # (600s = 10 minutes)
         #   delay_before_mail_s : 600
-        #   # THROTTLE is the minimum time between mail notifications sent for a given room.
-        #   # Each room maintains its own throttle counter, but each new mail notification
-        #   # sends the pending notifications for all rooms.
+        #   # THROTTLE is the minimum time between mail notifications sent for
+        #   # a given room. Each room maintains its own throttle counter, but each new
+        #   # mail notification sends the pending notifications for all rooms.
         #   mail_throttle_start_s : 600
         #   # (86400 = 24 hours)
         #   mail_throttle_max_s : 86400
@@ -171,9 +172,9 @@ class EmailConfig(Config):
         #   mail_throttle_multiplier : 144
         #   # If no event triggers a notification for this long after the previous,
         #   # the throttle is released.
-        #   # 12 hours - a gap of 12 hours in conversation is surely enough to merit a new
-        #   # notification when things get going again...
+        #   # 12 hours - a gap of 12 hours in conversation is surely enough to merit
+        #   # a new notification when things get going again...
         #   mail_throttle_reset_after_s : 43200
         #   # Ignore these room ids for mail notifications (comma separated list).
-        #   #mail_ignore_rooms: "!QtykxKocfZaZOUrTwp:matrix.org, !DgvjtOljKujDBrxyHk:matrix.org"
+        #   #mail_ignore_rooms: "!QtykxKocfZaZOUrTwp:matrix.org"
         """

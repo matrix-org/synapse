@@ -284,7 +284,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range_for_email(
-        self, user_id, min_stream_ordering, max_stream_ordering, msglimit=26, invlimit=4, room_ignore_list=[]
+        self, user_id, min_stream_ordering, max_stream_ordering,
+        msglimit=26, invlimit=4, room_ignore_list=[]
     ):
         """Get a list of the oldest and most recent unread push actions for a given user,
         within the given stream ordering range. Called by the emailpusher
@@ -389,7 +390,10 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "stream_ordering": row[2],
                 "actions": _deserialize_action(row[3], row[4]),
                 "received_ts": row[5],
-            } for row in after_read_receipt_desc + after_read_receipt_asc + no_read_receipt_desc + no_read_receipt_asc
+            } for row in (
+                after_read_receipt_desc + after_read_receipt_asc
+                + no_read_receipt_desc + no_read_receipt_asc
+                )
         ]
 
         # Remove duplicates
