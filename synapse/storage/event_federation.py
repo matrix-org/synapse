@@ -23,6 +23,7 @@ from unpaddedbase64 import encode_base64
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.events import EventsWorkerStore
 from synapse.storage.signatures import SignatureWorkerStore
@@ -446,7 +447,7 @@ class EventFederationStore(EventFederationWorkerStore):
         )
 
         hs.get_clock().looping_call(
-            self._delete_old_forward_extrem_cache, 60 * 60 * 1000
+            self._delete_old_forward_extrem_cache, 60 * 60 * 1000,
         )
 
     def _update_min_depth_for_room_txn(self, txn, room_id, depth):
@@ -548,9 +549,11 @@ class EventFederationStore(EventFederationWorkerStore):
                 sql,
                 (self.stream_ordering_month_ago, self.stream_ordering_month_ago,)
             )
-        return self.runInteraction(
+        run_as_background_process(
+            "delete_old_forward_extrem_cache",
+            self.runInteraction,
             "_delete_old_forward_extrem_cache",
-            _delete_old_forward_extrem_cache_txn
+            _delete_old_forward_extrem_cache_txn,
         )
 
     def clean_room_for_join(self, room_id):

@@ -311,6 +311,12 @@ class SQLBaseStore(object):
         after_callbacks = []
         exception_callbacks = []
 
+        if LoggingContext.current_context() == LoggingContext.sentinel:
+            logger.warn(
+                "Starting db txn '%s' from sentinel context",
+                desc,
+            )
+
         try:
             result = yield self.runWithConnection(
                 self._new_transaction,
