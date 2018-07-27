@@ -42,6 +42,7 @@ from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import is_ascii, random_string
 
 from ._base import FileInfo, respond_404, respond_with_responder
+from .config_resource import MediaConfigResource
 from .download_resource import DownloadResource
 from .filepath import MediaFilePaths
 from .identicon_resource import IdenticonResource
@@ -51,7 +52,6 @@ from .storage_provider import StorageProviderWrapper
 from .thumbnail_resource import ThumbnailResource
 from .thumbnailer import Thumbnailer
 from .upload_resource import UploadResource
-from .config_resource import MediaConfigResource
 
 logger = logging.getLogger(__name__)
 
