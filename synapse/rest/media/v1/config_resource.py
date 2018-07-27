@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from synapse.http.server import respond_with_json, wrap_json_request_handler
