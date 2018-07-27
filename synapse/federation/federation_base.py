@@ -23,7 +23,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
-from synapse.http.servlet import assert_params_in_request
+from synapse.http.servlet import assert_params_in_dict
 from synapse.util import logcontext, unwrapFirstError
 
 logger = logging.getLogger(__name__)
@@ -199,7 +199,7 @@ def event_from_pdu_json(pdu_json, outlier=False):
     """
     # we could probably enforce a bunch of other fields here (room_id, sender,
     # origin, etc etc)
-    assert_params_in_request(pdu_json, ('event_id', 'type', 'depth'))
+    assert_params_in_dict(pdu_json, ('event_id', 'type', 'depth'))
 
     depth = pdu_json['depth']
     if not isinstance(depth, six.integer_types):
