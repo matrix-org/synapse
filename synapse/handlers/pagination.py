@@ -251,6 +251,32 @@ class PaginationHandler(object):
             is_peeking=(member_event_id is None),
         )
 
+        state = None
+        if event_filter and event_filter.lazy_load_members():
+            # TODO: remove redundant members
+
+            types = [
+                (EventTypes.Member, state_key)
+                for state_key in set(
+                    event.sender  # FIXME: we also care about invite targets etc.
+                    for event in events
+                )
+            ]
+
+            state_ids = yield self.store.get_state_ids_for_event(
+                events[0].event_id, types=types,
+            )
+
+            if state_ids:
+                state = yield self.store.get_events(list(state_ids.values()))
+
+            state = yield filter_events_for_client(
+                self.store,
+                user_id,
+                state.values(),
+                is_peeking=(member_event_id is None),
+            )
+
         time_now = self.clock.time_msec()
 
         chunk = {
@@ -261,5 +287,11 @@ class PaginationHandler(object):
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }
+
+        if state:
+            chunk["state"] = [
+                serialize_event(e, time_now, as_client_event)
+                for e in state
+            ]
 
         defer.returnValue(chunk)
