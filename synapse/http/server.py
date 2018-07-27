@@ -300,8 +300,13 @@ class JsonResource(HttpServer, resource.Resource):
 
         def _unquote(s):
             if PY3:
+                # On Python 3, unquote is unicode -> unicode
                 return urllib.parse.unquote(s)
             else:
+                # On Python 2, unquote is bytes -> bytes We need to encode the
+                # URL again (as it was decoded by _get_handler_for request), as
+                # ASCII because it's a URL, and then decode it to get the UTF-8
+                # characters that were quoted.
                 return urllib.parse.unquote(s.encode('ascii')).decode('utf8')
 
         kwargs = intern_dict({
@@ -321,9 +326,9 @@ class JsonResource(HttpServer, resource.Resource):
             request (twisted.web.http.Request):
 
         Returns:
-            Tuple[Callable, dict[str, str]]: callback method, and the dict
-                mapping keys to path components as specified in the handler's
-                path match regexp.
+            Tuple[Callable, dict[unicode, unicode]]: callback method, and the
+                dict mapping keys to path components as specified in the
+                handler's path match regexp.
 
                 The callback will normally be a method registered via
                 register_paths, so will return (possibly via Deferred) either
