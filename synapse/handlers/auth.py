@@ -709,10 +709,10 @@ class AuthHandler(BaseHandler):
         multiple inexact matches.
 
         Args:
-            user_id (str): complete @user:id
+            user_id (unicode): complete @user:id
             password (unicode): the provided password
         Returns:
-            (str) the canonical_user_id, or None if unknown user / bad password
+            (unicode) the canonical_user_id, or None if unknown user / bad password
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
@@ -855,7 +855,7 @@ class AuthHandler(BaseHandler):
             password (unicode): Password to hash.
 
         Returns:
-            Deferred(str): Hashed password.
+            Deferred(unicode): Hashed password.
         """
         def _do_hash():
             # Normalise the Unicode in the password
@@ -864,7 +864,7 @@ class AuthHandler(BaseHandler):
             return bcrypt.hashpw(
                 pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
                 bcrypt.gensalt(self.bcrypt_rounds),
-            )
+            ).decode('ascii')
 
         return make_deferred_yieldable(
             threads.deferToThreadPool(
@@ -877,7 +877,7 @@ class AuthHandler(BaseHandler):
 
         Args:
             password (unicode): Password to hash.
-            stored_hash (str): Expected hash value.
+            stored_hash (unicode): Expected hash value.
 
         Returns:
             Deferred(bool): Whether self.hash(password) == stored_hash.
