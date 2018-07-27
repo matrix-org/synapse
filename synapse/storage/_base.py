@@ -311,6 +311,12 @@ class SQLBaseStore(object):
         after_callbacks = []
         exception_callbacks = []
 
+        if LoggingContext.current_context() == LoggingContext.sentinel:
+            logger.warn(
+                "Starting db txn '%s' from sentinel context",
+                desc,
+            )
+
         try:
             result = yield self.runWithConnection(
                 self._new_transaction,
@@ -344,7 +350,7 @@ class SQLBaseStore(object):
         parent_context = LoggingContext.current_context()
         if parent_context == LoggingContext.sentinel:
             logger.warn(
-                "Running db txn from sentinel context: metrics will be lost",
+                "Starting db connection from sentinel context: metrics will be lost",
             )
             parent_context = None
 

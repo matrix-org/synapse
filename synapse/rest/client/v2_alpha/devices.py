@@ -19,9 +19,9 @@ from twisted.internet import defer
 
 from synapse.api import errors
 from synapse.http.servlet import (
+    RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
-    RestServlet
 )
 
 from ._base import client_v2_patterns, interactive_auth_handler

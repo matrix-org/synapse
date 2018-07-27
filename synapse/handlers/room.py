@@ -24,7 +24,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
-from synapse.types import RoomAlias, RoomID, RoomStreamToken, UserID
+from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
 from synapse.visibility import filter_events_for_client
 
@@ -395,7 +395,11 @@ class RoomCreationHandler(BaseHandler):
             )
 
 
-class RoomContextHandler(BaseHandler):
+class RoomContextHandler(object):
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+
     @defer.inlineCallbacks
     def get_event_context(self, user, room_id, event_id, limit):
         """Retrieves events, pagination tokens and state around a given event
@@ -413,8 +417,6 @@ class RoomContextHandler(BaseHandler):
         """
         before_limit = math.floor(limit / 2.)
         after_limit = limit - before_limit
-
-        now_token = yield self.hs.get_event_sources().get_current_token()
 
         users = yield self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
@@ -458,11 +460,15 @@ class RoomContextHandler(BaseHandler):
         )
         results["state"] = list(state[last_event_id].values())
 
-        results["start"] = now_token.copy_and_replace(
+        # We use a dummy token here as we only care about the room portion of
+        # the token, which we replace.
+        token = StreamToken.START
+
+        results["start"] = token.copy_and_replace(
             "room_key", results["start"]
         ).to_string()
 
-        results["end"] = now_token.copy_and_replace(
+        results["end"] = token.copy_and_replace(
             "room_key", results["end"]
         ).to_string()
 

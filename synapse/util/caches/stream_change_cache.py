@@ -80,12 +80,7 @@ class StreamChangeCache(object):
                 )
             }
 
-            # we need to include entities which we don't know about, as well as
-            # those which are known to have changed since the stream pos.
-            result = {
-                e for e in entities
-                if e in changed_entities or e not in self._entity_to_key
-            }
+            result = changed_entities.intersection(entities)
 
             self.metrics.inc_hits()
         else:
