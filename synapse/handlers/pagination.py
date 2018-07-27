@@ -18,7 +18,7 @@ import logging
 from twisted.internet import defer
 from twisted.python.failure import Failure
 
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.utils import serialize_event
 from synapse.types import RoomStreamToken
