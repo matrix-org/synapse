@@ -460,18 +460,17 @@ class RoomContextHandler(object):
         types = None
         filtered_types = None
         if event_filter and event_filter.lazy_load_members():
-            members = {}
-            for ev in (
-                results["events_before"] +
-                [results["event"]] +
-                results["events_after"]
-            ):
-                members[ev.sender] = True
+            members = set(ev.sender for ev in itertools.chain(
+                results["events_before"],
+                (results["event"],),
+                results["events_after"],
+            ))
             filtered_types = [EventTypes.Member]
-            types = [(EventTypes.Member, member) for member in members.keys()]
+            types = [(EventTypes.Member, member) for member in members]
 
         # XXX: why do we return the state as of the last event rather than the
         # first? Shouldn't we be consistent with /sync?
+        # https://github.com/matrix-org/matrix-doc/issues/687
 
         state = yield self.store.get_state_for_events(
             [last_event_id], types, filtered_types=filtered_types,
