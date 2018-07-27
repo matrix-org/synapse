@@ -90,6 +90,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         self.handlers = hs.get_handlers()
         self.event_creation_hander = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self.message_handler = hs.get_message_handler()
 
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -124,7 +125,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         format = parse_string(request, "format", default="content",
                               allowed_values=["content", "event"])
 
-        msg_handler = self.handlers.message_handler
+        msg_handler = self.message_handler
         data = yield msg_handler.get_room_data(
             user_id=requester.user.to_string(),
             room_id=room_id,
@@ -377,13 +378,13 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomMemberListRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.message_handler = hs.get_message_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
         requester = yield self.auth.get_user_by_req(request)
-        handler = self.handlers.message_handler
+        handler = self.message_handler
 
         # request the state as of a given event
         # useful for synchronising with /messages
@@ -422,7 +423,7 @@ class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(JoinedRoomMemberListRestServlet, self).__init__(hs)
-        self.message_handler = hs.get_handlers().message_handler
+        self.message_handler = hs.get_message_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -443,7 +444,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomMessageListRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -458,8 +459,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
-        handler = self.handlers.message_handler
-        msgs = yield handler.get_messages(
+        msgs = yield self.pagination_handler.get_messages(
             room_id=room_id,
             requester=requester,
             pagin_config=pagination_config,
@@ -476,14 +476,13 @@ class RoomStateRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomStateRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.message_handler = hs.get_message_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        handler = self.handlers.message_handler
         # Get all the current state for this room
-        events = yield handler.get_state_events(
+        events = yield self.message_handler.get_state_events(
             room_id=room_id,
             user_id=requester.user.to_string(),
             is_guest=requester.is_guest,
@@ -541,7 +540,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomEventContextServlet, self).__init__(hs)
         self.clock = hs.get_clock()
-        self.handlers = hs.get_handlers()
+        self.room_context_handler = hs.get_room_context_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
@@ -557,7 +556,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
         else:
             event_filter = None
 
-        results = yield self.handlers.room_context_handler.get_event_context(
+        results = yield self.room_context_handler.get_event_context(
             requester.user,
             room_id,
             event_id,
