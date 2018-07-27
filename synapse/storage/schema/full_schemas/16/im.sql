@@ -19,7 +19,12 @@ CREATE TABLE IF NOT EXISTS events(
     event_id TEXT NOT NULL,
     type TEXT NOT NULL,
     room_id TEXT NOT NULL,
-    content TEXT NOT NULL,
+
+    -- 'content' used to be created NULLable, but as of delta 50 we drop that constraint.
+    -- the hack we use to drop the constraint doesn't work for an in-memory sqlite
+    -- database, which breaks the sytests. Hence, we no longer make it nullable.
+    content TEXT,
+
     unrecognized_keys TEXT,
     processed BOOL NOT NULL,
     outlier BOOL NOT NULL,

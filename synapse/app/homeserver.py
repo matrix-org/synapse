@@ -429,7 +429,7 @@ def run(hs):
     stats_process = []
 
     def start_phone_stats_home():
-        run_as_background_process("phone_stats_home", phone_stats_home)
+        return run_as_background_process("phone_stats_home", phone_stats_home)
 
     @defer.inlineCallbacks
     def phone_stats_home():
@@ -502,7 +502,7 @@ def run(hs):
             )
 
     def generate_user_daily_visit_stats():
-        run_as_background_process(
+        return run_as_background_process(
             "generate_user_daily_visits",
             hs.get_datastore().generate_user_daily_visits,
         )
