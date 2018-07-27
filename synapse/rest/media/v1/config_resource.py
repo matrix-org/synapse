@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from synapse.http.server import respond_with_json, wrap_json_request_handler
@@ -26,6 +27,7 @@ class MediaConfigResource(Resource):
         Resource.__init__(self)
         config = hs.get_config()
         self.clock = hs.get_clock()
+        self.auth = hs.get_auth()
         self.limits_dict = {
             "m.upload.size": config.max_upload_size,
         }
@@ -35,8 +37,10 @@ class MediaConfigResource(Resource):
         return NOT_DONE_YET
 
     @wrap_json_request_handler
+    @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        return respond_with_json(request, 200, self.limits_dict)
+        yield self.auth.get_user_by_req(request)
+        respond_with_json(request, 200, self.limits_dict)
 
     def render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
