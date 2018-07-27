@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from twisted.web.server import NOT_DONE_YET
+
+from twisted.internet import defer
 from twisted.web.resource import Resource
-from synapse.http.server import respond_with_json, respond_with_json_bytes, wrap_json_request_handler
+from twisted.web.server import NOT_DONE_YET
+from synapse.http.server import respond_with_json, wrap_json_request_handler
 
 
 class MediaConfigResource(Resource):
@@ -24,15 +26,19 @@ class MediaConfigResource(Resource):
     def __init__(self, hs):
         Resource.__init__(self)
         config = hs.get_config()
+        self.clock = hs.get_clock()
         self.limits_dict = {
             "m.upload.size": config.max_upload_size,
         }
 
-    @wrap_json_request_handler
     def render_GET(self, request):
-        respond_with_json(request, 200, self.limits_dict, send_cors=True)
+        self._async_render_GET(request)
         return NOT_DONE_YET
 
+    @wrap_json_request_handler
+    def _async_render_GET(self, request):
+        return respond_with_json(request, 200, self.limits_dict)
+
     def render_OPTIONS(self, request):
-        respond_with_json_bytes(request, 200, {}, send_cors=True)
+        respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
