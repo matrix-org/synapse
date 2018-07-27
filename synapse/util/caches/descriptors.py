@@ -528,7 +528,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                     deferreds_map[arg] = deferred
                     key = arg_to_cache_key(arg)
                     observable = ObservableDeferred(deferred)
-                    cache.set(key, observable)
+                    cache.set(key, observable, callback=invalidate_callback)
 
                 def complete_all(res):
                     # the wrapped function has completed. It returns a
