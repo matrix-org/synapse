@@ -13,12 +13,13 @@
 # limitations under the License.
 import logging
 
+from zope.interface import implementer
+
 from OpenSSL import SSL, crypto
 from twisted.internet._idna import _idnaBytes
-from twisted.internet.ssl import ContextFactory, CertificateOptions
 from twisted.internet._sslverify import _defaultCurveName, _tolerateErrors
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
-from zope.interface import implementer
+from twisted.internet.ssl import CertificateOptions, ContextFactory
 
 logger = logging.getLogger(__name__)
 
