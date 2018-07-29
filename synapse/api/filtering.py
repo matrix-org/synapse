@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import jsonschema
+import six
 from canonicaljson import json
 from jsonschema import FormatChecker
 
@@ -370,10 +371,8 @@ class Filter(object):
             ev_type = event.get("type", None)
 
             content = event.get("content", {})
-            is_url = (
-                "url" in content
-                and isinstance(content["url"], basestring)
-            )
+            # check if there is a string url field in the content for filtering purposes
+            is_url = isinstance(content.get("url"), six.text_type)
 
         return self.check_fields(
             room_id,
