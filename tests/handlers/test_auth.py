@@ -12,14 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from mock import Mock
 import pymacaroons
 
 from twisted.internet import defer
 
 import synapse
+from synapse.api.errors import AuthError
 import synapse.api.errors
 from synapse.handlers.auth import AuthHandler
+
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
@@ -37,6 +39,10 @@ class AuthTestCase(unittest.TestCase):
         self.hs.handlers = AuthHandlers(self.hs)
         self.auth_handler = self.hs.handlers.auth_handler
         self.macaroon_generator = self.hs.get_macaroon_generator()
+        # MAU tests
+        self.hs.config.max_mau_value = 50
+        self.small_number_of_users = 1
+        self.large_number_of_users = 100
 
     def test_token_is_a_macaroon(self):
         token = self.macaroon_generator.generate_access_token("some_user")
@@ -113,3 +119,44 @@ class AuthTestCase(unittest.TestCase):
             self.auth_handler.validate_short_term_login_token_and_get_user_id(
                 macaroon.serialize()
             )
+
+    @defer.inlineCallbacks
+    def test_mau_limits_disabled(self):
+        self.hs.config.limit_usage_by_mau = False
+        # Ensure does not throw exception
+        yield self.auth_handler.get_access_token_for_user_id('user_a')
+
+        self.auth_handler.validate_short_term_login_token_and_get_user_id(
+            self._get_macaroon().serialize()
+        )
+
+    @defer.inlineCallbacks
+    def test_mau_limits_exceeded(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.get_datastore().count_monthly_users = Mock(
+            return_value=self.large_number_of_users
+        )
+        with self.assertRaises(AuthError):
+            yield self.auth_handler.get_access_token_for_user_id('user_a')
+        with self.assertRaises(AuthError):
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
+
+    @defer.inlineCallbacks
+    def test_mau_limits_not_exceeded(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.get_datastore().count_monthly_users = Mock(
+            return_value=self.small_number_of_users
+        )
+        # Ensure does not raise exception
+        yield self.auth_handler.get_access_token_for_user_id('user_a')
+        self.auth_handler.validate_short_term_login_token_and_get_user_id(
+            self._get_macaroon().serialize()
+        )
+
+    def _get_macaroon(self):
+        token = self.macaroon_generator.generate_short_term_login_token(
+            "user_a", 5000
+        )
+        return pymacaroons.Macaroon.deserialize(token)

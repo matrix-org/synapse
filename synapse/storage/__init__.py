@@ -19,6 +19,7 @@ import logging
 import time
 
 from dateutil import tz
+from prometheus_client import Gauge
 
 from synapse.api.constants import PresenceState
 from synapse.storage.devices import DeviceStore
@@ -59,6 +60,13 @@ from .user_directory import UserDirectoryStore
 from .util.id_generators import ChainedIdGenerator, IdGenerator, StreamIdGenerator
 
 logger = logging.getLogger(__name__)
+
+# Gauges to expose monthly active user control metrics
+current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
+max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
+limit_usage_by_mau_gauge = Gauge(
+    "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
+)
 
 
 class DataStore(RoomMemberStore, RoomStore,
@@ -265,6 +273,32 @@ class DataStore(RoomMemberStore, RoomStore,
             return count
 
         return self.runInteraction("count_users", _count_users)
+
+    def count_monthly_users(self):
+        """
+        Counts the number of users who used this homeserver in the last 30 days
+        This method should be refactored with count_daily_users - the only
+        reason not to is waiting on definition of mau
+        returns:
+            int: count of current monthly active users
+        """
+        def _count_monthly_users(txn):
+            thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
+            sql = """
+                SELECT COUNT(*) FROM user_ips
+                WHERE last_seen > ?
+            """
+            txn.execute(sql, (thirty_days_ago,))
+            count, = txn.fetchone()
+
+            self._current_mau = count
+            current_mau_gauge.set(self._current_mau)
+            max_mau_value_gauge.set(self.hs.config.max_mau_value)
+            limit_usage_by_mau_gauge.set(self.hs.config.limit_usage_by_mau)
+            logger.info("calling mau stats")
+            return count
+        return self.runInteraction("count_monthly_users", _count_monthly_users)
+
 
     def count_r30_users(self):
         """
