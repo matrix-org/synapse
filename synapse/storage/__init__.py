@@ -283,10 +283,14 @@ class DataStore(RoomMemberStore, RoomStore,
                 GROUP BY user_id
             ) u
         """
-        txn = self.db_conn.cursor()
-        txn.execute(sql, (thirty_days_ago,))
-        count, = txn.fetchone()
-        return count
+        try:
+            txn = self.db_conn.cursor()
+            txn.execute(sql, (thirty_days_ago,))
+            count, = txn.fetchone()
+            return count
+        finally:
+            txn.close()
+
 
 
     def count_r30_users(self):
