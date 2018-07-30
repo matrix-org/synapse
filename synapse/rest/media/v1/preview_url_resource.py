@@ -373,7 +373,7 @@ class PreviewUrlResource(Resource):
         })
 
     def _start_expire_url_cache_data(self):
-        run_as_background_process(
+        return run_as_background_process(
             "expire_url_cache_data", self._expire_url_cache_data,
         )
 
