@@ -287,7 +287,7 @@ class FederationSendServlet(BaseFederationServlet):
                 transaction_id, origin,
                 len(transaction_data.get("pdus", [])),
                 len(transaction_data.get("edus", [])),
-                len(transaction_data.get("failures", [])),
+                len(transaction_data.get("pdu_failures", [])),
             )
 
             # We should ideally be getting this from the security layer.
