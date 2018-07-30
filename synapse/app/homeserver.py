@@ -522,7 +522,6 @@ def run(hs):
         count = 0
         if hs.config.limit_usage_by_mau:
             count = hs.get_datastore().count_monthly_users()
-        logger.info("NJ count is %d" % (count,))
         current_mau_gauge.set(float(count))
         max_mau_value_gauge.set(float(hs.config.max_mau_value))
         limit_usage_by_mau_gauge.set(float(hs.config.limit_usage_by_mau))
