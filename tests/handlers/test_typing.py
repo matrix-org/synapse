@@ -44,7 +44,6 @@ def _expect_edu(destination, edu_type, content, origin="test"):
                 "content": content,
             }
         ],
-        "pdu_failures": [],
     }
 
 
