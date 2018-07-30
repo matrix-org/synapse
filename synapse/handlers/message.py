@@ -119,12 +119,17 @@ class MessageHandler(object):
         Args:
             user_id(str): The user requesting state events.
             room_id(str): The room ID to get all state events from.
-            types(list[(Str, (Str|None))]): the (type, state_key)s to return
-                results for.
-            filtered_types(list[Str]): the list of types to apply the types filter
-                to.
-            at_event(str): the event_id we are requesting the state as of
-            is_guest(Boolean): whether this user is a guest
+            types(list[(str, str|None)]|None): List of (type, state_key) tuples
+                which are used to filter the state fetched. If `state_key` is None,
+                all events are returned of the given type.
+                May be None, which matches any key.
+            filtered_types(list[str]|None): Only apply filtering via `types` to this
+                list of event types.  Other types of events are returned unfiltered.
+                If None, `types` filtering is applied to all events.
+            at_event(str|None): the event_id we are requesting the state as of.
+                If None, returns the current state based on the current_state_events
+                table.
+            is_guest(bool): whether this user is a guest
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         """
@@ -135,17 +140,17 @@ class MessageHandler(object):
         if membership == Membership.JOIN:
             if at_event:
                 room_state = yield self.store.get_state_for_events(
-                    [at_event], types, filtered_types=filtered_types
+                    [at_event], types, filtered_types=filtered_types,
                 )
                 room_state = room_state[at_event]
             else:
                 state_ids = yield self.store.get_filtered_current_state_ids(
-                    room_id, types, filtered_types=filtered_types
+                    room_id, types, filtered_types=filtered_types,
                 )
                 room_state = yield self.store.get_events(state_ids.values())
         elif membership == Membership.LEAVE:
             room_state = yield self.store.get_state_for_events(
-                [membership_event_id], types, filtered_types=filtered_types
+                [membership_event_id], types, filtered_types=filtered_types,
             )
             room_state = room_state[membership_event_id]
 
