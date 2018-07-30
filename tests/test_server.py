@@ -33,9 +33,11 @@ class JsonResourceTests(unittest.TestCase):
             return (200, kwargs)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/foo/(?P<room_id>[^/]*)$")], _callback)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")], _callback
+        )
 
-        request, channel = make_request(b"GET", b"/foo/%E2%98%83?a=%E2%98%83")
+        request, channel = make_request(b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83")
         request.render(res)
 
         self.assertEqual(request.args, {b'a': [u"\N{SNOWMAN}".encode('utf8')]})
@@ -51,9 +53,9 @@ class JsonResourceTests(unittest.TestCase):
             raise Exception("boo")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/foo")
+        request, channel = make_request(b"GET", b"/_matrix/foo")
         request.render(res)
 
         self.assertEqual(channel.result["code"], b'500')
@@ -74,9 +76,9 @@ class JsonResourceTests(unittest.TestCase):
             return d
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/foo")
+        request, channel = make_request(b"GET", b"/_matrix/foo")
         request.render(res)
 
         # No error has been raised yet
@@ -96,9 +98,9 @@ class JsonResourceTests(unittest.TestCase):
             raise SynapseError(403, "Forbidden!!one!", Codes.FORBIDDEN)
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/foo")
+        request, channel = make_request(b"GET", b"/_matrix/foo")
         request.render(res)
 
         self.assertEqual(channel.result["code"], b'403')
@@ -118,9 +120,9 @@ class JsonResourceTests(unittest.TestCase):
             self.fail("shouldn't ever get here")
 
         res = JsonResource(self.homeserver)
-        res.register_paths("GET", [re.compile("^/foo$")], _callback)
+        res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/foobar")
+        request, channel = make_request(b"GET", b"/_matrix/foobar")
         request.render(res)
 
         self.assertEqual(channel.result["code"], b'400')

@@ -113,7 +113,13 @@ ROOM_EVENT_FILTER_SCHEMA = {
         },
         "contains_url": {
             "type": "boolean"
-        }
+        },
+        "lazy_load_members": {
+            "type": "boolean"
+        },
+        "include_redundant_members": {
+            "type": "boolean"
+        },
     }
 }
 
@@ -260,6 +266,12 @@ class FilterCollection(object):
 
     def ephemeral_limit(self):
         return self._room_ephemeral_filter.limit()
+
+    def lazy_load_members(self):
+        return self._room_state_filter.lazy_load_members()
+
+    def include_redundant_members(self):
+        return self._room_state_filter.include_redundant_members()
 
     def filter_presence(self, events):
         return self._presence_filter.filter(events)
@@ -416,6 +428,12 @@ class Filter(object):
 
     def limit(self):
         return self.filter_json.get("limit", 10)
+
+    def lazy_load_members(self):
+        return self.filter_json.get("lazy_load_members", False)
+
+    def include_redundant_members(self):
+        return self.filter_json.get("include_redundant_members", False)
 
 
 def _matches_wildcard(actual_value, filter_value):
