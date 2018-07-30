@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 
+from prometheus_client import Gauge
 from six import iteritems
 
 from twisted.application import service
@@ -299,7 +300,12 @@ class SynapseHomeServer(HomeServer):
         except IncorrectDatabaseSetup as e:
             quit_with_error(e.message)
 
-
+# Gauges to expose monthly active user control metrics
+current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
+max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
+limit_usage_by_mau_gauge = Gauge(
+    "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
+)
 def setup(config_options):
     """
     Args:
@@ -511,6 +517,18 @@ def run(hs):
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+
+    def generate_monthly_active_users():
+        count = 0
+        if hs.config.limit_usage_by_mau:
+            count = hs.get_datastore().count_monthly_users()
+        logger.info("NJ count is %d" % (count,))
+        current_mau_gauge.set(float(count))
+        max_mau_value_gauge.set(float(hs.config.max_mau_value))
+        limit_usage_by_mau_gauge.set(float(hs.config.limit_usage_by_mau))
+
+    generate_monthly_active_users()
+    clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")

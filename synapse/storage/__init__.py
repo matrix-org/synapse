@@ -19,7 +19,6 @@ import logging
 import time
 
 from dateutil import tz
-from prometheus_client import Gauge
 
 from synapse.api.constants import PresenceState
 from synapse.storage.devices import DeviceStore
@@ -61,14 +60,6 @@ from .util.id_generators import ChainedIdGenerator, IdGenerator, StreamIdGenerat
 
 logger = logging.getLogger(__name__)
 
-# Gauges to expose monthly active user control metrics
-current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
-max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
-limit_usage_by_mau_gauge = Gauge(
-    "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
-)
-
-
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore,
                 PresenceStore, TransactionStore,
@@ -102,6 +93,7 @@ class DataStore(RoomMemberStore, RoomStore,
         self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
 
+        self.db_conn = db_conn
         self._stream_id_gen = StreamIdGenerator(
             db_conn, "events", "stream_ordering",
             extra_tables=[("local_invites", "stream_id")]
@@ -282,22 +274,19 @@ class DataStore(RoomMemberStore, RoomStore,
         returns:
             int: count of current monthly active users
         """
-        def _count_monthly_users(txn):
-            thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
-            sql = """
-                SELECT COUNT(*) FROM user_ips
-                WHERE last_seen > ?
-            """
-            txn.execute(sql, (thirty_days_ago,))
-            count, = txn.fetchone()
 
-            self._current_mau = count
-            current_mau_gauge.set(self._current_mau)
-            max_mau_value_gauge.set(self.hs.config.max_mau_value)
-            limit_usage_by_mau_gauge.set(self.hs.config.limit_usage_by_mau)
-            logger.info("calling mau stats")
-            return count
-        return self.runInteraction("count_monthly_users", _count_monthly_users)
+        thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
+        sql = """
+            SELECT COALESCE(count(*), 0) FROM (
+                SELECT user_id FROM user_ips
+                WHERE last_seen > ?
+                GROUP BY user_id
+            ) u
+        """
+        txn = self.db_conn.cursor()
+        txn.execute(sql, (thirty_days_ago,))
+        count, = txn.fetchone()
+        return count
 
 
     def count_r30_users(self):
