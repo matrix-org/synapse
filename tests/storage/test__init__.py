@@ -28,21 +28,45 @@ class InitTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield tests.utils.setup_test_homeserver()
+
         hs.config.max_mau_value = 50
         hs.config.limit_usage_by_mau = True
         self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
 
-    @defer.inlineCallbacks
     def test_count_monthly_users(self):
-        count = yield self.store.count_monthly_users()
-        self.assertEqual(0, count)
-        yield self.store.insert_client_ip(
-            "@user:server1", "access_token", "ip", "user_agent", "device_id"
-        )
-
-        yield self.store.insert_client_ip(
-            "@user:server2", "access_token", "ip", "user_agent", "device_id"
-        )
         count = self.store.count_monthly_users()
+        self.assertEqual(0, count)
 
+        self._insert_user_ips("@user:server1")
+        self._insert_user_ips("@user:server2")
+
+        count = self.store.count_monthly_users()
         self.assertEqual(2, count)
+
+    def _insert_user_ips(self, user):
+        """
+        Helper function to populate user_ips without using batch insertion infra
+        args:
+            user (str):  specify username i.e. @user:server.com
+        """
+        try:
+            txn = self.store.db_conn.cursor()
+            self.store.database_engine.lock_table(txn, "user_ips")
+            self.store._simple_upsert_txn(
+                txn,
+                table="user_ips",
+                keyvalues={
+                    "user_id": user,
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "device_id": "device_id",
+                },
+                values={
+                    "last_seen": self.clock.time_msec(),
+                },
+                lock=False,
+            )
+        finally:
+            txn.close()
