@@ -62,6 +62,7 @@ from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
 from synapse.storage import are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
+from synapse.storage.monthly_active_users import MonthlyActiveUsersStore
 from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
@@ -511,6 +512,9 @@ def run(hs):
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+    clock.looping_call(
+        MonthlyActiveUsersStore(hs).reap_monthly_active_users, 1000 * 60 * 60
+    )
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
