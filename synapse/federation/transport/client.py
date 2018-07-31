@@ -106,7 +106,7 @@ class TransportLayerClient(object):
             dest (str)
             room_id (str)
             event_tuples (list)
-            limt (int)
+            limit (int)
 
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
