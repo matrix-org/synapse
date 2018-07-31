@@ -18,8 +18,9 @@ import logging
 import os
 import sys
 
-from prometheus_client import Gauge
 from six import iteritems
+
+from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
@@ -300,12 +301,15 @@ class SynapseHomeServer(HomeServer):
         except IncorrectDatabaseSetup as e:
             quit_with_error(e.message)
 
+
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
 max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
 limit_usage_by_mau_gauge = Gauge(
     "synapse_admin_limit_usage_by_mau", "MAU Limiting enabled"
 )
+
+
 def setup(config_options):
     """
     Args:

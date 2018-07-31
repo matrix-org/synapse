@@ -60,6 +60,7 @@ from .util.id_generators import ChainedIdGenerator, IdGenerator, StreamIdGenerat
 
 logger = logging.getLogger(__name__)
 
+
 class DataStore(RoomMemberStore, RoomStore,
                 RegistrationStore, StreamStore, ProfileStore,
                 PresenceStore, TransactionStore,
@@ -290,8 +291,6 @@ class DataStore(RoomMemberStore, RoomStore,
             return count
         finally:
             txn.close()
-
-
 
     def count_r30_users(self):
         """

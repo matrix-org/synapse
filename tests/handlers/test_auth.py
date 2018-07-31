@@ -13,15 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mock import Mock
+
 import pymacaroons
 
 from twisted.internet import defer
 
 import synapse
-from synapse.api.errors import AuthError
 import synapse.api.errors
+from synapse.api.errors import AuthError
 from synapse.handlers.auth import AuthHandler
-
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
