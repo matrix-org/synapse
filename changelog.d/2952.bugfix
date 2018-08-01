@@ -1,1 +1,1 @@
-/directory/list API returns 404 for room not found instead of 400
+Make /directory/list API return 404 for room not found instead of 400
