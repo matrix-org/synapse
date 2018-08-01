@@ -13,12 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 import pymacaroons
 
 from twisted.internet import defer
 
 import synapse
-import synapse.api.errors
+from synapse.api.errors import AuthError
 from synapse.handlers.auth import AuthHandler
 
 from tests import unittest
@@ -37,6 +39,10 @@ class AuthTestCase(unittest.TestCase):
         self.hs.handlers = AuthHandlers(self.hs)
         self.auth_handler = self.hs.handlers.auth_handler
         self.macaroon_generator = self.hs.get_macaroon_generator()
+        # MAU tests
+        self.hs.config.max_mau_value = 50
+        self.small_number_of_users = 1
+        self.large_number_of_users = 100
 
     def test_token_is_a_macaroon(self):
         token = self.macaroon_generator.generate_access_token("some_user")
@@ -113,3 +119,93 @@ class AuthTestCase(unittest.TestCase):
             self.auth_handler.validate_short_term_login_token_and_get_user_id(
                 macaroon.serialize()
             )
+
+    @defer.inlineCallbacks
+    def test_mau_limits_disabled(self):
+        self.hs.config.limit_usage_by_mau = False
+        try:
+            yield self.auth_handler.get_access_token_for_user_id('user_a')
+        except AuthError as e:
+            self.fail("Should not throw an exception %s" % e)
+
+        try:
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
+        except AuthError as e:
+            self.fail("Should not throw an exception %s" % e)
+
+    @defer.inlineCallbacks
+    def test_mau_limits_not_exceeded_old_user(self):
+        """
+        MAU limits not exceeded, check users not part of current mau group are
+        not rejected
+        """
+
+        self.hs.get_datastore().get_current_mau = Mock(
+            return_value=(self.small_number_of_users, ['user_b', 'user_c'])
+        )
+        self.hs.config.limit_usage_by_mau = True
+
+        try:
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
+        except AuthError as e:
+            self.fail("Should not throw an exception %s" % e)
+
+        try:
+            yield self.auth_handler.get_access_token_for_user_id('user_a')
+        except AuthError as e:
+            self.fail("Should not throw an exception %s" % e)
+
+    @defer.inlineCallbacks
+    def test_mau_limits_exceeded_old_user(self):
+        """
+        Mau limits are exceeded, user is not part of the mau group so is rejected
+        """
+
+        self.hs.get_datastore().get_current_mau = Mock(
+            return_value=(self.large_number_of_users, ['user_b', 'user_c'])
+        )
+        self.hs.config.limit_usage_by_mau = True
+
+        try:
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
+            self.fail("Auth exception expected")
+        except AuthError:
+            pass
+        try:
+            yield self.auth_handler.get_access_token_for_user_id('user_a')
+            self.fail("Auth exception expected")
+        except AuthError:
+            pass
+
+    @defer.inlineCallbacks
+    def test_mau_limits_exceeded_active_user(self):
+        """
+        Mau limits are exceeded, user is part of the mau group so is accepted
+        """
+        self.hs.get_datastore().get_current_mau = Mock(
+            return_value=(self.large_number_of_users, ['user_a', 'user_c'])
+        )
+        self.hs.config.limit_usage_by_mau = True
+        try:
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
+
+        except AuthError as e:
+            self.fail("Should not throw an exception %s" % e)
+        try:
+            yield self.auth_handler.get_access_token_for_user_id('user_a')
+        except AuthError as e:
+            self.fail("Should not throw an exception %s" % e)
+
+    def _get_macaroon(self):
+        token = self.macaroon_generator.generate_short_term_login_token(
+            "user_a", 5000
+        )
+        return pymacaroons.Macaroon.deserialize(token)

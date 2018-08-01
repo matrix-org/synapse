@@ -512,6 +512,12 @@ def run(hs):
     # table will decrease
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
+    def generate_monthly_active_users():
+        hs.get_datastore().count_monthly_users()
+
+    generate_monthly_active_users()
+    clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
+
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000)
