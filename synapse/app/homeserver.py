@@ -519,10 +519,11 @@ def run(hs):
     # table will decrease
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
+    @defer.inlineCallbacks
     def generate_monthly_active_users():
         count = 0
         if hs.config.limit_usage_by_mau:
-            count = hs.get_datastore().count_monthly_users()
+            count = yield hs.get_datastore().count_monthly_users()
         current_mau_gauge.set(float(count))
         max_mau_value_gauge.set(float(hs.config.max_mau_value))
 
