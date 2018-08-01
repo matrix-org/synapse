@@ -531,7 +531,8 @@ def run(hs):
         limit_usage_by_mau_gauge.set(float(hs.config.limit_usage_by_mau))
 
     generate_monthly_active_users()
-    clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
+    if hs.config.limit_usage_by_mau:
+        clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
