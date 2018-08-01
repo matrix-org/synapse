@@ -105,38 +105,28 @@ class SynapseError(CodeMessageException):
             self.errcode,
         )
 
-    @classmethod
-    def from_http_response_exception(cls, err):
-        """Make a SynapseError based on an HTTPResponseException
 
-        This is useful when a proxied request has failed, and we need to
-        decide how to map the failure onto a matrix error to send back to the
-        client.
+class ProxiedRequestError(SynapseError):
+    """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
 
-        An attempt is made to parse the body of the http response as a matrix
-        error. If that succeeds, the errcode and error message from the body
-        are used as the errcode and error message in the new synapse error.
+    Attributes:
+        errcode (str): Matrix error code e.g 'M_FORBIDDEN'
+    """
+    def __init__(self, code, msg, errcode=Codes.UNKNOWN, additional_fields=None):
+        super(ProxiedRequestError, self).__init__(
+            code, msg, errcode
+        )
+        if additional_fields is None:
+            self._additional_fields = {}
+        else:
+            self._additional_fields = dict(additional_fields)
 
-        Otherwise, the errcode is set to M_UNKNOWN, and the error message is
-        set to the reason code from the HTTP response.
-
-        Args:
-            err (HttpResponseException):
-
-        Returns:
-            SynapseError:
-        """
-        # try to parse the body as json, to get better errcode/msg, but
-        # default to M_UNKNOWN with the HTTP status as the error text
-        try:
-            j = json.loads(err.response)
-        except ValueError:
-            j = {}
-        errcode = j.get('errcode', Codes.UNKNOWN)
-        errmsg = j.get('error', err.msg)
-
-        res = SynapseError(err.code, errmsg, errcode)
-        return res
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            **self._additional_fields
+        )
 
 
 class ConsentNotGivenError(SynapseError):
@@ -361,7 +351,7 @@ class HttpResponseException(CodeMessageException):
     Represents an HTTP-level failure of an outbound request
 
     Attributes:
-        response (str): body of response
+        response (bytes): body of response
     """
     def __init__(self, code, msg, response):
         """
@@ -369,7 +359,39 @@ class HttpResponseException(CodeMessageException):
         Args:
             code (int): HTTP status code
             msg (str): reason phrase from HTTP response status line
-            response (str): body of response
+            response (bytes): body of response
         """
         super(HttpResponseException, self).__init__(code, msg)
         self.response = response
+
+    def to_synapse_error(self):
+        """Make a SynapseError based on an HTTPResponseException
+
+        This is useful when a proxied request has failed, and we need to
+        decide how to map the failure onto a matrix error to send back to the
+        client.
+
+        An attempt is made to parse the body of the http response as a matrix
+        error. If that succeeds, the errcode and error message from the body
+        are used as the errcode and error message in the new synapse error.
+
+        Otherwise, the errcode is set to M_UNKNOWN, and the error message is
+        set to the reason code from the HTTP response.
+
+        Returns:
+            SynapseError:
+        """
+        # try to parse the body as json, to get better errcode/msg, but
+        # default to M_UNKNOWN with the HTTP status as the error text
+        try:
+            j = json.loads(self.response)
+        except ValueError:
+            j = {}
+
+        if not isinstance(j, dict):
+            j = {}
+
+        errcode = j.pop('errcode', Codes.UNKNOWN)
+        errmsg = j.pop('error', self.msg)
+
+        return ProxiedRequestError(self.code, errmsg, errcode, j)

@@ -506,7 +506,7 @@ class FederationClient(FederationBase):
                 )
             except HttpResponseException as e:
                 if not 500 <= e.code < 600:
-                    raise SynapseError.from_http_response_exception(e)
+                    raise e.to_synapse_error()
                 else:
                     logger.warn(
                         "Failed to %s via %s: %i %s",
@@ -682,7 +682,7 @@ class FederationClient(FederationBase):
             )
         except HttpResponseException as e:
             if e.code == 403:
-                raise SynapseError.from_http_response_exception(e)
+                raise e.to_synapse_error()
             raise
 
         pdu_dict = content["event"]
