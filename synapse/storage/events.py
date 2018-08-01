@@ -64,6 +64,12 @@ state_delta_reuse_delta_counter = Counter(
     "synapse_storage_events_state_delta_reuse_delta", "")
 
 
+def encode_json(json_object):
+    out = frozendict_json_encoder.encode(json_object)
+    if isinstance(out, bytes):
+        out = out.decode('utf8')
+    return out
+
 class _EventPeristenceQueue(object):
     """Queues up events so that they can be persisted in bulk with only one
     concurrent transaction per room.
@@ -1048,7 +1054,7 @@ class EventsStore(EventsWorkerStore):
                     logger.exception("")
                     raise
 
-                metadata_json = frozendict_json_encoder.encode(
+                metadata_json = encode_json(
                     event.internal_metadata.get_dict()
                 )
 
@@ -1162,10 +1168,10 @@ class EventsStore(EventsWorkerStore):
                 {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
-                    "internal_metadata": frozendict_json_encoder.encode(
+                    "internal_metadata": encode_json(
                         event.internal_metadata.get_dict()
                     ),
-                    "json": frozendict_json_encoder.encode(event_dict(event)),
+                    "json": encode_json(event_dict(event)),
                 }
                 for event, _ in events_and_contexts
             ],

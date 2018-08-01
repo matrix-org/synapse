@@ -66,7 +66,5 @@ def _handle_frozendict(obj):
 
 # A JSONEncoder which is capable of encoding frozendics without barfing
 frozendict_json_encoder = json.JSONEncoder(
-    # Ensure we consistently return Unicode objects
-    ensure_ascii=False,
     default=_handle_frozendict,
 )
