@@ -15,7 +15,6 @@
 
 from twisted.internet import defer
 
-
 import tests.utils
 
 
