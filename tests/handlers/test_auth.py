@@ -156,6 +156,10 @@ class AuthTestCase(unittest.TestCase):
         )
         # Ensure does not raise exception
         yield self.auth_handler.get_access_token_for_user_id('user_a')
+
+        self.hs.get_datastore().count_monthly_users = Mock(
+            return_value=defer.succeed(self.small_number_of_users)
+        )
         yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
             self._get_macaroon().serialize()
         )
