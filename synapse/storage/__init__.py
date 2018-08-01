@@ -287,7 +287,6 @@ class DataStore(RoomMemberStore, RoomStore,
 
             txn.execute(sql, (thirty_days_ago,))
             count, = txn.fetchone()
-            print "Count is %d" % (count,)
             return count
 
         return self.runInteraction("count_monthly_users", _count_monthly_users)
