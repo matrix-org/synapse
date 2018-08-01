@@ -17,6 +17,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.api.errors import RegistrationError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import UserID, create_requester
 
@@ -77,3 +78,53 @@ class RegistrationTestCase(unittest.TestCase):
             requester, local_part, display_name)
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
+
+    @defer.inlineCallbacks
+    def test_cannot_register_when_mau_limits_exceeded(self):
+        local_part = "someone"
+        display_name = "someone"
+        requester = create_requester("@as:test")
+        store = self.hs.get_datastore()
+        self.hs.config.limit_usage_by_mau = False
+        self.hs.config.max_mau_value = 50
+        lots_of_users = 100
+        small_number_users = 1
+
+        store.count_monthly_users = Mock(return_value=defer.succeed(lots_of_users))
+
+        # Ensure does not throw exception
+        yield self.handler.get_or_create_user(requester, 'a', display_name)
+
+        self.hs.config.limit_usage_by_mau = True
+
+        with self.assertRaises(RegistrationError):
+            yield self.handler.get_or_create_user(requester, 'b', display_name)
+
+        store.count_monthly_users = Mock(return_value=defer.succeed(small_number_users))
+
+        self._macaroon_mock_generator("another_secret")
+
+        # Ensure does not throw exception
+        yield self.handler.get_or_create_user("@neil:matrix.org", 'c', "Neil")
+
+        self._macaroon_mock_generator("another another secret")
+        store.count_monthly_users = Mock(return_value=defer.succeed(lots_of_users))
+
+        with self.assertRaises(RegistrationError):
+            yield self.handler.register(localpart=local_part)
+
+        self._macaroon_mock_generator("another another secret")
+        store.count_monthly_users = Mock(return_value=defer.succeed(lots_of_users))
+
+        with self.assertRaises(RegistrationError):
+            yield self.handler.register_saml2(local_part)
+
+    def _macaroon_mock_generator(self, secret):
+        """
+        Reset macaroon generator in the case where the test creates multiple users
+        """
+        macaroon_generator = Mock(
+            generate_access_token=Mock(return_value=secret))
+        self.hs.get_macaroon_generator = Mock(return_value=macaroon_generator)
+        self.hs.handlers = RegistrationHandlers(self.hs)
+        self.handler = self.hs.get_handlers().registration_handler

@@ -88,5 +88,5 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
         "UPDATE sqlite_master SET sql=? WHERE tbl_name='events' AND type='table'",
         (sql, ),
     )
-    cur.execute("PRAGMA schema_version=%i" % (oldver+1,))
+    cur.execute("PRAGMA schema_version=%i" % (oldver + 1,))
     cur.execute("PRAGMA writable_schema=OFF")
