@@ -65,10 +65,14 @@ state_delta_reuse_delta_counter = Counter(
 
 
 def encode_json(json_object):
+    """
+    Encode a Python object as JSON and return it in a Unicode string.
+    """
     out = frozendict_json_encoder.encode(json_object)
     if isinstance(out, bytes):
         out = out.decode('utf8')
     return out
+
 
 class _EventPeristenceQueue(object):
     """Queues up events so that they can be persisted in bulk with only one
