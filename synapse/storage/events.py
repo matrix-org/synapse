@@ -242,7 +242,7 @@ class EventsStore(EventsWorkerStore):
                 which might update the current state etc.
 
         Returns:
-            Deferred[int]: he stream ordering of the latest persisted event
+            Deferred[int]: the stream ordering of the latest persisted event
         """
         partitioned = {}
         for event, ctx in events_and_contexts:
