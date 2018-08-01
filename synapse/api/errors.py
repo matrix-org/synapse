@@ -70,17 +70,6 @@ class CodeMessageException(RuntimeError):
         self.msg = msg
 
 
-class MatrixCodeMessageException(CodeMessageException):
-    """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
-
-    Attributes:
-        errcode (str): Matrix error code e.g 'M_FORBIDDEN'
-    """
-    def __init__(self, code, msg, errcode=Codes.UNKNOWN):
-        super(MatrixCodeMessageException, self).__init__(code, msg)
-        self.errcode = errcode
-
-
 class SynapseError(CodeMessageException):
     """A base exception type for matrix errors which have an errcode and error
     message (as well as an HTTP status code).

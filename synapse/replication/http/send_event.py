@@ -18,11 +18,7 @@ import re
 
 from twisted.internet import defer
 
-from synapse.api.errors import (
-    CodeMessageException,
-    MatrixCodeMessageException,
-    SynapseError,
-)
+from synapse.api.errors import CodeMessageException, HttpResponseException
 from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -83,11 +79,11 @@ def send_event_to_master(clock, store, client, host, port, requester, event, con
             # If we timed out we probably don't need to worry about backing
             # off too much, but lets just wait a little anyway.
             yield clock.sleep(1)
-    except MatrixCodeMessageException as e:
+    except HttpResponseException as e:
         # We convert to SynapseError as we know that it was a SynapseError
         # on the master process that we should send to the client. (And
         # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
+        raise e.to_synapse_error()
     defer.returnValue(result)
 
 

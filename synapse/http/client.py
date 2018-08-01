@@ -39,12 +39,7 @@ from twisted.web.client import (
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 
-from synapse.api.errors import (
-    CodeMessageException,
-    Codes,
-    MatrixCodeMessageException,
-    SynapseError,
-)
+from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import cancelled_to_request_timed_out_error, redact_uri
 from synapse.http.endpoint import SpiderEndpoint
 from synapse.util.async import add_timeout_to_deferred
@@ -132,6 +127,11 @@ class SimpleHttpClient(object):
 
         Returns:
             Deferred[object]: parsed json
+
+        Raises:
+            HttpResponseException: On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
         """
 
         # TODO: Do we ever want to log message contents?
@@ -155,7 +155,10 @@ class SimpleHttpClient(object):
 
         body = yield make_deferred_yieldable(readBody(response))
 
-        defer.returnValue(json.loads(body))
+        if 200 <= response.code < 300:
+            defer.returnValue(json.loads(body))
+        else:
+            raise HttpResponseException(response.code, response.phrase, body)
 
     @defer.inlineCallbacks
     def post_json_get_json(self, uri, post_json, headers=None):
@@ -169,6 +172,11 @@ class SimpleHttpClient(object):
 
         Returns:
             Deferred[object]: parsed json
+
+        Raises:
+            HttpResponseException: On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
         """
         json_str = encode_canonical_json(post_json)
 
@@ -193,9 +201,7 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
         else:
-            raise self._exceptionFromFailedRequest(response, body)
-
-        defer.returnValue(json.loads(body))
+            raise HttpResponseException(response.code, response.phrase, body)
 
     @defer.inlineCallbacks
     def get_json(self, uri, args={}, headers=None):
@@ -213,14 +219,12 @@ class SimpleHttpClient(object):
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
             HTTP body as JSON.
         Raises:
-            On a non-2xx HTTP response. The response body will be used as the
-            error message.
+            HttpResponseException On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
         """
-        try:
-            body = yield self.get_raw(uri, args, headers=headers)
-            defer.returnValue(json.loads(body))
-        except CodeMessageException as e:
-            raise self._exceptionFromFailedRequest(e.code, e.msg)
+        body = yield self.get_raw(uri, args, headers=headers)
+        defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}, headers=None):
@@ -239,7 +243,9 @@ class SimpleHttpClient(object):
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
             HTTP body as JSON.
         Raises:
-            On a non-2xx HTTP response.
+            HttpResponseException On a non-2xx HTTP response.
+
+            ValueError: if the response was not JSON
         """
         if len(args):
             query_bytes = urllib.urlencode(args, True)
@@ -266,10 +272,7 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             defer.returnValue(json.loads(body))
         else:
-            # NB: This is explicitly not json.loads(body)'d because the contract
-            # of CodeMessageException is a *string* message. Callers can always
-            # load it into JSON if they want.
-            raise CodeMessageException(response.code, body)
+            raise HttpResponseException(response.code, response.phrase, body)
 
     @defer.inlineCallbacks
     def get_raw(self, uri, args={}, headers=None):
@@ -287,8 +290,7 @@ class SimpleHttpClient(object):
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
             HTTP body at text.
         Raises:
-            On a non-2xx HTTP response. The response body will be used as the
-            error message.
+            HttpResponseException on a non-2xx HTTP response.
         """
         if len(args):
             query_bytes = urllib.urlencode(args, True)
@@ -311,16 +313,7 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             defer.returnValue(body)
         else:
-            raise CodeMessageException(response.code, body)
-
-    def _exceptionFromFailedRequest(self, response, body):
-        try:
-            jsonBody = json.loads(body)
-            errcode = jsonBody['errcode']
-            error = jsonBody['error']
-            return MatrixCodeMessageException(response.code, error, errcode)
-        except (ValueError, KeyError):
-            return CodeMessageException(response.code, body)
+            raise HttpResponseException(response.code, response.phrase, body)
 
     # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
     # The two should be factored out.
