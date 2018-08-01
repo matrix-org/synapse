@@ -31,11 +31,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 defered resolves to int
         """
         def _count_users(txn):
-            sql = """
-                SELECT COALESCE(count(*), 0) FROM (
-                    SELECT user_id FROM monthly_active_users
-                ) u
-            """
+            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+
             txn.execute(sql)
             count, = txn.fetchone()
             return count
@@ -59,9 +56,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             lock=False,
         )
 
-    def clean_out_monthly_active_users(self):
-        pass
-
     @defer.inlineCallbacks
     def is_user_monthly_active(self, user_id):
         """
@@ -79,11 +73,5 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             retcol="user_id",
             desc="is_user_monthly_active",
         )
-        # jeff = self.cursor_to_dict(res)
-        result = False
-        if user_present:
-            result = True
 
-        defer.returnValue(
-            result
-        )
+        defer.returnValue(bool(user_present))
