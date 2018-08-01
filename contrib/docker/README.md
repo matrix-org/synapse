@@ -9,13 +9,7 @@ use that server.
 
 ## Build
 
-Build the docker image with the `docker build` command from the root of the synapse repository.
-
-```
-docker build -t docker.io/matrixdotorg/synapse .
-```
-
-The `-t` option sets the image tag. Official images are tagged `matrixdotorg/synapse:<version>` where `<version>` is the same as the release tag in the synapse git repository.
+Build the docker image with the `docker-compose build` command.
 
 You may have a local Python wheel cache available, in which case copy the relevant packages in the ``cache/`` directory at the root of the project.
 
