@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
--- a table of users who have requested that their details be erased
+-- a table of monthly active users, for use where blocking based on mau limits
 CREATE TABLE monthly_active_users (
     user_id TEXT NOT NULL,
     timestamp BIGINT NOT NULL
