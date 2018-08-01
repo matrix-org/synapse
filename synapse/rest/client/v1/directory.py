@@ -18,7 +18,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import RoomAlias
 
@@ -159,7 +159,7 @@ class ClientDirectoryListServer(ClientV1RestServlet):
     def on_GET(self, request, room_id):
         room = yield self.store.get_room(room_id)
         if room is None:
-            raise SynapseError(400, "Unknown room")
+            raise NotFoundError("Unknown room")
 
         defer.returnValue((200, {
             "visibility": "public" if room["is_public"] else "private"
