@@ -131,7 +131,7 @@ class RegistrationHandler(BaseHandler):
         Args:
             localpart : The local part of the user ID to register. If None,
               one will be generated.
-            password (str) : The password to assign to this user so they can
+            password (unicode) : The password to assign to this user so they can
               login again. This can be None which means they cannot login again
               via a password (e.g. the user is an application service user).
             generate_token (bool): Whether a new access token should be

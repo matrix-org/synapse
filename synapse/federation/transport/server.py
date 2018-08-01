@@ -165,7 +165,7 @@ def _parse_auth_header(header_bytes):
         param_dict = dict(kv.split("=") for kv in params)
 
         def strip_quotes(value):
-            if value.startswith(b"\""):
+            if value.startswith("\""):
                 return value[1:-1]
             else:
                 return value
