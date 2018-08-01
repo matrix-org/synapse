@@ -38,22 +38,18 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             return count
         return self.runInteraction("count_users", _count_users)
 
-    def upsert_monthly_active_user(self, user_id):
+    def insert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member
             Arguments:
                 user_id (str): user to add/update
         """
-        return self._simple_upsert(
+        return self._simple_insert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
-            keyvalues={
+            values={
                 "user_id": user_id,
             },
-            values={
-                "timestamp": int(self._clock.time_msec()),
-            },
-            lock=False,
         )
 
     @defer.inlineCallbacks

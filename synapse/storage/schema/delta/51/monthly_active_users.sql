@@ -15,9 +15,7 @@
 
 -- a table of monthly active users, for use where blocking based on mau limits
 CREATE TABLE monthly_active_users (
-    user_id TEXT NOT NULL,
-    timestamp BIGINT NOT NULL
+    user_id TEXT NOT NULL
 );
 
 CREATE UNIQUE INDEX monthly_active_users_users ON monthly_active_users(user_id);
-CREATE INDEX monthly_active_users_time_stamp ON monthly_active_users(timestamp);

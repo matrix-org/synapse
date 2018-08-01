@@ -22,7 +22,7 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         count = yield self.mau.get_monthly_active_count()
         self.assertEqual(0, count)
 
-        yield self.mau.upsert_monthly_active_user("@user:server")
+        yield self.mau.insert_monthly_active_user("@user:server")
         count = yield self.mau.get_monthly_active_count()
 
         self.assertEqual(1, count)
@@ -34,8 +34,8 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         user_id3 = "@user3:server"
         result = yield self.mau.is_user_monthly_active(user_id1)
         self.assertFalse(result)
-        yield self.mau.upsert_monthly_active_user(user_id1)
-        yield self.mau.upsert_monthly_active_user(user_id2)
+        yield self.mau.insert_monthly_active_user(user_id1)
+        yield self.mau.insert_monthly_active_user(user_id2)
         result = yield self.mau.is_user_monthly_active(user_id1)
         self.assertTrue(result)
         result = yield self.mau.is_user_monthly_active(user_id3)
