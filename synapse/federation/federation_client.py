@@ -561,7 +561,9 @@ class FederationClient(FederationBase):
                 destination, room_id, user_id, membership
             )
 
-            pdu_dict = ret["event"]
+            pdu_dict = ret.get("event", None)
+            if not isinstance(pdu_dict, dict):
+                raise InvalidResponseError("Bad 'event' field in response")
 
             logger.debug("Got response to make_%s: %s", membership, pdu_dict)
 
