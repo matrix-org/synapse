@@ -519,7 +519,7 @@ class AuthHandler(BaseHandler):
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
-        self._check_mau_limits()
+        yield self._check_mau_limits()
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -729,16 +729,18 @@ class AuthHandler(BaseHandler):
                                                   device_id)
         defer.returnValue(access_token)
 
+    @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
-        self._check_mau_limits()
+        yield self._check_mau_limits()
         auth_api = self.hs.get_auth()
+        user_id = None
         try:
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
             user_id = auth_api.get_user_id_from_macaroon(macaroon)
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
-            return user_id
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def delete_access_token(self, access_token):
@@ -894,13 +896,14 @@ class AuthHandler(BaseHandler):
         else:
             return defer.succeed(False)
 
+    @defer.inlineCallbacks
     def _check_mau_limits(self):
         """
         Ensure that if mau blocking is enabled that invalid users cannot
         log in.
         """
         if self.hs.config.limit_usage_by_mau is True:
-            current_mau = self.store.count_monthly_users()
+            current_mau = yield self.store.count_monthly_users()
             if current_mau >= self.hs.config.max_mau_value:
                 raise AuthError(
                     403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
