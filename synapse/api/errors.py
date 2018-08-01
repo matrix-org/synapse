@@ -69,9 +69,6 @@ class CodeMessageException(RuntimeError):
         self.code = code
         self.msg = msg
 
-    def error_dict(self):
-        return cs_error(self.msg)
-
 
 class MatrixCodeMessageException(CodeMessageException):
     """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
@@ -306,14 +303,6 @@ class LimitExceededError(SynapseError):
             self.errcode,
             retry_after_ms=self.retry_after_ms,
         )
-
-
-def cs_exception(exception):
-    if isinstance(exception, CodeMessageException):
-        return exception.error_dict()
-    else:
-        logger.error("Unknown exception type: %s", type(exception))
-        return {}
 
 
 def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
