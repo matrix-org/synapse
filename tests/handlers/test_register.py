@@ -90,7 +90,7 @@ class RegistrationTestCase(unittest.TestCase):
         lots_of_users = 100
         small_number_users = 1
 
-        store.count_monthly_users = Mock(return_value=lots_of_users)
+        store.count_monthly_users = Mock(return_value=defer.succeed(lots_of_users))
 
         # Ensure does not throw exception
         yield self.handler.get_or_create_user(requester, 'a', display_name)
@@ -100,7 +100,7 @@ class RegistrationTestCase(unittest.TestCase):
         with self.assertRaises(RegistrationError):
             yield self.handler.get_or_create_user(requester, 'b', display_name)
 
-        store.count_monthly_users = Mock(return_value=small_number_users)
+        store.count_monthly_users = Mock(return_value=defer.succeed(small_number_users))
 
         self._macaroon_mock_generator("another_secret")
 
@@ -108,12 +108,14 @@ class RegistrationTestCase(unittest.TestCase):
         yield self.handler.get_or_create_user("@neil:matrix.org", 'c', "Neil")
 
         self._macaroon_mock_generator("another another secret")
-        store.count_monthly_users = Mock(return_value=lots_of_users)
+        store.count_monthly_users = Mock(return_value=defer.succeed(lots_of_users))
+
         with self.assertRaises(RegistrationError):
             yield self.handler.register(localpart=local_part)
 
         self._macaroon_mock_generator("another another secret")
-        store.count_monthly_users = Mock(return_value=lots_of_users)
+        store.count_monthly_users = Mock(return_value=defer.succeed(lots_of_users))
+
         with self.assertRaises(RegistrationError):
             yield self.handler.register_saml2(local_part)
 

@@ -77,38 +77,37 @@ class AuthTestCase(unittest.TestCase):
         v.satisfy_general(verify_nonce)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
+    @defer.inlineCallbacks
     def test_short_term_login_token_gives_user_id(self):
         self.hs.clock.now = 1000
 
         token = self.macaroon_generator.generate_short_term_login_token(
             "a_user", 5000
         )
-
-        self.assertEqual(
-            "a_user",
-            self.auth_handler.validate_short_term_login_token_and_get_user_id(
-                token
-            )
+        user_id = yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
+            token
         )
+        self.assertEqual("a_user", user_id)
 
         # when we advance the clock, the token should be rejected
         self.hs.clock.now = 6000
         with self.assertRaises(synapse.api.errors.AuthError):
-            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+            yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
                 token
             )
 
+    @defer.inlineCallbacks
     def test_short_term_login_token_cannot_replace_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token(
             "a_user", 5000
         )
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
+        user_id = yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
+            macaroon.serialize()
+        )
         self.assertEqual(
-            "a_user",
-            self.auth_handler.validate_short_term_login_token_and_get_user_id(
-                macaroon.serialize()
-            )
+            "a_user", user_id
         )
 
         # add another "user_id" caveat, which might allow us to override the
@@ -116,7 +115,7 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("user_id = b_user")
 
         with self.assertRaises(synapse.api.errors.AuthError):
-            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+            yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
                 macaroon.serialize()
             )
 
@@ -126,7 +125,7 @@ class AuthTestCase(unittest.TestCase):
         # Ensure does not throw exception
         yield self.auth_handler.get_access_token_for_user_id('user_a')
 
-        self.auth_handler.validate_short_term_login_token_and_get_user_id(
+        yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
             self._get_macaroon().serialize()
         )
 
@@ -134,24 +133,30 @@ class AuthTestCase(unittest.TestCase):
     def test_mau_limits_exceeded(self):
         self.hs.config.limit_usage_by_mau = True
         self.hs.get_datastore().count_monthly_users = Mock(
-            return_value=self.large_number_of_users
+            return_value=defer.succeed(self.large_number_of_users)
         )
+
         with self.assertRaises(AuthError):
             yield self.auth_handler.get_access_token_for_user_id('user_a')
+
+        self.hs.get_datastore().count_monthly_users = Mock(
+            return_value=defer.succeed(self.large_number_of_users)
+        )
         with self.assertRaises(AuthError):
-            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+            yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
                 self._get_macaroon().serialize()
             )
 
     @defer.inlineCallbacks
     def test_mau_limits_not_exceeded(self):
         self.hs.config.limit_usage_by_mau = True
+
         self.hs.get_datastore().count_monthly_users = Mock(
-            return_value=self.small_number_of_users
+            return_value=defer.succeed(self.small_number_of_users)
         )
         # Ensure does not raise exception
         yield self.auth_handler.get_access_token_for_user_id('user_a')
-        self.auth_handler.validate_short_term_login_token_and_get_user_id(
+        yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
             self._get_macaroon().serialize()
         )
 

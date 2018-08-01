@@ -273,24 +273,24 @@ class DataStore(RoomMemberStore, RoomStore,
         This method should be refactored with count_daily_users - the only
         reason not to is waiting on definition of mau
         returns:
-            int: count of current monthly active users
+            defered: resolves to int
         """
+        def _count_monthly_users(txn):
+            thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
+            sql = """
+                SELECT COALESCE(count(*), 0) FROM (
+                    SELECT user_id FROM user_ips
+                    WHERE last_seen > ?
+                    GROUP BY user_id
+                ) u
+            """
 
-        thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
-        sql = """
-            SELECT COALESCE(count(*), 0) FROM (
-                SELECT user_id FROM user_ips
-                WHERE last_seen > ?
-                GROUP BY user_id
-            ) u
-        """
-        try:
-            txn = self.db_conn.cursor()
             txn.execute(sql, (thirty_days_ago,))
             count, = txn.fetchone()
+            print "Count is %d" % (count,)
             return count
-        finally:
-            txn.close()
+
+        return self.runInteraction("count_monthly_users", _count_monthly_users)
 
     def count_r30_users(self):
         """
