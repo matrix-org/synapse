@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
 from collections import namedtuple
 
+from synapse.util.module_loader import load_module
+
+from ._base import Config, ConfigError
 
 MISSING_NETADDR = (
     "Missing netaddr library. This is required for URL preview API."
@@ -34,6 +36,14 @@ MISSING_LXML = (
 
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
+)
+
+MediaStorageProviderConfig = namedtuple(
+    "MediaStorageProviderConfig", (
+        "store_local",  # Whether to store newly uploaded local files
+        "store_remote",  # Whether to store newly downloaded remote files
+        "store_synchronous",  # Whether to wait for successful storage for local uploads
+    ),
 )
 
 
@@ -70,7 +80,64 @@ class ContentRepositoryConfig(Config):
         self.max_upload_size = self.parse_size(config["max_upload_size"])
         self.max_image_pixels = self.parse_size(config["max_image_pixels"])
         self.max_spider_size = self.parse_size(config["max_spider_size"])
+
         self.media_store_path = self.ensure_directory(config["media_store_path"])
+
+        backup_media_store_path = config.get("backup_media_store_path")
+
+        synchronous_backup_media_store = config.get(
+            "synchronous_backup_media_store", False
+        )
+
+        storage_providers = config.get("media_storage_providers", [])
+
+        if backup_media_store_path:
+            if storage_providers:
+                raise ConfigError(
+                    "Cannot use both 'backup_media_store_path' and 'storage_providers'"
+                )
+
+            storage_providers = [{
+                "module": "file_system",
+                "store_local": True,
+                "store_synchronous": synchronous_backup_media_store,
+                "store_remote": True,
+                "config": {
+                    "directory": backup_media_store_path,
+                }
+            }]
+
+        # This is a list of config that can be used to create the storage
+        # providers. The entries are tuples of (Class, class_config,
+        # MediaStorageProviderConfig), where Class is the class of the provider,
+        # the class_config the config to pass to it, and
+        # MediaStorageProviderConfig are options for StorageProviderWrapper.
+        #
+        # We don't create the storage providers here as not all workers need
+        # them to be started.
+        self.media_storage_providers = []
+
+        for provider_config in storage_providers:
+            # We special case the module "file_system" so as not to need to
+            # expose FileStorageProviderBackend
+            if provider_config["module"] == "file_system":
+                provider_config["module"] = (
+                    "synapse.rest.media.v1.storage_provider"
+                    ".FileStorageProviderBackend"
+                )
+
+            provider_class, parsed_config = load_module(provider_config)
+
+            wrapper_config = MediaStorageProviderConfig(
+                provider_config.get("store_local", False),
+                provider_config.get("store_remote", False),
+                provider_config.get("store_synchronous", False),
+            )
+
+            self.media_storage_providers.append(
+                (provider_class, parsed_config, wrapper_config,)
+            )
+
         self.uploads_path = self.ensure_directory(config["uploads_path"])
         self.dynamic_thumbnails = config["dynamic_thumbnails"]
         self.thumbnail_requirements = parse_thumbnail_requirements(
@@ -114,6 +181,20 @@ class ContentRepositoryConfig(Config):
         return """
         # Directory where uploaded images and attachments are stored.
         media_store_path: "%(media_store)s"
+
+        # Media storage providers allow media to be stored in different
+        # locations.
+        # media_storage_providers:
+        # - module: file_system
+        #   # Whether to write new local files.
+        #   store_local: false
+        #   # Whether to write new remote media
+        #   store_remote: false
+        #   # Whether to block upload requests waiting for write to this
+        #   # provider to complete
+        #   store_synchronous: false
+        #   config:
+        #     directory: /mnt/some/other/directory
 
         # Directory where in-progress uploads are stored.
         uploads_path: "%(uploads_path)s"
@@ -169,6 +250,9 @@ class ContentRepositoryConfig(Config):
         # - '192.168.0.0/16'
         # - '100.64.0.0/10'
         # - '169.254.0.0/16'
+        # - '::1/128'
+        # - 'fe80::/64'
+        # - 'fc00::/7'
         #
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.

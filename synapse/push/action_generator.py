@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
 
-from .bulk_push_rule_evaluator import BulkPushRuleEvaluator
+from twisted.internet import defer
 
 from synapse.util.metrics import Measure
 
-import logging
+from .bulk_push_rule_evaluator import BulkPushRuleEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +40,6 @@ class ActionGenerator(object):
     @defer.inlineCallbacks
     def handle_push_actions_for_event(self, event, context):
         with Measure(self.clock, "action_for_event_by_user"):
-            actions_by_user = yield self.bulk_evaluator.action_for_event_by_user(
+            yield self.bulk_evaluator.action_for_event_by_user(
                 event, context
             )
-
-        context.push_actions = [
-            (uid, actions) for uid, actions in actions_by_user.iteritems()
-        ]

@@ -14,17 +14,17 @@
 # limitations under the License.
 
 
-from tests import unittest
-from twisted.internet import defer
+from collections import OrderedDict
 
 from mock import Mock
 
-from collections import OrderedDict
+from twisted.internet import defer
 
 from synapse.server import HomeServer
-
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import create_engine
+
+from tests import unittest
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
@@ -56,7 +56,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             database_engine=create_engine(config.database_config),
         )
 
-        self.datastore = SQLBaseStore(hs)
+        self.datastore = SQLBaseStore(None, hs)
 
     @defer.inlineCallbacks
     def test_insert_1col(self):

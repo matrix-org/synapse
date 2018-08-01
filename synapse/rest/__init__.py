@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,48 +14,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.rest.client import (
-    versions,
-)
+from six import PY3
 
+from synapse.http.server import JsonResource
+from synapse.rest.client import versions
 from synapse.rest.client.v1 import (
-    room,
-    events,
-    profile,
-    presence,
-    initial_sync,
-    directory,
-    voip,
     admin,
-    pusher,
-    push_rule,
-    register as v1_register,
+    directory,
+    events,
+    initial_sync,
     login as v1_login,
     logout,
+    presence,
+    profile,
+    push_rule,
+    pusher,
+    room,
+    voip,
 )
-
 from synapse.rest.client.v2_alpha import (
-    sync,
-    filter,
     account,
-    register,
-    auth,
-    receipts,
-    read_marker,
-    keys,
-    tokenrefresh,
-    tags,
     account_data,
-    report_event,
-    openid,
-    notifications,
+    auth,
     devices,
-    thirdparty,
+    filter,
+    groups,
+    keys,
+    notifications,
+    openid,
+    read_marker,
+    receipts,
+    register,
+    report_event,
     sendtodevice,
+    sync,
+    tags,
+    thirdparty,
+    tokenrefresh,
     user_directory,
 )
 
-from synapse.http.server import JsonResource
+if not PY3:
+    from synapse.rest.client.v1_only import (
+        register as v1_register,
+    )
 
 
 class ClientRestResource(JsonResource):
@@ -68,14 +71,22 @@ class ClientRestResource(JsonResource):
     def register_servlets(client_resource, hs):
         versions.register_servlets(client_resource)
 
-        # "v1"
-        room.register_servlets(hs, client_resource)
+        if not PY3:
+            # "v1" (Python 2 only)
+            v1_register.register_servlets(hs, client_resource)
+
+        # Deprecated in r0
+        initial_sync.register_servlets(hs, client_resource)
+        room.register_deprecated_servlets(hs, client_resource)
+
+        # Partially deprecated in r0
         events.register_servlets(hs, client_resource)
-        v1_register.register_servlets(hs, client_resource)
+
+        # "v1" + "r0"
+        room.register_servlets(hs, client_resource)
         v1_login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
         presence.register_servlets(hs, client_resource)
-        initial_sync.register_servlets(hs, client_resource)
         directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
         admin.register_servlets(hs, client_resource)
@@ -102,3 +113,4 @@ class ClientRestResource(JsonResource):
         thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
+        groups.register_servlets(hs, client_resource)

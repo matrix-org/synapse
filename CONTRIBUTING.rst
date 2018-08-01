@@ -30,8 +30,12 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use Jenkins for continuous integration (http://matrix.org/jenkins), and
-typically all pull requests get automatically tested Jenkins: if your change breaks the build, Jenkins will yell about it in #matrix-dev:matrix.org so please lurk there and keep an eye open.
+We use `Jenkins <http://matrix.org/jenkins>`_ and 
+`Travis <https://travis-ci.org/matrix-org/synapse>`_ for continuous
+integration. All pull requests to synapse get automatically tested by Travis; 
+the Jenkins builds require an adminstrator to start them. If your change 
+breaks the build, this will be shown in github, so please keep an eye on the 
+pull request for feedback.
 
 Code style
 ~~~~~~~~~~
@@ -43,6 +47,26 @@ at https://github.com/matrix-org/synapse/tree/master/docs/code_style.rst.
 Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
 makes it horribly hard to review otherwise.
+
+Changelog
+~~~~~~~~~
+
+All changes, even minor ones, need a corresponding changelog
+entry. These are managed by Towncrier
+(https://github.com/hawkowl/towncrier).
+
+To create a changelog entry, make a new file in the ``changelog.d``
+file named in the format of ``issuenumberOrPR.type``. The type can be
+one of ``feature``, ``bugfix``, ``removal`` (also used for
+deprecations), or ``misc`` (for internal-only changes). The content of
+the file is your changelog entry, which can contain RestructuredText
+formatting. A note of contributors is welcomed in changelogs for
+non-misc changes (the content of misc changes is not displayed).
+
+For example, a fix for a bug reported in #1234 would have its
+changelog entry in ``changelog.d/1234.bugfix``, and contain content
+like "The security levels of Florbs are now validated when
+recieved over federation. Contributed by Jane Matrix".
 
 Attribution
 ~~~~~~~~~~~
@@ -106,11 +130,15 @@ If you agree to this for your contribution, then all that's needed is to
 include the line in your commit or pull request comment::
 
     Signed-off-by: Your Name <your@email.example.org>
-    
-...using your real name; unfortunately pseudonyms and anonymous contributions
-can't be accepted. Git makes this trivial - just use the -s flag when you do
-``git commit``, having first set ``user.name`` and ``user.email`` git configs
-(which you should have done anyway :)
+
+We accept contributions under a legally identifiable name, such as
+your name on government documentation or common-law names (names
+claimed by legitimate usage or repute). Unfortunately, we cannot
+accept anonymous contributions at this time.
+
+Git allows you to add this signoff automatically when using the ``-s``
+flag to ``git commit``, which uses the name and email set in your
+``user.name`` and ``user.email`` git configs.
 
 Conclusion
 ~~~~~~~~~~

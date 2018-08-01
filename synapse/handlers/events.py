@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.util.logutils import log_function
-from synapse.types import UserID
-from synapse.events.utils import serialize_event
-from synapse.api.constants import Membership, EventTypes
-from synapse.events import EventBase
-
-from ._base import BaseHandler
-
 import logging
 import random
 
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.events import EventBase
+from synapse.events.utils import serialize_event
+from synapse.types import UserID
+from synapse.util.logutils import log_function
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +47,7 @@ class EventStreamHandler(BaseHandler):
 
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
+        self._server_notices_sender = hs.get_server_notices_sender()
 
     @defer.inlineCallbacks
     @log_function
@@ -58,6 +58,10 @@ class EventStreamHandler(BaseHandler):
 
         If `only_keys` is not None, events from keys will be sent down.
         """
+
+        # send any outstanding server notices to the user.
+        yield self._server_notices_sender.on_user_syncing(auth_user_id)
+
         auth_user = UserID.from_string(auth_user_id)
         presence_handler = self.hs.get_presence_handler()
 

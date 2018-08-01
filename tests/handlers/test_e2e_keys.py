@@ -14,13 +14,14 @@
 # limitations under the License.
 
 import mock
-from synapse.api import errors
+
 from twisted.internet import defer
 
 import synapse.api.errors
 import synapse.handlers.e2e_keys
-
 import synapse.storage
+from synapse.api import errors
+
 from tests import unittest, utils
 
 
@@ -34,7 +35,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
     def setUp(self):
         self.hs = yield utils.setup_test_homeserver(
             handlers=None,
-            replication_layer=mock.Mock(),
+            federation_client=mock.Mock(),
         )
         self.handler = synapse.handlers.e2e_keys.E2eKeysHandler(self.hs)
 
@@ -143,7 +144,6 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         except errors.SynapseError:
             pass
 
-    @unittest.DEBUG
     @defer.inlineCallbacks
     def test_claim_one_time_key(self):
         local_user = "@boris:" + self.hs.hostname

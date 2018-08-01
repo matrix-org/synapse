@@ -12,45 +12,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+import random
+
+from six.moves import range
+from six.moves.queue import Empty, PriorityQueue
+
+from unpaddedbase64 import encode_base64
 
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
 from synapse.api.errors import StoreError
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage._base import SQLBaseStore
+from synapse.storage.events_worker import EventsWorkerStore
+from synapse.storage.signatures import SignatureWorkerStore
 from synapse.util.caches.descriptors import cached
-from unpaddedbase64 import encode_base64
-
-import logging
-from Queue import PriorityQueue, Empty
-
 
 logger = logging.getLogger(__name__)
 
 
-class EventFederationStore(SQLBaseStore):
-    """ Responsible for storing and serving up the various graphs associated
-    with an event. Including the main event graph and the auth chains for an
-    event.
-
-    Also has methods for getting the front (latest) and back (oldest) edges
-    of the event graphs. These are used to generate the parents for new events
-    and backfilling from another server respectively.
-    """
-
-    EVENT_AUTH_STATE_ONLY = "event_auth_state_only"
-
-    def __init__(self, hs):
-        super(EventFederationStore, self).__init__(hs)
-
-        self.register_background_update_handler(
-            self.EVENT_AUTH_STATE_ONLY,
-            self._background_delete_non_state_event_auth,
-        )
-
-        hs.get_clock().looping_call(
-            self._delete_old_forward_extrem_cache, 60 * 60 * 1000
-        )
-
+class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
+                                 SQLBaseStore):
     def get_auth_chain(self, event_ids, include_given=False):
         """Get auth events for given event_ids. The events *must* be state events.
 
@@ -97,7 +80,7 @@ class EventFederationStore(SQLBaseStore):
             front_list = list(front)
             chunks = [
                 front_list[x:x + 100]
-                for x in xrange(0, len(front), 100)
+                for x in range(0, len(front), 100)
             ]
             for chunk in chunks:
                 txn.execute(
@@ -131,9 +114,9 @@ class EventFederationStore(SQLBaseStore):
         sql = (
             "SELECT b.event_id, MAX(e.depth) FROM events as e"
             " INNER JOIN event_edges as g"
-            " ON g.event_id = e.event_id AND g.room_id = e.room_id"
+            " ON g.event_id = e.event_id"
             " INNER JOIN event_backward_extremities as b"
-            " ON g.prev_event_id = b.event_id AND g.room_id = b.room_id"
+            " ON g.prev_event_id = b.event_id"
             " WHERE b.room_id = ? AND g.is_state is ?"
             " GROUP BY b.event_id"
         )
@@ -152,7 +135,47 @@ class EventFederationStore(SQLBaseStore):
             retcol="event_id",
         )
 
+    @defer.inlineCallbacks
+    def get_prev_events_for_room(self, room_id):
+        """
+        Gets a subset of the current forward extremities in the given room.
+
+        Limits the result to 10 extremities, so that we can avoid creating
+        events which refer to hundreds of prev_events.
+
+        Args:
+            room_id (str): room_id
+
+        Returns:
+            Deferred[list[(str, dict[str, str], int)]]
+                for each event, a tuple of (event_id, hashes, depth)
+                where *hashes* is a map from algorithm to hash.
+        """
+        res = yield self.get_latest_event_ids_and_hashes_in_room(room_id)
+        if len(res) > 10:
+            # Sort by reverse depth, so we point to the most recent.
+            res.sort(key=lambda a: -a[2])
+
+            # we use half of the limit for the actual most recent events, and
+            # the other half to randomly point to some of the older events, to
+            # make sure that we don't completely ignore the older events.
+            res = res[0:5] + random.sample(res[5:], 5)
+
+        defer.returnValue(res)
+
     def get_latest_event_ids_and_hashes_in_room(self, room_id):
+        """
+        Gets the current forward extremities in the given room
+
+        Args:
+            room_id (str): room_id
+
+        Returns:
+            Deferred[list[(str, dict[str, str], int)]]
+                for each event, a tuple of (event_id, hashes, depth)
+                where *hashes* is a map from algorithm to hash.
+        """
+
         return self.runInteraction(
             "get_latest_event_ids_and_hashes_in_room",
             self._get_latest_event_ids_and_hashes_in_room,
@@ -201,22 +224,6 @@ class EventFederationStore(SQLBaseStore):
             room_id,
         )
 
-    @defer.inlineCallbacks
-    def get_max_depth_of_events(self, event_ids):
-        sql = (
-            "SELECT MAX(depth) FROM events WHERE event_id IN (%s)"
-        ) % (",".join(["?"] * len(event_ids)),)
-
-        rows = yield self._execute(
-            "get_max_depth_of_events", None,
-            sql, *event_ids
-        )
-
-        if rows:
-            defer.returnValue(rows[0][0])
-        else:
-            defer.returnValue(1)
-
     def _get_min_depth_interaction(self, txn, room_id):
         min_depth = self._simple_select_one_onecol_txn(
             txn,
@@ -227,6 +234,220 @@ class EventFederationStore(SQLBaseStore):
         )
 
         return int(min_depth) if min_depth is not None else None
+
+    def get_forward_extremeties_for_room(self, room_id, stream_ordering):
+        """For a given room_id and stream_ordering, return the forward
+        extremeties of the room at that point in "time".
+
+        Throws a StoreError if we have since purged the index for
+        stream_orderings from that point.
+
+        Args:
+            room_id (str):
+            stream_ordering (int):
+
+        Returns:
+            deferred, which resolves to a list of event_ids
+        """
+        # We want to make the cache more effective, so we clamp to the last
+        # change before the given ordering.
+        last_change = self._events_stream_cache.get_max_pos_of_last_change(room_id)
+
+        # We don't always have a full stream_to_exterm_id table, e.g. after
+        # the upgrade that introduced it, so we make sure we never ask for a
+        # stream_ordering from before a restart
+        last_change = max(self._stream_order_on_start, last_change)
+
+        # provided the last_change is recent enough, we now clamp the requested
+        # stream_ordering to it.
+        if last_change > self.stream_ordering_month_ago:
+            stream_ordering = min(last_change, stream_ordering)
+
+        return self._get_forward_extremeties_for_room(room_id, stream_ordering)
+
+    @cached(max_entries=5000, num_args=2)
+    def _get_forward_extremeties_for_room(self, room_id, stream_ordering):
+        """For a given room_id and stream_ordering, return the forward
+        extremeties of the room at that point in "time".
+
+        Throws a StoreError if we have since purged the index for
+        stream_orderings from that point.
+        """
+
+        if stream_ordering <= self.stream_ordering_month_ago:
+            raise StoreError(400, "stream_ordering too old")
+
+        sql = ("""
+                SELECT event_id FROM stream_ordering_to_exterm
+                INNER JOIN (
+                    SELECT room_id, MAX(stream_ordering) AS stream_ordering
+                    FROM stream_ordering_to_exterm
+                    WHERE stream_ordering <= ? GROUP BY room_id
+                ) AS rms USING (room_id, stream_ordering)
+                WHERE room_id = ?
+        """)
+
+        def get_forward_extremeties_for_room_txn(txn):
+            txn.execute(sql, (stream_ordering, room_id))
+            return [event_id for event_id, in txn]
+
+        return self.runInteraction(
+            "get_forward_extremeties_for_room",
+            get_forward_extremeties_for_room_txn
+        )
+
+    def get_backfill_events(self, room_id, event_list, limit):
+        """Get a list of Events for a given topic that occurred before (and
+        including) the events in event_list. Return a list of max size `limit`
+
+        Args:
+            txn
+            room_id (str)
+            event_list (list)
+            limit (int)
+        """
+        return self.runInteraction(
+            "get_backfill_events",
+            self._get_backfill_events, room_id, event_list, limit
+        ).addCallback(
+            self._get_events
+        ).addCallback(
+            lambda l: sorted(l, key=lambda e: -e.depth)
+        )
+
+    def _get_backfill_events(self, txn, room_id, event_list, limit):
+        logger.debug(
+            "_get_backfill_events: %s, %s, %s",
+            room_id, repr(event_list), limit
+        )
+
+        event_results = set()
+
+        # We want to make sure that we do a breadth-first, "depth" ordered
+        # search.
+
+        query = (
+            "SELECT depth, prev_event_id FROM event_edges"
+            " INNER JOIN events"
+            " ON prev_event_id = events.event_id"
+            " WHERE event_edges.event_id = ?"
+            " AND event_edges.is_state = ?"
+            " LIMIT ?"
+        )
+
+        queue = PriorityQueue()
+
+        for event_id in event_list:
+            depth = self._simple_select_one_onecol_txn(
+                txn,
+                table="events",
+                keyvalues={
+                    "event_id": event_id,
+                },
+                retcol="depth",
+                allow_none=True,
+            )
+
+            if depth:
+                queue.put((-depth, event_id))
+
+        while not queue.empty() and len(event_results) < limit:
+            try:
+                _, event_id = queue.get_nowait()
+            except Empty:
+                break
+
+            if event_id in event_results:
+                continue
+
+            event_results.add(event_id)
+
+            txn.execute(
+                query,
+                (event_id, False, limit - len(event_results))
+            )
+
+            for row in txn:
+                if row[1] not in event_results:
+                    queue.put((-row[0], row[1]))
+
+        return event_results
+
+    @defer.inlineCallbacks
+    def get_missing_events(self, room_id, earliest_events, latest_events,
+                           limit, min_depth):
+        ids = yield self.runInteraction(
+            "get_missing_events",
+            self._get_missing_events,
+            room_id, earliest_events, latest_events, limit, min_depth
+        )
+
+        events = yield self._get_events(ids)
+
+        events = sorted(
+            [ev for ev in events if ev.depth >= min_depth],
+            key=lambda e: e.depth,
+        )
+
+        defer.returnValue(events[:limit])
+
+    def _get_missing_events(self, txn, room_id, earliest_events, latest_events,
+                            limit, min_depth):
+
+        earliest_events = set(earliest_events)
+        front = set(latest_events) - earliest_events
+
+        event_results = set()
+
+        query = (
+            "SELECT prev_event_id FROM event_edges "
+            "WHERE event_id = ? AND is_state = ? "
+            "LIMIT ?"
+        )
+
+        while front and len(event_results) < limit:
+            new_front = set()
+            for event_id in front:
+                txn.execute(
+                    query,
+                    (event_id, False, limit - len(event_results))
+                )
+
+                for e_id, in txn:
+                    new_front.add(e_id)
+
+            new_front -= earliest_events
+            new_front -= event_results
+
+            front = new_front
+            event_results |= new_front
+
+        return event_results
+
+
+class EventFederationStore(EventFederationWorkerStore):
+    """ Responsible for storing and serving up the various graphs associated
+    with an event. Including the main event graph and the auth chains for an
+    event.
+
+    Also has methods for getting the front (latest) and back (oldest) edges
+    of the event graphs. These are used to generate the parents for new events
+    and backfilling from another server respectively.
+    """
+
+    EVENT_AUTH_STATE_ONLY = "event_auth_state_only"
+
+    def __init__(self, db_conn, hs):
+        super(EventFederationStore, self).__init__(db_conn, hs)
+
+        self.register_background_update_handler(
+            self.EVENT_AUTH_STATE_ONLY,
+            self._background_delete_non_state_event_auth,
+        )
+
+        hs.get_clock().looping_call(
+            self._delete_old_forward_extrem_cache, 60 * 60 * 1000,
+        )
 
     def _update_min_depth_for_room_txn(self, txn, room_id, depth):
         min_depth = self._get_min_depth_interaction(txn, room_id)
@@ -310,67 +531,6 @@ class EventFederationStore(SQLBaseStore):
             ]
         )
 
-    def get_forward_extremeties_for_room(self, room_id, stream_ordering):
-        """For a given room_id and stream_ordering, return the forward
-        extremeties of the room at that point in "time".
-
-        Throws a StoreError if we have since purged the index for
-        stream_orderings from that point.
-
-        Args:
-            room_id (str):
-            stream_ordering (int):
-
-        Returns:
-            deferred, which resolves to a list of event_ids
-        """
-        # We want to make the cache more effective, so we clamp to the last
-        # change before the given ordering.
-        last_change = self._events_stream_cache.get_max_pos_of_last_change(room_id)
-
-        # We don't always have a full stream_to_exterm_id table, e.g. after
-        # the upgrade that introduced it, so we make sure we never ask for a
-        # stream_ordering from before a restart
-        last_change = max(self._stream_order_on_start, last_change)
-
-        # provided the last_change is recent enough, we now clamp the requested
-        # stream_ordering to it.
-        if last_change > self.stream_ordering_month_ago:
-            stream_ordering = min(last_change, stream_ordering)
-
-        return self._get_forward_extremeties_for_room(room_id, stream_ordering)
-
-    @cached(max_entries=5000, num_args=2)
-    def _get_forward_extremeties_for_room(self, room_id, stream_ordering):
-        """For a given room_id and stream_ordering, return the forward
-        extremeties of the room at that point in "time".
-
-        Throws a StoreError if we have since purged the index for
-        stream_orderings from that point.
-        """
-
-        if stream_ordering <= self.stream_ordering_month_ago:
-            raise StoreError(400, "stream_ordering too old")
-
-        sql = ("""
-                SELECT event_id FROM stream_ordering_to_exterm
-                INNER JOIN (
-                    SELECT room_id, MAX(stream_ordering) AS stream_ordering
-                    FROM stream_ordering_to_exterm
-                    WHERE stream_ordering <= ? GROUP BY room_id
-                ) AS rms USING (room_id, stream_ordering)
-                WHERE room_id = ?
-        """)
-
-        def get_forward_extremeties_for_room_txn(txn):
-            txn.execute(sql, (stream_ordering, room_id))
-            return [event_id for event_id, in txn]
-
-        return self.runInteraction(
-            "get_forward_extremeties_for_room",
-            get_forward_extremeties_for_room_txn
-        )
-
     def _delete_old_forward_extrem_cache(self):
         def _delete_old_forward_extrem_cache_txn(txn):
             # Delete entries older than a month, while making sure we don't delete
@@ -388,139 +548,12 @@ class EventFederationStore(SQLBaseStore):
                 sql,
                 (self.stream_ordering_month_ago, self.stream_ordering_month_ago,)
             )
-        return self.runInteraction(
+        return run_as_background_process(
+            "delete_old_forward_extrem_cache",
+            self.runInteraction,
             "_delete_old_forward_extrem_cache",
-            _delete_old_forward_extrem_cache_txn
+            _delete_old_forward_extrem_cache_txn,
         )
-
-    def get_backfill_events(self, room_id, event_list, limit):
-        """Get a list of Events for a given topic that occurred before (and
-        including) the events in event_list. Return a list of max size `limit`
-
-        Args:
-            txn
-            room_id (str)
-            event_list (list)
-            limit (int)
-        """
-        return self.runInteraction(
-            "get_backfill_events",
-            self._get_backfill_events, room_id, event_list, limit
-        ).addCallback(
-            self._get_events
-        ).addCallback(
-            lambda l: sorted(l, key=lambda e: -e.depth)
-        )
-
-    def _get_backfill_events(self, txn, room_id, event_list, limit):
-        logger.debug(
-            "_get_backfill_events: %s, %s, %s",
-            room_id, repr(event_list), limit
-        )
-
-        event_results = set()
-
-        # We want to make sure that we do a breadth-first, "depth" ordered
-        # search.
-
-        query = (
-            "SELECT depth, prev_event_id FROM event_edges"
-            " INNER JOIN events"
-            " ON prev_event_id = events.event_id"
-            " AND event_edges.room_id = events.room_id"
-            " WHERE event_edges.room_id = ? AND event_edges.event_id = ?"
-            " AND event_edges.is_state = ?"
-            " LIMIT ?"
-        )
-
-        queue = PriorityQueue()
-
-        for event_id in event_list:
-            depth = self._simple_select_one_onecol_txn(
-                txn,
-                table="events",
-                keyvalues={
-                    "event_id": event_id,
-                },
-                retcol="depth",
-                allow_none=True,
-            )
-
-            if depth:
-                queue.put((-depth, event_id))
-
-        while not queue.empty() and len(event_results) < limit:
-            try:
-                _, event_id = queue.get_nowait()
-            except Empty:
-                break
-
-            if event_id in event_results:
-                continue
-
-            event_results.add(event_id)
-
-            txn.execute(
-                query,
-                (room_id, event_id, False, limit - len(event_results))
-            )
-
-            for row in txn:
-                if row[1] not in event_results:
-                    queue.put((-row[0], row[1]))
-
-        return event_results
-
-    @defer.inlineCallbacks
-    def get_missing_events(self, room_id, earliest_events, latest_events,
-                           limit, min_depth):
-        ids = yield self.runInteraction(
-            "get_missing_events",
-            self._get_missing_events,
-            room_id, earliest_events, latest_events, limit, min_depth
-        )
-
-        events = yield self._get_events(ids)
-
-        events = sorted(
-            [ev for ev in events if ev.depth >= min_depth],
-            key=lambda e: e.depth,
-        )
-
-        defer.returnValue(events[:limit])
-
-    def _get_missing_events(self, txn, room_id, earliest_events, latest_events,
-                            limit, min_depth):
-
-        earliest_events = set(earliest_events)
-        front = set(latest_events) - earliest_events
-
-        event_results = set()
-
-        query = (
-            "SELECT prev_event_id FROM event_edges "
-            "WHERE room_id = ? AND event_id = ? AND is_state = ? "
-            "LIMIT ?"
-        )
-
-        while front and len(event_results) < limit:
-            new_front = set()
-            for event_id in front:
-                txn.execute(
-                    query,
-                    (room_id, event_id, False, limit - len(event_results))
-                )
-
-                for e_id, in txn:
-                    new_front.add(e_id)
-
-            new_front -= earliest_events
-            new_front -= event_results
-
-            front = new_front
-            event_results |= new_front
-
-        return event_results
 
     def clean_room_for_join(self, room_id):
         return self.runInteraction(

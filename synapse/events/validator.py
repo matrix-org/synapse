@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.types import EventID, RoomID, UserID
-from synapse.api.errors import SynapseError
+from six import string_types
+
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import SynapseError
+from synapse.types import EventID, RoomID, UserID
 
 
 class EventValidator(object):
@@ -49,7 +51,7 @@ class EventValidator(object):
             strings.append("state_key")
 
         for s in strings:
-            if not isinstance(getattr(event, s), basestring):
+            if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))
 
         if event.type == EventTypes.Member:
@@ -88,5 +90,5 @@ class EventValidator(object):
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))
-            if not isinstance(d[s], basestring):
+            if not isinstance(d[s], string_types):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))

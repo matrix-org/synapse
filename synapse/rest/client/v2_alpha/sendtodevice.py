@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class SendToDeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_v2_patterns(
         "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$",
-        releases=[], v2_alpha=False
+        v2_alpha=False
     )
 
     def __init__(self, hs):
@@ -40,7 +40,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         super(SendToDeviceRestServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.txns = HttpTransactionCache(hs.get_clock())
+        self.txns = HttpTransactionCache(hs)
         self.device_message_handler = hs.get_device_message_handler()
 
     def on_PUT(self, request, message_type, txn_id):

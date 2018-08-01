@@ -15,15 +15,19 @@
 
 import logging
 
+from six import itervalues
+
 import pymacaroons
+from netaddr import IPAddress
+
 from twisted.internet import defer
 
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, JoinRules
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes
 from synapse.types import UserID
-from synapse.util.caches import register_cache, CACHE_SIZE_FACTOR
+from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
@@ -57,16 +61,17 @@ class Auth(object):
         self.TOKEN_NOT_FOUND_HTTP_STATUS = 401
 
         self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
-        register_cache("token_cache", self.token_cache)
+        register_cache("cache", "token_cache", self.token_cache)
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
         auth_events_ids = yield self.compute_auth_events(
-            event, context.prev_state_ids, for_verification=True,
+            event, prev_state_ids, for_verification=True,
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {
-            (e.type, e.state_key): e for e in auth_events.values()
+            (e.type, e.state_key): e for e in itervalues(auth_events)
         }
         self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
 
@@ -189,7 +194,7 @@ class Auth(object):
                     synapse.types.create_requester(user_id, app_service=app_service)
                 )
 
-            access_token = get_access_token_from_request(
+            access_token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
 
@@ -204,12 +209,12 @@ class Auth(object):
 
             ip_addr = self.hs.get_ip_from_request(request)
             user_agent = request.requestHeaders.getRawHeaders(
-                "User-Agent",
-                default=[""]
+                b"User-Agent",
+                default=[b""]
             )[0]
             if user and access_token and ip_addr:
                 self.store.insert_client_ip(
-                    user=user,
+                    user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent,
@@ -235,17 +240,22 @@ class Auth(object):
     @defer.inlineCallbacks
     def _get_appservice_user_id(self, request):
         app_service = self.store.get_app_service_by_token(
-            get_access_token_from_request(
+            self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
         )
         if app_service is None:
             defer.returnValue((None, None))
 
-        if "user_id" not in request.args:
+        if app_service.ip_range_whitelist:
+            ip_address = IPAddress(self.hs.get_ip_from_request(request))
+            if ip_address not in app_service.ip_range_whitelist:
+                defer.returnValue((None, None))
+
+        if b"user_id" not in request.args:
             defer.returnValue((app_service.sender, app_service))
 
-        user_id = request.args["user_id"][0]
+        user_id = request.args[b"user_id"][0].decode('utf8')
         if app_service.sender == user_id:
             defer.returnValue((app_service.sender, app_service))
 
@@ -270,7 +280,11 @@ class Auth(object):
             rights (str): The operation being performed; the access token must
                 allow this.
         Returns:
-            dict : dict that includes the user and the ID of their access token.
+            Deferred[dict]: dict that includes:
+               `user` (UserID)
+               `is_guest` (bool)
+               `token_id` (int|None): access token id. May be None if guest
+               `device_id` (str|None): device corresponding to access token
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
@@ -482,7 +496,7 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
-            logger.warn("Unrecognised access token - not in store: %s" % (token,))
+            logger.warn("Unrecognised access token - not in store.")
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
                 errcode=Codes.UNKNOWN_TOKEN
@@ -500,12 +514,12 @@ class Auth(object):
 
     def get_appservice_by_req(self, request):
         try:
-            token = get_access_token_from_request(
+            token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
             service = self.store.get_app_service_by_token(token)
             if not service:
-                logger.warn("Unrecognised appservice access token: %s" % (token,))
+                logger.warn("Unrecognised appservice access token.")
                 raise AuthError(
                     self.TOKEN_NOT_FOUND_HTTP_STATUS,
                     "Unrecognised access token.",
@@ -519,11 +533,20 @@ class Auth(object):
             )
 
     def is_server_admin(self, user):
+        """ Check if the given user is a local server admin.
+
+        Args:
+            user (str): mxid of user to check
+
+        Returns:
+            bool: True if the user is an admin
+        """
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
     def add_auth_events(self, builder, context):
-        auth_ids = yield self.compute_auth_events(builder, context.prev_state_ids)
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        auth_ids = yield self.compute_auth_events(builder, prev_state_ids)
 
         auth_events_entries = yield self.store.add_event_hashes(
             auth_ids
@@ -641,7 +664,7 @@ class Auth(object):
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
         send_level = event_auth.get_send_level(
-            EventTypes.Aliases, "", auth_events
+            EventTypes.Aliases, "", power_level_event,
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
@@ -652,67 +675,101 @@ class Auth(object):
                 " edit its room list entry"
             )
 
+    @staticmethod
+    def has_access_token(request):
+        """Checks if the request has an access_token.
 
-def has_access_token(request):
-    """Checks if the request has an access_token.
+        Returns:
+            bool: False if no access_token was given, True otherwise.
+        """
+        query_params = request.args.get("access_token")
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+        return bool(query_params) or bool(auth_headers)
 
-    Returns:
-        bool: False if no access_token was given, True otherwise.
-    """
-    query_params = request.args.get("access_token")
-    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-    return bool(query_params) or bool(auth_headers)
+    @staticmethod
+    def get_access_token_from_request(request, token_not_found_http_status=401):
+        """Extracts the access_token from the request.
 
+        Args:
+            request: The http request.
+            token_not_found_http_status(int): The HTTP status code to set in the
+                AuthError if the token isn't found. This is used in some of the
+                legacy APIs to change the status code to 403 from the default of
+                401 since some of the old clients depended on auth errors returning
+                403.
+        Returns:
+            str: The access_token
+        Raises:
+            AuthError: If there isn't an access_token in the request.
+        """
 
-def get_access_token_from_request(request, token_not_found_http_status=401):
-    """Extracts the access_token from the request.
-
-    Args:
-        request: The http request.
-        token_not_found_http_status(int): The HTTP status code to set in the
-            AuthError if the token isn't found. This is used in some of the
-            legacy APIs to change the status code to 403 from the default of
-            401 since some of the old clients depended on auth errors returning
-            403.
-    Returns:
-        str: The access_token
-    Raises:
-        AuthError: If there isn't an access_token in the request.
-    """
-
-    auth_headers = request.requestHeaders.getRawHeaders("Authorization")
-    query_params = request.args.get("access_token")
-    if auth_headers:
-        # Try the get the access_token from a "Authorization: Bearer"
-        # header
-        if query_params is not None:
-            raise AuthError(
-                token_not_found_http_status,
-                "Mixing Authorization headers and access_token query parameters.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-        if len(auth_headers) > 1:
-            raise AuthError(
-                token_not_found_http_status,
-                "Too many Authorization headers.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-        parts = auth_headers[0].split(" ")
-        if parts[0] == "Bearer" and len(parts) == 2:
-            return parts[1]
+        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+        query_params = request.args.get(b"access_token")
+        if auth_headers:
+            # Try the get the access_token from a "Authorization: Bearer"
+            # header
+            if query_params is not None:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Mixing Authorization headers and access_token query parameters.",
+                    errcode=Codes.MISSING_TOKEN,
+                )
+            if len(auth_headers) > 1:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Too many Authorization headers.",
+                    errcode=Codes.MISSING_TOKEN,
+                )
+            parts = auth_headers[0].split(" ")
+            if parts[0] == "Bearer" and len(parts) == 2:
+                return parts[1]
+            else:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Invalid Authorization header.",
+                    errcode=Codes.MISSING_TOKEN,
+                )
         else:
-            raise AuthError(
-                token_not_found_http_status,
-                "Invalid Authorization header.",
-                errcode=Codes.MISSING_TOKEN,
-            )
-    else:
-        # Try to get the access_token from the query params.
-        if not query_params:
-            raise AuthError(
-                token_not_found_http_status,
-                "Missing access token.",
-                errcode=Codes.MISSING_TOKEN
-            )
+            # Try to get the access_token from the query params.
+            if not query_params:
+                raise AuthError(
+                    token_not_found_http_status,
+                    "Missing access token.",
+                    errcode=Codes.MISSING_TOKEN
+                )
 
-        return query_params[0]
+            return query_params[0]
+
+    @defer.inlineCallbacks
+    def check_in_room_or_world_readable(self, room_id, user_id):
+        """Checks that the user is or was in the room or the room is world
+        readable. If it isn't then an exception is raised.
+
+        Returns:
+            Deferred[tuple[str, str|None]]: Resolves to the current membership of
+            the user in the room and the membership event ID of the user. If
+            the user is not in the room and never has been, then
+            `(Membership.JOIN, None)` is returned.
+        """
+
+        try:
+            # check_user_was_in_room will return the most recent membership
+            # event for the user if:
+            #  * The user is a non-guest user, and was ever in the room
+            #  * The user is a guest user, and has joined the room
+            # else it will throw.
+            member_event = yield self.check_user_was_in_room(room_id, user_id)
+            defer.returnValue((member_event.membership, member_event.event_id))
+        except AuthError:
+            visibility = yield self.state.get_current_state(
+                room_id, EventTypes.RoomHistoryVisibility, ""
+            )
+            if (
+                visibility and
+                visibility.content["history_visibility"] == "world_readable"
+            ):
+                defer.returnValue((Membership.JOIN, None))
+                return
+            raise AuthError(
+                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+            )

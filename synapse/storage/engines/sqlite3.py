@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.prepare_database import prepare_database
-
 import struct
+import threading
+
+from synapse.storage.prepare_database import prepare_database
 
 
 class Sqlite3Engine(object):
@@ -23,6 +24,11 @@ class Sqlite3Engine(object):
 
     def __init__(self, database_module, database_config):
         self.module = database_module
+
+        # The current max state_group, or None if we haven't looked
+        # in the DB yet.
+        self._current_state_group_id = None
+        self._current_state_group_id_lock = threading.Lock()
 
     def check_database(self, txn):
         pass
@@ -42,6 +48,19 @@ class Sqlite3Engine(object):
 
     def lock_table(self, txn, table):
         return
+
+    def get_next_state_group_id(self, txn):
+        """Returns an int that can be used as a new state_group ID
+        """
+        # We do application locking here since if we're using sqlite then
+        # we are a single process synapse.
+        with self._current_state_group_id_lock:
+            if self._current_state_group_id is None:
+                txn.execute("SELECT COALESCE(max(id), 0) FROM state_groups")
+                self._current_state_group_id = txn.fetchone()[0]
+
+            self._current_state_group_id += 1
+            return self._current_state_group_id
 
 
 # Following functions taken from: https://github.com/coleifer/peewee

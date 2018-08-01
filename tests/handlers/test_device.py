@@ -17,9 +17,8 @@ from twisted.internet import defer
 
 import synapse.api.errors
 import synapse.handlers.device
-
 import synapse.storage
-from synapse import types
+
 from tests import unittest, utils
 
 user1 = "@boris:aaa"
@@ -179,6 +178,6 @@ class DeviceTestCase(unittest.TestCase):
 
         if ip is not None:
             yield self.store.insert_client_ip(
-                types.UserID.from_string(user_id),
+                user_id,
                 access_token, ip, "user_agent", device_id)
             self.clock.advance_time(1000)

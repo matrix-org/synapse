@@ -279,9 +279,9 @@ Obviously that option means that the operations done in
 that might be fixed by setting a different logcontext via a ``with
 LoggingContext(...)`` in ``background_operation``).
 
-The second option is to use ``logcontext.preserve_fn``, which wraps a function
-so that it doesn't reset the logcontext even when it returns an incomplete
-deferred, and adds a callback to the returned deferred to reset the
+The second option is to use ``logcontext.run_in_background``, which wraps a
+function so that it doesn't reset the logcontext even when it returns an
+incomplete deferred, and adds a callback to the returned deferred to reset the
 logcontext. In other words, it turns a function that follows the Synapse rules
 about logcontexts and Deferreds into one which behaves more like an external
 function — the opposite operation to that described in the previous section.
@@ -293,14 +293,10 @@ It can be used like this:
     def do_request_handling():
         yield foreground_operation()
 
-        logcontext.preserve_fn(background_operation)()
+        logcontext.run_in_background(background_operation)
 
         # this will now be logged against the request context
         logger.debug("Request handling complete")
-
-XXX: I think ``preserve_context_over_fn`` is supposed to do the first option,
-but the fact that it does ``preserve_context_over_deferred`` on its results
-means that its use is fraught with difficulty.
 
 Passing synapse deferreds into third-party functions
 ----------------------------------------------------

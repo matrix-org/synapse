@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.engines import PostgresEngine
-
 import logging
+
+from synapse.storage.engines import PostgresEngine
 
 logger = logging.getLogger(__name__)
 

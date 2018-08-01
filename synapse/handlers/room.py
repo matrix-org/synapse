@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,23 +15,21 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
-from twisted.internet import defer
-
-from ._base import BaseHandler
-
-from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
-from synapse.api.constants import (
-    EventTypes, JoinRules, RoomCreationPreset
-)
-from synapse.api.errors import AuthError, StoreError, SynapseError
-from synapse.util import stringutils
-from synapse.visibility import filter_events_for_client
-
-from collections import OrderedDict
-
+import itertools
 import logging
 import math
 import string
+from collections import OrderedDict
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
+from synapse.util import stringutils
+from synapse.visibility import filter_events_for_client
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -60,20 +59,42 @@ class RoomCreationHandler(BaseHandler):
         },
     }
 
+    def __init__(self, hs):
+        super(RoomCreationHandler, self).__init__(hs)
+
+        self.spam_checker = hs.get_spam_checker()
+        self.event_creation_handler = hs.get_event_creation_handler()
+
     @defer.inlineCallbacks
-    def create_room(self, requester, config, ratelimit=True):
+    def create_room(self, requester, config, ratelimit=True,
+                    creator_join_profile=None):
         """ Creates a new room.
 
         Args:
-            requester (Requester): The user who requested the room creation.
+            requester (synapse.types.Requester):
+                The user who requested the room creation.
             config (dict) : A dict of configuration options.
+            ratelimit (bool): set to False to disable the rate limiter
+
+            creator_join_profile (dict|None):
+                Set to override the displayname and avatar for the creating
+                user in this room. If unset, displayname and avatar will be
+                derived from the user's profile. If set, should contain the
+                values to go in the body of the 'join' event (typically
+                `avatar_url` and/or `displayname`.
+
         Returns:
-            The new room ID.
+            Deferred[dict]:
+                a dict containing the keys `room_id` and, if an alias was
+                requested, `room_alias`.
         Raises:
             SynapseError if the room ID couldn't be stored, or something went
             horribly wrong.
         """
         user_id = requester.user.to_string()
+
+        if not self.spam_checker.user_may_create_room(user_id):
+            raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
             yield self.ratelimit(requester)
@@ -83,7 +104,7 @@ class RoomCreationHandler(BaseHandler):
                 if wchar in config["room_alias_name"]:
                     raise SynapseError(400, "Invalid characters in room alias")
 
-            room_alias = RoomAlias.create(
+            room_alias = RoomAlias(
                 config["room_alias_name"],
                 self.hs.hostname,
             )
@@ -92,7 +113,11 @@ class RoomCreationHandler(BaseHandler):
             )
 
             if mapping:
-                raise SynapseError(400, "Room alias already taken")
+                raise SynapseError(
+                    400,
+                    "Room alias already taken",
+                    Codes.ROOM_IN_USE
+                )
         else:
             room_alias = None
 
@@ -100,8 +125,12 @@ class RoomCreationHandler(BaseHandler):
         for i in invite_list:
             try:
                 UserID.from_string(i)
-            except:
+            except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
+
+        yield self.event_creation_handler.assert_accepted_privacy_policy(
+            requester,
+        )
 
         invite_3pid_list = config.get("invite_3pid", [])
 
@@ -115,7 +144,7 @@ class RoomCreationHandler(BaseHandler):
         while attempts < 5:
             try:
                 random_string = stringutils.random_string(18)
-                gen_room_id = RoomID.create(
+                gen_room_id = RoomID(
                     random_string,
                     self.hs.hostname,
                 )
@@ -155,25 +184,24 @@ class RoomCreationHandler(BaseHandler):
 
         creation_content = config.get("creation_content", {})
 
-        msg_handler = self.hs.get_handlers().message_handler
-        room_member_handler = self.hs.get_handlers().room_member_handler
+        room_member_handler = self.hs.get_room_member_handler()
 
         yield self._send_events_for_new_room(
             requester,
             room_id,
-            msg_handler,
             room_member_handler,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override", {})
+            power_level_content_override=config.get("power_level_content_override", {}),
+            creator_join_profile=creator_join_profile,
         )
 
         if "name" in config:
             name = config["name"]
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Name,
@@ -186,7 +214,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "topic" in config:
             topic = config["topic"]
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Topic,
@@ -197,12 +225,12 @@ class RoomCreationHandler(BaseHandler):
                 },
                 ratelimit=False)
 
-        content = {}
-        is_direct = config.get("is_direct", None)
-        if is_direct:
-            content["is_direct"] = is_direct
-
         for invitee in invite_list:
+            content = {}
+            is_direct = config.get("is_direct", None)
+            if is_direct:
+                content["is_direct"] = is_direct
+
             yield room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
@@ -216,7 +244,7 @@ class RoomCreationHandler(BaseHandler):
             id_server = invite_3pid["id_server"]
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
-            yield self.hs.get_handlers().room_member_handler.do_3pid_invite(
+            yield self.hs.get_room_member_handler().do_3pid_invite(
                 room_id,
                 requester.user,
                 medium,
@@ -241,7 +269,6 @@ class RoomCreationHandler(BaseHandler):
             self,
             creator,  # A Requester object.
             room_id,
-            msg_handler,
             room_member_handler,
             preset_config,
             invite_list,
@@ -249,6 +276,7 @@ class RoomCreationHandler(BaseHandler):
             creation_content,
             room_alias,
             power_level_content_override,
+            creator_join_profile,
     ):
         def create(etype, content, **kwargs):
             e = {
@@ -264,7 +292,7 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
-            yield msg_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_nonmember_event(
                 creator,
                 event,
                 ratelimit=False
@@ -292,6 +320,7 @@ class RoomCreationHandler(BaseHandler):
             room_id,
             "join",
             ratelimit=False,
+            content=creator_join_profile,
         )
 
         # We treat the power levels override specially as this needs to be one
@@ -367,9 +396,13 @@ class RoomCreationHandler(BaseHandler):
             )
 
 
-class RoomContextHandler(BaseHandler):
+class RoomContextHandler(object):
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+
     @defer.inlineCallbacks
-    def get_event_context(self, user, room_id, event_id, limit):
+    def get_event_context(self, user, room_id, event_id, limit, event_filter):
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
@@ -379,14 +412,14 @@ class RoomContextHandler(BaseHandler):
             event_id (str)
             limit (int): The maximum number of events to return in total
                 (excluding state).
+            event_filter (Filter|None): the filter to apply to the events returned
+                (excluding the target event_id)
 
         Returns:
             dict, or None if the event isn't found
         """
         before_limit = math.floor(limit / 2.)
         after_limit = limit - before_limit
-
-        now_token = yield self.hs.get_event_sources().get_current_token()
 
         users = yield self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
@@ -413,7 +446,7 @@ class RoomContextHandler(BaseHandler):
             )
 
         results = yield self.store.get_events_around(
-            room_id, event_id, before_limit, after_limit
+            room_id, event_id, before_limit, after_limit, event_filter
         )
 
         results["events_before"] = yield filter_evts(results["events_before"])
@@ -425,16 +458,35 @@ class RoomContextHandler(BaseHandler):
         else:
             last_event_id = event_id
 
-        state = yield self.store.get_state_for_events(
-            [last_event_id], None
-        )
-        results["state"] = state[last_event_id].values()
+        types = None
+        filtered_types = None
+        if event_filter and event_filter.lazy_load_members():
+            members = set(ev.sender for ev in itertools.chain(
+                results["events_before"],
+                (results["event"],),
+                results["events_after"],
+            ))
+            filtered_types = [EventTypes.Member]
+            types = [(EventTypes.Member, member) for member in members]
 
-        results["start"] = now_token.copy_and_replace(
+        # XXX: why do we return the state as of the last event rather than the
+        # first? Shouldn't we be consistent with /sync?
+        # https://github.com/matrix-org/matrix-doc/issues/687
+
+        state = yield self.store.get_state_for_events(
+            [last_event_id], types, filtered_types=filtered_types,
+        )
+        results["state"] = list(state[last_event_id].values())
+
+        # We use a dummy token here as we only care about the room portion of
+        # the token, which we replace.
+        token = StreamToken.START
+
+        results["start"] = token.copy_and_replace(
             "room_key", results["start"]
         ).to_string()
 
-        results["end"] = now_token.copy_and_replace(
+        results["end"] = token.copy_and_replace(
             "room_key", results["end"]
         ).to_string()
 
@@ -468,12 +520,9 @@ class RoomEventSource(object):
             user.to_string()
         )
         if app_service:
-            events, end_key = yield self.store.get_appservice_room_stream(
-                service=app_service,
-                from_key=from_key,
-                to_key=to_key,
-                limit=limit,
-            )
+            # We no longer support AS users using /sync directly.
+            # See https://github.com/matrix-org/matrix-doc/issues/1144
+            raise NotImplementedError()
         else:
             room_events = yield self.store.get_membership_changes_for_user(
                 user.to_string(), from_key, to_key

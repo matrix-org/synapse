@@ -13,21 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
-
-from synapse.util.stringutils import random_string
-from signedjson.key import (
-    generate_signing_key, is_signing_algorithm_supported,
-    decode_signing_key_base64, decode_verify_key_bytes,
-    read_signing_keys, write_signing_keys, NACL_ED25519
-)
-from unpaddedbase64 import decode_base64
-from synapse.util.stringutils import random_string_with_symbols
-
-import os
 import hashlib
 import logging
+import os
 
+from signedjson.key import (
+    NACL_ED25519,
+    decode_signing_key_base64,
+    decode_verify_key_bytes,
+    generate_signing_key,
+    is_signing_algorithm_supported,
+    read_signing_keys,
+    write_signing_keys,
+)
+from unpaddedbase64 import decode_base64
+
+from synapse.util.stringutils import random_string, random_string_with_symbols
+
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -59,20 +62,30 @@ class KeyConfig(Config):
 
         self.expire_access_token = config.get("expire_access_token", False)
 
+        # a secret which is used to calculate HMACs for form values, to stop
+        # falsification of values
+        self.form_secret = config.get("form_secret", None)
+
     def default_config(self, config_dir_path, server_name, is_generating_file=False,
                        **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if is_generating_file:
             macaroon_secret_key = random_string_with_symbols(50)
+            form_secret = '"%s"' % random_string_with_symbols(50)
         else:
             macaroon_secret_key = None
+            form_secret = 'null'
 
         return """\
         macaroon_secret_key: "%(macaroon_secret_key)s"
 
         # Used to enable access token expiration.
         expire_access_token: False
+
+        # a secret which is used to calculate HMACs for form values, to stop
+        # falsification of values
+        form_secret: %(form_secret)s
 
         ## Signing Keys ##
 
@@ -118,10 +131,9 @@ class KeyConfig(Config):
         signing_keys = self.read_file(signing_key_path, "signing_key")
         try:
             return read_signing_keys(signing_keys.splitlines(True))
-        except Exception:
+        except Exception as e:
             raise ConfigError(
-                "Error reading signing_key."
-                " Try running again with --generate-config"
+                "Error reading signing_key: %s" % (str(e))
             )
 
     def read_old_signing_keys(self, old_signing_keys):
@@ -141,7 +153,8 @@ class KeyConfig(Config):
 
     def generate_files(self, config):
         signing_key_path = config["signing_key_path"]
-        if not os.path.exists(signing_key_path):
+
+        if not self.path_exists(signing_key_path):
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(
