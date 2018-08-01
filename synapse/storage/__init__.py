@@ -268,12 +268,13 @@ class DataStore(RoomMemberStore, RoomStore,
         return self.runInteraction("count_users", _count_users)
 
     def count_monthly_users(self):
-        """
-        Counts the number of users who used this homeserver in the last 30 days
+        """Counts the number of users who used this homeserver in the last 30 days
+
         This method should be refactored with count_daily_users - the only
         reason not to is waiting on definition of mau
-        returns:
-            defered: resolves to int
+
+        Returns:
+            Defered[int]
         """
         def _count_monthly_users(txn):
             thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)

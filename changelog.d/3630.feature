@@ -1,1 +1,1 @@
-Blocks registration and sign in if max mau value exceeded
+Add ability to limit number of monthly active users on the server
