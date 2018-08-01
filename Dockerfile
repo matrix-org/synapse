@@ -1,16 +1,32 @@
 FROM docker.io/python:2-alpine3.7
 
-RUN apk add --no-cache --virtual .nacl_deps su-exec build-base libffi-dev zlib-dev libressl-dev libjpeg-turbo-dev linux-headers postgresql-dev libxslt-dev
+RUN apk add --no-cache --virtual .nacl_deps \
+        build-base \
+        libffi-dev \
+        libjpeg-turbo-dev \
+        libressl-dev \
+        libxslt-dev \
+        linux-headers \
+        postgresql-dev \
+        su-exec \
+        zlib-dev
 
 COPY . /synapse
 
 # A wheel cache may be provided in ./cache for faster build
 RUN cd /synapse \
- && pip install --upgrade pip setuptools psycopg2 lxml \
+ && pip install --upgrade \
+        lxml \
+        pip \
+        psycopg2 \
+        setuptools \
  && mkdir -p /synapse/cache \
  && pip install -f /synapse/cache --upgrade --process-dependency-links . \
  && mv /synapse/contrib/docker/start.py /synapse/contrib/docker/conf / \
- && rm -rf setup.py setup.cfg synapse
+ && rm -rf \
+        setup.cfg \
+        setup.py \
+        synapse
 
 VOLUME ["/data"]
 
