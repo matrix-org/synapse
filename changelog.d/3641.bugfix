@@ -1,1 +1,1 @@
-Fix a potential event disclosure issue
+Fix a potential issue where servers could request events for rooms they have not joined.
