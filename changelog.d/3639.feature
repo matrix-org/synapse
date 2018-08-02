@@ -1,0 +1,1 @@
+When we fail to join a room over federation, pass the error code back to the client.

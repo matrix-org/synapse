@@ -488,7 +488,7 @@ class FederationClient(FederationBase):
             The [Deferred] result of callback, if it succeeds
 
         Raises:
-            CodeMessageException if the chosen remote server returns a 300/400 code.
+            SynapseError if the chosen remote server returns a 300/400 code.
 
             RuntimeError if no servers were reachable.
         """
@@ -504,9 +504,9 @@ class FederationClient(FederationBase):
                     "Failed to %s via %s: %s",
                     description, destination, e,
                 )
-            except CodeMessageException as e:
+            except HttpResponseException as e:
                 if not 500 <= e.code < 600:
-                    raise
+                    raise e.to_synapse_error()
                 else:
                     logger.warn(
                         "Failed to %s via %s: %i %s",
@@ -543,7 +543,7 @@ class FederationClient(FederationBase):
             Deferred: resolves to a tuple of (origin (str), event (object))
             where origin is the remote homeserver which generated the event.
 
-            Fails with a ``CodeMessageException`` if the chosen remote server
+            Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
 
             Fails with a ``RuntimeError`` if no servers were reachable.
@@ -599,7 +599,7 @@ class FederationClient(FederationBase):
             giving the serer the event was sent to, ``state`` (?) and
             ``auth_chain``.
 
-            Fails with a ``CodeMessageException`` if the chosen remote server
+            Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
 
             Fails with a ``RuntimeError`` if no servers were reachable.
@@ -673,12 +673,17 @@ class FederationClient(FederationBase):
     @defer.inlineCallbacks
     def send_invite(self, destination, room_id, event_id, pdu):
         time_now = self._clock.time_msec()
-        code, content = yield self.transport_layer.send_invite(
-            destination=destination,
-            room_id=room_id,
-            event_id=event_id,
-            content=pdu.get_pdu_json(time_now),
-        )
+        try:
+            code, content = yield self.transport_layer.send_invite(
+                destination=destination,
+                room_id=room_id,
+                event_id=event_id,
+                content=pdu.get_pdu_json(time_now),
+            )
+        except HttpResponseException as e:
+            if e.code == 403:
+                raise e.to_synapse_error()
+            raise
 
         pdu_dict = content["event"]
 
@@ -709,7 +714,7 @@ class FederationClient(FederationBase):
         Return:
             Deferred: resolves to None.
 
-            Fails with a ``CodeMessageException`` if the chosen remote server
+            Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
 
             Fails with a ``RuntimeError`` if no servers were reachable.
