@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, Codes
 from synapse.types import UserID
 
 from tests import unittest
@@ -444,3 +444,32 @@ class AuthTestCase(unittest.TestCase):
         self.assertEqual("Guest access token used for regular user", cm.exception.msg)
 
         self.store.get_user_by_id.assert_called_with(USER_ID)
+
+    @defer.inlineCallbacks
+    def test_blocking_mau(self):
+        self.hs.config.limit_usage_by_mau = False
+        self.hs.config.max_mau_value = 50
+        lots_of_users = 100
+        small_number_of_users = 1
+
+        error = AuthError(
+            403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+        )
+
+        # Ensure no error thrown
+        yield self.auth.check_auth_blocking(error)
+
+        self.hs.config.limit_usage_by_mau = True
+
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(lots_of_users)
+        )
+
+        with self.assertRaises(AuthError):
+            yield self.auth.check_auth_blocking(error)
+
+        # Ensure does not throw an error
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(small_number_of_users)
+        )
+        yield self.auth.check_auth_blocking(error)

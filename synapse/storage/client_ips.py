@@ -97,21 +97,22 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _populate_monthly_active_users(self, user_id):
+        """Checks on the state of monthly active user limits and optionally
+        add the user to the monthly active tables
+
+        Args:
+            user_id(str): the user_id to query
+        """
+
         store = self.hs.get_datastore()
-        print "entering _populate_monthly_active_users"
         if self.hs.config.limit_usage_by_mau:
-            print "self.hs.config.limit_usage_by_mau is TRUE"
             is_user_monthly_active = yield store.is_user_monthly_active(user_id)
-            print "is_user_monthly_active is %r" % is_user_monthly_active
             if is_user_monthly_active:
                 yield store.upsert_monthly_active_user(user_id)
             else:
                 count = yield store.get_monthly_active_count()
-                print "count is %d" % count
                 if count < self.hs.config.max_mau_value:
-                    print "count is less than self.hs.config.max_mau_value "
-                    res = yield store.upsert_monthly_active_user(user_id)
-                    print "upsert response is %r" % res
+                    yield store.upsert_monthly_active_user(user_id)
 
     def _update_client_ips_batch(self):
         def update():

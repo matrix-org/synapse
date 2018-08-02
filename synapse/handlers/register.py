@@ -540,9 +540,7 @@ class RegistrationHandler(BaseHandler):
         Do not accept registrations if monthly active user limits exceeded
          and limiting is enabled
         """
-        if self.hs.config.limit_usage_by_mau is True:
-            current_mau = yield self.store.count_monthly_users()
-            if current_mau >= self.hs.config.max_mau_value:
-                raise RegistrationError(
-                    403, "MAU Limit Exceeded", Codes.MAU_LIMIT_EXCEEDED
-                )
+        error = RegistrationError(
+            403, "Monthly Active User limits exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+        )
+        yield self.auth.check_auth_blocking(error)

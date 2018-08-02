@@ -913,12 +913,10 @@ class AuthHandler(BaseHandler):
         Ensure that if mau blocking is enabled that invalid users cannot
         log in.
         """
-        if self.hs.config.limit_usage_by_mau is True:
-            current_mau = yield self.store.count_monthly_users()
-            if current_mau >= self.hs.config.max_mau_value:
-                raise AuthError(
-                    403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
-                )
+        error = AuthError(
+            403, "Monthly Active User limits exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+        )
+        yield self.auth.check_auth_blocking(error)
 
 
 @attr.s

@@ -773,3 +773,16 @@ class Auth(object):
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
+
+    @defer.inlineCallbacks
+    def check_auth_blocking(self, error):
+        """Checks if the user should be rejected for some external reason,
+        such as monthly active user limiting or global disable flag
+        Args:
+            error (Error): The error that should be raised if user is to be
+            blocked
+            """
+        if self.hs.config.limit_usage_by_mau is True:
+            current_mau = yield self.store.get_monthly_active_count()
+            if current_mau >= self.hs.config.max_mau_value:
+                raise error
