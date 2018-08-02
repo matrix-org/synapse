@@ -1,4 +1,6 @@
 from twisted.internet import defer
+from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
 from ._base import SQLBaseStore
 
@@ -20,17 +22,53 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             thirty_days_ago = (
                 int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
             )
-            sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
-            txn.execute(sql, (thirty_days_ago,))
-            sql = """
-                DELETE FROM monthly_active_users
-                ORDER BY timestamp desc
-                LIMIT -1 OFFSET ?
-                """
-            txn.execute(sql, (self.max_mau_value,))
+
+            if isinstance(self.database_engine, PostgresEngine):
+                sql = """
+                    DELETE FROM monthly_active_users
+                    WHERE timestamp < ?
+                    RETURNING user_id
+                    """
+                txn.execute(sql, (thirty_days_ago,))
+                res = txn.fetchall()
+                for r in res:
+                    self.is_user_monthly_active.invalidate(r)
+
+                sql = """
+                    DELETE FROM monthly_active_users
+                    ORDER BY timestamp desc
+                    LIMIT -1 OFFSET ?
+                    RETURNING user_id
+                    """
+                txn.execute(sql, (self.max_mau_value,))
+                res = txn.fetchall()
+                for r in res:
+                    self.is_user_monthly_active.invalidate(r)
+                    print r
+                self.get_monthly_active_count.invalidate()
+            elif isinstance(self.database_engine, Sqlite3Engine):
+                sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
+
+                txn.execute(sql, (thirty_days_ago,))
+                sql = """
+                    DELETE FROM monthly_active_users
+                    ORDER BY timestamp desc
+                    LIMIT -1 OFFSET ?
+                    """
+                txn.execute(sql, (self.max_mau_value,))
+
+                # It seems poor to invalidate the whole cache, but the alternative
+                # is to select then delete which has it's own problem.
+                # It seems unlikely that anyone using this feature on large datasets
+                # would be using sqlite and if they are then there will be
+                # larger perf issues than this one to encourage an upgrade to postgres.
+
+                self.is_user_monthly_active.invalidate_all()
+                self.get_monthly_active_count.invalidate_all()
 
         return self.runInteraction("reap_monthly_active_users", _reap_users)
 
+    @cachedInlineCallbacks(num_args=0)
     def get_monthly_active_count(self):
         """
             Generates current count of monthly active users.abs
@@ -65,7 +103,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             lock=False,
         )
 
-    @defer.inlineCallbacks
+    @cachedInlineCallbacks(num_args=1)
     def is_user_monthly_active(self, user_id):
         """
             Checks if a given user is part of the monthly active user group
