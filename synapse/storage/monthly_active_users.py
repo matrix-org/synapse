@@ -7,6 +7,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
     def __init__(self, hs):
         super(MonthlyActiveUsersStore, self).__init__(None, hs)
         self._clock = hs.get_clock()
+        self.max_mau_value = hs.config.max_mau_value
 
     def reap_monthly_active_users(self):
         """
@@ -19,7 +20,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             thirty_days_ago = (
                 int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
             )
+
             sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
+
             txn.execute(sql, (thirty_days_ago,))
 
         return self.runInteraction("reap_monthly_active_users", _reap_users)
