@@ -15,7 +15,7 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield setup_test_homeserver()
-        self.mau = MonthlyActiveUsersStore(hs)
+        self.mau = MonthlyActiveUsersStore(None, hs)
 
     @defer.inlineCallbacks
     def test_can_insert_and_count_mau(self):
