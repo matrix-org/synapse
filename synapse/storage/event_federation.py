@@ -295,35 +295,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
             get_forward_extremeties_for_room_txn
         )
 
-    def get_room_ids_for_events(self, event_ids):
-        """Get a list of room IDs for which the given events belong.
-
-        Args:
-            event_ids (list): the events to look up the room of
-
-        Returns:
-            list, the room IDs for the events
-        """
-        return self.runInteraction(
-            "get_room_ids_for_events",
-            self._get_room_ids_for_events, event_ids
-        )
-
-    def _get_room_ids_for_events(self, txn, event_ids):
-        logger.debug("_get_room_ids_for_events: %s", repr(event_ids))
-
-        base_sql = (
-            "SELECT DISTINCT room_id FROM events"
-            " WHERE event_id IN (%s)"
-        )
-
-        txn.execute(
-            base_sql % (",".join(["?"] * len(event_ids)),),
-            event_ids
-        )
-
-        return [r[0] for r in txn]
-
     def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occurred before (and
         including) the events in event_list. Return a list of max size `limit`
@@ -372,6 +343,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
                 table="events",
                 keyvalues={
                     "event_id": event_id,
+                    "room_id": room_id,
                 },
                 retcol="depth",
                 allow_none=True,
