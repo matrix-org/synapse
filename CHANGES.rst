@@ -5,7 +5,7 @@ Bugfixes
 --------
 
 - Fix a potential issue where servers could request events for rooms they have not joined. (`#3641 <https://github.com/matrix-org/synapse/issues/3641>`_)
-- Fix a potential issue where users could see events in private joins before they joined (`#3642 <https://github.com/matrix-org/synapse/issues/3642>`_)
+- Fix a potential issue where users could see events in private rooms before they joined. (`#3642 <https://github.com/matrix-org/synapse/issues/3642>`_)
 
 
 Synapse 0.33.0 (2018-07-19)
