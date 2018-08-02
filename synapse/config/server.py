@@ -217,6 +217,8 @@ class ServerConfig(Config):
         # different cores. See
         # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
         #
+        # This setting requires the affinity package to be installed!
+        #
         # cpu_affinity: 0xFFFFFFFF
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.

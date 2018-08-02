@@ -1,3 +1,12 @@
+Synapse 0.33.1 (2018-08-02)
+===========================
+
+SECURITY FIXES
+--------------
+
+- Fix a potential issue where servers could request events for rooms they have not joined. ([\#3641](https://github.com/matrix-org/synapse/issues/3641))
+- Fix a potential issue where users could see events in private rooms before they joined. ([\#3642](https://github.com/matrix-org/synapse/issues/3642))
+
 Synapse 0.33.0 (2018-07-19)
 ===========================
 
