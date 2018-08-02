@@ -213,7 +213,7 @@ class Auth(object):
                 default=[b""]
             )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                yield self.store.insert_client_ip(
                     user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,

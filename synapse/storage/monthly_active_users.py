@@ -4,7 +4,7 @@ from ._base import SQLBaseStore
 
 
 class MonthlyActiveUsersStore(SQLBaseStore):
-    def __init__(self, hs):
+    def __init__(self, dbconn, hs):
         super(MonthlyActiveUsersStore, self).__init__(None, hs)
         self._clock = hs.get_clock()
         self.max_mau_value = hs.config.max_mau_value
@@ -14,24 +14,28 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Cleans out monthly active user table to ensure that no stale
         entries exist.
         Return:
-            defered, no return type
+            Defered()
         """
         def _reap_users(txn):
             thirty_days_ago = (
                 int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
             )
-
             sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
-
             txn.execute(sql, (thirty_days_ago,))
+            sql = """
+                DELETE FROM monthly_active_users
+                ORDER BY timestamp desc
+                LIMIT -1 OFFSET ?
+                """
+            txn.execute(sql, (self.max_mau_value,))
 
         return self.runInteraction("reap_monthly_active_users", _reap_users)
 
     def get_monthly_active_count(self):
         """
             Generates current count of monthly active users.abs
-            return:
-                defered resolves to int
+            Return:
+                Defered(int): Number of current monthly active users
         """
         def _count_users(txn):
             sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
@@ -46,6 +50,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Updates or inserts monthly active user member
             Arguments:
                 user_id (str): user to add/update
+            Deferred(bool): True if a new entry was created, False if an
+                existing one was updated.
         """
         return self._simple_upsert(
             desc="upsert_monthly_active_user",

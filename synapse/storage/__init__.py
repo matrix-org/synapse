@@ -39,6 +39,7 @@ from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
 from .media_repository import MediaRepositoryStore
+from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
@@ -87,6 +88,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 UserDirectoryStore,
                 GroupServerStore,
                 UserErasureStore,
+                MonthlyActiveUsersStore,
                 ):
 
     def __init__(self, db_conn, hs):

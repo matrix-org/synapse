@@ -35,6 +35,7 @@ LAST_SEEN_GRANULARITY = 120 * 1000
 
 class ClientIpStore(background_updates.BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
+
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",
             keylen=4,
@@ -74,6 +75,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             "before", "shutdown", self._update_client_ips_batch
         )
 
+    @defer.inlineCallbacks
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
                          now=None):
         if not now:
@@ -84,7 +86,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             last_seen = self.client_ip_last_seen.get(key)
         except KeyError:
             last_seen = None
-
+        yield self._populate_monthly_active_users(user_id)
         # Rate-limited inserts
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
@@ -92,6 +94,24 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self.client_ip_last_seen.prefill(key, now)
 
         self._batch_row_update[key] = (user_agent, device_id, now)
+
+    @defer.inlineCallbacks
+    def _populate_monthly_active_users(self, user_id):
+        store = self.hs.get_datastore()
+        print "entering _populate_monthly_active_users"
+        if self.hs.config.limit_usage_by_mau:
+            print "self.hs.config.limit_usage_by_mau is TRUE"
+            is_user_monthly_active = yield store.is_user_monthly_active(user_id)
+            print "is_user_monthly_active is %r" % is_user_monthly_active
+            if is_user_monthly_active:
+                yield store.upsert_monthly_active_user(user_id)
+            else:
+                count = yield store.get_monthly_active_count()
+                print "count is %d" % count
+                if count < self.hs.config.max_mau_value:
+                    print "count is less than self.hs.config.max_mau_value "
+                    res = yield store.upsert_monthly_active_user(user_id)
+                    print "upsert response is %r" % res
 
     def _update_client_ips_batch(self):
         def update():
