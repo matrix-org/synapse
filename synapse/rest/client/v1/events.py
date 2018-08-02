@@ -88,7 +88,7 @@ class EventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
         requester = yield self.auth.get_user_by_req(request)
-        event = yield self.event_handler.get_event(requester.user, event_id)
+        event = yield self.event_handler.get_event(requester.user, None, event_id)
 
         time_now = self.clock.time_msec()
         if event:
