@@ -225,6 +225,21 @@ class RoomCreationHandler(BaseHandler):
                 },
                 ratelimit=False)
 
+        if "guest_can_join" in config:
+            guest_can_join = config["guest_can_join"]
+            yield self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.GuestAccess,
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "state_key": "",
+                    "content": {
+                        "guest_access": "can_join" if guest_can_join else "forbidden"
+                    },
+                },
+                ratelimit=False)
+
         for invitee in invite_list:
             content = {}
             is_direct = config.get("is_direct", None)
