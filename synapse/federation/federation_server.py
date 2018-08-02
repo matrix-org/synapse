@@ -430,6 +430,7 @@ class FederationServer(FederationBase):
             ret = yield self.handler.on_query_auth(
                 origin,
                 event_id,
+                room_id,
                 signed_auth,
                 content.get("rejects", []),
                 content.get("missing", []),
