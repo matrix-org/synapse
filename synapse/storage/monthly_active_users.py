@@ -58,7 +58,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 txn.execute(sql, (self.max_mau_value,))
 
                 # It seems poor to invalidate the whole cache, but the alternative
-                # is to select then delete which has it's own problem.
+                # is to select then delete which has its own problems.
                 # It seems unlikely that anyone using this feature on large datasets
                 # would be using sqlite and if they are then there will be
                 # larger perf issues than this one to encourage an upgrade to postgres.
