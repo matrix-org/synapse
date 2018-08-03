@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError
 from synapse.types import UserID
 
 from tests import unittest
