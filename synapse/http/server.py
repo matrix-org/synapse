@@ -13,12 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import cgi
 import collections
 import logging
-import urllib
 
-from six.moves import http_client
+from six import PY3
+from six.moves import http_client, urllib
 
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
 
@@ -35,7 +36,6 @@ from synapse.api.errors import (
     Codes,
     SynapseError,
     UnrecognizedRequestError,
-    cs_exception,
 )
 from synapse.http.request_metrics import requests_counter
 from synapse.util.caches import intern_dict
@@ -76,16 +76,13 @@ def wrap_json_request_handler(h):
     def wrapped_request_handler(self, request):
         try:
             yield h(self, request)
-        except CodeMessageException as e:
+        except SynapseError as e:
             code = e.code
-            if isinstance(e, SynapseError):
-                logger.info(
-                    "%s SynapseError: %s - %s", request, code, e.msg
-                )
-            else:
-                logger.exception(e)
+            logger.info(
+                "%s SynapseError: %s - %s", request, code, e.msg
+            )
             respond_with_json(
-                request, code, cs_exception(e), send_cors=True,
+                request, code, e.error_dict(), send_cors=True,
                 pretty_print=_request_user_agent_is_curl(request),
             )
 
@@ -264,6 +261,7 @@ class JsonResource(HttpServer, resource.Resource):
         self.hs = hs
 
     def register_paths(self, method, path_patterns, callback):
+        method = method.encode("utf-8")  # method is bytes on py3
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
@@ -296,8 +294,19 @@ class JsonResource(HttpServer, resource.Resource):
         # here. If it throws an exception, that is handled by the wrapper
         # installed by @request_handler.
 
+        def _unquote(s):
+            if PY3:
+                # On Python 3, unquote is unicode -> unicode
+                return urllib.parse.unquote(s)
+            else:
+                # On Python 2, unquote is bytes -> bytes We need to encode the
+                # URL again (as it was decoded by _get_handler_for request), as
+                # ASCII because it's a URL, and then decode it to get the UTF-8
+                # characters that were quoted.
+                return urllib.parse.unquote(s.encode('ascii')).decode('utf8')
+
         kwargs = intern_dict({
-            name: urllib.unquote(value).decode("UTF-8") if value else value
+            name: _unquote(value) if value else value
             for name, value in group_dict.items()
         })
 
@@ -313,9 +322,9 @@ class JsonResource(HttpServer, resource.Resource):
             request (twisted.web.http.Request):
 
         Returns:
-            Tuple[Callable, dict[str, str]]: callback method, and the dict
-                mapping keys to path components as specified in the handler's
-                path match regexp.
+            Tuple[Callable, dict[unicode, unicode]]: callback method, and the
+                dict mapping keys to path components as specified in the
+                handler's path match regexp.
 
                 The callback will normally be a method registered via
                 register_paths, so will return (possibly via Deferred) either
@@ -327,7 +336,7 @@ class JsonResource(HttpServer, resource.Resource):
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path)
+            m = path_entry.pattern.match(request.path.decode('ascii'))
             if m:
                 # We found a match!
                 return path_entry.callback, m.groupdict()
@@ -383,7 +392,7 @@ class RootRedirect(resource.Resource):
         self.url = path
 
     def render_GET(self, request):
-        return redirectTo(self.url, request)
+        return redirectTo(self.url.encode('ascii'), request)
 
     def getChild(self, name, request):
         if len(name) == 0:
@@ -404,12 +413,14 @@ def respond_with_json(request, code, json_object, send_cors=False,
         return
 
     if pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object) + "\n"
+        json_bytes = (encode_pretty_printed_json(json_object) + "\n"
+                      ).encode("utf-8")
     else:
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
+            # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = json.dumps(json_object)
+            json_bytes = json.dumps(json_object).encode("utf-8")
 
     return respond_with_json_bytes(
         request, code, json_bytes,

@@ -252,10 +252,10 @@ class Auth(object):
             if ip_address not in app_service.ip_range_whitelist:
                 defer.returnValue((None, None))
 
-        if "user_id" not in request.args:
+        if b"user_id" not in request.args:
             defer.returnValue((app_service.sender, app_service))
 
-        user_id = request.args["user_id"][0]
+        user_id = request.args[b"user_id"][0].decode('utf8')
         if app_service.sender == user_id:
             defer.returnValue((app_service.sender, app_service))
 

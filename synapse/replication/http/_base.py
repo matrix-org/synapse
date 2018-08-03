@@ -23,8 +23,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import (
     CodeMessageException,
-    MatrixCodeMessageException,
-    SynapseError,
+    HttpResponseException,
 )
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
@@ -160,11 +159,11 @@ class ReplicationEndpoint(object):
                     # If we timed out we probably don't need to worry about backing
                     # off too much, but lets just wait a little anyway.
                     yield clock.sleep(1)
-            except MatrixCodeMessageException as e:
+            except HttpResponseException as e:
                 # We convert to SynapseError as we know that it was a SynapseError
                 # on the master process that we should send to the client. (And
                 # importantly, not stack traces everywhere)
-                raise SynapseError(e.code, e.msg, e.errcode)
+                raise e.to_synapse_error()
 
             defer.returnValue(result)
 
