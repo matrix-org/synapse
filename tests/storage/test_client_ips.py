@@ -34,6 +34,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_insert_new_client_ip(self):
+        self.hs.config.max_mau_value = 50
         self.clock.now = 12345678
         user_id = "@user:id"
         yield self.store.insert_client_ip(
