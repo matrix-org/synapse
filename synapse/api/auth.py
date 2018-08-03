@@ -775,7 +775,7 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, error):
+    def check_auth_blocking(self):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
         Args:
@@ -785,4 +785,6 @@ class Auth(object):
         if self.hs.config.limit_usage_by_mau is True:
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
-                raise error
+                raise AuthError(
+                    403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+                )

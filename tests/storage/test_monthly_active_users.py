@@ -40,18 +40,18 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         self.assertEqual(1, count)
 
     @defer.inlineCallbacks
-    def test_is_user_monthly_active(self):
+    def test__user_last_seen_monthly_active(self):
         user_id1 = "@user1:server"
         user_id2 = "@user2:server"
         user_id3 = "@user3:server"
-        result = yield self.store.is_user_monthly_active(user_id1)
-        self.assertFalse(result)
+        result = yield self.store._user_last_seen_monthly_active(user_id1)
+        self.assertFalse(result == 0)
         yield self.store.upsert_monthly_active_user(user_id1)
         yield self.store.upsert_monthly_active_user(user_id2)
-        result = yield self.store.is_user_monthly_active(user_id1)
-        self.assertTrue(result)
-        result = yield self.store.is_user_monthly_active(user_id3)
-        self.assertFalse(result)
+        result = yield self.store._user_last_seen_monthly_active(user_id1)
+        self.assertTrue(result > 0)
+        result = yield self.store._user_last_seen_monthly_active(user_id3)
+        self.assertFalse(result == 0)
 
     @defer.inlineCallbacks
     def test_reap_monthly_active_users(self):

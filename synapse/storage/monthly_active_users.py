@@ -19,6 +19,10 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from ._base import SQLBaseStore
 
+# Number of msec of granularity to store the monthly_active_user timestamp
+# This means it is not necessary to update the table on every request
+LAST_SEEN_GRANULARITY = 60 * 60 * 1000
+
 
 class MonthlyActiveUsersStore(SQLBaseStore):
     def __init__(self, dbconn, hs):
@@ -30,8 +34,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         """
         Cleans out monthly active user table to ensure that no stale
         entries exist.
-        Return:
-            Defered()
+
+        Returns:
+            Deferred[]
         """
         def _reap_users(txn):
 
@@ -49,7 +54,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 """
             txn.execute(sql, (self.hs.config.max_mau_value,))
 
-        res = self.runInteraction("reap_monthly_active_users", _reap_users)
+        res = yield self.runInteraction("reap_monthly_active_users", _reap_users)
         # It seems poor to invalidate the whole cache, Postgres supports
         # 'Returning' which would allow me to invalidate only the
         # specific users, but sqlite has no way to do this and instead
@@ -57,16 +62,16 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # is racy.
         # Have resolved to invalidate the whole cache for now and do
         # something about it if and when the perf becomes significant
-        self.is_user_monthly_active.invalidate_all()
+        self._user_last_seen_monthly_active.invalidate_all()
         self.get_monthly_active_count.invalidate_all()
         return res
 
     @cached(num_args=0)
     def get_monthly_active_count(self):
-        """
-            Generates current count of monthly active users.abs
-            Return:
-                Defered(int): Number of current monthly active users
+        """Generates current count of monthly active users.abs
+
+        Returns:
+            Defered[int]: Number of current monthly active users
         """
 
         def _count_users(txn):
@@ -82,10 +87,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Updates or inserts monthly active user member
             Arguments:
                 user_id (str): user to add/update
-            Deferred(bool): True if a new entry was created, False if an
+            Deferred[bool]: True if a new entry was created, False if an
                 existing one was updated.
         """
-        self._simple_upsert(
+        is_insert = self._simple_upsert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
             keyvalues={
@@ -96,24 +101,49 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             },
             lock=False,
         )
-        self.is_user_monthly_active.invalidate((user_id,))
-        self.get_monthly_active_count.invalidate(())
+        if is_insert:
+            self._user_last_seen_monthly_active.invalidate((user_id,))
+            self.get_monthly_active_count.invalidate(())
 
     @cachedInlineCallbacks(num_args=1)
-    def is_user_monthly_active(self, user_id):
+    def _user_last_seen_monthly_active(self, user_id):
         """
             Checks if a given user is part of the monthly active user group
             Arguments:
                 user_id (str): user to add/update
             Return:
-                bool : True if user part of group, False otherwise
+                int : timestamp since last seen, None if never seen
+
         """
-        user_present = yield self._simple_select_onecol(
+        result = yield self._simple_select_onecol(
             table="monthly_active_users",
             keyvalues={
                 "user_id": user_id,
             },
-            retcol="user_id",
-            desc="is_user_monthly_active",
+            retcol="timestamp",
+            desc="_user_last_seen_monthly_active",
         )
-        defer.returnValue(bool(user_present))
+        timestamp = None
+        if len(result) > 0:
+            timestamp = result[0]
+        defer.returnValue(timestamp)
+
+    @defer.inlineCallbacks
+    def populate_monthly_active_users(self, user_id):
+        """Checks on the state of monthly active user limits and optionally
+        add the user to the monthly active tables
+
+        Args:
+            user_id(str): the user_id to query
+        """
+
+        if self.hs.config.limit_usage_by_mau:
+            last_seen_timestamp = yield self._user_last_seen_monthly_active(user_id)
+            now = self.hs.get_clock().time_msec()
+
+            if last_seen_timestamp is None:
+                count = yield self.get_monthly_active_count()
+                if count < self.hs.config.max_mau_value:
+                    yield self.upsert_monthly_active_user(user_id)
+            elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
+                yield self.upsert_monthly_active_user(user_id)
