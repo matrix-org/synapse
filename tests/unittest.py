@@ -15,11 +15,17 @@
 
 import logging
 
+from mock import Mock
+
 import twisted
 import twisted.logger
 from twisted.trial import unittest
 
+from synapse.http.server import JsonResource
+from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContextFilter
+
+from tests.server import get_clock, render
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
@@ -56,6 +62,7 @@ def around(target):
     def method_name(orig, *args, **kwargs):
         return orig(*args, **kwargs)
     """
+
     def _around(code):
         name = code.__name__
         orig = getattr(target, name)
@@ -89,6 +96,7 @@ class TestCase(unittest.TestCase):
             old_level = logging.getLogger().level
 
             if old_level != level:
+
                 @around(self)
                 def tearDown(orig):
                     ret = orig()
@@ -117,8 +125,9 @@ class TestCase(unittest.TestCase):
             actual (dict): The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(required[key], actual[key],
-                              msg="%s mismatch. %s" % (key, actual))
+            self.assertEquals(
+                required[key], actual[key], msg="%s mismatch. %s" % (key, actual)
+            )
 
 
 def DEBUG(target):
@@ -126,3 +135,55 @@ def DEBUG(target):
     Can apply to either a TestCase or an individual test method."""
     target.loglevel = logging.DEBUG
     return target
+
+
+class HomeserverTestCase(TestCase):
+
+    servlets = []
+    hijack_auth = True
+
+    def setUp(self):
+
+        self.reactor, self.clock = get_clock()
+        hs_args = {"clock": self.clock, "reactor": self.reactor}
+        self.hs = self.make_homeserver(self.reactor, self.clock, hs_args)
+
+        if self.hs is None:
+            raise Exception("No homeserver returned from make_homeserver.")
+
+        # Register the resources
+        self.resource = JsonResource(self.hs)
+
+        for servlet in self.servlets:
+            servlet(self.hs, self.resource)
+
+        if hasattr(self, "user_id"):
+            from tests.rest.client.v1.utils import RestHelper
+
+            self.helper = RestHelper(self.hs, self.resource, self.user_id)
+
+            if self.hijack_auth:
+
+                def get_user_by_access_token(token=None, allow_guest=False):
+                    return {
+                        "user": UserID.from_string(self.helper.auth_user_id),
+                        "token_id": 1,
+                        "is_guest": False,
+                    }
+
+                def get_user_by_req(request, allow_guest=False, rights="access"):
+                    return create_requester(
+                        UserID.from_string(self.helper.auth_user_id), 1, False, None
+                    )
+
+                self.hs.get_auth().get_user_by_req = get_user_by_req
+                self.hs.get_auth().get_user_by_access_token = get_user_by_access_token
+                self.hs.get_auth().get_access_token_from_request = Mock(
+                    return_value="1234"
+                )
+
+        if hasattr(self, "prepare"):
+            self.prepare(self.reactor, self.clock, self.hs)
+
+    def render(self, request):
+        render(request, self.resource, self.reactor)

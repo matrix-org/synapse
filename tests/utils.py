@@ -146,8 +146,9 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
     # Need to let the HS build an auth handler and then mess with it
     # because AuthHandler's constructor requires the HS, so we can't make one
     # beforehand and pass it in to the HS's constructor (chicken / egg)
-    hs.get_auth_handler().hash = lambda p: hashlib.md5(p).hexdigest()
-    hs.get_auth_handler().validate_hash = lambda p, h: hashlib.md5(p).hexdigest() == h
+    hs.get_auth_handler().hash = lambda p: hashlib.md5(p.encode('utf8')).hexdigest()
+    hs.get_auth_handler().validate_hash = lambda p, h: hashlib.md5(
+        p.encode('utf8')).hexdigest() == h
 
     fed = kargs.get("resource_for_federation", None)
     if fed:
@@ -220,8 +221,8 @@ class MockHttpResource(HttpServer):
         mock_content.configure_mock(**config)
         mock_request.content = mock_content
 
-        mock_request.method = http_method
-        mock_request.uri = path
+        mock_request.method = http_method.encode('ascii')
+        mock_request.uri = path.encode('ascii')
 
         mock_request.getClientIP.return_value = "-"
 
