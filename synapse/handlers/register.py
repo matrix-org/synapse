@@ -540,7 +540,7 @@ class RegistrationHandler(BaseHandler):
         Do not accept registrations if monthly active user limits exceeded
          and limiting is enabled
         """
-        error = RegistrationError(
-            403, "Monthly Active User limits exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
-        )
-        yield self.auth.check_auth_blocking(error)
+        try:
+            yield self.auth.check_auth_blocking()
+        except AuthError as e:
+            raise RegistrationError(e.code, e.message, e.errcode)

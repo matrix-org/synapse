@@ -104,7 +104,6 @@ class RegistrationTestCase(unittest.TestCase):
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
         )
-
         with self.assertRaises(RegistrationError):
             yield self.handler.get_or_create_user("requester", 'b', "display_name")
 

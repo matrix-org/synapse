@@ -452,12 +452,8 @@ class AuthTestCase(unittest.TestCase):
         lots_of_users = 100
         small_number_of_users = 1
 
-        error = AuthError(
-            403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
-        )
-
         # Ensure no error thrown
-        yield self.auth.check_auth_blocking(error)
+        yield self.auth.check_auth_blocking()
 
         self.hs.config.limit_usage_by_mau = True
 
@@ -466,10 +462,10 @@ class AuthTestCase(unittest.TestCase):
         )
 
         with self.assertRaises(AuthError):
-            yield self.auth.check_auth_blocking(error)
+            yield self.auth.check_auth_blocking()
 
         # Ensure does not throw an error
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(small_number_of_users)
         )
-        yield self.auth.check_auth_blocking(error)
+        yield self.auth.check_auth_blocking()

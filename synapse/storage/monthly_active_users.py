@@ -54,7 +54,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 """
             txn.execute(sql, (self.hs.config.max_mau_value,))
 
-        res = yield self.runInteraction("reap_monthly_active_users", _reap_users)
+        yield self.runInteraction("reap_monthly_active_users", _reap_users)
         # It seems poor to invalidate the whole cache, Postgres supports
         # 'Returning' which would allow me to invalidate only the
         # specific users, but sqlite has no way to do this and instead
@@ -64,7 +64,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # something about it if and when the perf becomes significant
         self._user_last_seen_monthly_active.invalidate_all()
         self.get_monthly_active_count.invalidate_all()
-        return res
 
     @cached(num_args=0)
     def get_monthly_active_count(self):
