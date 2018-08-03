@@ -15,7 +15,7 @@ This image is designed to run either with an automatically generated configurati
 file or with a custom configuration that requires manual editing.
 
 An easy way to make use of this image is via docker-compose. See the
-(https://github.com/matrix-org/synapse/tree/develop/contrib/docker)[contrib]
+[contrib/docker](../contrib/docker)
 section of the synapse project for examples.
 
 ### Without Compose (harder)
