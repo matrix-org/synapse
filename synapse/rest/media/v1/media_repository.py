@@ -379,7 +379,7 @@ class MediaRepository(object):
                 logger.warn("HTTP error fetching remote media %s/%s: %s",
                             server_name, media_id, e.response)
                 if e.code == twisted.web.http.NOT_FOUND:
-                    raise SynapseError.from_http_response_exception(e)
+                    raise e.to_synapse_error()
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except SynapseError:

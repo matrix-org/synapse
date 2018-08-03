@@ -18,7 +18,7 @@ import re
 
 from twisted.internet import defer
 
-from synapse.api.errors import MatrixCodeMessageException, SynapseError
+from synapse.api.errors import HttpResponseException
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import Requester, UserID
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -56,11 +56,11 @@ def remote_join(client, host, port, requester, remote_room_hosts,
 
     try:
         result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
+    except HttpResponseException as e:
         # We convert to SynapseError as we know that it was a SynapseError
         # on the master process that we should send to the client. (And
         # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
+        raise e.to_synapse_error()
     defer.returnValue(result)
 
 
@@ -92,11 +92,11 @@ def remote_reject_invite(client, host, port, requester, remote_room_hosts,
 
     try:
         result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
+    except HttpResponseException as e:
         # We convert to SynapseError as we know that it was a SynapseError
         # on the master process that we should send to the client. (And
         # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
+        raise e.to_synapse_error()
     defer.returnValue(result)
 
 
@@ -131,11 +131,11 @@ def get_or_register_3pid_guest(client, host, port, requester,
 
     try:
         result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
+    except HttpResponseException as e:
         # We convert to SynapseError as we know that it was a SynapseError
         # on the master process that we should send to the client. (And
         # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
+        raise e.to_synapse_error()
     defer.returnValue(result)
 
 
@@ -165,11 +165,11 @@ def notify_user_membership_change(client, host, port, user_id, room_id, change):
 
     try:
         result = yield client.post_json_get_json(uri, payload)
-    except MatrixCodeMessageException as e:
+    except HttpResponseException as e:
         # We convert to SynapseError as we know that it was a SynapseError
         # on the master process that we should send to the client. (And
         # importantly, not stack traces everywhere)
-        raise SynapseError(e.code, e.msg, e.errcode)
+        raise e.to_synapse_error()
     defer.returnValue(result)
 
 

@@ -36,7 +36,6 @@ from synapse.api.errors import (
     Codes,
     SynapseError,
     UnrecognizedRequestError,
-    cs_exception,
 )
 from synapse.http.request_metrics import requests_counter
 from synapse.util.caches import intern_dict
@@ -77,16 +76,13 @@ def wrap_json_request_handler(h):
     def wrapped_request_handler(self, request):
         try:
             yield h(self, request)
-        except CodeMessageException as e:
+        except SynapseError as e:
             code = e.code
-            if isinstance(e, SynapseError):
-                logger.info(
-                    "%s SynapseError: %s - %s", request, code, e.msg
-                )
-            else:
-                logger.exception(e)
+            logger.info(
+                "%s SynapseError: %s - %s", request, code, e.msg
+            )
             respond_with_json(
-                request, code, cs_exception(e), send_cors=True,
+                request, code, e.error_dict(), send_cors=True,
                 pretty_print=_request_user_agent_is_curl(request),
             )
 
