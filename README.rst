@@ -159,7 +159,7 @@ In case of problems, please see the _`Troubleshooting` section below.
 
 There is an offical synapse image available at 
 https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with
-the docker-compose file available at `contrib/docker`. Further information on
+the docker-compose file available at `contrib/docker <contrib/docker>`_. Further information on
 this including configuration options is available in the README on
 hub.docker.com.
 
