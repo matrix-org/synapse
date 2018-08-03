@@ -65,7 +65,7 @@ class ProfileHandler(BaseHandler):
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-                raise e
+                raise
 
             defer.returnValue({
                 "displayname": displayname,
@@ -85,7 +85,6 @@ class ProfileHandler(BaseHandler):
             except CodeMessageException as e:
                 if e.code != 404:
                     logger.exception("Failed to get displayname")
-
                 raise
 
     @defer.inlineCallbacks
@@ -106,7 +105,7 @@ class ProfileHandler(BaseHandler):
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-                raise e
+                raise
 
             defer.returnValue({
                 "displayname": displayname,
@@ -126,7 +125,7 @@ class ProfileHandler(BaseHandler):
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-                raise e
+                raise
 
             defer.returnValue(displayname)
         else:
@@ -143,7 +142,6 @@ class ProfileHandler(BaseHandler):
             except CodeMessageException as e:
                 if e.code != 404:
                     logger.exception("Failed to get displayname")
-
                 raise
             except Exception:
                 logger.exception("Failed to get displayname")
@@ -185,7 +183,7 @@ class ProfileHandler(BaseHandler):
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-                raise e
+                raise
             defer.returnValue(avatar_url)
         else:
             try:
@@ -251,7 +249,7 @@ class ProfileHandler(BaseHandler):
         except StoreError as e:
             if e.code == 404:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-            raise e
+            raise
 
         defer.returnValue(response)
 
