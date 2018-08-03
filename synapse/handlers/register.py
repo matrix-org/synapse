@@ -543,4 +543,4 @@ class RegistrationHandler(BaseHandler):
         try:
             yield self.auth.check_auth_blocking()
         except AuthError as e:
-            raise RegistrationError(e.code, e.message, e.errcode)
+            raise RegistrationError(e.code, str(e), e.errcode)
