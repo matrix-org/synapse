@@ -38,4 +38,4 @@ docker-compose up -d
 
 ### More information
 
-For more information on required environment variables and mounts, see the main docker documentation at `docker/README.md`
+For more information on required environment variables and mounts, see the main docker documentation at [/docker/README.md](../../docker/README.md)
