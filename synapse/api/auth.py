@@ -778,10 +778,7 @@ class Auth(object):
     def check_auth_blocking(self):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
-        Args:
-            error (Error): The error that should be raised if user is to be
-            blocked
-            """
+        """
         if self.hs.config.hs_disabled:
             raise AuthError(
                 403, self.hs.config.hs_disabled_message, errcode=Codes.HS_DISABLED
