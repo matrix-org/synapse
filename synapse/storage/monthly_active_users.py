@@ -15,7 +15,7 @@
 
 from twisted.internet import defer
 
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore
 
@@ -104,7 +104,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             self._user_last_seen_monthly_active.invalidate((user_id,))
             self.get_monthly_active_count.invalidate(())
 
-    @cachedInlineCallbacks(num_args=1)
+    @cached(num_args=1)
     def _user_last_seen_monthly_active(self, user_id):
         """
             Checks if a given user is part of the monthly active user group
@@ -114,18 +114,16 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 int : timestamp since last seen, None if never seen
 
         """
-        result = yield self._simple_select_onecol(
+
+        return(self._simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={
                 "user_id": user_id,
             },
             retcol="timestamp",
+            allow_none=True,
             desc="_user_last_seen_monthly_active",
-        )
-        timestamp = None
-        if len(result) > 0:
-            timestamp = result[0]
-        defer.returnValue(timestamp)
+        ))
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):
@@ -140,6 +138,11 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             last_seen_timestamp = yield self._user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
 
+            # We want to reduce to the total number of db writes, and are happy
+            # to trade accuracy of timestamp in order to lighten load. This means
+            # We always insert new users (where MAU threshold has not been reached),
+            # but only update if we have not previously seen the user for
+            # LAST_SEEN_GRANULARITY ms
             if last_seen_timestamp is None:
                 count = yield self.get_monthly_active_count()
                 if count < self.hs.config.max_mau_value:
