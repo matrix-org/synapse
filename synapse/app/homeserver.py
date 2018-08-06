@@ -20,6 +20,8 @@ import sys
 
 from six import iteritems
 
+from prometheus_client import Gauge
+
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, NoResource
@@ -49,6 +51,7 @@ from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.module_api import ModuleApi
 from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, check_requirements
@@ -299,6 +302,11 @@ class SynapseHomeServer(HomeServer):
             quit_with_error(e.message)
 
 
+# Gauges to expose monthly active user control metrics
+current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
+max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
+
+
 def setup(config_options):
     """
     Args:
@@ -427,6 +435,9 @@ def run(hs):
     # currently either 0 or 1
     stats_process = []
 
+    def start_phone_stats_home():
+        return run_as_background_process("phone_stats_home", phone_stats_home)
+
     @defer.inlineCallbacks
     def phone_stats_home():
         logger.info("Gathering stats for reporting")
@@ -498,16 +509,31 @@ def run(hs):
             )
 
     def generate_user_daily_visit_stats():
-        hs.get_datastore().generate_user_daily_visits()
+        return run_as_background_process(
+            "generate_user_daily_visits",
+            hs.get_datastore().generate_user_daily_visits,
+        )
 
     # Rather than update on per session basis, batch up the requests.
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
+    @defer.inlineCallbacks
+    def generate_monthly_active_users():
+        count = 0
+        if hs.config.limit_usage_by_mau:
+            count = yield hs.get_datastore().count_monthly_users()
+        current_mau_gauge.set(float(count))
+        max_mau_value_gauge.set(float(hs.config.max_mau_value))
+
+    generate_monthly_active_users()
+    if hs.config.limit_usage_by_mau:
+        clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
+
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
-        clock.looping_call(phone_stats_home, 3 * 60 * 60 * 1000)
+        clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000)
 
         # We need to defer this init for the cases that we daemonize
         # otherwise the process ID we get is that of the non-daemon process
@@ -515,7 +541,7 @@ def run(hs):
 
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
-        clock.call_later(5 * 60, phone_stats_home)
+        clock.call_later(5 * 60, start_phone_stats_home)
 
     if hs.config.daemonize and hs.config.print_pidfile:
         print (hs.config.pid_file)

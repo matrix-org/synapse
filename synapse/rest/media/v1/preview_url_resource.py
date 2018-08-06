@@ -41,6 +41,7 @@ from synapse.http.server import (
     wrap_json_request_handler,
 )
 from synapse.http.servlet import parse_integer, parse_string
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.async import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
@@ -81,7 +82,7 @@ class PreviewUrlResource(Resource):
         self._cache.start()
 
         self._cleaner_loop = self.clock.looping_call(
-            self._expire_url_cache_data, 10 * 1000
+            self._start_expire_url_cache_data, 10 * 1000,
         )
 
     def render_OPTIONS(self, request):
@@ -370,6 +371,11 @@ class PreviewUrlResource(Resource):
             "expires": 60 * 60 * 1000,
             "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
+
+    def _start_expire_url_cache_data(self):
+        return run_as_background_process(
+            "expire_url_cache_data", self._expire_url_cache_data,
+        )
 
     @defer.inlineCallbacks
     def _expire_url_cache_data(self):
