@@ -15,17 +15,16 @@
 
 """Tests REST events for /rooms paths."""
 
+from mock import Mock, NonCallableMock
+
 # twisted imports
 from twisted.internet import defer
 
 import synapse.rest.client.v1.room
 from synapse.types import UserID
 
-from ....utils import MockHttpResource, MockClock, setup_test_homeserver
+from ....utils import MockClock, MockHttpResource, setup_test_homeserver
 from .utils import RestTestCase
-
-from mock import Mock, NonCallableMock
-
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 

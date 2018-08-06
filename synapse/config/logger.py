@@ -16,15 +16,17 @@ import logging
 import logging.config
 import os
 import signal
-from string import Template
 import sys
+from string import Template
+
+import yaml
 
 from twisted.logger import STDLibLogObserver, globalLogBeginner
-import yaml
 
 import synapse
 from synapse.util.logcontext import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
+
 from ._base import Config
 
 DEFAULT_LOG_CONFIG = Template("""

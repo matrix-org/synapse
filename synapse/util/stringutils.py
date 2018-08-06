@@ -15,6 +15,7 @@
 
 import random
 import string
+
 from six.moves import range
 
 _string_with_symbols = (

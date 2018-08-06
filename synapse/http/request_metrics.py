@@ -17,8 +17,8 @@
 import logging
 
 from prometheus_client.core import Counter, Histogram
-from synapse.metrics import LaterGauge
 
+from synapse.metrics import LaterGauge
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ outgoing_responses_counter = Counter(
 )
 
 response_timer = Histogram(
-    "synapse_http_server_response_time_seconds", "sec", ["method", "servlet", "tag"]
+    "synapse_http_server_response_time_seconds", "sec",
+    ["method", "servlet", "tag", "code"],
 )
 
 response_ru_utime = Counter(
@@ -149,7 +150,9 @@ class RequestMetrics(object):
         self.name = name
         self.method = method
 
-        self._request_stats = _RequestStats.from_context(self.start_context)
+        # _request_stats records resource usage that we have already added
+        # to the "in flight" metrics.
+        self._request_stats = self.start_context.get_resource_usage()
 
         _in_flight_requests.add(self)
 
@@ -169,26 +172,32 @@ class RequestMetrics(object):
                 )
                 return
 
-        outgoing_responses_counter.labels(request.method, str(request.code)).inc()
+        response_code = str(request.code)
+
+        outgoing_responses_counter.labels(request.method, response_code).inc()
 
         response_count.labels(request.method, self.name, tag).inc()
 
-        response_timer.labels(request.method, self.name, tag).observe(
+        response_timer.labels(request.method, self.name, tag, response_code).observe(
             time_sec - self.start
         )
 
-        ru_utime, ru_stime = context.get_resource_usage()
+        resource_usage = context.get_resource_usage()
 
-        response_ru_utime.labels(request.method, self.name, tag).inc(ru_utime)
-        response_ru_stime.labels(request.method, self.name, tag).inc(ru_stime)
+        response_ru_utime.labels(request.method, self.name, tag).inc(
+            resource_usage.ru_utime,
+        )
+        response_ru_stime.labels(request.method, self.name, tag).inc(
+            resource_usage.ru_stime,
+        )
         response_db_txn_count.labels(request.method, self.name, tag).inc(
-            context.db_txn_count
+            resource_usage.db_txn_count
         )
         response_db_txn_duration.labels(request.method, self.name, tag).inc(
-            context.db_txn_duration_sec
+            resource_usage.db_txn_duration_sec
         )
         response_db_sched_duration.labels(request.method, self.name, tag).inc(
-            context.db_sched_duration_sec
+            resource_usage.db_sched_duration_sec
         )
 
         response_size.labels(request.method, self.name, tag).inc(request.sentLength)
@@ -201,7 +210,10 @@ class RequestMetrics(object):
     def update_metrics(self):
         """Updates the in flight metrics with values from this request.
         """
-        diff = self._request_stats.update(self.start_context)
+        new_stats = self.start_context.get_resource_usage()
+
+        diff = new_stats - self._request_stats
+        self._request_stats = new_stats
 
         in_flight_requests_ru_utime.labels(self.method, self.name).inc(diff.ru_utime)
         in_flight_requests_ru_stime.labels(self.method, self.name).inc(diff.ru_stime)
@@ -217,61 +229,3 @@ class RequestMetrics(object):
         in_flight_requests_db_sched_duration.labels(self.method, self.name).inc(
             diff.db_sched_duration_sec
         )
-
-
-class _RequestStats(object):
-    """Keeps tracks of various metrics for an in flight request.
-    """
-
-    __slots__ = [
-        "ru_utime",
-        "ru_stime",
-        "db_txn_count",
-        "db_txn_duration_sec",
-        "db_sched_duration_sec",
-    ]
-
-    def __init__(
-        self, ru_utime, ru_stime, db_txn_count, db_txn_duration_sec, db_sched_duration_sec
-    ):
-        self.ru_utime = ru_utime
-        self.ru_stime = ru_stime
-        self.db_txn_count = db_txn_count
-        self.db_txn_duration_sec = db_txn_duration_sec
-        self.db_sched_duration_sec = db_sched_duration_sec
-
-    @staticmethod
-    def from_context(context):
-        ru_utime, ru_stime = context.get_resource_usage()
-
-        return _RequestStats(
-            ru_utime, ru_stime,
-            context.db_txn_count,
-            context.db_txn_duration_sec,
-            context.db_sched_duration_sec,
-        )
-
-    def update(self, context):
-        """Updates the current values and returns the difference between the
-        old and new values.
-
-        Returns:
-            _RequestStats: The difference between the old and new values
-        """
-        new = _RequestStats.from_context(context)
-
-        diff = _RequestStats(
-            new.ru_utime - self.ru_utime,
-            new.ru_stime - self.ru_stime,
-            new.db_txn_count - self.db_txn_count,
-            new.db_txn_duration_sec - self.db_txn_duration_sec,
-            new.db_sched_duration_sec - self.db_sched_duration_sec,
-        )
-
-        self.ru_utime = new.ru_utime
-        self.ru_stime = new.ru_stime
-        self.db_txn_count = new.db_txn_count
-        self.db_txn_duration_sec = new.db_txn_duration_sec
-        self.db_sched_duration_sec = new.db_sched_duration_sec
-
-        return diff

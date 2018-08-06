@@ -14,9 +14,8 @@
 # limitations under the License.
 
 from twisted.internet import defer
-from synapse.push.presentable_names import (
-    calculate_room_name, name_from_member_event
-)
+
+from synapse.push.presentable_names import calculate_room_name, name_from_member_event
 
 
 @defer.inlineCallbacks

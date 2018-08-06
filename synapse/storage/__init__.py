@@ -15,51 +15,48 @@
 # limitations under the License.
 
 import datetime
-from dateutil import tz
-import time
 import logging
+import time
 
-from synapse.storage.devices import DeviceStore
-from synapse.storage.user_erasure_store import UserErasureStore
-from .appservice import (
-    ApplicationServiceStore, ApplicationServiceTransactionStore
-)
-from .directory import DirectoryStore
-from .events import EventsStore
-from .presence import PresenceStore, UserPresenceState
-from .profile import ProfileStore
-from .registration import RegistrationStore
-from .room import RoomStore
-from .roommember import RoomMemberStore
-from .stream import StreamStore
-from .transactions import TransactionStore
-from .keys import KeyStore
-from .event_federation import EventFederationStore
-from .pusher import PusherStore
-from .push_rule import PushRuleStore
-from .media_repository import MediaRepositoryStore
-from .rejections import RejectionsStore
-from .event_push_actions import EventPushActionsStore
-from .deviceinbox import DeviceInboxStore
-from .group_server import GroupServerStore
-from .state import StateStore
-from .signatures import SignatureStore
-from .filtering import FilteringStore
-from .end_to_end_keys import EndToEndKeyStore
-
-from .receipts import ReceiptsStore
-from .search import SearchStore
-from .tags import TagsStore
-from .account_data import AccountDataStore
-from .openid import OpenIdStore
-from .client_ips import ClientIpStore
-from .user_directory import UserDirectoryStore
-
-from .util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
-from .engines import PostgresEngine
+from dateutil import tz
 
 from synapse.api.constants import PresenceState
+from synapse.storage.devices import DeviceStore
+from synapse.storage.user_erasure_store import UserErasureStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+
+from .account_data import AccountDataStore
+from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
+from .client_ips import ClientIpStore
+from .deviceinbox import DeviceInboxStore
+from .directory import DirectoryStore
+from .end_to_end_keys import EndToEndKeyStore
+from .engines import PostgresEngine
+from .event_federation import EventFederationStore
+from .event_push_actions import EventPushActionsStore
+from .events import EventsStore
+from .filtering import FilteringStore
+from .group_server import GroupServerStore
+from .keys import KeyStore
+from .media_repository import MediaRepositoryStore
+from .openid import OpenIdStore
+from .presence import PresenceStore, UserPresenceState
+from .profile import ProfileStore
+from .push_rule import PushRuleStore
+from .pusher import PusherStore
+from .receipts import ReceiptsStore
+from .registration import RegistrationStore
+from .rejections import RejectionsStore
+from .room import RoomStore
+from .roommember import RoomMemberStore
+from .search import SearchStore
+from .signatures import SignatureStore
+from .state import StateStore
+from .stream import StreamStore
+from .tags import TagsStore
+from .transactions import TransactionStore
+from .user_directory import UserDirectoryStore
+from .util.id_generators import ChainedIdGenerator, IdGenerator, StreamIdGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +66,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
                 ApplicationServiceStore,
+                EventsStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 RejectionsStore,
@@ -76,7 +74,6 @@ class DataStore(RoomMemberStore, RoomStore,
                 PusherStore,
                 PushRuleStore,
                 ApplicationServiceTransactionStore,
-                EventsStore,
                 ReceiptsStore,
                 EndToEndKeyStore,
                 SearchStore,
@@ -97,6 +94,7 @@ class DataStore(RoomMemberStore, RoomStore,
         self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
 
+        self.db_conn = db_conn
         self._stream_id_gen = StreamIdGenerator(
             db_conn, "events", "stream_ordering",
             extra_tables=[("local_invites", "stream_id")]
@@ -268,6 +266,31 @@ class DataStore(RoomMemberStore, RoomStore,
             return count
 
         return self.runInteraction("count_users", _count_users)
+
+    def count_monthly_users(self):
+        """Counts the number of users who used this homeserver in the last 30 days
+
+        This method should be refactored with count_daily_users - the only
+        reason not to is waiting on definition of mau
+
+        Returns:
+            Defered[int]
+        """
+        def _count_monthly_users(txn):
+            thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
+            sql = """
+                SELECT COALESCE(count(*), 0) FROM (
+                    SELECT user_id FROM user_ips
+                    WHERE last_seen > ?
+                    GROUP BY user_id
+                ) u
+            """
+
+            txn.execute(sql, (thirty_days_ago,))
+            count, = txn.fetchone()
+            return count
+
+        return self.runInteraction("count_monthly_users", _count_monthly_users)
 
     def count_r30_users(self):
         """

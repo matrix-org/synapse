@@ -12,21 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import tempfile
-from synapse.config._base import ConfigError
-from tests import unittest
-from twisted.internet import defer
-
-from tests.utils import setup_test_homeserver
-from synapse.appservice import ApplicationService, ApplicationServiceState
-from synapse.storage.appservice import (
-    ApplicationServiceStore, ApplicationServiceTransactionStore
-)
-
 import json
 import os
-import yaml
+import tempfile
+
 from mock import Mock
+
+import yaml
+
+from twisted.internet import defer
+
+from synapse.appservice import ApplicationService, ApplicationServiceState
+from synapse.config._base import ConfigError
+from synapse.storage.appservice import (
+    ApplicationServiceStore,
+    ApplicationServiceTransactionStore,
+)
+
+from tests import unittest
+from tests.utils import setup_test_homeserver
 
 
 class ApplicationServiceStoreTestCase(unittest.TestCase):

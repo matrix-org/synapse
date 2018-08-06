@@ -14,15 +14,15 @@
 # limitations under the License.
 
 """This module contains REST servlets to do with event streaming, /events."""
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.streams.config import PaginationConfig
-from .base import ClientV1RestServlet, client_path_patterns
 from synapse.events.utils import serialize_event
+from synapse.streams.config import PaginationConfig
 
-import logging
-
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class EventRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
         requester = yield self.auth.get_user_by_req(request)
-        event = yield self.event_handler.get_event(requester.user, event_id)
+        event = yield self.event_handler.get_event(requester.user, None, event_id)
 
         time_now = self.clock.time_msec()
         if event:

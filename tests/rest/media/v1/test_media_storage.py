@@ -14,20 +14,20 @@
 # limitations under the License.
 
 
-from twisted.internet import defer, reactor
-
-from synapse.rest.media.v1._base import FileInfo
-from synapse.rest.media.v1.media_storage import MediaStorage
-from synapse.rest.media.v1.filepath import MediaFilePaths
-from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
-
-from mock import Mock
-
-from tests import unittest
-
 import os
 import shutil
 import tempfile
+
+from mock import Mock
+
+from twisted.internet import defer, reactor
+
+from synapse.rest.media.v1._base import FileInfo
+from synapse.rest.media.v1.filepath import MediaFilePaths
+from synapse.rest.media.v1.media_storage import MediaStorage
+from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
+
+from tests import unittest
 
 
 class MediaStorageTests(unittest.TestCase):
