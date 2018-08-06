@@ -21,10 +21,7 @@ from six.moves import urllib
 
 from twisted.internet import defer
 
-from synapse.api.errors import (
-    CodeMessageException,
-    HttpResponseException,
-)
+from synapse.api.errors import CodeMessageException, HttpResponseException
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
