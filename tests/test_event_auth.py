@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest
+
 from synapse import event_auth
 from synapse.api.errors import AuthError
 from synapse.events import FrozenEvent
-import unittest
 
 
 class EventAuthTestCase(unittest.TestCase):

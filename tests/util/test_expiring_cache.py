@@ -14,11 +14,11 @@
 # limitations under the License.
 
 
-from .. import unittest
-
 from synapse.util.caches.expiringcache import ExpiringCache
 
 from tests.utils import MockClock
+
+from .. import unittest
 
 
 class ExpiringCacheTestCase(unittest.TestCase):

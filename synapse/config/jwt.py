@@ -15,7 +15,6 @@
 
 from ._base import Config, ConfigError
 
-
 MISSING_JWT = (
     """Missing jwt library. This is required for jwt login.
 

@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from distutils.util import strtobool
 
 from synapse.util.stringutils import random_string_with_symbols
 
-from distutils.util import strtobool
+from ._base import Config
 
 
 class RegistrationConfig(Config):

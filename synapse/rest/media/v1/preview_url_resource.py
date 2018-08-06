@@ -23,31 +23,31 @@ import re
 import shutil
 import sys
 import traceback
-import simplejson as json
 
-from six.moves import urllib_parse as urlparse
 from six import string_types
+from six.moves import urllib_parse as urlparse
 
-from twisted.web.server import NOT_DONE_YET
+from canonicaljson import json
+
 from twisted.internet import defer
 from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 
-from ._base import FileInfo
-
-from synapse.api.errors import (
-    SynapseError, Codes,
-)
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
-from synapse.util.stringutils import random_string
-from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SpiderHttpClient
 from synapse.http.server import (
-    respond_with_json_bytes,
     respond_with_json,
+    respond_with_json_bytes,
     wrap_json_request_handler,
 )
+from synapse.http.servlet import parse_integer, parse_string
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.async import ObservableDeferred
-from synapse.util.stringutils import is_ascii
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.util.stringutils import is_ascii, random_string
+
+from ._base import FileInfo
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class PreviewUrlResource(Resource):
         self._cache.start()
 
         self._cleaner_loop = self.clock.looping_call(
-            self._expire_url_cache_data, 10 * 1000
+            self._start_expire_url_cache_data, 10 * 1000,
         )
 
     def render_OPTIONS(self, request):
@@ -98,9 +98,9 @@ class PreviewUrlResource(Resource):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = yield self.auth.get_user_by_req(request)
-        url = request.args.get("url")[0]
+        url = parse_string(request, "url")
         if "ts" in request.args:
-            ts = int(request.args.get("ts")[0])
+            ts = parse_integer(request, "ts")
         else:
             ts = self.clock.time_msec()
 
@@ -371,6 +371,11 @@ class PreviewUrlResource(Resource):
             "expires": 60 * 60 * 1000,
             "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
+
+    def _start_expire_url_cache_data(self):
+        return run_as_background_process(
+            "expire_url_cache_data", self._expire_url_cache_data,
+        )
 
     @defer.inlineCallbacks
     def _expire_url_cache_data(self):

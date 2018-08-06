@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.constants import LoginType
@@ -22,9 +24,6 @@ from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 

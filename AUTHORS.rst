@@ -66,3 +66,6 @@ Pierre Jaury <pierre at jaury.eu>
 
 Werner Sembach <werner.sembach at fau.de>
 * Utility scripts to delete communities
+
+Serban Constantin <serban.constantin at gmail dot com>
+ * Small bug fix

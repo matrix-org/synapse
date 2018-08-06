@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-from synapse.api.constants import Membership
-
-from synapse.api.urls import FEDERATION_PREFIX as PREFIX
-from synapse.util.logutils import log_function
-
 import logging
 import urllib
 
+from twisted.internet import defer
+
+from synapse.api.constants import Membership
+from synapse.api.urls import FEDERATION_PREFIX as PREFIX
+from synapse.util.logutils import log_function
 
 logger = logging.getLogger(__name__)
 

@@ -16,10 +16,11 @@
 import argparse
 import errno
 import os
-import yaml
 from textwrap import dedent
 
 from six import integer_types
+
+import yaml
 
 
 class ConfigError(Exception):

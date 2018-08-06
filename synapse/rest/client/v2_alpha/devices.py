@@ -18,13 +18,18 @@ import logging
 from twisted.internet import defer
 
 from synapse.api import errors
-from synapse.http import servlet
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+)
+
 from ._base import client_v2_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
 
 
-class DevicesRestServlet(servlet.RestServlet):
+class DevicesRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/devices$", v2_alpha=False)
 
     def __init__(self, hs):
@@ -46,7 +51,7 @@ class DevicesRestServlet(servlet.RestServlet):
         defer.returnValue((200, {"devices": devices}))
 
 
-class DeleteDevicesRestServlet(servlet.RestServlet):
+class DeleteDevicesRestServlet(RestServlet):
     """
     API for bulk deletion of devices. Accepts a JSON object with a devices
     key which lists the device_ids to delete. Requires user interactive auth.
@@ -66,19 +71,17 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
         requester = yield self.auth.get_user_by_req(request)
 
         try:
-            body = servlet.parse_json_object_from_request(request)
+            body = parse_json_object_from_request(request)
         except errors.SynapseError as e:
             if e.errcode == errors.Codes.NOT_JSON:
-                # deal with older clients which didn't pass a J*DELETESON dict
+                # DELETE
+                # deal with older clients which didn't pass a JSON dict
                 # the same as those that pass an empty dict
                 body = {}
             else:
                 raise e
 
-        if 'devices' not in body:
-            raise errors.SynapseError(
-                400, "No devices supplied", errcode=errors.Codes.MISSING_PARAM
-            )
+        assert_params_in_dict(body, ["devices"])
 
         yield self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request),
@@ -91,7 +94,7 @@ class DeleteDevicesRestServlet(servlet.RestServlet):
         defer.returnValue((200, {}))
 
 
-class DeviceRestServlet(servlet.RestServlet):
+class DeviceRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$", v2_alpha=False)
 
     def __init__(self, hs):
@@ -120,7 +123,7 @@ class DeviceRestServlet(servlet.RestServlet):
         requester = yield self.auth.get_user_by_req(request)
 
         try:
-            body = servlet.parse_json_object_from_request(request)
+            body = parse_json_object_from_request(request)
 
         except errors.SynapseError as e:
             if e.errcode == errors.Codes.NOT_JSON:
@@ -143,7 +146,7 @@ class DeviceRestServlet(servlet.RestServlet):
     def on_PUT(self, request, device_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
 
-        body = servlet.parse_json_object_from_request(request)
+        body = parse_json_object_from_request(request)
         yield self.device_handler.update_device(
             requester.user.to_string(),
             device_id,

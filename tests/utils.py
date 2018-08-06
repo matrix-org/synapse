@@ -15,9 +15,10 @@
 
 import hashlib
 from inspect import getcallargs
-from six.moves.urllib import parse as urlparse
 
 from mock import Mock, patch
+from six.moves.urllib import parse as urlparse
+
 from twisted.internet import defer, reactor
 
 from synapse.api.errors import CodeMessageException, cs_error
@@ -64,11 +65,14 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         config.federation_domain_whitelist = None
         config.federation_rc_reject_limit = 10
         config.federation_rc_sleep_limit = 10
+        config.federation_rc_sleep_delay = 100
         config.federation_rc_concurrent = 10
         config.filter_timeline_limit = 5000
         config.user_directory_search_all_users = False
         config.user_consent_server_notice_content = None
         config.block_events_without_consent_error = None
+        config.media_storage_providers = []
+        config.auto_join_rooms = []
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
@@ -134,6 +138,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
             database_engine=db_engine,
             room_list_handler=object(),
             tls_server_context_factory=Mock(),
+            reactor=reactor,
             **kargs
         )
 
@@ -188,7 +193,7 @@ class MockHttpResource(HttpServer):
         self.prefix = prefix
 
     def trigger_get(self, path):
-        return self.trigger("GET", path, None)
+        return self.trigger(b"GET", path, None)
 
     @patch('twisted.web.http.Request')
     @defer.inlineCallbacks
@@ -222,7 +227,7 @@ class MockHttpResource(HttpServer):
 
         headers = {}
         if federation_auth:
-            headers[b"Authorization"] = ["X-Matrix origin=test,key=,sig="]
+            headers[b"Authorization"] = [b"X-Matrix origin=test,key=,sig="]
         mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
         # return the right path if the event requires it
@@ -236,6 +241,9 @@ class MockHttpResource(HttpServer):
         except Exception:
             pass
 
+        if isinstance(path, bytes):
+            path = path.decode('utf8')
+
         for (method, pattern, func) in self.callbacks:
             if http_method != method:
                 continue
@@ -244,7 +252,7 @@ class MockHttpResource(HttpServer):
             if matcher:
                 try:
                     args = [
-                        urlparse.unquote(u).decode("UTF-8")
+                        urlparse.unquote(u)
                         for u in matcher.groups()
                     ]
 

@@ -14,15 +14,16 @@
 # limitations under the License.
 
 
-from twisted.internet import defer, reactor
+import threading
+
 from mock import NonCallableMock
+from six import StringIO
+
+from twisted.internet import defer, reactor
 
 from synapse.util.file_consumer import BackgroundFileConsumer
 
 from tests import unittest
-from six import StringIO
-
-import threading
 
 
 class FileConsumerTests(unittest.TestCase):

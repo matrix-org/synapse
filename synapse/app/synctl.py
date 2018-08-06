@@ -16,15 +16,18 @@
 
 import argparse
 import collections
+import errno
 import glob
 import os
 import os.path
 import signal
 import subprocess
 import sys
-import yaml
-import errno
 import time
+
+from six import iteritems
+
+import yaml
 
 SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
 
@@ -172,7 +175,7 @@ def main():
         os.environ["SYNAPSE_CACHE_FACTOR"] = str(cache_factor)
 
     cache_factors = config.get("synctl_cache_factors", {})
-    for cache_name, factor in cache_factors.iteritems():
+    for cache_name, factor in iteritems(cache_factors):
         os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
     worker_configfiles = []

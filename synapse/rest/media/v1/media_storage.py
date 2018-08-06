@@ -13,22 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, threads
-from twisted.protocols.basic import FileSender
+import contextlib
+import logging
+import os
+import shutil
+import sys
 
 import six
 
-from ._base import Responder
+from twisted.internet import defer, threads
+from twisted.protocols.basic import FileSender
 
 from synapse.util.file_consumer import BackgroundFileConsumer
 from synapse.util.logcontext import make_deferred_yieldable
 
-import contextlib
-import os
-import logging
-import shutil
-import sys
-
+from ._base import Responder
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +177,7 @@ class MediaStorage(object):
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(
-                        open(local_path, "w"), self.hs.get_reactor())
+                        open(local_path, "wb"), self.hs.get_reactor())
                     yield res.write_to_consumer(consumer)
                     yield consumer.wait()
                 defer.returnValue(local_path)

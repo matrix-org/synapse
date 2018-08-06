@@ -15,23 +15,21 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
-from twisted.internet import defer
-
-from ._base import BaseHandler
-
-from synapse.types import UserID, RoomAlias, RoomID, RoomStreamToken
-from synapse.api.constants import (
-    EventTypes, JoinRules, RoomCreationPreset
-)
-from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
-from synapse.util import stringutils
-from synapse.visibility import filter_events_for_client
-
-from collections import OrderedDict
-
+import itertools
 import logging
 import math
 import string
+from collections import OrderedDict
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
+from synapse.util import stringutils
+from synapse.visibility import filter_events_for_client
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -398,9 +396,13 @@ class RoomCreationHandler(BaseHandler):
             )
 
 
-class RoomContextHandler(BaseHandler):
+class RoomContextHandler(object):
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+
     @defer.inlineCallbacks
-    def get_event_context(self, user, room_id, event_id, limit):
+    def get_event_context(self, user, room_id, event_id, limit, event_filter):
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
@@ -410,14 +412,14 @@ class RoomContextHandler(BaseHandler):
             event_id (str)
             limit (int): The maximum number of events to return in total
                 (excluding state).
+            event_filter (Filter|None): the filter to apply to the events returned
+                (excluding the target event_id)
 
         Returns:
             dict, or None if the event isn't found
         """
         before_limit = math.floor(limit / 2.)
         after_limit = limit - before_limit
-
-        now_token = yield self.hs.get_event_sources().get_current_token()
 
         users = yield self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
@@ -444,7 +446,7 @@ class RoomContextHandler(BaseHandler):
             )
 
         results = yield self.store.get_events_around(
-            room_id, event_id, before_limit, after_limit
+            room_id, event_id, before_limit, after_limit, event_filter
         )
 
         results["events_before"] = yield filter_evts(results["events_before"])
@@ -456,16 +458,35 @@ class RoomContextHandler(BaseHandler):
         else:
             last_event_id = event_id
 
+        types = None
+        filtered_types = None
+        if event_filter and event_filter.lazy_load_members():
+            members = set(ev.sender for ev in itertools.chain(
+                results["events_before"],
+                (results["event"],),
+                results["events_after"],
+            ))
+            filtered_types = [EventTypes.Member]
+            types = [(EventTypes.Member, member) for member in members]
+
+        # XXX: why do we return the state as of the last event rather than the
+        # first? Shouldn't we be consistent with /sync?
+        # https://github.com/matrix-org/matrix-doc/issues/687
+
         state = yield self.store.get_state_for_events(
-            [last_event_id], None
+            [last_event_id], types, filtered_types=filtered_types,
         )
         results["state"] = list(state[last_event_id].values())
 
-        results["start"] = now_token.copy_and_replace(
+        # We use a dummy token here as we only care about the room portion of
+        # the token, which we replace.
+        token = StreamToken.START
+
+        results["start"] = token.copy_and_replace(
             "room_key", results["start"]
         ).to_string()
 
-        results["end"] = now_token.copy_and_replace(
+        results["end"] = token.copy_and_replace(
             "room_key", results["end"]
         ).to_string()
 

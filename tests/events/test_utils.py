@@ -14,10 +14,10 @@
 # limitations under the License.
 
 
-from .. import unittest
-
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event, serialize_event
+
+from .. import unittest
 
 
 def MockEvent(**kwargs):

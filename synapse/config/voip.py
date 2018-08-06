@@ -30,10 +30,10 @@ class VoipConfig(Config):
         ## Turn ##
 
         # The public URIs of the TURN server to give to clients
-        turn_uris: []
+        #turn_uris: []
 
         # The shared secret used to compute passwords for the TURN server
-        turn_shared_secret: "YOUR_SHARED_SECRET"
+        #turn_shared_secret: "YOUR_SHARED_SECRET"
 
         # The Username and password if the TURN server needs them and
         # does not use a token
