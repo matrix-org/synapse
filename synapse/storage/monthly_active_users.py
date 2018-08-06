@@ -43,14 +43,25 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             thirty_days_ago = (
                 int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
             )
-
+            # Purge stale users
             sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
-
             txn.execute(sql, (thirty_days_ago,))
+
+            # If MAU user count still exceeds the MAU threshold, then delete on
+            # a least recently active basis.
+            # Note it is not possible to write this query using OFFSET due to
+            # incompatibilities in how sqlite an postgres support the feature.
+            # sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be present
+            # While Postgres does not require 'LIMIT', but also does not support
+            # negative LIMIT values. So there is no way to write it that both can
+            # support
             sql = """
                 DELETE FROM monthly_active_users
-                ORDER BY timestamp desc
-                LIMIT -1 OFFSET ?
+                WHERE user_id NOT IN (
+                    SELECT user_id FROM monthly_active_users
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                    )
                 """
             txn.execute(sql, (self.hs.config.max_mau_value,))
 
