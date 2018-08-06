@@ -10,9 +10,9 @@ set -e
 
 if [ "$1" == "-h" ] || [ "$1" == "" ]; then
   echo "Call with group_id (Community ID e.g. +test:example.com) as first option and then pipe it into the database. So for instance you might run"
-  echo " nuke-room-from-db.sh <group_id> | sqlite3 homeserver.db"
+  echo " nuke-community-from-db.sh <group_id> | sqlite3 homeserver.db"
   echo "or"
-  echo " nuke-room-from-db.sh <group_id> | psql --dbname=synapse"
+  echo " nuke-community-from-db.sh <group_id> | psql --dbname=synapse"
   exit
 fi
 
