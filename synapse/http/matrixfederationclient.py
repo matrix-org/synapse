@@ -439,7 +439,7 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def get_json(self, destination, path, args={}, retry_on_dns_fail=True,
+    def get_json(self, destination, path, args=None, retry_on_dns_fail=True,
                  timeout=None, ignore_backoff=False):
         """ GETs some json from the given host homeserver and path
 
@@ -447,7 +447,7 @@ class MatrixFederationHttpClient(object):
             destination (str): The remote server to send the HTTP request
                 to.
             path (str): The HTTP path.
-            args (dict): A dictionary used to create query strings, defaults to
+            args (dict|None): A dictionary used to create query strings, defaults to
                 None.
             timeout (int): How long to try (in ms) the destination for before
                 giving up. None indicates no timeout and that the request will
@@ -702,6 +702,9 @@ def check_content_type_is_json(headers):
 
 
 def encode_query_args(args):
+    if args is None:
+        return b""
+
     encoded_args = {}
     for k, vs in args.items():
         if isinstance(vs, string_types):

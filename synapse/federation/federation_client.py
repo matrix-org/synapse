@@ -521,7 +521,7 @@ class FederationClient(FederationBase):
         raise RuntimeError("Failed to %s via any server", description)
 
     def make_membership_event(self, destinations, room_id, user_id, membership,
-                              content={},):
+                              content, params):
         """
         Creates an m.room.member event, with context, without participating in the room.
 
@@ -537,8 +537,10 @@ class FederationClient(FederationBase):
             user_id (str): The user whose membership is being evented.
             membership (str): The "membership" property of the event. Must be
                 one of "join" or "leave".
-            content (object): Any additional data to put into the content field
+            content (dict): Any additional data to put into the content field
                 of the event.
+            params (dict[str, str|Iterable[str]]): Query parameters to include in the
+                request.
         Return:
             Deferred: resolves to a tuple of (origin (str), event (object))
             where origin is the remote homeserver which generated the event.
@@ -558,7 +560,7 @@ class FederationClient(FederationBase):
         @defer.inlineCallbacks
         def send_request(destination):
             ret = yield self.transport_layer.make_membership_event(
-                destination, room_id, user_id, membership
+                destination, room_id, user_id, membership, params,
             )
 
             pdu_dict = ret.get("event", None)
