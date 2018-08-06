@@ -25,7 +25,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     FederationDeniedError,
@@ -518,7 +518,7 @@ class FederationClient(FederationBase):
                     description, destination, exc_info=1,
                 )
 
-        raise RuntimeError("Failed to %s via any server", description)
+        raise RuntimeError("Failed to %s via any server" % (description, ))
 
     def make_membership_event(self, destinations, room_id, user_id, membership,
                               content, params):
@@ -609,6 +609,26 @@ class FederationClient(FederationBase):
             Fails with a ``RuntimeError`` if no servers were reachable.
         """
 
+        def check_authchain_validity(signed_auth_chain):
+            for e in signed_auth_chain:
+                if e.type == EventTypes.Create:
+                    create_event = e
+                    break
+            else:
+                raise InvalidResponseError(
+                    "no %s in auth chain" % (EventTypes.Create,),
+                )
+
+            # the room version should be sane.
+            room_version = create_event.content.get("room_version", "1")
+            if room_version not in KNOWN_ROOM_VERSIONS:
+                # This shouldn't be possible, because the remote server should have
+                # rejected the join attempt during make_join.
+                raise InvalidResponseError(
+                    "room appears to have unsupported version %s" % (
+                        room_version,
+                    ))
+
         @defer.inlineCallbacks
         def send_request(destination):
             time_now = self._clock.time_msec()
@@ -665,7 +685,7 @@ class FederationClient(FederationBase):
             for s in signed_state:
                 s.internal_metadata = copy.deepcopy(s.internal_metadata)
 
-            auth_chain.sort(key=lambda e: e.depth)
+            check_authchain_validity(signed_auth)
 
             defer.returnValue({
                 "state": signed_state,
