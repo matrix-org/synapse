@@ -19,16 +19,30 @@ from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore
 
+
 # Number of msec of granularity to store the monthly_active_user timestamp
 # This means it is not necessary to update the table on every request
 LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 
 class MonthlyActiveUsersStore(SQLBaseStore):
+    @defer.inlineCallbacks
     def __init__(self, dbconn, hs):
         super(MonthlyActiveUsersStore, self).__init__(None, hs)
         self._clock = hs.get_clock()
         self.hs = hs
+        threepids = self.hs.config.mau_limits_reserved_threepids
+        self.reserved_user_ids = set()
+        for tp in threepids:
+            user_id = yield hs.get_datastore().get_user_id_by_threepid(
+                tp["medium"], tp["address"]
+            )
+            if user_id:
+                self.reserved_user_ids.add(user_id)
+            else:
+                logger.warning(
+                    "mau limit reserved threepid %s not found in db" % tp
+                )
 
     def reap_monthly_active_users(self):
         """
@@ -78,7 +92,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     @cached(num_args=0)
     def get_monthly_active_count(self):
-        """Generates current count of monthly active users.abs
+        """Generates current count of monthly active users
 
         Returns:
             Defered[int]: Number of current monthly active users
