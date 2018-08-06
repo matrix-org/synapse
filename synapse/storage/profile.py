@@ -71,8 +71,6 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_from_remote_profile_cache",
         )
 
-
-class ProfileStore(ProfileWorkerStore):
     def create_profile(self, user_localpart):
         return self._simple_insert(
             table="profiles",
@@ -182,3 +180,7 @@ class ProfileStore(ProfileWorkerStore):
 
         if res:
             defer.returnValue(True)
+
+
+class ProfileStore(ProfileWorkerStore):
+    pass

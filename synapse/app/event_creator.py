@@ -45,6 +45,11 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import TransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.client.v1.profile import (
+    ProfileAvatarURLRestServlet,
+    ProfileDisplaynameRestServlet,
+    ProfileRestServlet,
+)
 from synapse.rest.client.v1.room import (
     JoinRoomAliasServlet,
     RoomMembershipRestServlet,
@@ -101,6 +106,9 @@ class EventCreatorServer(HomeServer):
                     RoomMembershipRestServlet(self).register(resource)
                     RoomStateEventRestServlet(self).register(resource)
                     JoinRoomAliasServlet(self).register(resource)
+                    ProfileAvatarURLRestServlet(self).register(resource)
+                    ProfileDisplaynameRestServlet(self).register(resource)
+                    ProfileRestServlet(self).register(resource)
                     resources.update({
                         "/_matrix/client/r0": resource,
                         "/_matrix/client/unstable": resource,
