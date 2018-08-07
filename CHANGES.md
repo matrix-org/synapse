@@ -12,6 +12,7 @@ Features
 - make the /context API filter & lazy-load aware as per MSC1227 ([\#3567](https://github.com/matrix-org/synapse/issues/3567>))
 - Add ability to limit number of monthly active users on the server ([\#3630](https://github.com/matrix-org/synapse/issues/3630>))
 - When we fail to join a room over federation, pass the error code back to the client. ([\#3639](https://github.com/matrix-org/synapse/issues/3639>))
+- Add a new /admin/register API for non-interactively creating users. ([\#3415](https://github.com/matrix-org/synapse/issues/3415>))
 
 
 Bugfixes
@@ -37,7 +38,9 @@ Internal Changes
 - Remove redundant checks on who_forgot_in_room ([\#3350](https://github.com/matrix-org/synapse/issues/3350>))
 - Remove unnecessary event re-signing hacks ([\#3367](https://github.com/matrix-org/synapse/issues/3367>))
 - Rewrite cache list decorator ([\#3384](https://github.com/matrix-org/synapse/issues/3384>))
--  ([\#3415](https://github.com/matrix-org/synapse/issues/3415>), [\#3460](https://github.com/matrix-org/synapse/issues/3460>), [\#3562](https://github.com/matrix-org/synapse/issues/3562>), [\#3577](https://github.com/matrix-org/synapse/issues/3577>))
+- Move v1-only REST APIs into their own module. ([\#3460](https://github.com/matrix-org/synapse/issues/3460>))
+- Replace more instances of Python 2-only iteritems and itervalues uses. ([\#3562](https://github.com/matrix-org/synapse/issues/3562>))
+- Refactor EventContext to accept state during init ([\#3577](https://github.com/matrix-org/synapse/issues/3577>))
 - Improve Dockerfile and docker-compose instructions ([\#3543](https://github.com/matrix-org/synapse/issues/3543>))
 - Release notes are now in the Markdown format. ([\#3552](https://github.com/matrix-org/synapse/issues/3552>))
 - add config for pep8 ([\#3559](https://github.com/matrix-org/synapse/issues/3559>))
