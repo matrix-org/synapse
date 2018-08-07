@@ -26,6 +26,7 @@ from six import string_types
 from twisted.internet import defer
 
 from synapse.api.constants import (
+    DEFAULT_ROOM_VERSION,
     KNOWN_ROOM_VERSIONS,
     EventTypes,
     JoinRules,
@@ -106,7 +107,7 @@ class RoomCreationHandler(BaseHandler):
         if ratelimit:
             yield self.ratelimit(requester)
 
-        room_version = config.get("room_version", self.hs.config.default_room_version)
+        room_version = config.get("room_version", DEFAULT_ROOM_VERSION)
         if not isinstance(room_version, string_types):
             raise SynapseError(
                 400,
