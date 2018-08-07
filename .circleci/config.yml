@@ -18,3 +18,10 @@ jobs:
       - store_artifacts:
           path: ~/logs
           destination: logs
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - sytestpy2
+      - sytestpy3
