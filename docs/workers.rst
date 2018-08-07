@@ -244,6 +244,7 @@ Handles some event creation. It can handle REST endpoints matching::
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|unstable)/join/
+    ^/_matrix/client/(api/v1|r0|unstable)/profile/
 
 It will create events locally and then send them on to the main synapse
 instance to be persisted and handled.
