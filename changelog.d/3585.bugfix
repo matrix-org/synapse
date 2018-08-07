@@ -1,1 +1,0 @@
-Respond with M_NOT_FOUND when profiles are not found locally or over federation. Fixes #3585
