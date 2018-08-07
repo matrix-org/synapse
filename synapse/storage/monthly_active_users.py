@@ -39,7 +39,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # TODO Why can't I do this in init?
         store = self.hs.get_datastore()
         reserved_user_list = []
-        for tp in threepids:
+
+        # Do not add more reserved users than the total allowable number
+        for tp in threepids[:self.hs.config.max_mau_value]:
             user_id = yield store.get_user_id_by_threepid(
                 tp["medium"], tp["address"]
             )
