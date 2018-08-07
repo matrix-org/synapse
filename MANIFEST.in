@@ -27,6 +27,8 @@ exclude jenkins.sh
 exclude jenkins*.sh
 exclude jenkins*
 exclude Dockerfile
+exclude Dockerfile*
+exclude docker_sytest.sh
 exclude .dockerignore
 recursive-exclude jenkins *.sh
 
@@ -36,3 +38,4 @@ recursive-include changelog.d *
 prune .github
 prune demo/etc
 prune docker
+prune .circleci
