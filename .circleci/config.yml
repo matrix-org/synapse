@@ -9,3 +9,12 @@ jobs:
       - store_artifacts:
           path: ~/logs
           destination: logs
+  sytestpy3:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull hawkowl/sytestpy3
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 hawkowl/sytestpy3
+      - store_artifacts:
+          path: ~/logs
+          destination: logs
