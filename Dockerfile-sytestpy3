@@ -1,0 +1,3 @@
+FROM hawkowl/sytest:latest
+
+ENV PYTHON=python3.5
