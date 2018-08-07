@@ -1,0 +1,11 @@
+version: 2
+jobs:
+  sytestpy2:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull hawkowl/sytestpy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 hawkowl/sytestpy2
+      - store_artifacts:
+          path: ~/logs
+          destination: logs
