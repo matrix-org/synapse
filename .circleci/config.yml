@@ -5,18 +5,27 @@ jobs:
     steps:
       - checkout
       - run: docker pull hawkowl/sytestpy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs hawkowl/sytestpy2
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+  sytestpy2postgres:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull hawkowl/sytestpy2
       - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 hawkowl/sytestpy2
       - store_artifacts:
-          path: ~/logs
+          path: ~/project/logs
           destination: logs
   sytestpy3:
     machine: true
     steps:
       - checkout
       - run: docker pull hawkowl/sytestpy3
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 hawkowl/sytestpy3
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs hawkowl/sytestpy3
       - store_artifacts:
-          path: ~/logs
+          path: ~/project/logs
           destination: logs
 
 workflows:
@@ -24,4 +33,5 @@ workflows:
   build:
     jobs:
       - sytestpy2
+      - sytestpy2postgres
       - sytestpy3
