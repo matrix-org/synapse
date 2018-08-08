@@ -17,7 +17,13 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, CodeMessageException, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    CodeMessageException,
+    Codes,
+    StoreError,
+    SynapseError,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID, get_domain_from_id
 
@@ -49,12 +55,17 @@ class ProfileHandler(BaseHandler):
     def get_profile(self, user_id):
         target_user = UserID.from_string(user_id)
         if self.hs.is_mine(target_user):
-            displayname = yield self.store.get_profile_displayname(
-                target_user.localpart
-            )
-            avatar_url = yield self.store.get_profile_avatar_url(
-                target_user.localpart
-            )
+            try:
+                displayname = yield self.store.get_profile_displayname(
+                    target_user.localpart
+                )
+                avatar_url = yield self.store.get_profile_avatar_url(
+                    target_user.localpart
+                )
+            except StoreError as e:
+                if e.code == 404:
+                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+                raise
 
             defer.returnValue({
                 "displayname": displayname,
@@ -74,7 +85,6 @@ class ProfileHandler(BaseHandler):
             except CodeMessageException as e:
                 if e.code != 404:
                     logger.exception("Failed to get displayname")
-
                 raise
 
     @defer.inlineCallbacks
@@ -85,12 +95,17 @@ class ProfileHandler(BaseHandler):
         """
         target_user = UserID.from_string(user_id)
         if self.hs.is_mine(target_user):
-            displayname = yield self.store.get_profile_displayname(
-                target_user.localpart
-            )
-            avatar_url = yield self.store.get_profile_avatar_url(
-                target_user.localpart
-            )
+            try:
+                displayname = yield self.store.get_profile_displayname(
+                    target_user.localpart
+                )
+                avatar_url = yield self.store.get_profile_avatar_url(
+                    target_user.localpart
+                )
+            except StoreError as e:
+                if e.code == 404:
+                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+                raise
 
             defer.returnValue({
                 "displayname": displayname,
@@ -103,9 +118,14 @@ class ProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):
-            displayname = yield self.store.get_profile_displayname(
-                target_user.localpart
-            )
+            try:
+                displayname = yield self.store.get_profile_displayname(
+                    target_user.localpart
+                )
+            except StoreError as e:
+                if e.code == 404:
+                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+                raise
 
             defer.returnValue(displayname)
         else:
@@ -122,7 +142,6 @@ class ProfileHandler(BaseHandler):
             except CodeMessageException as e:
                 if e.code != 404:
                     logger.exception("Failed to get displayname")
-
                 raise
             except Exception:
                 logger.exception("Failed to get displayname")
@@ -157,10 +176,14 @@ class ProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def get_avatar_url(self, target_user):
         if self.hs.is_mine(target_user):
-            avatar_url = yield self.store.get_profile_avatar_url(
-                target_user.localpart
-            )
-
+            try:
+                avatar_url = yield self.store.get_profile_avatar_url(
+                    target_user.localpart
+                )
+            except StoreError as e:
+                if e.code == 404:
+                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+                raise
             defer.returnValue(avatar_url)
         else:
             try:
@@ -213,16 +236,20 @@ class ProfileHandler(BaseHandler):
         just_field = args.get("field", None)
 
         response = {}
+        try:
+            if just_field is None or just_field == "displayname":
+                response["displayname"] = yield self.store.get_profile_displayname(
+                    user.localpart
+                )
 
-        if just_field is None or just_field == "displayname":
-            response["displayname"] = yield self.store.get_profile_displayname(
-                user.localpart
-            )
-
-        if just_field is None or just_field == "avatar_url":
-            response["avatar_url"] = yield self.store.get_profile_avatar_url(
-                user.localpart
-            )
+            if just_field is None or just_field == "avatar_url":
+                response["avatar_url"] = yield self.store.get_profile_avatar_url(
+                    user.localpart
+                )
+        except StoreError as e:
+            if e.code == 404:
+                raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+            raise
 
         defer.returnValue(response)
 

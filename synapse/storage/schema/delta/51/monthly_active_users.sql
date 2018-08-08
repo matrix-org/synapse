@@ -18,7 +18,7 @@ CREATE TABLE monthly_active_users (
     user_id TEXT NOT NULL,
     -- Last time we saw the user. Not guaranteed to be accurate due to rate limiting
     -- on updates, Granularity of updates governed by
-    -- syanpse.storage.monthly_active_users.LAST_SEEN_GRANULARITY
+    -- synapse.storage.monthly_active_users.LAST_SEEN_GRANULARITY
     -- Measured in ms since epoch.
     timestamp BIGINT NOT NULL
 );
