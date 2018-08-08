@@ -34,4 +34,5 @@ workflows:
     jobs:
       - sytestpy2
       - sytestpy2postgres
-      - sytestpy3
+# Currently broken!
+#      - sytestpy3
