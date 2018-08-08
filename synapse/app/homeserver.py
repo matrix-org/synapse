@@ -518,12 +518,15 @@ def run(hs):
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+    clock.looping_call(
+        hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60
+    )
 
     @defer.inlineCallbacks
     def generate_monthly_active_users():
         count = 0
         if hs.config.limit_usage_by_mau:
-            count = yield hs.get_datastore().count_monthly_users()
+            count = yield hs.get_datastore().get_monthly_active_count()
         current_mau_gauge.set(float(count))
         max_mau_value_gauge.set(float(hs.config.max_mau_value))
 

@@ -73,6 +73,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         config.block_events_without_consent_error = None
         config.media_storage_providers = []
         config.auto_join_rooms = []
+        config.limit_usage_by_mau = False
 
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.

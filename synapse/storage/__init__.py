@@ -39,6 +39,7 @@ from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
 from .media_repository import MediaRepositoryStore
+from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
@@ -87,6 +88,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 UserDirectoryStore,
                 GroupServerStore,
                 UserErasureStore,
+                MonthlyActiveUsersStore,
                 ):
 
     def __init__(self, db_conn, hs):
@@ -94,7 +96,6 @@ class DataStore(RoomMemberStore, RoomStore,
         self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
 
-        self.db_conn = db_conn
         self._stream_id_gen = StreamIdGenerator(
             db_conn, "events", "stream_ordering",
             extra_tables=[("local_invites", "stream_id")]
@@ -266,31 +267,6 @@ class DataStore(RoomMemberStore, RoomStore,
             return count
 
         return self.runInteraction("count_users", _count_users)
-
-    def count_monthly_users(self):
-        """Counts the number of users who used this homeserver in the last 30 days
-
-        This method should be refactored with count_daily_users - the only
-        reason not to is waiting on definition of mau
-
-        Returns:
-            Defered[int]
-        """
-        def _count_monthly_users(txn):
-            thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
-            sql = """
-                SELECT COALESCE(count(*), 0) FROM (
-                    SELECT user_id FROM user_ips
-                    WHERE last_seen > ?
-                    GROUP BY user_id
-                ) u
-            """
-
-            txn.execute(sql, (thirty_days_ago,))
-            count, = txn.fetchone()
-            return count
-
-        return self.runInteraction("count_monthly_users", _count_monthly_users)
 
     def count_r30_users(self):
         """
