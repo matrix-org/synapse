@@ -74,6 +74,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         config.media_storage_providers = []
         config.auto_join_rooms = []
         config.limit_usage_by_mau = False
+        config.max_mau_value = 50
         config.mau_limits_reserved_threepids = []
 
         # disable user directory updates, because they get done in the
