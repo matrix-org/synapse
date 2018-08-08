@@ -27,8 +27,6 @@ exclude jenkins.sh
 exclude jenkins*.sh
 exclude jenkins*
 exclude Dockerfile
-exclude Dockerfile*
-exclude docker_sytest.sh
 exclude .dockerignore
 recursive-exclude jenkins *.sh
 
