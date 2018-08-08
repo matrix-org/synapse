@@ -22,7 +22,7 @@ RUN cd /synapse \
         setuptools \
  && mkdir -p /synapse/cache \
  && pip install -f /synapse/cache --upgrade --process-dependency-links . \
- && mv /synapse/contrib/docker/start.py /synapse/contrib/docker/conf / \
+ && mv /synapse/docker/start.py /synapse/docker/conf / \
  && rm -rf \
         setup.cfg \
         setup.py \

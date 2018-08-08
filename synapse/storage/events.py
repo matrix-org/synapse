@@ -485,9 +485,14 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
                     new_forward_extremeties=new_forward_extremeties,
                 )
                 persist_event_counter.inc(len(chunk))
-                synapse.metrics.event_persisted_position.set(
-                    chunk[-1][0].internal_metadata.stream_ordering,
-                )
+
+                if not backfilled:
+                    # backfilled events have negative stream orderings, so we don't
+                    # want to set the event_persisted_position to that.
+                    synapse.metrics.event_persisted_position.set(
+                        chunk[-1][0].internal_metadata.stream_ordering,
+                    )
+
                 for event, context in chunk:
                     if context.app_service:
                         origin_type = "local"
