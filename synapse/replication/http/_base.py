@@ -151,7 +151,7 @@ class ReplicationEndpoint(object):
                         if e.code != 504 or not cls.RETRY_ON_TIMEOUT:
                             raise
 
-                    logger.warn("send_federation_events_to_master request timed out")
+                    logger.warn("%s request timed out", cls.NAME)
 
                     # If we timed out we probably don't need to worry about backing
                     # off too much, but lets just wait a little anyway.
@@ -190,7 +190,9 @@ class ReplicationEndpoint(object):
         http_server.register_paths(method, [pattern], handler)
 
     def _cached_handler(self, request, txn_id, **kwargs):
-        """Wraps `_handle_request` the responses should be cached.
+        """Called on new incoming requests when caching is enabled. Checks
+        if their is a cached response for the request and returns that,
+        otherwise calls `_handle_request` and caches its response.
         """
         # We just use the txn_id here, but we probably also want to use the
         # other PATH_ARGS as well.
