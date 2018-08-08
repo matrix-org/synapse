@@ -4,8 +4,8 @@ jobs:
     machine: true
     steps:
       - checkout
-      - run: docker pull hawkowl/sytestpy2
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs hawkowl/sytestpy2
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy2
       - store_artifacts:
           path: ~/project/logs
           destination: logs
@@ -13,8 +13,8 @@ jobs:
     machine: true
     steps:
       - checkout
-      - run: docker pull hawkowl/sytestpy2
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 hawkowl/sytestpy2
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy2
       - store_artifacts:
           path: ~/project/logs
           destination: logs
@@ -22,7 +22,7 @@ jobs:
     machine: true
     steps:
       - checkout
-      - run: docker pull hawkowl/sytestpy3
+      - run: docker pull matrixdotorg/sytest-synapsepy3
       - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs hawkowl/sytestpy3
       - store_artifacts:
           path: ~/project/logs

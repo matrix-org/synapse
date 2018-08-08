@@ -1,3 +1,0 @@
-FROM hawkowl/sytest:latest
-
-ENV PYTHON=python2
