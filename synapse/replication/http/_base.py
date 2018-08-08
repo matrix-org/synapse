@@ -40,8 +40,8 @@ class ReplicationEndpoint(object):
 
         /_synapse/replication/send_event/:event_id/:txn_id
 
-    For POST requests the payload is serialized to json and sent as the body,
-    while for GET requests the payload is added as query parameters. See
+    For POST/PUT requests the payload is serialized to json and sent as the
+    body, while for GET requests the payload is added as query parameters. See
     `_serialize_payload` for details.
 
     Incoming requests are handled by overriding `_handle_request`. Servers
@@ -55,8 +55,9 @@ class ReplicationEndpoint(object):
         PATH_ARGS (tuple[str]): A list of parameters to be added to the path.
             Adding parameters to the path (rather than payload) can make it
             easier to follow along in the log files.
-        POST (bool): True to use POST request with JSON body, or false to use
-            GET requests with query params.
+        METHOD (str): The method of the HTTP request, defaults to POST. Can be
+            one of POST, PUT or GET. If GET then the payload is sent as query
+            parameters rather than a JSON body.
         CACHE (bool): Whether server should cache the result of the request/
             If true then transparently adds a txn_id to all requests, and
             `_handle_request` must return a Deferred.
@@ -69,7 +70,7 @@ class ReplicationEndpoint(object):
     NAME = abc.abstractproperty()
     PATH_ARGS = abc.abstractproperty()
 
-    POST = True
+    METHOD = "POST"
     CACHE = True
     RETRY_ON_TIMEOUT = True
 
@@ -79,6 +80,8 @@ class ReplicationEndpoint(object):
                 hs, "repl." + self.NAME,
                 timeout_ms=30 * 60 * 1000,
             )
+
+        assert self.METHOD in ("PUT", "POST", "GET")
 
     @abc.abstractmethod
     def _serialize_payload(**kwargs):
@@ -90,9 +93,9 @@ class ReplicationEndpoint(object):
         argument list.
 
         Returns:
-            Deferred[dict]|dict: If POST request then dictionary must be JSON
-            serialisable, otherwise must be appropriate for adding as query
-            args.
+            Deferred[dict]|dict: If POST/PUT request then dictionary must be
+            JSON serialisable, otherwise must be appropriate for adding as
+            query args.
         """
         return {}
 
@@ -130,10 +133,18 @@ class ReplicationEndpoint(object):
                 txn_id = random_string(10)
                 url_args.append(txn_id)
 
-            if cls.POST:
+            if cls.METHOD == "POST":
                 request_func = client.post_json_get_json
-            else:
+            elif cls.METHOD == "PUT":
+                request_func = client.put_json
+            elif cls.METHOD == "GET":
                 request_func = client.get_json
+            else:
+                # We have already asserted in the constructor that a
+                # compatible was picked, but lets be paranoid.
+                raise Exception(
+                    "Unknown METHOD on %s replication endpoint" % (cls.NAME,)
+                )
 
             uri = "http://%s:%s/_synapse/replication/%s/%s" % (
                 host, port, cls.NAME, "/".join(url_args)
@@ -174,8 +185,7 @@ class ReplicationEndpoint(object):
         url_args = list(self.PATH_ARGS)
         method = "GET"
         handler = self._handle_request
-        if self.POST:
-            method = "POST"
+        method = self.METHOD
 
         if self.CACHE:
             handler = self._cached_handler

@@ -47,7 +47,6 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
     """
     NAME = "send_event"
     PATH_ARGS = ("event_id",)
-    POST = True
 
     def __init__(self, hs):
         super(ReplicationSendEventRestServlet, self).__init__(hs)
