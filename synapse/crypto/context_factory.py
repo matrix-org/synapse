@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class ServerContextFactory(ContextFactory):
     """Factory for PyOpenSSL SSL contexts that are used to handle incoming
-    connections and to make connections to remote servers."""
+    connections."""
 
     def __init__(self, config):
         self._context = SSL.Context(SSL.SSLv23_METHOD)
