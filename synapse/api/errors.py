@@ -62,7 +62,6 @@ class Codes(object):
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
 
 
-
 class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
 
