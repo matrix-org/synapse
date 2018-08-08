@@ -19,6 +19,8 @@ import tests.unittest
 import tests.utils
 from tests.utils import setup_test_homeserver
 
+FORTY_DAYS = 40 * 24 * 60 * 60
+
 
 class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -28,6 +30,56 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
     def setUp(self):
         self.hs = yield setup_test_homeserver()
         self.store = self.hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def test_initialise_reserved_users(self):
+
+        user1 = "@user1:server"
+        user1_email = "user1@matrix.org"
+        user2 = "@user2:server"
+        user2_email = "user2@matrix.org"
+        threepids = [
+            {'medium': 'email', 'address': user1_email},
+            {'medium': 'email', 'address': user2_email}
+        ]
+        user_num = len(threepids)
+
+        yield self.store.register(
+            user_id=user1,
+            token="123",
+            password_hash=None)
+
+        yield self.store.register(
+            user_id=user2,
+            token="456",
+            password_hash=None)
+
+        now = int(self.hs.get_clock().time_msec())
+        yield self.store.user_add_threepid(user1, "email", user1_email, now, now)
+        yield self.store.user_add_threepid(user2, "email", user2_email, now, now)
+        yield self.store.initialise_reserved_users(threepids)
+
+        active_count = yield self.store.get_monthly_active_count()
+
+        # Test total counts
+        self.assertEquals(active_count, user_num)
+
+        # Test user is marked as active
+
+        timestamp = yield self.store._user_last_seen_monthly_active(user1)
+        self.assertTrue(timestamp)
+        timestamp = yield self.store._user_last_seen_monthly_active(user2)
+        self.assertTrue(timestamp)
+
+        # Test that users are never removed from the db.
+        self.hs.config.max_mau_value = 0
+
+        self.hs.get_clock().advance_time(FORTY_DAYS)
+
+        yield self.store.reap_monthly_active_users()
+
+        active_count = yield self.store.get_monthly_active_count()
+        self.assertEquals(active_count, user_num)
 
     @defer.inlineCallbacks
     def test_can_insert_and_count_mau(self):
@@ -63,4 +115,9 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         self.assertTrue(count, initial_users)
         yield self.store.reap_monthly_active_users()
         count = yield self.store.get_monthly_active_count()
-        self.assertTrue(count, initial_users - self.hs.config.max_mau_value)
+        self.assertEquals(count, initial_users - self.hs.config.max_mau_value)
+
+        self.hs.get_clock().advance_time(FORTY_DAYS)
+        yield self.store.reap_monthly_active_users()
+        count = yield self.store.get_monthly_active_count()
+        self.assertEquals(count, 0)

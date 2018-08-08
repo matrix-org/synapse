@@ -74,6 +74,9 @@ class ServerConfig(Config):
             self.max_mau_value = config.get(
                 "max_mau_value", 0,
             )
+        self.mau_limits_reserved_threepids = config.get(
+            "mau_limit_reserved_threepids", []
+        )
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)

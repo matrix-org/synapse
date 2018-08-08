@@ -12,12 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore
+
+logger = logging.getLogger(__name__)
 
 # Number of msec of granularity to store the monthly_active_user timestamp
 # This means it is not necessary to update the table on every request
@@ -29,7 +32,29 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         super(MonthlyActiveUsersStore, self).__init__(None, hs)
         self._clock = hs.get_clock()
         self.hs = hs
+        self.reserved_users = ()
 
+    @defer.inlineCallbacks
+    def initialise_reserved_users(self, threepids):
+        # TODO Why can't I do this in init?
+        store = self.hs.get_datastore()
+        reserved_user_list = []
+
+        # Do not add more reserved users than the total allowable number
+        for tp in threepids[:self.hs.config.max_mau_value]:
+            user_id = yield store.get_user_id_by_threepid(
+                tp["medium"], tp["address"]
+            )
+            if user_id:
+                self.upsert_monthly_active_user(user_id)
+                reserved_user_list.append(user_id)
+            else:
+                logger.warning(
+                    "mau limit reserved threepid %s not found in db" % tp
+                )
+        self.reserved_users = tuple(reserved_user_list)
+
+    @defer.inlineCallbacks
     def reap_monthly_active_users(self):
         """
         Cleans out monthly active user table to ensure that no stale
@@ -44,8 +69,20 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
             )
             # Purge stale users
-            sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
-            txn.execute(sql, (thirty_days_ago,))
+
+            # questionmarks is a hack to overcome sqlite not supporting
+            # tuples in 'WHERE IN %s'
+            questionmarks = '?' * len(self.reserved_users)
+            query_args = [thirty_days_ago]
+            query_args.extend(self.reserved_users)
+
+            sql = """
+                DELETE FROM monthly_active_users
+                WHERE timestamp < ?
+                AND user_id NOT IN ({})
+                """.format(','.join(questionmarks))
+
+            txn.execute(sql, query_args)
 
             # If MAU user count still exceeds the MAU threshold, then delete on
             # a least recently active basis.
@@ -55,6 +92,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # While Postgres does not require 'LIMIT', but also does not support
             # negative LIMIT values. So there is no way to write it that both can
             # support
+            query_args = [self.hs.config.max_mau_value]
+            query_args.extend(self.reserved_users)
             sql = """
                 DELETE FROM monthly_active_users
                 WHERE user_id NOT IN (
@@ -62,8 +101,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                     ORDER BY timestamp DESC
                     LIMIT ?
                     )
-                """
-            txn.execute(sql, (self.hs.config.max_mau_value,))
+                AND user_id NOT IN ({})
+                """.format(','.join(questionmarks))
+            txn.execute(sql, query_args)
 
         yield self.runInteraction("reap_monthly_active_users", _reap_users)
         # It seems poor to invalidate the whole cache, Postgres supports
@@ -122,7 +162,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Arguments:
                 user_id (str): user to add/update
             Return:
-                int : timestamp since last seen, None if never seen
+                Deferred[int] : timestamp since last seen, None if never seen
 
         """
 
@@ -144,7 +184,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Args:
             user_id(str): the user_id to query
         """
-
         if self.hs.config.limit_usage_by_mau:
             last_seen_timestamp = yield self._user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
