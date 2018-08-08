@@ -25,7 +25,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     FederationDeniedError,
@@ -518,10 +518,10 @@ class FederationClient(FederationBase):
                     description, destination, exc_info=1,
                 )
 
-        raise RuntimeError("Failed to %s via any server", description)
+        raise RuntimeError("Failed to %s via any server" % (description, ))
 
     def make_membership_event(self, destinations, room_id, user_id, membership,
-                              content={},):
+                              content, params):
         """
         Creates an m.room.member event, with context, without participating in the room.
 
@@ -537,8 +537,10 @@ class FederationClient(FederationBase):
             user_id (str): The user whose membership is being evented.
             membership (str): The "membership" property of the event. Must be
                 one of "join" or "leave".
-            content (object): Any additional data to put into the content field
+            content (dict): Any additional data to put into the content field
                 of the event.
+            params (dict[str, str|Iterable[str]]): Query parameters to include in the
+                request.
         Return:
             Deferred: resolves to a tuple of (origin (str), event (object))
             where origin is the remote homeserver which generated the event.
@@ -558,10 +560,12 @@ class FederationClient(FederationBase):
         @defer.inlineCallbacks
         def send_request(destination):
             ret = yield self.transport_layer.make_membership_event(
-                destination, room_id, user_id, membership
+                destination, room_id, user_id, membership, params,
             )
 
-            pdu_dict = ret["event"]
+            pdu_dict = ret.get("event", None)
+            if not isinstance(pdu_dict, dict):
+                raise InvalidResponseError("Bad 'event' field in response")
 
             logger.debug("Got response to make_%s: %s", membership, pdu_dict)
 
@@ -604,6 +608,26 @@ class FederationClient(FederationBase):
 
             Fails with a ``RuntimeError`` if no servers were reachable.
         """
+
+        def check_authchain_validity(signed_auth_chain):
+            for e in signed_auth_chain:
+                if e.type == EventTypes.Create:
+                    create_event = e
+                    break
+            else:
+                raise InvalidResponseError(
+                    "no %s in auth chain" % (EventTypes.Create,),
+                )
+
+            # the room version should be sane.
+            room_version = create_event.content.get("room_version", "1")
+            if room_version not in KNOWN_ROOM_VERSIONS:
+                # This shouldn't be possible, because the remote server should have
+                # rejected the join attempt during make_join.
+                raise InvalidResponseError(
+                    "room appears to have unsupported version %s" % (
+                        room_version,
+                    ))
 
         @defer.inlineCallbacks
         def send_request(destination):
@@ -661,7 +685,7 @@ class FederationClient(FederationBase):
             for s in signed_state:
                 s.internal_metadata = copy.deepcopy(s.internal_metadata)
 
-            auth_chain.sort(key=lambda e: e.depth)
+            check_authchain_validity(signed_auth)
 
             defer.returnValue({
                 "state": signed_state,
