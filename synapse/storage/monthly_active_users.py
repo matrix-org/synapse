@@ -50,7 +50,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # If MAU user count still exceeds the MAU threshold, then delete on
             # a least recently active basis.
             # Note it is not possible to write this query using OFFSET due to
-            # incompatibilities in how sqlite an postgres support the feature.
+            # incompatibilities in how sqlite and postgres support the feature.
             # sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be present
             # While Postgres does not require 'LIMIT', but also does not support
             # negative LIMIT values. So there is no way to write it that both can
@@ -78,7 +78,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     @cached(num_args=0)
     def get_monthly_active_count(self):
-        """Generates current count of monthly active users.abs
+        """Generates current count of monthly active users
 
         Returns:
             Defered[int]: Number of current monthly active users
