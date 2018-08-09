@@ -811,6 +811,13 @@ class FederationHandlerRegistry(object):
 
 
 class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
+    """A FederationHandlerRegistry for worker processes.
+
+    When receiving EDU or queries it will check if an appropriate handler has
+    been registered on the worker, if there isn't one then it calls off to the
+    master process.
+    """
+
     def __init__(self, hs):
         self.config = hs.config
         self.http_client = hs.get_simple_http_client()
@@ -822,6 +829,8 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
         super(ReplicationFederationHandlerRegistry, self).__init__()
 
     def on_edu(self, edu_type, origin, content):
+        """Overrides FederationHandlerRegistry
+        """
         handler = self.edu_handlers.get(edu_type)
         if handler:
             return super(ReplicationFederationHandlerRegistry, self).on_edu(
@@ -835,6 +844,8 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
         )
 
     def on_query(self, query_type, args):
+        """Overrides FederationHandlerRegistry
+        """
         handler = self.query_handlers.get(query_type)
         if handler:
             return handler(args)

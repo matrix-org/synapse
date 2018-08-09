@@ -157,6 +157,15 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
     """Handles EDUs newly received from federation, including persisting and
     notifying.
+
+    Request format:
+
+        POST /_synapse/replication/fed_send_edu/:edu_type/:txn_id
+
+        {
+            "origin": ...,
+            "content: { ... }
+        }
     """
 
     NAME = "fed_send_edu"
@@ -196,6 +205,14 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
 
 class ReplicationGetQueryRestServlet(ReplicationEndpoint):
     """Handle responding to queries from federation.
+
+    Request format:
+
+        POST /_synapse/replication/fed_query/:query_type
+
+        {
+            "args": { ... }
+        }
     """
 
     NAME = "fed_query"
