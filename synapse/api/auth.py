@@ -213,7 +213,7 @@ class Auth(object):
                 default=[b""]
             )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                yield self.store.insert_client_ip(
                     user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,
@@ -773,3 +773,15 @@ class Auth(object):
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
+
+    @defer.inlineCallbacks
+    def check_auth_blocking(self):
+        """Checks if the user should be rejected for some external reason,
+        such as monthly active user limiting or global disable flag
+        """
+        if self.hs.config.limit_usage_by_mau is True:
+            current_mau = yield self.store.get_monthly_active_count()
+            if current_mau >= self.hs.config.max_mau_value:
+                raise AuthError(
+                    403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+                )

@@ -176,7 +176,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         room_id = self.room.to_string()
         group_ids = yield self.store.get_state_groups_ids(room_id, [e5.event_id])
-        group = group_ids.keys()[0]
+        group = list(group_ids.keys())[0]
 
         # test _get_some_state_from_cache correctly filters out members with types=[]
         (state_dict, is_all) = yield self.store._get_some_state_from_cache(

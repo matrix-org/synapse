@@ -80,7 +80,7 @@ class ProfileTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger(
             "PUT",
             "/profile/%s/displayname" % (myid),
-            '{"displayname": "Frank Jr."}'
+            b'{"displayname": "Frank Jr."}'
         )
 
         self.assertEquals(200, code)
@@ -95,7 +95,7 @@ class ProfileTestCase(unittest.TestCase):
 
         (code, response) = yield self.mock_resource.trigger(
             "PUT", "/profile/%s/displayname" % ("@4567:test"),
-            '{"displayname": "Frank Jr."}'
+            b'{"displayname": "Frank Jr."}'
         )
 
         self.assertTrue(
@@ -122,7 +122,7 @@ class ProfileTestCase(unittest.TestCase):
 
         (code, response) = yield self.mock_resource.trigger(
             "PUT", "/profile/%s/displayname" % ("@opaque:elsewhere"),
-            '{"displayname":"bob"}'
+            b'{"displayname":"bob"}'
         )
 
         self.assertTrue(
@@ -151,7 +151,7 @@ class ProfileTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger(
             "PUT",
             "/profile/%s/avatar_url" % (myid),
-            '{"avatar_url": "http://my.server/pic.gif"}'
+            b'{"avatar_url": "http://my.server/pic.gif"}'
         )
 
         self.assertEquals(200, code)

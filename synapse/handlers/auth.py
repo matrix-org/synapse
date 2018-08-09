@@ -520,7 +520,7 @@ class AuthHandler(BaseHandler):
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
-        yield self._check_mau_limits()
+        yield self.auth.check_auth_blocking()
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -734,7 +734,7 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
-        yield self._check_mau_limits()
+        yield self.auth.check_auth_blocking()
         auth_api = self.hs.get_auth()
         user_id = None
         try:
@@ -906,19 +906,6 @@ class AuthHandler(BaseHandler):
             )
         else:
             return defer.succeed(False)
-
-    @defer.inlineCallbacks
-    def _check_mau_limits(self):
-        """
-        Ensure that if mau blocking is enabled that invalid users cannot
-        log in.
-        """
-        if self.hs.config.limit_usage_by_mau is True:
-            current_mau = yield self.store.count_monthly_users()
-            if current_mau >= self.hs.config.max_mau_value:
-                raise AuthError(
-                    403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
-                )
 
 
 @attr.s
