@@ -21,6 +21,7 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 
+from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.federation.transport import server
 from synapse.http.server import HttpServer
@@ -445,3 +446,32 @@ class DeferredMockCallable(object):
                     "call(%s)" % _format_call(c[0], c[1]) for c in calls
                 ])
             )
+
+
+@defer.inlineCallbacks
+def create_room(hs, room_id, creator_id):
+    """Creates and persist a creation event for the given room
+
+    Args:
+        hs
+        room_id (str)
+        creator_id (str)
+    """
+
+    store = hs.get_datastore()
+    event_builder_factory = hs.get_event_builder_factory()
+    event_creation_handler = hs.get_event_creation_handler()
+
+    builder = event_builder_factory.new({
+        "type": EventTypes.Create,
+        "state_key": "",
+        "sender": creator_id,
+        "room_id": room_id,
+        "content": {},
+    })
+
+    event, context = yield event_creation_handler.create_new_client_event(
+        builder
+    )
+
+    yield store.persist_event(event, context)
