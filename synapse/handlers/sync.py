@@ -208,7 +208,12 @@ class SyncHandler(object):
         Returns:
             Deferred[SyncResult]
         """
-        yield self.auth.check_auth_blocking()
+        # If the user is not part of the mau group, then check that limits have
+        # not been exceeded (if not part of the group by this point, almost certain
+        # auth_blocking will occur)
+        user_id = sync_config.user.to_string()
+        yield self.auth.check_auth_blocking(user_id)
+
         res = yield self.response_cache.wrap(
             sync_config.request_key,
             self._wait_for_sync_for_user,
