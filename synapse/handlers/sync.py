@@ -209,14 +209,12 @@ class SyncHandler(object):
             Deferred[SyncResult]
         """
         yield self.auth.check_auth_blocking()
-
-        defer.returnValue(
-            self.response_cache.wrap(
-                sync_config.request_key,
-                self._wait_for_sync_for_user,
-                sync_config, since_token, timeout, full_state,
-            )
+        res = yield self.response_cache.wrap(
+            sync_config.request_key,
+            self._wait_for_sync_for_user,
+            sync_config, since_token, timeout, full_state,
         )
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def _wait_for_sync_for_user(self, sync_config, since_token, timeout,

@@ -14,11 +14,14 @@
 # limitations under the License.
 from twisted.internet import defer
 
+from synapse.api.errors import AuthError
+from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
+from synapse.handlers.sync import SyncConfig, SyncHandler
+from synapse.types import UserID
+
 import tests.unittest
 import tests.utils
 from tests.utils import setup_test_homeserver
-from synapse.handlers.sync import SyncHandler, SyncConfig
-from synapse.types import UserID
 
 
 class SyncTestCase(tests.unittest.TestCase):
@@ -32,11 +35,15 @@ class SyncTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def test_wait_for_sync_for_user_auth_blocking(self):
         sync_config = SyncConfig(
-            user=UserID("@user","server"),
-            filter_collection=None,
+            user=UserID("@user", "server"),
+            filter_collection=DEFAULT_FILTER_COLLECTION,
             is_guest=False,
             request_key="request_key",
             device_id="device_id",
         )
-        res = yield self.sync_handler.wait_for_sync_for_user(sync_config)
-        print res
+        # Ensure that an exception is not thrown
+        yield self.sync_handler.wait_for_sync_for_user(sync_config)
+        self.hs.config.hs_disabled = True
+
+        with self.assertRaises(AuthError):
+            yield self.sync_handler.wait_for_sync_for_user(sync_config)
