@@ -64,7 +64,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         yield self.store.insert_client_ip(
             user_id, "access_token", "ip", "user_agent", "device_id",
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
     @defer.inlineCallbacks
@@ -80,7 +80,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         yield self.store.insert_client_ip(
             user_id, "access_token", "ip", "user_agent", "device_id",
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
     @defer.inlineCallbacks
@@ -88,13 +88,13 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 50
         user_id = "@user:server"
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
         yield self.store.insert_client_ip(
             user_id, "access_token", "ip", "user_agent", "device_id",
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertTrue(active)
 
     @defer.inlineCallbacks
@@ -103,7 +103,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         self.hs.config.max_mau_value = 50
         user_id = "@user:server"
 
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
         yield self.store.insert_client_ip(
@@ -112,5 +112,5 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         yield self.store.insert_client_ip(
             user_id, "access_token", "ip", "user_agent", "device_id",
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertTrue(active)
