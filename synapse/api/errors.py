@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,6 +57,8 @@ class Codes(object):
     CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
     CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
     MAU_LIMIT_EXCEEDED = "M_MAU_LIMIT_EXCEEDED"
+    UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
+    INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
 
 
 class CodeMessageException(RuntimeError):
@@ -282,6 +285,27 @@ class LimitExceededError(SynapseError):
             self.msg,
             self.errcode,
             retry_after_ms=self.retry_after_ms,
+        )
+
+
+class IncompatibleRoomVersionError(SynapseError):
+    """A server is trying to join a room whose version it does not support."""
+
+    def __init__(self, room_version):
+        super(IncompatibleRoomVersionError, self).__init__(
+            code=400,
+            msg="Your homeserver does not support the features required to "
+                "join this room",
+            errcode=Codes.INCOMPATIBLE_ROOM_VERSION,
+        )
+
+        self._room_version = room_version
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            room_version=self._room_version,
         )
 
 

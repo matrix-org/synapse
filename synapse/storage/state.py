@@ -21,14 +21,16 @@ from six.moves import range
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
+from synapse.api.errors import NotFoundError
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.events_worker import EventsWorkerStore
 from synapse.util.caches import get_cache_factor_for, intern_string
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.stringutils import to_ascii
-
-from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,8 @@ class _GetStateGroupDelta(namedtuple("_GetStateGroupDelta", ("prev_group", "delt
         return len(self.delta_ids) if self.delta_ids else 0
 
 
-class StateGroupWorkerStore(SQLBaseStore):
+# this inherits from EventsWorkerStore because it calls self.get_events
+class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     """The parts of StateGroupStore that can be called from workers.
     """
 
@@ -60,6 +63,30 @@ class StateGroupWorkerStore(SQLBaseStore):
         self._state_group_cache = DictionaryCache(
             "*stateGroupCache*", 500000 * get_cache_factor_for("stateGroupCache")
         )
+
+    @defer.inlineCallbacks
+    def get_room_version(self, room_id):
+        """Get the room_version of a given room
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[str]
+
+        Raises:
+            NotFoundError if the room is unknown
+        """
+        # for now we do this by looking at the create event. We may want to cache this
+        # more intelligently in future.
+        state_ids = yield self.get_current_state_ids(room_id)
+        create_id = state_ids.get((EventTypes.Create, ""))
+
+        if not create_id:
+            raise NotFoundError("Unknown room")
+
+        create_event = yield self.get_event(create_id)
+        defer.returnValue(create_event.content.get("room_version", "1"))
 
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):

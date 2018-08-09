@@ -54,7 +54,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1533026624326,
+  "iteration": 1533598785368,
   "links": [
     {
       "asDropdown": true,
@@ -4629,7 +4629,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 11
+            "y": 29
           },
           "id": 67,
           "legend": {
@@ -4655,11 +4655,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": " synapse_event_persisted_position{instance=\"$instance\"} - ignoring(index, job, name) group_right(instance) synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": " synapse_event_persisted_position{instance=\"$instance\",job=\"synapse\"}  - ignoring(index, job, name) group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{job}}-{{index}}",
+              "legendFormat": "{{job}}-{{index}} ",
               "refId": "A"
             }
           ],
@@ -4697,7 +4697,11 @@
               "min": null,
               "show": true
             }
-          ]
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         },
         {
           "aliasColors": {},
@@ -4710,7 +4714,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 11
+            "y": 29
           },
           "id": 71,
           "legend": {
@@ -4778,7 +4782,11 @@
               "min": null,
               "show": true
             }
-          ]
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "title": "Event processing loop positions",
@@ -4957,5 +4965,5 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 125
+  "version": 127
 }

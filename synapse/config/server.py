@@ -69,12 +69,15 @@ class ServerConfig(Config):
 
         # Options to control access by tracking MAU
         self.limit_usage_by_mau = config.get("limit_usage_by_mau", False)
+        self.max_mau_value = 0
         if self.limit_usage_by_mau:
             self.max_mau_value = config.get(
                 "max_mau_value", 0,
             )
-        else:
-            self.max_mau_value = 0
+        self.mau_limits_reserved_threepids = config.get(
+            "mau_limit_reserved_threepids", []
+        )
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(

@@ -21,9 +21,17 @@ import math
 import string
 from collections import OrderedDict
 
+from six import string_types
+
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.constants import (
+    DEFAULT_ROOM_VERSION,
+    KNOWN_ROOM_VERSIONS,
+    EventTypes,
+    JoinRules,
+    RoomCreationPreset,
+)
 from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
@@ -98,6 +106,21 @@ class RoomCreationHandler(BaseHandler):
 
         if ratelimit:
             yield self.ratelimit(requester)
+
+        room_version = config.get("room_version", DEFAULT_ROOM_VERSION)
+        if not isinstance(room_version, string_types):
+            raise SynapseError(
+                400,
+                "room_version must be a string",
+                Codes.BAD_JSON,
+            )
+
+        if room_version not in KNOWN_ROOM_VERSIONS:
+            raise SynapseError(
+                400,
+                "Your homeserver does not support this room version",
+                Codes.UNSUPPORTED_ROOM_VERSION,
+            )
 
         if "room_alias_name" in config:
             for wchar in string.whitespace:
@@ -183,6 +206,9 @@ class RoomCreationHandler(BaseHandler):
             initial_state[(val["type"], val.get("state_key", ""))] = val["content"]
 
         creation_content = config.get("creation_content", {})
+
+        # override any attempt to set room versions via the creation_content
+        creation_content["room_version"] = room_version
 
         room_member_handler = self.hs.get_room_member_handler()
 

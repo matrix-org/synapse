@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 
 class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
     """Does a remote join for the given user to the given room
+
+    Request format:
+
+        POST /_synapse/replication/remote_join/:room_id/:user_id
+
+        {
+            "requester": ...,
+            "remote_room_hosts": [...],
+            "content": { ... }
+        }
     """
 
     NAME = "remote_join"
@@ -85,6 +95,15 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
 
 class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
     """Rejects the invite for the user and room.
+
+    Request format:
+
+        POST /_synapse/replication/remote_reject_invite/:room_id/:user_id
+
+        {
+            "requester": ...,
+            "remote_room_hosts": [...],
+        }
     """
 
     NAME = "remote_reject_invite"
@@ -153,6 +172,17 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
 
 class ReplicationRegister3PIDGuestRestServlet(ReplicationEndpoint):
     """Gets/creates a guest account for given 3PID.
+
+    Request format:
+
+        POST /_synapse/replication/get_or_register_3pid_guest/
+
+        {
+            "requester": ...,
+            "medium": ...,
+            "address": ...,
+            "inviter_user_id": ...
+        }
     """
 
     NAME = "get_or_register_3pid_guest"
@@ -206,6 +236,12 @@ class ReplicationRegister3PIDGuestRestServlet(ReplicationEndpoint):
 
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
     """Notifies that a user has joined or left the room
+
+    Request format:
+
+        POST /_synapse/replication/membership_change/:room_id/:user_id/:change
+
+        {}
     """
 
     NAME = "membership_change"

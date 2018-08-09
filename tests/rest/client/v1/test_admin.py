@@ -140,7 +140,7 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -168,7 +168,7 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -195,7 +195,7 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -253,7 +253,7 @@ class UserRegisterTestCase(unittest.TestCase):
         self.assertEqual('Invalid username', channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": b"abcd\x00"})
+        body = json.dumps({"nonce": nonce(), "username": u"abcd\u0000"})
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -289,7 +289,7 @@ class UserRegisterTestCase(unittest.TestCase):
         self.assertEqual('Invalid password', channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": "a", "password": b"abcd\x00"})
+        body = json.dumps({"nonce": nonce(), "username": "a", "password": u"abcd\u0000"})
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
