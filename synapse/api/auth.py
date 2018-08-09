@@ -797,4 +797,4 @@ class Auth(object):
             if current_mau >= self.hs.config.max_mau_value:
                 raise AuthError(
                     403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
-            )
+                )
