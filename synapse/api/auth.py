@@ -779,6 +779,10 @@ class Auth(object):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
         """
+        if self.hs.config.hs_disabled:
+            raise AuthError(
+                403, self.hs.config.hs_disabled_message, errcode=Codes.HS_DISABLED
+            )
         if self.hs.config.limit_usage_by_mau is True:
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:

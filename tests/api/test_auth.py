@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, Codes
 from synapse.types import UserID
 
 from tests import unittest
@@ -469,3 +469,12 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(small_number_of_users)
         )
         yield self.auth.check_auth_blocking()
+
+    @defer.inlineCallbacks
+    def test_hs_disabled(self):
+        self.hs.config.hs_disabled = True
+        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        with self.assertRaises(AuthError) as e:
+            yield self.auth.check_auth_blocking()
+        self.assertEquals(e.exception.errcode, Codes.HS_DISABLED)
+        self.assertEquals(e.exception.code, 403)
