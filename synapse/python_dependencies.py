@@ -59,6 +59,7 @@ REQUIREMENTS = {
     "prometheus_client": ["prometheus_client"],
     "attrs": ["attr"],
     "netaddr>=0.7.18": ["netaddr"],
+    "networkx>=2.0": ["networkx>=2.0"]
 }
 
 CONDITIONAL_REQUIREMENTS = {
