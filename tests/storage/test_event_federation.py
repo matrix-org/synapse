@@ -49,7 +49,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
                 'INSERT INTO event_reference_hashes '
                 '(event_id, algorithm, hash) '
                 "VALUES (?, 'sha256', ?)"
-            ), (event_id, 'ffff'))
+            ), (event_id, b'ffff'))
 
         for i in range(0, 11):
             yield self.store.runInteraction("insert", insert_event, i)
