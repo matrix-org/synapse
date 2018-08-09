@@ -30,34 +30,6 @@ logger = logging.getLogger(__name__)
 POWER_KEY = (EventTypes.PowerLevels, "")
 
 
-def resolve_events_with_state_map(state_sets, state_map):
-    """
-    Args:
-        state_sets(list): List of dicts of (type, state_key) -> event_id,
-            which are the different state groups to resolve.
-        state_map(dict): a dict from event_id to event, for all events in
-            state_sets.
-
-    Returns
-        dict[(str, str), str]:
-            a map from (type, state_key) to event_id.
-    """
-    if len(state_sets) == 1:
-        return state_sets[0]
-
-    unconflicted_state, conflicted_state = _seperate(
-        state_sets,
-    )
-
-    auth_events = _create_auth_events_from_maps(
-        unconflicted_state, conflicted_state, state_map
-    )
-
-    return _resolve_with_state(
-        unconflicted_state, conflicted_state, auth_events, state_map
-    )
-
-
 @defer.inlineCallbacks
 def resolve_events_with_factory(state_sets, event_map, state_map_factory):
     """
