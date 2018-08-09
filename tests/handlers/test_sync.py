@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from twisted.internet import defer
-from synapse.api.errors import AuthError, Codes
 
+from synapse.api.errors import AuthError, Codes
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
 from synapse.handlers.sync import SyncConfig, SyncHandler
 from synapse.types import UserID
