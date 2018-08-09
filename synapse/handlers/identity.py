@@ -188,8 +188,10 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             if e.code in (400, 404, 501,):
                 # The remote server probably doesn't support unbinding (yet)
+                logger.warn("Received %d response while unbinding threepid", e.code)
                 defer.returnValue(False)
             else:
+                logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(502, "Failed to contact identity server")
 
         defer.returnValue(True)
