@@ -361,7 +361,12 @@ class StateHandler(object):
             room_id, event_ids
         )
 
-        if len(state_groups_ids) == 1:
+        if len(state_groups_ids) == 0:
+            defer.returnValue(_StateCacheEntry(
+                state={},
+                state_group=None,
+            ))
+        elif len(state_groups_ids) == 1:
             name, state_list = list(state_groups_ids.items()).pop()
 
             prev_group, delta_ids = yield self.store.get_state_group_delta(name)
