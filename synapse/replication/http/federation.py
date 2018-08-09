@@ -256,7 +256,42 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
         defer.returnValue((200, result))
 
 
+class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
+    """Called to clean up any data in DB for a given room, ready for the
+    server to join the room.
+
+    Request format:
+
+        POST /_synapse/replication/fed_query/:fed_cleanup_room/:txn_id
+
+        {}
+    """
+
+    NAME = "fed_cleanup_room"
+    PATH_ARGS = ("room_id",)
+
+    def __init__(self, hs):
+        super(ReplicationCleanRoomRestServlet, self).__init__(hs)
+
+        self.store = hs.get_datastore()
+
+    @staticmethod
+    def _serialize_payload(room_id, args):
+        """
+        Args:
+            room_id (str)
+        """
+        return {}
+
+    @defer.inlineCallbacks
+    def _handle_request(self, request, room_id):
+        yield self.store.clean_room_for_join(room_id)
+
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     ReplicationFederationSendEventsRestServlet(hs).register(http_server)
     ReplicationFederationSendEduRestServlet(hs).register(http_server)
     ReplicationGetQueryRestServlet(hs).register(http_server)
+    ReplicationCleanRoomRestServlet(hs).register(http_server)

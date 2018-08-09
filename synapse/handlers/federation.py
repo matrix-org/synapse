@@ -50,6 +50,7 @@ from synapse.crypto.event_signing import (
 )
 from synapse.events.validator import EventValidator
 from synapse.replication.http.federation import (
+    ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
@@ -103,6 +104,9 @@ class FederationHandler(BaseHandler):
         )
         self._notify_user_membership_change = (
             ReplicationUserJoinedLeftRoomRestServlet.make_client(hs)
+        )
+        self._clean_room_for_join_client = (
+            ReplicationCleanRoomRestServlet.make_client(hs)
         )
 
         # When joining a room we need to queue any events for that room up
@@ -2388,8 +2392,16 @@ class FederationHandler(BaseHandler):
         )
 
     def _clean_room_for_join(self, room_id):
-        # TODO move this out to master
-        return self.store.clean_room_for_join(room_id)
+        """Called to clean up any data in DB for a given room, ready for the
+        server to join the room.
+
+        Args:
+            room_id (str)
+        """
+        if self.config.worker_app:
+            return self._clean_room_for_join_client(room_id)
+        else:
+            return self.store.clean_room_for_join(room_id)
 
     def user_joined_room(self, user, room_id):
         """Called when a new user has joined the room
