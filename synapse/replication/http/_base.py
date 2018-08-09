@@ -183,7 +183,6 @@ class ReplicationEndpoint(object):
         """
 
         url_args = list(self.PATH_ARGS)
-        method = "GET"
         handler = self._handle_request
         method = self.METHOD
 
@@ -201,7 +200,7 @@ class ReplicationEndpoint(object):
 
     def _cached_handler(self, request, txn_id, **kwargs):
         """Called on new incoming requests when caching is enabled. Checks
-        if their is a cached response for the request and returns that,
+        if there is a cached response for the request and returns that,
         otherwise calls `_handle_request` and caches its response.
         """
         # We just use the txn_id here, but we probably also want to use the
