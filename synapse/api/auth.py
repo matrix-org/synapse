@@ -211,7 +211,7 @@ class Auth(object):
             user_agent = request.requestHeaders.getRawHeaders(
                 b"User-Agent",
                 default=[b""]
-            )[0]
+            )[0].decode('ascii', 'surrogateescape')
             if user and access_token and ip_addr:
                 yield self.store.insert_client_ip(
                     user_id=user.to_string(),
@@ -682,7 +682,7 @@ class Auth(object):
         Returns:
             bool: False if no access_token was given, True otherwise.
         """
-        query_params = request.args.get("access_token")
+        query_params = request.args.get(b"access_token")
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
 
@@ -720,9 +720,9 @@ class Auth(object):
                     "Too many Authorization headers.",
                     errcode=Codes.MISSING_TOKEN,
                 )
-            parts = auth_headers[0].split(" ")
-            if parts[0] == "Bearer" and len(parts) == 2:
-                return parts[1]
+            parts = auth_headers[0].split(b" ")
+            if parts[0] == b"Bearer" and len(parts) == 2:
+                return parts[1].decode('ascii')
             else:
                 raise AuthError(
                     token_not_found_http_status,
@@ -738,7 +738,7 @@ class Auth(object):
                     errcode=Codes.MISSING_TOKEN
                 )
 
-            return query_params[0]
+            return query_params[0].decode('ascii')
 
     @defer.inlineCallbacks
     def check_in_room_or_world_readable(self, room_id, user_id):

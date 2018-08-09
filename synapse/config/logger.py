@@ -168,7 +168,8 @@ def setup_logging(config, use_worker_options=False):
         if log_file:
             # TODO: Customisable file size / backup count
             handler = logging.handlers.RotatingFileHandler(
-                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3,
+                encoding='utf8'
             )
 
             def sighup(signum, stack):
