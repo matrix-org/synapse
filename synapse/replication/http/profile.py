@@ -25,9 +25,19 @@ logger = logging.getLogger(__name__)
 
 
 class ReplicationHandleProfileChangeRestServlet(ReplicationEndpoint):
+    """Notifies that a users profile has changed
+
+    Request format:
+
+        POST /_synapse/replication/profile_changed/:user_id
+
+        {
+            "requester": ...
+        }
+    """
+
     NAME = "profile_changed"
     PATH_ARGS = ("user_id",)
-    POST = True
 
     def __init__(self, hs):
         super(ReplicationHandleProfileChangeRestServlet, self).__init__(hs)
