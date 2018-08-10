@@ -40,7 +40,7 @@ from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.endpoint import parse_server_name
 from synapse.types import get_domain_from_id
-from synapse.util import async
+from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logutils import log_function
 
@@ -67,8 +67,8 @@ class FederationServer(FederationBase):
         self.auth = hs.get_auth()
         self.handler = hs.get_handlers().federation_handler
 
-        self._server_linearizer = async.Linearizer("fed_server")
-        self._transaction_linearizer = async.Linearizer("fed_txn_handler")
+        self._server_linearizer = Linearizer("fed_server")
+        self._transaction_linearizer = Linearizer("fed_txn_handler")
 
         self.transaction_actions = TransactionActions(self.store)
 
@@ -200,7 +200,7 @@ class FederationServer(FederationBase):
                         event_id, f.getTraceback().rstrip(),
                     )
 
-        yield async.concurrently_execute(
+        yield concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(),
             TRANSACTION_CONCURRENCY_LIMIT,
         )

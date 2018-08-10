@@ -22,7 +22,7 @@ from synapse.api.constants import Membership
 from synapse.api.errors import SynapseError
 from synapse.events.utils import serialize_event
 from synapse.types import RoomStreamToken
-from synapse.util.async import ReadWriteLock
+from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.logcontext import run_in_background
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
