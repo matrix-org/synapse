@@ -14,14 +14,9 @@
 # limitations under the License.
 import logging
 
-from six import iteritems, string_types
-
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
-from synapse.api.urls import ConsentURIBuilder
-from synapse.config import ConfigError
-from synapse.types import get_localpart_from_id
+from synapse.api.errors import AuthError, SynapseError
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +32,12 @@ class ResourceLimitsServerNotices(object):
         """
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastore()
-        self._api = hs.get_api()
+        self.auth = hs.get_auth()
         self._server_notice_content = hs.config.user_consent_server_notice_content
-        self._limit_usage_by_mau = config.limit_usage_by_mau = False
-        self._hs_disabled.config.hs_disabled = False
+        self._limit_usage_by_mau = hs.config.limit_usage_by_mau = False
+        self._hs_disabled = hs.config.hs_disabled
 
-        self._notified = set()
+        self._notified_of_blocking = set()
         self._resouce_limited = False
         # Config checks?
 
@@ -56,29 +51,49 @@ class ResourceLimitsServerNotices(object):
         Returns:
             Deferred
         """
-        if self._limit_usage_by_mau is False and self._hs_disabled is False:
-            # not enabled
+        if self._hs_disabled is True:
             return
 
-        timestamp = yield self.store.user_last_seen_monthly_active(user_id)
-        if timestamp is None:
-            # This user will be blocked from receiving the notice anyway
-            return
-        try:
-            yield self.api.check_auth_blocking()
-            if self._resouce_limited:
-                # Need to start removing notices
-                pass
-        except AuthError as e:
-            # Need to start notifying of blocking
-            if not self._resouce_limited:
-                pass
-
-            # need to send a message.
+        if self._limit_usage_by_mau is True:
+            timestamp = yield self._store.user_last_seen_monthly_active(user_id)
+            if timestamp is None:
+                # This user will be blocked from receiving the notice anyway.
+                # In practice, not sure we can ever get here
+                return
             try:
-                yield self._server_notices_manager.send_notice(
-                    user_id, content,
-                )
+                yield self.auth.check_auth_blocking()
+                self._resouce_limited = False
+                # Need to start removing notices
+                if user_id in self._notified_of_blocking:
+                    # Send message to remove warning - needs updating
+                    content = "remove warning"
+                    self._send_server_notice(user_id, content)
+                    self._notified_of_blocking.remove(user_id)
 
-            except SynapseError as e:
-                logger.error("Error sending server notice about resource limits: %s", e)
+            except AuthError:
+                # Need to start notifying of blocking
+
+                self._resouce_limited = True
+                if user_id not in self._notified_of_blocking:
+                    # Send message to add warning - needs updating
+                    content = "add warning"
+                    self._send_server_notice(user_id, content)
+                    self._notified_of_blocking.add(user_id)
+
+    @defer.inlineCallbacks
+    def _send_server_notice(self, user_id, content):
+        """Sends Server notice
+
+        Args:
+            user_id(str): The user to send to
+            content(str): The content of the message
+
+        Returns:
+            Deferred[]
+        """
+        try:
+            yield self._server_notices_manager.send_notice(
+                user_id, content,
+            )
+        except SynapseError as e:
+            logger.error("Error sending server notice about resource limits: %s", e)
