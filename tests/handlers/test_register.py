@@ -40,6 +40,7 @@ class RegistrationTestCase(unittest.TestCase):
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
         self.hs = yield setup_test_homeserver(
+            self.addCleanup,
             handlers=None,
             http_client=None,
             expire_access_token=True,

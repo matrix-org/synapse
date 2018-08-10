@@ -44,6 +44,7 @@ class RoomTypingTestCase(RestTestCase):
         self.auth_user_id = self.user_id
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             "red",
             clock=self.clock,
             http_client=None,
