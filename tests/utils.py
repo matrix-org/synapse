@@ -153,7 +153,7 @@ def setup_test_homeserver(
 
         config.database_config = {
             "name": "psycopg2",
-            "args": {"database": "synapse_test", "cp_min": 1, "cp_max": 5},
+            "args": {"database": test_db, "cp_min": 1, "cp_max": 5},
         }
     else:
         config.database_config = {

@@ -43,7 +43,10 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             password_providers=[],
         )
         hs = yield setup_test_homeserver(
-            config=config, federation_sender=Mock(), federation_client=Mock()
+            self.addCleanup,
+            config=config,
+            federation_sender=Mock(),
+            federation_client=Mock(),
         )
 
         self.as_token = "token1"
@@ -108,7 +111,10 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             password_providers=[],
         )
         hs = yield setup_test_homeserver(
-            config=config, federation_sender=Mock(), federation_client=Mock()
+            self.addCleanup,
+            config=config,
+            federation_sender=Mock(),
+            federation_client=Mock(),
         )
         self.db_pool = hs.get_db_pool()
 
