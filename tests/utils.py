@@ -38,8 +38,9 @@ USE_POSTGRES_FOR_TESTS = False
 
 
 @defer.inlineCallbacks
-def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None,
-                          **kargs):
+def setup_test_homeserver(
+    name="test", datastore=None, config=None, reactor=None, **kargs
+):
     """Setup a homeserver suitable for running tests against. Keyword arguments
     are passed to the Homeserver constructor. If no datastore is supplied a
     datastore backed by an in-memory sqlite db will be given to the HS.
@@ -96,20 +97,12 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
     if USE_POSTGRES_FOR_TESTS:
         config.database_config = {
             "name": "psycopg2",
-            "args": {
-                "database": "synapse_test",
-                "cp_min": 1,
-                "cp_max": 5,
-            },
+            "args": {"database": "synapse_test", "cp_min": 1, "cp_max": 5},
         }
     else:
         config.database_config = {
             "name": "sqlite3",
-            "args": {
-                "database": ":memory:",
-                "cp_min": 1,
-                "cp_max": 1,
-            },
+            "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
 
     db_engine = create_engine(config.database_config)
@@ -121,7 +114,8 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
 
     if datastore is None:
         hs = HomeServer(
-            name, config=config,
+            name,
+            config=config,
             db_config=config.database_config,
             version_string="Synapse/tests",
             database_engine=db_engine,
@@ -143,7 +137,10 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
         hs.setup()
     else:
         hs = HomeServer(
-            name, db_pool=None, datastore=datastore, config=config,
+            name,
+            db_pool=None,
+            datastore=datastore,
+            config=config,
             version_string="Synapse/tests",
             database_engine=db_engine,
             room_list_handler=object(),
@@ -158,8 +155,9 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
     # because AuthHandler's constructor requires the HS, so we can't make one
     # beforehand and pass it in to the HS's constructor (chicken / egg)
     hs.get_auth_handler().hash = lambda p: hashlib.md5(p.encode('utf8')).hexdigest()
-    hs.get_auth_handler().validate_hash = lambda p, h: hashlib.md5(
-        p.encode('utf8')).hexdigest() == h
+    hs.get_auth_handler().validate_hash = (
+        lambda p, h: hashlib.md5(p.encode('utf8')).hexdigest() == h
+    )
 
     fed = kargs.get("resource_for_federation", None)
     if fed:
@@ -173,7 +171,7 @@ def setup_test_homeserver(name="test", datastore=None, config=None, reactor=None
                 sleep_limit=hs.config.federation_rc_sleep_limit,
                 sleep_msec=hs.config.federation_rc_sleep_delay,
                 reject_limit=hs.config.federation_rc_reject_limit,
-                concurrent_requests=hs.config.federation_rc_concurrent
+                concurrent_requests=hs.config.federation_rc_concurrent,
             ),
         )
 
@@ -199,7 +197,6 @@ def mock_getRawHeaders(headers=None):
 
 # This is a mock /resource/ not an entire server
 class MockHttpResource(HttpServer):
-
     def __init__(self, prefix=""):
         self.callbacks = []  # 3-tuple of method/pattern/function
         self.prefix = prefix
@@ -263,15 +260,9 @@ class MockHttpResource(HttpServer):
             matcher = pattern.match(path)
             if matcher:
                 try:
-                    args = [
-                        urlparse.unquote(u)
-                        for u in matcher.groups()
-                    ]
+                    args = [urlparse.unquote(u) for u in matcher.groups()]
 
-                    (code, response) = yield func(
-                        mock_request,
-                        *args
-                    )
+                    (code, response) = yield func(mock_request, *args)
                     defer.returnValue((code, response))
                 except CodeMessageException as e:
                     defer.returnValue((e.code, cs_error(e.msg, code=e.errcode)))
@@ -372,8 +363,7 @@ class MockClock(object):
 
 def _format_call(args, kwargs):
     return ", ".join(
-        ["%r" % (a) for a in args] +
-        ["%s=%r" % (k, v) for k, v in kwargs.items()]
+        ["%r" % (a) for a in args] + ["%s=%r" % (k, v) for k, v in kwargs.items()]
     )
 
 
@@ -391,8 +381,9 @@ class DeferredMockCallable(object):
         self.calls.append((args, kwargs))
 
         if not self.expectations:
-            raise ValueError("%r has no pending calls to handle call(%s)" % (
-                self, _format_call(args, kwargs))
+            raise ValueError(
+                "%r has no pending calls to handle call(%s)"
+                % (self, _format_call(args, kwargs))
             )
 
         for (call, result, d) in self.expectations:
@@ -400,9 +391,9 @@ class DeferredMockCallable(object):
                 d.callback(None)
                 return result
 
-        failure = AssertionError("Was not expecting call(%s)" % (
-            _format_call(args, kwargs)
-        ))
+        failure = AssertionError(
+            "Was not expecting call(%s)" % (_format_call(args, kwargs))
+        )
 
         for _, _, d in self.expectations:
             try:
@@ -418,17 +409,19 @@ class DeferredMockCallable(object):
     @defer.inlineCallbacks
     def await_calls(self, timeout=1000):
         deferred = defer.DeferredList(
-            [d for _, _, d in self.expectations],
-            fireOnOneErrback=True
+            [d for _, _, d in self.expectations], fireOnOneErrback=True
         )
 
         timer = reactor.callLater(
             timeout / 1000,
             deferred.errback,
-            AssertionError("%d pending calls left: %s" % (
-                len([e for e in self.expectations if not e[2].called]),
-                [e for e in self.expectations if not e[2].called]
-            ))
+            AssertionError(
+                "%d pending calls left: %s"
+                % (
+                    len([e for e in self.expectations if not e[2].called]),
+                    [e for e in self.expectations if not e[2].called],
+                )
+            ),
         )
 
         yield deferred
@@ -443,7 +436,6 @@ class DeferredMockCallable(object):
             self.calls = []
 
             raise AssertionError(
-                "Expected not to received any calls, got:\n" + "\n".join([
-                    "call(%s)" % _format_call(c[0], c[1]) for c in calls
-                ])
+                "Expected not to received any calls, got:\n"
+                + "\n".join(["call(%s)" % _format_call(c[0], c[1]) for c in calls])
             )

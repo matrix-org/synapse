@@ -215,6 +215,7 @@ class UserRegisterTestCase(unittest.TestCase):
         mac.  Admin is optional.  Additional checks are done for length and
         type.
         """
+
         def nonce():
             request, channel = make_request("GET", self.url)
             render(request, self.resource, self.clock)
@@ -289,7 +290,9 @@ class UserRegisterTestCase(unittest.TestCase):
         self.assertEqual('Invalid password', channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": "a", "password": u"abcd\u0000"})
+        body = json.dumps(
+            {"nonce": nonce(), "username": "a", "password": u"abcd\u0000"}
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 

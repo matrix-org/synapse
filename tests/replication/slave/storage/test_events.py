@@ -38,6 +38,7 @@ def patch__eq__(cls):
     def unpatch():
         if eq is not None:
             cls.__eq__ = eq
+
     return unpatch
 
 
@@ -48,10 +49,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
     def setUp(self):
         # Patch up the equality operator for events so that we can check
         # whether lists of events match using assertEquals
-        self.unpatches = [
-            patch__eq__(_EventInternalMetadata),
-            patch__eq__(FrozenEvent),
-        ]
+        self.unpatches = [patch__eq__(_EventInternalMetadata), patch__eq__(FrozenEvent)]
         return super(SlavedEventStoreTestCase, self).setUp()
 
     def tearDown(self):
@@ -61,33 +59,27 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
     def test_get_latest_event_ids_in_room(self):
         create = yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.replicate()
-        yield self.check(
-            "get_latest_event_ids_in_room", (ROOM_ID,), [create.event_id]
-        )
+        yield self.check("get_latest_event_ids_in_room", (ROOM_ID,), [create.event_id])
 
         join = yield self.persist(
-            type="m.room.member", key=USER_ID, membership="join",
+            type="m.room.member",
+            key=USER_ID,
+            membership="join",
             prev_events=[(create.event_id, {})],
         )
         yield self.replicate()
-        yield self.check(
-            "get_latest_event_ids_in_room", (ROOM_ID,), [join.event_id]
-        )
+        yield self.check("get_latest_event_ids_in_room", (ROOM_ID,), [join.event_id])
 
     @defer.inlineCallbacks
     def test_redactions(self):
         yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.persist(type="m.room.member", key=USER_ID, membership="join")
 
-        msg = yield self.persist(
-            type="m.room.message", msgtype="m.text", body="Hello"
-        )
+        msg = yield self.persist(type="m.room.message", msgtype="m.text", body="Hello")
         yield self.replicate()
         yield self.check("get_event", [msg.event_id], msg)
 
-        redaction = yield self.persist(
-            type="m.room.redaction", redacts=msg.event_id
-        )
+        redaction = yield self.persist(type="m.room.redaction", redacts=msg.event_id)
         yield self.replicate()
 
         msg_dict = msg.get_dict()
@@ -102,9 +94,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.persist(type="m.room.member", key=USER_ID, membership="join")
 
-        msg = yield self.persist(
-            type="m.room.message", msgtype="m.text", body="Hello"
-        )
+        msg = yield self.persist(type="m.room.message", msgtype="m.text", body="Hello")
         yield self.replicate()
         yield self.check("get_event", [msg.event_id], msg)
 
@@ -127,10 +117,19 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.member", key=USER_ID_2, membership="invite"
         )
         yield self.replicate()
-        yield self.check("get_invited_rooms_for_user", [USER_ID_2], [RoomsForUser(
-            ROOM_ID, USER_ID, "invite", event.event_id,
-            event.internal_metadata.stream_ordering
-        )])
+        yield self.check(
+            "get_invited_rooms_for_user",
+            [USER_ID_2],
+            [
+                RoomsForUser(
+                    ROOM_ID,
+                    USER_ID,
+                    "invite",
+                    event.event_id,
+                    event.internal_metadata.stream_ordering,
+                )
+            ],
+        )
 
     @defer.inlineCallbacks
     def test_push_actions_for_user(self):
@@ -146,40 +145,55 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         yield self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "notify_count": 0}
+            {"highlight_count": 0, "notify_count": 0},
         )
 
         yield self.persist(
-            type="m.room.message", msgtype="m.text", body="world",
+            type="m.room.message",
+            msgtype="m.text",
+            body="world",
             push_actions=[(USER_ID_2, ["notify"])],
         )
         yield self.replicate()
         yield self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "notify_count": 1}
+            {"highlight_count": 0, "notify_count": 1},
         )
 
         yield self.persist(
-            type="m.room.message", msgtype="m.text", body="world",
-            push_actions=[(USER_ID_2, [
-                "notify", {"set_tweak": "highlight", "value": True}
-            ])],
+            type="m.room.message",
+            msgtype="m.text",
+            body="world",
+            push_actions=[
+                (USER_ID_2, ["notify", {"set_tweak": "highlight", "value": True}])
+            ],
         )
         yield self.replicate()
         yield self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 1, "notify_count": 2}
+            {"highlight_count": 1, "notify_count": 2},
         )
 
     event_id = 0
 
     @defer.inlineCallbacks
     def persist(
-        self, sender=USER_ID, room_id=ROOM_ID, type={}, key=None, internal={},
-        state=None, reset_state=False, backfill=False,
-        depth=None, prev_events=[], auth_events=[], prev_state=[], redacts=None,
+        self,
+        sender=USER_ID,
+        room_id=ROOM_ID,
+        type={},
+        key=None,
+        internal={},
+        state=None,
+        reset_state=False,
+        backfill=False,
+        depth=None,
+        prev_events=[],
+        auth_events=[],
+        prev_state=[],
+        redacts=None,
         push_actions=[],
         **content
     ):
@@ -219,34 +233,23 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.event_id += 1
 
         if state is not None:
-            state_ids = {
-                key: e.event_id for key, e in state.items()
-            }
+            state_ids = {key: e.event_id for key, e in state.items()}
             context = EventContext.with_state(
-                state_group=None,
-                current_state_ids=state_ids,
-                prev_state_ids=state_ids
+                state_group=None, current_state_ids=state_ids, prev_state_ids=state_ids
             )
         else:
             state_handler = self.hs.get_state_handler()
             context = yield state_handler.compute_event_context(event)
 
         yield self.master_store.add_push_actions_to_staging(
-            event.event_id, {
-                user_id: actions
-                for user_id, actions in push_actions
-            },
+            event.event_id, {user_id: actions for user_id, actions in push_actions}
         )
 
         ordering = None
         if backfill:
-            yield self.master_store.persist_events(
-                [(event, context)], backfilled=True
-            )
+            yield self.master_store.persist_events([(event, context)], backfilled=True)
         else:
-            ordering, _ = yield self.master_store.persist_event(
-                event, context,
-            )
+            ordering, _ = yield self.master_store.persist_event(event, context)
 
         if ordering:
             event.internal_metadata.stream_ordering = ordering

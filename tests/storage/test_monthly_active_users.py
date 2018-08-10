@@ -40,19 +40,13 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         user2_email = "user2@matrix.org"
         threepids = [
             {'medium': 'email', 'address': user1_email},
-            {'medium': 'email', 'address': user2_email}
+            {'medium': 'email', 'address': user2_email},
         ]
         user_num = len(threepids)
 
-        yield self.store.register(
-            user_id=user1,
-            token="123",
-            password_hash=None)
+        yield self.store.register(user_id=user1, token="123", password_hash=None)
 
-        yield self.store.register(
-            user_id=user2,
-            token="456",
-            password_hash=None)
+        yield self.store.register(user_id=user2, token="456", password_hash=None)
 
         now = int(self.hs.get_clock().time_msec())
         yield self.store.user_add_threepid(user1, "email", user1_email, now, now)

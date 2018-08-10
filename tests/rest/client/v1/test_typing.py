@@ -31,6 +31,7 @@ PATH_PREFIX = "/_matrix/client/api/v1"
 
 class RoomTypingTestCase(RestTestCase):
     """ Tests /rooms/$room_id/typing/$user_id REST API. """
+
     user_id = "@sid:red"
 
     user = UserID.from_string(user_id)
@@ -47,9 +48,7 @@ class RoomTypingTestCase(RestTestCase):
             clock=self.clock,
             http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.hs = hs
 
@@ -71,6 +70,7 @@ class RoomTypingTestCase(RestTestCase):
 
         def _insert_client_ip(*args, **kwargs):
             return defer.succeed(None)
+
         hs.get_datastore().insert_client_ip = _insert_client_ip
 
         def get_room_members(room_id):
@@ -94,6 +94,7 @@ class RoomTypingTestCase(RestTestCase):
                 else:
                     if remotedomains is not None:
                         remotedomains.add(member.domain)
+
         hs.get_room_member_handler().fetch_room_distributions_into = (
             fetch_room_distributions_into
         )
@@ -107,37 +108,42 @@ class RoomTypingTestCase(RestTestCase):
     @defer.inlineCallbacks
     def test_set_typing(self):
         (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}'
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": true, "timeout": 30000}',
         )
         self.assertEquals(200, code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = yield self.event_source.get_new_events(
-            from_key=0,
-            room_ids=[self.room_id],
+            from_key=0, room_ids=[self.room_id]
         )
-        self.assertEquals(events[0], [{
-            "type": "m.typing",
-            "room_id": self.room_id,
-            "content": {
-                "user_ids": [self.user_id],
-            }
-        }])
+        self.assertEquals(
+            events[0],
+            [
+                {
+                    "type": "m.typing",
+                    "room_id": self.room_id,
+                    "content": {"user_ids": [self.user_id]},
+                }
+            ],
+        )
 
     @defer.inlineCallbacks
     def test_set_not_typing(self):
         (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": false}'
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": false}',
         )
         self.assertEquals(200, code)
 
     @defer.inlineCallbacks
     def test_typing_timeout(self):
         (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}'
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": true, "timeout": 30000}',
         )
         self.assertEquals(200, code)
 
@@ -148,8 +154,9 @@ class RoomTypingTestCase(RestTestCase):
         self.assertEquals(self.event_source.get_current_key(), 2)
 
         (code, _) = yield self.mock_resource.trigger(
-            "PUT", "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}'
+            "PUT",
+            "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
+            '{"typing": true, "timeout": 30000}',
         )
         self.assertEquals(200, code)
 

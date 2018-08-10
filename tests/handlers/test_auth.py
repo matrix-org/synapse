@@ -81,9 +81,7 @@ class AuthTestCase(unittest.TestCase):
     def test_short_term_login_token_gives_user_id(self):
         self.hs.clock.now = 1000
 
-        token = self.macaroon_generator.generate_short_term_login_token(
-            "a_user", 5000
-        )
+        token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
         user_id = yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
             token
         )
@@ -98,17 +96,13 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_short_term_login_token_cannot_replace_user_id(self):
-        token = self.macaroon_generator.generate_short_term_login_token(
-            "a_user", 5000
-        )
+        token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         user_id = yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
             macaroon.serialize()
         )
-        self.assertEqual(
-            "a_user", user_id
-        )
+        self.assertEqual("a_user", user_id)
 
         # add another "user_id" caveat, which might allow us to override the
         # user_id.
@@ -165,7 +159,5 @@ class AuthTestCase(unittest.TestCase):
         )
 
     def _get_macaroon(self):
-        token = self.macaroon_generator.generate_short_term_login_token(
-            "user_a", 5000
-        )
+        token = self.macaroon_generator.generate_short_term_login_token("user_a", 5000)
         return pymacaroons.Macaroon.deserialize(token)
