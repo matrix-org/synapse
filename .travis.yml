@@ -37,7 +37,7 @@ matrix:
 
   allow_failures:
   - python: 2.7
-    env: TOX_ENV=py27-postgres
+    env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
 
 install:
   - pip install tox
