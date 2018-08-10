@@ -34,6 +34,6 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
             ROOM_ID, "m.read", USER_ID, [EVENT_ID], {}
         )
         yield self.replicate()
-        yield self.check("get_receipts_for_user", [USER_ID, "m.read"], {
-            ROOM_ID: EVENT_ID
-        })
+        yield self.check(
+            "get_receipts_for_user", [USER_ID, "m.read"], {ROOM_ID: EVENT_ID}
+        )

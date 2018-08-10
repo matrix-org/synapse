@@ -25,7 +25,6 @@ from tests import unittest
 
 
 class CacheTestCase(unittest.TestCase):
-
     def setUp(self):
         self.cache = Cache("test")
 
@@ -97,7 +96,6 @@ class CacheTestCase(unittest.TestCase):
 
 
 class CacheDecoratorTestCase(unittest.TestCase):
-
     @defer.inlineCallbacks
     def test_passthrough(self):
         class A(object):
@@ -180,8 +178,7 @@ class CacheDecoratorTestCase(unittest.TestCase):
             yield a.func(k)
 
         self.assertTrue(
-            callcount[0] >= 14,
-            msg="Expected callcount >= 14, got %d" % (callcount[0])
+            callcount[0] >= 14, msg="Expected callcount >= 14, got %d" % (callcount[0])
         )
 
     def test_prefill(self):

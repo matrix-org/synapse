@@ -56,6 +56,7 @@ def around(target):
     def method_name(orig, *args, **kwargs):
         return orig(*args, **kwargs)
     """
+
     def _around(code):
         name = code.__name__
         orig = getattr(target, name)
@@ -89,6 +90,7 @@ class TestCase(unittest.TestCase):
             old_level = logging.getLogger().level
 
             if old_level != level:
+
                 @around(self)
                 def tearDown(orig):
                     ret = orig()
@@ -117,8 +119,9 @@ class TestCase(unittest.TestCase):
             actual (dict): The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(required[key], actual[key],
-                              msg="%s mismatch. %s" % (key, actual))
+            self.assertEquals(
+                required[key], actual[key], msg="%s mismatch. %s" % (key, actual)
+            )
 
 
 def DEBUG(target):

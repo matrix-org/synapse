@@ -101,9 +101,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
-        self.assertEquals(
-            channel.json_body["error"], "Invalid password"
-        )
+        self.assertEquals(channel.json_body["error"], "Invalid password")
 
     def test_POST_bad_username(self):
         request_data = json.dumps({"username": 777, "password": "monkey"})
@@ -112,9 +110,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
-        self.assertEquals(
-            channel.json_body["error"], "Invalid username"
-        )
+        self.assertEquals(channel.json_body["error"], "Invalid username")
 
     def test_POST_user_valid(self):
         user_id = "@kermit:muppet"
@@ -157,10 +153,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
-        self.assertEquals(
-            channel.json_body["error"],
-            "Registration has been disabled",
-        )
+        self.assertEquals(channel.json_body["error"], "Registration has been disabled")
 
     def test_POST_guest_registration(self):
         user_id = "a@b"
@@ -188,6 +181,4 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
-        self.assertEquals(
-            channel.json_body["error"], "Guest access is disabled"
-        )
+        self.assertEquals(channel.json_body["error"], "Guest access is disabled")

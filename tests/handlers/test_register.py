@@ -46,7 +46,8 @@ class RegistrationTestCase(unittest.TestCase):
             profile_handler=Mock(),
         )
         self.macaroon_generator = Mock(
-            generate_access_token=Mock(return_value='secret'))
+            generate_access_token=Mock(return_value='secret')
+        )
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.hs.handlers = RegistrationHandlers(self.hs)
         self.handler = self.hs.get_handlers().registration_handler
@@ -62,7 +63,8 @@ class RegistrationTestCase(unittest.TestCase):
         user_id = "@someone:test"
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name)
+            requester, local_part, display_name
+        )
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
 
@@ -73,13 +75,15 @@ class RegistrationTestCase(unittest.TestCase):
         yield store.register(
             user_id=frank.to_string(),
             token="jkv;g498752-43gj['eamb!-5",
-            password_hash=None)
+            password_hash=None,
+        )
         local_part = "frank"
         display_name = "Frank"
         user_id = "@frank:test"
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name)
+            requester, local_part, display_name
+        )
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
 
