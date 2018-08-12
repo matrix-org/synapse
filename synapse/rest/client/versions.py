@@ -27,11 +27,17 @@ class VersionsRestServlet(RestServlet):
     def on_GET(self, request):
         return (200, {
             "versions": [
-                "r0.0.1",
-                "r0.1.0",
-                "r0.2.0",
+                # we don't need to include the minor values any more, as we've defined
+                # X.Y.Z to be backwards-compatible with compatible with X.(Y-1).*
+                # "r0.0.1",
+                # "r0.1.0",
+                # "r0.2.0",
                 "r0.3.0",
-            ]
+            ],
+            # as per MSC1497:
+            "unstable_features": {
+                "m.lazy_load_members": True,
+            }
         })
 
 
