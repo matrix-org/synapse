@@ -34,7 +34,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.streams.config import PaginationConfig
-from synapse.types import RoomAlias, RoomID, ThirdPartyInstanceID, UserID
+from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -386,18 +386,27 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         handler = self.message_handler
 
-        # request the state as of a given event
-        # useful for synchronising with /messages
-        at_event = parse_string(request, "at")
+        # request the state as of a given event, as identified by a stream token,
+        # for consistency with /messages etc.
+        # useful for getting the membership in retrospect as of a given /sync
+        # response.
+        at_token_string = parse_string(request, "at")
+        if at_token_string is None:
+            at_token = None
+        else:
+            at_token = StreamToken.from_string(at_token_string)
 
-        # let you filter down on particular memberships
+        # let you filter down on particular memberships.
+        # XXX: this may not be the best shape for this API - we could pass in a filter
+        # instead, except filters aren't currently aware of memberships.
+        # See https://github.com/matrix-org/matrix-doc/issues/1337 for more details.
         membership = parse_string(request, "membership")
         not_membership = parse_string(request, "not_membership")
 
         events = yield handler.get_state_events(
             room_id=room_id,
             user_id=requester.user.to_string(),
-            at_event=at_event,
+            at_token=at_token,
             types=[(EventTypes.Member, None)],
         )
 
