@@ -480,7 +480,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     @defer.inlineCallbacks
     def get_state_ids_for_events(self, event_ids, types=None, filtered_types=None):
         """
-        Get the state ids corresponding to a list of events
+        Get the state dicts corresponding to a list of events, containing the event_ids
+        of the state events (as opposed to the events themselves)
 
         Args:
             event_ids(list(str)): events whose state should be returned

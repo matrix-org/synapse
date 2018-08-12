@@ -1155,7 +1155,7 @@ class SQLBaseStore(object):
         Args:
             txn : Transaction object
         Returns:
-            defer.Deferred: resolves to int
+            int : number of users
         """
         sql_count = "SELECT COUNT(*) FROM users WHERE is_guest = 0;"
         txn.execute(sql_count)
