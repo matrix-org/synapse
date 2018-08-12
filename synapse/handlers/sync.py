@@ -516,17 +516,17 @@ class SyncHandler(object):
         """
 
         # FIXME: this promulgates https://github.com/matrix-org/synapse/issues/3305
-        last_event_ids, _ = yield self.store.get_recent_event_ids_for_room(
+        last_events, _ = yield self.store.get_recent_event_ids_for_room(
             room_id, end_token=now_token.room_key, limit=1,
         )
 
-        if not last_event_ids:
+        if not last_events:
             defer.returnValue(None)
             return
 
-        last_event_id = last_event_ids[-1]
+        last_event = last_events[-1]
         state_ids = yield self.store.get_state_ids_for_event(
-            last_event_id, [
+            last_event.event_id, [
                 (EventTypes.Member, None),
                 (EventTypes.Name, ''),
                 (EventTypes.CanonicalAlias, ''),
