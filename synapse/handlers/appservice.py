@@ -23,6 +23,10 @@ from twisted.internet import defer
 
 import synapse
 from synapse.api.constants import EventTypes
+from synapse.metrics import (
+    event_processing_loop_counter,
+    event_processing_loop_room_count,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.metrics import Measure
@@ -135,6 +139,12 @@ class ApplicationServicesHandler(object):
                         "appservice_sender").set(upper_bound)
 
                     events_processed_counter.inc(len(events))
+
+                    event_processing_loop_room_count.labels(
+                        "appservice_sender"
+                    ).inc(len(events_by_room))
+
+                    event_processing_loop_counter.labels("appservice_sender").inc()
 
                     synapse.metrics.event_processing_lag.labels(
                         "appservice_sender").set(now - ts)

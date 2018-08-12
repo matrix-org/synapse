@@ -523,7 +523,7 @@ class RoomEventServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request)
-        event = yield self.event_handler.get_event(requester.user, event_id)
+        event = yield self.event_handler.get_event(requester.user, room_id, event_id)
 
         time_now = self.clock.time_msec()
         if event:
@@ -548,7 +548,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
 
         limit = parse_integer(request, "limit", default=10)
 
-        # for symmetry with /messages for now
+        # picking the API shape for symmetry with /messages
         filter_bytes = parse_string(request, "filter")
         if filter_bytes:
             filter_json = urlparse.unquote(filter_bytes).decode("UTF-8")

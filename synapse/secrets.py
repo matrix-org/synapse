@@ -20,17 +20,16 @@ See https://docs.python.org/3/library/secrets.html#module-secrets for the API
 used in Python 3.6, and the API emulated in Python 2.7.
 """
 
-import six
+import sys
 
-if six.PY3:
+# secrets is available since python 3.6
+if sys.version_info[0:2] >= (3, 6):
     import secrets
 
     def Secrets():
         return secrets
 
-
 else:
-
     import os
     import binascii
 

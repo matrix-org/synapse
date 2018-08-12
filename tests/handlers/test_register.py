@@ -17,6 +17,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.api.errors import RegistrationError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import UserID, create_requester
 
@@ -45,10 +46,15 @@ class RegistrationTestCase(unittest.TestCase):
             profile_handler=Mock(),
         )
         self.macaroon_generator = Mock(
-            generate_access_token=Mock(return_value='secret'))
+            generate_access_token=Mock(return_value='secret')
+        )
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.hs.handlers = RegistrationHandlers(self.hs)
         self.handler = self.hs.get_handlers().registration_handler
+        self.store = self.hs.get_datastore()
+        self.hs.config.max_mau_value = 50
+        self.lots_of_users = 100
+        self.small_number_of_users = 1
 
     @defer.inlineCallbacks
     def test_user_is_created_and_logged_in_if_doesnt_exist(self):
@@ -57,7 +63,8 @@ class RegistrationTestCase(unittest.TestCase):
         user_id = "@someone:test"
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name)
+            requester, local_part, display_name
+        )
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
 
@@ -68,12 +75,56 @@ class RegistrationTestCase(unittest.TestCase):
         yield store.register(
             user_id=frank.to_string(),
             token="jkv;g498752-43gj['eamb!-5",
-            password_hash=None)
+            password_hash=None,
+        )
         local_part = "frank"
         display_name = "Frank"
         user_id = "@frank:test"
         requester = create_requester("@as:test")
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name)
+            requester, local_part, display_name
+        )
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
+
+    @defer.inlineCallbacks
+    def test_mau_limits_when_disabled(self):
+        self.hs.config.limit_usage_by_mau = False
+        # Ensure does not throw exception
+        yield self.handler.get_or_create_user("requester", 'a', "display_name")
+
+    @defer.inlineCallbacks
+    def test_get_or_create_user_mau_not_blocked(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.store.count_monthly_users = Mock(
+            return_value=defer.succeed(self.small_number_of_users)
+        )
+        # Ensure does not throw exception
+        yield self.handler.get_or_create_user("@user:server", 'c', "User")
+
+    @defer.inlineCallbacks
+    def test_get_or_create_user_mau_blocked(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.lots_of_users)
+        )
+        with self.assertRaises(RegistrationError):
+            yield self.handler.get_or_create_user("requester", 'b', "display_name")
+
+    @defer.inlineCallbacks
+    def test_register_mau_blocked(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.lots_of_users)
+        )
+        with self.assertRaises(RegistrationError):
+            yield self.handler.register(localpart="local_part")
+
+    @defer.inlineCallbacks
+    def test_register_saml2_mau_blocked(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.lots_of_users)
+        )
+        with self.assertRaises(RegistrationError):
+            yield self.handler.register_saml2(localpart="local_part")

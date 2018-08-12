@@ -19,7 +19,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import NotFoundError
 # these are only included to make the type annotations work
 from synapse.events import EventBase  # noqa: F401
 from synapse.events import FrozenEvent
@@ -77,7 +77,7 @@ class EventsWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_event(self, event_id, check_redacted=True,
                   get_prev_content=False, allow_rejected=False,
-                  allow_none=False):
+                  allow_none=False, check_room_id=None):
         """Get an event from the database by event_id.
 
         Args:
@@ -88,7 +88,9 @@ class EventsWorkerStore(SQLBaseStore):
                 include the previous states content in the unsigned field.
             allow_rejected (bool): If True return rejected events.
             allow_none (bool): If True, return None if no event found, if
-                False throw an exception.
+                False throw a NotFoundError
+            check_room_id (str|None): if not None, check the room of the found event.
+                If there is a mismatch, behave as per allow_none.
 
         Returns:
             Deferred : A FrozenEvent.
@@ -100,10 +102,16 @@ class EventsWorkerStore(SQLBaseStore):
             allow_rejected=allow_rejected,
         )
 
-        if not events and not allow_none:
-            raise SynapseError(404, "Could not find event %s" % (event_id,))
+        event = events[0] if events else None
 
-        defer.returnValue(events[0] if events else None)
+        if event is not None and check_room_id is not None:
+            if event.room_id != check_room_id:
+                event = None
+
+        if event is None and not allow_none:
+            raise NotFoundError("Could not find event %s" % (event_id,))
+
+        defer.returnValue(event)
 
     @defer.inlineCallbacks
     def get_events(self, event_ids, check_redacted=True,
