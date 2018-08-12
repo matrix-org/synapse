@@ -26,7 +26,7 @@ from twisted.internet import defer
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
-    MatrixCodeMessageException,
+    HttpResponseException,
     SynapseError,
 )
 
@@ -85,7 +85,6 @@ class IdentityHandler(BaseHandler):
             )
             defer.returnValue(None)
 
-        data = {}
         try:
             data = yield self.http_client.get_json(
                 "https://%s%s" % (
@@ -94,11 +93,9 @@ class IdentityHandler(BaseHandler):
                 ),
                 {'sid': creds['sid'], 'client_secret': client_secret}
             )
-        except MatrixCodeMessageException as e:
+        except HttpResponseException as e:
             logger.info("getValidated3pid failed with Matrix error: %r", e)
-            raise SynapseError(e.code, e.msg, e.errcode)
-        except CodeMessageException as e:
-            data = json.loads(e.msg)
+            raise e.to_synapse_error()
 
         if 'medium' in data:
             defer.returnValue(data)
@@ -136,7 +133,7 @@ class IdentityHandler(BaseHandler):
             )
             logger.debug("bound threepid %r to %s", creds, mxid)
         except CodeMessageException as e:
-            data = json.loads(e.msg)
+            data = json.loads(e.msg)  # XXX WAT?
         defer.returnValue(data)
 
     @defer.inlineCallbacks
@@ -209,12 +206,9 @@ class IdentityHandler(BaseHandler):
                 params
             )
             defer.returnValue(data)
-        except MatrixCodeMessageException as e:
-            logger.info("Proxied requestToken failed with Matrix error: %r", e)
-            raise SynapseError(e.code, e.msg, e.errcode)
-        except CodeMessageException as e:
+        except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
-            raise e
+            raise e.to_synapse_error()
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
@@ -244,9 +238,6 @@ class IdentityHandler(BaseHandler):
                 params
             )
             defer.returnValue(data)
-        except MatrixCodeMessageException as e:
-            logger.info("Proxied requestToken failed with Matrix error: %r", e)
-            raise SynapseError(e.code, e.msg, e.errcode)
-        except CodeMessageException as e:
+        except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
-            raise e
+            raise e.to_synapse_error()

@@ -27,8 +27,9 @@ Describe here the problem that you are experiencing, or the feature you are requ
 
 Describe how what happens differs from what you expected.
 
-If you can identify any relevant log snippets from _homeserver.log_, please include
-those here (please be careful to remove any personal or private data):
+<!-- If you can identify any relevant log snippets from _homeserver.log_, please include
+those (please be careful to remove any personal or private data). Please surround them with
+``` (three backticks, on a line on their own), so that they are formatted legibly. -->
 
 ### Version information
 

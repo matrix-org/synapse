@@ -151,13 +151,19 @@ def run_as_background_process(desc, func, *args, **kwargs):
     This should be used to wrap processes which are fired off to run in the
     background, instead of being associated with a particular request.
 
+    It returns a Deferred which completes when the function completes, but it doesn't
+    follow the synapse logcontext rules, which makes it appropriate for passing to
+    clock.looping_call and friends (or for firing-and-forgetting in the middle of a
+    normal synapse inlineCallbacks function).
+
     Args:
         desc (str): a description for this background process type
         func: a function, which may return a Deferred
         args: positional args for func
         kwargs: keyword args for func
 
-    Returns: None
+    Returns: Deferred which returns the result of func, but note that it does not
+        follow the synapse logcontext rules.
     """
     @defer.inlineCallbacks
     def run():
@@ -176,4 +182,4 @@ def run_as_background_process(desc, func, *args, **kwargs):
                 _background_processes[desc].remove(proc)
 
     with PreserveLoggingContext():
-        run()
+        return run()

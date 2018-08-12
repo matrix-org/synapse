@@ -311,6 +311,12 @@ class SQLBaseStore(object):
         after_callbacks = []
         exception_callbacks = []
 
+        if LoggingContext.current_context() == LoggingContext.sentinel:
+            logger.warn(
+                "Starting db txn '%s' from sentinel context",
+                desc,
+            )
+
         try:
             result = yield self.runWithConnection(
                 self._new_transaction,
@@ -1149,7 +1155,7 @@ class SQLBaseStore(object):
         Args:
             txn : Transaction object
         Returns:
-            defer.Deferred: resolves to int
+            int : number of users
         """
         sql_count = "SELECT COUNT(*) FROM users WHERE is_guest = 0;"
         txn.execute(sql_count)

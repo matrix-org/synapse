@@ -15,16 +15,25 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
+import itertools
 import logging
 import math
 import string
 from collections import OrderedDict
 
+from six import string_types
+
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.constants import (
+    DEFAULT_ROOM_VERSION,
+    KNOWN_ROOM_VERSIONS,
+    EventTypes,
+    JoinRules,
+    RoomCreationPreset,
+)
 from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
-from synapse.types import RoomAlias, RoomID, RoomStreamToken, UserID
+from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
 from synapse.visibility import filter_events_for_client
 
@@ -97,6 +106,21 @@ class RoomCreationHandler(BaseHandler):
 
         if ratelimit:
             yield self.ratelimit(requester)
+
+        room_version = config.get("room_version", DEFAULT_ROOM_VERSION)
+        if not isinstance(room_version, string_types):
+            raise SynapseError(
+                400,
+                "room_version must be a string",
+                Codes.BAD_JSON,
+            )
+
+        if room_version not in KNOWN_ROOM_VERSIONS:
+            raise SynapseError(
+                400,
+                "Your homeserver does not support this room version",
+                Codes.UNSUPPORTED_ROOM_VERSION,
+            )
 
         if "room_alias_name" in config:
             for wchar in string.whitespace:
@@ -182,6 +206,9 @@ class RoomCreationHandler(BaseHandler):
             initial_state[(val["type"], val.get("state_key", ""))] = val["content"]
 
         creation_content = config.get("creation_content", {})
+
+        # override any attempt to set room versions via the creation_content
+        creation_content["room_version"] = room_version
 
         room_member_handler = self.hs.get_room_member_handler()
 
@@ -420,8 +447,6 @@ class RoomContextHandler(object):
         before_limit = math.floor(limit / 2.)
         after_limit = limit - before_limit
 
-        now_token = yield self.hs.get_event_sources().get_current_token()
-
         users = yield self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
 
@@ -462,29 +487,32 @@ class RoomContextHandler(object):
         types = None
         filtered_types = None
         if event_filter and event_filter.lazy_load_members():
-            members = {}
-            for ev in (
-                results["events_before"] +
-                [results["event"]] +
-                results["events_after"]
-            ):
-                members[ev.sender] = True
+            members = set(ev.sender for ev in itertools.chain(
+                results["events_before"],
+                (results["event"],),
+                results["events_after"],
+            ))
             filtered_types = [EventTypes.Member]
-            types = [(EventTypes.Member, member) for member in members.keys()]
+            types = [(EventTypes.Member, member) for member in members]
 
         # XXX: why do we return the state as of the last event rather than the
         # first? Shouldn't we be consistent with /sync?
+        # https://github.com/matrix-org/matrix-doc/issues/687
 
         state = yield self.store.get_state_for_events(
-            [last_event_id], types, filtered_types=filtered_types
+            [last_event_id], types, filtered_types=filtered_types,
         )
         results["state"] = list(state[last_event_id].values())
 
-        results["start"] = now_token.copy_and_replace(
+        # We use a dummy token here as we only care about the room portion of
+        # the token, which we replace.
+        token = StreamToken.START
+
+        results["start"] = token.copy_and_replace(
             "room_key", results["start"]
         ).to_string()
 
-        results["end"] = now_token.copy_and_replace(
+        results["end"] = token.copy_and_replace(
             "room_key", results["end"]
         ).to_string()
 

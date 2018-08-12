@@ -25,7 +25,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.types import RoomStreamToken
-from synapse.util.async import concurrently_execute
+from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.response_cache import ResponseCache
@@ -193,10 +193,10 @@ class SyncHandler(object):
         self.response_cache = ResponseCache(hs, "sync")
         self.state = hs.get_state_handler()
 
-        # ExpiringCache((User, Device)) -> LruCache(membership event_id)
+        # ExpiringCache((User, Device)) -> LruCache(state_key => event_id)
         self.lazy_loaded_members_cache = ExpiringCache(
             "lazy_loaded_members_cache", self.clock,
-            max_len=0, expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE
+            max_len=0, expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE,
         )
 
     def wait_for_sync_for_user(self, sync_config, since_token=None, timeout=0,
@@ -510,14 +510,13 @@ class SyncHandler(object):
             state(dict): dict of (type, state_key) -> Event as returned by
                 compute_state_delta
             now_token(str): Token of the end of the current batch.
-            full_state(bool): Whether to force returning the full state.
 
         Returns:
              A deferred dict describing the room summary
         """
 
         # FIXME: this promulgates https://github.com/matrix-org/synapse/issues/3305
-        last_events, _ = yield self.store.get_recent_events_for_room(
+        last_events, _ = yield self.store.get_recent_event_ids_for_room(
             room_id, end_token=now_token.room_key, limit=1,
         )
 
@@ -545,9 +544,7 @@ class SyncHandler(object):
         summary = {}
 
         # FIXME: it feels very heavy to load up every single membership event
-        # just to calculate the counts. get_joined_users_from_context might
-        # help us, but we don't have an EventContext at this point, and we need
-        # to know more than just the joined user stats.
+        # just to calculate the counts.
         member_events = yield self.store.get_events(member_ids.values())
 
         joined_user_ids = []
@@ -559,54 +556,60 @@ class SyncHandler(object):
             elif ev.content.get("membership") == Membership.INVITE:
                 invited_user_ids.append(ev.state_key)
 
+        # TODO: only send these when they change.
         summary["m.joined_member_count"] = len(joined_user_ids)
-        if invited_user_ids:
-            summary["m.invited_member_count"] = len(invited_user_ids)
+        summary["m.invited_member_count"] = len(invited_user_ids)
 
         if not name_id and not canonical_alias_id:
             # FIXME: order by stream ordering, not alphabetic
 
             me = sync_config.user.to_string()
-            if (
-                summary["m.joined_member_count"] == 0 and
-                summary["m.invited_member_count"] == 0
-            ):
+            if (joined_user_ids or invited_user_ids):
                 summary['m.heroes'] = sorted(
-                    [user_id for user_id in member_ids.keys() if user_id != me]
+                    [
+                        user_id
+                        for user_id in (joined_user_ids + invited_user_ids)
+                        if user_id != me
+                    ]
                 )[0:5]
             else:
                 summary['m.heroes'] = sorted(
-                    [user_id for user_id in joined_user_ids if user_id != me]
+                    [user_id for user_id in member_ids.keys() if user_id != me]
                 )[0:5]
 
-            # ensure we send membership events for heroes if needed
-            cache_key = (sync_config.user.to_string(), sync_config.device_id)
-            cache = self.lazy_loaded_members_cache.get(cache_key)
+            if sync_config.filter_collection.lazy_load_members():
+                # ensure we send membership events for heroes if needed
+                cache_key = (sync_config.user.to_string(), sync_config.device_id)
+                cache = self.lazy_loaded_members_cache.get(cache_key)
 
-            existing_members = {
-                user_id: True for (typ, user_id) in state.keys()
-                if typ == EventTypes.Member
-            }
-
-            for ev in batch.events:
-                if ev.type == EventTypes.Member:
-                    existing_members[ev.state_key] = True
-
-            missing_hero_event_ids = [
-                member_ids[hero_id]
-                for hero_id in summary['m.heroes']
-                if (
-                    not cache.get(hero_id) and
-                    hero_id not in existing_members
+                # track which members the client should already know about via LL:
+                # Ones which are already in state...
+                existing_members = set(
+                    user_id for (typ, user_id) in state.keys()
+                    if typ == EventTypes.Member
                 )
-            ]
 
-            missing_hero_state = yield self.store.get_events(missing_hero_event_ids)
-            missing_hero_state = missing_hero_state.values()
+                # ...or ones which are in the timeline...
+                for ev in batch.events:
+                    if ev.type == EventTypes.Member:
+                        existing_members.add(ev.state_key)
 
-            for s in missing_hero_state:
-                cache.set(s.state_key, True)
-                state[(EventTypes.Member, s.state_key)] = s
+                # ...and then ensure any missing ones get included in state.
+                missing_hero_event_ids = [
+                    member_ids[hero_id]
+                    for hero_id in summary['m.heroes']
+                    if (
+                        cache.get(hero_id) != member_ids[hero_id] and
+                        hero_id not in existing_members
+                    )
+                ]
+
+                missing_hero_state = yield self.store.get_events(missing_hero_event_ids)
+                missing_hero_state = missing_hero_state.values()
+
+                for s in missing_hero_state:
+                    cache.set(s.state_key, s.event_id)
+                    state[(EventTypes.Member, s.state_key)] = s
 
         defer.returnValue(summary)
 
@@ -655,16 +658,6 @@ class SyncHandler(object):
                         for event in batch.events
                     )
                 ]
-
-                if not include_redundant_members:
-                    cache_key = (sync_config.user.to_string(), sync_config.device_id)
-                    cache = self.lazy_loaded_members_cache.get(cache_key)
-                    if cache is None:
-                        logger.debug("creating LruCache for %r", cache_key)
-                        cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
-                        self.lazy_loaded_members_cache[cache_key] = cache
-                    else:
-                        logger.debug("found LruCache for %r", cache_key)
 
                 # only apply the filtering to room members
                 filtered_types = [EventTypes.Member]
@@ -717,16 +710,6 @@ class SyncHandler(object):
                     filtered_types=filtered_types,
                 )
 
-                # TODO: optionally filter out redundant membership events at this
-                # point, to stop repeatedly sending members in every /sync as if
-                # the client isn't tracking them.
-                # When implemented, this should filter using event_ids (not mxids).
-                # In practice, limited syncs are
-                # relatively rare so it's not a total disaster to send redundant
-                # members down at this point. Redundant members are ones which
-                # repeatedly get sent down /sync because we don't know if the client
-                # is caching them or not.
-
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
                     timeline_start=state_at_timeline_start,
@@ -744,6 +727,15 @@ class SyncHandler(object):
                         )
 
             if lazy_load_members and not include_redundant_members:
+                cache_key = (sync_config.user.to_string(), sync_config.device_id)
+                cache = self.lazy_loaded_members_cache.get(cache_key)
+                if cache is None:
+                    logger.debug("creating LruCache for %r", cache_key)
+                    cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
+                    self.lazy_loaded_members_cache[cache_key] = cache
+                else:
+                    logger.debug("found LruCache for %r", cache_key)
+
                 # if it's a new sync sequence, then assume the client has had
                 # amnesia and doesn't want any recent lazy-loaded members
                 # de-duplicated.
@@ -756,9 +748,9 @@ class SyncHandler(object):
                     # of the cache)
                     logger.debug("filtering state from %r...", state_ids)
                     state_ids = {
-                        t: state_id
-                        for t, state_id in state_ids.iteritems()
-                        if not cache.get(state_id)
+                        t: event_id
+                        for t, event_id in state_ids.iteritems()
+                        if cache.get(t[1]) != event_id
                     }
                     logger.debug("...to %r", state_ids)
 
@@ -768,7 +760,7 @@ class SyncHandler(object):
                     timeline_state.items(),
                 ):
                     if t[0] == EventTypes.Member:
-                        cache.set(event_id, True)
+                        cache.set(t[1], event_id)
 
         state = {}
         if state_ids:
@@ -1543,7 +1535,6 @@ class SyncHandler(object):
             if events == [] and tags is None:
                 return
 
-        since_token = sync_result_builder.since_token
         now_token = sync_result_builder.now_token
         sync_config = sync_result_builder.sync_config
 
@@ -1586,10 +1577,13 @@ class SyncHandler(object):
             full_state=full_state
         )
 
-        summary = None
+        summary = {}
         if (
             sync_config.filter_collection.lazy_load_members() and
-            any(ev.type == EventTypes.Member for ev in batch.events)
+            (
+                any(ev.type == EventTypes.Member for ev in batch.events) or
+                since_token is None
+            )
         ):
             summary = yield self.compute_summary(
                 room_id, sync_config, batch, state, now_token

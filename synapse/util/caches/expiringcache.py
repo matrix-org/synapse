@@ -64,7 +64,7 @@ class ExpiringCache(object):
             return
 
         def f():
-            run_as_background_process(
+            return run_as_background_process(
                 "prune_cache_%s" % self._cache_name,
                 self._prune_cache,
             )

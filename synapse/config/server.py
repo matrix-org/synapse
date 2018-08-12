@@ -67,6 +67,21 @@ class ServerConfig(Config):
             "block_non_admin_invites", False,
         )
 
+        # Options to control access by tracking MAU
+        self.limit_usage_by_mau = config.get("limit_usage_by_mau", False)
+        self.max_mau_value = 0
+        if self.limit_usage_by_mau:
+            self.max_mau_value = config.get(
+                "max_mau_value", 0,
+            )
+        self.mau_limits_reserved_threepids = config.get(
+            "mau_limit_reserved_threepids", []
+        )
+
+        # Options to disable HS
+        self.hs_disabled = config.get("hs_disabled", False)
+        self.hs_disabled_message = config.get("hs_disabled_message", "")
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
@@ -208,6 +223,8 @@ class ServerConfig(Config):
         # if the scheduler happens to schedule the underlying threads across
         # different cores. See
         # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
+        #
+        # This setting requires the affinity package to be installed!
         #
         # cpu_affinity: 0xFFFFFFFF
 

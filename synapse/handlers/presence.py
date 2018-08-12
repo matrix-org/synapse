@@ -36,7 +36,7 @@ from synapse.api.errors import SynapseError
 from synapse.metrics import LaterGauge
 from synapse.storage.presence import UserPresenceState
 from synapse.types import UserID, get_domain_from_id
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.logcontext import run_in_background
 from synapse.util.logutils import log_function

@@ -24,16 +24,23 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
+from twisted.python import failure
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, FederationError, NotFoundError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    FederationError,
+    IncompatibleRoomVersionError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.endpoint import parse_server_name
 from synapse.types import get_domain_from_id
-from synapse.util import async
+from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logutils import log_function
 
@@ -60,8 +67,8 @@ class FederationServer(FederationBase):
         self.auth = hs.get_auth()
         self.handler = hs.get_handlers().federation_handler
 
-        self._server_linearizer = async.Linearizer("fed_server")
-        self._transaction_linearizer = async.Linearizer("fed_txn_handler")
+        self._server_linearizer = Linearizer("fed_server")
+        self._transaction_linearizer = Linearizer("fed_txn_handler")
 
         self.transaction_actions = TransactionActions(self.store)
 
@@ -186,10 +193,14 @@ class FederationServer(FederationBase):
                     logger.warn("Error handling PDU %s: %s", event_id, e)
                     pdu_results[event_id] = {"error": str(e)}
                 except Exception as e:
+                    f = failure.Failure()
                     pdu_results[event_id] = {"error": str(e)}
-                    logger.exception("Failed to handle PDU %s", event_id)
+                    logger.error(
+                        "Failed to handle PDU %s: %s",
+                        event_id, f.getTraceback().rstrip(),
+                    )
 
-        yield async.concurrently_execute(
+        yield concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(),
             TRANSACTION_CONCURRENCY_LIMIT,
         )
@@ -201,10 +212,6 @@ class FederationServer(FederationBase):
                     edu.edu_type,
                     edu.content
                 )
-
-        pdu_failures = getattr(transaction, "pdu_failures", [])
-        for failure in pdu_failures:
-            logger.info("Got failure %r", failure)
 
         response = {
             "pdus": pdu_results,
@@ -322,12 +329,21 @@ class FederationServer(FederationBase):
         defer.returnValue((200, resp))
 
     @defer.inlineCallbacks
-    def on_make_join_request(self, origin, room_id, user_id):
+    def on_make_join_request(self, origin, room_id, user_id, supported_versions):
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, room_id)
+
+        room_version = yield self.store.get_room_version(room_id)
+        if room_version not in supported_versions:
+            logger.warn("Room version %s not in %s", room_version, supported_versions)
+            raise IncompatibleRoomVersionError(room_version=room_version)
+
         pdu = yield self.handler.on_make_join_request(room_id, user_id)
         time_now = self._clock.time_msec()
-        defer.returnValue({"event": pdu.get_pdu_json(time_now)})
+        defer.returnValue({
+            "event": pdu.get_pdu_json(time_now),
+            "room_version": room_version,
+        })
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content):
@@ -425,6 +441,7 @@ class FederationServer(FederationBase):
             ret = yield self.handler.on_query_auth(
                 origin,
                 event_id,
+                room_id,
                 signed_auth,
                 content.get("rejects", []),
                 content.get("missing", []),

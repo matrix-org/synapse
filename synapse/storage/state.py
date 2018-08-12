@@ -21,14 +21,16 @@ from six.moves import range
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
+from synapse.api.errors import NotFoundError
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.events_worker import EventsWorkerStore
 from synapse.util.caches import get_cache_factor_for, intern_string
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.stringutils import to_ascii
-
-from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,8 @@ class _GetStateGroupDelta(namedtuple("_GetStateGroupDelta", ("prev_group", "delt
         return len(self.delta_ids) if self.delta_ids else 0
 
 
-class StateGroupWorkerStore(SQLBaseStore):
+# this inherits from EventsWorkerStore because it calls self.get_events
+class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     """The parts of StateGroupStore that can be called from workers.
     """
 
@@ -60,6 +63,30 @@ class StateGroupWorkerStore(SQLBaseStore):
         self._state_group_cache = DictionaryCache(
             "*stateGroupCache*", 500000 * get_cache_factor_for("stateGroupCache")
         )
+
+    @defer.inlineCallbacks
+    def get_room_version(self, room_id):
+        """Get the room_version of a given room
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[str]
+
+        Raises:
+            NotFoundError if the room is unknown
+        """
+        # for now we do this by looking at the create event. We may want to cache this
+        # more intelligently in future.
+        state_ids = yield self.get_current_state_ids(room_id)
+        create_id = state_ids.get((EventTypes.Create, ""))
+
+        if not create_id:
+            raise NotFoundError("Unknown room")
+
+        create_event = yield self.get_event(create_id)
+        defer.returnValue(create_event.content.get("room_version", "1"))
 
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
@@ -453,7 +480,8 @@ class StateGroupWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_state_ids_for_events(self, event_ids, types=None, filtered_types=None):
         """
-        Get the state ids corresponding to a list of events
+        Get the state dicts corresponding to a list of events, containing the event_ids
+        of the state events (as opposed to the events themselves)
 
         Args:
             event_ids(list(str)): events whose state should be returned
@@ -555,12 +583,6 @@ class StateGroupWorkerStore(SQLBaseStore):
     def _get_some_state_from_cache(self, group, types, filtered_types=None):
         """Checks if group is in cache. See `_get_state_for_groups`
 
-        Returns 3-tuple (`state_dict`, `missing_types`, `got_all`).
-        `missing_types` is the list of types that aren't in the cache for that
-        group. `got_all` is a bool indicating if we successfully retrieved all
-        requests state from the cache, if False we need to query the DB for the
-        missing state.
-
         Args:
             group(int): The state group to lookup
             types(list[str, str|None]): List of 2-tuples of the form
@@ -569,33 +591,38 @@ class StateGroupWorkerStore(SQLBaseStore):
             filtered_types(list[str]|None): Only apply filtering via `types` to this
                 list of event types.  Other types of events are returned unfiltered.
                 If None, `types` filtering is applied to all events.
+
+        Returns 2-tuple (`state_dict`, `got_all`).
+        `got_all` is a bool indicating if we successfully retrieved all
+        requests state from the cache, if False we need to query the DB for the
+        missing state.
         """
         is_all, known_absent, state_dict_ids = self._state_group_cache.get(group)
 
         type_to_key = {}
 
-        # tracks which of the requested types are missing from our cache
-        missing_types = set()
+        # tracks whether any of ourrequested types are missing from the cache
+        missing_types = False
 
         for typ, state_key in types:
             key = (typ, state_key)
 
             if (
                 state_key is None or
-                filtered_types is not None and typ not in filtered_types
+                (filtered_types is not None and typ not in filtered_types)
             ):
                 type_to_key[typ] = None
                 # we mark the type as missing from the cache because
                 # when the cache was populated it might have been done with a
                 # restricted set of state_keys, so the wildcard will not work
                 # and the cache may be incomplete.
-                missing_types.add(key)
+                missing_types = True
             else:
                 if type_to_key.get(typ, object()) is not None:
                     type_to_key.setdefault(typ, set()).add(state_key)
 
                 if key not in state_dict_ids and key not in known_absent:
-                    missing_types.add(key)
+                    missing_types = True
 
         sentinel = object()
 
@@ -609,18 +636,17 @@ class StateGroupWorkerStore(SQLBaseStore):
                 return True
             return False
 
-        if types == [] and filtered_types is not None:
-            # special wildcard case for empty type-list but an explicit filtered_types
-            # which means that we'll try to return all types which aren't in the
-            # filtered_types list.  missing_types will always be empty, so we ignore it.
-            got_all = is_all
-        else:
-            got_all = is_all or not missing_types
+        got_all = is_all
+        if not got_all:
+            # the cache is incomplete. We may still have got all the results we need, if
+            # we don't have any wildcards in the match list.
+            if not missing_types and filtered_types is None:
+                got_all = True
 
         return {
             k: v for k, v in iteritems(state_dict_ids)
             if include(k[0], k[1])
-        }, missing_types, got_all
+        }, got_all
 
     def _get_all_state_from_cache(self, group):
         """Checks if group is in cache. See `_get_state_for_groups`
@@ -665,7 +691,7 @@ class StateGroupWorkerStore(SQLBaseStore):
         missing_groups = []
         if types is not None:
             for group in set(groups):
-                state_dict_ids, _, got_all = self._get_some_state_from_cache(
+                state_dict_ids, got_all = self._get_some_state_from_cache(
                     group, types, filtered_types
                 )
                 results[group] = state_dict_ids

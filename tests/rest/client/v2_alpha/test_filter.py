@@ -33,7 +33,7 @@ PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 class FilterTestCase(unittest.TestCase):
 
-    USER_ID = b"@apple:test"
+    USER_ID = "@apple:test"
     EXAMPLE_FILTER = {"room": {"timeline": {"types": ["m.room.message"]}}}
     EXAMPLE_FILTER_JSON = b'{"room": {"timeline": {"types": ["m.room.message"]}}}'
     TO_REGISTER = [filter]
@@ -72,8 +72,8 @@ class FilterTestCase(unittest.TestCase):
 
     def test_add_filter(self):
         request, channel = make_request(
-            b"POST",
-            b"/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
+            "POST",
+            "/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
             self.EXAMPLE_FILTER_JSON,
         )
         request.render(self.resource)
@@ -87,8 +87,8 @@ class FilterTestCase(unittest.TestCase):
 
     def test_add_filter_for_other_user(self):
         request, channel = make_request(
-            b"POST",
-            b"/_matrix/client/r0/user/%s/filter" % (b"@watermelon:test"),
+            "POST",
+            "/_matrix/client/r0/user/%s/filter" % ("@watermelon:test"),
             self.EXAMPLE_FILTER_JSON,
         )
         request.render(self.resource)
@@ -101,8 +101,8 @@ class FilterTestCase(unittest.TestCase):
         _is_mine = self.hs.is_mine
         self.hs.is_mine = lambda target_user: False
         request, channel = make_request(
-            b"POST",
-            b"/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
+            "POST",
+            "/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
             self.EXAMPLE_FILTER_JSON,
         )
         request.render(self.resource)
@@ -119,7 +119,7 @@ class FilterTestCase(unittest.TestCase):
         self.clock.advance(1)
         filter_id = filter_id.result
         request, channel = make_request(
-            b"GET", b"/_matrix/client/r0/user/%s/filter/%s" % (self.USER_ID, filter_id)
+            "GET", "/_matrix/client/r0/user/%s/filter/%s" % (self.USER_ID, filter_id)
         )
         request.render(self.resource)
         wait_until_result(self.clock, channel)
@@ -129,7 +129,7 @@ class FilterTestCase(unittest.TestCase):
 
     def test_get_filter_non_existant(self):
         request, channel = make_request(
-            b"GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.USER_ID)
+            "GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.USER_ID)
         )
         request.render(self.resource)
         wait_until_result(self.clock, channel)
@@ -141,7 +141,7 @@ class FilterTestCase(unittest.TestCase):
     # in errors.py
     def test_get_filter_invalid_id(self):
         request, channel = make_request(
-            b"GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.USER_ID)
+            "GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.USER_ID)
         )
         request.render(self.resource)
         wait_until_result(self.clock, channel)
@@ -151,7 +151,7 @@ class FilterTestCase(unittest.TestCase):
     # No ID also returns an invalid_id error
     def test_get_filter_no_id(self):
         request, channel = make_request(
-            b"GET", "/_matrix/client/r0/user/%s/filter/" % (self.USER_ID)
+            "GET", "/_matrix/client/r0/user/%s/filter/" % (self.USER_ID)
         )
         request.render(self.resource)
         wait_until_result(self.clock, channel)
