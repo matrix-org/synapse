@@ -35,7 +35,8 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-from synapse.util.async import Linearizer
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.async_helpers import Linearizer
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import is_ascii, random_string
@@ -100,8 +101,13 @@ class MediaRepository(object):
         )
 
         self.clock.looping_call(
-            self._update_recently_accessed,
+            self._start_update_recently_accessed,
             UPDATE_RECENTLY_ACCESSED_TS,
+        )
+
+    def _start_update_recently_accessed(self):
+        return run_as_background_process(
+            "update_recently_accessed_media", self._update_recently_accessed,
         )
 
     @defer.inlineCallbacks
@@ -373,7 +379,7 @@ class MediaRepository(object):
                 logger.warn("HTTP error fetching remote media %s/%s: %s",
                             server_name, media_id, e.response)
                 if e.code == twisted.web.http.NOT_FOUND:
-                    raise SynapseError.from_http_response_exception(e)
+                    raise e.to_synapse_error()
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except SynapseError:

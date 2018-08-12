@@ -51,7 +51,7 @@ makes it horribly hard to review otherwise.
 Changelog
 ~~~~~~~~~
 
-All changes, even minor ones, need a corresponding changelog
+All changes, even minor ones, need a corresponding changelog / newsfragment
 entry. These are managed by Towncrier
 (https://github.com/hawkowl/towncrier).
 

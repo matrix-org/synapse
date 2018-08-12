@@ -23,10 +23,7 @@ from tests import unittest
 @unittest.DEBUG
 class ServerACLsTestCase(unittest.TestCase):
     def test_blacklisted_server(self):
-        e = _create_acl_event({
-            "allow": ["*"],
-            "deny": ["evil.com"],
-        })
+        e = _create_acl_event({"allow": ["*"], "deny": ["evil.com"]})
         logging.info("ACL event: %s", e.content)
 
         self.assertFalse(server_matches_acl_event("evil.com", e))
@@ -36,10 +33,7 @@ class ServerACLsTestCase(unittest.TestCase):
         self.assertTrue(server_matches_acl_event("honestly.not.evil.com", e))
 
     def test_block_ip_literals(self):
-        e = _create_acl_event({
-            "allow_ip_literals": False,
-            "allow": ["*"],
-        })
+        e = _create_acl_event({"allow_ip_literals": False, "allow": ["*"]})
         logging.info("ACL event: %s", e.content)
 
         self.assertFalse(server_matches_acl_event("1.2.3.4", e))
@@ -49,10 +43,12 @@ class ServerACLsTestCase(unittest.TestCase):
 
 
 def _create_acl_event(content):
-    return FrozenEvent({
-        "room_id": "!a:b",
-        "event_id": "$a:b",
-        "type": "m.room.server_acls",
-        "sender": "@a:b",
-        "content": content
-    })
+    return FrozenEvent(
+        {
+            "room_id": "!a:b",
+            "event_id": "$a:b",
+            "type": "m.room.server_acls",
+            "sender": "@a:b",
+            "content": content,
+        }
+    )
