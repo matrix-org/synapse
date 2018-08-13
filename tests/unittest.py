@@ -25,7 +25,7 @@ from synapse.http.server import JsonResource
 from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContextFilter
 
-from tests.server import get_clock, render
+from tests.server import get_clock, render, setup_test_homeserver, make_request
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
@@ -145,8 +145,8 @@ class HomeserverTestCase(TestCase):
     def setUp(self):
 
         self.reactor, self.clock = get_clock()
-        hs_args = {"clock": self.clock, "reactor": self.reactor}
-        self.hs = self.make_homeserver(self.reactor, self.clock, hs_args)
+        self._hs_args = {"clock": self.clock, "reactor": self.reactor}
+        self.hs = self.make_homeserver(self.reactor, self.clock)
 
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
@@ -187,3 +187,9 @@ class HomeserverTestCase(TestCase):
 
     def render(self, request):
         render(request, self.resource, self.reactor)
+
+    def setup_test_homeserver(self, *args, **kwargs):
+        return setup_test_homeserver(self.addCleanup, *args, **kwargs, **self._hs_args)
+
+    def make_request(self, *args, **kwargs):
+        return make_request(*args, **kwargs)

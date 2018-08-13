@@ -24,7 +24,6 @@ from synapse.rest.client.v1 import room
 from synapse.types import UserID
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
@@ -37,10 +36,9 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
     user = UserID.from_string(user_id)
     servlets = [room.register_servlets]
 
-    def make_homeserver(self, reactor, clock, hs_args):
+    def make_homeserver(self, reactor, clock):
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup,
+        hs = yield self.setup_test_homeserver(
             "red",
             http_client=None,
             federation_client=Mock(),
@@ -102,18 +100,16 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id, user="@jim:red")
 
     def test_set_typing(self):
-        (code, _) = yield self.mock_resource.trigger(
+        request, channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}',
+            b'{"typing": true, "timeout": 30000}',
         )
         self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = yield self.event_source.get_new_events(
-            from_key=0, room_ids=[self.room_id]
-        )
+        events = self.event_source.get_new_events(from_key=0, room_ids=[self.room_id])
         self.assertEquals(
             events[0],
             [
@@ -126,19 +122,19 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
         )
 
     def test_set_not_typing(self):
-        (code, _) = yield self.mock_resource.trigger(
+        request, channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": false}',
+            b'{"typing": false}',
         )
         self.render(request)
         self.assertEquals(200, channel.code)
 
     def test_typing_timeout(self):
-        (code, _) = yield self.mock_resource.trigger(
+        request, channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}',
+            b'{"typing": true, "timeout": 30000}',
         )
         self.render(request)
         self.assertEquals(200, channel.code)
@@ -149,10 +145,10 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 2)
 
-        (code, _) = yield self.mock_resource.trigger(
+        request, channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
-            '{"typing": true, "timeout": 30000}',
+            b'{"typing": true, "timeout": 30000}',
         )
         self.render(request)
         self.assertEquals(200, channel.code)
