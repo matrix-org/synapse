@@ -41,6 +41,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             http_client=None,
             federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),

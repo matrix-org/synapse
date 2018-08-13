@@ -28,7 +28,7 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver()
+        self.hs = yield setup_test_homeserver(self.addCleanup)
         self.store = self.hs.get_datastore()
 
     @defer.inlineCallbacks

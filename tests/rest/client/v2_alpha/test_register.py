@@ -47,7 +47,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             login_handler=self.login_handler,
         )
         self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
         self.hs.get_auth = Mock(return_value=self.auth)
         self.hs.get_handlers = Mock(return_value=self.handlers)

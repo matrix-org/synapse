@@ -51,7 +51,7 @@ class UserRegisterTestCase(unittest.TestCase):
         self.secrets = Mock()
 
         self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
 
         self.hs.config.registration_shared_secret = u"shared"
