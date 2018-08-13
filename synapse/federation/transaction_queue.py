@@ -308,6 +308,7 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
+        return
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
