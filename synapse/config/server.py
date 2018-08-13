@@ -248,6 +248,9 @@ class ServerConfig(Config):
         # hard limit.
         soft_file_limit: 0
 
+        # Set to false to disable presence tracking on this homeserver.
+        use_presence: true
+
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         # gc_thresholds: [700, 10, 10]
 
