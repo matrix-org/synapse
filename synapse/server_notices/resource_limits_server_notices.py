@@ -34,7 +34,7 @@ class ResourceLimitsServerNotices(object):
         self._store = hs.get_datastore()
         self.auth = hs.get_auth()
         self._server_notice_content = hs.config.user_consent_server_notice_content
-        self._limit_usage_by_mau = hs.config.limit_usage_by_mau = False
+        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._hs_disabled = hs.config.hs_disabled
 
         self._notified_of_blocking = set()
