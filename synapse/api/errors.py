@@ -225,11 +225,20 @@ class NotFoundError(SynapseError):
 
 class AuthError(SynapseError):
     """An error raised when there was a problem authorising an event."""
-
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
-        super(AuthError, self).__init__(*args, **kwargs)
+        self.admin_email = kwargs.get('admin_email')
+        self.msg = kwargs.get('msg')
+        self.errcode = kwargs.get('errcode')
+        super(AuthError, self).__init__(*args, errcode=kwargs["errcode"])
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            admin_email=self.admin_email,
+        )
 
 
 class EventSizeError(SynapseError):
