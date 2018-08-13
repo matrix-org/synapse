@@ -21,12 +21,12 @@ import twisted
 import twisted.logger
 from twisted.trial import unittest
 
-from synapse.server import HomeServer
 from synapse.http.server import JsonResource
+from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContextFilter
 
-from tests.server import get_clock, render, setup_test_homeserver, make_request
+from tests.server import get_clock, make_request, render, setup_test_homeserver
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
