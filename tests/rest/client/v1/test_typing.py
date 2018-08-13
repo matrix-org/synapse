@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,41 +18,34 @@
 
 from mock import Mock, NonCallableMock
 
-# twisted imports
 from twisted.internet import defer
 
-import synapse.rest.client.v1.room
+from synapse.rest.client.v1 import room
 from synapse.types import UserID
 
-from ....utils import MockClock, MockHttpResource, setup_test_homeserver
-from .utils import RestTestCase
+from tests import unittest
+from tests.server import make_request, setup_test_homeserver
 
 PATH_PREFIX = "/_matrix/client/api/v1"
 
 
-class RoomTypingTestCase(RestTestCase):
+class RoomTypingTestCase(unittest.HomeserverTestCase):
     """ Tests /rooms/$room_id/typing/$user_id REST API. """
 
     user_id = "@sid:red"
 
     user = UserID.from_string(user_id)
+    servlets = [room.register_servlets]
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.clock = MockClock()
-
-        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-        self.auth_user_id = self.user_id
+    def make_homeserver(self, reactor, clock, hs_args):
 
         hs = yield setup_test_homeserver(
             self.addCleanup,
             "red",
-            clock=self.clock,
             http_client=None,
             federation_client=Mock(),
             ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
-        self.hs = hs
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
@@ -100,20 +94,21 @@ class RoomTypingTestCase(RestTestCase):
             fetch_room_distributions_into
         )
 
-        synapse.rest.client.v1.room.register_servlets(hs, self.mock_resource)
+        return hs
 
-        self.room_id = yield self.create_room_as(self.user_id)
+    def prepare(self, reactor, clock, hs):
+        self.room_id = self.helper.create_room_as(self.user_id)
         # Need another user to make notifications actually work
-        yield self.join(self.room_id, user="@jim:red")
+        self.helper.join(self.room_id, user="@jim:red")
 
-    @defer.inlineCallbacks
     def test_set_typing(self):
         (code, _) = yield self.mock_resource.trigger(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = yield self.event_source.get_new_events(
@@ -130,27 +125,27 @@ class RoomTypingTestCase(RestTestCase):
             ],
         )
 
-    @defer.inlineCallbacks
     def test_set_not_typing(self):
         (code, _) = yield self.mock_resource.trigger(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": false}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
-    @defer.inlineCallbacks
     def test_typing_timeout(self):
         (code, _) = yield self.mock_resource.trigger(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
 
-        self.clock.advance_time(36)
+        self.reactor.advance(36)
 
         self.assertEquals(self.event_source.get_current_key(), 2)
 
@@ -159,6 +154,7 @@ class RoomTypingTestCase(RestTestCase):
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             '{"typing": true, "timeout": 30000}',
         )
-        self.assertEquals(200, code)
+        self.render(request)
+        self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 3)
