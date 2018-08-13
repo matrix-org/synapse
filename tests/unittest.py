@@ -21,6 +21,7 @@ import twisted
 import twisted.logger
 from twisted.trial import unittest
 
+from synapse.server import HomeServer
 from synapse.http.server import JsonResource
 from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContextFilter
@@ -151,6 +152,9 @@ class HomeserverTestCase(TestCase):
         if self.hs is None:
             raise Exception("No homeserver returned from make_homeserver.")
 
+        if not isinstance(self.hs, HomeServer):
+            raise Exception("A homeserver wasn't returned, but %r" % (self.hs,))
+
         # Register the resources
         self.resource = JsonResource(self.hs)
 
@@ -189,7 +193,9 @@ class HomeserverTestCase(TestCase):
         render(request, self.resource, self.reactor)
 
     def setup_test_homeserver(self, *args, **kwargs):
-        return setup_test_homeserver(self.addCleanup, *args, **kwargs, **self._hs_args)
+        kwargs = dict(kwargs)
+        kwargs.update(self._hs_args)
+        return setup_test_homeserver(self.addCleanup, *args, **kwargs)
 
     def make_request(self, *args, **kwargs):
         return make_request(*args, **kwargs)

@@ -38,7 +38,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        hs = yield self.setup_test_homeserver(
+        hs = self.setup_test_homeserver(
             "red",
             http_client=None,
             federation_client=Mock(),
