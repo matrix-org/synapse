@@ -308,7 +308,9 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
-        return
+        if not self.hs.config.use_presence:
+            # No-op if presence is disabled.
+            return
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
