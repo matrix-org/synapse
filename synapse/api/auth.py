@@ -775,9 +775,13 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self):
+    def check_auth_blocking(self, user_id=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
+
+        Args:
+            user_id(str|None): If present, checks for presence against existing
+            MAU cohort
         """
         if self.hs.config.hs_disabled:
             raise AuthError(
@@ -786,6 +790,12 @@ class Auth(object):
                 admin_email=self.hs.config.admin_email,
             )
         if self.hs.config.limit_usage_by_mau is True:
+            # If the user is already part of the MAU cohort
+            if user_id:
+                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
+                if timestamp:
+                    return
+            # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
                 raise AuthError(
