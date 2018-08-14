@@ -91,6 +91,7 @@ class ResourceLimitsServerNotices(object):
                     self._send_server_notice(user_id, content)
                     self._notified_of_blocking.add(user_id)
 
+
     @defer.inlineCallbacks
     def _send_server_notice(self, user_id, content):
         """Sends Server notice
@@ -104,7 +105,7 @@ class ResourceLimitsServerNotices(object):
         """
         try:
             yield self._server_notices_manager.send_notice(
-                user_id, content, EventTypes.ServerNoticeLimitReached
+                user_id, content
             )
         except SynapseError as e:
             logger.error("Error sending server notice about resource limits: %s", e)
