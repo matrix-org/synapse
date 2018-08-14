@@ -39,8 +39,7 @@ class PresenceUpdateTestCase(unittest.TestCase):
 
         prev_state = UserPresenceState.default(user_id)
         new_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active_ts=now,
+            state=PresenceState.ONLINE, last_active_ts=now
         )
 
         state, persist_and_notify, federation_ping = handle_update(
@@ -54,23 +53,22 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(state.last_federation_update_ts, now)
 
         self.assertEquals(wheel_timer.insert.call_count, 3)
-        wheel_timer.insert.assert_has_calls([
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_active_ts + IDLE_TIMER
-            ),
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
-            ),
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
-            ),
-        ], any_order=True)
+        wheel_timer.insert.assert_has_calls(
+            [
+                call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
+                ),
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY,
+                ),
+            ],
+            any_order=True,
+        )
 
     def test_online_to_online(self):
         wheel_timer = Mock()
@@ -79,14 +77,11 @@ class PresenceUpdateTestCase(unittest.TestCase):
 
         prev_state = UserPresenceState.default(user_id)
         prev_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active_ts=now,
-            currently_active=True,
+            state=PresenceState.ONLINE, last_active_ts=now, currently_active=True
         )
 
         new_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active_ts=now,
+            state=PresenceState.ONLINE, last_active_ts=now
         )
 
         state, persist_and_notify, federation_ping = handle_update(
@@ -101,23 +96,22 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(state.last_federation_update_ts, now)
 
         self.assertEquals(wheel_timer.insert.call_count, 3)
-        wheel_timer.insert.assert_has_calls([
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_active_ts + IDLE_TIMER
-            ),
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
-            ),
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
-            ),
-        ], any_order=True)
+        wheel_timer.insert.assert_has_calls(
+            [
+                call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
+                ),
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY,
+                ),
+            ],
+            any_order=True,
+        )
 
     def test_online_to_online_last_active_noop(self):
         wheel_timer = Mock()
@@ -132,8 +126,7 @@ class PresenceUpdateTestCase(unittest.TestCase):
         )
 
         new_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active_ts=now,
+            state=PresenceState.ONLINE, last_active_ts=now
         )
 
         state, persist_and_notify, federation_ping = handle_update(
@@ -148,23 +141,22 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(state.last_federation_update_ts, now)
 
         self.assertEquals(wheel_timer.insert.call_count, 3)
-        wheel_timer.insert.assert_has_calls([
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_active_ts + IDLE_TIMER
-            ),
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
-            ),
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY
-            ),
-        ], any_order=True)
+        wheel_timer.insert.assert_has_calls(
+            [
+                call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
+                ),
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_active_ts + LAST_ACTIVE_GRANULARITY,
+                ),
+            ],
+            any_order=True,
+        )
 
     def test_online_to_online_last_active(self):
         wheel_timer = Mock()
@@ -178,9 +170,7 @@ class PresenceUpdateTestCase(unittest.TestCase):
             currently_active=True,
         )
 
-        new_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-        )
+        new_state = prev_state.copy_and_replace(state=PresenceState.ONLINE)
 
         state, persist_and_notify, federation_ping = handle_update(
             prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
@@ -193,18 +183,17 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(state.last_federation_update_ts, now)
 
         self.assertEquals(wheel_timer.insert.call_count, 2)
-        wheel_timer.insert.assert_has_calls([
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_active_ts + IDLE_TIMER
-            ),
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
-            )
-        ], any_order=True)
+        wheel_timer.insert.assert_has_calls(
+            [
+                call(now=now, obj=user_id, then=new_state.last_active_ts + IDLE_TIMER),
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
+                ),
+            ],
+            any_order=True,
+        )
 
     def test_remote_ping_timer(self):
         wheel_timer = Mock()
@@ -213,13 +202,10 @@ class PresenceUpdateTestCase(unittest.TestCase):
 
         prev_state = UserPresenceState.default(user_id)
         prev_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active_ts=now,
+            state=PresenceState.ONLINE, last_active_ts=now
         )
 
-        new_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-        )
+        new_state = prev_state.copy_and_replace(state=PresenceState.ONLINE)
 
         state, persist_and_notify, federation_ping = handle_update(
             prev_state, new_state, is_mine=False, wheel_timer=wheel_timer, now=now
@@ -232,13 +218,16 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(new_state.status_msg, state.status_msg)
 
         self.assertEquals(wheel_timer.insert.call_count, 1)
-        wheel_timer.insert.assert_has_calls([
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT
-            ),
-        ], any_order=True)
+        wheel_timer.insert.assert_has_calls(
+            [
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_federation_update_ts + FEDERATION_TIMEOUT,
+                )
+            ],
+            any_order=True,
+        )
 
     def test_online_to_offline(self):
         wheel_timer = Mock()
@@ -247,14 +236,10 @@ class PresenceUpdateTestCase(unittest.TestCase):
 
         prev_state = UserPresenceState.default(user_id)
         prev_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active_ts=now,
-            currently_active=True,
+            state=PresenceState.ONLINE, last_active_ts=now, currently_active=True
         )
 
-        new_state = prev_state.copy_and_replace(
-            state=PresenceState.OFFLINE,
-        )
+        new_state = prev_state.copy_and_replace(state=PresenceState.OFFLINE)
 
         state, persist_and_notify, federation_ping = handle_update(
             prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
@@ -273,14 +258,10 @@ class PresenceUpdateTestCase(unittest.TestCase):
 
         prev_state = UserPresenceState.default(user_id)
         prev_state = prev_state.copy_and_replace(
-            state=PresenceState.ONLINE,
-            last_active_ts=now,
-            currently_active=True,
+            state=PresenceState.ONLINE, last_active_ts=now, currently_active=True
         )
 
-        new_state = prev_state.copy_and_replace(
-            state=PresenceState.UNAVAILABLE,
-        )
+        new_state = prev_state.copy_and_replace(state=PresenceState.UNAVAILABLE)
 
         state, persist_and_notify, federation_ping = handle_update(
             prev_state, new_state, is_mine=True, wheel_timer=wheel_timer, now=now
@@ -293,13 +274,16 @@ class PresenceUpdateTestCase(unittest.TestCase):
         self.assertEquals(new_state.status_msg, state.status_msg)
 
         self.assertEquals(wheel_timer.insert.call_count, 1)
-        wheel_timer.insert.assert_has_calls([
-            call(
-                now=now,
-                obj=user_id,
-                then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT
-            )
-        ], any_order=True)
+        wheel_timer.insert.assert_has_calls(
+            [
+                call(
+                    now=now,
+                    obj=user_id,
+                    then=new_state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
+                )
+            ],
+            any_order=True,
+        )
 
 
 class PresenceTimeoutTestCase(unittest.TestCase):
@@ -314,9 +298,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_user_sync_ts=now,
         )
 
-        new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set(), now=now
-        )
+        new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.UNAVAILABLE)
@@ -332,9 +314,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_user_sync_ts=now - SYNC_ONLINE_TIMEOUT - 1,
         )
 
-        new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set(), now=now
-        )
+        new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state.state, PresenceState.OFFLINE)
@@ -369,9 +349,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_federation_update_ts=now - FEDERATION_PING_INTERVAL - 1,
         )
 
-        new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set(), now=now
-        )
+        new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
         self.assertEquals(new_state, new_state)
@@ -388,9 +366,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_federation_update_ts=now,
         )
 
-        new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set(), now=now
-        )
+        new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNone(new_state)
 
@@ -425,9 +401,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
             last_federation_update_ts=now,
         )
 
-        new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set(), now=now
-        )
+        new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
         self.assertEquals(state, new_state)

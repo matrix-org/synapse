@@ -50,6 +50,7 @@ class RoomBase(unittest.TestCase):
         self.hs_clock = Clock(self.clock)
 
         self.hs = setup_test_homeserver(
+            self.addCleanup,
             "red",
             http_client=None,
             clock=self.hs_clock,

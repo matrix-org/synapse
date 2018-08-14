@@ -194,9 +194,8 @@ def setup_logging(config, use_worker_options=False):
 
         def sighup(signum, stack):
             # it might be better to use a file watcher or something for this.
-            logging.info("Reloading log config from %s due to SIGHUP",
-                         log_config)
             load_log_config()
+            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
 
         load_log_config()
 

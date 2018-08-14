@@ -30,14 +30,14 @@ KEY_API_V1 = b"/_matrix/key/v1/"
 
 
 @defer.inlineCallbacks
-def fetch_server_key(server_name, ssl_context_factory, path=KEY_API_V1):
+def fetch_server_key(server_name, tls_client_options_factory, path=KEY_API_V1):
     """Fetch the keys for a remote server."""
 
     factory = SynapseKeyClientFactory()
     factory.path = path
     factory.host = server_name
     endpoint = matrix_federation_endpoint(
-        reactor, server_name, ssl_context_factory, timeout=30
+        reactor, server_name, tls_client_options_factory, timeout=30
     )
 
     for i in range(5):

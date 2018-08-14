@@ -136,6 +136,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
     A MemoryReactorClock that supports callFromThread.
     """
+
     def callFromThread(self, callback, *args, **kwargs):
         """
         Make the callback fire in the next reactor iteration.
@@ -146,12 +147,15 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         return d
 
 
-def setup_test_homeserver(*args, **kwargs):
+def setup_test_homeserver(cleanup_func, *args, **kwargs):
     """
     Set up a synchronous test server, driven by the reactor used by
     the homeserver.
     """
-    d = _sth(*args, **kwargs).result
+    d = _sth(cleanup_func, *args, **kwargs).result
+
+    if isinstance(d, Failure):
+        d.raiseException()
 
     # Make the thread pool synchronous.
     clock = d.get_clock()
@@ -184,7 +188,11 @@ def setup_test_homeserver(*args, **kwargs):
         """
         Threadless thread pool.
         """
+
         def start(self):
+            pass
+
+        def stop(self):
             pass
 
         def callInThreadWithCallback(self, onResult, function, *args, **kwargs):

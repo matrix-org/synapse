@@ -16,7 +16,7 @@ class JsonResourceTests(unittest.TestCase):
         self.reactor = MemoryReactorClock()
         self.hs_clock = Clock(self.reactor)
         self.homeserver = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.reactor
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.reactor
         )
 
     def test_handler_for_request(self):
