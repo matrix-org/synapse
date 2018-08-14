@@ -28,7 +28,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield tests.utils.setup_test_homeserver()
+        self.hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
