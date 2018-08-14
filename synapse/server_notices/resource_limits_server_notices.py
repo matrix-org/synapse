@@ -17,6 +17,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
+from synapse.api.constants import EventTypes
 
 logger = logging.getLogger(__name__)
 
@@ -61,22 +62,32 @@ class ResourceLimitsServerNotices(object):
                 # In practice, not sure we can ever get here
                 return
             try:
+                # Normally should always pass in user_id if you have it, but in
+                # this case are checking what would happen to other users if they
+                # were to arrive.
                 yield self.auth.check_auth_blocking()
                 self._resouce_limited = False
                 # Need to start removing notices
                 if user_id in self._notified_of_blocking:
                     # Send message to remove warning - needs updating
-                    content = "remove warning"
+                    content = {
+                        'body': '',
+                        'admin_email': '',
+                    }
                     self._send_server_notice(user_id, content)
                     self._notified_of_blocking.remove(user_id)
 
-            except AuthError:
+            except AuthError as e:
                 # Need to start notifying of blocking
 
                 self._resouce_limited = True
                 if user_id not in self._notified_of_blocking:
-                    # Send message to add warning - needs updating
-                    content = "add warning"
+                    # TODO use admin email contained in error once PR lands
+                    content = {
+                        'body': e.msg,
+                        'admin_email': 'stunt@adminemail.com',
+                        'msgtype': 'm.text'
+                    }
                     self._send_server_notice(user_id, content)
                     self._notified_of_blocking.add(user_id)
 
@@ -93,7 +104,7 @@ class ResourceLimitsServerNotices(object):
         """
         try:
             yield self._server_notices_manager.send_notice(
-                user_id, content,
+                user_id, content, EventTypes.ServerNoticeLimitReached
             )
         except SynapseError as e:
             logger.error("Error sending server notice about resource limits: %s", e)

@@ -79,6 +79,8 @@ class EventTypes(object):
 
     ServerACL = "m.room.server_acl"
 
+    ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
+
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"

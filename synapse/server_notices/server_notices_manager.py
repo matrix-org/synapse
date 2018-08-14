@@ -46,7 +46,7 @@ class ServerNoticesManager(object):
         return self._config.server_notices_mxid is not None
 
     @defer.inlineCallbacks
-    def send_notice(self, user_id, event_content):
+    def send_notice(self, user_id, event_content, type):
         """Send a notice to the given user
 
         Creates the server notices room, if none exists.
@@ -67,7 +67,7 @@ class ServerNoticesManager(object):
 
         yield self._event_creation_handler.create_and_send_nonmember_event(
             requester, {
-                "type": EventTypes.Message,
+                "type": type,
                 "room_id": room_id,
                 "sender": system_mxid,
                 "content": event_content,

@@ -22,6 +22,7 @@ from synapse.api.errors import SynapseError
 from synapse.api.urls import ConsentURIBuilder
 from synapse.config import ConfigError
 from synapse.types import get_localpart_from_id
+from synapse.api.constants import EventTypes
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ class ConsentServerNotices(object):
                     },
                 )
                 yield self._server_notices_manager.send_notice(
-                    user_id, content,
+                    user_id, content, EventTypes.Message
                 )
                 yield self._store.user_set_consent_server_notice_sent(
                     user_id, self._current_consent_version,
