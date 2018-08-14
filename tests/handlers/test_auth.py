@@ -177,7 +177,6 @@ class AuthTestCase(unittest.TestCase):
             self._get_macaroon().serialize()
         )
 
-
     @defer.inlineCallbacks
     def test_mau_limits_not_exceeded(self):
         self.hs.config.limit_usage_by_mau = True
