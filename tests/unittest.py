@@ -22,6 +22,8 @@ import twisted
 import twisted.logger
 from twisted.trial import unittest
 
+from canonicaljson import json
+
 from synapse.http.server import JsonResource
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
@@ -241,11 +243,15 @@ class HomeserverTestCase(TestCase):
             method (bytes/unicode): The HTTP request method ("verb").
             path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
             escaped UTF-8 & spaces and such).
-            content (bytes): The body of the request.
+            content (bytes or dict): The body of the request. JSON-encoded, if
+            a dict.
 
         Returns:
             A synapse.http.site.SynapseRequest.
         """
+        if isinstance(content, dict):
+            content = json.dumps(content).encode('utf8')
+
         return make_request(method, path, content)
 
     def render(self, request):
