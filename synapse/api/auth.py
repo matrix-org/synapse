@@ -784,7 +784,9 @@ class Auth(object):
         """
         if self.hs.config.hs_disabled:
             raise AuthError(
-                403, self.hs.config.hs_disabled_message, errcode=Codes.HS_DISABLED
+                403, self.hs.config.hs_disabled_message,
+                errcode=Codes.HS_DISABLED,
+                admin_email=self.hs.config.admin_email,
             )
         if self.hs.config.limit_usage_by_mau is True:
             # If the user is already part of the MAU cohort
@@ -796,5 +798,7 @@ class Auth(object):
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
                 raise AuthError(
-                    403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+                    403, "MAU Limit Exceeded",
+                    admin_email=self.hs.config.admin_email,
+                    errcode=Codes.MAU_LIMIT_EXCEEDED
                 )
