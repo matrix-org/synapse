@@ -535,13 +535,3 @@ class RegistrationHandler(BaseHandler):
             action="join",
         )
 
-    # @defer.inlineCallbacks
-    # def _s(self):
-    #     """
-    #     Do not accept registrations if monthly active user limits exceeded
-    #      and limiting is enabled
-    #     """
-    #     try:
-    #         yield self.auth.check_auth_blocking()
-    #     except AuthError as e:
-    #         raise RegistrationError(e.code, str(e), e.errcode)
