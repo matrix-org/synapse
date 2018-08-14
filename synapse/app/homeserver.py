@@ -306,6 +306,7 @@ class SynapseHomeServer(HomeServer):
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
 max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
 
+
 def setup(config_options):
     """
     Args:
