@@ -33,7 +33,7 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_initialise_reserved_users(self):
-
+        self.hs.config.max_mau_value = 5
         user1 = "@user1:server"
         user1_email = "user1@matrix.org"
         user2 = "@user2:server"

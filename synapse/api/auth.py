@@ -780,7 +780,8 @@ class Auth(object):
         such as monthly active user limiting or global disable flag
 
         Args:
-            user_id(str): If present, checks for presence against existing MAU cohort
+            user_id(str|None): If present, checks for presence against existing
+            MAU cohort
         """
         if self.hs.config.hs_disabled:
             raise AuthError(

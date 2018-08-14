@@ -46,7 +46,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 tp["medium"], tp["address"]
             )
             if user_id:
-                self.upsert_monthly_active_user(user_id)
+                yield self.upsert_monthly_active_user(user_id)
                 reserved_user_list.append(user_id)
             else:
                 logger.warning(
