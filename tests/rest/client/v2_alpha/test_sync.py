@@ -40,7 +40,7 @@ class FilterTestCase(unittest.TestCase):
         self.hs_clock = Clock(self.clock)
 
         self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
 
         self.auth = self.hs.get_auth()
