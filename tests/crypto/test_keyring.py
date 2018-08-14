@@ -58,12 +58,10 @@ class KeyringTestCase(unittest.TestCase):
         self.mock_perspective_server = MockPerspectiveServer()
         self.http_client = Mock()
         self.hs = yield utils.setup_test_homeserver(
-            handlers=None, http_client=self.http_client
+            self.addCleanup, handlers=None, http_client=self.http_client
         )
         keys = self.mock_perspective_server.get_verify_keys()
-        self.hs.config.perspectives = {
-            self.mock_perspective_server.server_name: keys
-        }
+        self.hs.config.perspectives = {self.mock_perspective_server.server_name: keys}
 
     def check_context(self, _, expected):
         self.assertEquals(

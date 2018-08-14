@@ -43,7 +43,10 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             password_providers=[],
         )
         hs = yield setup_test_homeserver(
-            config=config, federation_sender=Mock(), federation_client=Mock()
+            self.addCleanup,
+            config=config,
+            federation_sender=Mock(),
+            federation_client=Mock(),
         )
 
         self.as_token = "token1"
@@ -108,7 +111,10 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             password_providers=[],
         )
         hs = yield setup_test_homeserver(
-            config=config, federation_sender=Mock(), federation_client=Mock()
+            self.addCleanup,
+            config=config,
+            federation_sender=Mock(),
+            federation_client=Mock(),
         )
         self.db_pool = hs.get_db_pool()
 
@@ -392,6 +398,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             app_service_config_files=[f1, f2], event_cache_size=1, password_providers=[]
         )
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
@@ -409,6 +416,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             app_service_config_files=[f1, f2], event_cache_size=1, password_providers=[]
         )
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),
@@ -432,6 +440,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             app_service_config_files=[f1, f2], event_cache_size=1, password_providers=[]
         )
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             config=config,
             datastore=Mock(),
             federation_sender=Mock(),

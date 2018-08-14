@@ -46,7 +46,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 tp["medium"], tp["address"]
             )
             if user_id:
-                self.upsert_monthly_active_user(user_id)
+                yield self.upsert_monthly_active_user(user_id)
                 reserved_user_list.append(user_id)
             else:
                 logger.warning(
@@ -64,23 +64,27 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Deferred[]
         """
         def _reap_users(txn):
+            # Purge stale users
 
             thirty_days_ago = (
                 int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
             )
-            # Purge stale users
-
-            # questionmarks is a hack to overcome sqlite not supporting
-            # tuples in 'WHERE IN %s'
-            questionmarks = '?' * len(self.reserved_users)
             query_args = [thirty_days_ago]
-            query_args.extend(self.reserved_users)
+            base_sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
 
-            sql = """
-                DELETE FROM monthly_active_users
-                WHERE timestamp < ?
-                AND user_id NOT IN ({})
-                """.format(','.join(questionmarks))
+            # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
+            # when len(reserved_users) == 0. Works fine on sqlite.
+            if len(self.reserved_users) > 0:
+                # questionmarks is a hack to overcome sqlite not supporting
+                # tuples in 'WHERE IN %s'
+                questionmarks = '?' * len(self.reserved_users)
+
+                query_args.extend(self.reserved_users)
+                sql = base_sql + """ AND user_id NOT IN ({})""".format(
+                    ','.join(questionmarks)
+                )
+            else:
+                sql = base_sql
 
             txn.execute(sql, query_args)
 
@@ -93,16 +97,24 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # negative LIMIT values. So there is no way to write it that both can
             # support
             query_args = [self.hs.config.max_mau_value]
-            query_args.extend(self.reserved_users)
-            sql = """
+
+            base_sql = """
                 DELETE FROM monthly_active_users
                 WHERE user_id NOT IN (
                     SELECT user_id FROM monthly_active_users
                     ORDER BY timestamp DESC
                     LIMIT ?
                     )
-                AND user_id NOT IN ({})
-                """.format(','.join(questionmarks))
+                """
+            # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
+            # when len(reserved_users) == 0. Works fine on sqlite.
+            if len(self.reserved_users) > 0:
+                query_args.extend(self.reserved_users)
+                sql = base_sql + """ AND user_id NOT IN ({})""".format(
+                    ','.join(questionmarks)
+                )
+            else:
+                sql = base_sql
             txn.execute(sql, query_args)
 
         yield self.runInteraction("reap_monthly_active_users", _reap_users)
@@ -113,7 +125,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # is racy.
         # Have resolved to invalidate the whole cache for now and do
         # something about it if and when the perf becomes significant
-        self._user_last_seen_monthly_active.invalidate_all()
+        self.user_last_seen_monthly_active.invalidate_all()
         self.get_monthly_active_count.invalidate_all()
 
     @cached(num_args=0)
@@ -152,11 +164,11 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             lock=False,
         )
         if is_insert:
-            self._user_last_seen_monthly_active.invalidate((user_id,))
+            self.user_last_seen_monthly_active.invalidate((user_id,))
             self.get_monthly_active_count.invalidate(())
 
     @cached(num_args=1)
-    def _user_last_seen_monthly_active(self, user_id):
+    def user_last_seen_monthly_active(self, user_id):
         """
             Checks if a given user is part of the monthly active user group
             Arguments:
@@ -173,7 +185,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             },
             retcol="timestamp",
             allow_none=True,
-            desc="_user_last_seen_monthly_active",
+            desc="user_last_seen_monthly_active",
         ))
 
     @defer.inlineCallbacks
@@ -185,7 +197,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             user_id(str): the user_id to query
         """
         if self.hs.config.limit_usage_by_mau:
-            last_seen_timestamp = yield self._user_last_seen_monthly_active(user_id)
+            last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
 
             # We want to reduce to the total number of db writes, and are happy

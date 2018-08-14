@@ -26,8 +26,7 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver()
-
+        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
