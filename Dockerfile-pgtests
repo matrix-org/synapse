@@ -1,0 +1,8 @@
+FROM matrixdotorg/sytest:latest
+
+RUN apt-get -qq install -y python python-dev python-pip
+
+RUN pip install tox
+
+ADD docker_run_pg_tests.sh /pg_tests.sh
+ENTRYPOINT /pg_tests.sh
