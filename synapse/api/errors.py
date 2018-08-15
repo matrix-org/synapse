@@ -228,7 +228,7 @@ class AuthError(SynapseError):
     def __init__(self, *args, **kwargs):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
-        self.admin_email = kwargs.get('admin_email')
+        self.admin_uri = kwargs.get('admin_uri')
         self.msg = kwargs.get('msg')
         self.errcode = kwargs.get('errcode')
         super(AuthError, self).__init__(*args, errcode=kwargs["errcode"])
@@ -237,7 +237,7 @@ class AuthError(SynapseError):
         return cs_error(
             self.msg,
             self.errcode,
-            admin_email=self.admin_email,
+            admin_uri=self.admin_uri,
         )
 
 

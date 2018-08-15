@@ -84,7 +84,7 @@ class ServerConfig(Config):
 
         # Admin email to direct users at should their instance become blocked
         # due to resource constraints
-        self.admin_email = config.get("admin_email", None)
+        self.admin_uri = config.get("admin_uri", None)
 
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
