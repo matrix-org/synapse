@@ -175,7 +175,7 @@ sent_transactions_counter = Counter("synapse_federation_client_sent_transactions
 events_processed_counter = Counter("synapse_federation_client_events_processed", "")
 
 event_processing_loop_counter = Counter(
-    "synapse_event_processing_loop",
+    "synapse_event_processing_loop_count",
     "Event processing loop iterations",
     ["name"],
 )

@@ -69,12 +69,23 @@ class ServerConfig(Config):
 
         # Options to control access by tracking MAU
         self.limit_usage_by_mau = config.get("limit_usage_by_mau", False)
+        self.max_mau_value = 0
         if self.limit_usage_by_mau:
             self.max_mau_value = config.get(
                 "max_mau_value", 0,
             )
-        else:
-            self.max_mau_value = 0
+        self.mau_limits_reserved_threepids = config.get(
+            "mau_limit_reserved_threepids", []
+        )
+
+        # Options to disable HS
+        self.hs_disabled = config.get("hs_disabled", False)
+        self.hs_disabled_message = config.get("hs_disabled_message", "")
+
+        # Admin uri to direct users at should their instance become blocked
+        # due to resource constraints
+        self.admin_uri = config.get("admin_uri", None)
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(

@@ -181,17 +181,8 @@ class StreamChangeCacheTests(unittest.TestCase):
         # Query a subset of the entries mid-way through the stream. We should
         # only get back the subset.
         self.assertEqual(
-            cache.get_entities_changed(
-                [
-                    "bar@baz.net",
-                ],
-                stream_pos=2,
-            ),
-            set(
-                [
-                    "bar@baz.net",
-                ]
-            ),
+            cache.get_entities_changed(["bar@baz.net"], stream_pos=2),
+            set(["bar@baz.net"]),
         )
 
     def test_max_pos(self):

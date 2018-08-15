@@ -213,7 +213,7 @@ class Auth(object):
                 default=[b""]
             )[0]
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                yield self.store.insert_client_ip(
                     user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,
@@ -773,3 +773,33 @@ class Auth(object):
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
+
+    @defer.inlineCallbacks
+    def check_auth_blocking(self, user_id=None):
+        """Checks if the user should be rejected for some external reason,
+        such as monthly active user limiting or global disable flag
+
+        Args:
+            user_id(str|None): If present, checks for presence against existing
+            MAU cohort
+        """
+        if self.hs.config.hs_disabled:
+            raise AuthError(
+                403, self.hs.config.hs_disabled_message,
+                errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                admin_uri=self.hs.config.admin_uri,
+            )
+        if self.hs.config.limit_usage_by_mau is True:
+            # If the user is already part of the MAU cohort
+            if user_id:
+                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
+                if timestamp:
+                    return
+            # Else if there is no room in the MAU bucket, bail
+            current_mau = yield self.store.get_monthly_active_count()
+            if current_mau >= self.hs.config.max_mau_value:
+                raise AuthError(
+                    403, "Monthly Active User Limits AU Limit Exceeded",
+                    admin_uri=self.hs.config.admin_uri,
+                    errcode=Codes.RESOURCE_LIMIT_EXCEED
+                )
