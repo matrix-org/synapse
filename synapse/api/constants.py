@@ -78,6 +78,7 @@ class EventTypes(object):
     Name = "m.room.name"
 
     ServerACL = "m.room.server_acl"
+    Pinned = "m.room.pinned_events"
 
     ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
 
