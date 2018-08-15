@@ -15,21 +15,9 @@
 
 from mock import Mock
 
-import synapse.types
-from synapse.http.server import JsonResource
 from synapse.rest.client.v2_alpha import sync
-from synapse.types import UserID
-from synapse.util import Clock
 
 from tests import unittest
-from tests.server import (
-    ThreadedMemoryReactorClock as MemoryReactorClock,
-    make_request,
-    setup_test_homeserver,
-    wait_until_result,
-)
-
-PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -45,7 +33,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         return hs
 
     def test_sync_argless(self):
-        request, channel = self.make_request("GET", "/_matrix/client/r0/sync")
+        request, channel = self.make_request("GET", "/sync")
         self.render(request)
 
         self.assertEqual(channel.code, 200)
@@ -68,7 +56,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         """
         self.hs.config.use_presence = False
 
-        request, channel = self.make_request("GET", "/_matrix/client/r0/sync")
+        request, channel = self.make_request("GET", "/sync")
         self.render(request)
 
         self.assertEqual(channel.code, 200)
