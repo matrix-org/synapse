@@ -1,0 +1,1 @@
+Rename synapse.util.async to synapse.util.async_helpers to mitigate async becoming a keyword on Python 3.7.

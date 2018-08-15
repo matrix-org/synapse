@@ -780,11 +780,14 @@ class Auth(object):
         such as monthly active user limiting or global disable flag
 
         Args:
-            user_id(str): If present, checks for presence against existing MAU cohort
+            user_id(str|None): If present, checks for presence against existing
+            MAU cohort
         """
         if self.hs.config.hs_disabled:
             raise AuthError(
-                403, self.hs.config.hs_disabled_message, errcode=Codes.HS_DISABLED
+                403, self.hs.config.hs_disabled_message,
+                errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                admin_uri=self.hs.config.admin_uri,
             )
         if self.hs.config.limit_usage_by_mau is True:
             # If the user is already part of the MAU cohort
@@ -796,5 +799,7 @@ class Auth(object):
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
                 raise AuthError(
-                    403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
+                    403, "Monthly Active User Limits AU Limit Exceeded",
+                    admin_uri=self.hs.config.admin_uri,
+                    errcode=Codes.RESOURCE_LIMIT_EXCEED
                 )

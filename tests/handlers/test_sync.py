@@ -29,7 +29,7 @@ class SyncTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver()
+        self.hs = yield setup_test_homeserver(self.addCleanup)
         self.sync_handler = SyncHandler(self.hs)
         self.store = self.hs.get_datastore()
 
@@ -51,7 +51,7 @@ class SyncTestCase(tests.unittest.TestCase):
         self.hs.config.hs_disabled = True
         with self.assertRaises(AuthError) as e:
             yield self.sync_handler.wait_for_sync_for_user(sync_config)
-        self.assertEquals(e.exception.errcode, Codes.HS_DISABLED)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
 
         self.hs.config.hs_disabled = False
 
@@ -59,7 +59,7 @@ class SyncTestCase(tests.unittest.TestCase):
 
         with self.assertRaises(AuthError) as e:
             yield self.sync_handler.wait_for_sync_for_user(sync_config)
-        self.assertEquals(e.exception.errcode, Codes.MAU_LIMIT_EXCEEDED)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
 
     def _generate_sync_config(self, user_id):
         return SyncConfig(

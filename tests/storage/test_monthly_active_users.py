@@ -28,31 +28,25 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver()
+        self.hs = yield setup_test_homeserver(self.addCleanup)
         self.store = self.hs.get_datastore()
 
     @defer.inlineCallbacks
     def test_initialise_reserved_users(self):
-
+        self.hs.config.max_mau_value = 5
         user1 = "@user1:server"
         user1_email = "user1@matrix.org"
         user2 = "@user2:server"
         user2_email = "user2@matrix.org"
         threepids = [
             {'medium': 'email', 'address': user1_email},
-            {'medium': 'email', 'address': user2_email}
+            {'medium': 'email', 'address': user2_email},
         ]
         user_num = len(threepids)
 
-        yield self.store.register(
-            user_id=user1,
-            token="123",
-            password_hash=None)
+        yield self.store.register(user_id=user1, token="123", password_hash=None)
 
-        yield self.store.register(
-            user_id=user2,
-            token="456",
-            password_hash=None)
+        yield self.store.register(user_id=user2, token="456", password_hash=None)
 
         now = int(self.hs.get_clock().time_msec())
         yield self.store.user_add_threepid(user1, "email", user1_email, now, now)

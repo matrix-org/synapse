@@ -43,7 +43,7 @@ from synapse.api.errors import (
 from synapse.http import cancelled_to_request_timed_out_error
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util import logcontext
-from synapse.util.async import add_timeout_to_deferred
+from synapse.util.async_helpers import add_timeout_to_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
@@ -61,14 +61,14 @@ MAX_SHORT_RETRIES = 3
 
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
-        self.tls_server_context_factory = hs.tls_server_context_factory
+        self.tls_client_options_factory = hs.tls_client_options_factory
 
     def endpointForURI(self, uri):
         destination = uri.netloc
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
-            ssl_context_factory=self.tls_server_context_factory
+            tls_client_options_factory=self.tls_client_options_factory
         )
 
 

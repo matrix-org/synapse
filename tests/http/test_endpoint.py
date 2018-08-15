@@ -39,15 +39,13 @@ class ServerNameTestCase(unittest.TestCase):
             "[1234",
             "underscore_.com",
             "percent%65.com",
-            "1234:5678:80",   # too many colons
+            "1234:5678:80",  # too many colons
         ]
         for i in test_data:
             try:
                 parse_and_validate_server_name(i)
                 self.fail(
-                    "Expected parse_and_validate_server_name('%s') to throw" % (
-                        i,
-                    ),
+                    "Expected parse_and_validate_server_name('%s') to throw" % (i,)
                 )
             except ValueError:
                 pass
