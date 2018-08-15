@@ -593,7 +593,7 @@ class SyncHandler(object):
 
         # ensure we send membership events for heroes if needed
         cache_key = (sync_config.user.to_string(), sync_config.device_id)
-        cache = self.lazy_loaded_members_cache.get(cache_key)
+        cache = self.get_lazy_loaded_members_cache(cache_key)
 
         # track which members the client should already know about via LL:
         # Ones which are already in state...
@@ -625,6 +625,16 @@ class SyncHandler(object):
             state[(EventTypes.Member, s.state_key)] = s
 
         defer.returnValue(summary)
+
+    def get_lazy_loaded_members_cache(self, cache_key):
+        cache = self.lazy_loaded_members_cache.get(cache_key)
+        if cache is None:
+            logger.debug("creating LruCache for %r", cache_key)
+            cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
+            self.lazy_loaded_members_cache[cache_key] = cache
+        else:
+            logger.debug("found LruCache for %r", cache_key)
+        return cache
 
     @defer.inlineCallbacks
     def compute_state_delta(self, room_id, batch, sync_config, since_token, now_token,
@@ -741,13 +751,7 @@ class SyncHandler(object):
 
             if lazy_load_members and not include_redundant_members:
                 cache_key = (sync_config.user.to_string(), sync_config.device_id)
-                cache = self.lazy_loaded_members_cache.get(cache_key)
-                if cache is None:
-                    logger.debug("creating LruCache for %r", cache_key)
-                    cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
-                    self.lazy_loaded_members_cache[cache_key] = cache
-                else:
-                    logger.debug("found LruCache for %r", cache_key)
+                cache = self.get_lazy_loaded_members_cache(cache_key)
 
                 # if it's a new sync sequence, then assume the client has had
                 # amnesia and doesn't want any recent lazy-loaded members
