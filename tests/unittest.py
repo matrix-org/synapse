@@ -18,11 +18,11 @@ import logging
 
 from mock import Mock
 
+from canonicaljson import json
+
 import twisted
 import twisted.logger
 from twisted.trial import unittest
-
-from canonicaljson import json
 
 from synapse.http.server import JsonResource
 from synapse.server import HomeServer
