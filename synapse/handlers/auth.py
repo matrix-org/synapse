@@ -520,7 +520,7 @@ class AuthHandler(BaseHandler):
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
-        yield self.auth.check_auth_blocking()
+        yield self.auth.check_auth_blocking(user_id)
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -734,7 +734,6 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
-        yield self.auth.check_auth_blocking()
         auth_api = self.hs.get_auth()
         user_id = None
         try:
@@ -743,6 +742,7 @@ class AuthHandler(BaseHandler):
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+        yield self.auth.check_auth_blocking(user_id)
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
