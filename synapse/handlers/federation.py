@@ -1175,7 +1175,7 @@ class FederationHandler(BaseHandler):
         )
 
         context = yield self.state_handler.compute_event_context(event)
-        yield self._persist_events([(event, context)])
+        yield self.persist_events_and_notify([(event, context)])
 
         defer.returnValue(event)
 
@@ -1206,7 +1206,7 @@ class FederationHandler(BaseHandler):
         )
 
         context = yield self.state_handler.compute_event_context(event)
-        yield self._persist_events([(event, context)])
+        yield self.persist_events_and_notify([(event, context)])
 
         defer.returnValue(event)
 
@@ -1449,7 +1449,7 @@ class FederationHandler(BaseHandler):
                     event, context
                 )
 
-            yield self._persist_events(
+            yield self.persist_events_and_notify(
                 [(event, context)],
                 backfilled=backfilled,
             )
@@ -1487,7 +1487,7 @@ class FederationHandler(BaseHandler):
             ], consumeErrors=True,
         ))
 
-        yield self._persist_events(
+        yield self.persist_events_and_notify(
             [
                 (ev_info["event"], context)
                 for ev_info, context in zip(event_infos, contexts)
@@ -1575,7 +1575,7 @@ class FederationHandler(BaseHandler):
                     raise
                 events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
-        yield self._persist_events(
+        yield self.persist_events_and_notify(
             [
                 (e, events_to_context[e.event_id])
                 for e in itertools.chain(auth_events, state)
@@ -1586,7 +1586,7 @@ class FederationHandler(BaseHandler):
             event, old_state=state
         )
 
-        yield self._persist_events(
+        yield self.persist_events_and_notify(
             [(event, new_event_context)],
         )
 
@@ -2327,7 +2327,7 @@ class FederationHandler(BaseHandler):
             raise AuthError(403, "Third party certificate was invalid")
 
     @defer.inlineCallbacks
-    def _persist_events(self, event_and_contexts, backfilled=False):
+    def persist_events_and_notify(self, event_and_contexts, backfilled=False):
         """Persists events and tells the notifier/pushers about them, if
         necessary.
 
