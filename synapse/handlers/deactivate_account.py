@@ -51,7 +51,8 @@ class DeactivateAccountHandler(BaseHandler):
             erase_data (bool): whether to GDPR-erase the user's data
 
         Returns:
-            Deferred
+            Deferred[bool]: True if identity server supports removing
+            threepids, otherwise False.
         """
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
@@ -60,16 +61,22 @@ class DeactivateAccountHandler(BaseHandler):
         # leave the user still active so they can try again.
         # Ideally we would prevent password resets and then do this in the
         # background thread.
+
+        # This will be set to false if the identity server doesn't support
+        # unbinding
+        identity_server_supports_unbinding = True
+
         threepids = yield self.store.user_get_threepids(user_id)
         for threepid in threepids:
             try:
-                yield self._identity_handler.unbind_threepid(
+                result = yield self._identity_handler.try_unbind_threepid(
                     user_id,
                     {
                         'medium': threepid['medium'],
                         'address': threepid['address'],
                     },
                 )
+                identity_server_supports_unbinding &= result
             except Exception:
                 # Do we want this to be a fatal error or should we carry on?
                 logger.exception("Failed to remove threepid from ID server")
@@ -102,6 +109,8 @@ class DeactivateAccountHandler(BaseHandler):
         # Now start the process that goes through that list and
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
+
+        defer.returnValue(identity_server_supports_unbinding)
 
     def _start_user_parting(self):
         """
