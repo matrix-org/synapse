@@ -82,6 +82,10 @@ class ServerConfig(Config):
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
 
+        # Admin uri to direct users at should their instance become blocked
+        # due to resource constraints
+        self.admin_uri = config.get("admin_uri", None)
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
