@@ -148,7 +148,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             {(e3.type, e3.state_key): e3, (e5.type, e5.state_key): e5}, state
         )
 
-        # check we can use filter_types to grab a specific room member
+        # check we can use filtered_types to grab a specific room member
         # without filtering out the other event types
         state = yield self.store.get_state_for_event(
             e5.event_id,

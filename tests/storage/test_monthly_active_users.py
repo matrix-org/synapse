@@ -33,7 +33,7 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_initialise_reserved_users(self):
-
+        self.hs.config.max_mau_value = 5
         user1 = "@user1:server"
         user1_email = "user1@matrix.org"
         user2 = "@user2:server"
@@ -60,9 +60,9 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
 
         # Test user is marked as active
 
-        timestamp = yield self.store._user_last_seen_monthly_active(user1)
+        timestamp = yield self.store.user_last_seen_monthly_active(user1)
         self.assertTrue(timestamp)
-        timestamp = yield self.store._user_last_seen_monthly_active(user2)
+        timestamp = yield self.store.user_last_seen_monthly_active(user2)
         self.assertTrue(timestamp)
 
         # Test that users are never removed from the db.
@@ -86,17 +86,18 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         self.assertEqual(1, count)
 
     @defer.inlineCallbacks
-    def test__user_last_seen_monthly_active(self):
+    def test_user_last_seen_monthly_active(self):
         user_id1 = "@user1:server"
         user_id2 = "@user2:server"
         user_id3 = "@user3:server"
-        result = yield self.store._user_last_seen_monthly_active(user_id1)
+
+        result = yield self.store.user_last_seen_monthly_active(user_id1)
         self.assertFalse(result == 0)
         yield self.store.upsert_monthly_active_user(user_id1)
         yield self.store.upsert_monthly_active_user(user_id2)
-        result = yield self.store._user_last_seen_monthly_active(user_id1)
+        result = yield self.store.user_last_seen_monthly_active(user_id1)
         self.assertTrue(result > 0)
-        result = yield self.store._user_last_seen_monthly_active(user_id3)
+        result = yield self.store.user_last_seen_monthly_active(user_id3)
         self.assertFalse(result == 0)
 
     @defer.inlineCallbacks
