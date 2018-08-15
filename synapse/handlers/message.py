@@ -25,7 +25,13 @@ from twisted.internet import defer
 from twisted.internet.defer import succeed
 
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    ConsentNotGivenError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.api.urls import ConsentURIBuilder
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
@@ -111,7 +117,7 @@ class MessageHandler(object):
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         Raises:
-            SynapseError (404) if the at token does not yield an event
+            NotFoundError (404) if the at token does not yield an event
 
             AuthError (403) if the user doesn't have permission to view
             members of this room.
@@ -126,14 +132,10 @@ class MessageHandler(object):
             )
 
             if not last_events:
-                raise SynapseError(
-                    404,
-                    "Can't find event for token %s" % at_token,
-                    Codes.NOT_FOUND
-                )
+                raise NotFoundError("Can't find event for token %s" % (at_token, ))
 
             visible_events = yield filter_events_for_client(
-                self.store, user_id, last_events
+                self.store, user_id, last_events,
             )
 
             event = last_events[0]
@@ -144,14 +146,15 @@ class MessageHandler(object):
                 room_state = room_state[event.event_id]
             else:
                 raise AuthError(
-                    403, "User %s not allowed to view events in room %s at token %s" % (
-                        user_id, room_id, at_token
+                    403,
+                    "User %s not allowed to view events in room %s at token %s" % (
+                        user_id, room_id, at_token,
                     )
                 )
         else:
             membership, membership_event_id = (
                 yield self.auth.check_in_room_or_world_readable(
-                    room_id, user_id
+                    room_id, user_id,
                 )
             )
 
