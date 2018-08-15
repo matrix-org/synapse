@@ -115,7 +115,9 @@ class SynchrotronPresence(object):
 
     def send_user_sync(self, user_id, is_syncing, last_sync_ms):
         if self.hs.config.use_presence:
-            self.hs.get_tcp_replication().send_user_sync(user_id, is_syncing, last_sync_ms)
+            self.hs.get_tcp_replication().send_user_sync(
+                user_id, is_syncing, last_sync_ms
+            )
 
     def mark_as_coming_online(self, user_id):
         """A user has started syncing. Send a UserSync to the master, unless they
