@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
+from mock import Mock
 
 import synapse.types
 from synapse.http.server import JsonResource
@@ -64,6 +64,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def test_sync_presence_disabled(self):
         """
+        When presence is disabled, the key does not appear in /sync.
         """
         self.hs.config.use_presence = False
 
