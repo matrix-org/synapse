@@ -303,8 +303,8 @@ class SynapseHomeServer(HomeServer):
 
 
 # Gauges to expose monthly active user control metrics
-current_mau_gauge = Gauge("synapse_admin_current_mau", "Current MAU")
-max_mau_value_gauge = Gauge("synapse_admin_max_mau_value", "MAU Limit")
+current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
+max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
 
 
 def setup(config_options):
@@ -532,7 +532,7 @@ def run(hs):
         if hs.config.limit_usage_by_mau:
             count = yield hs.get_datastore().get_monthly_active_count()
         current_mau_gauge.set(float(count))
-        max_mau_value_gauge.set(float(hs.config.max_mau_value))
+        max_mau_gauge.set(float(hs.config.max_mau_value))
 
     hs.get_datastore().initialise_reserved_users(
         hs.config.mau_limits_reserved_threepids

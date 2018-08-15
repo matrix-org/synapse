@@ -224,13 +224,9 @@ class NotFoundError(SynapseError):
 
 class AuthError(SynapseError):
     """An error raised when there was a problem authorising an event."""
-    def __init__(self, *args, **kwargs):
-        if "errcode" not in kwargs:
-            kwargs["errcode"] = Codes.FORBIDDEN
-        self.admin_uri = kwargs.get('admin_uri')
-        self.msg = kwargs.get('msg')
-        self.errcode = kwargs.get('errcode')
-        super(AuthError, self).__init__(*args, errcode=kwargs["errcode"])
+    def __init__(self, code, msg, errcode=Codes.FORBIDDEN, admin_uri=None):
+        self.admin_uri = admin_uri
+        super(AuthError, self).__init__(code, msg, errcode=errcode)
 
     def error_dict(self):
         return cs_error(
