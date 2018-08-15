@@ -569,56 +569,60 @@ class SyncHandler(object):
         summary["m.joined_member_count"] = len(joined_user_ids)
         summary["m.invited_member_count"] = len(invited_user_ids)
 
-        if not name_id and not canonical_alias_id:
-            # FIXME: order by stream ordering, not alphabetic
+        if name_id or canonical_alias_id:
+            defer.returnValue(summary)
 
-            me = sync_config.user.to_string()
-            if (joined_user_ids or invited_user_ids):
-                summary['m.heroes'] = sorted(
-                    [
-                        user_id
-                        for user_id in (joined_user_ids + invited_user_ids)
-                        if user_id != me
-                    ]
-                )[0:5]
-            else:
-                summary['m.heroes'] = sorted(
-                    [user_id for user_id in member_ids.keys() if user_id != me]
-                )[0:5]
+        # FIXME: order by stream ordering, not alphabetic
 
-            if sync_config.filter_collection.lazy_load_members():
-                # ensure we send membership events for heroes if needed
-                cache_key = (sync_config.user.to_string(), sync_config.device_id)
-                cache = self.lazy_loaded_members_cache.get(cache_key)
-
-                # track which members the client should already know about via LL:
-                # Ones which are already in state...
-                existing_members = set(
-                    user_id for (typ, user_id) in state.keys()
-                    if typ == EventTypes.Member
-                )
-
-                # ...or ones which are in the timeline...
-                for ev in batch.events:
-                    if ev.type == EventTypes.Member:
-                        existing_members.add(ev.state_key)
-
-                # ...and then ensure any missing ones get included in state.
-                missing_hero_event_ids = [
-                    member_ids[hero_id]
-                    for hero_id in summary['m.heroes']
-                    if (
-                        cache.get(hero_id) != member_ids[hero_id] and
-                        hero_id not in existing_members
-                    )
+        me = sync_config.user.to_string()
+        if (joined_user_ids or invited_user_ids):
+            summary['m.heroes'] = sorted(
+                [
+                    user_id
+                    for user_id in (joined_user_ids + invited_user_ids)
+                    if user_id != me
                 ]
+            )[0:5]
+        else:
+            summary['m.heroes'] = sorted(
+                [user_id for user_id in member_ids.keys() if user_id != me]
+            )[0:5]
 
-                missing_hero_state = yield self.store.get_events(missing_hero_event_ids)
-                missing_hero_state = missing_hero_state.values()
+        if not sync_config.filter_collection.lazy_load_members():
+            defer.returnValue(summary)
 
-                for s in missing_hero_state:
-                    cache.set(s.state_key, s.event_id)
-                    state[(EventTypes.Member, s.state_key)] = s
+        # ensure we send membership events for heroes if needed
+        cache_key = (sync_config.user.to_string(), sync_config.device_id)
+        cache = self.lazy_loaded_members_cache.get(cache_key)
+
+        # track which members the client should already know about via LL:
+        # Ones which are already in state...
+        existing_members = set(
+            user_id for (typ, user_id) in state.keys()
+            if typ == EventTypes.Member
+        )
+
+        # ...or ones which are in the timeline...
+        for ev in batch.events:
+            if ev.type == EventTypes.Member:
+                existing_members.add(ev.state_key)
+
+        # ...and then ensure any missing ones get included in state.
+        missing_hero_event_ids = [
+            member_ids[hero_id]
+            for hero_id in summary['m.heroes']
+            if (
+                cache.get(hero_id) != member_ids[hero_id] and
+                hero_id not in existing_members
+            )
+        ]
+
+        missing_hero_state = yield self.store.get_events(missing_hero_event_ids)
+        missing_hero_state = missing_hero_state.values()
+
+        for s in missing_hero_state:
+            cache.set(s.state_key, s.event_id)
+            state[(EventTypes.Member, s.state_key)] = s
 
         defer.returnValue(summary)
 
