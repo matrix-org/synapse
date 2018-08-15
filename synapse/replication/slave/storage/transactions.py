@@ -18,5 +18,5 @@ from synapse.storage.transactions import TransactionStore
 from ._base import BaseSlavedStore
 
 
-class TransactionStore(TransactionStore, BaseSlavedStore):
+class SlavedTransactionStore(TransactionStore, BaseSlavedStore):
     pass
