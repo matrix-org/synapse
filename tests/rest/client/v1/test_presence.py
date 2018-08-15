@@ -21,7 +21,7 @@ from synapse.types import UserID
 from tests import unittest
 
 
-class RoomTypingTestCase(unittest.HomeserverTestCase):
+class PresenceTestCase(unittest.HomeserverTestCase):
     """ Tests presence REST API. """
 
     user_id = "@sid:red"
