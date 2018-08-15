@@ -27,11 +27,16 @@ class VersionsRestServlet(RestServlet):
     def on_GET(self, request):
         return (200, {
             "versions": [
-                # we don't need to include the minor values any more, as we've defined
-                # X.Y.Z to be backwards-compatible with X.(Y-1).* where Y>1
-                # "r0.0.1",
-                # "r0.1.0",
-                # "r0.2.0",
+                # XXX: at some point we need to decide whether we need to include
+                # the previous version numbers, given we've defined r0.3.0 to be
+                # backwards compatible with r0.2.0.  But need to check how
+                # conscientious we've been in compatibility, and decide whether the
+                # middle number is the major revision when at 0.X.Y (as opposed to
+                # X.Y.Z).  And we need to decide whether it's fair to make clients
+                # parse the version string to figure out what's going on.
+                "r0.0.1",
+                "r0.1.0",
+                "r0.2.0",
                 "r0.3.0",
             ],
             # as per MSC1497:
