@@ -455,8 +455,11 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(lots_of_users)
         )
 
-        with self.assertRaises(AuthError):
+        with self.assertRaises(AuthError) as e:
             yield self.auth.check_auth_blocking()
+        self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
+        self.assertEquals(e.exception.code, 403)
 
         # Ensure does not throw an error
         self.store.get_monthly_active_count = Mock(
@@ -470,5 +473,6 @@ class AuthTestCase(unittest.TestCase):
         self.hs.config.hs_disabled_message = "Reason for being disabled"
         with self.assertRaises(AuthError) as e:
             yield self.auth.check_auth_blocking()
-        self.assertEquals(e.exception.errcode, Codes.HS_DISABLED)
+        self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
         self.assertEquals(e.exception.code, 403)
