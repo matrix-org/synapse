@@ -31,7 +31,7 @@ from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
-from synapse.types import RoomAlias, RoomStreamToken, UserID
+from synapse.types import RoomAlias, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.logcontext import run_in_background
@@ -110,7 +110,7 @@ class MessageHandler(object):
     @defer.inlineCallbacks
     def get_state_events(
         self, user_id, room_id, types=None, filtered_types=None,
-        at_token=None, is_guest=False
+        at_token=None, is_guest=False,
     ):
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
@@ -130,37 +130,49 @@ class MessageHandler(object):
                 If None, `types` filtering is applied to all events.
             at_token(StreamToken|None): the stream token of the at which we are requesting
                 the stats. If the user is not allowed to view the state as of that
-                stream token, no events are returned. If None, returns the current
+                stream token, we raise a 403 SynapseError. If None, returns the current
                 state based on the current_state_events table.
             is_guest(bool): whether this user is a guest
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
+        Raises:
+            SynapseError (404) if the at token does not yield an event
+
+            AuthError (403) if the user doesn't have permission to view
+            members of this room.
         """
         if at_token:
-            # we have to turn the token into a event
-            stream_ordering = RoomStreamToken.parse_stream_token(
-                at_token.room_key
-            ).stream
-
-            # XXX: is this the right method to be using?  What id we don't yet have an
-            # event after this stream token?
-            (stream_ordering, topo_ordering, event_id) = (
-                yield self.store.get_room_event_after_stream_ordering(
-                    room_id, stream_ordering
-                )
+            # FIXME this claims to get the state at a stream position, but
+            # get_recent_events_for_room operates by topo ordering. This therefore
+            # does not reliably give you the state at the given stream position.
+            # (https://github.com/matrix-org/synapse/issues/3305)
+            last_events, _ = yield self.store.get_recent_events_for_room(
+                room_id, end_token=at_token.room_key, limit=1,
             )
 
-            # check we are even allowed to be reading the room at this point
-            event = yield self.store.get_event(event_id, allow_none=True)
-            visible_events = yield filter_events_for_client(self.store, user_id, [event])
+            if not last_events:
+                raise SynapseError(
+                    404,
+                    "Can't find event for token %s" % at_token,
+                    Codes.NOT_FOUND
+                )
 
-            if len(visible_events) > 0:
+            visible_events = yield filter_events_for_client(
+                self.store, user_id, last_events
+            )
+
+            event = last_events[0]
+            if visible_events:
                 room_state = yield self.store.get_state_for_events(
                     [event.event_id], types, filtered_types=filtered_types,
                 )
                 room_state = room_state[event.event_id]
             else:
-                room_state = {}
+                raise AuthError(
+                    403, "User %s not allowed to view events in room %s at token %s" % (
+                        user_id, room_id, at_token
+                    )
+                )
         else:
             membership, membership_event_id = (
                 yield self.auth.check_in_room_or_world_readable(

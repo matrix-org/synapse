@@ -144,7 +144,8 @@ class RegistrationHandler(BaseHandler):
         Raises:
             RegistrationError if there was a problem registering.
         """
-        yield self._check_mau_limits()
+
+        yield self.auth.check_auth_blocking()
         password_hash = None
         if password:
             password_hash = yield self.auth_handler().hash(password)
@@ -289,7 +290,7 @@ class RegistrationHandler(BaseHandler):
                 400,
                 "User ID can only contain characters a-z, 0-9, or '=_-./'",
             )
-        yield self._check_mau_limits()
+        yield self.auth.check_auth_blocking()
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
 
@@ -439,7 +440,7 @@ class RegistrationHandler(BaseHandler):
         """
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
-        yield self._check_mau_limits()
+        yield self.auth.check_auth_blocking()
         need_register = True
 
         try:
@@ -533,14 +534,3 @@ class RegistrationHandler(BaseHandler):
             remote_room_hosts=remote_room_hosts,
             action="join",
         )
-
-    @defer.inlineCallbacks
-    def _check_mau_limits(self):
-        """
-        Do not accept registrations if monthly active user limits exceeded
-         and limiting is enabled
-        """
-        try:
-            yield self.auth.check_auth_blocking()
-        except AuthError as e:
-            raise RegistrationError(e.code, str(e), e.errcode)

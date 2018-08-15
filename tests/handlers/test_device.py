@@ -34,7 +34,7 @@ class DeviceTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield utils.setup_test_homeserver()
+        hs = yield utils.setup_test_homeserver(self.addCleanup)
         self.handler = hs.get_device_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()

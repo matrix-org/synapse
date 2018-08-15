@@ -54,6 +54,7 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(
+            self.addCleanup,
             "blue",
             http_client=None,
             federation_client=Mock(),

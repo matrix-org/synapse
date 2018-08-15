@@ -67,6 +67,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
         self.state_handler = Mock()
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             "test",
             auth=self.auth,
             clock=self.clock,

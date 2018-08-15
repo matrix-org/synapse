@@ -46,6 +46,7 @@ class DirectoryTestCase(unittest.TestCase):
         self.mock_registry.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             http_client=None,
             resource_for_federation=Mock(),
             federation_client=self.mock_federation,
