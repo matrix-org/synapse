@@ -40,6 +40,7 @@ class ResourceLimitsServerNotices(object):
 
         self._notified_of_blocking = set()
         self._resouce_limited = False
+
         # Config checks?
 
     @defer.inlineCallbacks
@@ -69,43 +70,43 @@ class ResourceLimitsServerNotices(object):
                 self._resouce_limited = False
                 # Need to start removing notices
                 if user_id in self._notified_of_blocking:
-                    # Send message to remove warning - needs updating
+                    # Send message to remove warning
+                    # send state event here
+                    # How do I do this? if drop the id, how to refer to it?
                     content = {
-                        'body': '',
-                        'admin_email': '',
+                        "pinned":[]
                     }
-                    self._send_server_notice(user_id, content)
+                    yield self._server_notices_manager.send_notice(
+                        user_id, content, EventTypes.Pinned, '',
+                    )
+
                     self._notified_of_blocking.remove(user_id)
 
             except AuthError as e:
                 # Need to start notifying of blocking
+                try:
+                    self._resouce_limited = True
+                    if user_id not in self._notified_of_blocking:
+                        # TODO use admin email contained in error once PR lands
+                        content = {
+                            'body': e.msg,
+                            'admin_email': 'stunt@adminemail.com',
+                        }
+                        event = yield self._server_notices_manager.send_notice(
+                            user_id, content, EventTypes.ServerNoticeLimitReached
+                        )
 
-                self._resouce_limited = True
-                if user_id not in self._notified_of_blocking:
-                    # TODO use admin email contained in error once PR lands
-                    content = {
-                        'body': e.msg,
-                        'admin_email': 'stunt@adminemail.com',
-                        'msgtype': 'm.text'
-                    }
-                    self._send_server_notice(user_id, content)
-                    self._notified_of_blocking.add(user_id)
+                        # send server notices state event here
+                        # TODO Over writing pinned events
+                        content = {
+                            "pinned":[
+                                event.event_id,
+                            ]
+                        }
+                        yield self._server_notices_manager.send_notice(
+                            user_id, content, EventTypes.Pinned, '',
+                        )
 
-
-    @defer.inlineCallbacks
-    def _send_server_notice(self, user_id, content):
-        """Sends Server notice
-
-        Args:
-            user_id(str): The user to send to
-            content(str): The content of the message
-
-        Returns:
-            Deferred[]
-        """
-        try:
-            yield self._server_notices_manager.send_notice(
-                user_id, content
-            )
-        except SynapseError as e:
-            logger.error("Error sending server notice about resource limits: %s", e)
+                        self._notified_of_blocking.add(user_id)
+                except SynapseError as e:
+                    logger.error("Error sending server notice about resource limits: %s", e)
