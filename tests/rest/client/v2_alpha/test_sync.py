@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import mock
+
 import synapse.types
 from synapse.http.server import JsonResource
 from synapse.rest.client.v2_alpha import sync
@@ -30,55 +32,50 @@ from tests.server import (
 PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 
-class FilterTestCase(unittest.TestCase):
+class FilterTestCase(unittest.HomeserverTestCase):
 
-    USER_ID = "@apple:test"
-    TO_REGISTER = [sync]
+    user_id = "@apple:test"
+    servlets = [sync.register_servlets]
 
-    def setUp(self):
-        self.clock = MemoryReactorClock()
-        self.hs_clock = Clock(self.clock)
+    def make_homeserver(self, reactor, clock):
 
-        self.hs = setup_test_homeserver(
-            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
+        hs = self.setup_test_homeserver(
+            "red", http_client=None, federation_client=Mock()
         )
-
-        self.auth = self.hs.get_auth()
-
-        def get_user_by_access_token(token=None, allow_guest=False):
-            return {
-                "user": UserID.from_string(self.USER_ID),
-                "token_id": 1,
-                "is_guest": False,
-            }
-
-        def get_user_by_req(request, allow_guest=False, rights="access"):
-            return synapse.types.create_requester(
-                UserID.from_string(self.USER_ID), 1, False, None
-            )
-
-        self.auth.get_user_by_access_token = get_user_by_access_token
-        self.auth.get_user_by_req = get_user_by_req
-
-        self.store = self.hs.get_datastore()
-        self.filtering = self.hs.get_filtering()
-        self.resource = JsonResource(self.hs)
-
-        for r in self.TO_REGISTER:
-            r.register_servlets(self.hs, self.resource)
+        return hs
 
     def test_sync_argless(self):
-        request, channel = make_request("GET", "/_matrix/client/r0/sync")
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        request, channel = self.make_request("GET", "/_matrix/client/r0/sync")
+        self.render(self.request)
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertTrue(
             set(
                 [
                     "next_batch",
                     "rooms",
                     "presence",
+                    "account_data",
+                    "to_device",
+                    "device_lists",
+                ]
+            ).issubset(set(channel.json_body.keys()))
+        )
+
+    def test_sync_presence_disabled(self):
+        """
+        """
+        self.hs.config.use_presence = False
+
+        request, channel = self.make_request("GET", "/_matrix/client/r0/sync")
+        self.render(self.request)
+
+        self.assertEqual(channel.code, 200)
+        self.assertTrue(
+            set(
+                [
+                    "next_batch",
+                    "rooms",
                     "account_data",
                     "to_device",
                     "device_lists",
