@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock, NonCallableMock
-
-from twisted.internet import defer
+from mock import Mock
 
 from synapse.rest.client.v1 import presence
 from synapse.types import UserID
 
 from tests import unittest
+
 
 class RoomTypingTestCase(unittest.HomeserverTestCase):
     """ Tests presence REST API. """
@@ -33,9 +32,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(
-            "red",
-            http_client=None,
-            federation_client=Mock(),
+            "red", http_client=None, federation_client=Mock()
         )
 
         hs.presence_handler = Mock()
@@ -51,9 +48,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         body = {"presence": "here", "status_msg": "beep boop"}
         request, channel = self.make_request(
-            "PUT",
-            "/presence/%s/status" % (self.user_id,),
-            body
+            "PUT", "/presence/%s/status" % (self.user_id,), body
         )
         self.render(request)
 
@@ -69,9 +64,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         body = {"presence": "here", "status_msg": "beep boop"}
         request, channel = self.make_request(
-            "PUT",
-            "/presence/%s/status" % (self.user_id,),
-            body
+            "PUT", "/presence/%s/status" % (self.user_id,), body
         )
         self.render(request)
 
