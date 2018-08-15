@@ -214,7 +214,6 @@ class SynchrotronPresence(object):
         yield self.notify_from_replication(states, stream_id)
 
     def get_currently_syncing_users(self):
-        # presence is disabled on matrix.org, so we return the empty set
         if self.hs.config.use_presence:
             return [
                 user_id for user_id, count in iteritems(self.user_to_num_current_syncs)
