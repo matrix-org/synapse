@@ -58,6 +58,7 @@ class TransactionQueue(object):
     """
 
     def __init__(self, hs):
+        self.hs = hs
         self.server_name = hs.hostname
 
         self.store = hs.get_datastore()
