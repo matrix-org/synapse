@@ -46,7 +46,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
     def test_sync_argless(self):
         request, channel = self.make_request("GET", "/_matrix/client/r0/sync")
-        self.render(self.request)
+        self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
@@ -69,7 +69,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.hs.config.use_presence = False
 
         request, channel = self.make_request("GET", "/_matrix/client/r0/sync")
-        self.render(self.request)
+        self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
