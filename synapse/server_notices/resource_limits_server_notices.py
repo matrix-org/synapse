@@ -66,8 +66,12 @@ class ResourceLimitsServerNotices(object):
 
             room_id = yield self._server_notices_manager.get_notice_room_for_user(user_id)
 
+            # Need to set tag here because room may have been created prior to
+            # tagging being set on creation. Ideally would set something to read
+            # room tags first, and cache that aggressively/
+            yield self._store.add_tag_to_room(user_id, room_id, 'm.server_notice', None)
+
             currently_blocked = False
-            logger.info("GET CURRENT STATE")
             pinned_state_event = None
             try:
                 pinned_state_event = yield self._state.get_current_state(
@@ -82,15 +86,9 @@ class ResourceLimitsServerNotices(object):
                 referenced_events = pinned_state_event.content.get('pinned')
 
             events = yield self._store.get_events(referenced_events)
-            logger.info(events)
             for event_id, event in events.items():
-                logger.info("event_id, event event.type %s %s %s" % (
-                    event_id, event, event.type)
-                )
                 if event.type == EventTypes.ServerNoticeLimitReached:
                     currently_blocked = True
-
-            logger.info("currently_blocked is %r" % currently_blocked)
             try:
                 # Normally should always pass in user_id if you have it, but in
                 # this case are checking what would happen to other users if they
@@ -109,7 +107,6 @@ class ResourceLimitsServerNotices(object):
                     yield self._server_notices_manager.send_notice(
                         user_id, content, EventTypes.Pinned, '',
                     )
-                    logger.info('deactivate block')
 
             except AuthError as e:
                 # Need to start notifying of blocking
@@ -131,7 +128,6 @@ class ResourceLimitsServerNotices(object):
                                 event.event_id,
                             ]
                         }
-                        logger.info("active block")
                         yield self._server_notices_manager.send_notice(
                             user_id, content, EventTypes.Pinned, '',
                         )
