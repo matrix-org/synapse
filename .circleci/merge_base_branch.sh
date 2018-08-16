@@ -15,4 +15,8 @@ then
 
     # Test for merge conflicts.
     git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
+
 fi
+
+# Log what we are
+git show -s
