@@ -22,6 +22,8 @@ from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
 
+SERVER_NOTICE_ROOM_TAG = "m.server_notice"
+
 
 class ServerNoticesManager(object):
     def __init__(self, hs):
@@ -151,7 +153,9 @@ class ServerNoticesManager(object):
             creator_join_profile=join_profile,
         )
         room_id = info['room_id']
-        yield self._store.add_tag_to_room(user_id, room_id, 'm.server_notice', None)
+        yield self._store.add_tag_to_room(
+            user_id, room_id, SERVER_NOTICE_ROOM_TAG, None
+        )
 
         logger.info("Created server notices room %s for %s", room_id, user_id)
         defer.returnValue(room_id)
