@@ -28,6 +28,8 @@ jobs:
       - checkout
       - run:
           command: |
+            echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
+            source $BASH_ENV
             if [[ -n "${CIRCLE_PR_NUMBER}" ]]
             then
                 # Update PR refs for testing.
@@ -58,6 +60,8 @@ jobs:
       - checkout
       - run:
           command: |
+            echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
+            source $BASH_ENV
             if [[ -n "${CIRCLE_PR_NUMBER}" ]]
             then
                 # Update PR refs for testing.
@@ -110,6 +114,8 @@ jobs:
       - checkout
       - run:
           command: |
+            echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
+            source $BASH_ENV
             if [[ -n "${CIRCLE_PR_NUMBER}" ]]
             then
                 # Update PR refs for testing.
@@ -140,6 +146,8 @@ jobs:
       - checkout
       - run:
           command: |
+            echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
+            source $BASH_ENV
             if [[ -n "${CIRCLE_PR_NUMBER}" ]]
             then
                 # Update PR refs for testing.
