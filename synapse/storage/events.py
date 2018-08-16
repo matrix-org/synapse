@@ -1911,7 +1911,7 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
         max_depth = max(row[0] for row in rows)
 
         if max_depth <= token.topological:
-            # We need to ensure we don't delete all the events from the datanase
+            # We need to ensure we don't delete all the events from the database
             # otherwise we wouldn't be able to send any events (due to not
             # having any backwards extremeties)
             raise SynapseError(

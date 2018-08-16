@@ -98,7 +98,7 @@ class RegistrationTestCase(unittest.TestCase):
     def test_get_or_create_user_mau_not_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.count_monthly_users = Mock(
-            return_value=defer.succeed(self.small_number_of_users)
+            return_value=defer.succeed(self.hs.config.max_mau_value - 1)
         )
         # Ensure does not throw exception
         yield self.handler.get_or_create_user("@user:server", 'c', "User")
@@ -112,6 +112,12 @@ class RegistrationTestCase(unittest.TestCase):
         with self.assertRaises(AuthError):
             yield self.handler.get_or_create_user("requester", 'b', "display_name")
 
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value)
+        )
+        with self.assertRaises(AuthError):
+            yield self.handler.get_or_create_user("requester", 'b', "display_name")
+
     @defer.inlineCallbacks
     def test_register_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
@@ -121,11 +127,23 @@ class RegistrationTestCase(unittest.TestCase):
         with self.assertRaises(AuthError):
             yield self.handler.register(localpart="local_part")
 
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value)
+        )
+        with self.assertRaises(AuthError):
+            yield self.handler.register(localpart="local_part")
+
     @defer.inlineCallbacks
     def test_register_saml2_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
+        )
+        with self.assertRaises(AuthError):
+            yield self.handler.register_saml2(localpart="local_part")
+
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         with self.assertRaises(AuthError):
             yield self.handler.register_saml2(localpart="local_part")
