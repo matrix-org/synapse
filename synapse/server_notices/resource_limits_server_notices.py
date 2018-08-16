@@ -128,7 +128,7 @@ class ResourceLimitsServerNotices(object):
         server_notices_tags = tags.get(room_id)
         need_to_set_tag = True
         if server_notices_tags:
-            if server_notice_tags.get(SERVER_NOTICE_ROOM_TAG):
+            if server_notices_tags.get(SERVER_NOTICE_ROOM_TAG):
                 # tag already present, nothing to do here
                 need_to_set_tag = False
         if need_to_set_tag:
@@ -158,7 +158,7 @@ class ResourceLimitsServerNotices(object):
             pinned_state_event = yield self._state.get_current_state(
                 room_id, event_type=EventTypes.Pinned
             )
-        except AuthError as e:
+        except AuthError:
             # The user has yet to join the server notices room
             pass
 
@@ -167,7 +167,6 @@ class ResourceLimitsServerNotices(object):
             referenced_events = pinned_state_event.content.get('pinned')
 
         events = yield self._store.get_events(referenced_events)
-        event_to_remove = None
         for event_id, event in events.items():
             if event.type == EventTypes.ServerNoticeLimitReached:
                 currently_blocked = True
