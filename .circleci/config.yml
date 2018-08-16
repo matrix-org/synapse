@@ -46,6 +46,7 @@ jobs:
           destination: logs
       - store_test_results:
           path: logs
+
   sytestpy3:
     machine: true
     steps:
