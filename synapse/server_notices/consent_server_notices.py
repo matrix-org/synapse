@@ -22,7 +22,6 @@ from synapse.api.errors import SynapseError
 from synapse.api.urls import ConsentURIBuilder
 from synapse.config import ConfigError
 from synapse.types import get_localpart_from_id
-from synapse.api.constants import EventTypes
 
 logger = logging.getLogger(__name__)
 
