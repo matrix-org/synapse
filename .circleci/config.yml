@@ -9,6 +9,8 @@ jobs:
       - store_artifacts:
           path: ~/project/logs
           destination: logs
+      - store_test_results:
+          path: logs
   sytestpy2postgres:
     machine: true
     steps:
@@ -18,6 +20,32 @@ jobs:
       - store_artifacts:
           path: ~/project/logs
           destination: logs
+      - store_test_results:
+          path: logs
+  sytestpy2merged:
+    machine: true
+    steps:
+      - checkout
+      - run: git pull --ff-only origin "refs/pull/${CI_PULL_REQUEST//*pull\//}/merge"
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy2
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+      - store_test_results:
+          path: logs
+  sytestpy2postgresmerged:
+    machine: true
+    steps:
+      - checkout
+      - run: git pull --ff-only origin "refs/pull/${CI_PULL_REQUEST//*pull\//}/merge"
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy2
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+      - store_test_results:
+          path: logs
   sytestpy3:
     machine: true
     steps:
@@ -27,6 +55,8 @@ jobs:
       - store_artifacts:
           path: ~/project/logs
           destination: logs
+      - store_test_results:
+          path: logs
   sytestpy3postgres:
     machine: true
     steps:
@@ -36,6 +66,32 @@ jobs:
       - store_artifacts:
           path: ~/project/logs
           destination: logs
+      - store_test_results:
+          path: logs
+  sytestpy3merged:
+    machine: true
+    steps:
+      - checkout
+      - run: git pull --ff-only origin "refs/pull/${CI_PULL_REQUEST//*pull\//}/merge"
+      - run: docker pull matrixdotorg/sytest-synapsepy3
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs hawkowl/sytestpy3
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+      - store_test_results:
+          path: logs
+  sytestpy3postgresmerged:
+    machine: true
+    steps:
+      - checkout
+      - run: git pull --ff-only origin "refs/pull/${CI_PULL_REQUEST//*pull\//}/merge"
+      - run: docker pull matrixdotorg/sytest-synapsepy3
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy3
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+      - store_test_results:
+          path: logs
 
 workflows:
   version: 2
@@ -43,6 +99,8 @@ workflows:
     jobs:
       - sytestpy2
       - sytestpy2postgres
+      - sytestpy2merged
+      - sytestpy2postgresmerged
 # Currently broken while the Python 3 port is incomplete
 #      - sytestpy3
 #      - sytestpy3postgres
