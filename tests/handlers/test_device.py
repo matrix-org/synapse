@@ -28,13 +28,13 @@ user2 = "@theresa:bbb"
 class DeviceTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(DeviceTestCase, self).__init__(*args, **kwargs)
-        self.store = None    # type: synapse.storage.DataStore
+        self.store = None  # type: synapse.storage.DataStore
         self.handler = None  # type: synapse.handlers.device.DeviceHandler
-        self.clock = None    # type: utils.MockClock
+        self.clock = None  # type: utils.MockClock
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield utils.setup_test_homeserver()
+        hs = yield utils.setup_test_homeserver(self.addCleanup)
         self.handler = hs.get_device_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
@@ -44,7 +44,7 @@ class DeviceTestCase(unittest.TestCase):
         res = yield self.handler.check_device_registered(
             user_id="@boris:foo",
             device_id="fco",
-            initial_device_display_name="display name"
+            initial_device_display_name="display name",
         )
         self.assertEqual(res, "fco")
 
@@ -56,14 +56,14 @@ class DeviceTestCase(unittest.TestCase):
         res1 = yield self.handler.check_device_registered(
             user_id="@boris:foo",
             device_id="fco",
-            initial_device_display_name="display name"
+            initial_device_display_name="display name",
         )
         self.assertEqual(res1, "fco")
 
         res2 = yield self.handler.check_device_registered(
             user_id="@boris:foo",
             device_id="fco",
-            initial_device_display_name="new display name"
+            initial_device_display_name="new display name",
         )
         self.assertEqual(res2, "fco")
 
@@ -75,7 +75,7 @@ class DeviceTestCase(unittest.TestCase):
         device_id = yield self.handler.check_device_registered(
             user_id="@theresa:foo",
             device_id=None,
-            initial_device_display_name="display"
+            initial_device_display_name="display",
         )
 
         dev = yield self.handler.store.get_device("@theresa:foo", device_id)
@@ -87,43 +87,53 @@ class DeviceTestCase(unittest.TestCase):
 
         res = yield self.handler.get_devices_by_user(user1)
         self.assertEqual(3, len(res))
-        device_map = {
-            d["device_id"]: d for d in res
-        }
-        self.assertDictContainsSubset({
-            "user_id": user1,
-            "device_id": "xyz",
-            "display_name": "display 0",
-            "last_seen_ip": None,
-            "last_seen_ts": None,
-        }, device_map["xyz"])
-        self.assertDictContainsSubset({
-            "user_id": user1,
-            "device_id": "fco",
-            "display_name": "display 1",
-            "last_seen_ip": "ip1",
-            "last_seen_ts": 1000000,
-        }, device_map["fco"])
-        self.assertDictContainsSubset({
-            "user_id": user1,
-            "device_id": "abc",
-            "display_name": "display 2",
-            "last_seen_ip": "ip3",
-            "last_seen_ts": 3000000,
-        }, device_map["abc"])
+        device_map = {d["device_id"]: d for d in res}
+        self.assertDictContainsSubset(
+            {
+                "user_id": user1,
+                "device_id": "xyz",
+                "display_name": "display 0",
+                "last_seen_ip": None,
+                "last_seen_ts": None,
+            },
+            device_map["xyz"],
+        )
+        self.assertDictContainsSubset(
+            {
+                "user_id": user1,
+                "device_id": "fco",
+                "display_name": "display 1",
+                "last_seen_ip": "ip1",
+                "last_seen_ts": 1000000,
+            },
+            device_map["fco"],
+        )
+        self.assertDictContainsSubset(
+            {
+                "user_id": user1,
+                "device_id": "abc",
+                "display_name": "display 2",
+                "last_seen_ip": "ip3",
+                "last_seen_ts": 3000000,
+            },
+            device_map["abc"],
+        )
 
     @defer.inlineCallbacks
     def test_get_device(self):
         yield self._record_users()
 
         res = yield self.handler.get_device(user1, "abc")
-        self.assertDictContainsSubset({
-            "user_id": user1,
-            "device_id": "abc",
-            "display_name": "display 2",
-            "last_seen_ip": "ip3",
-            "last_seen_ts": 3000000,
-        }, res)
+        self.assertDictContainsSubset(
+            {
+                "user_id": user1,
+                "device_id": "abc",
+                "display_name": "display 2",
+                "last_seen_ip": "ip3",
+                "last_seen_ts": 3000000,
+            },
+            res,
+        )
 
     @defer.inlineCallbacks
     def test_delete_device(self):
@@ -153,8 +163,7 @@ class DeviceTestCase(unittest.TestCase):
     def test_update_unknown_device(self):
         update = {"display_name": "new_display"}
         with self.assertRaises(synapse.api.errors.NotFoundError):
-            yield self.handler.update_device("user_id", "unknown_device_id",
-                                             update)
+            yield self.handler.update_device("user_id", "unknown_device_id", update)
 
     @defer.inlineCallbacks
     def _record_users(self):
@@ -168,16 +177,17 @@ class DeviceTestCase(unittest.TestCase):
         yield self._record_user(user2, "def", "dispkay", "token4", "ip4")
 
     @defer.inlineCallbacks
-    def _record_user(self, user_id, device_id, display_name,
-                     access_token=None, ip=None):
+    def _record_user(
+        self, user_id, device_id, display_name, access_token=None, ip=None
+    ):
         device_id = yield self.handler.check_device_registered(
             user_id=user_id,
             device_id=device_id,
-            initial_device_display_name=display_name
+            initial_device_display_name=display_name,
         )
 
         if ip is not None:
             yield self.store.insert_client_ip(
-                user_id,
-                access_token, ip, "user_agent", device_id)
+                user_id, access_token, ip, "user_agent", device_id
+            )
             self.clock.advance_time(1000)

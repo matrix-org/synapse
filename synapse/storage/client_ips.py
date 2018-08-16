@@ -35,6 +35,7 @@ LAST_SEEN_GRANULARITY = 120 * 1000
 
 class ClientIpStore(background_updates.BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
+
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen",
             keylen=4,
@@ -74,6 +75,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             "before", "shutdown", self._update_client_ips_batch
         )
 
+    @defer.inlineCallbacks
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
                          now=None):
         if not now:
@@ -84,7 +86,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             last_seen = self.client_ip_last_seen.get(key)
         except KeyError:
             last_seen = None
-
+        yield self.populate_monthly_active_users(user_id)
         # Rate-limited inserts
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
@@ -94,6 +96,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self._batch_row_update[key] = (user_agent, device_id, now)
 
     def _update_client_ips_batch(self):
+
+        # If the DB pool has already terminated, don't try updating
+        if not self.hs.get_db_pool().running:
+            return
+
         def update():
             to_update = self._batch_row_update
             self._batch_row_update = {}

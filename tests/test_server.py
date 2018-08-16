@@ -1,4 +1,3 @@
-import json
 import re
 
 from twisted.internet.defer import Deferred
@@ -17,7 +16,7 @@ class JsonResourceTests(unittest.TestCase):
         self.reactor = MemoryReactorClock()
         self.hs_clock = Clock(self.reactor)
         self.homeserver = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.reactor
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.reactor
         )
 
     def test_handler_for_request(self):
@@ -104,9 +103,8 @@ class JsonResourceTests(unittest.TestCase):
         request.render(res)
 
         self.assertEqual(channel.result["code"], b'403')
-        reply_body = json.loads(channel.result["body"])
-        self.assertEqual(reply_body["error"], "Forbidden!!one!")
-        self.assertEqual(reply_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
     def test_no_handler(self):
         """
@@ -126,6 +124,5 @@ class JsonResourceTests(unittest.TestCase):
         request.render(res)
 
         self.assertEqual(channel.result["code"], b'400')
-        reply_body = json.loads(channel.result["body"])
-        self.assertEqual(reply_body["error"], "Unrecognized request")
-        self.assertEqual(reply_body["errcode"], "M_UNRECOGNIZED")
+        self.assertEqual(channel.json_body["error"], "Unrecognized request")
+        self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")

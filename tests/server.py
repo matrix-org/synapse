@@ -11,6 +11,7 @@ from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.http.site import SynapseRequest
+from synapse.util import Clock
 
 from tests.utils import setup_test_homeserver as _sth
 
@@ -28,7 +29,13 @@ class FakeChannel(object):
     def json_body(self):
         if not self.result:
             raise Exception("No result yet.")
-        return json.loads(self.result["body"])
+        return json.loads(self.result["body"].decode('utf8'))
+
+    @property
+    def code(self):
+        if not self.result:
+            raise Exception("No result yet.")
+        return int(self.result["code"])
 
     def writeHeaders(self, version, code, reason, headers):
         self.result["version"] = version
@@ -79,11 +86,16 @@ def make_request(method, path, content=b""):
     Make a web request using the given method and path, feed it the
     content, and return the Request and the Channel underneath.
     """
+    if not isinstance(method, bytes):
+        method = method.encode('ascii')
+
+    if not isinstance(path, bytes):
+        path = path.encode('ascii')
 
     # Decorate it to be the full path
     if not path.startswith(b"/_matrix"):
         path = b"/_matrix/client/r0/" + path
-        path = path.replace("//", "/")
+        path = path.replace(b"//", b"/")
 
     if isinstance(content, text_type):
         content = content.encode('utf8')
@@ -124,6 +136,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
     A MemoryReactorClock that supports callFromThread.
     """
+
     def callFromThread(self, callback, *args, **kwargs):
         """
         Make the callback fire in the next reactor iteration.
@@ -134,12 +147,15 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         return d
 
 
-def setup_test_homeserver(*args, **kwargs):
+def setup_test_homeserver(cleanup_func, *args, **kwargs):
     """
     Set up a synchronous test server, driven by the reactor used by
     the homeserver.
     """
-    d = _sth(*args, **kwargs).result
+    d = _sth(cleanup_func, *args, **kwargs).result
+
+    if isinstance(d, Failure):
+        d.raiseException()
 
     # Make the thread pool synchronous.
     clock = d.get_clock()
@@ -172,7 +188,11 @@ def setup_test_homeserver(*args, **kwargs):
         """
         Threadless thread pool.
         """
+
         def start(self):
+            pass
+
+        def stop(self):
             pass
 
         def callInThreadWithCallback(self, onResult, function, *args, **kwargs):
@@ -191,3 +211,9 @@ def setup_test_homeserver(*args, **kwargs):
     clock.threadpool = ThreadPool()
     pool.threadpool = ThreadPool()
     return d
+
+
+def get_clock():
+    clock = ThreadedMemoryReactorClock()
+    hs_clock = Clock(clock)
+    return (clock, hs_clock)

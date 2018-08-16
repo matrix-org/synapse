@@ -34,7 +34,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.streams.config import PaginationConfig
-from synapse.types import RoomAlias, RoomID, ThirdPartyInstanceID, UserID
+from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -384,15 +384,39 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
     def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
         requester = yield self.auth.get_user_by_req(request)
-        events = yield self.message_handler.get_state_events(
+        handler = self.message_handler
+
+        # request the state as of a given event, as identified by a stream token,
+        # for consistency with /messages etc.
+        # useful for getting the membership in retrospect as of a given /sync
+        # response.
+        at_token_string = parse_string(request, "at")
+        if at_token_string is None:
+            at_token = None
+        else:
+            at_token = StreamToken.from_string(at_token_string)
+
+        # let you filter down on particular memberships.
+        # XXX: this may not be the best shape for this API - we could pass in a filter
+        # instead, except filters aren't currently aware of memberships.
+        # See https://github.com/matrix-org/matrix-doc/issues/1337 for more details.
+        membership = parse_string(request, "membership")
+        not_membership = parse_string(request, "not_membership")
+
+        events = yield handler.get_state_events(
             room_id=room_id,
             user_id=requester.user.to_string(),
+            at_token=at_token,
+            types=[(EventTypes.Member, None)],
         )
 
         chunk = []
 
         for event in events:
-            if event["type"] != EventTypes.Member:
+            if (
+                (membership and event['content'].get("membership") != membership) or
+                (not_membership and event['content'].get("membership") == not_membership)
+            ):
                 continue
             chunk.append(event)
 
@@ -401,6 +425,8 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
         }))
 
 
+# deprecated in favour of /members?membership=join?
+# except it does custom AS logic and has a simpler return format
 class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$")
 
@@ -506,7 +532,7 @@ class RoomEventServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request)
-        event = yield self.event_handler.get_event(requester.user, event_id)
+        event = yield self.event_handler.get_event(requester.user, room_id, event_id)
 
         time_now = self.clock.time_msec()
         if event:
@@ -531,11 +557,20 @@ class RoomEventContextServlet(ClientV1RestServlet):
 
         limit = parse_integer(request, "limit", default=10)
 
+        # picking the API shape for symmetry with /messages
+        filter_bytes = parse_string(request, "filter")
+        if filter_bytes:
+            filter_json = urlparse.unquote(filter_bytes).decode("UTF-8")
+            event_filter = Filter(json.loads(filter_json))
+        else:
+            event_filter = None
+
         results = yield self.room_context_handler.get_event_context(
             requester.user,
             room_id,
             event_id,
             limit,
+            event_filter,
         )
 
         if not results:

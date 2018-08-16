@@ -32,7 +32,7 @@ PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 class FilterTestCase(unittest.TestCase):
 
-    USER_ID = b"@apple:test"
+    USER_ID = "@apple:test"
     TO_REGISTER = [sync]
 
     def setUp(self):
@@ -40,7 +40,7 @@ class FilterTestCase(unittest.TestCase):
         self.hs_clock = Clock(self.clock)
 
         self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
 
         self.auth = self.hs.get_auth()
@@ -68,7 +68,7 @@ class FilterTestCase(unittest.TestCase):
             r.register_servlets(self.hs, self.resource)
 
     def test_sync_argless(self):
-        request, channel = make_request(b"GET", b"/_matrix/client/r0/sync")
+        request, channel = make_request("GET", "/_matrix/client/r0/sync")
         request.render(self.resource)
         wait_until_result(self.clock, channel)
 

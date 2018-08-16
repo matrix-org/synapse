@@ -526,7 +526,7 @@ _to_ignore = [
     "synapse.util.logcontext",
     "synapse.http.server",
     "synapse.storage._base",
-    "synapse.util.async",
+    "synapse.util.async_helpers",
 ]
 
 

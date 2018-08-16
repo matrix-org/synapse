@@ -47,7 +47,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             login_handler=self.login_handler,
         )
         self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
         self.hs.get_auth = Mock(return_value=self.auth)
         self.hs.get_handlers = Mock(return_value=self.handlers)
@@ -81,7 +81,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "access_token": token,
             "home_server": self.hs.hostname,
         }
-        self.assertDictContainsSubset(det_data, json.loads(channel.result["body"]))
+        self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_appservice_registration_invalid(self):
         self.appservice = None  # no application service exists
@@ -101,9 +101,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"], "Invalid password"
-        )
+        self.assertEquals(channel.json_body["error"], "Invalid password")
 
     def test_POST_bad_username(self):
         request_data = json.dumps({"username": 777, "password": "monkey"})
@@ -112,9 +110,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"], "Invalid username"
-        )
+        self.assertEquals(channel.json_body["error"], "Invalid username")
 
     def test_POST_user_valid(self):
         user_id = "@kermit:muppet"
@@ -140,7 +136,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "device_id": device_id,
         }
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        self.assertDictContainsSubset(det_data, json.loads(channel.result["body"]))
+        self.assertDictContainsSubset(det_data, channel.json_body)
         self.auth_handler.get_login_tuple_for_user_id(
             user_id, device_id=device_id, initial_device_display_name=None
         )
@@ -157,10 +153,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"],
-            "Registration has been disabled",
-        )
+        self.assertEquals(channel.json_body["error"], "Registration has been disabled")
 
     def test_POST_guest_registration(self):
         user_id = "a@b"
@@ -178,7 +171,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
             "device_id": "guest_device",
         }
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        self.assertDictContainsSubset(det_data, json.loads(channel.result["body"]))
+        self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_disabled_guest_registration(self):
         self.hs.config.allow_guest_access = False
@@ -188,6 +181,4 @@ class RegisterRestServletTestCase(unittest.TestCase):
         wait_until_result(self.clock, channel)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
-        self.assertEquals(
-            json.loads(channel.result["body"])["error"], "Guest access is disabled"
-        )
+        self.assertEquals(channel.json_body["error"], "Guest access is disabled")

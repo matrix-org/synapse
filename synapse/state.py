@@ -28,7 +28,7 @@ from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.events.snapshot import EventContext
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logutils import log_function
@@ -577,7 +577,7 @@ def _make_state_cache_entry(
 
 def _ordered_events(events):
     def key_func(e):
-        return -int(e.depth), hashlib.sha1(e.event_id.encode()).hexdigest()
+        return -int(e.depth), hashlib.sha1(e.event_id.encode('ascii')).hexdigest()
 
     return sorted(events, key=key_func)
 

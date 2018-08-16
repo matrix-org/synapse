@@ -43,7 +43,7 @@ from synapse.api.errors import (
 from synapse.http import cancelled_to_request_timed_out_error
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util import logcontext
-from synapse.util.async import add_timeout_to_deferred
+from synapse.util.async_helpers import add_timeout_to_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
@@ -61,14 +61,14 @@ MAX_SHORT_RETRIES = 3
 
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
-        self.tls_server_context_factory = hs.tls_server_context_factory
+        self.tls_client_options_factory = hs.tls_client_options_factory
 
     def endpointForURI(self, uri):
         destination = uri.netloc
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
-            ssl_context_factory=self.tls_server_context_factory
+            tls_client_options_factory=self.tls_client_options_factory
         )
 
 
@@ -439,7 +439,7 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def get_json(self, destination, path, args={}, retry_on_dns_fail=True,
+    def get_json(self, destination, path, args=None, retry_on_dns_fail=True,
                  timeout=None, ignore_backoff=False):
         """ GETs some json from the given host homeserver and path
 
@@ -447,7 +447,7 @@ class MatrixFederationHttpClient(object):
             destination (str): The remote server to send the HTTP request
                 to.
             path (str): The HTTP path.
-            args (dict): A dictionary used to create query strings, defaults to
+            args (dict|None): A dictionary used to create query strings, defaults to
                 None.
             timeout (int): How long to try (in ms) the destination for before
                 giving up. None indicates no timeout and that the request will
@@ -702,6 +702,9 @@ def check_content_type_is_json(headers):
 
 
 def encode_query_args(args):
+    if args is None:
+        return b""
+
     encoded_args = {}
     for k, vs in args.items():
         if isinstance(vs, string_types):

@@ -2,7 +2,7 @@
     package = "synapse"
     filename = "CHANGES.md"
     directory = "changelog.d"
-    issue_format = "[\\#{issue}](https://github.com/matrix-org/synapse/issues/{issue}>)"
+    issue_format = "[\\#{issue}](https://github.com/matrix-org/synapse/issues/{issue})"
 
     [[tool.towncrier.type]]
         directory = "feature"
