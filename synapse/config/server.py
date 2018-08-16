@@ -81,6 +81,7 @@ class ServerConfig(Config):
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
+        self.hs_disabled_limit_type = config.get("hs_disabled_limit_type", "")
 
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints

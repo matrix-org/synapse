@@ -25,7 +25,7 @@ from twisted.internet import defer
 import synapse.types
 from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, ResourceLimitError
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -784,10 +784,11 @@ class Auth(object):
             MAU cohort
         """
         if self.hs.config.hs_disabled:
-            raise AuthError(
+            raise ResourceLimitError(
                 403, self.hs.config.hs_disabled_message,
                 errcode=Codes.RESOURCE_LIMIT_EXCEED,
                 admin_uri=self.hs.config.admin_uri,
+                limit_type=self.hs.config.hs_disabled_limit_type
             )
         if self.hs.config.limit_usage_by_mau is True:
             # If the user is already part of the MAU cohort
@@ -798,8 +799,9 @@ class Auth(object):
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
-                raise AuthError(
+                raise ResourceLimitError(
                     403, "Monthly Active User Limits AU Limit Exceeded",
                     admin_uri=self.hs.config.admin_uri,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEED
+                    errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                    limit_type="monthly_active_user"
                 )

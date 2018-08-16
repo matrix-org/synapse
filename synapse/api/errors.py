@@ -224,15 +224,34 @@ class NotFoundError(SynapseError):
 
 class AuthError(SynapseError):
     """An error raised when there was a problem authorising an event."""
-    def __init__(self, code, msg, errcode=Codes.FORBIDDEN, admin_uri=None):
+
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.FORBIDDEN
+        super(AuthError, self).__init__(*args, **kwargs)
+
+
+class ResourceLimitError(SynapseError):
+    """
+    Any error raised when there is a problem with resource usage.
+    For instance, the monthly active user limit for the server has been exceeded
+    """
+    def __init__(
+        self, code, msg,
+        errcode=Codes.RESOURCE_LIMIT_EXCEED,
+        admin_uri=None,
+        limit_type=None,
+    ):
         self.admin_uri = admin_uri
-        super(AuthError, self).__init__(code, msg, errcode=errcode)
+        self.limit_type = limit_type
+        super(ResourceLimitError, self).__init__(code, msg, errcode=errcode)
 
     def error_dict(self):
         return cs_error(
             self.msg,
             self.errcode,
             admin_uri=self.admin_uri,
+            limit_type=self.limit_type
         )
 
 
