@@ -75,6 +75,19 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         active_count = yield self.store.get_monthly_active_count()
         self.assertEquals(active_count, user_num)
 
+        # Test that regalar users are removed from the db
+        ru_count = 2
+        yield self.store.upsert_monthly_active_user("@ru1:server")
+        yield self.store.upsert_monthly_active_user("@ru2:server")
+        active_count = yield self.store.get_monthly_active_count()
+
+        self.assertEqual(active_count, user_num + ru_count)
+        self.hs.config.max_mau_value = user_num
+        yield self.store.reap_monthly_active_users()
+
+        active_count = yield self.store.get_monthly_active_count()
+        self.assertEquals(active_count, user_num)
+
     @defer.inlineCallbacks
     def test_can_insert_and_count_mau(self):
         count = yield self.store.get_monthly_active_count()
