@@ -26,24 +26,25 @@ jobs:
     machine: true
     steps:
       - checkout
-      - |
-        if [[ -n "${CIRCLE_PR_NUMBER}" ]]
-        then
-            # Update PR refs for testing.
-            FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
+      - run:
+          command: |
+            if [[ -n "${CIRCLE_PR_NUMBER}" ]]
+            then
+                # Update PR refs for testing.
+                FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Retrieve the refs
-            git fetch -u origin ${FETCH_REFS}
+                # Retrieve the refs
+                git fetch -u origin ${FETCH_REFS}
 
-            # Checkout PR merge ref.
-            git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
+                # Checkout PR merge ref.
+                git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Test for merge conflicts.
-            git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
-            git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
-        fi
+                # Test for merge conflicts.
+                git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
+                git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
+            fi
       - run: docker pull matrixdotorg/sytest-synapsepy2
       - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy2
       - store_artifacts:
@@ -55,24 +56,25 @@ jobs:
     machine: true
     steps:
       - checkout
-      - |
-        if [[ -n "${CIRCLE_PR_NUMBER}" ]]
-        then
-            # Update PR refs for testing.
-            FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
+      - run:
+          command: |
+            if [[ -n "${CIRCLE_PR_NUMBER}" ]]
+            then
+                # Update PR refs for testing.
+                FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Retrieve the refs
-            git fetch -u origin ${FETCH_REFS}
+                # Retrieve the refs
+                git fetch -u origin ${FETCH_REFS}
 
-            # Checkout PR merge ref.
-            git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
+                # Checkout PR merge ref.
+                git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Test for merge conflicts.
-            git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
-            git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
-        fi
+                # Test for merge conflicts.
+                git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
+                git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
+            fi
       - run: docker pull matrixdotorg/sytest-synapsepy2
       - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy2
       - store_artifacts:
@@ -106,24 +108,25 @@ jobs:
     machine: true
     steps:
       - checkout
-      - |
-        if [[ -n "${CIRCLE_PR_NUMBER}" ]]
-        then
-            # Update PR refs for testing.
-            FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
+      - run:
+          command: |
+            if [[ -n "${CIRCLE_PR_NUMBER}" ]]
+            then
+                # Update PR refs for testing.
+                FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Retrieve the refs
-            git fetch -u origin ${FETCH_REFS}
+                # Retrieve the refs
+                git fetch -u origin ${FETCH_REFS}
 
-            # Checkout PR merge ref.
-            git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
+                # Checkout PR merge ref.
+                git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Test for merge conflicts.
-            git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
-            git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
-        fi
+                # Test for merge conflicts.
+                git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
+                git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
+            fi
       - run: docker pull matrixdotorg/sytest-synapsepy3
       - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs hawkowl/sytestpy3
       - store_artifacts:
@@ -135,24 +138,25 @@ jobs:
     machine: true
     steps:
       - checkout
-      - |
-        if [[ -n "${CIRCLE_PR_NUMBER}" ]]
-        then
-            # Update PR refs for testing.
-            FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
-            FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
+      - run:
+          command: |
+            if [[ -n "${CIRCLE_PR_NUMBER}" ]]
+            then
+                # Update PR refs for testing.
+                FETCH_REFS="+${CIRCLE_PR_BASE_BRANCH}:${CIRCLE_PR_BASE_BRANCH}"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
+                FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Retrieve the refs
-            git fetch -u origin ${FETCH_REFS}
+                # Retrieve the refs
+                git fetch -u origin ${FETCH_REFS}
 
-            # Checkout PR merge ref.
-            git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
+                # Checkout PR merge ref.
+                git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
 
-            # Test for merge conflicts.
-            git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
-            git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
-        fi
+                # Test for merge conflicts.
+                git branch --merged | grep ${CIRCLE_PR_BASE_BRANCH} > /dev/null
+                git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
+            fi
       - run: docker pull matrixdotorg/sytest-synapsepy3
       - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy3
       - store_artifacts:
