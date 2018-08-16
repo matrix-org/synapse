@@ -76,7 +76,8 @@ class ServerNoticesManager(object):
             "sender": system_mxid,
             "content": event_content,
         }
-        if state_key:
+
+        if state_key is not None:
             event_dict['state_key'] = state_key
 
         res = yield self._event_creation_handler.create_and_send_nonmember_event(
