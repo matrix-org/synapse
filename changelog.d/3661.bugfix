@@ -1,0 +1,1 @@
+Fix bug on deleting 3pid when using identity servers that don't support unbind API

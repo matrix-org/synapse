@@ -46,7 +46,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 tp["medium"], tp["address"]
             )
             if user_id:
-                self.upsert_monthly_active_user(user_id)
+                yield self.upsert_monthly_active_user(user_id)
                 reserved_user_list.append(user_id)
             else:
                 logger.warning(
@@ -125,7 +125,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # is racy.
         # Have resolved to invalidate the whole cache for now and do
         # something about it if and when the perf becomes significant
-        self._user_last_seen_monthly_active.invalidate_all()
+        self.user_last_seen_monthly_active.invalidate_all()
         self.get_monthly_active_count.invalidate_all()
 
     @cached(num_args=0)
@@ -164,11 +164,11 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             lock=False,
         )
         if is_insert:
-            self._user_last_seen_monthly_active.invalidate((user_id,))
+            self.user_last_seen_monthly_active.invalidate((user_id,))
             self.get_monthly_active_count.invalidate(())
 
     @cached(num_args=1)
-    def _user_last_seen_monthly_active(self, user_id):
+    def user_last_seen_monthly_active(self, user_id):
         """
             Checks if a given user is part of the monthly active user group
             Arguments:
@@ -185,7 +185,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             },
             retcol="timestamp",
             allow_none=True,
-            desc="_user_last_seen_monthly_active",
+            desc="user_last_seen_monthly_active",
         ))
 
     @defer.inlineCallbacks
@@ -197,7 +197,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             user_id(str): the user_id to query
         """
         if self.hs.config.limit_usage_by_mau:
-            last_seen_timestamp = yield self._user_last_seen_monthly_active(user_id)
+            last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
 
             # We want to reduce to the total number of db writes, and are happy
