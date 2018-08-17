@@ -19,6 +19,7 @@ from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
 
+
 class FilterTestCase(unittest.HomeserverTestCase):
 
     user_id = "@apple:test"
