@@ -33,7 +33,7 @@ As an example::
 
   < {
      "access_token": "token_here",
-     "user_id": "@pepper_roni@test",
+     "user_id": "@pepper_roni:localhost",
      "home_server": "test",
      "device_id": "device_id_here"
     }

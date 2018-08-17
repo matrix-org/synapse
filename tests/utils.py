@@ -138,6 +138,7 @@ def setup_test_homeserver(
         config.limit_usage_by_mau = False
         config.hs_disabled = False
         config.hs_disabled_message = ""
+        config.hs_disabled_limit_type = ""
         config.max_mau_value = 50
         config.mau_limits_reserved_threepids = []
         config.admin_uri = None

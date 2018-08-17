@@ -25,7 +25,7 @@ from synapse.rest.client.v1_only.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver
+from tests.server import make_request, render, setup_test_homeserver
 
 
 class CreateUserServletTestCase(unittest.TestCase):
@@ -77,10 +77,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         )
 
         request, channel = make_request(b"POST", url, request_data)
-        request.render(res)
-
-        # Advance the clock because it waits
-        self.clock.advance(1)
+        render(request, res, self.clock)
 
         self.assertEquals(channel.result["code"], b"200")
 
