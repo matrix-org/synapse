@@ -48,7 +48,7 @@ def parse_integer(request, name, default=None, required=False):
 def parse_integer_from_args(args, name, default=None, required=False):
 
     if not isinstance(name, bytes):
-        name = name.encode('utf8')
+        name = name.encode('ascii')
 
     if name in args:
         try:
@@ -89,7 +89,7 @@ def parse_boolean(request, name, default=None, required=False):
 def parse_boolean_from_args(args, name, default=None, required=False):
 
     if not isinstance(name, bytes):
-        name = name.encode('utf8')
+        name = name.encode('ascii')
 
     if name in args:
         try:
@@ -116,19 +116,14 @@ def parse_string(request, name, default=None, required=False,
     """
     Parse a string parameter from the request query string.
 
-    If encoding is not None and name is unicode, it will be encoded before
-    looking at the query parameters. The content of the query param will be
-    decoded to Unicode using the encoding.
-
-    If encoding is None, the name must be bytes and the default must be bytes
-    (or None). The return value will not be decoded, and will be the exact
-    bytes in the query param.
+    If encoding is not None, the content of the query param will be
+    decoded to Unicode using the encoding, otherwise it will be encoded
 
     Args:
         request: the twisted HTTP request.
         name (bytes/unicode): the name of the query parameter.
         default (bytes/unicode|None): value to use if the parameter is absent,
-            defaults to None. Must be the same type as name, if given.
+            defaults to None. Must be bytes if encoding is None.
         required (bool): whether to raise a 400 SynapseError if the
             parameter is absent, defaults to False.
         allowed_values (list[bytes/unicode]): List of allowed values for the
@@ -154,8 +149,8 @@ def parse_string(request, name, default=None, required=False,
 def parse_string_from_args(args, name, default=None, required=False,
                            allowed_values=None, param_type="string", encoding='ascii'):
 
-    if not isinstance(name, bytes) and encoding:
-        name = name.encode(encoding)
+    if not isinstance(name, bytes):
+        name = name.encode('ascii')
 
     if name in args:
         value = args[name][0]
@@ -175,6 +170,10 @@ def parse_string_from_args(args, name, default=None, required=False,
             message = "Missing %s query parameter %r" % (param_type, name)
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
+
+            if encoding and isinstance(default, bytes):
+                return default.decode(encoding)
+
             return default
 
 
