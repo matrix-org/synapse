@@ -68,6 +68,8 @@ logger = logging.getLogger("synapse.app.event_creator")
 
 
 class EventCreatorSlavedStore(
+    # FIXME(#3714): We need to add UserDirectoryStore as we write directly
+    # rather than going via the correct worker.
     UserDirectoryStore,
     DirectoryStore,
     SlavedTransactionStore,
