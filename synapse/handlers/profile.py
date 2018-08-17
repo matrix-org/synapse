@@ -33,12 +33,12 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class ProfileHandler(BaseHandler):
+class WorkerProfileHandler(BaseHandler):
     PROFILE_UPDATE_MS = 60 * 1000
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs):
-        super(ProfileHandler, self).__init__(hs)
+        super(WorkerProfileHandler, self).__init__(hs)
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -46,11 +46,6 @@ class ProfileHandler(BaseHandler):
         )
 
         self.user_directory_handler = hs.get_user_directory_handler()
-
-        if hs.config.worker_app is None:
-            self.clock.looping_call(
-                self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
-            )
 
         self._notify_master_profile_change = (
             ReplicationHandleProfileChangeRestServlet.make_client(hs)
@@ -297,6 +292,18 @@ class ProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s",
                     room_id, str(e.message)
                 )
+
+
+class MasterProfileHandler(WorkerProfileHandler):
+    PROFILE_UPDATE_MS = 60 * 1000
+    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
+
+    def __init__(self, hs):
+        super(MasterProfileHandler, self).__init__(hs)
+
+        self.clock.looping_call(
+            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+        )
 
     def _start_update_remote_profile_cache(self):
         return run_as_background_process(

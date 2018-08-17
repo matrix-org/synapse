@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import AuthError
-from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.profile import MasterProfileHandler
 from synapse.types import UserID
 
 from tests import unittest
@@ -29,7 +29,7 @@ from tests.utils import setup_test_homeserver
 
 class ProfileHandlers(object):
     def __init__(self, hs):
-        self.profile_handler = ProfileHandler(hs)
+        self.profile_handler = MasterProfileHandler(hs)
 
 
 class ProfileTestCase(unittest.TestCase):
