@@ -81,6 +81,7 @@ class ServerConfig(Config):
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
+        self.hs_disabled_limit_type = config.get("hs_disabled_limit_type", "")
 
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
@@ -340,6 +341,32 @@ class ServerConfig(Config):
           # - port: 9000
           #   bind_addresses: ['::1', '127.0.0.1']
           #   type: manhole
+
+
+          # Homeserver blocking
+          #
+          # How to reach the server admin, used in ResourceLimitError
+          # admin_uri: 'mailto:admin@server.com'
+          #
+          # Global block config
+          #
+          # hs_disabled: False
+          # hs_disabled_message: 'Human readable reason for why the HS is blocked'
+          # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
+          #
+          # Monthly Active User Blocking
+          #
+          # Enables monthly active user checking
+          # limit_usage_by_mau: False
+          # max_mau_value: 50
+          #
+          # Sometimes the server admin will want to ensure certain accounts are
+          # never blocked by mau checking. These accounts are specified here.
+          #
+          # mau_limit_reserved_threepids:
+          # - medium: 'email'
+          #   address: 'reserved_user@example.com'
+
         """ % locals()
 
     def read_arguments(self, args):

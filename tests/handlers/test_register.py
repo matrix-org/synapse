@@ -17,7 +17,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError
+from synapse.api.errors import ResourceLimitError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import UserID, create_requester
 
@@ -109,13 +109,13 @@ class RegistrationTestCase(unittest.TestCase):
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.handler.get_or_create_user("requester", 'b', "display_name")
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.handler.get_or_create_user("requester", 'b', "display_name")
 
     @defer.inlineCallbacks
@@ -124,13 +124,13 @@ class RegistrationTestCase(unittest.TestCase):
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.handler.register(localpart="local_part")
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.handler.register(localpart="local_part")
 
     @defer.inlineCallbacks
@@ -139,11 +139,11 @@ class RegistrationTestCase(unittest.TestCase):
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.handler.register_saml2(localpart="local_part")
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.handler.register_saml2(localpart="local_part")
