@@ -19,8 +19,8 @@ from synapse.app.frontend_proxy import FrontendProxyServer
 
 from tests.unittest import HomeserverTestCase
 
-class FrontendProxyTests(HomeserverTestCase):
 
+class FrontendProxyTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(
@@ -39,11 +39,7 @@ class FrontendProxyTests(HomeserverTestCase):
         config = {
             "port": 8080,
             "bind_addresses": ["0.0.0.0"],
-            "resources": [
-                {
-                    "names": ["client"]
-                }
-            ]
+            "resources": [{"names": ["client"]}],
         }
 
         # Listen with the config
@@ -52,7 +48,9 @@ class FrontendProxyTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
-        self.resource = site.resource.children["_matrix"].children["client"].children["r0"]
+        self.resource = (
+            site.resource.children["_matrix"].children["client"].children["r0"]
+        )
 
         request, channel = self.make_request("PUT", "presence/a/status")
         self.render(request)
@@ -71,11 +69,7 @@ class FrontendProxyTests(HomeserverTestCase):
         config = {
             "port": 8080,
             "bind_addresses": ["0.0.0.0"],
-            "resources": [
-                {
-                    "names": ["client"]
-                }
-            ]
+            "resources": [{"names": ["client"]}],
         }
 
         # Listen with the config
@@ -84,7 +78,9 @@ class FrontendProxyTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
-        self.resource = site.resource.children["_matrix"].children["client"].children["r0"]
+        self.resource = (
+            site.resource.children["_matrix"].children["client"].children["r0"]
+        )
 
         request, channel = self.make_request("PUT", "presence/a/status")
         self.render(request)
