@@ -94,6 +94,8 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="set_profile_avatar_url",
         )
 
+
+class ProfileStore(ProfileWorkerStore):
     def add_remote_profile_cache(self, user_id, displayname, avatar_url):
         """Ensure we are caching the remote user's profiles.
 
@@ -180,7 +182,3 @@ class ProfileWorkerStore(SQLBaseStore):
 
         if res:
             defer.returnValue(True)
-
-
-class ProfileStore(ProfileWorkerStore):
-    pass
