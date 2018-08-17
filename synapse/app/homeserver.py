@@ -525,6 +525,7 @@ def run(hs):
     clock.looping_call(
         hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60
     )
+    hs.get_datastore().reap_monthly_active_users()
 
     @defer.inlineCallbacks
     def generate_monthly_active_users():
