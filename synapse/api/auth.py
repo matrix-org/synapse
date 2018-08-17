@@ -698,7 +698,7 @@ class Auth(object):
                 401 since some of the old clients depended on auth errors returning
                 403.
         Returns:
-            str: The access_token
+            unicode: The access_token
         Raises:
             AuthError: If there isn't an access_token in the request.
         """
