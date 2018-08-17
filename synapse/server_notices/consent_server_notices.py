@@ -103,7 +103,7 @@ class ConsentServerNotices(object):
                     },
                 )
                 yield self._server_notices_manager.send_notice(
-                    user_id, content
+                    user_id, content,
                 )
                 yield self._store.user_set_consent_server_notice_sent(
                     user_id, self._current_consent_version,
