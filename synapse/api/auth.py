@@ -800,7 +800,8 @@ class Auth(object):
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
                 raise ResourceLimitError(
-                    403, "Monthly Active User Limits AU Limit Exceeded",
+                    403, "Monthly Active User Limit Exceeded",
+
                     admin_uri=self.hs.config.admin_uri,
                     errcode=Codes.RESOURCE_LIMIT_EXCEED,
                     limit_type="monthly_active_user"
