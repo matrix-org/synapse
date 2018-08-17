@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest import TestCase
-
 from synapse.app.frontend_proxy import FrontendProxyServer
 
 from tests.unittest import HomeserverTestCase
