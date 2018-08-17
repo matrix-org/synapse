@@ -93,7 +93,8 @@ def setupdb():
 
 @defer.inlineCallbacks
 def setup_test_homeserver(
-    cleanup_func, name="test", datastore=None, config=None, reactor=None, **kargs
+    cleanup_func, name="test", datastore=None, config=None, reactor=None,
+    homeserverToUse=HomeServer, **kargs
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -137,6 +138,7 @@ def setup_test_homeserver(
         config.limit_usage_by_mau = False
         config.hs_disabled = False
         config.hs_disabled_message = ""
+        config.hs_disabled_limit_type = ""
         config.max_mau_value = 50
         config.mau_limits_reserved_threepids = []
         config.admin_uri = None
@@ -191,7 +193,7 @@ def setup_test_homeserver(
     config.database_config["args"]["cp_openfun"] = db_engine.on_new_connection
 
     if datastore is None:
-        hs = HomeServer(
+        hs = homeserverToUse(
             name,
             config=config,
             db_config=config.database_config,
@@ -234,7 +236,7 @@ def setup_test_homeserver(
 
         hs.setup()
     else:
-        hs = HomeServer(
+        hs = homeserverToUse(
             name,
             db_pool=None,
             datastore=datastore,

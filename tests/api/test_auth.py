@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, ResourceLimitError
 from synapse.types import UserID
 
 from tests import unittest
@@ -455,7 +455,7 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(lots_of_users)
         )
 
-        with self.assertRaises(AuthError) as e:
+        with self.assertRaises(ResourceLimitError) as e:
             yield self.auth.check_auth_blocking()
         self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
@@ -471,7 +471,7 @@ class AuthTestCase(unittest.TestCase):
     def test_hs_disabled(self):
         self.hs.config.hs_disabled = True
         self.hs.config.hs_disabled_message = "Reason for being disabled"
-        with self.assertRaises(AuthError) as e:
+        with self.assertRaises(ResourceLimitError) as e:
             yield self.auth.check_auth_blocking()
         self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
