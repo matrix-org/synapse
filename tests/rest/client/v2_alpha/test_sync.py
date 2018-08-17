@@ -23,8 +23,8 @@ from tests import unittest
 from tests.server import (
     ThreadedMemoryReactorClock as MemoryReactorClock,
     make_request,
+    render,
     setup_test_homeserver,
-    wait_until_result,
 )
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
@@ -69,8 +69,7 @@ class FilterTestCase(unittest.TestCase):
 
     def test_sync_argless(self):
         request, channel = make_request("GET", "/_matrix/client/r0/sync")
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertTrue(
