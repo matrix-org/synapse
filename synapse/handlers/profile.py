@@ -25,7 +25,6 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.http.profile import ReplicationHandleProfileChangeRestServlet
 from synapse.types import UserID, get_domain_from_id
 
 from ._base import BaseHandler
@@ -46,10 +45,6 @@ class WorkerProfileHandler(BaseHandler):
         )
 
         self.user_directory_handler = hs.get_user_directory_handler()
-
-        self._notify_master_profile_change = (
-            ReplicationHandleProfileChangeRestServlet.make_client(hs)
-        )
 
     @defer.inlineCallbacks
     def get_profile(self, user_id):
@@ -166,16 +161,10 @@ class WorkerProfileHandler(BaseHandler):
         )
 
         if self.hs.config.user_directory_search_all_users:
-            if self.hs.config.worker_app is None:
-                profile = yield self.store.get_profileinfo(target_user.localpart)
-                yield self.user_directory_handler.handle_local_profile_change(
-                    target_user.to_string(), profile
-                )
-            else:
-                yield self._notify_master_profile_change(
-                    requester=requester,
-                    user_id=target_user.to_string(),
-                )
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            yield self.user_directory_handler.handle_local_profile_change(
+                target_user.to_string(), profile
+            )
 
         yield self._update_join_states(requester, target_user)
 
@@ -225,15 +214,10 @@ class WorkerProfileHandler(BaseHandler):
             target_user.localpart, new_avatar_url
         )
 
-        if self.hs.config.worker_app is None:
+        if self.hs.config.user_directory_search_all_users:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             yield self.user_directory_handler.handle_local_profile_change(
                 target_user.to_string(), profile
-            )
-        else:
-            yield self._notify_master_profile_change(
-                requester=requester,
-                user_id=target_user.to_string(),
             )
 
         yield self._update_join_states(requester, target_user)

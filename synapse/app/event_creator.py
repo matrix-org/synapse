@@ -58,6 +58,7 @@ from synapse.rest.client.v1.room import (
 )
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
+from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
@@ -67,6 +68,7 @@ logger = logging.getLogger("synapse.app.event_creator")
 
 
 class EventCreatorSlavedStore(
+    UserDirectoryStore,
     DirectoryStore,
     SlavedTransactionStore,
     SlavedProfileStore,
