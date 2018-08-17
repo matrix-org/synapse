@@ -48,15 +48,14 @@ class ProfileTestCase(unittest.TestCase):
         self.mock_registry.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             http_client=None,
             handlers=None,
             resource_for_federation=Mock(),
             federation_client=self.mock_federation,
             federation_server=Mock(),
             federation_registry=self.mock_registry,
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ])
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
 
         self.ratelimiter = hs.get_ratelimiter()
@@ -74,9 +73,7 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield self.store.set_profile_displayname(
-            self.frank.localpart, "Frank"
-        )
+        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
 
         displayname = yield self.handler.get_displayname(self.frank)
 
@@ -85,22 +82,18 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_name(self):
         yield self.handler.set_displayname(
-            self.frank,
-            synapse.types.create_requester(self.frank),
-            "Frank Jr."
+            self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
         )
 
         self.assertEquals(
             (yield self.store.get_profile_displayname(self.frank.localpart)),
-            "Frank Jr."
+            "Frank Jr.",
         )
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
         d = self.handler.set_displayname(
-            self.frank,
-            synapse.types.create_requester(self.bob),
-            "Frank Jr."
+            self.frank, synapse.types.create_requester(self.bob), "Frank Jr."
         )
 
         yield self.assertFailure(d, AuthError)
@@ -145,11 +138,12 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
         yield self.handler.set_avatar_url(
-            self.frank, synapse.types.create_requester(self.frank),
-            "http://my.server/pic.gif"
+            self.frank,
+            synapse.types.create_requester(self.frank),
+            "http://my.server/pic.gif",
         )
 
         self.assertEquals(
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),
-            "http://my.server/pic.gif"
+            "http://my.server/pic.gif",
         )

@@ -1,4 +1,4 @@
-FROM docker.io/python:2-alpine3.7
+FROM docker.io/python:2-alpine3.8
 
 RUN apk add --no-cache --virtual .nacl_deps \
         build-base \

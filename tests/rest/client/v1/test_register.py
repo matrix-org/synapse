@@ -32,6 +32,7 @@ class CreateUserServletTestCase(unittest.TestCase):
     """
     Tests for CreateUserRestServlet.
     """
+
     if PY3:
         skip = "Not ported to Python 3."
 
@@ -48,7 +49,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         self.hs_clock = Clock(self.clock)
 
         self.hs = self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
         self.hs.get_datastore = Mock(return_value=self.datastore)
         self.hs.get_handlers = Mock(return_value=handlers)

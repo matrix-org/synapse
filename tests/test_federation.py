@@ -18,7 +18,10 @@ class MessageAcceptTests(unittest.TestCase):
         self.reactor = ThreadedMemoryReactorClock()
         self.hs_clock = Clock(self.reactor)
         self.homeserver = setup_test_homeserver(
-            http_client=self.http_client, clock=self.hs_clock, reactor=self.reactor
+            self.addCleanup,
+            http_client=self.http_client,
+            clock=self.hs_clock,
+            reactor=self.reactor,
         )
 
         user_id = UserID("us", "test")

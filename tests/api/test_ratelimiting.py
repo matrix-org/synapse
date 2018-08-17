@@ -4,17 +4,16 @@ from tests import unittest
 
 
 class TestRatelimiter(unittest.TestCase):
-
     def test_allowed(self):
         limiter = Ratelimiter()
         allowed, time_allowed = limiter.send_message(
-            user_id="test_id", time_now_s=0, msg_rate_hz=0.1, burst_count=1,
+            user_id="test_id", time_now_s=0, msg_rate_hz=0.1, burst_count=1
         )
         self.assertTrue(allowed)
         self.assertEquals(10., time_allowed)
 
         allowed, time_allowed = limiter.send_message(
-            user_id="test_id", time_now_s=5, msg_rate_hz=0.1, burst_count=1,
+            user_id="test_id", time_now_s=5, msg_rate_hz=0.1, burst_count=1
         )
         self.assertFalse(allowed)
         self.assertEquals(10., time_allowed)
@@ -28,7 +27,7 @@ class TestRatelimiter(unittest.TestCase):
     def test_pruning(self):
         limiter = Ratelimiter()
         allowed, time_allowed = limiter.send_message(
-            user_id="test_id_1", time_now_s=0, msg_rate_hz=0.1, burst_count=1,
+            user_id="test_id_1", time_now_s=0, msg_rate_hz=0.1, burst_count=1
         )
 
         self.assertIn("test_id_1", limiter.message_counts)
