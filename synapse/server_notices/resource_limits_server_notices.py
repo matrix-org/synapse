@@ -173,7 +173,7 @@ class ResourceLimitsServerNotices(object):
             referenced_events = pinned_state_event.content.get('pinned')
 
         events = yield self._store.get_events(referenced_events)
-        for event_id, event in events.iteritems():
+        for event_id, event in iteritems(events):
             if event.type == EventTypes.ServerNoticeLimitReached:
                 currently_blocked = True
                 # remove event in case we need to disable blocking later on.
