@@ -783,6 +783,12 @@ class Auth(object):
             user_id(str|None): If present, checks for presence against existing
             MAU cohort
         """
+
+        # Never fail an auth check for the server notices users
+        # This can be a problem where event creation is prohibited due to blocking
+        if user_id == self.hs.config.server_notices_mxid:
+            return
+
         if self.hs.config.hs_disabled:
             raise ResourceLimitError(
                 403, self.hs.config.hs_disabled_message,
