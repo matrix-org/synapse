@@ -1,3 +1,12 @@
+Synapse 0.33.3rc2 (2018-08-21)
+==============================
+
+Bugfixes
+--------
+
+- Fix bug in v0.33.3rc1 which caused infinite loops and OOMs ([\#3723](https://github.com/matrix-org/synapse/issues/3723))
+
+
 Synapse 0.33.3rc1 (2018-08-21)
 ==============================
 
