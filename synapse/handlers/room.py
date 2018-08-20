@@ -98,8 +98,12 @@ class RoomCreationHandler(BaseHandler):
         Raises:
             SynapseError if the room ID couldn't be stored, or something went
             horribly wrong.
+            ResourceLimitError if server is blocked to some resource being
+            exceeded
         """
         user_id = requester.user.to_string()
+
+        self.auth.check_auth_blocking(user_id)
 
         if not self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")

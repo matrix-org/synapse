@@ -14,7 +14,7 @@
 # limitations under the License.
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
 from synapse.handlers.sync import SyncConfig, SyncHandler
 from synapse.types import UserID
@@ -49,7 +49,7 @@ class SyncTestCase(tests.unittest.TestCase):
 
         # Test that global lock works
         self.hs.config.hs_disabled = True
-        with self.assertRaises(AuthError) as e:
+        with self.assertRaises(ResourceLimitError) as e:
             yield self.sync_handler.wait_for_sync_for_user(sync_config)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
 
@@ -57,7 +57,7 @@ class SyncTestCase(tests.unittest.TestCase):
 
         sync_config = self._generate_sync_config(user_id2)
 
-        with self.assertRaises(AuthError) as e:
+        with self.assertRaises(ResourceLimitError) as e:
             yield self.sync_handler.wait_for_sync_for_user(sync_config)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
 
