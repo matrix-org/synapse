@@ -385,7 +385,13 @@ class LoggingContextFilter(logging.Filter):
         context = LoggingContext.current_context()
         for key, value in self.defaults.items():
             setattr(record, key, value)
-        context.copy_to(record)
+
+        # context should never be None, but if it somehow ends up being, then
+        # we end up in a death spiral of infinite loops, so let's check, for
+        # robustness' sake.
+        if context is not None:
+            context.copy_to(record)
+
         return True
 
 
