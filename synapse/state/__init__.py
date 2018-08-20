@@ -262,14 +262,9 @@ class StateHandler(object):
             defer.returnValue(context)
 
         logger.debug("calling resolve_state_groups from compute_event_context")
-        if event.type == EventTypes.Create:
-            room_version = event.content.get("room_version", RoomVersions.V1)
-        else:
-            room_version = None
 
         entry = yield self.resolve_state_groups_for_events(
             event.room_id, [e for e, _ in event.prev_events],
-            explicit_room_version=room_version,
         )
 
         prev_state_ids = entry.state
@@ -337,8 +332,7 @@ class StateHandler(object):
         defer.returnValue(context)
 
     @defer.inlineCallbacks
-    def resolve_state_groups_for_events(self, room_id, event_ids,
-                                        explicit_room_version=None):
+    def resolve_state_groups_for_events(self, room_id, event_ids):
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
@@ -378,9 +372,7 @@ class StateHandler(object):
                 delta_ids=delta_ids,
             ))
 
-        room_version = explicit_room_version
-        if not room_version:
-            room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version(room_id)
 
         result = yield self._state_resolution_handler.resolve_state_groups(
             room_id, room_version, state_groups_ids, None,
@@ -393,7 +385,6 @@ class StateHandler(object):
             ev_ids, get_prev_content=False, check_redacted=False,
         )
 
-    @defer.inlineCallbacks
     def resolve_events(self, room_version, state_sets, event):
         logger.info(
             "Resolving state for %s with %d groups", event.room_id, len(state_sets)
@@ -409,8 +400,6 @@ class StateHandler(object):
             for ev in st
         }
 
-        room_version = yield self.store.get_room_version(event.room_id)
-
         with Measure(self.clock, "state._resolve_events"):
             new_state = resolve_events_with_state_map(
                 room_version, state_set_ids, state_map,
@@ -420,7 +409,7 @@ class StateHandler(object):
             key: state_map[ev_id] for key, ev_id in iteritems(new_state)
         }
 
-        defer.returnValue(new_state)
+        return new_state
 
 
 class StateResolutionHandler(object):
