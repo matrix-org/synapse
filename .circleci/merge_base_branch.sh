@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
 echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
 source $BASH_ENV
 
