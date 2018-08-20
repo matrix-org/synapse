@@ -96,7 +96,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # While Postgres does not require 'LIMIT', but also does not support
             # negative LIMIT values. So there is no way to write it that both can
             # support
-            query_args = [self.hs.config.max_mau_value]
+            safe_guard = self.hs.config.max_mau_value - len(self.reserved_users)
+            # Must be greater than zero for postgres
+            safe_guard = safe_guard if safe_guard > 0 else 0
+            query_args = [safe_guard]
 
             base_sql = """
                 DELETE FROM monthly_active_users

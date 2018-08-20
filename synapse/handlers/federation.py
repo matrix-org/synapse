@@ -2386,8 +2386,7 @@ class FederationHandler(BaseHandler):
             extra_users=extra_users
         )
 
-        logcontext.run_in_background(
-            self.pusher_pool.on_new_notifications,
+        self.pusher_pool.on_new_notifications(
             event_stream_id, max_stream_id,
         )
 

@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 import synapse
 import synapse.api.errors
-from synapse.api.errors import AuthError
+from synapse.api.errors import ResourceLimitError
 from synapse.handlers.auth import AuthHandler
 
 from tests import unittest
@@ -130,13 +130,13 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(self.large_number_of_users)
         )
 
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.auth_handler.get_access_token_for_user_id('user_a')
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.large_number_of_users)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
                 self._get_macaroon().serialize()
             )
@@ -149,13 +149,13 @@ class AuthTestCase(unittest.TestCase):
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.auth_handler.get_access_token_for_user_id('user_a')
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        with self.assertRaises(AuthError):
+        with self.assertRaises(ResourceLimitError):
             yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
                 self._get_macaroon().serialize()
             )

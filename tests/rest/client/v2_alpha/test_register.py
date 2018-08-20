@@ -11,7 +11,7 @@ from synapse.rest.client.v2_alpha.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver, wait_until_result
+from tests.server import make_request, render, setup_test_homeserver
 
 
 class RegisterRestServletTestCase(unittest.TestCase):
@@ -72,8 +72,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         request, channel = make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
         det_data = {
@@ -89,16 +88,14 @@ class RegisterRestServletTestCase(unittest.TestCase):
         request, channel = make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
     def test_POST_bad_password(self):
         request_data = json.dumps({"username": "kermit", "password": 666})
         request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
         self.assertEquals(channel.json_body["error"], "Invalid password")
@@ -106,8 +103,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
     def test_POST_bad_username(self):
         request_data = json.dumps({"username": 777, "password": "monkey"})
         request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEquals(channel.result["code"], b"400", channel.result)
         self.assertEquals(channel.json_body["error"], "Invalid username")
@@ -126,8 +122,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.device_handler.check_device_registered = Mock(return_value=device_id)
 
         request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         det_data = {
             "user_id": user_id,
@@ -149,8 +144,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.registration_handler.register = Mock(return_value=("@user:id", "t"))
 
         request, channel = make_request(b"POST", self.url, request_data)
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Registration has been disabled")
@@ -162,8 +156,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.registration_handler.register = Mock(return_value=(user_id, None))
 
         request, channel = make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         det_data = {
             "user_id": user_id,
@@ -177,8 +170,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.config.allow_guest_access = False
 
         request, channel = make_request(b"POST", self.url + b"?kind=guest", b"{}")
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
