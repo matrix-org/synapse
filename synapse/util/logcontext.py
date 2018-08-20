@@ -402,7 +402,9 @@ class PreserveLoggingContext(object):
 
     __slots__ = ["current_context", "new_context", "has_parent"]
 
-    def __init__(self, new_context=LoggingContext.sentinel):
+    def __init__(self, new_context=None):
+        if new_context is None:
+            new_context = LoggingContext.sentinel
         self.new_context = new_context
 
     def __enter__(self):
