@@ -1,0 +1,1 @@
+Fix missing yield in synapse.storage.monthly_active_users.initialise_reserved_users

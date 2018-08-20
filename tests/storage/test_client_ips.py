@@ -28,7 +28,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield tests.utils.setup_test_homeserver()
+        self.hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
@@ -37,8 +37,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         self.clock.now = 12345678
         user_id = "@user:id"
         yield self.store.insert_client_ip(
-            user_id,
-            "access_token", "ip", "user_agent", "device_id",
+            user_id, "access_token", "ip", "user_agent", "device_id"
         )
 
         result = yield self.store.get_last_client_ip_by_device(user_id, "device_id")
@@ -53,7 +52,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
                 "user_agent": "user_agent",
                 "last_seen": 12345678000,
             },
-            r
+            r,
         )
 
     @defer.inlineCallbacks
@@ -62,9 +61,9 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         self.hs.config.max_mau_value = 50
         user_id = "@user:server"
         yield self.store.insert_client_ip(
-            user_id, "access_token", "ip", "user_agent", "device_id",
+            user_id, "access_token", "ip", "user_agent", "device_id"
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
     @defer.inlineCallbacks
@@ -78,9 +77,9 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
             return_value=defer.succeed(lots_of_users)
         )
         yield self.store.insert_client_ip(
-            user_id, "access_token", "ip", "user_agent", "device_id",
+            user_id, "access_token", "ip", "user_agent", "device_id"
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
     @defer.inlineCallbacks
@@ -88,13 +87,13 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 50
         user_id = "@user:server"
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
         yield self.store.insert_client_ip(
-            user_id, "access_token", "ip", "user_agent", "device_id",
+            user_id, "access_token", "ip", "user_agent", "device_id"
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertTrue(active)
 
     @defer.inlineCallbacks
@@ -103,14 +102,14 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
         self.hs.config.max_mau_value = 50
         user_id = "@user:server"
 
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
 
         yield self.store.insert_client_ip(
-            user_id, "access_token", "ip", "user_agent", "device_id",
+            user_id, "access_token", "ip", "user_agent", "device_id"
         )
         yield self.store.insert_client_ip(
-            user_id, "access_token", "ip", "user_agent", "device_id",
+            user_id, "access_token", "ip", "user_agent", "device_id"
         )
-        active = yield self.store._user_last_seen_monthly_active(user_id)
+        active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertTrue(active)

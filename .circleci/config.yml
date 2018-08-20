@@ -1,0 +1,48 @@
+version: 2
+jobs:
+  sytestpy2:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy2
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+  sytestpy2postgres:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy2
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+  sytestpy3:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull matrixdotorg/sytest-synapsepy3
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs hawkowl/sytestpy3
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+  sytestpy3postgres:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull matrixdotorg/sytest-synapsepy3
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy3
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - sytestpy2
+      - sytestpy2postgres
+# Currently broken while the Python 3 port is incomplete
+#      - sytestpy3
+#      - sytestpy3postgres

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +16,20 @@
 
 import logging
 
+from mock import Mock
+
+from canonicaljson import json
+
 import twisted
 import twisted.logger
 from twisted.trial import unittest
 
+from synapse.http.server import JsonResource
+from synapse.server import HomeServer
+from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContextFilter
+
+from tests.server import get_clock, make_request, render, setup_test_homeserver
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
@@ -56,6 +66,7 @@ def around(target):
     def method_name(orig, *args, **kwargs):
         return orig(*args, **kwargs)
     """
+
     def _around(code):
         name = code.__name__
         orig = getattr(target, name)
@@ -89,6 +100,7 @@ class TestCase(unittest.TestCase):
             old_level = logging.getLogger().level
 
             if old_level != level:
+
                 @around(self)
                 def tearDown(orig):
                     ret = orig()
@@ -117,8 +129,9 @@ class TestCase(unittest.TestCase):
             actual (dict): The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(required[key], actual[key],
-                              msg="%s mismatch. %s" % (key, actual))
+            self.assertEquals(
+                required[key], actual[key], msg="%s mismatch. %s" % (key, actual)
+            )
 
 
 def DEBUG(target):
@@ -126,3 +139,143 @@ def DEBUG(target):
     Can apply to either a TestCase or an individual test method."""
     target.loglevel = logging.DEBUG
     return target
+
+
+class HomeserverTestCase(TestCase):
+    """
+    A base TestCase that reduces boilerplate for HomeServer-using test cases.
+
+    Attributes:
+        servlets (list[function]): List of servlet registration function.
+        user_id (str): The user ID to assume if auth is hijacked.
+        hijack_auth (bool): Whether to hijack auth to return the user specified
+        in user_id.
+    """
+    servlets = []
+    hijack_auth = True
+
+    def setUp(self):
+        """
+        Set up the TestCase by calling the homeserver constructor, optionally
+        hijacking the authentication system to return a fixed user, and then
+        calling the prepare function.
+        """
+        self.reactor, self.clock = get_clock()
+        self._hs_args = {"clock": self.clock, "reactor": self.reactor}
+        self.hs = self.make_homeserver(self.reactor, self.clock)
+
+        if self.hs is None:
+            raise Exception("No homeserver returned from make_homeserver.")
+
+        if not isinstance(self.hs, HomeServer):
+            raise Exception("A homeserver wasn't returned, but %r" % (self.hs,))
+
+        # Register the resources
+        self.resource = JsonResource(self.hs)
+
+        for servlet in self.servlets:
+            servlet(self.hs, self.resource)
+
+        if hasattr(self, "user_id"):
+            from tests.rest.client.v1.utils import RestHelper
+
+            self.helper = RestHelper(self.hs, self.resource, self.user_id)
+
+            if self.hijack_auth:
+
+                def get_user_by_access_token(token=None, allow_guest=False):
+                    return {
+                        "user": UserID.from_string(self.helper.auth_user_id),
+                        "token_id": 1,
+                        "is_guest": False,
+                    }
+
+                def get_user_by_req(request, allow_guest=False, rights="access"):
+                    return create_requester(
+                        UserID.from_string(self.helper.auth_user_id), 1, False, None
+                    )
+
+                self.hs.get_auth().get_user_by_req = get_user_by_req
+                self.hs.get_auth().get_user_by_access_token = get_user_by_access_token
+                self.hs.get_auth().get_access_token_from_request = Mock(
+                    return_value="1234"
+                )
+
+        if hasattr(self, "prepare"):
+            self.prepare(self.reactor, self.clock, self.hs)
+
+    def make_homeserver(self, reactor, clock):
+        """
+        Make and return a homeserver.
+
+        Args:
+            reactor: A Twisted Reactor, or something that pretends to be one.
+            clock (synapse.util.Clock): The Clock, associated with the reactor.
+
+        Returns:
+            A homeserver (synapse.server.HomeServer) suitable for testing.
+
+        Function to be overridden in subclasses.
+        """
+        raise NotImplementedError()
+
+    def prepare(self, reactor, clock, homeserver):
+        """
+        Prepare for the test.  This involves things like mocking out parts of
+        the homeserver, or building test data common across the whole test
+        suite.
+
+        Args:
+            reactor: A Twisted Reactor, or something that pretends to be one.
+            clock (synapse.util.Clock): The Clock, associated with the reactor.
+            homeserver (synapse.server.HomeServer): The HomeServer to test
+            against.
+
+        Function to optionally be overridden in subclasses.
+        """
+
+    def make_request(self, method, path, content=b""):
+        """
+        Create a SynapseRequest at the path using the method and containing the
+        given content.
+
+        Args:
+            method (bytes/unicode): The HTTP request method ("verb").
+            path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
+            escaped UTF-8 & spaces and such).
+            content (bytes or dict): The body of the request. JSON-encoded, if
+            a dict.
+
+        Returns:
+            A synapse.http.site.SynapseRequest.
+        """
+        if isinstance(content, dict):
+            content = json.dumps(content).encode('utf8')
+
+        return make_request(method, path, content)
+
+    def render(self, request):
+        """
+        Render a request against the resources registered by the test class's
+        servlets.
+
+        Args:
+            request (synapse.http.site.SynapseRequest): The request to render.
+        """
+        render(request, self.resource, self.reactor)
+
+    def setup_test_homeserver(self, *args, **kwargs):
+        """
+        Set up the test homeserver, meant to be called by the overridable
+        make_homeserver. It automatically passes through the test class's
+        clock & reactor.
+
+        Args:
+            See tests.utils.setup_test_homeserver.
+
+        Returns:
+            synapse.server.HomeServer
+        """
+        kwargs = dict(kwargs)
+        kwargs.update(self._hs_args)
+        return setup_test_homeserver(self.addCleanup, *args, **kwargs)

@@ -18,14 +18,13 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.util.async import ObservableDeferred
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import Cache, cached
 
 from tests import unittest
 
 
 class CacheTestCase(unittest.TestCase):
-
     def setUp(self):
         self.cache = Cache("test")
 
@@ -97,7 +96,6 @@ class CacheTestCase(unittest.TestCase):
 
 
 class CacheDecoratorTestCase(unittest.TestCase):
-
     @defer.inlineCallbacks
     def test_passthrough(self):
         class A(object):
@@ -180,8 +178,7 @@ class CacheDecoratorTestCase(unittest.TestCase):
             yield a.func(k)
 
         self.assertTrue(
-            callcount[0] >= 14,
-            msg="Expected callcount >= 14, got %d" % (callcount[0])
+            callcount[0] >= 14, msg="Expected callcount >= 14, got %d" % (callcount[0])
         )
 
     def test_prefill(self):

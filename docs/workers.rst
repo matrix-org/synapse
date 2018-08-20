@@ -173,9 +173,22 @@ endpoints matching the following regular expressions::
     ^/_matrix/federation/v1/backfill/
     ^/_matrix/federation/v1/get_missing_events/
     ^/_matrix/federation/v1/publicRooms
+    ^/_matrix/federation/v1/query/
+    ^/_matrix/federation/v1/make_join/
+    ^/_matrix/federation/v1/make_leave/
+    ^/_matrix/federation/v1/send_join/
+    ^/_matrix/federation/v1/send_leave/
+    ^/_matrix/federation/v1/invite/
+    ^/_matrix/federation/v1/query_auth/
+    ^/_matrix/federation/v1/event_auth/
+    ^/_matrix/federation/v1/exchange_third_party_invite/
+    ^/_matrix/federation/v1/send/
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
+
+The `^/_matrix/federation/v1/send/` endpoint must only be handled by a single
+instance.
 
 ``synapse.app.federation_sender``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -227,6 +240,14 @@ load from the main synapse. It can handle REST endpoints matching the following
 regular expressions::
 
     ^/_matrix/client/(api/v1|r0|unstable)/keys/upload
+
+If ``use_presence`` is False in the homeserver config, it can also handle REST
+endpoints matching the following regular expressions::
+
+    ^/_matrix/client/(api/v1|r0|unstable)/presence/[^/]+/status
+
+This "stub" presence handler will pass through ``GET`` request but make the
+``PUT`` effectively a no-op.
 
 It will proxy any requests it cannot handle to the main synapse instance. It
 must therefore be configured with the location of the main instance, via

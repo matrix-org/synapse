@@ -56,8 +56,7 @@ class Codes(object):
     SERVER_NOT_TRUSTED = "M_SERVER_NOT_TRUSTED"
     CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
     CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
-    MAU_LIMIT_EXCEEDED = "M_MAU_LIMIT_EXCEEDED"
-    HS_DISABLED = "M_HS_DISABLED"
+    RESOURCE_LIMIT_EXCEED = "M_RESOURCE_LIMIT_EXCEED"
     UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
 
@@ -230,6 +229,30 @@ class AuthError(SynapseError):
         if "errcode" not in kwargs:
             kwargs["errcode"] = Codes.FORBIDDEN
         super(AuthError, self).__init__(*args, **kwargs)
+
+
+class ResourceLimitError(SynapseError):
+    """
+    Any error raised when there is a problem with resource usage.
+    For instance, the monthly active user limit for the server has been exceeded
+    """
+    def __init__(
+        self, code, msg,
+        errcode=Codes.RESOURCE_LIMIT_EXCEED,
+        admin_uri=None,
+        limit_type=None,
+    ):
+        self.admin_uri = admin_uri
+        self.limit_type = limit_type
+        super(ResourceLimitError, self).__init__(code, msg, errcode=errcode)
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            admin_uri=self.admin_uri,
+            limit_type=self.limit_type
+        )
 
 
 class EventSizeError(SynapseError):

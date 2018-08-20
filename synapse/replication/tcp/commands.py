@@ -59,6 +59,12 @@ class Command(object):
         """
         return self.data
 
+    def get_logcontext_id(self):
+        """Get a suitable string for the logcontext when processing this command"""
+
+        # by default, we just use the command name.
+        return self.NAME
+
 
 class ServerCommand(Command):
     """Sent by the server on new connection and includes the server_name.
@@ -115,6 +121,9 @@ class RdataCommand(Command):
             str(self.token) if self.token is not None else "batch",
             _json_encoder.encode(self.row),
         ))
+
+    def get_logcontext_id(self):
+        return "RDATA-" + self.stream_name
 
 
 class PositionCommand(Command):
@@ -189,6 +198,9 @@ class ReplicateCommand(Command):
 
     def to_line(self):
         return " ".join((self.stream_name, str(self.token),))
+
+    def get_logcontext_id(self):
+        return "REPLICATE-" + self.stream_name
 
 
 class UserSyncCommand(Command):
