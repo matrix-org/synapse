@@ -261,10 +261,10 @@ class BaseFederationServlet(object):
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
-                    logger.exception("authenticate_request failed")
+                    logger.warn("authenticate_request failed")
                     raise
             except Exception:
-                logger.exception("authenticate_request failed")
+                logger.warn("authenticate_request failed")
                 raise
 
             if origin:
