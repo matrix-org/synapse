@@ -60,8 +60,38 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(StateGroupWorkerStore, self).__init__(db_conn, hs)
 
+        # Originally the state store used a single DictionaryCache to cache the
+        # event IDs for the state types in a given state group to avoid hammering
+        # on the state_group* tables.
+        #
+        # The point using a DictionaryCache is that it can cache a subset
+        # of the state events for a given state group (i.e. a subset of the keys for a
+        # given dict which is an entry in the cache for a given state group ID).
+        #
+        # However, this poses problems when performing complicated queries
+        # on the store - for instance: "give me all the state for this group, but
+        # limit members to this subset of users", as DictionaryCache's API isn't
+        # rich enough to say "please cache any of these fields, apart from this subset".
+        # This is problematic when lazy loading members, which requires this behaviour,
+        # as without it the cache has no choice but to speculatively load all
+        # state events for the group, which negates the efficiency being sought.
+        #
+        # Rather than overcomplicating DictionaryCache's API, we instead split the
+        # state_group_cache into two halves - one for tracking non-member events,
+        # and the other for tracking member_events.  This means that lazy loading
+        # queries can be made in a cache-friendly manner by querying both caches
+        # separately and then merging the result.  So for the example above, you
+        # would query the members cache for a specific subset of state types
+        # (which DictionaryCache will handle efficiently and fine) and the non-members
+        # cache for all state (which DictionaryCache will similarly handle fine)
+        # and then just merge the results together.
+        #
+        # We size the non-members cache to be smaller than the members cache as the
+        # vast majority of state in Matrix (today) is member events.
+
         self._state_group_cache = DictionaryCache(
             "*stateGroupCache*",
+            # TODO: this hasn't been tuned yet
             50000 * get_cache_factor_for("stateGroupCache")
         )
         self._state_group_members_cache = DictionaryCache(
@@ -289,9 +319,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             types (Iterable[str, str|None]|None): list of 2-tuples of the form
                 (`type`, `state_key`), where a `state_key` of `None` matches all
                 state_keys for the `type`. If None, all types are returned.
-            members (Boolean|None): whether we are limiting this to return just
-                member state events, or not member state events, or not limiting
-                at all (None).
+            members (bool|None): If not None, then, in addition to any filtering
+                implied by types, the results are also filtered to only include
+                member events (if True), or to exclude member events (if False)
 
         Returns:
             dictionary state_group -> (dict of (type, state_key) -> event id)
@@ -376,7 +406,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                     args = [group]
                     args.extend(where_args)
 
-                    txn.execute(sql % (where_clause, additional_clause), args)
+                    txn.execute(sql % (where_clause,), args)
                     for row in txn:
                         typ, state_key, event_id = row
                         key = (typ, state_key)
@@ -707,33 +737,25 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         if types is not None:
             non_member_types = [t for t in types if t[0] != EventTypes.Member]
-            member_types = [t for t in types if t[0] == EventTypes.Member]
 
-            if filtered_types == [EventTypes.Member]:
-                # special case the common case of filtering only room members
-                # to efficiently use the caches, to speed up LL.
-                non_member_state = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_cache, None, None,
-                )
-                member_state = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_members_cache, member_types, None,
-                )
+            if filtered_types is not None and EventTypes.Member not in filtered_types:
+                # we want all of the membership events
+                member_types = None
             else:
-                # degenerate case where we just pass the query through to both
-                # caches verbatim and merge the results.
-                non_member_state = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_cache, non_member_types, filtered_types,
-                )
-                member_state = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_members_cache, member_types, filtered_types,
-                )
+                member_types = [t for t in types if t[0] == EventTypes.Member]
+
         else:
-            non_member_state = yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_cache, None, None,
-            )
-            member_state = yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_members_cache, None, None,
-            )
+            non_member_types = None
+            member_types = None
+
+        non_member_state = yield self._get_state_for_groups_using_cache(
+            groups, self._state_group_cache, non_member_types, filtered_types,
+        )
+        # XXX: we could skip this entirely if member_types is []
+        member_state = yield self._get_state_for_groups_using_cache(
+            # we set filtered_types=None as member_state only ever contain members.
+            groups, self._state_group_members_cache, member_types, None,
+        )
 
         state = non_member_state
         for group in groups:
