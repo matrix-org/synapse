@@ -38,16 +38,16 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.as_yaml_files = []
         config = Mock(
-            app_service_config_files=self.as_yaml_files,
-            event_cache_size=1,
-            password_providers=[],
         )
         hs = yield setup_test_homeserver(
             self.addCleanup,
-            config=config,
             federation_sender=Mock(),
             federation_client=Mock(),
         )
+
+        hs.config.app_service_config_files=self.as_yaml_files
+        hs.config.event_cache_size=1
+        hs.config.password_providers=[]
 
         self.as_token = "token1"
         self.as_url = "some_url"
@@ -58,7 +58,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         self._add_appservice("token2", "as2", "some_url", "some_hs_token", "bob")
         self._add_appservice("token3", "as3", "some_url", "some_hs_token", "bob")
         # must be done after inserts
-        self.store = ApplicationServiceStore(None, hs)
+        self.store = ApplicationServiceStore(hs.get_db_conn(), hs)
 
     def tearDown(self):
         # TODO: suboptimal that we need to create files for tests!
@@ -105,17 +105,16 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.as_yaml_files = []
 
-        config = Mock(
-            app_service_config_files=self.as_yaml_files,
-            event_cache_size=1,
-            password_providers=[],
-        )
         hs = yield setup_test_homeserver(
             self.addCleanup,
-            config=config,
             federation_sender=Mock(),
             federation_client=Mock(),
         )
+
+        hs.config.app_service_config_files=self.as_yaml_files
+        hs.config.event_cache_size=1
+        hs.config.password_providers=[]
+
         self.db_pool = hs.get_db_pool()
 
         self.as_list = [
@@ -129,7 +128,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
         self.as_yaml_files = []
 
-        self.store = TestTransactionStore(None, hs)
+        self.store = TestTransactionStore(hs.get_db_conn(), hs)
 
     def _add_service(self, url, as_token, id):
         as_yaml = dict(
@@ -394,37 +393,35 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(suffix="1")
         f2 = self._write_config(suffix="2")
 
-        config = Mock(
-            app_service_config_files=[f1, f2], event_cache_size=1, password_providers=[]
-        )
         hs = yield setup_test_homeserver(
             self.addCleanup,
-            config=config,
-            datastore=Mock(),
             federation_sender=Mock(),
             federation_client=Mock(),
         )
 
-        ApplicationServiceStore(None, hs)
+        hs.config.app_service_config_files=[f1, f2]
+        hs.config.event_cache_size=1
+        hs.config.password_providers=[]
+
+        ApplicationServiceStore(hs.get_db_conn(), hs)
 
     @defer.inlineCallbacks
     def test_duplicate_ids(self):
         f1 = self._write_config(id="id", suffix="1")
         f2 = self._write_config(id="id", suffix="2")
 
-        config = Mock(
-            app_service_config_files=[f1, f2], event_cache_size=1, password_providers=[]
-        )
         hs = yield setup_test_homeserver(
             self.addCleanup,
-            config=config,
-            datastore=Mock(),
             federation_sender=Mock(),
             federation_client=Mock(),
         )
 
+        hs.config.app_service_config_files=[f1, f2]
+        hs.config.event_cache_size=1
+        hs.config.password_providers=[]
+
         with self.assertRaises(ConfigError) as cm:
-            ApplicationServiceStore(None, hs)
+            ApplicationServiceStore(hs.get_db_conn(), hs)
 
         e = cm.exception
         self.assertIn(f1, str(e))
@@ -436,19 +433,18 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f1 = self._write_config(as_token="as_token", suffix="1")
         f2 = self._write_config(as_token="as_token", suffix="2")
 
-        config = Mock(
-            app_service_config_files=[f1, f2], event_cache_size=1, password_providers=[]
-        )
         hs = yield setup_test_homeserver(
             self.addCleanup,
-            config=config,
-            datastore=Mock(),
             federation_sender=Mock(),
             federation_client=Mock(),
         )
 
+        hs.config.app_service_config_files=[f1, f2]
+        hs.config.event_cache_size=1
+        hs.config.password_providers=[]
+
         with self.assertRaises(ConfigError) as cm:
-            ApplicationServiceStore(None, hs)
+            ApplicationServiceStore(hs.get_db_conn(), hs)
 
         e = cm.exception
         self.assertIn(f1, str(e))

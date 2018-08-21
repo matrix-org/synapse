@@ -16,7 +16,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 from ._base import SQLBaseStore
 
@@ -29,7 +29,7 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 class MonthlyActiveUsersStore(SQLBaseStore):
     def __init__(self, dbconn, hs):
-        super(MonthlyActiveUsersStore, self).__init__(None, hs)
+        super(MonthlyActiveUsersStore, self).__init__(dbconn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
         self.reserved_users = ()
@@ -131,22 +131,23 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self.user_last_seen_monthly_active.invalidate_all()
         self.get_monthly_active_count.invalidate_all()
 
-    @cached(num_args=0)
+    @cachedInlineCallbacks(num_args=0)
     def get_monthly_active_count(self):
         """Generates current count of monthly active users
 
         Returns:
             Defered[int]: Number of current monthly active users
         """
-
+        @defer.inlineCallbacks
         def _count_users(txn):
             sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+            yield txn.execute(sql)
+            count, = yield txn.fetchone()
+            defer.returnValue(count)
+        res = yield self.runInteraction("count_users", _count_users)
+        defer.returnValue(res)
 
-            txn.execute(sql)
-            count, = txn.fetchone()
-            return count
-        return self.runInteraction("count_users", _count_users)
-
+    @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member
@@ -155,7 +156,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Deferred[bool]: True if a new entry was created, False if an
                 existing one was updated.
         """
-        is_insert = self._simple_upsert(
+        is_insert = yield self._simple_upsert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
             keyvalues={
@@ -170,7 +171,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             self.user_last_seen_monthly_active.invalidate((user_id,))
             self.get_monthly_active_count.invalidate(())
 
-    @cached(num_args=1)
+    @cachedInlineCallbacks(num_args=1)
     def user_last_seen_monthly_active(self, user_id):
         """
             Checks if a given user is part of the monthly active user group
@@ -181,7 +182,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
         """
 
-        return(self._simple_select_one_onecol(
+        res = yield (self._simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={
                 "user_id": user_id,
@@ -190,6 +191,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             allow_none=True,
             desc="user_last_seen_monthly_active",
         ))
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):

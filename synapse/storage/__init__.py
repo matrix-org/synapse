@@ -133,13 +133,6 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "local_group_updates", "stream_id",
         )
 
-        if isinstance(self.database_engine, PostgresEngine):
-            self._cache_id_gen = StreamIdGenerator(
-                db_conn, "cache_invalidation_stream", "stream_id",
-            )
-        else:
-            self._cache_id_gen = None
-
         self._presence_on_startup = self._get_active_presence(db_conn)
 
         presence_cache_prefill, min_presence_val = self._get_cache_dict(

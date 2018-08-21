@@ -26,9 +26,9 @@ from tests.utils import MockClock, setup_test_homeserver
 class PresenceStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup, clock=MockClock())
+        hs = yield setup_test_homeserver(self.addCleanup)
 
-        self.store = PresenceStore(None, hs)
+        self.store = PresenceStore(hs.get_db_conn(), hs)
 
         self.u_apple = UserID.from_string("@apple:test")
         self.u_banana = UserID.from_string("@banana:test")

@@ -28,7 +28,7 @@ class ProfileStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver(self.addCleanup)
 
-        self.store = ProfileStore(None, hs)
+        self.store = ProfileStore(hs.get_db_conn(), hs)
 
         self.u_frank = UserID.from_string("@frank:test")
 

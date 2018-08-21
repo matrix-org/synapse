@@ -28,6 +28,8 @@ from synapse.api.errors import StoreError
 from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.storage.util.id_generators import StreamIdGenerator
+
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +191,14 @@ class SQLBaseStore(object):
         self._pending_ds = []
 
         self.database_engine = hs.database_engine
+
+        if isinstance(self.database_engine, PostgresEngine):
+            self._cache_id_gen = StreamIdGenerator(
+                db_conn, "cache_invalidation_stream", "stream_id",
+            )
+            self.clock = self.hs.get_clock()
+        else:
+            self._cache_id_gen = None
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
