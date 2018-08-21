@@ -58,6 +58,8 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="get_e2e_room_key",
         )
 
+        row["session_data"] = json.loads(row["session_data"]);
+
         defer.returnValue(row)
 
     @defer.inlineCallbacks
@@ -87,7 +89,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "first_message_index": room_key['first_message_index'],
                 "forwarded_count": room_key['forwarded_count'],
                 "is_verified": room_key['is_verified'],
-                "session_data": room_key['session_data'],
+                "session_data": json.dumps(room_key['session_data']),
             },
             lock=False,
         )
@@ -145,7 +147,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "first_message_index": row["first_message_index"],
                 "forwarded_count": row["forwarded_count"],
                 "is_verified": row["is_verified"],
-                "session_data": row["session_data"],
+                "session_data": json.loads(row["session_data"]),
             }
 
         defer.returnValue(sessions)
