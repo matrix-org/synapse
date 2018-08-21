@@ -64,7 +64,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         # event IDs for the state types in a given state group to avoid hammering
         # on the state_group* tables.
         #
-        # The point using a DictionaryCache is that it can cache a subset
+        # The point of using a DictionaryCache is that it can cache a subset
         # of the state events for a given state group (i.e. a subset of the keys for a
         # given dict which is an entry in the cache for a given state group ID).
         #
@@ -81,7 +81,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         # and the other for tracking member_events.  This means that lazy loading
         # queries can be made in a cache-friendly manner by querying both caches
         # separately and then merging the result.  So for the example above, you
-        # would query the members cache for a specific subset of state types
+        # would query the members cache for a specific subset of state keys
         # (which DictionaryCache will handle efficiently and fine) and the non-members
         # cache for all state (which DictionaryCache will similarly handle fine)
         # and then just merge the results together.
