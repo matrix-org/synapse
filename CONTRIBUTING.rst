@@ -59,9 +59,10 @@ To create a changelog entry, make a new file in the ``changelog.d``
 file named in the format of ``PRnumber.type``. The type can be
 one of ``feature``, ``bugfix``, ``removal`` (also used for
 deprecations), or ``misc`` (for internal-only changes). The content of
-the file is your changelog entry, which can contain RestructuredText
-formatting. A note of contributors is welcomed in changelogs for
-non-misc changes (the content of misc changes is not displayed).
+the file is your changelog entry, which can contain Markdown
+formatting. Adding credits to the changelog is encouraged, we value
+your contributions and would like to have you shouted out in the
+release notes!
 
 For example, a fix in PR #1234 would have its changelog entry in
 ``changelog.d/1234.bugfix``, and contain content like "The security levels of
