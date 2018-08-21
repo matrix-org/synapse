@@ -182,7 +182,7 @@ class SynapseRequest(Request):
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
             logger.warn(
-                "Error processing request: %s %s", reason.type, reason.value,
+                "Error processing request %r: %s %s", self, reason.type, reason.value,
             )
 
             if not self._is_processing:
@@ -219,6 +219,12 @@ class SynapseRequest(Request):
         """Log the completion of this request and update the metrics
         """
 
+        if self.logcontext is None:
+            # this can happen if the connection closed before we read the
+            # headers (so render was never called). In that case we'll already
+            # have logged a warning, so just bail out.
+            return
+
         usage = self.logcontext.get_resource_usage()
 
         if self._processing_finished_time is None:
@@ -235,7 +241,7 @@ class SynapseRequest(Request):
         # need to decode as it could be raw utf-8 bytes
         # from a IDN servname in an auth header
         authenticated_entity = self.authenticated_entity
-        if authenticated_entity is not None:
+        if authenticated_entity is not None and isinstance(authenticated_entity, bytes):
             authenticated_entity = authenticated_entity.decode("utf-8", "replace")
 
         # ...or could be raw utf-8 bytes in the User-Agent header.
@@ -328,7 +334,7 @@ class SynapseSite(Site):
         proxied = config.get("x_forwarded", False)
         self.requestFactory = SynapseRequestFactory(self, proxied)
         self.access_logger = logging.getLogger(logger_name)
-        self.server_version_string = server_version_string
+        self.server_version_string = server_version_string.encode('ascii')
 
     def log(self, request):
         pass

@@ -72,7 +72,7 @@ class Ratelimiter(object):
         return allowed, time_allowed
 
     def prune_message_counts(self, time_now_s):
-        for user_id in self.message_counts.keys():
+        for user_id in list(self.message_counts.keys()):
             message_count, time_start, msg_rate_hz = (
                 self.message_counts[user_id]
             )
