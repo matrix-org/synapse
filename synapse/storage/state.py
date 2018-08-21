@@ -604,6 +604,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """Checks if group is in cache. See `_get_state_for_groups`
 
         Args:
+            cache(DictionaryCache): the state group cache to use
             group(int): The state group to lookup
             types(list[str, str|None]): List of 2-tuples of the form
                 (`type`, `state_key`), where a `state_key` of `None` matches all
@@ -676,6 +677,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         cache, if False we need to query the DB for the missing state.
 
         Args:
+            cache(DictionaryCache): the state group cache to use
             group: The state group to lookup
         """
         is_all, _, state_dict_ids = cache.get(group)
@@ -706,7 +708,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 a dictionary mapping from state group to state dictionary.
         """
         res = {}
-        if types:
+        if types is not None:
             non_member_types = [t for t in types if t[0] != EventTypes.Member]
             member_types = [t for t in types if t[0] == EventTypes.Member]
 
@@ -714,12 +716,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             # to efficiently use the cache.
             if filtered_types == [EventTypes.Member]:
                 res = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_cache, non_member_types,
+                    groups, self._state_group_cache, non_member_types or None,
                 )
                 res2 = yield self._get_state_for_groups_using_cache(
                     groups, self._state_group_members_cache, member_types,
                 )
-                res.update(res2)
             else:
                 res = yield self._get_state_for_groups_using_cache(
                     groups, self._state_group_cache,
@@ -729,7 +730,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                     groups, self._state_group_members_cache,
                     member_types, filtered_types,
                 )
-                res.update(res2)
         else:
             res = yield self._get_state_for_groups_using_cache(
                 groups, self._state_group_cache,
@@ -737,7 +737,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             res2 = yield self._get_state_for_groups_using_cache(
                 groups, self._state_group_members_cache,
             )
-            res.update(res2)
+
+        for group in groups:
+            res[group].update(res2[group])
 
         defer.returnValue(res)
 
