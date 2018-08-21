@@ -707,41 +707,41 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             Deferred[dict[int, dict[(type, state_key), EventBase]]]
                 a dictionary mapping from state group to state dictionary.
         """
-        res = {}
         if types is not None:
             non_member_types = [t for t in types if t[0] != EventTypes.Member]
             member_types = [t for t in types if t[0] == EventTypes.Member]
 
-            # special case the common case of filtering only room members
-            # to efficiently use the cache.
             if filtered_types == [EventTypes.Member]:
-                res = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_cache, non_member_types or None,
+                # special case the common case of filtering only room members
+                # to efficiently use the caches, to speed up LL.
+                non_member_state = yield self._get_state_for_groups_using_cache(
+                    groups, self._state_group_cache, None, None,
                 )
-                res2 = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_members_cache, member_types,
+                member_state = yield self._get_state_for_groups_using_cache(
+                    groups, self._state_group_members_cache, member_types, None,
                 )
             else:
-                res = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_cache,
-                    non_member_types, filtered_types,
+                # degenerate case where we just pass the query through to both
+                # caches verbatim and merge the results.
+                non_member_state = yield self._get_state_for_groups_using_cache(
+                    groups, self._state_group_cache, non_member_types, filtered_types,
                 )
-                res2 = yield self._get_state_for_groups_using_cache(
-                    groups, self._state_group_members_cache,
-                    member_types, filtered_types,
+                member_state = yield self._get_state_for_groups_using_cache(
+                    groups, self._state_group_members_cache, member_types, filtered_types,
                 )
         else:
-            res = yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_cache,
+            non_member_state = yield self._get_state_for_groups_using_cache(
+                groups, self._state_group_cache, None, None,
             )
-            res2 = yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_members_cache,
+            member_state = yield self._get_state_for_groups_using_cache(
+                groups, self._state_group_members_cache, None, None,
             )
 
+        state = non_member_state
         for group in groups:
-            res[group].update(res2[group])
+            state[group].update(member_state[group])
 
-        defer.returnValue(res)
+        defer.returnValue(state)
 
     @defer.inlineCallbacks
     def _get_state_for_groups_using_cache(
