@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 from synapse.api.errors import StoreError
+import simplejson as json
 
 from ._base import SQLBaseStore
 
@@ -215,7 +216,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             else:
                 this_version = version
 
-            return self._simple_select_one_txn(
+            result = self._simple_select_one_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={
@@ -228,6 +229,8 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "auth_data",
                 ),
             )
+            result["auth_data"] = json.loads(result["auth_data"])
+            return result
 
         return self.runInteraction(
             "get_e2e_room_keys_version_info",
@@ -264,7 +267,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     "user_id": user_id,
                     "version": new_version,
                     "algorithm": info["algorithm"],
-                    "auth_data": info["auth_data"],
+                    "auth_data": json.dumps(info["auth_data"]),
                 },
             )
 
