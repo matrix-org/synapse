@@ -344,8 +344,13 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 WHERE state_group IN (
                     SELECT state_group FROM state
                 )
-                %s %s
+                %s
             """)
+
+            if members is True:
+                sql += " AND type = '%s'" % (EventTypes.Member,)
+            elif members is False:
+                sql += " AND type <> '%s'" % (EventTypes.Member,)
 
             # Turns out that postgres doesn't like doing a list of OR's and
             # is about 1000x slower, so we just issue a query for each specific
@@ -365,12 +370,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 # If types is None we fetch all the state, and so just use an
                 # empty where clause with no extra args.
                 clause_to_args = [("", [])]
-
-            additional_clause = ""
-            if members is True:
-                additional_clause = "AND type = '?'" % EventTypes.Member
-            elif members is False:
-                additional_clause = "AND type <> '?'" % EventTypes.Member
 
             for where_clause, where_args in clause_to_args:
                 for group in groups:
