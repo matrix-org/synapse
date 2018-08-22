@@ -142,7 +142,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
             txn.execute(sql)
             count, = txn.fetchone()
-            defer.returnValue(count)
+            return count
         res = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(res)
 
