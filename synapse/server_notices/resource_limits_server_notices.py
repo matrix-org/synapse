@@ -18,7 +18,11 @@ from six import iteritems
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import (
+    EventTypes,
+    ServerNoticeLimitReached,
+    ServerNoticeMsgType,
+)
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
 from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 
@@ -102,11 +106,13 @@ class ResourceLimitsServerNotices(object):
                 # Add block notification
                 content = {
                     'body': event_content,
+                    'msgtype': ServerNoticeMsgType,
+                    'server_notice_type': ServerNoticeLimitReached,
                     'admin_uri': self._config.admin_uri,
                     'limit_type': event_limit_type
                 }
                 event = yield self._server_notices_manager.send_notice(
-                    user_id, content, EventTypes.ServerNoticeLimitReached
+                    user_id, content, EventTypes.Message,
                 )
 
                 content = {
@@ -174,7 +180,9 @@ class ResourceLimitsServerNotices(object):
 
         events = yield self._store.get_events(referenced_events)
         for event_id, event in iteritems(events):
-            if event.type == EventTypes.ServerNoticeLimitReached:
+            if event.type != EventTypes.Message:
+                continue
+            if event.content.get("msgtype") == ServerNoticeMsgType:
                 currently_blocked = True
                 # remove event in case we need to disable blocking later on.
                 if event_id in referenced_events:

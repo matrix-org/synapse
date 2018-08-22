@@ -80,8 +80,6 @@ class EventTypes(object):
     ServerACL = "m.room.server_acl"
     Pinned = "m.room.pinned_events"
 
-    ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
-
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"
@@ -106,3 +104,7 @@ DEFAULT_ROOM_VERSION = "1"
 # vdh-test-version is a placeholder to get room versioning support working and tested
 # until we have a working v2.
 KNOWN_ROOM_VERSIONS = {"1", "vdh-test-version"}
+
+
+ServerNoticeMsgType = "m.server_notice"
+ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"

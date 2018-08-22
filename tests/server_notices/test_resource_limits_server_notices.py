@@ -2,7 +2,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
 from synapse.handlers.auth import AuthHandler
 from synapse.server_notices.resource_limits_server_notices import (
@@ -78,7 +78,10 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
         """Test when user has blocked notice, but should have it removed"""
 
         self._rlsn._auth.check_auth_blocking = Mock()
-        mock_event = Mock(type=EventTypes.ServerNoticeLimitReached)
+        mock_event = Mock(
+            type=EventTypes.Message,
+            content={"msgtype": ServerNoticeMsgType},
+        )
         self._rlsn._store.get_events = Mock(return_value=defer.succeed(
             {"123": mock_event}
         ))
@@ -94,7 +97,10 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
             side_effect=ResourceLimitError(403, 'foo')
         )
 
-        mock_event = Mock(type=EventTypes.ServerNoticeLimitReached)
+        mock_event = Mock(
+            type=EventTypes.Message,
+            content={"msgtype": ServerNoticeMsgType},
+        )
         self._rlsn._store.get_events = Mock(return_value=defer.succeed(
             {"123": mock_event}
         ))
