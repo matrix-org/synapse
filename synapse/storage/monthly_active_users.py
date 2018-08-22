@@ -273,4 +273,4 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 if count < self.hs.config.max_mau_value:
                     yield self.upsert_monthly_active_user(user_id, create_as_trial)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
-                yield self.upsert_monthly_active_user(user_id, create_as_trial)
+                yield self.upsert_monthly_active_user(user_id)
