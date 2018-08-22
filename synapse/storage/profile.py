@@ -71,8 +71,6 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_from_remote_profile_cache",
         )
 
-
-class ProfileStore(ProfileWorkerStore):
     def create_profile(self, user_localpart):
         return self._simple_insert(
             table="profiles",
@@ -96,6 +94,8 @@ class ProfileStore(ProfileWorkerStore):
             desc="set_profile_avatar_url",
         )
 
+
+class ProfileStore(ProfileWorkerStore):
     def add_remote_profile_cache(self, user_id, displayname, avatar_url):
         """Ensure we are caching the remote user's profiles.
 
