@@ -36,6 +36,7 @@ from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
+from synapse.util.async_helpers import Linearizer
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -74,6 +75,124 @@ class RoomCreationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+
+        # linearizer to stop two upgrades happening at once
+        self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
+
+    @defer.inlineCallbacks
+    def upgrade_room(self, requester, old_room_id, new_version):
+        """Replace a room with a new room with a different version
+
+        Args:
+            requester (synapse.types.Requester): the user requesting the upgrade
+            old_room_id (unicode): the id of the room to be replaced
+            new_version (unicode): the new room version to use
+
+        Returns:
+            Deferred[unicode]: the new room id
+        """
+        yield self.ratelimit(requester)
+
+        user_id = requester.user.to_string()
+
+        with (yield self._upgrade_linearizer.queue(old_room_id)):
+            # start by allocating a new room id
+            is_public = False  # XXX fixme
+            new_room_id = yield self._generate_room_id(
+                creator_id=user_id, is_public=is_public,
+            )
+
+            # we create and auth the tombstone event before properly creating the new
+            # room, to check our user has perms in the old room.
+            tombstone_event, tombstone_context = (
+                yield self.event_creation_handler.create_event(
+                    requester, {
+                        "type": EventTypes.Tombstone,
+                        "state_key": "",
+                        "room_id": old_room_id,
+                        "sender": user_id,
+                        "content": {
+                            "body": "This room has been replaced",
+                            "replacement_room": new_room_id,
+                        }
+                    },
+                    token_id=requester.access_token_id,
+                )
+            )
+            yield self.auth.check_from_context(tombstone_event, tombstone_context)
+
+            yield self.clone_exiting_room(
+                requester,
+                old_room_id=old_room_id,
+                new_room_id=new_room_id,
+                new_room_version=new_version,
+                tombstone_event_id=tombstone_event.event_id,
+            )
+
+            # now send the tombstone
+            yield self.event_creation_handler.send_nonmember_event(
+                requester, tombstone_event, tombstone_context,
+            )
+
+            # XXX send a power_levels in the old room, if possible
+
+        defer.returnValue(new_room_id)
+
+    @defer.inlineCallbacks
+    def clone_exiting_room(
+            self, requester, old_room_id, new_room_id, new_room_version,
+            tombstone_event_id,
+    ):
+        """Populate a new room based on an old room
+
+        Args:
+            requester (synapse.types.Requester): the user requesting the upgrade
+            old_room_id (unicode): the id of the room to be replaced
+            new_room_id (unicode): the id to give the new room (should already have been
+                created with _gemerate_room_id())
+            new_room_version (unicode): the new room version to use
+            tombstone_event_id (unicode|str): the ID of the tombstone event in the old
+                room.
+        Returns:
+            Deferred[None]
+        """
+        user_id = requester.user.to_string()
+
+        if not self.spam_checker.user_may_create_room(user_id):
+            raise SynapseError(403, "You are not permitted to create rooms")
+
+        # XXX check alias is free
+        # canonical_alias = None
+
+        # XXX create association in directory handler
+        # XXX preset
+
+        preset_config = RoomCreationPreset.PRIVATE_CHAT
+
+        creation_content = {
+            "room_version": new_room_version,
+            "predecessor": {
+                "room_id": old_room_id,
+                "event_id": tombstone_event_id,
+            }
+        }
+
+        initial_state = OrderedDict()
+
+        yield self._send_events_for_new_room(
+            requester,
+            new_room_id,
+            preset_config=preset_config,
+            invite_list=[],
+            initial_state=initial_state,
+            creation_content=creation_content,
+        )
+
+        # XXX name
+        # XXX topic
+        # XXX invites/joins
+        # XXX 3pid invites
+        # XXX directory_handler.send_room_alias_update_event
 
     @defer.inlineCallbacks
     def create_room(self, requester, config, ratelimit=True,
@@ -416,6 +535,8 @@ class RoomCreationHandler(BaseHandler):
                     random_string,
                     self.hs.hostname,
                 ).to_string()
+                if isinstance(gen_room_id, bytes):
+                    gen_room_id = gen_room_id.decode('utf-8')
                 yield self.store.store_room(
                     room_id=gen_room_id,
                     room_creator_user_id=creator_id,
