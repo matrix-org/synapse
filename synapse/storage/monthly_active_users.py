@@ -145,10 +145,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             sql = """
                 SELECT COALESCE(count(*), 0)
                 FROM monthly_active_users
-                WHERE timestamp - last_active > ?
+                WHERE timestamp - first_active >= ?
             """
 
-            txn.execute(sql, mau_trial_ms)
+            txn.execute(sql, (mau_trial_ms,))
             count, = txn.fetchone()
             return count
         return self.runInteraction("count_users", _count_users)

@@ -41,6 +41,7 @@ class AuthTestCase(unittest.TestCase):
         self.macaroon_generator = self.hs.get_macaroon_generator()
         # MAU tests
         self.hs.config.max_mau_value = 50
+        self.hs.config.mau_trial_days = 0
         self.small_number_of_users = 1
         self.large_number_of_users = 100
 

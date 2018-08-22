@@ -30,6 +30,8 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
     def setUp(self):
         self.hs = yield setup_test_homeserver(self.addCleanup)
         self.store = self.hs.get_datastore()
+        self.hs.config.max_mau_value = 2
+        self.hs.config.mau_trial_days = 0
 
     @defer.inlineCallbacks
     def test_initialise_reserved_users(self):

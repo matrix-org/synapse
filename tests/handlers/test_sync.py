@@ -42,6 +42,7 @@ class SyncTestCase(tests.unittest.TestCase):
 
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 1
+        self.hs.config.mau_trial_days = 0
 
         # Check that the happy case does not throw errors
         yield self.store.upsert_monthly_active_user(user_id1)
