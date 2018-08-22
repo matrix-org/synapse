@@ -139,10 +139,16 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Defered[int]: Number of current monthly active users
         """
 
-        def _count_users(txn):
-            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+        mau_trial_ms = self.hs.config.mau_trial_days * 24 * 60 * 60 * 1000
 
-            txn.execute(sql)
+        def _count_users(txn):
+            sql = """
+                SELECT COALESCE(count(*), 0)
+                FROM monthly_active_users
+                WHERE timestamp - last_active > ?
+            """
+
+            txn.execute(sql, mau_trial_ms)
             count, = txn.fetchone()
             return count
         return self.runInteraction("count_users", _count_users)
@@ -155,6 +161,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Deferred[bool]: True if a new entry was created, False if an
                 existing one was updated.
         """
+        now = int(self._clock.time_msec())
         is_insert = self._simple_upsert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
@@ -162,7 +169,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 "user_id": user_id,
             },
             values={
-                "timestamp": int(self._clock.time_msec()),
+                "timestamp": now,
+            },
+            insertion_values={
+                "first_active": now,
             },
             lock=False,
         )
