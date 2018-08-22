@@ -1,3 +1,12 @@
+Synapse 0.33.3 (2018-08-22)
+===========================
+
+Bugfixes
+--------
+
+- Fix bug introduced in v0.33.3rc1 which made the ToS give a 500 error ([\#3732](https://github.com/matrix-org/synapse/issues/3732))
+
+
 Synapse 0.33.3rc2 (2018-08-21)
 ==============================
 
