@@ -1,3 +1,12 @@
+Synapse 0.33.3 (2018-08-22)
+===========================
+
+Bugfixes
+--------
+
+- Fix bug introduced in v0.33.3rc1 which made the ToS give a 500 error ([\#3732](https://github.com/matrix-org/synapse/issues/3732))
+
+
 Synapse 0.33.3rc2 (2018-08-21)
 ==============================
 
@@ -13,7 +22,7 @@ Synapse 0.33.3rc1 (2018-08-21)
 Features
 --------
 
-- Add support for the SNI extension to federation TLS connections ([\#1491](https://github.com/matrix-org/synapse/issues/1491))
+- Add support for the SNI extension to federation TLS connections. Thanks to @vojeroen! ([\#3439](https://github.com/matrix-org/synapse/issues/3439))
 - Add /_media/r0/config ([\#3184](https://github.com/matrix-org/synapse/issues/3184))
 - speed up /members API and add `at` and `membership` params as per MSC1227 ([\#3568](https://github.com/matrix-org/synapse/issues/3568))
 - implement `summary` block in /sync response as per MSC688 ([\#3574](https://github.com/matrix-org/synapse/issues/3574))
@@ -97,7 +106,7 @@ Features
 Bugfixes
 --------
 
-- Make /directory/list API return 404 for room not found instead of 400 ([\#2952](https://github.com/matrix-org/synapse/issues/2952))
+- Make /directory/list API return 404 for room not found instead of 400. Thanks to @fuzzmz! ([\#3620](https://github.com/matrix-org/synapse/issues/3620))
 - Default inviter_display_name to mxid for email invites ([\#3391](https://github.com/matrix-org/synapse/issues/3391))
 - Don't generate TURN credentials if no TURN config options are set ([\#3514](https://github.com/matrix-org/synapse/issues/3514))
 - Correctly announce deleted devices over federation ([\#3520](https://github.com/matrix-org/synapse/issues/3520))
