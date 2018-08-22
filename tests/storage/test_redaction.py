@@ -22,7 +22,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.types import RoomID, UserID
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.utils import create_room, setup_test_homeserver
 
 
 class RedactionTestCase(unittest.TestCase):
@@ -40,6 +40,8 @@ class RedactionTestCase(unittest.TestCase):
         self.u_bob = UserID.from_string("@bob:test")
 
         self.room1 = RoomID.from_string("!abc123:test")
+
+        yield create_room(hs, self.room1.to_string(), self.u_alice.to_string())
 
         self.depth = 1
 
