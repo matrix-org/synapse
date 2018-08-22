@@ -1,0 +1,1 @@
+Split the state_group_cache into member and non-member state events (and so speed up LL /sync)
