@@ -32,7 +32,6 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         self.store = self.hs.get_datastore()
         self.hs.config.mau_trial_days = 0
 
-    @tests.unittest.DEBUG
     @defer.inlineCallbacks
     def test_initialise_reserved_users(self):
         self.hs.config.max_mau_value = 5
