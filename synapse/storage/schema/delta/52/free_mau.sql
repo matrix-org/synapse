@@ -14,6 +14,6 @@
  */
 
 ALTER TABLE monthly_active_users ADD COLUMN first_active BIGINT DEFAULT 0 NOT NULL;
-ALTER TABLE monthly_active_users ADD COLUMN trial BOOLEAN DEFAULT 0 NOT NULL;
+ALTER TABLE monthly_active_users ADD COLUMN trial BOOLEAN;
 
 CREATE INDEX monthly_active_users_first_active ON monthly_active_users(first_active);
