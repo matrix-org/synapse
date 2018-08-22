@@ -282,6 +282,8 @@ class MasterProfileHandler(WorkerProfileHandler):
     def __init__(self, hs):
         super(MasterProfileHandler, self).__init__(hs)
 
+        assert hs.config.worker_app is None
+
         self.clock.looping_call(
             self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
         )
