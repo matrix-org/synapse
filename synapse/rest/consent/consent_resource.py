@@ -140,7 +140,7 @@ class ConsentResource(Resource):
         version = parse_string(request, "v",
                                default=self._default_consent_version)
         username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True)
+        userhmac = parse_string(request, "h", required=True, encoding=None)
 
         self._check_hash(username, userhmac)
 
