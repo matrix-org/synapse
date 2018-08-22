@@ -138,11 +138,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Returns:
             Defered[int]: Number of current monthly active users
         """
-        @defer.inlineCallbacks
         def _count_users(txn):
             sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
-            yield txn.execute(sql)
-            count, = yield txn.fetchone()
+            txn.execute(sql)
+            count, = txn.fetchone()
             defer.returnValue(count)
         res = yield self.runInteraction("count_users", _count_users)
         defer.returnValue(res)
