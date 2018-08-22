@@ -89,24 +89,31 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             txn.execute(sql, query_args)
 
             # Promote trial users to non-trial users, oldest first, assuming we
-            # have MAU headroom available.  Otherwise we leave them stuck in trial
+            # have MAU headroom available.  Otherwise we leave them stuck in trial
             # purgatory until their 30 days is up.
             #
             # We don't need to worry about reserved users, as they are already non-trial.
+
             mau_trial_ms = self.hs.config.mau_trial_days * 24 * 60 * 60 * 1000
 
+            sql = "SELECT count(*) FROM monthly_active_users WHERE NOT trial"
+            txn.execute(sql)
+            non_trial_users, = txn.fetchone()
+
             sql = """
-                UPDATE monthly_active_users SET trial='n' WHERE user_id IN (
+                UPDATE monthly_active_users SET trial=? WHERE user_id IN (
                     SELECT user_id FROM monthly_active_users
-                    ORDER BY (timestamp - last_active) DESC
-                    WHERE trial='y'
-                    LIMIT ? - (SELECT count(*) FROM monthly_active_users WHERE trial='n')
-                ) AND timestamp - last_active >= ?
+                    WHERE trial
+                    ORDER BY (timestamp - first_active) DESC
+                    LIMIT ?
+                ) AND timestamp - first_active >= ?
                 """
 
-            # FIXME: handle negative limits
+            limit = self.hs.config.max_mau_value - non_trial_users
+            if limit < 0:
+                limit = 0
 
-            txn.execute(sql, (self.hs.config.max_mau_value, mau_trial_ms))
+            txn.execute(sql, (False, limit, mau_trial_ms))
 
             # If non-trial MAU user count still exceeds the MAU threshold, then
             # delete on a least recently active basis.
@@ -127,10 +134,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 DELETE FROM monthly_active_users
                 WHERE user_id NOT IN (
                     SELECT user_id FROM monthly_active_users
+                    WHERE NOT trial
                     ORDER BY timestamp DESC
-                    WHERE trial='n'
                     LIMIT ?
-                    ) AND trial='n'
+                    ) AND NOT trial
                 """
             # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
             # when len(reserved_users) == 0. Works fine on sqlite.
@@ -166,7 +173,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             sql = """
                 SELECT COALESCE(count(*), 0)
                 FROM monthly_active_users
-                WHERE trial = 'n'
+                WHERE NOT trial
             """
 
             txn.execute(sql)
@@ -174,7 +181,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             return count
         return self.runInteraction("count_users", _count_users)
 
-    def upsert_monthly_active_user(self, user_id, trial):
+    def upsert_monthly_active_user(self, user_id, trial=False):
         """
             Updates or inserts monthly active user member
             Arguments:
@@ -219,21 +226,27 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
         mau_trial_ms = self.hs.config.mau_trial_days * 24 * 60 * 60 * 1000
 
-        def _user_last_seen_monthly_active_txn(txn):
+        def _user_last_seen_monthly_active(txn):
             sql = """
                 SELECT timestamp
                 FROM monthly_active_users
-                WHERE trial = 'n' OR (
-                    timestamp - last_active < ?
+                WHERE user_id = ? AND (
+                    (NOT trial) OR
+                    (timestamp - first_active < ?)
                 )
             """
 
-            txn.execute(sql, (mau_trial_ms, ))
-            count, = txn.fetchone()
-            return count
+            txn.execute(sql, (user_id, mau_trial_ms, ))
+            rows = txn.fetchall()
+            if rows:
+                timestamp = rows[0][0]
+                return timestamp
+            else:
+                return None
+
         return self.runInteraction(
             "user_last_seen_monthly_active",
-            _user_last_seen_monthly_active
+            _user_last_seen_monthly_active,
         )
 
     @defer.inlineCallbacks
@@ -248,6 +261,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
 
+            create_as_trial = self.hs.config.mau_trial_days > 0
+
             # We want to reduce to the total number of db writes, and are happy
             # to trade accuracy of timestamp in order to lighten load. This means
             # We always insert new users (where MAU threshold has not been reached),
@@ -256,6 +271,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             if last_seen_timestamp is None:
                 count = yield self.get_monthly_active_count()
                 if count < self.hs.config.max_mau_value:
-                    yield self.upsert_monthly_active_user(user_id, True)
+                    yield self.upsert_monthly_active_user(user_id, create_as_trial)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
-                yield self.upsert_monthly_active_user(user_id, True)
+                yield self.upsert_monthly_active_user(user_id, create_as_trial)
