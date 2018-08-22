@@ -42,7 +42,7 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util.async import ObservableDeferred
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.stringutils import is_ascii, random_string

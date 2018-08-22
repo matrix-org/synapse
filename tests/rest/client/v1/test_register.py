@@ -25,13 +25,14 @@ from synapse.rest.client.v1_only.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver
+from tests.server import make_request, render, setup_test_homeserver
 
 
 class CreateUserServletTestCase(unittest.TestCase):
     """
     Tests for CreateUserRestServlet.
     """
+
     if PY3:
         skip = "Not ported to Python 3."
 
@@ -48,7 +49,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         self.hs_clock = Clock(self.clock)
 
         self.hs = self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
         self.hs.get_datastore = Mock(return_value=self.datastore)
         self.hs.get_handlers = Mock(return_value=handlers)
@@ -76,10 +77,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         )
 
         request, channel = make_request(b"POST", url, request_data)
-        request.render(res)
-
-        # Advance the clock because it waits
-        self.clock.advance(1)
+        render(request, res, self.clock)
 
         self.assertEquals(channel.result["code"], b"200")
 

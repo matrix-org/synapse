@@ -385,7 +385,13 @@ class LoggingContextFilter(logging.Filter):
         context = LoggingContext.current_context()
         for key, value in self.defaults.items():
             setattr(record, key, value)
-        context.copy_to(record)
+
+        # context should never be None, but if it somehow ends up being, then
+        # we end up in a death spiral of infinite loops, so let's check, for
+        # robustness' sake.
+        if context is not None:
+            context.copy_to(record)
+
         return True
 
 
@@ -396,7 +402,9 @@ class PreserveLoggingContext(object):
 
     __slots__ = ["current_context", "new_context", "has_parent"]
 
-    def __init__(self, new_context=LoggingContext.sentinel):
+    def __init__(self, new_context=None):
+        if new_context is None:
+            new_context = LoggingContext.sentinel
         self.new_context = new_context
 
     def __enter__(self):
@@ -526,7 +534,7 @@ _to_ignore = [
     "synapse.util.logcontext",
     "synapse.http.server",
     "synapse.storage._base",
-    "synapse.util.async",
+    "synapse.util.async_helpers",
 ]
 
 

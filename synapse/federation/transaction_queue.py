@@ -26,6 +26,8 @@ from synapse.api.errors import FederationDeniedError, HttpResponseException
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 from synapse.metrics import (
     LaterGauge,
+    event_processing_loop_counter,
+    event_processing_loop_room_count,
     events_processed_counter,
     sent_edus_counter,
     sent_transactions_counter,
@@ -56,6 +58,7 @@ class TransactionQueue(object):
     """
 
     def __init__(self, hs):
+        self.hs = hs
         self.server_name = hs.hostname
 
         self.store = hs.get_datastore()
@@ -253,7 +256,13 @@ class TransactionQueue(object):
                     synapse.metrics.event_processing_last_ts.labels(
                         "federation_sender").set(ts)
 
-                events_processed_counter.inc(len(events))
+                    events_processed_counter.inc(len(events))
+
+                    event_processing_loop_room_count.labels(
+                        "federation_sender"
+                    ).inc(len(events_by_room))
+
+                event_processing_loop_counter.labels("federation_sender").inc()
 
                 synapse.metrics.event_processing_positions.labels(
                     "federation_sender").set(next_token)
@@ -300,6 +309,9 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
+        if not self.hs.config.use_presence:
+            # No-op if presence is disabled.
+            return
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled

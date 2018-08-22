@@ -21,14 +21,16 @@ from six.moves import range
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
+from synapse.api.errors import NotFoundError
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.events_worker import EventsWorkerStore
 from synapse.util.caches import get_cache_factor_for, intern_string
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.stringutils import to_ascii
-
-from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,8 @@ class _GetStateGroupDelta(namedtuple("_GetStateGroupDelta", ("prev_group", "delt
         return len(self.delta_ids) if self.delta_ids else 0
 
 
-class StateGroupWorkerStore(SQLBaseStore):
+# this inherits from EventsWorkerStore because it calls self.get_events
+class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     """The parts of StateGroupStore that can be called from workers.
     """
 
@@ -60,6 +63,30 @@ class StateGroupWorkerStore(SQLBaseStore):
         self._state_group_cache = DictionaryCache(
             "*stateGroupCache*", 500000 * get_cache_factor_for("stateGroupCache")
         )
+
+    @defer.inlineCallbacks
+    def get_room_version(self, room_id):
+        """Get the room_version of a given room
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[str]
+
+        Raises:
+            NotFoundError if the room is unknown
+        """
+        # for now we do this by looking at the create event. We may want to cache this
+        # more intelligently in future.
+        state_ids = yield self.get_current_state_ids(room_id)
+        create_id = state_ids.get((EventTypes.Create, ""))
+
+        if not create_id:
+            raise NotFoundError("Unknown room")
+
+        create_event = yield self.get_event(create_id)
+        defer.returnValue(create_event.content.get("room_version", "1"))
 
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
@@ -87,6 +114,69 @@ class StateGroupWorkerStore(SQLBaseStore):
         return self.runInteraction(
             "get_current_state_ids",
             _get_current_state_ids_txn,
+        )
+
+    # FIXME: how should this be cached?
+    def get_filtered_current_state_ids(self, room_id, types, filtered_types=None):
+        """Get the current state event of a given type for a room based on the
+        current_state_events table.  This may not be as up-to-date as the result
+        of doing a fresh state resolution as per state_handler.get_current_state
+        Args:
+            room_id (str)
+            types (list[(Str, (Str|None))]): List of (type, state_key) tuples
+                which are used to filter the state fetched. `state_key` may be
+                None, which matches any `state_key`
+            filtered_types (list[Str]|None): List of types to apply the above filter to.
+        Returns:
+            deferred: dict of (type, state_key) -> event
+        """
+
+        include_other_types = False if filtered_types is None else True
+
+        def _get_filtered_current_state_ids_txn(txn):
+            results = {}
+            sql = """SELECT type, state_key, event_id FROM current_state_events
+                     WHERE room_id = ? %s"""
+            # Turns out that postgres doesn't like doing a list of OR's and
+            # is about 1000x slower, so we just issue a query for each specific
+            # type seperately.
+            if types:
+                clause_to_args = [
+                    (
+                        "AND type = ? AND state_key = ?",
+                        (etype, state_key)
+                    ) if state_key is not None else (
+                        "AND type = ?",
+                        (etype,)
+                    )
+                    for etype, state_key in types
+                ]
+
+                if include_other_types:
+                    unique_types = set(filtered_types)
+                    clause_to_args.append(
+                        (
+                            "AND type <> ? " * len(unique_types),
+                            list(unique_types)
+                        )
+                    )
+            else:
+                # If types is None we fetch all the state, and so just use an
+                # empty where clause with no extra args.
+                clause_to_args = [("", [])]
+            for where_clause, where_args in clause_to_args:
+                args = [room_id]
+                args.extend(where_args)
+                txn.execute(sql % (where_clause,), args)
+                for row in txn:
+                    typ, state_key, event_id = row
+                    key = (intern_string(typ), intern_string(state_key))
+                    results[key] = event_id
+            return results
+
+        return self.runInteraction(
+            "get_filtered_current_state_ids",
+            _get_filtered_current_state_ids_txn,
         )
 
     @cached(max_entries=10000, iterable=True)
@@ -362,8 +452,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            deferred: A list of dicts corresponding to the event_ids given.
-            The dicts are mappings from (type, state_key) -> state_events
+            deferred: A dict of (event_id) -> (type, state_key) -> [state_events]
         """
         event_to_groups = yield self._get_state_group_for_events(
             event_ids,
@@ -391,7 +480,8 @@ class StateGroupWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_state_ids_for_events(self, event_ids, types=None, filtered_types=None):
         """
-        Get the state dicts corresponding to a list of events
+        Get the state dicts corresponding to a list of events, containing the event_ids
+        of the state events (as opposed to the events themselves)
 
         Args:
             event_ids(list(str)): events whose state should be returned
@@ -404,7 +494,7 @@ class StateGroupWorkerStore(SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            A deferred dict from event_id -> (type, state_key) -> state_event
+            A deferred dict from event_id -> (type, state_key) -> event_id
         """
         event_to_groups = yield self._get_state_group_for_events(
             event_ids,

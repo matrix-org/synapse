@@ -25,7 +25,7 @@ from twisted.internet import defer
 import synapse.types
 from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, ResourceLimitError
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -211,9 +211,9 @@ class Auth(object):
             user_agent = request.requestHeaders.getRawHeaders(
                 b"User-Agent",
                 default=[b""]
-            )[0]
+            )[0].decode('ascii', 'surrogateescape')
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                yield self.store.insert_client_ip(
                     user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,
@@ -682,7 +682,7 @@ class Auth(object):
         Returns:
             bool: False if no access_token was given, True otherwise.
         """
-        query_params = request.args.get("access_token")
+        query_params = request.args.get(b"access_token")
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
 
@@ -698,7 +698,7 @@ class Auth(object):
                 401 since some of the old clients depended on auth errors returning
                 403.
         Returns:
-            str: The access_token
+            unicode: The access_token
         Raises:
             AuthError: If there isn't an access_token in the request.
         """
@@ -720,9 +720,9 @@ class Auth(object):
                     "Too many Authorization headers.",
                     errcode=Codes.MISSING_TOKEN,
                 )
-            parts = auth_headers[0].split(" ")
-            if parts[0] == "Bearer" and len(parts) == 2:
-                return parts[1]
+            parts = auth_headers[0].split(b" ")
+            if parts[0] == b"Bearer" and len(parts) == 2:
+                return parts[1].decode('ascii')
             else:
                 raise AuthError(
                     token_not_found_http_status,
@@ -738,7 +738,7 @@ class Auth(object):
                     errcode=Codes.MISSING_TOKEN
                 )
 
-            return query_params[0]
+            return query_params[0].decode('ascii')
 
     @defer.inlineCallbacks
     def check_in_room_or_world_readable(self, room_id, user_id):
@@ -773,3 +773,36 @@ class Auth(object):
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )
+
+    @defer.inlineCallbacks
+    def check_auth_blocking(self, user_id=None):
+        """Checks if the user should be rejected for some external reason,
+        such as monthly active user limiting or global disable flag
+
+        Args:
+            user_id(str|None): If present, checks for presence against existing
+            MAU cohort
+        """
+        if self.hs.config.hs_disabled:
+            raise ResourceLimitError(
+                403, self.hs.config.hs_disabled_message,
+                errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                admin_uri=self.hs.config.admin_uri,
+                limit_type=self.hs.config.hs_disabled_limit_type
+            )
+        if self.hs.config.limit_usage_by_mau is True:
+            # If the user is already part of the MAU cohort
+            if user_id:
+                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
+                if timestamp:
+                    return
+            # Else if there is no room in the MAU bucket, bail
+            current_mau = yield self.store.get_monthly_active_count()
+            if current_mau >= self.hs.config.max_mau_value:
+                raise ResourceLimitError(
+                    403, "Monthly Active User Limit Exceeded",
+
+                    admin_uri=self.hs.config.admin_uri,
+                    errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                    limit_type="monthly_active_user"
+                )

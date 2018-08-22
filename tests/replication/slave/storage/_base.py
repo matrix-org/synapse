@@ -31,6 +31,7 @@ from tests.utils import setup_test_homeserver
 
 class TestReplicationClientHandler(ReplicationClientHandler):
     """Overrides on_rdata so that we can wait for it to happen"""
+
     def __init__(self, store):
         super(TestReplicationClientHandler, self).__init__(store)
         self._rdata_awaiters = []
@@ -53,12 +54,11 @@ class BaseSlavedStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(
+            self.addCleanup,
             "blue",
             http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.hs.get_ratelimiter().send_message.return_value = (True, 0)
 

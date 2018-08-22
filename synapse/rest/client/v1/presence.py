@@ -84,7 +84,8 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
         except Exception:
             raise SynapseError(400, "Unable to parse state")
 
-        yield self.presence_handler.set_state(user, state)
+        if self.hs.config.use_presence:
+            yield self.presence_handler.set_state(user, state)
 
         defer.returnValue((200, {}))
 
