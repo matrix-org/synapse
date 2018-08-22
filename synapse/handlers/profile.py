@@ -33,9 +33,6 @@ logger = logging.getLogger(__name__)
 
 
 class WorkerProfileHandler(BaseHandler):
-    PROFILE_UPDATE_MS = 60 * 1000
-    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
-
     def __init__(self, hs):
         super(WorkerProfileHandler, self).__init__(hs)
 
