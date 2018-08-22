@@ -32,9 +32,16 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class WorkerProfileHandler(BaseHandler):
+class BaseProfileHandler(BaseHandler):
+    """Handles fetching and updating user profile information.
+
+    BaseProfileHandler can be instantiated directly on workers and will
+    delegate to master when necessary. The master process should use the
+    subclass MasterProfileHandler
+    """
+
     def __init__(self, hs):
-        super(WorkerProfileHandler, self).__init__(hs)
+        super(BaseProfileHandler, self).__init__(hs)
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -275,7 +282,7 @@ class WorkerProfileHandler(BaseHandler):
                 )
 
 
-class MasterProfileHandler(WorkerProfileHandler):
+class MasterProfileHandler(BaseProfileHandler):
     PROFILE_UPDATE_MS = 60 * 1000
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 

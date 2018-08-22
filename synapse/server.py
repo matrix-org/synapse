@@ -56,7 +56,7 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import MasterProfileHandler, WorkerProfileHandler
+from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
@@ -309,7 +309,7 @@ class HomeServer(object):
 
     def build_profile_handler(self):
         if self.config.worker_app:
-            return WorkerProfileHandler(self)
+            return BaseProfileHandler(self)
         else:
             return MasterProfileHandler(self)
 
