@@ -24,6 +24,7 @@ class FakeChannel(object):
     """
 
     result = attr.ib(default=attr.Factory(dict))
+    _producer = None
 
     @property
     def json_body(self):
@@ -48,6 +49,15 @@ class FakeChannel(object):
             self.result["body"] = b""
 
         self.result["body"] += content
+
+    def registerProducer(self, producer, streaming):
+        self._producer = producer
+
+    def unregisterProducer(self):
+        if self._producer is None:
+            return
+
+        self._producer = None
 
     def requestDone(self, _self):
         self.result["done"] = True
@@ -111,14 +121,19 @@ def make_request(method, path, content=b""):
     return req, channel
 
 
-def wait_until_result(clock, channel, timeout=100):
+def wait_until_result(clock, request, timeout=100):
     """
-    Wait until the channel has a result.
+    Wait until the request is finished.
     """
     clock.run()
     x = 0
 
-    while not channel.result:
+    while not request.finished:
+
+        # If there's a producer, tell it to resume producing so we get content
+        if request._channel._producer:
+            request._channel._producer.resumeProducing()
+
         x += 1
 
         if x > timeout:
@@ -129,7 +144,7 @@ def wait_until_result(clock, channel, timeout=100):
 
 def render(request, resource, clock):
     request.render(resource)
-    wait_until_result(clock, request._channel)
+    wait_until_result(clock, request)
 
 
 class ThreadedMemoryReactorClock(MemoryReactorClock):

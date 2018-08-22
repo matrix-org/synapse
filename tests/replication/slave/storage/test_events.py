@@ -112,6 +112,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
     @defer.inlineCallbacks
     def test_invites(self):
+        yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.check("get_invited_rooms_for_user", [USER_ID_2], [])
         event = yield self.persist(
             type="m.room.member", key=USER_ID_2, membership="invite"
@@ -133,7 +134,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
     @defer.inlineCallbacks
     def test_push_actions_for_user(self):
-        yield self.persist(type="m.room.create", creator=USER_ID)
+        yield self.persist(type="m.room.create", key="", creator=USER_ID)
         yield self.persist(type="m.room.join", key=USER_ID, membership="join")
         yield self.persist(
             type="m.room.join", sender=USER_ID, key=USER_ID_2, membership="join"

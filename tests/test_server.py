@@ -8,7 +8,7 @@ from synapse.http.server import JsonResource
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver
+from tests.server import make_request, render, setup_test_homeserver
 
 
 class JsonResourceTests(unittest.TestCase):
@@ -37,7 +37,7 @@ class JsonResourceTests(unittest.TestCase):
         )
 
         request, channel = make_request(b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(request.args, {b'a': [u"\N{SNOWMAN}".encode('utf8')]})
         self.assertEqual(got_kwargs, {u"room_id": u"\N{SNOWMAN}"})
@@ -55,7 +55,7 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foo")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'500')
 
@@ -78,13 +78,8 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foo")
-        request.render(res)
+        render(request, res, self.reactor)
 
-        # No error has been raised yet
-        self.assertTrue("code" not in channel.result)
-
-        # Advance time, now there's an error
-        self.reactor.advance(1)
         self.assertEqual(channel.result["code"], b'500')
 
     def test_callback_synapseerror(self):
@@ -100,7 +95,7 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foo")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'403')
         self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
@@ -121,7 +116,7 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foobar")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'400')
         self.assertEqual(channel.json_body["error"], "Unrecognized request")

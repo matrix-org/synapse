@@ -344,6 +344,7 @@ class RoomMemberHandler(object):
         latest_event_ids = (
             event_id for (event_id, _, _) in prev_events_and_hashes
         )
+
         current_state_ids = yield self.state_handler.get_current_state_ids(
             room_id, latest_event_ids=latest_event_ids,
         )

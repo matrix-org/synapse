@@ -49,6 +49,9 @@ class ServerConfig(Config):
         # "disable" federation
         self.send_federation = config.get("send_federation", True)
 
+        # Whether to enable user presence.
+        self.use_presence = config.get("use_presence", True)
+
         # Whether to update the user directory or not. This should be set to
         # false only if we are updating the user directory in a worker
         self.update_user_directory = config.get("update_user_directory", True)
@@ -249,6 +252,9 @@ class ServerConfig(Config):
         # Zero is used to indicate synapse should set the soft limit to the
         # hard limit.
         soft_file_limit: 0
+
+        # Set to false to disable presence tracking on this homeserver.
+        use_presence: true
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         # gc_thresholds: [700, 10, 10]
