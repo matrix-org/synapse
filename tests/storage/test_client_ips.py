@@ -59,6 +59,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
     def test_disabled_monthly_active_user(self):
         self.hs.config.limit_usage_by_mau = False
         self.hs.config.max_mau_value = 50
+        self.hs.config.mau_trial_days = 0
         user_id = "@user:server"
         yield self.store.insert_client_ip(
             user_id, "access_token", "ip", "user_agent", "device_id"
@@ -70,6 +71,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
     def test_adding_monthly_active_user_when_full(self):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 50
+        self.hs.config.mau_trial_days = 0
         lots_of_users = 100
         user_id = "@user:server"
 
@@ -86,6 +88,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
     def test_adding_monthly_active_user_when_space(self):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 50
+        self.hs.config.mau_trial_days = 0
         user_id = "@user:server"
         active = yield self.store.user_last_seen_monthly_active(user_id)
         self.assertFalse(active)
@@ -100,6 +103,7 @@ class ClientIpStoreTestCase(tests.unittest.TestCase):
     def test_updating_monthly_active_user_when_space(self):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 50
+        self.hs.config.mau_trial_days = 0
         user_id = "@user:server"
 
         active = yield self.store.user_last_seen_monthly_active(user_id)

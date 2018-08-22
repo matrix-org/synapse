@@ -54,6 +54,7 @@ class RegistrationTestCase(unittest.TestCase):
         self.handler = self.hs.get_handlers().registration_handler
         self.store = self.hs.get_datastore()
         self.hs.config.max_mau_value = 50
+        self.hs.config.mau_trial_days = 0
         self.lots_of_users = 100
         self.small_number_of_users = 1
 
