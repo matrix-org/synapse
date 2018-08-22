@@ -41,6 +41,7 @@ class AuthTestCase(unittest.TestCase):
         self.macaroon_generator = self.hs.get_macaroon_generator()
         # MAU tests
         self.hs.config.max_mau_value = 50
+        self.hs.config.mau_trial_days = 0
         self.small_number_of_users = 1
         self.large_number_of_users = 100
 
@@ -161,14 +162,14 @@ class AuthTestCase(unittest.TestCase):
             )
         # If in monthly active cohort
         self.hs.get_datastore().user_last_seen_monthly_active = Mock(
-            return_value=defer.succeed(self.hs.get_clock().time_msec())
+            return_value=defer.succeed((self.hs.get_clock().time_msec(), False))
         )
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         yield self.auth_handler.get_access_token_for_user_id('user_a')
         self.hs.get_datastore().user_last_seen_monthly_active = Mock(
-            return_value=defer.succeed(self.hs.get_clock().time_msec())
+            return_value=defer.succeed((self.hs.get_clock().time_msec(), False))
         )
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)

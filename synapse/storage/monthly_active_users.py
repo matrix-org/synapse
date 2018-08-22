@@ -177,19 +177,36 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Arguments:
                 user_id (str): user to add/update
             Return:
-                Deferred[int] : timestamp since last seen, None if never seen
-
+                Deferred[(int,bool)|None] : (time since last seen, bool if trial user)
+                    None if never seen
         """
 
-        return(self._simple_select_one_onecol(
-            table="monthly_active_users",
-            keyvalues={
-                "user_id": user_id,
-            },
-            retcol="timestamp",
-            allow_none=True,
-            desc="user_last_seen_monthly_active",
-        ))
+        mau_trial_ms = self.hs.config.mau_trial_days * 24 * 60 * 60 * 1000
+
+        def _user_last_seen_monthly_active(txn):
+
+            sql = """
+                SELECT timestamp, creation_ts
+                FROM monthly_active_users LEFT JOIN users
+                ON monthly_active_users.user_id = users.name
+                WHERE user_id = ?
+            """
+
+            txn.execute(sql, (user_id,))
+            rows = txn.fetchall()
+            if not rows or not rows[0][0]:
+                return None
+            else:
+                (timestamp, created) = (rows[0][0], rows[0][1])
+                if not created:
+                    created = 0
+                trial = (timestamp - created * 1000) < mau_trial_ms
+                return (timestamp, trial)
+
+        return self.runInteraction(
+            "user_last_seen_monthly_active",
+            _user_last_seen_monthly_active
+        )
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):
@@ -200,7 +217,12 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             user_id(str): the user_id to query
         """
         if self.hs.config.limit_usage_by_mau:
-            last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
+            activity = yield self.user_last_seen_monthly_active(user_id)
+
+            if activity and activity[1]:
+                # we don't track trial users in the MAU table.
+                return
+
             now = self.hs.get_clock().time_msec()
 
             # We want to reduce to the total number of db writes, and are happy
@@ -208,9 +230,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # We always insert new users (where MAU threshold has not been reached),
             # but only update if we have not previously seen the user for
             # LAST_SEEN_GRANULARITY ms
-            if last_seen_timestamp is None:
+            if activity is None:
                 count = yield self.get_monthly_active_count()
                 if count < self.hs.config.max_mau_value:
                     yield self.upsert_monthly_active_user(user_id)
-            elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
+            elif now - activity[0] > LAST_SEEN_GRANULARITY:
                 yield self.upsert_monthly_active_user(user_id)
