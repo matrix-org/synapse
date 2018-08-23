@@ -147,6 +147,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             return count
         return self.runInteraction("count_users", _count_users)
 
+    @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member
@@ -155,7 +156,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Deferred[bool]: True if a new entry was created, False if an
                 existing one was updated.
         """
-        is_insert = self._simple_upsert(
+        is_insert = yield self._simple_upsert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
             keyvalues={
