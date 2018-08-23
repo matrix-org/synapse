@@ -128,7 +128,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # is racy.
         # Have resolved to invalidate the whole cache for now and do
         # something about it if and when the perf becomes significant
-        self.user_last_seen_monthly_active.invalidate_all()
+        self._user_last_seen_monthly_active.invalidate_all()
         self.get_monthly_active_count.invalidate_all()
 
     @cached(num_args=0)
@@ -168,29 +168,59 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             lock=False,
         )
         if is_insert:
-            self.user_last_seen_monthly_active.invalidate((user_id,))
+            self._user_last_seen_monthly_active.invalidate((user_id,))
             self.get_monthly_active_count.invalidate(())
 
-    @cached(num_args=1)
+    @defer.inlineCallbacks
     def user_last_seen_monthly_active(self, user_id):
-        """
-            Checks if a given user is part of the monthly active user group
-            Arguments:
-                user_id (str): user to add/update
-            Return:
-                Deferred[int] : timestamp since last seen, None if never seen
+        """Checks if a given user is part of the monthly active user group
 
+        Args:
+            user_id (str): user to add/update
+
+        Return:
+            Deferred[(int|None, bool)]: First arg is None if the user is not
+                in the mau group, otherwise approximate timestamp they were last
+                seen in milliseconds.
+                The second is a bool indicating if the user is in the trial
+                period or not.
         """
 
-        return(self._simple_select_one_onecol(
-            table="monthly_active_users",
-            keyvalues={
-                "user_id": user_id,
-            },
-            retcol="timestamp",
-            allow_none=True,
-            desc="user_last_seen_monthly_active",
-        ))
+        ret = yield self._user_last_seen_monthly_active(user_id)
+        last_seen, created_at = ret
+
+        mau_trial_ms = self.hs.config.mau_trial_days * 24 * 60 * 60 * 1000
+        is_trial = (self._clock.time_msec() - created_at) < mau_trial_ms
+
+        defer.returnValue((last_seen, is_trial))
+
+    @cached(num_args=1)
+    def _user_last_seen_monthly_active(self, user_id):
+        """Checks if a given user is part of the monthly active user group
+
+        Args:
+            user_id (str): user to add/update
+
+        Return:
+            Deferred[(int, int)|None]: None if never seen, otherwise time user
+            was last seen and registration time of user (both in milliseconds)
+        """
+
+        def _user_last_seen_monthly_active(txn):
+            sql = """
+                SELECT timestamp, creation_ts
+                FROM users LEFT JOIN monthly_active_users
+                ON monthly_active_users.user_id = users.name
+                WHERE name = ?
+            """
+            txn.execute(sql, (user_id,))
+            row = txn.fetchone()
+            return row[0], row[1] * 1000
+
+        return self.runInteraction(
+            "user_last_seen_monthly_active",
+            _user_last_seen_monthly_active
+        )
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):
@@ -201,7 +231,12 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             user_id(str): the user_id to query
         """
         if self.hs.config.limit_usage_by_mau:
-            last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
+            last_seen, is_trial = yield self.user_last_seen_monthly_active(user_id)
+
+            if is_trial:
+                # we don't track trial users in the MAU table.
+                return
+
             now = self.hs.get_clock().time_msec()
 
             # We want to reduce to the total number of db writes, and are happy
@@ -209,9 +244,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # We always insert new users (where MAU threshold has not been reached),
             # but only update if we have not previously seen the user for
             # LAST_SEEN_GRANULARITY ms
-            if last_seen_timestamp is None:
+            if last_seen is None:
                 count = yield self.get_monthly_active_count()
                 if count < self.hs.config.max_mau_value:
                     yield self.upsert_monthly_active_user(user_id)
-            elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
+            elif now - last_seen > LAST_SEEN_GRANULARITY:
                 yield self.upsert_monthly_active_user(user_id)

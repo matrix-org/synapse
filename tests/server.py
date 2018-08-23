@@ -5,7 +5,7 @@ from six import text_type
 
 import attr
 
-from twisted.internet import threads
+from twisted.internet import address, threads
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactorClock
@@ -63,7 +63,9 @@ class FakeChannel(object):
         self.result["done"] = True
 
     def getPeer(self):
-        return None
+        # We give an address so that getClientIP returns a non null entry,
+        # causing us to record the MAU
+        return address.IPv4Address(b"TCP", "127.0.0.1", 3423)
 
     def getHost(self):
         return None
@@ -91,7 +93,7 @@ class FakeSite:
         return FakeLogger()
 
 
-def make_request(method, path, content=b""):
+def make_request(method, path, content=b"", access_token=None):
     """
     Make a web request using the given method and path, feed it the
     content, and return the Request and the Channel underneath.
@@ -116,6 +118,11 @@ def make_request(method, path, content=b""):
     req = SynapseRequest(site, channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
+
+    if access_token:
+        req.requestHeaders.addRawHeader(b"Authorization", b"Bearer " + access_token)
+
+    req.requestHeaders.addRawHeader(b"X-Forwarded-For", b"127.0.0.1")
     req.requestReceived(method, path, b"1.1")
 
     return req, channel

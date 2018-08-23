@@ -799,8 +799,10 @@ class Auth(object):
         if self.hs.config.limit_usage_by_mau is True:
             # If the user is already part of the MAU cohort
             if user_id:
-                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
-                if timestamp:
+                activity, is_trial = yield self.store.user_last_seen_monthly_active(
+                    user_id,
+                )
+                if activity or is_trial:
                     return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()

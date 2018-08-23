@@ -30,6 +30,7 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
     def setUp(self):
         self.hs = yield setup_test_homeserver(self.addCleanup)
         self.store = self.hs.get_datastore()
+        self.hs.config.mau_trial_days = 0
 
     @defer.inlineCallbacks
     def test_initialise_reserved_users(self):
@@ -105,13 +106,13 @@ class MonthlyActiveUsersTestCase(tests.unittest.TestCase):
         user_id3 = "@user3:server"
 
         result = yield self.store.user_last_seen_monthly_active(user_id1)
-        self.assertFalse(result == 0)
+        self.assertFalse(result)
         yield self.store.upsert_monthly_active_user(user_id1)
         yield self.store.upsert_monthly_active_user(user_id2)
         result = yield self.store.user_last_seen_monthly_active(user_id1)
-        self.assertTrue(result > 0)
+        self.assertTrue(result[0] > 0)
         result = yield self.store.user_last_seen_monthly_active(user_id3)
-        self.assertFalse(result == 0)
+        self.assertFalse(result)
 
     @defer.inlineCallbacks
     def test_reap_monthly_active_users(self):
