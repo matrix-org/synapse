@@ -66,8 +66,8 @@ class ResourceLimitsServerNotices(object):
         if self._config.limit_usage_by_mau is False:
             return
 
-        timestamp = yield self._store.user_last_seen_monthly_active(user_id)
-        if timestamp is None:
+        timestamp, is_trial = yield self._store.user_last_seen_monthly_active(user_id)
+        if timestamp is None or is_trial:
             # This user will be blocked from receiving the notice anyway.
             # In practice, not sure we can ever get here
             return
