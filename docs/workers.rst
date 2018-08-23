@@ -74,7 +74,7 @@ replication endpoints that it's talking to on the main synapse process.
 ``worker_replication_port`` should point to the TCP replication listener port and
 ``worker_replication_http_port`` should point to the HTTP replication port.
 
-Currently, only the ``event_creator`` worker requires specifying
+Currently, the ``event_creator`` and ``federation_reader`` workers require specifying
 ``worker_replication_http_port``.
 
 For instance::
