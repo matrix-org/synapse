@@ -144,3 +144,69 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
         yield self._rlsn.maybe_send_server_notice_to_user(self.user_id)
 
         self._send_notice.assert_not_called()
+
+
+class TestResourceLimitsServerNoticesWithRealRooms(unittest.TestCase):
+    @defer.inlineCallbacks
+    def setUp(self):
+        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.store = self.hs.get_datastore()
+        self.server_notices_sender = self.hs.get_server_notices_sender()
+        self.server_notices_manager = self.hs.get_server_notices_manager()
+        self.event_source = self.hs.get_event_sources()
+
+        # relying on [1] is far from ideal, but the only case where
+        # ResourceLimitsServerNotices class needs to be isolated is this test,
+        # general code should never have a reason to do so ...
+        self._rlsn = self.server_notices_sender._server_notices[1]
+        if not isinstance(self._rlsn, ResourceLimitsServerNotices):
+            raise Exception("Failed to find reference to ResourceLimitsServerNotices")
+
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.config.hs_disabled = False
+        self.hs.config.max_mau_value = 5
+        self.hs.config.server_notices_mxid = "@server:test"
+        self.hs.config.server_notices_mxid_display_name = None
+        self.hs.config.server_notices_mxid_avatar_url = None
+        self.hs.config.server_notices_room_name = "Test Server Notice Room"
+
+        self.user_id = "@user_id:test"
+
+        self.hs.config.admin_uri = "mailto:user@test.com"
+
+    @defer.inlineCallbacks
+    def test_server_notice_only_sent_once(self):
+        self.store.get_monthly_active_count = Mock(
+            return_value=1000,
+        )
+
+        self.store.user_last_seen_monthly_active = Mock(
+            return_value=1000,
+        )
+
+        # Call the function multiple times to ensure we only send the notice once
+        yield self._rlsn.maybe_send_server_notice_to_user(self.user_id)
+        yield self._rlsn.maybe_send_server_notice_to_user(self.user_id)
+        yield self._rlsn.maybe_send_server_notice_to_user(self.user_id)
+
+        # Now lets get the last load of messages in the service notice room and
+        # check that there is only one server notice
+        room_id = yield self.server_notices_manager.get_notice_room_for_user(
+            self.user_id,
+        )
+
+        token = yield self.event_source.get_current_token()
+        events, _ = yield self.store.get_recent_events_for_room(
+            room_id, limit=100, end_token=token.room_key,
+        )
+
+        count = 0
+        for event in events:
+            if event.type != EventTypes.Message:
+                continue
+            if event.content.get("msgtype") != ServerNoticeMsgType:
+                continue
+
+            count += 1
+
+        self.assertEqual(count, 1)

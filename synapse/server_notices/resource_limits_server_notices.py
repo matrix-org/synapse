@@ -76,6 +76,10 @@ class ResourceLimitsServerNotices(object):
 
         room_id = yield self._server_notices_manager.get_notice_room_for_user(user_id)
 
+        if not room_id:
+            logger.warn("Failed to get server notices room")
+            return
+
         yield self._check_and_set_tags(user_id, room_id)
         currently_blocked, ref_events = yield self._is_room_currently_blocked(room_id)
 
@@ -176,7 +180,7 @@ class ResourceLimitsServerNotices(object):
 
         referenced_events = []
         if pinned_state_event is not None:
-            referenced_events = pinned_state_event.content.get('pinned')
+            referenced_events = list(pinned_state_event.content.get('pinned', []))
 
         events = yield self._store.get_events(referenced_events)
         for event_id, event in iteritems(events):
