@@ -66,6 +66,10 @@ class ResourceLimitsServerNotices(object):
         if self._config.limit_usage_by_mau is False:
             return
 
+        if not self._server_notices_manager.is_enabled():
+            # Don't try and send server notices unles they've been enabled
+            return
+
         timestamp = yield self._store.user_last_seen_monthly_active(user_id)
         if timestamp is None:
             # This user will be blocked from receiving the notice anyway.
