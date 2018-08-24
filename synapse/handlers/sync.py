@@ -603,7 +603,7 @@ class SyncHandler(object):
                     if types:
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id, types=types,
-                            filtered_types=filtered_types,
+                            filtered_types=None,  # we only want members!
                         )
 
         state = {}
