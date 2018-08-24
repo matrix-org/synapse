@@ -55,6 +55,7 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
             returnValue=""
         )
         self._rlsn._store.add_tag_to_room = Mock()
+        self._rlsn._store.get_tags_for_room = Mock(return_value={})
         self.hs.config.admin_uri = "mailto:user@test.com"
 
     @defer.inlineCallbacks
