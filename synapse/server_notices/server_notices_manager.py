@@ -154,7 +154,7 @@ class ServerNoticesManager(object):
         )
         room_id = info['room_id']
         yield self._store.add_tag_to_room(
-            user_id, room_id, SERVER_NOTICE_ROOM_TAG, None
+            user_id, room_id, SERVER_NOTICE_ROOM_TAG, {},
         )
 
         logger.info("Created server notices room %s for %s", room_id, user_id)

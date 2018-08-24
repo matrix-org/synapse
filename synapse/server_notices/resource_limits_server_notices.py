@@ -153,7 +153,7 @@ class ResourceLimitsServerNotices(object):
                 need_to_set_tag = False
         if need_to_set_tag:
             yield self._store.add_tag_to_room(
-                user_id, room_id, SERVER_NOTICE_ROOM_TAG, None
+                user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
             )
 
     @defer.inlineCallbacks
