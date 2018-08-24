@@ -39,6 +39,8 @@ class ServerNoticesManager(object):
         self._event_creation_handler = hs.get_event_creation_handler()
         self._is_mine_id = hs.is_mine_id
 
+        self._notifier = hs.get_notifier()
+
     def is_enabled(self):
         """Checks if server notices are enabled on this server.
 
@@ -153,8 +155,12 @@ class ServerNoticesManager(object):
             creator_join_profile=join_profile,
         )
         room_id = info['room_id']
-        yield self._store.add_tag_to_room(
+
+        max_id = yield self._store.add_tag_to_room(
             user_id, room_id, SERVER_NOTICE_ROOM_TAG, {},
+        )
+        self._notifier.on_new_event(
+            "account_data_key", max_id, users=[user_id]
         )
 
         logger.info("Created server notices room %s for %s", room_id, user_id)

@@ -46,6 +46,8 @@ class ResourceLimitsServerNotices(object):
         self._message_handler = hs.get_message_handler()
         self._state = hs.get_state_handler()
 
+        self._notifier = hs.get_notifier()
+
     @defer.inlineCallbacks
     def maybe_send_server_notice_to_user(self, user_id):
         """Check if we need to send a notice to this user, this will be true in
@@ -152,8 +154,11 @@ class ResourceLimitsServerNotices(object):
                 # tag already present, nothing to do here
                 need_to_set_tag = False
         if need_to_set_tag:
-            yield self._store.add_tag_to_room(
+            max_id = yield self._store.add_tag_to_room(
                 user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
+            )
+            self._notifier.on_new_event(
+                "account_data_key", max_id, users=[user_id]
             )
 
     @defer.inlineCallbacks
