@@ -93,7 +93,7 @@ class ServerConfig(Config):
 
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
-        self.admin_uri = config.get("admin_uri", None)
+        self.admin_contact = config.get("admin_contact", None)
 
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
@@ -357,7 +357,7 @@ class ServerConfig(Config):
           # Homeserver blocking
           #
           # How to reach the server admin, used in ResourceLimitError
-          # admin_uri: 'mailto:admin@server.com'
+          # admin_contact: 'mailto:admin@server.com'
           #
           # Global block config
           #
