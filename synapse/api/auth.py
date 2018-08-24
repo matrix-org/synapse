@@ -797,10 +797,14 @@ class Auth(object):
                 limit_type=self.hs.config.hs_disabled_limit_type
             )
         if self.hs.config.limit_usage_by_mau is True:
-            # If the user is already part of the MAU cohort
+            # If the user is already part of the MAU cohort or a trial user
             if user_id:
                 timestamp = yield self.store.user_last_seen_monthly_active(user_id)
                 if timestamp:
+                    return
+
+                is_trial = yield self.store.is_trial_user(user_id)
+                if is_trial:
                     return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
