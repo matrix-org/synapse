@@ -146,11 +146,10 @@ class ResourceLimitsServerNotices(object):
             user_id(str): the user in question
             room_id(str): the server notices room for that user
         """
-        tags = yield self._store.get_tags_for_user(user_id)
-        server_notices_tags = tags.get(room_id)
+        tags = yield self._store.get_tags_for_room(user_id, room_id)
         need_to_set_tag = True
-        if server_notices_tags:
-            if server_notices_tags.get(SERVER_NOTICE_ROOM_TAG):
+        if tags:
+            if SERVER_NOTICE_ROOM_TAG in tags:
                 # tag already present, nothing to do here
                 need_to_set_tag = False
         if need_to_set_tag:
