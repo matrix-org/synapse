@@ -239,10 +239,10 @@ class ResourceLimitError(SynapseError):
     def __init__(
         self, code, msg,
         errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-        admin_uri=None,
+        admin_contact=None,
         limit_type=None,
     ):
-        self.admin_uri = admin_uri
+        self.admin_contact = admin_contact
         self.limit_type = limit_type
         super(ResourceLimitError, self).__init__(code, msg, errcode=errcode)
 
@@ -250,7 +250,7 @@ class ResourceLimitError(SynapseError):
         return cs_error(
             self.msg,
             self.errcode,
-            admin_uri=self.admin_uri,
+            admin_contact=self.admin_contact,
             limit_type=self.limit_type
         )
 

@@ -793,7 +793,7 @@ class Auth(object):
             raise ResourceLimitError(
                 403, self.hs.config.hs_disabled_message,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                admin_uri=self.hs.config.admin_uri,
+                admin_contact=self.hs.config.admin_contact,
                 limit_type=self.hs.config.hs_disabled_limit_type
             )
         if self.hs.config.limit_usage_by_mau is True:
@@ -812,7 +812,7 @@ class Auth(object):
                 raise ResourceLimitError(
                     403, "Monthly Active User Limit Exceeded",
 
-                    admin_uri=self.hs.config.admin_uri,
+                    admin_contact=self.hs.config.admin_contact,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                     limit_type="monthly_active_user"
                 )

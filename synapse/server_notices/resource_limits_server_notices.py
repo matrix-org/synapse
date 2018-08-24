@@ -118,7 +118,7 @@ class ResourceLimitsServerNotices(object):
                     'body': event_content,
                     'msgtype': ServerNoticeMsgType,
                     'server_notice_type': ServerNoticeLimitReached,
-                    'admin_uri': self._config.admin_uri,
+                    'admin_contact': self._config.admin_contact,
                     'limit_type': event_limit_type
                 }
                 event = yield self._server_notices_manager.send_notice(

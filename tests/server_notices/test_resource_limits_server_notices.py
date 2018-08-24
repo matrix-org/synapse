@@ -56,7 +56,7 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
         )
         self._rlsn._store.add_tag_to_room = Mock()
         self._rlsn._store.get_tags_for_room = Mock(return_value={})
-        self.hs.config.admin_uri = "mailto:user@test.com"
+        self.hs.config.admin_contact = "mailto:user@test.com"
 
     @defer.inlineCallbacks
     def test_maybe_send_server_notice_to_user_flag_off(self):
@@ -173,7 +173,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.TestCase):
 
         self.user_id = "@user_id:test"
 
-        self.hs.config.admin_uri = "mailto:user@test.com"
+        self.hs.config.admin_contact = "mailto:user@test.com"
 
     @defer.inlineCallbacks
     def test_server_notice_only_sent_once(self):
