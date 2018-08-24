@@ -41,13 +41,11 @@ class MediaStorageTests(unittest.TestCase):
         hs.get_reactor = Mock(return_value=reactor)
         hs.config.media_store_path = self.primary_base_path
 
-        storage_providers = [FileStorageProviderBackend(
-            hs, self.secondary_base_path
-        )]
+        storage_providers = [FileStorageProviderBackend(hs, self.secondary_base_path)]
 
         self.filepaths = MediaFilePaths(self.primary_base_path)
         self.media_storage = MediaStorage(
-            hs, self.primary_base_path, self.filepaths, storage_providers,
+            hs, self.primary_base_path, self.filepaths, storage_providers
         )
 
     def tearDown(self):

@@ -24,9 +24,7 @@ from tests import unittest
 
 # Perform these tests using given secret key so we get entirely deterministic
 # signatures output that we can test against.
-SIGNING_KEY_SEED = decode_base64(
-    "YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1"
-)
+SIGNING_KEY_SEED = decode_base64("YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1")
 
 KEY_ALG = "ed25519"
 KEY_VER = 1
@@ -36,7 +34,6 @@ HOSTNAME = "domain"
 
 
 class EventSigningTestCase(unittest.TestCase):
-
     def setUp(self):
         self.signing_key = nacl.signing.SigningKey(SIGNING_KEY_SEED)
         self.signing_key.alg = KEY_ALG
@@ -51,7 +48,7 @@ class EventSigningTestCase(unittest.TestCase):
                 'signatures': {},
                 'type': "X",
                 'unsigned': {'age_ts': 1000000},
-            },
+            }
         )
 
         add_hashes_and_signatures(builder, HOSTNAME, self.signing_key)
@@ -61,8 +58,7 @@ class EventSigningTestCase(unittest.TestCase):
         self.assertTrue(hasattr(event, 'hashes'))
         self.assertIn('sha256', event.hashes)
         self.assertEquals(
-            event.hashes['sha256'],
-            "6tJjLpXtggfke8UxFhAKg82QVkJzvKOVOOSjUDK4ZSI",
+            event.hashes['sha256'], "6tJjLpXtggfke8UxFhAKg82QVkJzvKOVOOSjUDK4ZSI"
         )
 
         self.assertTrue(hasattr(event, 'signatures'))
@@ -77,9 +73,7 @@ class EventSigningTestCase(unittest.TestCase):
     def test_sign_message(self):
         builder = EventBuilder(
             {
-                'content': {
-                    'body': "Here is the message content",
-                },
+                'content': {'body': "Here is the message content"},
                 'event_id': "$0:domain",
                 'origin': "domain",
                 'origin_server_ts': 1000000,
@@ -98,8 +92,7 @@ class EventSigningTestCase(unittest.TestCase):
         self.assertTrue(hasattr(event, 'hashes'))
         self.assertIn('sha256', event.hashes)
         self.assertEquals(
-            event.hashes['sha256'],
-            "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g",
+            event.hashes['sha256'], "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g"
         )
 
         self.assertTrue(hasattr(event, 'signatures'))
@@ -108,5 +101,5 @@ class EventSigningTestCase(unittest.TestCase):
         self.assertEquals(
             event.signatures[HOSTNAME][KEY_NAME],
             "Wm+VzmOUOz08Ds+0NTWb1d4CZrVsJSikkeRxh6aCcUw"
-            "u6pNC78FunoD7KNWzqFn241eYHYMGCA5McEiVPdhzBA"
+            "u6pNC78FunoD7KNWzqFn241eYHYMGCA5McEiVPdhzBA",
         )

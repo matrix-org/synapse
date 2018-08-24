@@ -30,7 +30,7 @@ import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.types import RoomID, UserID
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
 logger = logging.getLogger(__name__)
@@ -344,6 +344,7 @@ class RoomMemberHandler(object):
         latest_event_ids = (
             event_id for (event_id, _, _) in prev_events_and_hashes
         )
+
         current_state_ids = yield self.state_handler.get_current_state_ids(
             room_id, latest_event_ids=latest_event_ids,
         )

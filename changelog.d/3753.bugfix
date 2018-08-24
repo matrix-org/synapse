@@ -1,0 +1,1 @@
+Fix bug where we broke sync when using limit_usage_by_mau but hadn't configured server notices

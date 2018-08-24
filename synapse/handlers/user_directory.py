@@ -119,6 +119,8 @@ class UserDirectoryHandler(object):
         """Called to update index of our local user profiles when they change
         irrespective of any rooms the user may be in.
         """
+        # FIXME(#3714): We should probably do this in the same worker as all
+        # the other changes.
         yield self.store.update_profile_in_user_dir(
             user_id, profile.display_name, profile.avatar_url, None,
         )
@@ -127,6 +129,8 @@ class UserDirectoryHandler(object):
     def handle_user_deactivated(self, user_id):
         """Called when a user ID is deactivated
         """
+        # FIXME(#3714): We should probably do this in the same worker as all
+        # the other changes.
         yield self.store.remove_from_user_dir(user_id)
         yield self.store.remove_from_user_in_public_room(user_id)
 

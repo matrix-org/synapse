@@ -43,8 +43,13 @@ from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.slave.storage.transactions import TransactionStore
+from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.client.v1.profile import (
+    ProfileAvatarURLRestServlet,
+    ProfileDisplaynameRestServlet,
+    ProfileRestServlet,
+)
 from synapse.rest.client.v1.room import (
     JoinRoomAliasServlet,
     RoomMembershipRestServlet,
@@ -53,6 +58,7 @@ from synapse.rest.client.v1.room import (
 )
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
+from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
@@ -62,8 +68,11 @@ logger = logging.getLogger("synapse.app.event_creator")
 
 
 class EventCreatorSlavedStore(
+    # FIXME(#3714): We need to add UserDirectoryStore as we write directly
+    # rather than going via the correct worker.
+    UserDirectoryStore,
     DirectoryStore,
-    TransactionStore,
+    SlavedTransactionStore,
     SlavedProfileStore,
     SlavedAccountDataStore,
     SlavedPusherStore,
@@ -101,6 +110,9 @@ class EventCreatorServer(HomeServer):
                     RoomMembershipRestServlet(self).register(resource)
                     RoomStateEventRestServlet(self).register(resource)
                     JoinRoomAliasServlet(self).register(resource)
+                    ProfileAvatarURLRestServlet(self).register(resource)
+                    ProfileDisplaynameRestServlet(self).register(resource)
+                    ProfileRestServlet(self).register(resource)
                     resources.update({
                         "/_matrix/client/r0": resource,
                         "/_matrix/client/unstable": resource,
@@ -174,11 +186,13 @@ def start(config_options):
     database_engine = create_engine(config.database_config)
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
+    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
     ss = EventCreatorServer(
         config.server_name,
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
+        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,

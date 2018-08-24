@@ -25,7 +25,7 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.streams.config import PaginationConfig
 from synapse.types import StreamToken, UserID
 from synapse.util import unwrapFirstError
-from synapse.util.async import concurrently_execute
+from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.visibility import filter_events_for_client
@@ -372,6 +372,10 @@ class InitialSyncHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
+            # If presence is disabled, return an empty list
+            if not self.hs.config.use_presence:
+                defer.returnValue([])
+
             states = yield presence_handler.get_states(
                 [m.user_id for m in room_members],
                 as_event=True,

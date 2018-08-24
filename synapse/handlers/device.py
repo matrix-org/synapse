@@ -23,7 +23,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import FederationDeniedError
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination

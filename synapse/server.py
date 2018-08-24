@@ -36,6 +36,7 @@ from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
     FederationServer,
+    ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.transaction_queue import TransactionQueue
@@ -56,7 +57,7 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
@@ -312,7 +313,10 @@ class HomeServer(object):
         return InitialSyncHandler(self)
 
     def build_profile_handler(self):
-        return ProfileHandler(self)
+        if self.config.worker_app:
+            return BaseProfileHandler(self)
+        else:
+            return MasterProfileHandler(self)
 
     def build_event_creation_handler(self):
         return EventCreationHandler(self)
@@ -428,7 +432,10 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        return FederationHandlerRegistry()
+        if self.config.worker_app:
+            return ReplicationFederationHandlerRegistry(self)
+        else:
+            return FederationHandlerRegistry()
 
     def build_server_notices_manager(self):
         if self.config.worker_app:
