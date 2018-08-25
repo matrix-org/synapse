@@ -52,6 +52,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield utils.setup_test_homeserver(
+            self.addCleanup,
             handlers=None,
             replication_layer=mock.Mock(),
         )
