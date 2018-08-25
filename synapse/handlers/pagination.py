@@ -18,11 +18,11 @@ import logging
 from twisted.internet import defer
 from twisted.python.failure import Failure
 
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.utils import serialize_event
 from synapse.types import RoomStreamToken
-from synapse.util.async import ReadWriteLock
+from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.logcontext import run_in_background
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -251,6 +251,33 @@ class PaginationHandler(object):
             is_peeking=(member_event_id is None),
         )
 
+        state = None
+        if event_filter and event_filter.lazy_load_members():
+            # TODO: remove redundant members
+
+            types = [
+                (EventTypes.Member, state_key)
+                for state_key in set(
+                    event.sender  # FIXME: we also care about invite targets etc.
+                    for event in events
+                )
+            ]
+
+            state_ids = yield self.store.get_state_ids_for_event(
+                events[0].event_id, types=types,
+            )
+
+            if state_ids:
+                state = yield self.store.get_events(list(state_ids.values()))
+
+            if state:
+                state = yield filter_events_for_client(
+                    self.store,
+                    user_id,
+                    state.values(),
+                    is_peeking=(member_event_id is None),
+                )
+
         time_now = self.clock.time_msec()
 
         chunk = {
@@ -261,5 +288,11 @@ class PaginationHandler(object):
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }
+
+        if state:
+            chunk["state"] = [
+                serialize_event(e, time_now, as_client_event)
+                for e in state
+            ]
 
         defer.returnValue(chunk)

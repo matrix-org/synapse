@@ -23,7 +23,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 
 from tests import unittest
-from tests.server import make_request, wait_until_result
+from tests.server import make_request, render
 
 
 class RestTestCase(unittest.TestCase):
@@ -55,25 +55,39 @@ class RestTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
-        yield self.change_membership(room=room, src=src, targ=targ, tok=tok,
-                                     membership=Membership.INVITE,
-                                     expect_code=expect_code)
+        yield self.change_membership(
+            room=room,
+            src=src,
+            targ=targ,
+            tok=tok,
+            membership=Membership.INVITE,
+            expect_code=expect_code,
+        )
 
     @defer.inlineCallbacks
     def join(self, room=None, user=None, expect_code=200, tok=None):
-        yield self.change_membership(room=room, src=user, targ=user, tok=tok,
-                                     membership=Membership.JOIN,
-                                     expect_code=expect_code)
+        yield self.change_membership(
+            room=room,
+            src=user,
+            targ=user,
+            tok=tok,
+            membership=Membership.JOIN,
+            expect_code=expect_code,
+        )
 
     @defer.inlineCallbacks
     def leave(self, room=None, user=None, expect_code=200, tok=None):
-        yield self.change_membership(room=room, src=user, targ=user, tok=tok,
-                                     membership=Membership.LEAVE,
-                                     expect_code=expect_code)
+        yield self.change_membership(
+            room=room,
+            src=user,
+            targ=user,
+            tok=tok,
+            membership=Membership.LEAVE,
+            expect_code=expect_code,
+        )
 
     @defer.inlineCallbacks
-    def change_membership(self, room, src, targ, membership, tok=None,
-                          expect_code=200):
+    def change_membership(self, room, src, targ, membership, tok=None, expect_code=200):
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
@@ -81,16 +95,15 @@ class RestTestCase(unittest.TestCase):
         if tok:
             path = path + "?access_token=%s" % tok
 
-        data = {
-            "membership": membership
-        }
+        data = {"membership": membership}
 
         (code, response) = yield self.mock_resource.trigger(
             "PUT", path, json.dumps(data)
         )
         self.assertEquals(
-            expect_code, code,
-            msg="Expected: %d, got: %d, resp: %r" % (expect_code, code, response)
+            expect_code,
+            code,
+            msg="Expected: %d, got: %d, resp: %r" % (expect_code, code, response),
         )
 
         self.auth_user_id = temp_id
@@ -100,17 +113,15 @@ class RestTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger(
             "POST",
             "/register",
-            json.dumps({
-                "user": user_id,
-                "password": "test",
-                "type": "m.login.password"
-            }))
-        self.assertEquals(200, code)
+            json.dumps(
+                {"user": user_id, "password": "test", "type": "m.login.password"}
+            ),
+        )
+        self.assertEquals(200, code, msg=response)
         defer.returnValue(response)
 
     @defer.inlineCallbacks
-    def send(self, room_id, body=None, txn_id=None, tok=None,
-             expect_code=200):
+    def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
         if body is None:
@@ -132,8 +143,9 @@ class RestTestCase(unittest.TestCase):
             actual (dict): The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(required[key], actual[key],
-                              msg="%s mismatch. %s" % (key, actual))
+            self.assertEquals(
+                required[key], actual[key], msg="%s mismatch. %s" % (key, actual)
+            )
 
 
 @attr.s
@@ -149,16 +161,17 @@ class RestHelper(object):
     def create_room_as(self, room_creator, is_public=True, tok=None):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
-        path = b"/_matrix/client/r0/createRoom"
+        path = "/_matrix/client/r0/createRoom"
         content = {}
         if not is_public:
             content["visibility"] = "private"
         if tok:
-            path = path + b"?access_token=%s" % tok.encode('ascii')
+            path = path + "?access_token=%s" % tok
 
-        request, channel = make_request(b"POST", path, json.dumps(content).encode('utf8'))
-        request.render(self.resource)
-        wait_until_result(self.hs.get_reactor(), channel)
+        request, channel = make_request(
+            "POST", path, json.dumps(content).encode('utf8')
+        )
+        render(request, self.resource, self.hs.get_reactor())
 
         assert channel.result["code"] == b"200", channel.result
         self.auth_user_id = temp_id
@@ -204,12 +217,9 @@ class RestHelper(object):
 
         data = {"membership": membership}
 
-        request, channel = make_request(
-            b"PUT", path.encode('ascii'), json.dumps(data).encode('utf8')
-        )
+        request, channel = make_request("PUT", path, json.dumps(data).encode('utf8'))
 
-        request.render(self.resource)
-        wait_until_result(self.hs.get_reactor(), channel)
+        render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"

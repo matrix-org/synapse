@@ -1,0 +1,1 @@
+Fix error collecting prometheus metrics when run on dedicated thread due to threading concurrency issues

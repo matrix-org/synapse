@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import threading
 
 from prometheus_client.core import Counter, Histogram
 
@@ -111,6 +112,9 @@ in_flight_requests_db_sched_duration = Counter(
 # The set of all in flight requests, set[RequestMetrics]
 _in_flight_requests = set()
 
+# Protects the _in_flight_requests set from concurrent accesss
+_in_flight_requests_lock = threading.Lock()
+
 
 def _get_in_flight_counts():
     """Returns a count of all in flight requests by (method, server_name)
@@ -120,7 +124,8 @@ def _get_in_flight_counts():
     """
     # Cast to a list to prevent it changing while the Prometheus
     # thread is collecting metrics
-    reqs = list(_in_flight_requests)
+    with _in_flight_requests_lock:
+        reqs = list(_in_flight_requests)
 
     for rm in reqs:
         rm.update_metrics()
@@ -154,10 +159,12 @@ class RequestMetrics(object):
         # to the "in flight" metrics.
         self._request_stats = self.start_context.get_resource_usage()
 
-        _in_flight_requests.add(self)
+        with _in_flight_requests_lock:
+            _in_flight_requests.add(self)
 
     def stop(self, time_sec, request):
-        _in_flight_requests.discard(self)
+        with _in_flight_requests_lock:
+            _in_flight_requests.discard(self)
 
         context = LoggingContext.current_context()
 

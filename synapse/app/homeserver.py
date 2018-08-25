@@ -20,6 +20,8 @@ import sys
 
 from six import iteritems
 
+from prometheus_client import Gauge
+
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, NoResource
@@ -300,6 +302,11 @@ class SynapseHomeServer(HomeServer):
             quit_with_error(e.message)
 
 
+# Gauges to expose monthly active user control metrics
+current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
+max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
+
+
 def setup(config_options):
     """
     Args:
@@ -331,6 +338,7 @@ def setup(config_options):
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
+    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
@@ -339,6 +347,7 @@ def setup(config_options):
         config.server_name,
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
+        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
@@ -429,7 +438,7 @@ def run(hs):
     stats_process = []
 
     def start_phone_stats_home():
-        run_as_background_process("phone_stats_home", phone_stats_home)
+        return run_as_background_process("phone_stats_home", phone_stats_home)
 
     @defer.inlineCallbacks
     def phone_stats_home():
@@ -502,7 +511,7 @@ def run(hs):
             )
 
     def generate_user_daily_visit_stats():
-        run_as_background_process(
+        return run_as_background_process(
             "generate_user_daily_visits",
             hs.get_datastore().generate_user_daily_visits,
         )
@@ -511,6 +520,28 @@ def run(hs):
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+
+    # monthly active user limiting functionality
+    clock.looping_call(
+        hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60
+    )
+    hs.get_datastore().reap_monthly_active_users()
+
+    @defer.inlineCallbacks
+    def generate_monthly_active_users():
+        count = 0
+        if hs.config.limit_usage_by_mau:
+            count = yield hs.get_datastore().get_monthly_active_count()
+        current_mau_gauge.set(float(count))
+        max_mau_gauge.set(float(hs.config.max_mau_value))
+
+    hs.get_datastore().initialise_reserved_users(
+        hs.config.mau_limits_reserved_threepids
+    )
+    generate_monthly_active_users()
+    if hs.config.limit_usage_by_mau:
+        clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
+    # End of monthly active user settings
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")

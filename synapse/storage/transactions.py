@@ -273,7 +273,9 @@ class TransactionStore(SQLBaseStore):
         return self.cursor_to_dict(txn)
 
     def _start_cleanup_transactions(self):
-        run_as_background_process("cleanup_transactions", self._cleanup_transactions)
+        return run_as_background_process(
+            "cleanup_transactions", self._cleanup_transactions,
+        )
 
     def _cleanup_transactions(self):
         now = self._clock.time_msec()

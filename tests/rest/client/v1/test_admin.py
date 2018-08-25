@@ -51,7 +51,7 @@ class UserRegisterTestCase(unittest.TestCase):
         self.secrets = Mock()
 
         self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
 
         self.hs.config.registration_shared_secret = u"shared"
@@ -140,7 +140,7 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -168,7 +168,7 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -195,7 +195,7 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -215,6 +215,7 @@ class UserRegisterTestCase(unittest.TestCase):
         mac.  Admin is optional.  Additional checks are done for length and
         type.
         """
+
         def nonce():
             request, channel = make_request("GET", self.url)
             render(request, self.resource, self.clock)
@@ -253,7 +254,7 @@ class UserRegisterTestCase(unittest.TestCase):
         self.assertEqual('Invalid username', channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": b"abcd\x00"})
+        body = json.dumps({"nonce": nonce(), "username": u"abcd\u0000"})
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 
@@ -289,7 +290,9 @@ class UserRegisterTestCase(unittest.TestCase):
         self.assertEqual('Invalid password', channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": "a", "password": b"abcd\x00"})
+        body = json.dumps(
+            {"nonce": nonce(), "username": "a", "password": u"abcd\u0000"}
+        )
         request, channel = make_request("POST", self.url, body.encode('utf8'))
         render(request, self.resource, self.clock)
 

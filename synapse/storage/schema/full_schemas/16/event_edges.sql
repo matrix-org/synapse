@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS event_edges(
     event_id TEXT NOT NULL,
     prev_event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
-    is_state BOOL NOT NULL,
+    is_state BOOL NOT NULL,  -- true if this is a prev_state edge rather than a regular
+                             -- event dag edge.
     UNIQUE (event_id, prev_event_id, room_id, is_state)
 );
 

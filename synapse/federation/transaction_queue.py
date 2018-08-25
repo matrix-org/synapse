@@ -26,6 +26,8 @@ from synapse.api.errors import FederationDeniedError, HttpResponseException
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 from synapse.metrics import (
     LaterGauge,
+    event_processing_loop_counter,
+    event_processing_loop_room_count,
     events_processed_counter,
     sent_edus_counter,
     sent_transactions_counter,
@@ -56,6 +58,7 @@ class TransactionQueue(object):
     """
 
     def __init__(self, hs):
+        self.hs = hs
         self.server_name = hs.hostname
 
         self.store = hs.get_datastore()
@@ -115,9 +118,6 @@ class TransactionQueue(object):
                 + sum(map(len, edus_keyed.values()))
             ),
         )
-
-        # destination -> list of tuple(failure, deferred)
-        self.pending_failures_by_dest = {}
 
         # destination -> stream_id of last successfully sent to-device message.
         # NB: may be a long or an int.
@@ -256,7 +256,13 @@ class TransactionQueue(object):
                     synapse.metrics.event_processing_last_ts.labels(
                         "federation_sender").set(ts)
 
-                events_processed_counter.inc(len(events))
+                    events_processed_counter.inc(len(events))
+
+                    event_processing_loop_room_count.labels(
+                        "federation_sender"
+                    ).inc(len(events_by_room))
+
+                event_processing_loop_counter.labels("federation_sender").inc()
 
                 synapse.metrics.event_processing_positions.labels(
                     "federation_sender").set(next_token)
@@ -303,6 +309,9 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
+        if not self.hs.config.use_presence:
+            # No-op if presence is disabled.
+            return
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
@@ -382,19 +391,6 @@ class TransactionQueue(object):
 
         self._attempt_new_transaction(destination)
 
-    def send_failure(self, failure, destination):
-        if destination == self.server_name or destination == "localhost":
-            return
-
-        if not self.can_send_to(destination):
-            return
-
-        self.pending_failures_by_dest.setdefault(
-            destination, []
-        ).append(failure)
-
-        self._attempt_new_transaction(destination)
-
     def send_device_messages(self, destination):
         if destination == self.server_name or destination == "localhost":
             return
@@ -469,7 +465,6 @@ class TransactionQueue(object):
                 pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
                 pending_edus = self.pending_edus_by_dest.pop(destination, [])
                 pending_presence = self.pending_presence_by_dest.pop(destination, {})
-                pending_failures = self.pending_failures_by_dest.pop(destination, [])
 
                 pending_edus.extend(
                     self.pending_edus_keyed_by_dest.pop(destination, {}).values()
@@ -497,7 +492,7 @@ class TransactionQueue(object):
                     logger.debug("TX [%s] len(pending_pdus_by_dest[dest]) = %d",
                                  destination, len(pending_pdus))
 
-                if not pending_pdus and not pending_edus and not pending_failures:
+                if not pending_pdus and not pending_edus:
                     logger.debug("TX [%s] Nothing to send", destination)
                     self.last_device_stream_id_by_dest[destination] = (
                         device_stream_id
@@ -507,7 +502,7 @@ class TransactionQueue(object):
                 # END CRITICAL SECTION
 
                 success = yield self._send_new_transaction(
-                    destination, pending_pdus, pending_edus, pending_failures,
+                    destination, pending_pdus, pending_edus,
                 )
                 if success:
                     sent_transactions_counter.inc()
@@ -584,14 +579,12 @@ class TransactionQueue(object):
 
     @measure_func("_send_new_transaction")
     @defer.inlineCallbacks
-    def _send_new_transaction(self, destination, pending_pdus, pending_edus,
-                              pending_failures):
+    def _send_new_transaction(self, destination, pending_pdus, pending_edus):
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[1])
         pdus = [x[0] for x in pending_pdus]
         edus = pending_edus
-        failures = [x.get_dict() for x in pending_failures]
 
         success = True
 
@@ -601,11 +594,10 @@ class TransactionQueue(object):
 
         logger.debug(
             "TX [%s] {%s} Attempting new transaction"
-            " (pdus: %d, edus: %d, failures: %d)",
+            " (pdus: %d, edus: %d)",
             destination, txn_id,
             len(pdus),
             len(edus),
-            len(failures)
         )
 
         logger.debug("TX [%s] Persisting transaction...", destination)
@@ -617,7 +609,6 @@ class TransactionQueue(object):
             destination=destination,
             pdus=pdus,
             edus=edus,
-            pdu_failures=failures,
         )
 
         self._next_txn_id += 1
@@ -627,12 +618,11 @@ class TransactionQueue(object):
         logger.debug("TX [%s] Persisted transaction", destination)
         logger.info(
             "TX [%s] {%s} Sending transaction [%s],"
-            " (PDUs: %d, EDUs: %d, failures: %d)",
+            " (PDUs: %d, EDUs: %d)",
             destination, txn_id,
             transaction.transaction_id,
             len(pdus),
             len(edus),
-            len(failures),
         )
 
         # Actually send the transaction

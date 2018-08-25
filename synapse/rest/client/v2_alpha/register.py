@@ -193,15 +193,15 @@ class RegisterRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        kind = "user"
-        if "kind" in request.args:
-            kind = request.args["kind"][0]
+        kind = b"user"
+        if b"kind" in request.args:
+            kind = request.args[b"kind"][0]
 
-        if kind == "guest":
+        if kind == b"guest":
             ret = yield self._do_guest_registration(body)
             defer.returnValue(ret)
             return
-        elif kind != "user":
+        elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
             )
@@ -389,8 +389,8 @@ class RegisterRestServlet(RestServlet):
             assert_params_in_dict(params, ["password"])
 
             desired_username = params.get("username", None)
-            new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+            new_password = params.get("password", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
