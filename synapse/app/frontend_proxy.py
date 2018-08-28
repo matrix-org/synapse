@@ -148,10 +148,7 @@ class FrontendProxySlavedStore(
 
 
 class FrontendProxyServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = FrontendProxySlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = FrontendProxySlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
