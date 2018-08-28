@@ -29,7 +29,7 @@ from synapse.api.errors import CodeMessageException, cs_error
 from synapse.federation.transport import server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
-from synapse.storage import PostgresEngine
+from synapse.storage import DataStore, PostgresEngine
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import (
     _get_or_create_schema_state,
@@ -92,10 +92,14 @@ def setupdb():
         atexit.register(_cleanup)
 
 
+class TestHomeServer(HomeServer):
+    DATASTORE_CLASS = DataStore
+
+
 @defer.inlineCallbacks
 def setup_test_homeserver(
     cleanup_func, name="test", datastore=None, config=None, reactor=None,
-    homeserverToUse=HomeServer, **kargs
+    homeserverToUse=TestHomeServer, **kargs
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
