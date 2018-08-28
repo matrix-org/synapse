@@ -19,6 +19,7 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+import abc
 import logging
 
 from twisted.enterprise import adbapi
@@ -110,6 +111,8 @@ class HomeServer(object):
         config (synapse.config.homeserver.HomeserverConfig):
     """
 
+    __metaclass__ = abc.ABCMeta
+
     DEPENDENCIES = [
         'http_client',
         'db_pool',
@@ -174,7 +177,7 @@ class HomeServer(object):
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
-    DATASTORE_CLASS = None
+    DATASTORE_CLASS = abc.abstractproperty()
 
     def __init__(self, hostname, reactor=None, **kwargs):
         """
@@ -200,10 +203,6 @@ class HomeServer(object):
 
     def setup(self):
         logger.info("Setting up.")
-        if self.DATASTORE_CLASS is None:
-            raise RuntimeError("%s does not define a DATASTORE_CLASS" % (
-                self.__class__.__name__,
-            ))
         with self.get_db_conn() as conn:
             self.datastore = self.DATASTORE_CLASS(conn, self)
         logger.info("Finished setting up.")
