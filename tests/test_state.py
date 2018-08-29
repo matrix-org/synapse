@@ -18,7 +18,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.api.auth import Auth
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomVersions
 from synapse.events import FrozenEvent
 from synapse.state import StateHandler, StateResolutionHandler
 
@@ -117,6 +117,9 @@ class StateGroupStore(object):
     def register_event_id_state_group(self, event_id, state_group):
         self._event_to_state_group[event_id] = state_group
 
+    def get_room_version(self, room_id):
+        return RoomVersions.V1
+
 
 class DictObj(dict):
     def __init__(self, **kwargs):
@@ -176,7 +179,9 @@ class StateTestCase(unittest.TestCase):
     def test_branch_no_conflict(self):
         graph = Graph(
             nodes={
-                "START": DictObj(type=EventTypes.Create, state_key="", depth=1),
+                "START": DictObj(
+                    type=EventTypes.Create, state_key="", content={}, depth=1,
+                ),
                 "A": DictObj(type=EventTypes.Message, depth=2),
                 "B": DictObj(type=EventTypes.Message, depth=3),
                 "C": DictObj(type=EventTypes.Name, state_key="", depth=3),

@@ -745,9 +745,16 @@ class SyncHandler(object):
                 state_ids = {}
                 if lazy_load_members:
                     if types:
+                        # We're returning an incremental sync, with no "gap" since
+                        # the previous sync, so normally there would be no state to return
+                        # But we're lazy-loading, so the client might need some more
+                        # member events to understand the events in this timeline.
+                        # So we fish out all the member events corresponding to the
+                        # timeline here, and then dedupe any redundant ones below.
+
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id, types=types,
-                            filtered_types=filtered_types,
+                            filtered_types=None,  # we only want members!
                         )
 
             if lazy_load_members and not include_redundant_members:

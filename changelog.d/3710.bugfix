@@ -1,1 +1,0 @@
-Fix "Starting db txn 'get_all_updated_receipts' from sentinel context" warning

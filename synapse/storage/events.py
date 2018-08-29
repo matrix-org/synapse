@@ -705,9 +705,11 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
         }
 
         events_map = {ev.event_id: ev for ev, _ in events_context}
+        room_version = yield self.get_room_version(room_id)
+
         logger.debug("calling resolve_state_groups from preserve_events")
         res = yield self._state_resolution_handler.resolve_state_groups(
-            room_id, state_groups, events_map, get_events
+            room_id, room_version, state_groups, events_map, get_events
         )
 
         defer.returnValue((res.state, None))

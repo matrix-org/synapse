@@ -77,8 +77,13 @@ class ServerConfig(Config):
             self.max_mau_value = config.get(
                 "max_mau_value", 0,
             )
+
         self.mau_limits_reserved_threepids = config.get(
             "mau_limit_reserved_threepids", []
+        )
+
+        self.mau_trial_days = config.get(
+            "mau_trial_days", 0,
         )
 
         # Options to disable HS
@@ -88,7 +93,7 @@ class ServerConfig(Config):
 
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
-        self.admin_uri = config.get("admin_uri", None)
+        self.admin_contact = config.get("admin_contact", None)
 
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
@@ -352,7 +357,7 @@ class ServerConfig(Config):
           # Homeserver blocking
           #
           # How to reach the server admin, used in ResourceLimitError
-          # admin_uri: 'mailto:admin@server.com'
+          # admin_contact: 'mailto:admin@server.com'
           #
           # Global block config
           #
@@ -365,6 +370,7 @@ class ServerConfig(Config):
           # Enables monthly active user checking
           # limit_usage_by_mau: False
           # max_mau_value: 50
+          # mau_trial_days: 2
           #
           # Sometimes the server admin will want to ensure certain accounts are
           # never blocked by mau checking. These accounts are specified here.

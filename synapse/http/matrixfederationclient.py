@@ -133,7 +133,7 @@ class MatrixFederationHttpClient(object):
                 failures, connection failures, SSL failures.)
         """
         if (
-            self.hs.config.federation_domain_whitelist and
+            self.hs.config.federation_domain_whitelist is not None and
             destination not in self.hs.config.federation_domain_whitelist
         ):
             raise FederationDeniedError(destination)

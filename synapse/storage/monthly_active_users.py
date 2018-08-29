@@ -147,6 +147,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             return count
         return self.runInteraction("count_users", _count_users)
 
+    @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member
@@ -155,7 +156,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Deferred[bool]: True if a new entry was created, False if an
                 existing one was updated.
         """
-        is_insert = self._simple_upsert(
+        is_insert = yield self._simple_upsert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
             keyvalues={
@@ -200,6 +201,11 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             user_id(str): the user_id to query
         """
         if self.hs.config.limit_usage_by_mau:
+            is_trial = yield self.is_trial_user(user_id)
+            if is_trial:
+                # we don't track trial users in the MAU table.
+                return
+
             last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
 
