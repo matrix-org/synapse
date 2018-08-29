@@ -146,23 +146,29 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             self.as_yaml_files.append(as_token)
 
     def _set_state(self, id, state, txn=None):
-        return self.db_pool.runOperation(self.engine.convert_param_style(
-            "INSERT INTO application_services_state(as_id, state, last_txn) "
-            "VALUES(?,?,?)"),
+        return self.db_pool.runOperation(
+            self.engine.convert_param_style(
+                "INSERT INTO application_services_state(as_id, state, last_txn) "
+                "VALUES(?,?,?)"
+            ),
             (id, state, txn),
         )
 
     def _insert_txn(self, as_id, txn_id, events):
-        return self.db_pool.runOperation(self.engine.convert_param_style(
-            "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
-            "VALUES(?,?,?)"),
+        return self.db_pool.runOperation(
+            self.engine.convert_param_style(
+                "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
+                "VALUES(?,?,?)"
+            ),
             (as_id, txn_id, json.dumps([e.event_id for e in events])),
         )
 
     def _set_last_txn(self, as_id, txn_id):
-        return self.db_pool.runOperation(self.engine.convert_param_style(
-            "INSERT INTO application_services_state(as_id, last_txn, state) "
-            "VALUES(?,?,?)"),
+        return self.db_pool.runOperation(
+            self.engine.convert_param_style(
+                "INSERT INTO application_services_state(as_id, last_txn, state) "
+                "VALUES(?,?,?)"
+            ),
             (as_id, txn_id, ApplicationServiceState.UP),
         )
 
@@ -199,8 +205,10 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
     def test_set_appservices_state_down(self):
         service = Mock(id=self.as_list[1]["id"])
         yield self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
-        rows = yield self.db_pool.runQuery(self.engine.convert_param_style(
-            "SELECT as_id FROM application_services_state WHERE state=?"),
+        rows = yield self.db_pool.runQuery(
+            self.engine.convert_param_style(
+                "SELECT as_id FROM application_services_state WHERE state=?"
+            ),
             (ApplicationServiceState.DOWN,),
         )
         self.assertEquals(service.id, rows[0][0])
@@ -211,8 +219,10 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self.store.set_appservice_state(service, ApplicationServiceState.UP)
         yield self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
         yield self.store.set_appservice_state(service, ApplicationServiceState.UP)
-        rows = yield self.db_pool.runQuery(self.engine.convert_param_style(
-            "SELECT as_id FROM application_services_state WHERE state=?"),
+        rows = yield self.db_pool.runQuery(
+            self.engine.convert_param_style(
+                "SELECT as_id FROM application_services_state WHERE state=?"
+            ),
             (ApplicationServiceState.UP,),
         )
         self.assertEquals(service.id, rows[0][0])
@@ -278,15 +288,20 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(service.id, txn_id, events)
         yield self.store.complete_appservice_txn(txn_id=txn_id, service=service)
 
-        res = yield self.db_pool.runQuery(self.engine.convert_param_style(
-            "SELECT last_txn FROM application_services_state WHERE as_id=?"),
+        res = yield self.db_pool.runQuery(
+            self.engine.convert_param_style(
+                "SELECT last_txn FROM application_services_state WHERE as_id=?"
+            ),
             (service.id,),
         )
         self.assertEquals(1, len(res))
         self.assertEquals(txn_id, res[0][0])
 
-        res = yield self.db_pool.runQuery(self.engine.convert_param_style(
-            "SELECT * FROM application_services_txns WHERE txn_id=?"), (txn_id,)
+        res = yield self.db_pool.runQuery(
+            self.engine.convert_param_style(
+                "SELECT * FROM application_services_txns WHERE txn_id=?"
+            ),
+            (txn_id,),
         )
         self.assertEquals(0, len(res))
 
@@ -299,16 +314,21 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         yield self._insert_txn(service.id, txn_id, events)
         yield self.store.complete_appservice_txn(txn_id=txn_id, service=service)
 
-        res = yield self.db_pool.runQuery(self.engine.convert_param_style(
-            "SELECT last_txn, state FROM application_services_state WHERE as_id=?"),
+        res = yield self.db_pool.runQuery(
+            self.engine.convert_param_style(
+                "SELECT last_txn, state FROM application_services_state WHERE as_id=?"
+            ),
             (service.id,),
         )
         self.assertEquals(1, len(res))
         self.assertEquals(txn_id, res[0][0])
         self.assertEquals(ApplicationServiceState.UP, res[0][1])
 
-        res = yield self.db_pool.runQuery(self.engine.convert_param_style(
-            "SELECT * FROM application_services_txns WHERE txn_id=?"), (txn_id,)
+        res = yield self.db_pool.runQuery(
+            self.engine.convert_param_style(
+                "SELECT * FROM application_services_txns WHERE txn_id=?"
+            ),
+            (txn_id,),
         )
         self.assertEquals(0, len(res))
 
