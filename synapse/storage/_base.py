@@ -26,10 +26,9 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.storage.util.id_generators import StreamIdGenerator
-
 
 logger = logging.getLogger(__name__)
 
