@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
+
 from ._base import IncorrectDatabaseSetup
 
 
@@ -21,6 +23,14 @@ class PostgresEngine(object):
 
     def __init__(self, database_module, database_config):
         self.module = database_module
+
+        # Check the version. This will raise if it's less than the supported
+        # 9.1.
+        version = database_module.extensions.libpq_version()
+
+        if version < 100000:
+            warnings.warn("Consider upgrading your client to PostgreSQL 10.0+.")
+
         self.module.extensions.register_type(self.module.extensions.UNICODE)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
 
@@ -47,6 +57,7 @@ class PostgresEngine(object):
         if not self.synchronous_commit:
             cursor = db_conn.cursor()
             cursor.execute("SET synchronous_commit TO OFF")
+            cursor.execute("SET bytea_output TO escape")
             cursor.close()
 
     def is_deadlock(self, error):

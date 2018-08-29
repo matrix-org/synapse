@@ -1244,19 +1244,5 @@ def db_to_json(db_content):
     try:
         return json.loads(db_content)
     except Exception:
-        # I don't know how, but somehow some binary objects get mangled upon
-        # coming out of PostgreSQL on Python 3. The particular mangling is that
-        # the first byte ("{") is byte-escaped, but the rest is hex-encoded.
-        # This attempts to unmangle it, and warns about it. If it can't
-        # unmangle it, it'll complain and then log the problem.
-        try:
-            if db_content.startswith("\\x7b"):
-                logging.warning("Detecting mangled JSON, trying to unmangle...")
-                import binascii
-                db_content_n = "{" + binascii.unhexlify(db_content[4:]).decode('utf8')
-                return json.loads(db_content_n)
-        except Exception:
-            logging.warning("Failed to unmangle")
-
         logging.warning("Tried to decode '%r' as JSON and failed", db_content)
         raise

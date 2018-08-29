@@ -78,6 +78,9 @@ CONDITIONAL_REQUIREMENTS = {
     "affinity": {
         "affinity": ["affinity"],
     },
+    "postgres": {
+        "psycopg2>=2.7": ["psycopg2"]
+    }
 }
 
 
