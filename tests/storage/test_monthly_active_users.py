@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import tests.unittest
-
 from tests.unittest import HomeserverTestCase
 
 FORTY_DAYS = 40 * 24 * 60 * 60
