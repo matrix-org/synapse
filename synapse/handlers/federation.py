@@ -291,8 +291,9 @@ class FederationHandler(BaseHandler):
                             ev_ids, get_prev_content=False, check_redacted=False
                         )
 
+                    room_version = yield self.store.get_room_version(pdu.room_id)
                     state_map = yield resolve_events_with_factory(
-                        state_groups, {pdu.event_id: pdu}, fetch
+                        room_version, state_groups, {pdu.event_id: pdu}, fetch
                     )
 
                     state = (yield self.store.get_events(state_map.values())).values()
@@ -1828,7 +1829,10 @@ class FederationHandler(BaseHandler):
                     (d.type, d.state_key): d for d in different_events if d
                 })
 
+                room_version = yield self.store.get_room_version(event.room_id)
+
                 new_state = self.state_handler.resolve_events(
+                    room_version,
                     [list(local_view.values()), list(remote_view.values())],
                     event
                 )

@@ -32,12 +32,16 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class ProfileHandler(BaseHandler):
-    PROFILE_UPDATE_MS = 60 * 1000
-    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
+class BaseProfileHandler(BaseHandler):
+    """Handles fetching and updating user profile information.
+
+    BaseProfileHandler can be instantiated directly on workers and will
+    delegate to master when necessary. The master process should use the
+    subclass MasterProfileHandler
+    """
 
     def __init__(self, hs):
-        super(ProfileHandler, self).__init__(hs)
+        super(BaseProfileHandler, self).__init__(hs)
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -45,11 +49,6 @@ class ProfileHandler(BaseHandler):
         )
 
         self.user_directory_handler = hs.get_user_directory_handler()
-
-        if hs.config.worker_app is None:
-            self.clock.looping_call(
-                self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
-            )
 
     @defer.inlineCallbacks
     def get_profile(self, user_id):
@@ -281,6 +280,20 @@ class ProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s",
                     room_id, str(e.message)
                 )
+
+
+class MasterProfileHandler(BaseProfileHandler):
+    PROFILE_UPDATE_MS = 60 * 1000
+    PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
+
+    def __init__(self, hs):
+        super(MasterProfileHandler, self).__init__(hs)
+
+        assert hs.config.worker_app is None
+
+        self.clock.looping_call(
+            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+        )
 
     def _start_update_remote_profile_cache(self):
         return run_as_background_process(

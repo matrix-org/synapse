@@ -182,7 +182,7 @@ class SynapseRequest(Request):
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
             logger.warn(
-                "Error processing request: %s %s", reason.type, reason.value,
+                "Error processing request %r: %s %s", self, reason.type, reason.value,
             )
 
             if not self._is_processing:
@@ -218,6 +218,12 @@ class SynapseRequest(Request):
     def _finished_processing(self):
         """Log the completion of this request and update the metrics
         """
+
+        if self.logcontext is None:
+            # this can happen if the connection closed before we read the
+            # headers (so render was never called). In that case we'll already
+            # have logged a warning, so just bail out.
+            return
 
         usage = self.logcontext.get_resource_usage()
 

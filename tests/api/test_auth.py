@@ -457,8 +457,8 @@ class AuthTestCase(unittest.TestCase):
 
         with self.assertRaises(ResourceLimitError) as e:
             yield self.auth.check_auth_blocking()
-        self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
+        self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.exception.code, 403)
 
         # Ensure does not throw an error
@@ -473,6 +473,14 @@ class AuthTestCase(unittest.TestCase):
         self.hs.config.hs_disabled_message = "Reason for being disabled"
         with self.assertRaises(ResourceLimitError) as e:
             yield self.auth.check_auth_blocking()
-        self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
+        self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.exception.code, 403)
+
+    @defer.inlineCallbacks
+    def test_server_notices_mxid_special_cased(self):
+        self.hs.config.hs_disabled = True
+        user = "@user:server"
+        self.hs.config.server_notices_mxid = user
+        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        yield self.auth.check_auth_blocking(user)

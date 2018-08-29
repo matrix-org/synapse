@@ -1,0 +1,1 @@
+Fix 'federation_domain_whitelist' such that an empty list correctly blocks all outbound federation traffic

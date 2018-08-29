@@ -783,18 +783,28 @@ class Auth(object):
             user_id(str|None): If present, checks for presence against existing
             MAU cohort
         """
+
+        # Never fail an auth check for the server notices users
+        # This can be a problem where event creation is prohibited due to blocking
+        if user_id == self.hs.config.server_notices_mxid:
+            return
+
         if self.hs.config.hs_disabled:
             raise ResourceLimitError(
                 403, self.hs.config.hs_disabled_message,
-                errcode=Codes.RESOURCE_LIMIT_EXCEED,
-                admin_uri=self.hs.config.admin_uri,
+                errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+                admin_contact=self.hs.config.admin_contact,
                 limit_type=self.hs.config.hs_disabled_limit_type
             )
         if self.hs.config.limit_usage_by_mau is True:
-            # If the user is already part of the MAU cohort
+            # If the user is already part of the MAU cohort or a trial user
             if user_id:
                 timestamp = yield self.store.user_last_seen_monthly_active(user_id)
                 if timestamp:
+                    return
+
+                is_trial = yield self.store.is_trial_user(user_id)
+                if is_trial:
                     return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
@@ -802,7 +812,7 @@ class Auth(object):
                 raise ResourceLimitError(
                     403, "Monthly Active User Limit Exceeded",
 
-                    admin_uri=self.hs.config.admin_uri,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                    admin_contact=self.hs.config.admin_contact,
+                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                     limit_type="monthly_active_user"
                 )
