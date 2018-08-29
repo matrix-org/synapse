@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.unittest import HomeserverTestCase
-
 from synapse.rest.client.v1 import room
+
+from tests.unittest import HomeserverTestCase
 
 
 class PurgeTests(HomeserverTestCase):
