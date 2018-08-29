@@ -29,7 +29,10 @@ class PostgresEngine(object):
         version = database_module.extensions.libpq_version()
 
         if version < 100000:
-            warnings.warn("Consider upgrading your client to PostgreSQL 10.0+.")
+            warnings.warn(
+                "Consider upgrading your client to PostgreSQL 10.0+.",
+                DeprecationWarning
+            )
 
         self.module.extensions.register_type(self.module.extensions.UNICODE)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
