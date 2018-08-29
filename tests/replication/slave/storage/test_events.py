@@ -119,7 +119,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         )
 
         # PostgreSQL requires a few replications for everything to come through
-        for i in range(0, 10):
+        for i in range(0, 2):
             yield self.replicate()
 
         yield self.check(
