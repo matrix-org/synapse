@@ -37,17 +37,13 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.as_yaml_files = []
-        config = Mock(
-        )
         hs = yield setup_test_homeserver(
-            self.addCleanup,
-            federation_sender=Mock(),
-            federation_client=Mock(),
+            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files=self.as_yaml_files
-        hs.config.event_cache_size=1
-        hs.config.password_providers=[]
+        hs.config.app_service_config_files = self.as_yaml_files
+        hs.config.event_cache_size = 1
+        hs.config.password_providers = []
 
         self.as_token = "token1"
         self.as_url = "some_url"
@@ -106,14 +102,12 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.as_yaml_files = []
 
         hs = yield setup_test_homeserver(
-            self.addCleanup,
-            federation_sender=Mock(),
-            federation_client=Mock(),
+            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files=self.as_yaml_files
-        hs.config.event_cache_size=1
-        hs.config.password_providers=[]
+        hs.config.app_service_config_files = self.as_yaml_files
+        hs.config.event_cache_size = 1
+        hs.config.password_providers = []
 
         self.db_pool = hs.get_db_pool()
         self.engine = hs.database_engine
@@ -415,14 +409,12 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(suffix="2")
 
         hs = yield setup_test_homeserver(
-            self.addCleanup,
-            federation_sender=Mock(),
-            federation_client=Mock(),
+            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files=[f1, f2]
-        hs.config.event_cache_size=1
-        hs.config.password_providers=[]
+        hs.config.app_service_config_files = [f1, f2]
+        hs.config.event_cache_size = 1
+        hs.config.password_providers = []
 
         ApplicationServiceStore(hs.get_db_conn(), hs)
 
@@ -432,14 +424,12 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(id="id", suffix="2")
 
         hs = yield setup_test_homeserver(
-            self.addCleanup,
-            federation_sender=Mock(),
-            federation_client=Mock(),
+            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files=[f1, f2]
-        hs.config.event_cache_size=1
-        hs.config.password_providers=[]
+        hs.config.app_service_config_files = [f1, f2]
+        hs.config.event_cache_size = 1
+        hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(hs.get_db_conn(), hs)
@@ -455,14 +445,12 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(as_token="as_token", suffix="2")
 
         hs = yield setup_test_homeserver(
-            self.addCleanup,
-            federation_sender=Mock(),
-            federation_client=Mock(),
+            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files=[f1, f2]
-        hs.config.event_cache_size=1
-        hs.config.password_providers=[]
+        hs.config.app_service_config_files = [f1, f2]
+        hs.config.event_cache_size = 1
+        hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
             ApplicationServiceStore(hs.get_db_conn(), hs)

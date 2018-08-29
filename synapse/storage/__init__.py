@@ -31,7 +31,6 @@ from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .directory import DirectoryStore
 from .end_to_end_keys import EndToEndKeyStore
-from .engines import PostgresEngine
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events import EventsStore

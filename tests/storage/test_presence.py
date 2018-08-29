@@ -20,7 +20,7 @@ from synapse.storage.presence import PresenceStore
 from synapse.types import UserID
 
 from tests import unittest
-from tests.utils import MockClock, setup_test_homeserver
+from tests.utils import setup_test_homeserver
 
 
 class PresenceStoreTestCase(unittest.TestCase):

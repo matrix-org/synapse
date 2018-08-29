@@ -16,7 +16,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 from ._base import SQLBaseStore
 

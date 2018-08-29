@@ -13,11 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 import tests.unittest
-import tests.utils
-from tests.utils import setup_test_homeserver
 
 from tests.unittest import HomeserverTestCase
 
@@ -25,7 +21,6 @@ FORTY_DAYS = 40 * 24 * 60 * 60
 
 
 class MonthlyActiveUsersTestCase(HomeserverTestCase):
-
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver()
@@ -47,7 +42,6 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
             {'medium': 'email', 'address': user2_email},
         ]
         user_num = len(threepids)
-
 
         self.store.register(user_id=user1, token="123", password_hash=None)
         self.store.register(user_id=user2, token="456", password_hash=None)
@@ -137,7 +131,9 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store.reap_monthly_active_users()
         self.pump()
         count = self.store.get_monthly_active_count()
-        self.assertEquals(self.get_success(count), initial_users - self.hs.config.max_mau_value)
+        self.assertEquals(
+            self.get_success(count), initial_users - self.hs.config.max_mau_value
+        )
 
         self.reactor.advance(FORTY_DAYS)
         self.store.reap_monthly_active_users()
