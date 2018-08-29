@@ -117,7 +117,11 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         event = yield self.persist(
             type="m.room.member", key=USER_ID_2, membership="invite"
         )
-        yield self.replicate()
+
+        # PostgreSQL requires a few replications for everything to come through
+        for i in range(0, 10):
+            yield self.replicate()
+
         yield self.check(
             "get_invited_rooms_for_user",
             [USER_ID_2],
