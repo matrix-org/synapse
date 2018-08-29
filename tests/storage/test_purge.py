@@ -91,3 +91,9 @@ class PurgeTests(HomeserverTestCase):
         self.pump()
         f = self.failureResultOf(purge)
         self.assertIn("greater than forward", f.value.args[0])
+
+        # Nothing is deleted.
+        self.successResultOf(get_first)
+        self.successResultOf(get_second)
+        self.successResultOf(get_third)
+        self.successResultOf(get_last)
