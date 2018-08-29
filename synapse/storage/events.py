@@ -1912,7 +1912,7 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
         rows = txn.fetchall()
         max_depth = max(row[1] for row in rows)
 
-        if max_depth <= token.topological:
+        if max_depth < token.topological:
             # We need to ensure we don't delete all the events from the database
             # otherwise we wouldn't be able to send any events (due to not
             # having any backwards extremeties)
