@@ -92,6 +92,13 @@ class PurgeTests(HomeserverTestCase):
         f = self.failureResultOf(purge)
         self.assertIn("greater than forward", f.value.args[0])
 
+        # Try and get the events
+        get_first = storage.get_event(first["event_id"])
+        get_second = storage.get_event(second["event_id"])
+        get_third = storage.get_event(third["event_id"])
+        get_last = storage.get_event(last["event_id"])
+        self.pump()
+
         # Nothing is deleted.
         self.successResultOf(get_first)
         self.successResultOf(get_second)
