@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
@@ -120,6 +120,13 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         )
 
         yield self.replicate()
+
+        # Give it time to finish replicating all the data
+        while self.streamer.is_looping:
+            d = defer.Deferred()
+            reactor.callLater(0.0, d.callback, True)
+            yield d
+
         yield self.check(
             "get_invited_rooms_for_user",
             [USER_ID_2],
