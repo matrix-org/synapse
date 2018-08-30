@@ -20,11 +20,11 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.server import HomeServer
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import create_engine
 
 from tests import unittest
+from tests.utils import TestHomeServer
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
@@ -51,7 +51,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         config = Mock()
         config.event_cache_size = 1
         config.database_config = {"name": "sqlite3"}
-        hs = HomeServer(
+        hs = TestHomeServer(
             "test",
             db_pool=self.db_pool,
             config=config,
