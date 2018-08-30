@@ -17,7 +17,6 @@ from twisted.internet import defer, reactor
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
 from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.storage.engines import PostgresEngine
 from synapse.storage.roommember import RoomsForUser
 
 from ._base import BaseSlavedStoreTestCase
