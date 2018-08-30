@@ -119,11 +119,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.member", key=USER_ID_2, membership="invite"
         )
 
-        # If it's PostgreSQL, we have to churn it a bit
-        if self.hs.database_engine is PostgresEngine:
-            for x in range(0, 10):
-                yield self.replicate()
-
         yield self.replicate()
         yield self.check(
             "get_invited_rooms_for_user",
