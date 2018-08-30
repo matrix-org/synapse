@@ -18,14 +18,14 @@ from collections import namedtuple
 
 import six
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches.descriptors import cached
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, db_to_json
 
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview
@@ -95,7 +95,8 @@ class TransactionStore(SQLBaseStore):
         )
 
         if result and result["response_code"]:
-            return result["response_code"], json.loads(str(result["response_json"]))
+            return result["response_code"], db_to_json(result["response_json"])
+
         else:
             return None
 

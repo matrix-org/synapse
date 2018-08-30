@@ -147,6 +147,8 @@ def setup_test_homeserver(
         config.max_mau_value = 50
         config.mau_limits_reserved_threepids = []
         config.admin_contact = None
+        config.rc_messages_per_second = 10000
+        config.rc_message_burst_count = 10000
 
         # we need a sane default_room_version, otherwise attempts to create rooms will
         # fail.

@@ -17,9 +17,10 @@ import sys
 import threading
 import time
 
-from six import iteritems, iterkeys, itervalues
+from six import PY2, iteritems, iterkeys, itervalues
 from six.moves import intern, range
 
+from canonicaljson import json
 from prometheus_client import Histogram
 
 from twisted.internet import defer
@@ -1216,3 +1217,32 @@ class _RollbackButIsFineException(Exception):
     something went wrong.
     """
     pass
+
+
+def db_to_json(db_content):
+    """
+    Take some data from a database row and return a JSON-decoded object.
+
+    Args:
+        db_content (memoryview|buffer|bytes|bytearray|unicode)
+    """
+    # psycopg2 on Python 3 returns memoryview objects, which we need to
+    # cast to bytes to decode
+    if isinstance(db_content, memoryview):
+        db_content = db_content.tobytes()
+
+    # psycopg2 on Python 2 returns buffer objects, which we need to cast to
+    # bytes to decode
+    if PY2 and isinstance(db_content, buffer):
+        db_content = bytes(db_content)
+
+    # Decode it to a Unicode string before feeding it to json.loads, so we
+    # consistenty get a Unicode-containing object out.
+    if isinstance(db_content, (bytes, bytearray)):
+        db_content = db_content.decode('utf8')
+
+    try:
+        return json.loads(db_content)
+    except Exception:
+        logging.warning("Tried to decode '%r' as JSON and failed", db_content)
+        raise
