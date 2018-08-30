@@ -17,6 +17,7 @@ from twisted.internet import defer
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
 from synapse.replication.slave.storage.events import SlavedEventStore
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.roommember import RoomsForUser
 
 from ._base import BaseSlavedStoreTestCase
@@ -118,10 +119,12 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.member", key=USER_ID_2, membership="invite"
         )
 
-        # PostgreSQL requires a few replications for everything to come through
-        for i in range(0, 2):
-            yield self.replicate()
+        # If it's PostgreSQL, we have to churn it a bit
+        if self.hs.database_engine is PostgresEngine:
+            for x in range(0, 10):
+                yield self.replicate()
 
+        yield self.replicate()
         yield self.check(
             "get_invited_rooms_for_user",
             [USER_ID_2],
