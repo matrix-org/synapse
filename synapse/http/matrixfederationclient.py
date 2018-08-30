@@ -17,20 +17,22 @@ import cgi
 import logging
 import random
 import sys
-import urllib
 
-from six import string_types
-from six.moves.urllib import parse as urlparse
+from six import PY3, string_types
+from six.moves import urllib
 
+import treq
 from canonicaljson import encode_canonical_json, json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
+from zope.interface import implementer
 
 from twisted.internet import defer, protocol, reactor
 from twisted.internet.error import DNSLookupError
 from twisted.web._newclient import ResponseDone
 from twisted.web.client import Agent, HTTPConnectionPool, readBody
 from twisted.web.http_headers import Headers
+from twisted.web.iweb import IBodyProducer
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -58,13 +60,18 @@ incoming_responses_counter = Counter("synapse_http_matrixfederationclient_respon
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
 
+if PY3:
+    MAXINT = sys.maxsize
+else:
+    MAXINT = sys.maxint
+
 
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
         self.tls_client_options_factory = hs.tls_client_options_factory
 
     def endpointForURI(self, uri):
-        destination = uri.netloc
+        destination = uri.netloc.decode('ascii')
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
@@ -93,12 +100,12 @@ class MatrixFederationHttpClient(object):
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
-        self.version_string = hs.version_string
+        self.version_string = hs.version_string.encode('ascii')
         self._next_id = 1
 
     def _create_url(self, destination, path_bytes, param_bytes, query_bytes):
-        return urlparse.urlunparse(
-            ("matrix", destination, path_bytes, param_bytes, query_bytes, "")
+        return urllib.parse.urlunparse(
+            (b"matrix", destination, path_bytes, param_bytes, query_bytes, b"")
         )
 
     @defer.inlineCallbacks
@@ -152,16 +159,16 @@ class MatrixFederationHttpClient(object):
             headers_dict[b"User-Agent"] = [self.version_string]
             headers_dict[b"Host"] = [destination]
 
-            url_bytes = self._create_url(
+            url = self._create_url(
                 destination, path_bytes, param_bytes, query_bytes
-            )
+            ).decode('ascii')
 
             txn_id = "%s-O-%s" % (method, self._next_id)
-            self._next_id = (self._next_id + 1) % (sys.maxint - 1)
+            self._next_id = (self._next_id + 1) % (MAXINT - 1)
 
             outbound_logger.info(
                 "{%s} [%s] Sending request: %s %s",
-                txn_id, destination, method, url_bytes
+                txn_id, destination, method, url
             )
 
             # XXX: Would be much nicer to retry only at the transaction-layer
@@ -171,23 +178,24 @@ class MatrixFederationHttpClient(object):
             else:
                 retries_left = MAX_SHORT_RETRIES
 
-            http_url_bytes = urlparse.urlunparse(
-                ("", "", path_bytes, param_bytes, query_bytes, "")
-            )
+            http_url = urllib.parse.urlunparse(
+                (b"", b"", path_bytes, param_bytes, query_bytes, b"")
+            ).decode('ascii')
 
             log_result = None
             try:
                 while True:
                     producer = None
                     if body_callback:
-                        producer = body_callback(method, http_url_bytes, headers_dict)
+                        producer = body_callback(method, http_url, headers_dict)
 
                     try:
-                        request_deferred = self.agent.request(
+                        request_deferred = treq.request(
                             method,
-                            url_bytes,
-                            Headers(headers_dict),
-                            producer
+                            url,
+                            headers=Headers(headers_dict),
+                            data=producer,
+                            agent=self.agent,
                         )
                         add_timeout_to_deferred(
                             request_deferred,
@@ -218,7 +226,7 @@ class MatrixFederationHttpClient(object):
                             txn_id,
                             destination,
                             method,
-                            url_bytes,
+                            url,
                             _flatten_response_never_received(e),
                         )
 
@@ -297,11 +305,11 @@ class MatrixFederationHttpClient(object):
         auth_headers = []
 
         for key, sig in request["signatures"][self.server_name].items():
-            auth_headers.append(bytes(
+            auth_headers.append((
                 "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
                     self.server_name, key, sig,
-                )
-            ))
+                )).encode('ascii')
+            )
 
         headers_dict[b"Authorization"] = auth_headers
 
@@ -576,7 +584,7 @@ class MatrixFederationHttpClient(object):
                 vs = [vs]
             encoded_args[k] = [v.encode("UTF-8") for v in vs]
 
-        query_bytes = urllib.urlencode(encoded_args, True)
+        query_bytes = urllib.parse.urlencode(encoded_args, True).encode('utf8')
         logger.debug("Query bytes: %s Retry DNS: %s", query_bytes, retry_on_dns_fail)
 
         def body_callback(method, url_bytes, headers_dict):
@@ -639,6 +647,7 @@ def _readBodyToFile(response, stream, max_size):
     return d
 
 
+@implementer(IBodyProducer)
 class _JsonProducer(object):
     """ Used by the twisted http client to create the HTTP body from json
     """
@@ -693,7 +702,7 @@ def check_content_type_is_json(headers):
             "No Content-Type header"
         )
 
-    c_type = c_type[0]  # only the first header
+    c_type = c_type[0].decode('ascii')  # only the first header
     val, options = cgi.parse_header(c_type)
     if val != "application/json":
         raise RuntimeError(
@@ -711,6 +720,6 @@ def encode_query_args(args):
             vs = [vs]
         encoded_args[k] = [v.encode("UTF-8") for v in vs]
 
-    query_bytes = urllib.urlencode(encoded_args, True)
+    query_bytes = urllib.parse.urlencode(encoded_args, True)
 
-    return query_bytes
+    return query_bytes.encode('utf8')
