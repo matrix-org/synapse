@@ -60,10 +60,7 @@ class MediaRepositorySlavedStore(
 
 
 class MediaRepositoryServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = MediaRepositorySlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = MediaRepositorySlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
