@@ -232,6 +232,7 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
 
     clock.threadpool = ThreadPool()
     pool.threadpool = ThreadPool()
+    pool.running = True
     return d
 
 
