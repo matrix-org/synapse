@@ -101,10 +101,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         if not self.hs.get_db_pool().running:
             return
 
+        @defer.inlineCallbacks
         def update():
             to_update = self._batch_row_update
             self._batch_row_update = {}
-            return self.runInteraction(
+            yield self.runInteraction(
                 "_update_client_ips_batch", self._update_client_ips_batch_txn,
                 to_update,
             )
