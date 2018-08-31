@@ -23,6 +23,7 @@ from twisted.internet import defer
 import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
+from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request
 from synapse.rest.client.v1.base import ClientV1RestServlet
 from synapse.types import create_requester
@@ -282,7 +283,7 @@ class RegisterRestServlet(ClientV1RestServlet):
             if "user" in register_json else None
         )
         threepid = None
-        if session[LoginType.EMAIL_IDENTITY]:
+        if session.get(LoginType.EMAIL_IDENTITY):
             threepid = session["threepidCreds"]
 
         handler = self.handlers.registration_handler
@@ -293,8 +294,8 @@ class RegisterRestServlet(ClientV1RestServlet):
         )
         # Necessary due to auth checks prior to the threepid being
         # written to the db
-        if self.store.is_threepid_reserved(threepid):
-            self.store.upsert_monthly_active_user(registered_user_id)
+        if is_threepid_reserved(self.hs.config, threepid):
+            yield self.store.upsert_monthly_active_user(user_id)
 
         if session[LoginType.EMAIL_IDENTITY]:
             logger.debug("Binding emails %s to %s" % (
