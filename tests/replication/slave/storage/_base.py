@@ -25,8 +25,8 @@ from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 
 from tests import unittest
 
-class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
 
+class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(

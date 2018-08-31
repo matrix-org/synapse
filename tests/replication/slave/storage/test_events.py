@@ -108,9 +108,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
     def test_invites(self):
         self.persist(type="m.room.create", key="", creator=USER_ID)
         self.check("get_invited_rooms_for_user", [USER_ID_2], [])
-        event = self.persist(
-            type="m.room.member", key=USER_ID_2, membership="invite"
-        )
+        event = self.persist(type="m.room.member", key=USER_ID_2, membership="invite")
 
         self.replicate()
 
@@ -134,9 +132,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.persist(
             type="m.room.join", sender=USER_ID, key=USER_ID_2, membership="join"
         )
-        event1 = self.persist(
-            type="m.room.message", msgtype="m.text", body="hello"
-        )
+        event1 = self.persist(type="m.room.message", msgtype="m.text", body="hello")
         self.replicate()
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
@@ -200,9 +196,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             depth = self.event_id
 
         if not prev_events:
-            latest_event_ids = self.get_success(self.master_store.get_latest_event_ids_in_room(
-                room_id
-            ))
+            latest_event_ids = self.get_success(
+                self.master_store.get_latest_event_ids_in_room(room_id)
+            )
             prev_events = [(ev_id, {}) for ev_id in latest_event_ids]
 
         event_dict = {
@@ -242,9 +238,13 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         ordering = None
         if backfill:
-            self.get_success(self.master_store.persist_events([(event, context)], backfilled=True))
+            self.get_success(
+                self.master_store.persist_events([(event, context)], backfilled=True)
+            )
         else:
-            ordering, _ = self.get_success(self.master_store.persist_event(event, context))
+            ordering, _ = self.get_success(
+                self.master_store.persist_event(event, context)
+            )
 
         if ordering:
             event.internal_metadata.stream_ordering = ordering

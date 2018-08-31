@@ -25,13 +25,17 @@ class SlavedAccountDataStoreTestCase(BaseSlavedStoreTestCase):
     STORE_TYPE = SlavedAccountDataStore
 
     def test_user_account_data(self):
-        self.get_success(self.master_store.add_account_data_for_user(USER_ID, TYPE, {"a": 1}))
+        self.get_success(
+            self.master_store.add_account_data_for_user(USER_ID, TYPE, {"a": 1})
+        )
         self.replicate()
         self.check(
             "get_global_account_data_by_type_for_user", [TYPE, USER_ID], {"a": 1}
         )
 
-        self.get_success(self.master_store.add_account_data_for_user(USER_ID, TYPE, {"a": 2}))
+        self.get_success(
+            self.master_store.add_account_data_for_user(USER_ID, TYPE, {"a": 2})
+        )
         self.replicate()
         self.check(
             "get_global_account_data_by_type_for_user", [TYPE, USER_ID], {"a": 2}

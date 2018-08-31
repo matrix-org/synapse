@@ -27,10 +27,8 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
     def test_receipt(self):
         self.check("get_receipts_for_user", [USER_ID, "m.read"], {})
-        self.get_success(self.master_store.insert_receipt(
-            ROOM_ID, "m.read", USER_ID, [EVENT_ID], {}
-        ))
-        self.replicate()
-        self.check(
-            "get_receipts_for_user", [USER_ID, "m.read"], {ROOM_ID: EVENT_ID}
+        self.get_success(
+            self.master_store.insert_receipt(ROOM_ID, "m.read", USER_ID, [EVENT_ID], {})
         )
+        self.replicate()
+        self.check("get_receipts_for_user", [USER_ID, "m.read"], {ROOM_ID: EVENT_ID})
