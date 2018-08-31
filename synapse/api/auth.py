@@ -809,11 +809,8 @@ class Auth(object):
             elif threepid:
                 # If the user does not exist yet, but is signing up with a
                 # reserved threepid then pass auth check
-                for tp in self.hs.config.mau_limits_reserved_threepids:
-                    if (threepid['medium'] == tp['medium']
-                            and threepid['address'] == tp['address']):
-                        return
-
+                if is_threepid_reserved(threepid):
+                    return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:

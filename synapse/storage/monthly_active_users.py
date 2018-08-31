@@ -36,7 +36,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def initialise_reserved_users(self, threepids):
-        # TODO Why can't I do this in init?
         store = self.hs.get_datastore()
         reserved_user_list = []
 
@@ -220,3 +219,17 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                     yield self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 yield self.upsert_monthly_active_user(user_id)
+
+    def is_threepid_reserved(self, threepid):
+        """Check the threepid against the reserved threepid config
+        Args:
+            threepid(dict) - The threepid to test for
+        Returns:
+            boolean Is the threepid undertest reserved_user
+        """
+        for tp in self.hs.config.mau_limits_reserved_threepids:
+            if (threepid['medium'] == tp['medium']
+                    and threepid['address'] == tp['address']):
+                return True
+            else:
+                return False
