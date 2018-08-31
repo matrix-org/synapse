@@ -26,6 +26,7 @@ from twisted.internet import defer, reactor
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
+from synapse.config.server import ServerConfig
 from synapse.federation.transport import server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
@@ -157,6 +158,11 @@ def setup_test_homeserver(
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         config.update_user_directory = False
+
+        def is_threepid_reserved(threepid):
+            return ServerConfig.is_threepid_reserved(config, threepid)
+
+        config.is_threepid_reserved.side_effect = is_threepid_reserved
 
     config.use_frozen_dicts = True
     config.ldap_enabled = False

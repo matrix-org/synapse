@@ -36,7 +36,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def initialise_reserved_users(self, threepids):
-        # TODO Why can't I do this in init?
         store = self.hs.get_datastore()
         reserved_user_list = []
 

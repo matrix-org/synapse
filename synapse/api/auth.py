@@ -26,6 +26,7 @@ import synapse.types
 from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, ResourceLimitError
+from synapse.config.server import is_threepid_reserved
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -775,13 +776,19 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None):
+    def check_auth_blocking(self, user_id=None, threepid=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
         Args:
             user_id(str|None): If present, checks for presence against existing
             MAU cohort
+
+            threepid(dict|None): If present, checks for presence against configured
+            reserved threepid. Used in cases where the user is trying register
+            with a MAU blocked server, normally they would be rejected but their
+            threepid is on the reserved list. user_id and
+            threepid should never be set at the same time.
         """
 
         # Never fail an auth check for the server notices users
@@ -797,6 +804,8 @@ class Auth(object):
                 limit_type=self.hs.config.hs_disabled_limit_type
             )
         if self.hs.config.limit_usage_by_mau is True:
+            assert not (user_id and threepid)
+
             # If the user is already part of the MAU cohort or a trial user
             if user_id:
                 timestamp = yield self.store.user_last_seen_monthly_active(user_id)
@@ -806,12 +815,16 @@ class Auth(object):
                 is_trial = yield self.store.is_trial_user(user_id)
                 if is_trial:
                     return
+            elif threepid:
+                # If the user does not exist yet, but is signing up with a
+                # reserved threepid then pass auth check
+                if is_threepid_reserved(self.hs.config, threepid):
+                    return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
                 raise ResourceLimitError(
                     403, "Monthly Active User Limit Exceeded",
-
                     admin_contact=self.hs.config.admin_contact,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                     limit_type="monthly_active_user"

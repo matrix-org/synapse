@@ -404,6 +404,23 @@ class ServerConfig(Config):
                                   " service on the given port.")
 
 
+def is_threepid_reserved(config, threepid):
+    """Check the threepid against the reserved threepid config
+    Args:
+        config(ServerConfig) - to access server config attributes
+        threepid(dict) - The threepid to test for
+
+    Returns:
+        boolean Is the threepid undertest reserved_user
+    """
+
+    for tp in config.mau_limits_reserved_threepids:
+        if (threepid['medium'] == tp['medium']
+                and threepid['address'] == tp['address']):
+            return True
+    return False
+
+
 def read_gc_thresholds(thresholds):
     """Reads the three integer thresholds for garbage collection. Ensures that
     the thresholds are integers if thresholds are supplied.

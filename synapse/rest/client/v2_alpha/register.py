@@ -26,6 +26,7 @@ import synapse
 import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
+from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -395,12 +396,21 @@ class RegisterRestServlet(RestServlet):
             if desired_username is not None:
                 desired_username = desired_username.lower()
 
+            threepid = None
+            if auth_result:
+                threepid = auth_result.get(LoginType.EMAIL_IDENTITY)
+
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
                 password=new_password,
                 guest_access_token=guest_access_token,
                 generate_token=False,
+                threepid=threepid,
             )
+            # Necessary due to auth checks prior to the threepid being
+            # written to the db
+            if is_threepid_reserved(self.hs.config, threepid):
+                yield self.store.upsert_monthly_active_user(registered_user_id)
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
