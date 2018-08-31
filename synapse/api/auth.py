@@ -775,7 +775,7 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None):
+    def check_auth_blocking(self, user_id=None, threepid=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
@@ -806,6 +806,14 @@ class Auth(object):
                 is_trial = yield self.store.is_trial_user(user_id)
                 if is_trial:
                     return
+            elif threepid:
+                # If the user does not exist yet, but is signing up with a
+                # reserved threepid then pass auth check
+                for tp in self.hs.config.mau_limits_reserved_threepids:
+                    if (threepid['medium'] == tp['medium']
+                            and threepid['address'] == tp['address']):
+                        return
+
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:

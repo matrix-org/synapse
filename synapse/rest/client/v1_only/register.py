@@ -281,11 +281,15 @@ class RegisterRestServlet(ClientV1RestServlet):
             register_json["user"].encode("utf-8")
             if "user" in register_json else None
         )
+        threepid = None
+        if session[LoginType.EMAIL_IDENTITY]:
+            threepid = session["threepidCreds"]
 
         handler = self.handlers.registration_handler
         (user_id, token) = yield handler.register(
             localpart=desired_user_id,
-            password=password
+            password=password,
+            threepid=threepid,
         )
 
         if session[LoginType.EMAIL_IDENTITY]:

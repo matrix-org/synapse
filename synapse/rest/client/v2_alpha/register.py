@@ -395,11 +395,16 @@ class RegisterRestServlet(RestServlet):
             if desired_username is not None:
                 desired_username = desired_username.lower()
 
+            threepid = None
+            if auth_result:
+                threepid = auth_result.get(LoginType.EMAIL_IDENTITY)
+
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
                 password=new_password,
                 guest_access_token=guest_access_token,
                 generate_token=False,
+                threepid=threepid,
             )
 
             # remember that we've now registered that user account, and with

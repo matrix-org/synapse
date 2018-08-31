@@ -468,6 +468,23 @@ class AuthTestCase(unittest.TestCase):
         yield self.auth.check_auth_blocking()
 
     @defer.inlineCallbacks
+    def test_reserved_threepid(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.config.max_mau_value = 1
+        threepid = {'medium': 'email', 'address': 'reserved@server.com'}
+        unknown_threepid = {'medium': 'email', 'address': 'unreserved@server.com'}
+        self.hs.config.mau_limits_reserved_threepids = [threepid]
+
+        yield self.store.register(user_id='user1', token="123", password_hash=None)
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking()
+
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking(threepid=unknown_threepid)
+
+        yield self.auth.check_auth_blocking(threepid=threepid)
+
+    @defer.inlineCallbacks
     def test_hs_disabled(self):
         self.hs.config.hs_disabled = True
         self.hs.config.hs_disabled_message = "Reason for being disabled"
