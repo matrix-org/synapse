@@ -30,7 +30,7 @@ from synapse.federation.transport import server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import create_engine, PostgresEngine
+from synapse.storage.engines import PostgresEngine, create_engine
 from synapse.storage.prepare_database import (
     _get_or_create_schema_state,
     _setup_new_database,
