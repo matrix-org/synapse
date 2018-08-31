@@ -1,0 +1,1 @@
+Make sure that we close db connections opened during init

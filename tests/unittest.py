@@ -152,6 +152,7 @@ class HomeserverTestCase(TestCase):
         hijack_auth (bool): Whether to hijack auth to return the user specified
         in user_id.
     """
+
     servlets = []
     hijack_auth = True
 

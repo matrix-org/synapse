@@ -78,10 +78,7 @@ class FederationSenderSlaveStore(
 
 
 class FederationSenderServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = FederationSenderSlaveStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = FederationSenderSlaveStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
