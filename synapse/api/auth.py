@@ -783,6 +783,7 @@ class Auth(object):
         Args:
             user_id(str|None): If present, checks for presence against existing
             MAU cohort
+
             threepid(dict|None): If present, checks for presence against configured
             reserved threepid. Used in cases where the user is trying register
             with a MAU blocked server, normally they would be rejected but their
@@ -803,9 +804,7 @@ class Auth(object):
                 limit_type=self.hs.config.hs_disabled_limit_type
             )
         if self.hs.config.limit_usage_by_mau is True:
-
-            if user_id and threepid:
-                logger.warn("Called with both user_id and threepid, this shoudn't happen")
+            assert not (user_id and threepid)
 
             # If the user is already part of the MAU cohort or a trial user
             if user_id:
