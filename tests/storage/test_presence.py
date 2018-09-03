@@ -16,7 +16,6 @@
 
 from twisted.internet import defer
 
-from synapse.storage.presence import PresenceStore
 from synapse.types import UserID
 
 from tests import unittest
@@ -28,7 +27,7 @@ class PresenceStoreTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver(self.addCleanup)
 
-        self.store = PresenceStore(hs.get_db_conn(), hs)
+        self.store = hs.get_datastore()
 
         self.u_apple = UserID.from_string("@apple:test")
         self.u_banana = UserID.from_string("@banana:test")
