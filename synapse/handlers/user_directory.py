@@ -14,15 +14,15 @@
 # limitations under the License.
 
 import logging
+
+from six import iteritems
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.storage.roommember import ProfileInfo
-from synapse.util.metrics import Measure
-from synapse.util.async import sleep
 from synapse.types import get_localpart_from_id
-
-from six import iteritems
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,8 @@ class UserDirectoryHandler(object):
         """Called to update index of our local user profiles when they change
         irrespective of any rooms the user may be in.
         """
+        # FIXME(#3714): We should probably do this in the same worker as all
+        # the other changes.
         yield self.store.update_profile_in_user_dir(
             user_id, profile.display_name, profile.avatar_url, None,
         )
@@ -127,6 +129,8 @@ class UserDirectoryHandler(object):
     def handle_user_deactivated(self, user_id):
         """Called when a user ID is deactivated
         """
+        # FIXME(#3714): We should probably do this in the same worker as all
+        # the other changes.
         yield self.store.remove_from_user_dir(user_id)
         yield self.store.remove_from_user_in_public_room(user_id)
 
@@ -174,7 +178,7 @@ class UserDirectoryHandler(object):
             logger.info("Handling room %d/%d", num_processed_rooms + 1, len(room_ids))
             yield self._handle_initial_room(room_id)
             num_processed_rooms += 1
-            yield sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
+            yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
 
         logger.info("Processed all rooms.")
 
@@ -188,7 +192,7 @@ class UserDirectoryHandler(object):
                 logger.info("Handling user %d/%d", num_processed_users + 1, len(user_ids))
                 yield self._handle_local_user(user_id)
                 num_processed_users += 1
-                yield sleep(self.INITIAL_USER_SLEEP_MS / 1000.)
+                yield self.clock.sleep(self.INITIAL_USER_SLEEP_MS / 1000.)
 
             logger.info("Processed all users")
 
@@ -236,7 +240,7 @@ class UserDirectoryHandler(object):
         count = 0
         for user_id in user_ids:
             if count % self.INITIAL_ROOM_SLEEP_COUNT == 0:
-                yield sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
+                yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
 
             if not self.is_mine_id(user_id):
                 count += 1
@@ -251,7 +255,7 @@ class UserDirectoryHandler(object):
                     continue
 
                 if count % self.INITIAL_ROOM_SLEEP_COUNT == 0:
-                    yield sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
+                    yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
                 count += 1
 
                 user_set = (user_id, other_user_id)

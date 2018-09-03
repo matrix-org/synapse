@@ -39,7 +39,7 @@ REQUIREMENTS = {
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "pynacl>=1.2.1": ["nacl>=1.2.1", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
-    "Twisted>=16.0.0": ["twisted>=16.0.0"],
+    "Twisted>=17.1.0": ["twisted>=17.1.0"],
 
     # We use crypto.get_elliptic_curve which is only supported in >=0.15
     "pyopenssl>=0.15": ["OpenSSL>=0.15"],
@@ -57,15 +57,13 @@ REQUIREMENTS = {
     "phonenumbers>=8.2.0": ["phonenumbers"],
     "six": ["six"],
     "prometheus_client": ["prometheus_client"],
-    "attr": ["attr"],
+    "attrs": ["attr"],
+    "netaddr>=0.7.18": ["netaddr"],
 }
 
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
         "matrix_angular_sdk>=0.6.8": ["syweb>=0.6.8"],
-    },
-    "preview_url": {
-        "netaddr>=0.7.18": ["netaddr"],
     },
     "email.enable_notifs": {
         "Jinja2>=2.8": ["Jinja2>=2.8"],
@@ -80,6 +78,9 @@ CONDITIONAL_REQUIREMENTS = {
     "affinity": {
         "affinity": ["affinity"],
     },
+    "postgres": {
+        "psycopg2>=2.6": ["psycopg2"]
+    }
 }
 
 

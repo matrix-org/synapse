@@ -13,18 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+import logging
+from collections import namedtuple
 
-from twisted.internet import defer
 import six
 
 from canonicaljson import encode_canonical_json
 
-from collections import namedtuple
+from twisted.internet import defer
 
-import logging
-import simplejson as json
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.caches.descriptors import cached
+
+from ._base import SQLBaseStore, db_to_json
 
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview
@@ -57,7 +58,7 @@ class TransactionStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(TransactionStore, self).__init__(db_conn, hs)
 
-        self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
+        self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
 
     def get_received_txn_response(self, transaction_id, origin):
         """For an incoming transaction from a given origin, check if we have
@@ -94,7 +95,8 @@ class TransactionStore(SQLBaseStore):
         )
 
         if result and result["response_code"]:
-            return result["response_code"], json.loads(str(result["response_json"]))
+            return result["response_code"], db_to_json(result["response_json"])
+
         else:
             return None
 
@@ -270,6 +272,11 @@ class TransactionStore(SQLBaseStore):
 
         txn.execute(query, (self._clock.time_msec(),))
         return self.cursor_to_dict(txn)
+
+    def _start_cleanup_transactions(self):
+        return run_as_background_process(
+            "cleanup_transactions", self._cleanup_transactions,
+        )
 
     def _cleanup_transactions(self):
         now = self._clock.time_msec()

@@ -4,7 +4,15 @@ language: python
 # tell travis to cache ~/.cache/pip
 cache: pip
 
+before_script:
+  - git remote set-branches --add origin develop
+  - git fetch origin develop
+
+services:
+  - postgresql
+
 matrix:
+  fast_finish: true
   include:
   - python: 2.7
     env: TOX_ENV=packaging
@@ -14,9 +22,22 @@ matrix:
 
   - python: 2.7
     env: TOX_ENV=py27
-    
+
+  - python: 2.7
+    env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
+
   - python: 3.6
     env: TOX_ENV=py36
+
+  - python: 3.6
+    env: TOX_ENV=check_isort
+
+  - python: 3.6
+    env: TOX_ENV=check-newsfragment
+
+  allow_failures:
+  - python: 2.7
+    env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
 
 install:
   - pip install tox

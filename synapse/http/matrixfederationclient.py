@@ -13,39 +13,38 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer, reactor, protocol
-from twisted.internet.error import DNSLookupError
-from twisted.web.client import readBody, HTTPConnectionPool, Agent
-from twisted.web.http_headers import Headers
-from twisted.web._newclient import ResponseDone
-
-from synapse.http import cancelled_to_request_timed_out_error
-from synapse.http.endpoint import matrix_federation_endpoint
-import synapse.metrics
-from synapse.util.async import sleep, add_timeout_to_deferred
-from synapse.util import logcontext
-from synapse.util.logcontext import make_deferred_yieldable
-import synapse.util.retryutils
-
-from canonicaljson import encode_canonical_json
-
-from synapse.api.errors import (
-    SynapseError, Codes, HttpResponseException, FederationDeniedError,
-)
-
-from signedjson.sign import sign_json
-
 import cgi
-import simplejson as json
 import logging
 import random
 import sys
 import urllib
-from six.moves.urllib import parse as urlparse
+
 from six import string_types
+from six.moves.urllib import parse as urlparse
 
-
+from canonicaljson import encode_canonical_json, json
 from prometheus_client import Counter
+from signedjson.sign import sign_json
+
+from twisted.internet import defer, protocol, reactor
+from twisted.internet.error import DNSLookupError
+from twisted.web._newclient import ResponseDone
+from twisted.web.client import Agent, HTTPConnectionPool, readBody
+from twisted.web.http_headers import Headers
+
+import synapse.metrics
+import synapse.util.retryutils
+from synapse.api.errors import (
+    Codes,
+    FederationDeniedError,
+    HttpResponseException,
+    SynapseError,
+)
+from synapse.http import cancelled_to_request_timed_out_error
+from synapse.http.endpoint import matrix_federation_endpoint
+from synapse.util import logcontext
+from synapse.util.async_helpers import add_timeout_to_deferred
+from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 outbound_logger = logging.getLogger("synapse.http.outbound")
@@ -62,14 +61,14 @@ MAX_SHORT_RETRIES = 3
 
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
-        self.tls_server_context_factory = hs.tls_server_context_factory
+        self.tls_client_options_factory = hs.tls_client_options_factory
 
     def endpointForURI(self, uri):
         destination = uri.netloc
 
         return matrix_federation_endpoint(
             reactor, destination, timeout=10,
-            ssl_context_factory=self.tls_server_context_factory
+            tls_client_options_factory=self.tls_client_options_factory
         )
 
 
@@ -134,7 +133,7 @@ class MatrixFederationHttpClient(object):
                 failures, connection failures, SSL failures.)
         """
         if (
-            self.hs.config.federation_domain_whitelist and
+            self.hs.config.federation_domain_whitelist is not None and
             destination not in self.hs.config.federation_domain_whitelist
         ):
             raise FederationDeniedError(destination)
@@ -193,6 +192,7 @@ class MatrixFederationHttpClient(object):
                         add_timeout_to_deferred(
                             request_deferred,
                             timeout / 1000. if timeout else 60,
+                            self.hs.get_reactor(),
                             cancelled_to_request_timed_out_error,
                         )
                         response = yield make_deferred_yieldable(
@@ -234,7 +234,7 @@ class MatrixFederationHttpClient(object):
                                 delay = min(delay, 2)
                                 delay *= random.uniform(0.8, 1.4)
 
-                            yield sleep(delay)
+                            yield self.clock.sleep(delay)
                             retries_left -= 1
                         else:
                             raise
@@ -260,13 +260,34 @@ class MatrixFederationHttpClient(object):
             defer.returnValue(response)
 
     def sign_request(self, destination, method, url_bytes, headers_dict,
-                     content=None):
+                     content=None, destination_is=None):
+        """
+        Signs a request by adding an Authorization header to headers_dict
+        Args:
+            destination (bytes|None): The desination home server of the request.
+                May be None if the destination is an identity server, in which case
+                destination_is must be non-None.
+            method (bytes): The HTTP method of the request
+            url_bytes (bytes): The URI path of the request
+            headers_dict (dict): Dictionary of request headers to append to
+            content (bytes): The body of the request
+            destination_is (bytes): As 'destination', but if the destination is an
+                identity server
+
+        Returns:
+            None
+        """
         request = {
             "method": method,
             "uri": url_bytes,
             "origin": self.server_name,
-            "destination": destination,
         }
+
+        if destination is not None:
+            request["destination"] = destination
+
+        if destination_is is not None:
+            request["destination_is"] = destination_is
 
         if content is not None:
             request["content"] = content
@@ -418,7 +439,7 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def get_json(self, destination, path, args={}, retry_on_dns_fail=True,
+    def get_json(self, destination, path, args=None, retry_on_dns_fail=True,
                  timeout=None, ignore_backoff=False):
         """ GETs some json from the given host homeserver and path
 
@@ -426,7 +447,7 @@ class MatrixFederationHttpClient(object):
             destination (str): The remote server to send the HTTP request
                 to.
             path (str): The HTTP path.
-            args (dict): A dictionary used to create query strings, defaults to
+            args (dict|None): A dictionary used to create query strings, defaults to
                 None.
             timeout (int): How long to try (in ms) the destination for before
                 giving up. None indicates no timeout and that the request will
@@ -681,6 +702,9 @@ def check_content_type_is_json(headers):
 
 
 def encode_query_args(args):
+    if args is None:
+        return b""
+
     encoded_args = {}
     for k, vs in args.items():
         if isinstance(vs, string_types):

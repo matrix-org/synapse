@@ -14,41 +14,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, threads
-import twisted.internet.error
-import twisted.web.http
-from twisted.web.resource import Resource
-
-from ._base import respond_404, FileInfo, respond_with_responder
-from .upload_resource import UploadResource
-from .download_resource import DownloadResource
-from .thumbnail_resource import ThumbnailResource
-from .identicon_resource import IdenticonResource
-from .preview_url_resource import PreviewUrlResource
-from .filepath import MediaFilePaths
-from .thumbnailer import Thumbnailer
-from .storage_provider import StorageProviderWrapper
-from .media_storage import MediaStorage
-
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-from synapse.util.stringutils import random_string
-from synapse.api.errors import (
-    SynapseError, HttpResponseException, NotFoundError, FederationDeniedError,
-)
-
-from synapse.util.async import Linearizer
-from synapse.util.stringutils import is_ascii
-from synapse.util.logcontext import make_deferred_yieldable
-from synapse.util.retryutils import NotRetryingDestination
-
-import os
+import cgi
 import errno
+import logging
+import os
 import shutil
 
-import cgi
-import logging
-from six.moves.urllib import parse as urlparse
 from six import iteritems
+from six.moves.urllib import parse as urlparse
+
+import twisted.internet.error
+import twisted.web.http
+from twisted.internet import defer, threads
+from twisted.web.resource import Resource
+
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    NotFoundError,
+    SynapseError,
+)
+from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.async_helpers import Linearizer
+from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.stringutils import is_ascii, random_string
+
+from ._base import FileInfo, respond_404, respond_with_responder
+from .config_resource import MediaConfigResource
+from .download_resource import DownloadResource
+from .filepath import MediaFilePaths
+from .identicon_resource import IdenticonResource
+from .media_storage import MediaStorage
+from .preview_url_resource import PreviewUrlResource
+from .storage_provider import StorageProviderWrapper
+from .thumbnail_resource import ThumbnailResource
+from .thumbnailer import Thumbnailer
+from .upload_resource import UploadResource
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +61,7 @@ UPDATE_RECENTLY_ACCESSED_TS = 60 * 1000
 
 class MediaRepository(object):
     def __init__(self, hs):
+        self.hs = hs
         self.auth = hs.get_auth()
         self.client = MatrixFederationHttpClient(hs)
         self.clock = hs.get_clock()
@@ -94,12 +98,17 @@ class MediaRepository(object):
             storage_providers.append(provider)
 
         self.media_storage = MediaStorage(
-            self.primary_base_path, self.filepaths, storage_providers,
+            self.hs, self.primary_base_path, self.filepaths, storage_providers,
         )
 
         self.clock.looping_call(
-            self._update_recently_accessed,
+            self._start_update_recently_accessed,
             UPDATE_RECENTLY_ACCESSED_TS,
+        )
+
+    def _start_update_recently_accessed(self):
+        return run_as_background_process(
+            "update_recently_accessed_media", self._update_recently_accessed,
         )
 
     @defer.inlineCallbacks
@@ -371,7 +380,7 @@ class MediaRepository(object):
                 logger.warn("HTTP error fetching remote media %s/%s: %s",
                             server_name, media_id, e.response)
                 if e.code == twisted.web.http.NOT_FOUND:
-                    raise SynapseError.from_http_response_exception(e)
+                    raise e.to_synapse_error()
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except SynapseError:
@@ -746,7 +755,6 @@ class MediaRepositoryResource(Resource):
         Resource.__init__(self)
 
         media_repo = hs.get_media_repository()
-
         self.putChild("upload", UploadResource(hs, media_repo))
         self.putChild("download", DownloadResource(hs, media_repo))
         self.putChild("thumbnail", ThumbnailResource(
@@ -757,3 +765,4 @@ class MediaRepositoryResource(Resource):
             self.putChild("preview_url", PreviewUrlResource(
                 hs, media_repo, media_repo.media_storage,
             ))
+        self.putChild("config", MediaConfigResource(hs))

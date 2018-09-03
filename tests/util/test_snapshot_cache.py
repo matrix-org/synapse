@@ -14,14 +14,14 @@
 # limitations under the License.
 
 
-from .. import unittest
+from twisted.internet.defer import Deferred
 
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from twisted.internet.defer import Deferred
+
+from .. import unittest
 
 
 class SnapshotCacheTestCase(unittest.TestCase):
-
     def setUp(self):
         self.cache = SnapshotCache()
         self.cache.DURATION_MS = 1

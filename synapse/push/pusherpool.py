@@ -18,8 +18,8 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push.pusher import PusherFactory
-from synapse.util.async import run_on_reactor
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
@@ -123,9 +123,14 @@ class PusherPool:
                     p['app_id'], p['pushkey'], p['user_name'],
                 )
 
-    @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_id, max_stream_id):
-        yield run_on_reactor()
+        run_as_background_process(
+            "on_new_notifications",
+            self._on_new_notifications, min_stream_id, max_stream_id,
+        )
+
+    @defer.inlineCallbacks
+    def _on_new_notifications(self, min_stream_id, max_stream_id):
         try:
             users_affected = yield self.store.get_push_action_users_in_range(
                 min_stream_id, max_stream_id
@@ -149,9 +154,14 @@ class PusherPool:
         except Exception:
             logger.exception("Exception in pusher on_new_notifications")
 
-    @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
-        yield run_on_reactor()
+        run_as_background_process(
+            "on_new_receipts",
+            self._on_new_receipts, min_stream_id, max_stream_id, affected_room_ids,
+        )
+
+    @defer.inlineCallbacks
+    def _on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
         try:
             # Need to subtract 1 from the minimum because the lower bound here
             # is not inclusive

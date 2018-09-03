@@ -15,16 +15,16 @@
 # limitations under the License.
 import logging
 
-from twisted.internet import defer, reactor
+from prometheus_client import Counter
+
+from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
-from . import push_rule_evaluator
-from . import push_tools
 from synapse.push import PusherConfigException
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
-from prometheus_client import Counter
+from . import push_rule_evaluator, push_tools
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,9 @@ class HttpPusher(object):
                     )
                 else:
                     logger.info("Push failed: delaying for %ds", self.backoff_delay)
-                    self.timed_call = reactor.callLater(self.backoff_delay, self.on_timer)
+                    self.timed_call = self.hs.get_reactor().callLater(
+                        self.backoff_delay, self.on_timer
+                    )
                     self.backoff_delay = min(self.backoff_delay * 2, self.MAX_BACKOFF_SEC)
                     break
 

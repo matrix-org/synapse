@@ -13,17 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+import hashlib
+import logging
 
-from twisted.internet import defer
 import six
 
-import OpenSSL
 from signedjson.key import decode_verify_key_bytes
-import hashlib
 
-import logging
+import OpenSSL
+from twisted.internet import defer
+
+from synapse.util.caches.descriptors import cachedInlineCallbacks
+
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 

@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests import unittest
-
 from synapse.api.errors import SynapseError
-from synapse.server import HomeServer
-from synapse.types import UserID, RoomAlias, GroupID
+from synapse.types import GroupID, RoomAlias, UserID
 
-mock_homeserver = HomeServer(hostname="my.domain")
+from tests import unittest
+from tests.utils import TestHomeServer
+
+mock_homeserver = TestHomeServer(hostname="my.domain")
 
 
 class UserIDTestCase(unittest.TestCase):
@@ -69,10 +69,7 @@ class GroupIDTestCase(unittest.TestCase):
         self.assertEqual("my.domain", group_id.domain)
 
     def test_validate(self):
-        bad_ids = [
-            "$badsigil:domain",
-            "+:empty",
-        ] + [
+        bad_ids = ["$badsigil:domain", "+:empty"] + [
             "+group" + c + ":domain" for c in "A%?æ£"
         ]
         for id_string in bad_ids:

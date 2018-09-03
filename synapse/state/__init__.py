@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,26 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from collections import namedtuple
+
+from six import iteritems, itervalues
+
+from frozendict import frozendict
 
 from twisted.internet import defer
 
-from synapse import event_auth
-from synapse.util.logutils import log_function
-from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.metrics import Measure
-from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError
+from synapse.api.constants import EventTypes, RoomVersions
 from synapse.events.snapshot import EventContext
-from synapse.util.async import Linearizer
-from synapse.util.caches import CACHE_SIZE_FACTOR
-
-from collections import namedtuple
-from frozendict import frozendict
-
-import logging
-import hashlib
-
-from six import iteritems, itervalues
+from synapse.state import v1
+from synapse.util.async_helpers import Linearizer
+from synapse.util.caches import get_cache_factor_for
+from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +38,7 @@ logger = logging.getLogger(__name__)
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
-SIZE_OF_CACHE = int(100000 * CACHE_SIZE_FACTOR)
+SIZE_OF_CACHE = 100000 * get_cache_factor_for("state_cache")
 EVICTION_TIMEOUT_SECONDS = 60 * 60
 
 
@@ -203,25 +201,27 @@ class StateHandler(object):
             # If this is an outlier, then we know it shouldn't have any current
             # state. Certainly store.get_current_state won't return any, and
             # persisting the event won't store the state group.
-            context = EventContext()
             if old_state:
-                context.prev_state_ids = {
+                prev_state_ids = {
                     (s.type, s.state_key): s.event_id for s in old_state
                 }
                 if event.is_state():
-                    context.current_state_ids = dict(context.prev_state_ids)
+                    current_state_ids = dict(prev_state_ids)
                     key = (event.type, event.state_key)
-                    context.current_state_ids[key] = event.event_id
+                    current_state_ids[key] = event.event_id
                 else:
-                    context.current_state_ids = context.prev_state_ids
+                    current_state_ids = prev_state_ids
             else:
-                context.current_state_ids = {}
-                context.prev_state_ids = {}
-            context.prev_state_events = []
+                current_state_ids = {}
+                prev_state_ids = {}
 
             # We don't store state for outliers, so we don't generate a state
-            # froup for it.
-            context.state_group = None
+            # group for it.
+            context = EventContext.with_state(
+                state_group=None,
+                current_state_ids=current_state_ids,
+                prev_state_ids=prev_state_ids,
+            )
 
             defer.returnValue(context)
 
@@ -230,79 +230,84 @@ class StateHandler(object):
             # Let's just correctly fill out the context and create a
             # new state group for it.
 
-            context = EventContext()
-            context.prev_state_ids = {
+            prev_state_ids = {
                 (s.type, s.state_key): s.event_id for s in old_state
             }
 
             if event.is_state():
                 key = (event.type, event.state_key)
-                if key in context.prev_state_ids:
-                    replaces = context.prev_state_ids[key]
+                if key in prev_state_ids:
+                    replaces = prev_state_ids[key]
                     if replaces != event.event_id:  # Paranoia check
                         event.unsigned["replaces_state"] = replaces
-                context.current_state_ids = dict(context.prev_state_ids)
-                context.current_state_ids[key] = event.event_id
+                current_state_ids = dict(prev_state_ids)
+                current_state_ids[key] = event.event_id
             else:
-                context.current_state_ids = context.prev_state_ids
+                current_state_ids = prev_state_ids
 
-            context.state_group = yield self.store.store_state_group(
+            state_group = yield self.store.store_state_group(
                 event.event_id,
                 event.room_id,
                 prev_group=None,
                 delta_ids=None,
-                current_state_ids=context.current_state_ids,
+                current_state_ids=current_state_ids,
             )
 
-            context.prev_state_events = []
+            context = EventContext.with_state(
+                state_group=state_group,
+                current_state_ids=current_state_ids,
+                prev_state_ids=prev_state_ids,
+            )
+
             defer.returnValue(context)
 
         logger.debug("calling resolve_state_groups from compute_event_context")
+
         entry = yield self.resolve_state_groups_for_events(
             event.room_id, [e for e, _ in event.prev_events],
         )
 
-        curr_state = entry.state
+        prev_state_ids = entry.state
+        prev_group = None
+        delta_ids = None
 
-        context = EventContext()
-        context.prev_state_ids = curr_state
         if event.is_state():
             # If this is a state event then we need to create a new state
             # group for the state after this event.
 
             key = (event.type, event.state_key)
-            if key in context.prev_state_ids:
-                replaces = context.prev_state_ids[key]
+            if key in prev_state_ids:
+                replaces = prev_state_ids[key]
                 event.unsigned["replaces_state"] = replaces
 
-            context.current_state_ids = dict(context.prev_state_ids)
-            context.current_state_ids[key] = event.event_id
+            current_state_ids = dict(prev_state_ids)
+            current_state_ids[key] = event.event_id
 
             if entry.state_group:
                 # If the state at the event has a state group assigned then
                 # we can use that as the prev group
-                context.prev_group = entry.state_group
-                context.delta_ids = {
+                prev_group = entry.state_group
+                delta_ids = {
                     key: event.event_id
                 }
             elif entry.prev_group:
                 # If the state at the event only has a prev group, then we can
                 # use that as a prev group too.
-                context.prev_group = entry.prev_group
-                context.delta_ids = dict(entry.delta_ids)
-                context.delta_ids[key] = event.event_id
+                prev_group = entry.prev_group
+                delta_ids = dict(entry.delta_ids)
+                delta_ids[key] = event.event_id
 
-            context.state_group = yield self.store.store_state_group(
+            state_group = yield self.store.store_state_group(
                 event.event_id,
                 event.room_id,
-                prev_group=context.prev_group,
-                delta_ids=context.delta_ids,
-                current_state_ids=context.current_state_ids,
+                prev_group=prev_group,
+                delta_ids=delta_ids,
+                current_state_ids=current_state_ids,
             )
         else:
-            context.current_state_ids = context.prev_state_ids
-            context.prev_group = entry.prev_group
-            context.delta_ids = entry.delta_ids
+            current_state_ids = prev_state_ids
+            prev_group = entry.prev_group
+            delta_ids = entry.delta_ids
 
             if entry.state_group is None:
                 entry.state_group = yield self.store.store_state_group(
@@ -310,13 +315,20 @@ class StateHandler(object):
                     event.room_id,
                     prev_group=entry.prev_group,
                     delta_ids=entry.delta_ids,
-                    current_state_ids=context.current_state_ids,
+                    current_state_ids=current_state_ids,
                 )
                 entry.state_id = entry.state_group
 
-            context.state_group = entry.state_group
+            state_group = entry.state_group
 
-        context.prev_state_events = []
+        context = EventContext.with_state(
+            state_group=state_group,
+            current_state_ids=current_state_ids,
+            prev_state_ids=prev_state_ids,
+            prev_group=prev_group,
+            delta_ids=delta_ids,
+        )
+
         defer.returnValue(context)
 
     @defer.inlineCallbacks
@@ -325,8 +337,11 @@ class StateHandler(object):
         event, resolves conflicts between them and returns them.
 
         Args:
-            room_id (str):
-            event_ids (list[str]):
+            room_id (str)
+            event_ids (list[str])
+            explicit_room_version (str|None): If set uses the the given room
+                version to choose the resolution algorithm. If None, then
+                checks the database for room version.
 
         Returns:
             Deferred[_StateCacheEntry]: resolved state
@@ -340,7 +355,12 @@ class StateHandler(object):
             room_id, event_ids
         )
 
-        if len(state_groups_ids) == 1:
+        if len(state_groups_ids) == 0:
+            defer.returnValue(_StateCacheEntry(
+                state={},
+                state_group=None,
+            ))
+        elif len(state_groups_ids) == 1:
             name, state_list = list(state_groups_ids.items()).pop()
 
             prev_group, delta_ids = yield self.store.get_state_group_delta(name)
@@ -352,8 +372,11 @@ class StateHandler(object):
                 delta_ids=delta_ids,
             ))
 
+        room_version = yield self.store.get_room_version(room_id)
+
         result = yield self._state_resolution_handler.resolve_state_groups(
-            room_id, state_groups_ids, None, self._state_map_factory,
+            room_id, room_version, state_groups_ids, None,
+            self._state_map_factory,
         )
         defer.returnValue(result)
 
@@ -362,7 +385,7 @@ class StateHandler(object):
             ev_ids, get_prev_content=False, check_redacted=False,
         )
 
-    def resolve_events(self, state_sets, event):
+    def resolve_events(self, room_version, state_sets, event):
         logger.info(
             "Resolving state for %s with %d groups", event.room_id, len(state_sets)
         )
@@ -378,7 +401,9 @@ class StateHandler(object):
         }
 
         with Measure(self.clock, "state._resolve_events"):
-            new_state = resolve_events_with_state_map(state_set_ids, state_map)
+            new_state = resolve_events_with_state_map(
+                room_version, state_set_ids, state_map,
+            )
 
         new_state = {
             key: state_map[ev_id] for key, ev_id in iteritems(new_state)
@@ -417,7 +442,7 @@ class StateResolutionHandler(object):
     @defer.inlineCallbacks
     @log_function
     def resolve_state_groups(
-        self, room_id, state_groups_ids, event_map, state_map_factory,
+        self, room_id, room_version, state_groups_ids, event_map, state_map_factory,
     ):
         """Resolves conflicts between a set of state groups
 
@@ -426,6 +451,7 @@ class StateResolutionHandler(object):
 
         Args:
             room_id (str): room we are resolving for (used for logging)
+            room_version (str): version of the room
             state_groups_ids (dict[int, dict[(str, str), str]]):
                  map from state group id to the state in that state group
                 (where 'state' is a map from state key to event id)
@@ -458,69 +484,40 @@ class StateResolutionHandler(object):
                 "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
             )
 
-            # build a map from state key to the event_ids which set that state.
-            # dict[(str, str), set[str])
-            state = {}
+            # start by assuming we won't have any conflicted state, and build up the new
+            # state map by iterating through the state groups. If we discover a conflict,
+            # we give up and instead use `resolve_events_with_factory`.
+            #
+            # XXX: is this actually worthwhile, or should we just let
+            # resolve_events_with_factory do it?
+            new_state = {}
+            conflicted_state = False
             for st in itervalues(state_groups_ids):
                 for key, e_id in iteritems(st):
-                    state.setdefault(key, set()).add(e_id)
-
-            # build a map from state key to the event_ids which set that state,
-            # including only those where there are state keys in conflict.
-            conflicted_state = {
-                k: list(v)
-                for k, v in iteritems(state)
-                if len(v) > 1
-            }
+                    if key in new_state:
+                        conflicted_state = True
+                        break
+                    new_state[key] = e_id
+                if conflicted_state:
+                    break
 
             if conflicted_state:
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
                     new_state = yield resolve_events_with_factory(
-                        list(state_groups_ids.values()),
+                        room_version,
+                        list(itervalues(state_groups_ids)),
                         event_map=event_map,
                         state_map_factory=state_map_factory,
                     )
-            else:
-                new_state = {
-                    key: e_ids.pop() for key, e_ids in iteritems(state)
-                }
+
+            # if the new state matches any of the input state groups, we can
+            # use that state group again. Otherwise we will generate a state_id
+            # which will be used as a cache key for future resolutions, but
+            # not get persisted.
 
             with Measure(self.clock, "state.create_group_ids"):
-                # if the new state matches any of the input state groups, we can
-                # use that state group again. Otherwise we will generate a state_id
-                # which will be used as a cache key for future resolutions, but
-                # not get persisted.
-                state_group = None
-                new_state_event_ids = frozenset(itervalues(new_state))
-                for sg, events in iteritems(state_groups_ids):
-                    if new_state_event_ids == frozenset(e_id for e_id in events):
-                        state_group = sg
-                        break
-
-                # TODO: We want to create a state group for this set of events, to
-                # increase cache hits, but we need to make sure that it doesn't
-                # end up as a prev_group without being added to the database
-
-                prev_group = None
-                delta_ids = None
-                for old_group, old_ids in iteritems(state_groups_ids):
-                    if not set(new_state) - set(old_ids):
-                        n_delta_ids = {
-                            k: v
-                            for k, v in iteritems(new_state)
-                            if old_ids.get(k) != v
-                        }
-                        if not delta_ids or len(n_delta_ids) < len(delta_ids):
-                            prev_group = old_group
-                            delta_ids = n_delta_ids
-
-            cache = _StateCacheEntry(
-                state=new_state,
-                state_group=state_group,
-                prev_group=prev_group,
-                delta_ids=delta_ids,
-            )
+                cache = _make_state_cache_entry(new_state, state_groups_ids)
 
             if self._state_cache is not None:
                 self._state_cache[group_names] = cache
@@ -528,16 +525,74 @@ class StateResolutionHandler(object):
             defer.returnValue(cache)
 
 
-def _ordered_events(events):
-    def key_func(e):
-        return -int(e.depth), hashlib.sha1(e.event_id.encode()).hexdigest()
+def _make_state_cache_entry(
+    new_state,
+    state_groups_ids,
+):
+    """Given a resolved state, and a set of input state groups, pick one to base
+    a new state group on (if any), and return an appropriately-constructed
+    _StateCacheEntry.
 
-    return sorted(events, key=key_func)
+    Args:
+        new_state (dict[(str, str), str]): resolved state map (mapping from
+           (type, state_key) to event_id)
+
+        state_groups_ids (dict[int, dict[(str, str), str]]):
+                 map from state group id to the state in that state group
+                (where 'state' is a map from state key to event id)
+
+    Returns:
+        _StateCacheEntry
+    """
+    # if the new state matches any of the input state groups, we can
+    # use that state group again. Otherwise we will generate a state_id
+    # which will be used as a cache key for future resolutions, but
+    # not get persisted.
+
+    # first look for exact matches
+    new_state_event_ids = set(itervalues(new_state))
+    for sg, state in iteritems(state_groups_ids):
+        if len(new_state_event_ids) != len(state):
+            continue
+
+        old_state_event_ids = set(itervalues(state))
+        if new_state_event_ids == old_state_event_ids:
+            # got an exact match.
+            return _StateCacheEntry(
+                state=new_state,
+                state_group=sg,
+            )
+
+    # TODO: We want to create a state group for this set of events, to
+    # increase cache hits, but we need to make sure that it doesn't
+    # end up as a prev_group without being added to the database
+
+    # failing that, look for the closest match.
+    prev_group = None
+    delta_ids = None
+
+    for old_group, old_state in iteritems(state_groups_ids):
+        n_delta_ids = {
+            k: v
+            for k, v in iteritems(new_state)
+            if old_state.get(k) != v
+        }
+        if not delta_ids or len(n_delta_ids) < len(delta_ids):
+            prev_group = old_group
+            delta_ids = n_delta_ids
+
+    return _StateCacheEntry(
+        state=new_state,
+        state_group=None,
+        prev_group=prev_group,
+        delta_ids=delta_ids,
+    )
 
 
-def resolve_events_with_state_map(state_sets, state_map):
+def resolve_events_with_state_map(room_version, state_sets, state_map):
     """
     Args:
+        room_version(str): Version of the room
         state_sets(list): List of dicts of (type, state_key) -> event_id,
             which are the different state groups to resolve.
         state_map(dict): a dict from event_id to event, for all events in
@@ -547,74 +602,23 @@ def resolve_events_with_state_map(state_sets, state_map):
         dict[(str, str), str]:
             a map from (type, state_key) to event_id.
     """
-    if len(state_sets) == 1:
-        return state_sets[0]
-
-    unconflicted_state, conflicted_state = _seperate(
-        state_sets,
-    )
-
-    auth_events = _create_auth_events_from_maps(
-        unconflicted_state, conflicted_state, state_map
-    )
-
-    return _resolve_with_state(
-        unconflicted_state, conflicted_state, auth_events, state_map
-    )
+    if room_version in (RoomVersions.V1, RoomVersions.VDH_TEST,):
+        return v1.resolve_events_with_state_map(
+            state_sets, state_map,
+        )
+    else:
+        # This should only happen if we added a version but forgot to add it to
+        # the list above.
+        raise Exception(
+            "No state resolution algorithm defined for version %r" % (room_version,)
+        )
 
 
-def _seperate(state_sets):
-    """Takes the state_sets and figures out which keys are conflicted and
-    which aren't. i.e., which have multiple different event_ids associated
-    with them in different state sets.
-
-    Args:
-        state_sets(list[dict[(str, str), str]]):
-            List of dicts of (type, state_key) -> event_id, which are the
-            different state groups to resolve.
-
-    Returns:
-        (dict[(str, str), str], dict[(str, str), set[str]]):
-            A tuple of (unconflicted_state, conflicted_state), where:
-
-            unconflicted_state is a dict mapping (type, state_key)->event_id
-            for unconflicted state keys.
-
-            conflicted_state is a dict mapping (type, state_key) to a set of
-            event ids for conflicted state keys.
-    """
-    unconflicted_state = dict(state_sets[0])
-    conflicted_state = {}
-
-    for state_set in state_sets[1:]:
-        for key, value in iteritems(state_set):
-            # Check if there is an unconflicted entry for the state key.
-            unconflicted_value = unconflicted_state.get(key)
-            if unconflicted_value is None:
-                # There isn't an unconflicted entry so check if there is a
-                # conflicted entry.
-                ls = conflicted_state.get(key)
-                if ls is None:
-                    # There wasn't a conflicted entry so haven't seen this key before.
-                    # Therefore it isn't conflicted yet.
-                    unconflicted_state[key] = value
-                else:
-                    # This key is already conflicted, add our value to the conflict set.
-                    ls.add(value)
-            elif unconflicted_value != value:
-                # If the unconflicted value is not the same as our value then we
-                # have a new conflict. So move the key from the unconflicted_state
-                # to the conflicted state.
-                conflicted_state[key] = {value, unconflicted_value}
-                unconflicted_state.pop(key, None)
-
-    return unconflicted_state, conflicted_state
-
-
-@defer.inlineCallbacks
-def resolve_events_with_factory(state_sets, event_map, state_map_factory):
+def resolve_events_with_factory(room_version, state_sets, event_map, state_map_factory):
     """
     Args:
+        room_version(str): Version of the room
+
         state_sets(list): List of dicts of (type, state_key) -> event_id,
             which are the different state groups to resolve.
 
@@ -634,185 +638,13 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
         Deferred[dict[(str, str), str]]:
             a map from (type, state_key) to event_id.
     """
-    if len(state_sets) == 1:
-        defer.returnValue(state_sets[0])
-
-    unconflicted_state, conflicted_state = _seperate(
-        state_sets,
-    )
-
-    needed_events = set(
-        event_id
-        for event_ids in itervalues(conflicted_state)
-        for event_id in event_ids
-    )
-    if event_map is not None:
-        needed_events -= set(event_map.iterkeys())
-
-    logger.info("Asking for %d conflicted events", len(needed_events))
-
-    # dict[str, FrozenEvent]: a map from state event id to event. Only includes
-    # the state events which are in conflict (and those in event_map)
-    state_map = yield state_map_factory(needed_events)
-    if event_map is not None:
-        state_map.update(event_map)
-
-    # get the ids of the auth events which allow us to authenticate the
-    # conflicted state, picking only from the unconflicting state.
-    #
-    # dict[(str, str), str]: a map from state key to event id
-    auth_events = _create_auth_events_from_maps(
-        unconflicted_state, conflicted_state, state_map
-    )
-
-    new_needed_events = set(itervalues(auth_events))
-    new_needed_events -= needed_events
-    if event_map is not None:
-        new_needed_events -= set(event_map.iterkeys())
-
-    logger.info("Asking for %d auth events", len(new_needed_events))
-
-    state_map_new = yield state_map_factory(new_needed_events)
-    state_map.update(state_map_new)
-
-    defer.returnValue(_resolve_with_state(
-        unconflicted_state, conflicted_state, auth_events, state_map
-    ))
-
-
-def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_map):
-    auth_events = {}
-    for event_ids in itervalues(conflicted_state):
-        for event_id in event_ids:
-            if event_id in state_map:
-                keys = event_auth.auth_types_for_event(state_map[event_id])
-                for key in keys:
-                    if key not in auth_events:
-                        event_id = unconflicted_state.get(key, None)
-                        if event_id:
-                            auth_events[key] = event_id
-    return auth_events
-
-
-def _resolve_with_state(unconflicted_state_ids, conflicted_state_ds, auth_event_ids,
-                        state_map):
-    conflicted_state = {}
-    for key, event_ids in iteritems(conflicted_state_ds):
-        events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
-        if len(events) > 1:
-            conflicted_state[key] = events
-        elif len(events) == 1:
-            unconflicted_state_ids[key] = events[0].event_id
-
-    auth_events = {
-        key: state_map[ev_id]
-        for key, ev_id in iteritems(auth_event_ids)
-        if ev_id in state_map
-    }
-
-    try:
-        resolved_state = _resolve_state_events(
-            conflicted_state, auth_events
+    if room_version in (RoomVersions.V1, RoomVersions.VDH_TEST,):
+        return v1.resolve_events_with_factory(
+            state_sets, event_map, state_map_factory,
         )
-    except Exception:
-        logger.exception("Failed to resolve state")
-        raise
-
-    new_state = unconflicted_state_ids
-    for key, event in iteritems(resolved_state):
-        new_state[key] = event.event_id
-
-    return new_state
-
-
-def _resolve_state_events(conflicted_state, auth_events):
-    """ This is where we actually decide which of the conflicted state to
-    use.
-
-    We resolve conflicts in the following order:
-        1. power levels
-        2. join rules
-        3. memberships
-        4. other events.
-    """
-    resolved_state = {}
-    if POWER_KEY in conflicted_state:
-        events = conflicted_state[POWER_KEY]
-        logger.debug("Resolving conflicted power levels %r", events)
-        resolved_state[POWER_KEY] = _resolve_auth_events(
-            events, auth_events)
-
-    auth_events.update(resolved_state)
-
-    for key, events in iteritems(conflicted_state):
-        if key[0] == EventTypes.JoinRules:
-            logger.debug("Resolving conflicted join rules %r", events)
-            resolved_state[key] = _resolve_auth_events(
-                events,
-                auth_events
-            )
-
-    auth_events.update(resolved_state)
-
-    for key, events in iteritems(conflicted_state):
-        if key[0] == EventTypes.Member:
-            logger.debug("Resolving conflicted member lists %r", events)
-            resolved_state[key] = _resolve_auth_events(
-                events,
-                auth_events
-            )
-
-    auth_events.update(resolved_state)
-
-    for key, events in iteritems(conflicted_state):
-        if key not in resolved_state:
-            logger.debug("Resolving conflicted state %r:%r", key, events)
-            resolved_state[key] = _resolve_normal_events(
-                events, auth_events
-            )
-
-    return resolved_state
-
-
-def _resolve_auth_events(events, auth_events):
-    reverse = [i for i in reversed(_ordered_events(events))]
-
-    auth_keys = set(
-        key
-        for event in events
-        for key in event_auth.auth_types_for_event(event)
-    )
-
-    new_auth_events = {}
-    for key in auth_keys:
-        auth_event = auth_events.get(key, None)
-        if auth_event:
-            new_auth_events[key] = auth_event
-
-    auth_events = new_auth_events
-
-    prev_event = reverse[0]
-    for event in reverse[1:]:
-        auth_events[(prev_event.type, prev_event.state_key)] = prev_event
-        try:
-            # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
-            prev_event = event
-        except AuthError:
-            return prev_event
-
-    return event
-
-
-def _resolve_normal_events(events, auth_events):
-    for event in _ordered_events(events):
-        try:
-            # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
-            return event
-        except AuthError:
-            pass
-
-    # Use the last event (the one with the least depth) if they all fail
-    # the auth check.
-    return event
+    else:
+        # This should only happen if we added a version but forgot to add it to
+        # the list above.
+        raise Exception(
+            "No state resolution algorithm defined for version %r" % (room_version,)
+        )

@@ -15,17 +15,22 @@
 
 import re
 
+from six.moves import range
+
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError, Codes
+from synapse.api.errors import Codes, StoreError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
-from six.moves import range
-
 
 class RegistrationWorkerStore(SQLBaseStore):
+    def __init__(self, db_conn, hs):
+        super(RegistrationWorkerStore, self).__init__(db_conn, hs)
+
+        self.config = hs.config
+
     @cached()
     def get_user_by_id(self, user_id):
         return self._simple_select_one(
@@ -36,11 +41,32 @@ class RegistrationWorkerStore(SQLBaseStore):
             retcols=[
                 "name", "password_hash", "is_guest",
                 "consent_version", "consent_server_notice_sent",
-                "appservice_id",
+                "appservice_id", "creation_ts",
             ],
             allow_none=True,
             desc="get_user_by_id",
         )
+
+    @defer.inlineCallbacks
+    def is_trial_user(self, user_id):
+        """Checks if user is in the "trial" period, i.e. within the first
+        N days of registration defined by `mau_trial_days` config
+
+        Args:
+            user_id (str)
+
+        Returns:
+            Deferred[bool]
+        """
+
+        info = yield self.get_user_by_id(user_id)
+        if not info:
+            defer.returnValue(False)
+
+        now = self.clock.time_msec()
+        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
+        defer.returnValue(is_trial)
 
     @cached()
     def get_user_by_access_token(self, token):
@@ -460,15 +486,6 @@ class RegistrationStore(RegistrationWorkerStore,
             defer.returnValue(ret['user_id'])
         defer.returnValue(None)
 
-    def user_delete_threepids(self, user_id):
-        return self._simple_delete(
-            "user_threepids",
-            keyvalues={
-                "user_id": user_id,
-            },
-            desc="user_delete_threepids",
-        )
-
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
             "user_threepids",
@@ -632,7 +649,9 @@ class RegistrationStore(RegistrationWorkerStore,
         Removes the given user to the table of users who need to be parted from all the
         rooms they're in, effectively marking that user as fully deactivated.
         """
-        return self._simple_delete_one(
+        # XXX: This should be simple_delete_one but we failed to put a unique index on
+        # the table, so somehow duplicate entries have ended up in it.
+        return self._simple_delete(
             "users_pending_deactivation",
             keyvalues={
                 "user_id": user_id,

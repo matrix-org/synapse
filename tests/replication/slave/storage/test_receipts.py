@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStoreTestCase
+from twisted.internet import defer
 
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 
-from twisted.internet import defer
+from ._base import BaseSlavedStoreTestCase
 
 USER_ID = "@feeling:blue"
 ROOM_ID = "!room:blue"
@@ -34,6 +34,6 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
             ROOM_ID, "m.read", USER_ID, [EVENT_ID], {}
         )
         yield self.replicate()
-        yield self.check("get_receipts_for_user", [USER_ID, "m.read"], {
-            ROOM_ID: EVENT_ID
-        })
+        yield self.check(
+            "get_receipts_for_user", [USER_ID, "m.read"], {ROOM_ID: EVENT_ID}
+        )

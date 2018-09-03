@@ -14,15 +14,14 @@
 # limitations under the License.
 
 
-from .. import unittest
-
 from synapse.util.caches.expiringcache import ExpiringCache
 
 from tests.utils import MockClock
 
+from .. import unittest
+
 
 class ExpiringCacheTestCase(unittest.TestCase):
-
     def test_get_set(self):
         clock = MockClock()
         cache = ExpiringCache("test", clock, max_len=1)

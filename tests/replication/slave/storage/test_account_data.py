@@ -13,11 +13,11 @@
 # limitations under the License.
 
 
-from ._base import BaseSlavedStoreTestCase
+from twisted.internet import defer
 
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 
-from twisted.internet import defer
+from ._base import BaseSlavedStoreTestCase
 
 USER_ID = "@feeling:blue"
 TYPE = "my.type"
@@ -29,28 +29,14 @@ class SlavedAccountDataStoreTestCase(BaseSlavedStoreTestCase):
 
     @defer.inlineCallbacks
     def test_user_account_data(self):
-        yield self.master_store.add_account_data_for_user(
-            USER_ID, TYPE, {"a": 1}
-        )
+        yield self.master_store.add_account_data_for_user(USER_ID, TYPE, {"a": 1})
         yield self.replicate()
         yield self.check(
-            "get_global_account_data_by_type_for_user",
-            [TYPE, USER_ID], {"a": 1}
-        )
-        yield self.check(
-            "get_global_account_data_by_type_for_users",
-            [TYPE, [USER_ID]], {USER_ID: {"a": 1}}
+            "get_global_account_data_by_type_for_user", [TYPE, USER_ID], {"a": 1}
         )
 
-        yield self.master_store.add_account_data_for_user(
-            USER_ID, TYPE, {"a": 2}
-        )
+        yield self.master_store.add_account_data_for_user(USER_ID, TYPE, {"a": 2})
         yield self.replicate()
         yield self.check(
-            "get_global_account_data_by_type_for_user",
-            [TYPE, USER_ID], {"a": 2}
-        )
-        yield self.check(
-            "get_global_account_data_by_type_for_users",
-            [TYPE, [USER_ID]], {USER_ID: {"a": 2}}
+            "get_global_account_data_by_type_for_user", [TYPE, USER_ID], {"a": 2}
         )

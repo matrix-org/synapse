@@ -14,10 +14,10 @@
 
 import logging
 
-from synapse.storage.prepare_database import get_statements
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-
 import simplejson
+
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
 

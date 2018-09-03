@@ -12,19 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
-
-from synapse.api.constants import ThirdPartyEntityKind
-from synapse.api.errors import CodeMessageException
-from synapse.http.client import SimpleHttpClient
-from synapse.events.utils import serialize_event
-from synapse.util.caches.response_cache import ResponseCache
-from synapse.types import ThirdPartyInstanceID
-
 import logging
 import urllib
 
 from prometheus_client import Counter
+
+from twisted.internet import defer
+
+from synapse.api.constants import ThirdPartyEntityKind
+from synapse.api.errors import CodeMessageException
+from synapse.events.utils import serialize_event
+from synapse.http.client import SimpleHttpClient
+from synapse.types import ThirdPartyInstanceID
+from synapse.util.caches.response_cache import ResponseCache
 
 logger = logging.getLogger(__name__)
 
