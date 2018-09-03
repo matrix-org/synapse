@@ -31,6 +31,7 @@ from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .directory import DirectoryStore
 from .end_to_end_keys import EndToEndKeyStore
+from .engines import PostgresEngine
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events import EventsStore
@@ -131,6 +132,13 @@ class DataStore(RoomMemberStore, RoomStore,
         self._group_updates_id_gen = StreamIdGenerator(
             db_conn, "local_group_updates", "stream_id",
         )
+
+        if isinstance(self.database_engine, PostgresEngine):
+            self._cache_id_gen = StreamIdGenerator(
+                db_conn, "cache_invalidation_stream", "stream_id",
+            )
+        else:
+            self._cache_id_gen = None
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 

@@ -27,7 +27,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 
@@ -191,7 +190,6 @@ class SQLBaseStore(object):
         self._pending_ds = []
 
         self.database_engine = hs.database_engine
-
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
