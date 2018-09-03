@@ -385,6 +385,7 @@ class StateHandler(object):
             ev_ids, get_prev_content=False, check_redacted=False,
         )
 
+    @defer.inlineCallbacks
     def resolve_events(self, room_version, state_sets, event):
         logger.info(
             "Resolving state for %s with %d groups", event.room_id, len(state_sets)
@@ -401,15 +402,17 @@ class StateHandler(object):
         }
 
         with Measure(self.clock, "state._resolve_events"):
-            new_state = resolve_events_with_state_map(
-                room_version, state_set_ids, state_map,
+            new_state = yield resolve_events_with_factory(
+                room_version, state_set_ids,
+                event_map=state_map,
+                state_map_factory=self._state_map_factory
             )
 
         new_state = {
             key: state_map[ev_id] for key, ev_id in iteritems(new_state)
         }
 
-        return new_state
+        defer.returnValue(new_state)
 
 
 class StateResolutionHandler(object):
@@ -587,31 +590,6 @@ def _make_state_cache_entry(
         prev_group=prev_group,
         delta_ids=delta_ids,
     )
-
-
-def resolve_events_with_state_map(room_version, state_sets, state_map):
-    """
-    Args:
-        room_version(str): Version of the room
-        state_sets(list): List of dicts of (type, state_key) -> event_id,
-            which are the different state groups to resolve.
-        state_map(dict): a dict from event_id to event, for all events in
-            state_sets.
-
-    Returns
-        dict[(str, str), str]:
-            a map from (type, state_key) to event_id.
-    """
-    if room_version in (RoomVersions.V1, RoomVersions.VDH_TEST,):
-        return v1.resolve_events_with_state_map(
-            state_sets, state_map,
-        )
-    else:
-        # This should only happen if we added a version but forgot to add it to
-        # the list above.
-        raise Exception(
-            "No state resolution algorithm defined for version %r" % (room_version,)
-        )
 
 
 def resolve_events_with_factory(room_version, state_sets, event_map, state_map_factory):
