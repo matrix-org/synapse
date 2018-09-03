@@ -29,7 +29,7 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 class MonthlyActiveUsersStore(SQLBaseStore):
     def __init__(self, dbconn, hs):
-        super(MonthlyActiveUsersStore, self).__init__(dbconn, hs)
+        super(MonthlyActiveUsersStore, self).__init__(None, hs)
         self._clock = hs.get_clock()
         self.hs = hs
         self.reserved_users = ()
@@ -138,8 +138,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Returns:
             Defered[int]: Number of current monthly active users
         """
+
         def _count_users(txn):
             sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+
             txn.execute(sql)
             count, = txn.fetchone()
             return count
@@ -179,7 +181,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 Deferred[int] : timestamp since last seen, None if never seen
 
         """
-        return (self._simple_select_one_onecol(
+
+        return(self._simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={
                 "user_id": user_id,
