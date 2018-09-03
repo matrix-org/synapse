@@ -754,8 +754,8 @@ and an example apache configuration may look like::
         ServerName matrix.example.com;
 
         <Location /_matrix>
-            ProxyPass http://127.0.0.1:8008/_matrix/ nocanon
-            ProxyPassReverse http://127.0.0.1:8008/_matrix/
+            ProxyPass http://127.0.0.1:8008/_matrix nocanon
+            ProxyPassReverse http://127.0.0.1:8008/_matrix
         </Location>
     </VirtualHost>
 
