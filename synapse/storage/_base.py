@@ -192,13 +192,6 @@ class SQLBaseStore(object):
 
         self.database_engine = hs.database_engine
 
-        if isinstance(self.database_engine, PostgresEngine):
-            self._cache_id_gen = StreamIdGenerator(
-                db_conn, "cache_invalidation_stream", "stream_id",
-            )
-            self.clock = self.hs.get_clock()
-        else:
-            self._cache_id_gen = None
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()

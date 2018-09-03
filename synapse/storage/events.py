@@ -35,8 +35,10 @@ from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.event_federation import EventFederationStore
 from synapse.storage.events_worker import EventsWorkerStore
+from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -209,6 +211,14 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
 
     def __init__(self, db_conn, hs):
         super(EventsStore, self).__init__(db_conn, hs)
+
+        if isinstance(self.database_engine, PostgresEngine):
+            self._cache_id_gen = StreamIdGenerator(
+                db_conn, "cache_invalidation_stream", "stream_id",
+            )
+        else:
+            self._cache_id_gen = None
+
         self.register_background_update_handler(
             self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
         )
