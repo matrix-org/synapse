@@ -16,7 +16,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore
 
@@ -131,7 +131,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self.user_last_seen_monthly_active.invalidate_all()
         self.get_monthly_active_count.invalidate_all()
 
-    @cachedInlineCallbacks(num_args=0)
+    @cached(num_args=0)
     def get_monthly_active_count(self):
         """Generates current count of monthly active users
 
@@ -143,8 +143,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             txn.execute(sql)
             count, = txn.fetchone()
             return count
-        res = yield self.runInteraction("count_users", _count_users)
-        defer.returnValue(res)
+        return self.runInteraction("count_users", _count_users)
 
     @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
@@ -170,7 +169,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             self.user_last_seen_monthly_active.invalidate((user_id,))
             self.get_monthly_active_count.invalidate(())
 
-    @cachedInlineCallbacks(num_args=1)
+    @cached(num_args=1)
     def user_last_seen_monthly_active(self, user_id):
         """
             Checks if a given user is part of the monthly active user group
@@ -180,8 +179,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 Deferred[int] : timestamp since last seen, None if never seen
 
         """
-
-        res = yield (self._simple_select_one_onecol(
+        return (self._simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={
                 "user_id": user_id,
@@ -190,7 +188,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             allow_none=True,
             desc="user_last_seen_monthly_active",
         ))
-        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):
