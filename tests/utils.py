@@ -30,8 +30,8 @@ from synapse.config.server import ServerConfig
 from synapse.federation.transport import server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
-from synapse.storage import DataStore, PostgresEngine
-from synapse.storage.engines import create_engine
+from synapse.storage import DataStore
+from synapse.storage.engines import PostgresEngine, create_engine
 from synapse.storage.prepare_database import (
     _get_or_create_schema_state,
     _setup_new_database,
@@ -42,6 +42,7 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
 USE_POSTGRES_FOR_TESTS = os.environ.get("SYNAPSE_POSTGRES", False)
+LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", "postgres")
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
@@ -244,8 +245,9 @@ def setup_test_homeserver(
                 cur.close()
                 db_conn.close()
 
-            # Register the cleanup hook
-            cleanup_func(cleanup)
+            if not LEAVE_DB:
+                # Register the cleanup hook
+                cleanup_func(cleanup)
 
         hs.setup()
     else:
