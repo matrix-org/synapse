@@ -108,7 +108,8 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def _request(self, destination, method, path,
-                 data=None, json=None, json_data_callback=None, headers_dict={}, param_bytes=b"",
+                 data=None, json=None, json_callback=None, headers_dict={},
+                 param_bytes=b"",
                  query_bytes=b"", retry_on_dns_fail=True,
                  timeout=None, long_retries=False,
                  ignore_backoff=False,
@@ -185,7 +186,7 @@ class MatrixFederationHttpClient(object):
                 while True:
                     try:
                         if json_callback:
-                            data = encode_canonical_json(json_data_callback())
+                            data = encode_canonical_json(json_callback())
                             self.sign_request(destination, method, http_url, headers_dict, json)
                         elif json:
                             data = encode_canonical_json(json)
