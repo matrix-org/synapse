@@ -40,7 +40,7 @@ REQUIREMENTS = {
     "pynacl>=1.2.1": ["nacl>=1.2.1", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
     "Twisted>=17.1.0": ["twisted>=17.1.0"],
-    "treq>=17.8.0": ["treq>=17.8.0"],
+    "treq>=15.1": ["treq>=15.1"],
 
     # We use crypto.get_elliptic_curve which is only supported in >=0.15
     "pyopenssl>=0.15": ["OpenSSL>=0.15"],
