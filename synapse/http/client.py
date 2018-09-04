@@ -25,14 +25,13 @@ from prometheus_client import Counter
 
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
-from twisted.internet import defer, protocol, reactor, ssl, task
+from twisted.internet import defer, protocol, reactor, ssl
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.web._newclient import ResponseDone
 from twisted.web.client import (
     Agent,
     BrowserLikeRedirectAgent,
     ContentDecoderAgent,
-    FileBodyProducer as TwistedFileBodyProducer,
     GzipDecoder,
     HTTPConnectionPool,
     PartialDownloadError,
@@ -88,7 +87,7 @@ class SimpleHttpClient(object):
         self.user_agent = self.user_agent.encode('ascii')
 
     @defer.inlineCallbacks
-    def request(self, method, uri, *args, **kwargs):
+    def request(self, method, uri, data=b''):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.labels(method).inc()
@@ -97,15 +96,8 @@ class SimpleHttpClient(object):
         logger.info("Sending request %s %s", method, redact_uri(uri.encode('ascii')))
 
         try:
-            if "data" in kwargs:
-                data = kwargs.pop("data")
-            elif "bodyProducer" in kwargs:
-                data = kwargs.pop("bodyProducer")
-            else:
-                data = None
-
             request_deferred = treq.request(
-                method, uri, *args, agent=self.agent, data=data, **kwargs
+                method, uri, agent=self.agent, data=data
             )
             add_timeout_to_deferred(
                 request_deferred, 60, self.hs.get_reactor(),
@@ -162,7 +154,7 @@ class SimpleHttpClient(object):
             "POST",
             uri,
             headers=Headers(actual_headers),
-            bodyProducer=query_bytes
+            data=query_bytes
         )
 
         if 200 <= response.code < 300:
@@ -553,26 +545,3 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
 
     def creatorForNetloc(self, hostname, port):
         return self
-
-
-class FileBodyProducer(TwistedFileBodyProducer):
-    """Workaround for https://twistedmatrix.com/trac/ticket/8473
-
-    We override the pauseProducing and resumeProducing methods in twisted's
-    FileBodyProducer so that they do not raise exceptions if the task has
-    already completed.
-    """
-
-    def pauseProducing(self):
-        try:
-            super(FileBodyProducer, self).pauseProducing()
-        except task.TaskDone:
-            # task has already completed
-            pass
-
-    def resumeProducing(self):
-        try:
-            super(FileBodyProducer, self).resumeProducing()
-        except task.NotPaused:
-            # task was not paused (probably because it had already completed)
-            pass
