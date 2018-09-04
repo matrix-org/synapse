@@ -87,7 +87,7 @@ class SimpleHttpClient(object):
         self.user_agent = self.user_agent.encode('ascii')
 
     @defer.inlineCallbacks
-    def request(self, method, uri, data=b''):
+    def request(self, method, uri, data=b'', headers=None):
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.labels(method).inc()
@@ -97,7 +97,7 @@ class SimpleHttpClient(object):
 
         try:
             request_deferred = treq.request(
-                method, uri, agent=self.agent, data=data
+                method, uri, agent=self.agent, data=data, headers=headers
             )
             add_timeout_to_deferred(
                 request_deferred, 60, self.hs.get_reactor(),
