@@ -185,7 +185,7 @@ class MatrixFederationHttpClient(object):
                 if json:
                     data = encode_canonical_json(json)
 
-                self.sign_request(destination, method, http_url, headers_dict)
+                self.sign_request(destination, method, http_url_bytes, headers_dict)
 
                 while True:
                     try:
