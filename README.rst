@@ -167,11 +167,6 @@ Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
-Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
-tested with VirtualBox/AWS/DigitalOcean - see 
-https://github.com/EMnify/matrix-synapse-auto-deploy
-for details.
-
 Configuring synapse
 -------------------
 

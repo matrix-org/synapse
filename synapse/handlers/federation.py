@@ -1831,7 +1831,7 @@ class FederationHandler(BaseHandler):
 
                 room_version = yield self.store.get_room_version(event.room_id)
 
-                new_state = self.state_handler.resolve_events(
+                new_state = yield self.state_handler.resolve_events(
                     room_version,
                     [list(local_view.values()), list(remote_view.values())],
                     event
