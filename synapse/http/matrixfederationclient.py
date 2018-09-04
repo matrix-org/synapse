@@ -176,16 +176,18 @@ class MatrixFederationHttpClient(object):
             else:
                 retries_left = MAX_SHORT_RETRIES
 
-            http_url = urllib.parse.urlunparse(
+            http_url_bytes = urllib.parse.urlunparse(
                 (b"", b"", path_bytes, param_bytes, query_bytes, b"")
-            ).decode('ascii')
+            )
+            http_url = http_url_bytes.decode('ascii')
 
             log_result = None
             try:
                 if json:
                     data = encode_canonical_json(json)
-
-                self.sign_request(destination, method, http_url_bytes, headers_dict)
+                    self.sign_request(destination, method, http_url_bytes, headers_dict, json)
+                else:
+                    self.sign_request(destination, method, http_url_bytes, headers_dict)
 
                 while True:
                     try:
