@@ -22,7 +22,7 @@ from six import PY3, string_types
 from six.moves import urllib
 
 import treq
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 
@@ -176,18 +176,17 @@ class MatrixFederationHttpClient(object):
             else:
                 retries_left = MAX_SHORT_RETRIES
 
-            http_url_bytes = urllib.parse.urlunparse(
+            http_url = urllib.parse.urlunparse(
                 (b"", b"", path_bytes, param_bytes, query_bytes, b"")
-            )
-            http_url = http_url_bytes.decode('ascii')
+            ).decode('ascii')
 
             log_result = None
             try:
                 if json:
                     data = encode_canonical_json(json)
-                    self.sign_request(destination, method, http_url_bytes, headers_dict, json)
+                    self.sign_request(destination, method, http_url, headers_dict, json)
                 else:
-                    self.sign_request(destination, method, http_url_bytes, headers_dict)
+                    self.sign_request(destination, method, http_url, headers_dict)
 
                 while True:
                     try:
