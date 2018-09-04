@@ -189,12 +189,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
                 if include_other_types:
                     unique_types = set(filtered_types)
-                    clause_to_args.append(
-                        (
-                            "AND type <> ? " * len(unique_types),
-                            list(unique_types)
-                        )
-                    )
+                    sql += " AND type <> ? " * len(unique_types)
+                    additional_args = list(unique_types)
             else:
                 # If types is None we fetch all the state, and so just use an
                 # empty where clause with no extra args.
@@ -202,6 +198,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             for where_clause, where_args in clause_to_args:
                 args = [room_id]
                 args.extend(where_args)
+                args.extend(additional_args)
                 txn.execute(sql % (where_clause,), args)
                 for row in txn:
                     typ, state_key, event_id = row
