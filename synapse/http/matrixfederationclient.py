@@ -186,11 +186,13 @@ class MatrixFederationHttpClient(object):
                 while True:
                     try:
                         if json_callback:
-                            data = encode_canonical_json(json_callback())
-                            self.sign_request(destination, method, http_url, headers_dict, json)
-                        elif json:
+                            json = json_callback()
+
+                        if json:
                             data = encode_canonical_json(json)
-                            self.sign_request(destination, method, http_url, headers_dict, json)
+                            self.sign_request(
+                                destination, method, http_url, headers_dict, json
+                            )
                         else:
                             self.sign_request(destination, method, http_url, headers_dict)
 
