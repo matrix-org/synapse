@@ -108,7 +108,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def _request(self, destination, method, path,
-                 data=None, json=None, json_callback=None, headers_dict={},
+                 json=None, json_callback=None, headers_dict={},
                  param_bytes=b"",
                  query_bytes=b"", retry_on_dns_fail=True,
                  timeout=None, long_retries=False,
