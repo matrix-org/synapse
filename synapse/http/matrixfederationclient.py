@@ -151,14 +151,14 @@ class MatrixFederationHttpClient(object):
             ignore_backoff=ignore_backoff,
         )
 
-        destination = destination.encode("ascii")
+        destination_bytes = destination.encode("ascii")
         path_bytes = path.encode("ascii")
         with limiter:
             headers_dict[b"User-Agent"] = [self.version_string]
-            headers_dict[b"Host"] = [destination]
+            headers_dict[b"Host"] = [destination_bytes]
 
             url = self._create_url(
-                destination, path_bytes, param_bytes, query_bytes
+                destination_bytes, path_bytes, param_bytes, query_bytes
             ).decode('ascii')
 
             txn_id = "%s-O-%s" % (method, self._next_id)
