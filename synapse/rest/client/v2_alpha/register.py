@@ -378,7 +378,8 @@ class RegisterRestServlet(RestServlet):
                     if not check_3pid_allowed(self.hs, medium, address):
                         raise SynapseError(
                             403,
-                            "Third party identifier (email/phone number) is not allowed",
+                            "Third party identifiers (email/phone numbers)" +
+                            " are not authorized on this server",
                             Codes.THREEPID_DENIED,
                         )
 
