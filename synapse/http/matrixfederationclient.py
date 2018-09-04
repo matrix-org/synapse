@@ -29,7 +29,7 @@ from signedjson.sign import sign_json
 from twisted.internet import defer, protocol, reactor
 from twisted.internet.error import DNSLookupError
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool, readBody
+from twisted.web.client import Agent, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
@@ -108,7 +108,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def _request(self, destination, method, path,
-                 data=None, headers_dict={}, param_bytes=b"",
+                 data=None, json=None, headers_dict={}, param_bytes=b"",
                  query_bytes=b"", retry_on_dns_fail=True,
                  timeout=None, long_retries=False,
                  ignore_backoff=False,
@@ -182,9 +182,12 @@ class MatrixFederationHttpClient(object):
 
             log_result = None
             try:
-                while True:
-                    self.sign_request(destination, method, http_url, headers_dict)
+                if json:
+                    data = encode_canonical_json(json)
 
+                self.sign_request(destination, method, http_url, headers_dict)
+
+                while True:
                     try:
                         request_deferred = treq.request(
                             method,
@@ -256,7 +259,7 @@ class MatrixFederationHttpClient(object):
                 # :'(
                 # Update transactions table?
                 with logcontext.PreserveLoggingContext():
-                    body = yield readBody(response)
+                    body = yield treq.content(response)
                 raise HttpResponseException(
                     response.code, response.phrase, body
                 )
@@ -355,13 +358,11 @@ class MatrixFederationHttpClient(object):
         else:
             json_data = json_data_callback()
 
-        encoded_data = encode_canonical_json(json_data)
-
         response = yield self._request(
             destination,
             "PUT",
             path,
-            data=encoded_data,
+            json=json_data,
             headers_dict={"Content-Type": ["application/json"]},
             query_bytes=encode_query_args(args),
             long_retries=long_retries,
@@ -375,8 +376,8 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield readBody(response)
-        defer.returnValue(json.loads(body))
+            body = yield treq.json_content(response)
+        defer.returnValue(body)
 
     @defer.inlineCallbacks
     def post_json(self, destination, path, data={}, long_retries=False,
@@ -409,15 +410,12 @@ class MatrixFederationHttpClient(object):
             Fails with ``FederationDeniedError`` if this destination
             is not on our federation whitelist
         """
-
-        encoded_data = encode_canonical_json(data)
-
         response = yield self._request(
             destination,
             "POST",
             path,
             query_bytes=encode_query_args(args),
-            data=encoded_data,
+            json=data,
             headers_dict={"Content-Type": ["application/json"]},
             long_retries=long_retries,
             timeout=timeout,
@@ -429,9 +427,9 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield readBody(response)
+            body = yield treq.json_content(response)
 
-        defer.returnValue(json.loads(body))
+        defer.returnValue(body)
 
     @defer.inlineCallbacks
     def get_json(self, destination, path, args=None, retry_on_dns_fail=True,
@@ -481,9 +479,9 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield readBody(response)
+            body = yield treq.json_content(response)
 
-        defer.returnValue(json.loads(body))
+        defer.returnValue(body)
 
     @defer.inlineCallbacks
     def delete_json(self, destination, path, long_retries=False,
@@ -529,9 +527,9 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield readBody(response)
+            body = yield treq.json_content(response)
 
-        defer.returnValue(json.loads(body))
+        defer.returnValue(body)
 
     @defer.inlineCallbacks
     def get_file(self, destination, path, output_stream, args={},
@@ -568,16 +566,11 @@ class MatrixFederationHttpClient(object):
         query_bytes = urllib.parse.urlencode(encoded_args, True).encode('utf8')
         logger.debug("Query bytes: %s Retry DNS: %s", query_bytes, retry_on_dns_fail)
 
-        def body_callback(method, url_bytes, headers_dict):
-            self.sign_request(destination, method, url_bytes, headers_dict)
-            return None
-
         response = yield self._request(
             destination,
             "GET",
             path,
             query_bytes=query_bytes,
-            body_callback=body_callback,
             retry_on_dns_fail=retry_on_dns_fail,
             ignore_backoff=ignore_backoff,
         )
