@@ -108,7 +108,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def _request(self, destination, method, path,
-                 data=None, json=None, headers_dict={}, param_bytes=b"",
+                 data=None, json=None, json_data_callback=None, headers_dict={}, param_bytes=b"",
                  query_bytes=b"", retry_on_dns_fail=True,
                  timeout=None, long_retries=False,
                  ignore_backoff=False,
@@ -182,14 +182,17 @@ class MatrixFederationHttpClient(object):
 
             log_result = None
             try:
-                if json:
-                    data = encode_canonical_json(json)
-                    self.sign_request(destination, method, http_url, headers_dict, json)
-                else:
-                    self.sign_request(destination, method, http_url, headers_dict)
-
                 while True:
                     try:
+                        if json_callback:
+                            data = encode_canonical_json(json_data_callback())
+                            self.sign_request(destination, method, http_url, headers_dict, json)
+                        elif json:
+                            data = encode_canonical_json(json)
+                            self.sign_request(destination, method, http_url, headers_dict, json)
+                        else:
+                            self.sign_request(destination, method, http_url, headers_dict)
+
                         request_deferred = treq.request(
                             method,
                             url,
@@ -355,15 +358,13 @@ class MatrixFederationHttpClient(object):
         """
 
         if not json_data_callback:
-            json_data = data
-        else:
-            json_data = json_data_callback()
+            json_data_callback = lambda: data
 
         response = yield self._request(
             destination,
             "PUT",
             path,
-            json=json_data,
+            json_callback=json_data_callback,
             headers_dict={"Content-Type": ["application/json"]},
             query_bytes=encode_query_args(args),
             long_retries=long_retries,
