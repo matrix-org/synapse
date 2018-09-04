@@ -590,9 +590,9 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 pending_commands = LaterGauge(
     "synapse_replication_tcp_protocol_pending_commands",
     "",
-    ["name", "conn_id"],
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): len(p.pending_commands) for p in connected_connections
+        (p.name,): len(p.pending_commands) for p in connected_connections
     },
 )
 
