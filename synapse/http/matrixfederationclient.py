@@ -194,6 +194,7 @@ class MatrixFederationHttpClient(object):
                                 destination, method, http_url, headers_dict, json
                             )
                         else:
+                            data = None
                             self.sign_request(destination, method, http_url, headers_dict)
 
                         request_deferred = treq.request(
