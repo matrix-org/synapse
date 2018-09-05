@@ -116,7 +116,7 @@ class MatrixFederationHttpClient(object):
                  backoff_on_404=False):
         """
         Creates and sends a request to the given server.
-        
+
         Args:
             destination (str): The remote server to send the HTTP request to.
             method (str): HTTP method
