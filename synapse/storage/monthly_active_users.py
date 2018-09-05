@@ -192,14 +192,19 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         ))
 
     @defer.inlineCallbacks
-    def populate_monthly_active_users(self, user_id):
+    def populate_monthly_active_users(self, user_id, is_guest=False):
         """Checks on the state of monthly active user limits and optionally
         add the user to the monthly active tables
 
         Args:
             user_id(str): the user_id to query
         """
+
         if self.hs.config.limit_usage_by_mau:
+            # Guests should not be included as part of MAU group
+            if is_guest:
+                return
+
             is_trial = yield self.is_trial_user(user_id)
             if is_trial:
                 # we don't track trial users in the MAU table.
