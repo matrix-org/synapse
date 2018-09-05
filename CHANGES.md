@@ -1,3 +1,12 @@
+Synapse 0.33.2.1 (2018-09-06)
+=============================
+
+SECURITY FIXES
+--------------
+
+- Fix an issue where event signatures were not always correctly validated ([\#3796](https://github.com/matrix-org/synapse/issues/3796))
+- Fix an issue where server_acls could be circumvented for incoming events ([\#3796](https://github.com/matrix-org/synapse/issues/3796))
+
 Synapse 0.33.2 (2018-08-09)
 ===========================
 
