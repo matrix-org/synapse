@@ -165,8 +165,8 @@ class MatrixFederationHttpClient(object):
             query_bytes = b""
 
         headers_dict = {
-            "User-Agent": self.version_string,
-            "Host": destination,
+            "User-Agent": [self.version_string],
+            "Host": [destination],
         }
 
         with limiter:
