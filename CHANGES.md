@@ -1,3 +1,17 @@
+Synapse 0.33.3.1 (2018-09-06)
+=============================
+
+SECURITY FIXES
+--------------
+
+- Fix an issue where event signatures were not always correctly validated ([\#3796](https://github.com/matrix-org/synapse/issues/3796))
+- Fix an issue where server_acls could be circumvented for incoming events ([\#3796](https://github.com/matrix-org/synapse/issues/3796))
+
+Internal Changes
+----------------
+
+- Unignore synctl in .dockerignore to fix docker builds ([\#3802](https://github.com/matrix-org/synapse/issues/3802))
+
 Synapse 0.33.3 (2018-08-22)
 ===========================
 
