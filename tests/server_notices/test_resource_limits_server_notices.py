@@ -6,7 +6,7 @@ from synapse.api.constants import EventTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
 from synapse.handlers.auth import AuthHandler
 from synapse.server_notices.resource_limits_server_notices import (
-    ResourceLimitsServerNotices
+    ResourceLimitsServerNotices,
 )
 
 from tests import unittest
