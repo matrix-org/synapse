@@ -185,18 +185,20 @@ class TestMauLimit(unittest.TestCase):
         self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def create_user(self, localpart):
-        request_data = json.dumps({
-            "username": localpart,
-            "password": "monkey",
-            "auth": {"type": LoginType.DUMMY},
-        })
+        request_data = json.dumps(
+            {
+                "username": localpart,
+                "password": "monkey",
+                "auth": {"type": LoginType.DUMMY},
+            }
+        )
 
-        request, channel = make_request(b"POST", b"/register", request_data)
+        request, channel = make_request("POST", "/register", request_data)
         render(request, self.resource, self.reactor)
 
-        if channel.result["code"] != b"200":
+        if channel.code != 200:
             raise HttpResponseException(
-                int(channel.result["code"]),
+                channel.code,
                 channel.result["reason"],
                 channel.result["body"],
             ).to_synapse_error()
@@ -206,12 +208,12 @@ class TestMauLimit(unittest.TestCase):
         return access_token
 
     def do_sync_for_user(self, token):
-        request, channel = make_request(b"GET", b"/sync", access_token=token)
+        request, channel = make_request(
+            "GET", "/sync", access_token=token.encode('ascii')
+        )
         render(request, self.resource, self.reactor)
 
-        if channel.result["code"] != b"200":
+        if channel.code != 200:
             raise HttpResponseException(
-                int(channel.result["code"]),
-                channel.result["reason"],
-                channel.result["body"],
+                channel.code, channel.result["reason"], channel.result["body"]
             ).to_synapse_error()

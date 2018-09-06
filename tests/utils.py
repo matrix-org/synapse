@@ -100,8 +100,13 @@ class TestHomeServer(HomeServer):
 
 @defer.inlineCallbacks
 def setup_test_homeserver(
-    cleanup_func, name="test", datastore=None, config=None, reactor=None,
-    homeserverToUse=TestHomeServer, **kargs
+    cleanup_func,
+    name="test",
+    datastore=None,
+    config=None,
+    reactor=None,
+    homeserverToUse=TestHomeServer,
+    **kargs
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments

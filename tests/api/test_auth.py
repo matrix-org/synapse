@@ -471,6 +471,7 @@ class AuthTestCase(unittest.TestCase):
     def test_reserved_threepid(self):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 1
+        self.store.get_monthly_active_count = lambda: defer.succeed(2)
         threepid = {'medium': 'email', 'address': 'reserved@server.com'}
         unknown_threepid = {'medium': 'email', 'address': 'unreserved@server.com'}
         self.hs.config.mau_limits_reserved_threepids = [threepid]
