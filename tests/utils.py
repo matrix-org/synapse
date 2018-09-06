@@ -147,6 +147,7 @@ def setup_test_homeserver(
         config.hs_disabled_message = ""
         config.hs_disabled_limit_type = ""
         config.max_mau_value = 50
+        config.mau_trial_days = 0
         config.mau_limits_reserved_threepids = []
         config.admin_contact = None
         config.rc_messages_per_second = 10000
