@@ -198,9 +198,7 @@ class TestMauLimit(unittest.TestCase):
 
         if channel.code != 200:
             raise HttpResponseException(
-                channel.code,
-                channel.result["reason"],
-                channel.result["body"],
+                channel.code, channel.result["reason"], channel.result["body"]
             ).to_synapse_error()
 
         access_token = channel.json_body["access_token"]
