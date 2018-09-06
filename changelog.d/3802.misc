@@ -1,0 +1,1 @@
+Unignore synctl in .dockerignore to fix docker builds
