@@ -1,3 +1,19 @@
+Synapse 0.33.3.1 (2018-09-06)
+=============================
+
+SECURITY FIXES
+--------------
+
+- Fix an issue where event signatures were not always correctly validated ([\#3796](https://github.com/matrix-org/synapse/issues/3796))
+- Fix an issue where server_acls could be circumvented for incoming events ([\#3796](https://github.com/matrix-org/synapse/issues/3796))
+
+
+Internal Changes
+----------------
+
+- Unignore synctl in .dockerignore to fix docker builds ([\#3802](https://github.com/matrix-org/synapse/issues/3802))
+
+
 Synapse 0.33.4rc1 (2018-09-04)
 ==============================
 
@@ -23,7 +39,6 @@ Bugfixes
 - Don't return non-LL-member state in incremental sync state blocks ([\#3760](https://github.com/matrix-org/synapse/issues/3760))
 - Fix bug in sending presence over federation ([\#3768](https://github.com/matrix-org/synapse/issues/3768))
 - Fix bug where preserved threepid user comes to sign up and server is mau blocked ([\#3777](https://github.com/matrix-org/synapse/issues/3777))
-
 
 Internal Changes
 ----------------
