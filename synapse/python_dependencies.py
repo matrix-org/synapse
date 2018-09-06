@@ -42,8 +42,8 @@ REQUIREMENTS = {
     "Twisted>=17.1.0": ["twisted>=17.1.0"],
     "treq>=15.1": ["treq>=15.1"],
 
-    # We use crypto.get_elliptic_curve which is only supported in >=0.15
-    "pyopenssl>=0.15": ["OpenSSL>=0.15"],
+    # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
+    "pyopenssl>=16.0.0": ["OpenSSL>=16.0.0"],
 
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
