@@ -802,7 +802,7 @@ class FederationHandler(BaseHandler):
                     )
                     continue
                 except NotRetryingDestination as e:
-                    logger.info(e.args[0])
+                    logger.info(str(e))
                     continue
                 except FederationDeniedError as e:
                     logger.info(e)
