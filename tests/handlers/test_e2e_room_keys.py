@@ -14,17 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
-from synapse.api import errors
-from twisted.internet import defer
 import copy
+
+import mock
+
+from twisted.internet import defer
 
 import synapse.api.errors
 import synapse.handlers.e2e_room_keys
-
 import synapse.storage
-from tests import unittest, utils
+from synapse.api import errors
 
+from tests import unittest, utils
 
 # sample room_key data for use in the tests
 room_keys = {

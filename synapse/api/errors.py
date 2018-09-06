@@ -326,6 +326,7 @@ class RoomKeysVersionError(SynapseError):
         )
         self.current_version = current_version
 
+
 class IncompatibleRoomVersionError(SynapseError):
     """A server is trying to join a room whose version it does not support."""
 

@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-from synapse.api.errors import StoreError
 import simplejson as json
+
+from twisted.internet import defer
+
+from synapse.api.errors import StoreError
 
 from ._base import SQLBaseStore
 
@@ -58,7 +60,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="get_e2e_room_key",
         )
 
-        row["session_data"] = json.loads(row["session_data"]);
+        row["session_data"] = json.loads(row["session_data"])
 
         defer.returnValue(row)
 

@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError, SynapseError, RoomKeysVersionError
+from synapse.api.errors import RoomKeysVersionError, StoreError, SynapseError
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
