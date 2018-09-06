@@ -8,9 +8,6 @@ before_script:
   - git remote set-branches --add origin develop
   - git fetch origin develop
 
-services:
-  - postgresql
-
 matrix:
   fast_finish: true
   include:
@@ -25,6 +22,8 @@ matrix:
 
   - python: 2.7
     env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
+    services:
+      - postgresql
 
   - python: 3.6
     env: TOX_ENV=py36
