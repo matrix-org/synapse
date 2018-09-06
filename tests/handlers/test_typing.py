@@ -33,7 +33,7 @@ from ..utils import (
 )
 
 
-def _expect_edu(destination, edu_type, content, origin="test"):
+def _expect_edu_transaction(edu_type, content, origin="test"):
     return {
         "origin": origin,
         "origin_server_ts": 1000000,
@@ -42,8 +42,8 @@ def _expect_edu(destination, edu_type, content, origin="test"):
     }
 
 
-def _make_edu_json(origin, edu_type, content):
-    return json.dumps(_expect_edu("test", edu_type, content, origin=origin)).encode(
+def _make_edu_transaction_json(edu_type, content):
+    return json.dumps(_expect_edu_transaction(edu_type, content)).encode(
         'utf8'
     )
 
@@ -190,8 +190,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
             call(
                 "farm",
                 path="/_matrix/federation/v1/send/1000000/",
-                data=_expect_edu(
-                    "farm",
+                data=_expect_edu_transaction(
                     "m.typing",
                     content={
                         "room_id": self.room_id,
@@ -221,11 +220,10 @@ class TypingNotificationsTestCase(unittest.TestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        yield self.mock_federation_resource.trigger(
+        (code, response) = yield self.mock_federation_resource.trigger(
             "PUT",
             "/_matrix/federation/v1/send/1000000/",
-            _make_edu_json(
-                "farm",
+            _make_edu_transaction_json(
                 "m.typing",
                 content={
                     "room_id": self.room_id,
@@ -233,7 +231,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
                     "typing": True,
                 },
             ),
-            federation_auth=True,
+            federation_auth_origin=b'farm',
         )
 
         self.on_new_event.assert_has_calls(
@@ -264,8 +262,7 @@ class TypingNotificationsTestCase(unittest.TestCase):
             call(
                 "farm",
                 path="/_matrix/federation/v1/send/1000000/",
-                data=_expect_edu(
-                    "farm",
+                data=_expect_edu_transaction(
                     "m.typing",
                     content={
                         "room_id": self.room_id,
