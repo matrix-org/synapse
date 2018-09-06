@@ -1583,6 +1583,11 @@ class SyncHandler(object):
             user_id = sync_result_builder.sync_config.user.to_string()
             tags = yield self.store.get_tags_for_room(user_id, room_id)
 
+            # If there aren't any tags, don't send the empty tags list down
+            # sync
+            if not tags:
+                tags = None
+
         account_data_events = []
         if tags is not None:
             account_data_events.append({
