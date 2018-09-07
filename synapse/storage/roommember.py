@@ -98,7 +98,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             res = {}
             for r in txn:
                 summary = res.setdefault(to_ascii(r[1]), {})
-                summary['users'].append((to_ascii(r[0]), to_ascii(r[2])))
+                users = summary.setdefault('users', [])
+                users.append((to_ascii(r[0]), to_ascii(r[2])))
 
             sql = (
                 "SELECT count(*), m.membership FROM room_memberships as m"
@@ -112,7 +113,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (room_id,))
             for r in txn:
                 summary = res.setdefault(to_ascii(r[1]), {})
-                summary['count'] = r[0]
+                summary.set('count', r[0])
 
             return res
 
