@@ -113,7 +113,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (room_id,))
             for r in txn:
                 summary = res.setdefault(to_ascii(r[1]), {})
-                summary.set('count', r[0])
+                summary.put('count', r[0])
 
             return res
 
