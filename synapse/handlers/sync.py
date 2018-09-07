@@ -32,6 +32,7 @@ from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
+from synapse.storage.roommember import MemberSummary
 
 logger = logging.getLogger(__name__)
 
@@ -551,27 +552,28 @@ class SyncHandler(object):
         canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ''))
 
         summary = {}
+        empty_ms = MemberSummary([], 0)
 
         # TODO: only send these when they change.
         summary["m.joined_member_count"] = (
-            details.get(Membership.JOIN, ([], 0))[1]
+            details.get(Membership.JOIN, empty_ms).count
         )
         summary["m.invited_member_count"] = (
-            details.get(Membership.INVITE, ([], 0))[1]
+            details.get(Membership.INVITE, empty_ms).count
         )
 
         if name_id or canonical_alias_id:
             defer.returnValue(summary)
 
         joined_user_ids = [
-            r[0] for r in details.get(Membership.JOIN, ([], 0))[0]
+            r[0] for r in details.get(Membership.JOIN, empty_ms).members
         ]
         invited_user_ids = [
-            r[0] for r in details.get(Membership.INVITE, ([], 0))[0]
+            r[0] for r in details.get(Membership.INVITE, empty_ms).members
         ]
         gone_user_ids = (
-            [r[0] for r in details.get(Membership.LEAVE, ([], 0))[0]] +
-            [r[0] for r in details.get(Membership.BAN, ([], 0))[0]]
+            [r[0] for r in details.get(Membership.LEAVE, empty_ms).members] +
+            [r[0] for r in details.get(Membership.BAN, empty_ms).members]
         )
 
         # FIXME: only build up a member_ids list for our heroes

@@ -51,6 +51,12 @@ ProfileInfo = namedtuple(
     "ProfileInfo", ("avatar_url", "display_name")
 )
 
+# "members" points to a truncated list of (user_id, event_id) tuples for users of
+# a given membership type, suitable for use in calculating heroes for a room.
+# "count" points to the total numberr of users of a given membership type.
+MemberSummary = namedtuple(
+    "MemberSummary", ("members", "count")
+)
 
 _MEMBERSHIP_PROFILE_UPDATE_NAME = "room_membership_profile_update"
 
@@ -84,36 +90,49 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000, iterable=True)
     def get_room_summary(self, room_id):
+        """ Get the details of a room roughly suitable for use by the room
+        summary extension to /sync. Useful when lazy loading room members.
+        Args:
+            room_id (str): The room ID to query
+        Returns:
+            Deferred[dict[str, MemberSummary]:
+                dict of membership states, pointing to a MemberSummary named tuple.
+        """
+
         def f(txn):
+            # first get counts.
+            # We do this all in one transaction to keep the cache small.
+            # FIXME: get rid of this when we have room_stats
             sql = (
-                "SELECT m.user_id, m.membership, m.event_id FROM room_memberships as m"
+                "SELECT count(*), m.membership FROM room_memberships as m"
                 " INNER JOIN current_state_events as c"
-                " ON m.event_id = c.event_id "
-                " AND m.room_id = c.room_id "
+                " ON m.event_id = c.event_id"
+                " AND m.room_id = c.room_id"
+                " AND m.user_id = c.state_key"
+                " WHERE c.type = 'm.room.member' AND c.room_id = ?"
+                " GROUP BY m.membership"
+            )
+
+            txn.execute(sql, (room_id,))
+            res = {}
+            for r in txn:
+                summary = res.setdefault(to_ascii(r[1]), MemberSummary([], r[0]))
+
+            sql = (
+                "SELECT m.user_id, m.membership, m.event_id "
+                "FROM room_memberships as m"
+                " INNER JOIN current_state_events as c"
+                " ON m.event_id = c.event_id"
+                " AND m.room_id = c.room_id"
                 " AND m.user_id = c.state_key"
                 " WHERE c.type = 'm.room.member' AND c.room_id = ? limit ?"
             )
 
             txn.execute(sql, (room_id, 5))
-            res = {}
             for r in txn:
-                summary = res.setdefault(to_ascii(r[1]), {})
-                users = summary.setdefault('users', [])
-                users.append((to_ascii(r[0]), to_ascii(r[2])))
-
-            sql = (
-                "SELECT count(*), m.membership FROM room_memberships as m"
-                " INNER JOIN current_state_events as c"
-                " ON m.event_id = c.event_id "
-                " AND m.room_id = c.room_id "
-                " AND m.user_id = c.state_key"
-                " WHERE c.type = 'm.room.member' AND c.room_id = ? group by m.membership"
-            )
-
-            txn.execute(sql, (room_id,))
-            for r in txn:
-                summary = res.setdefault(to_ascii(r[1]), {})
-                summary['count'] = r[0]
+                summary = res.get(to_ascii(r[1]))
+                members = summary.members
+                members.append((to_ascii(r[0]), to_ascii(r[2])))
 
             return res
 
