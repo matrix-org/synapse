@@ -65,7 +65,7 @@ class FakeChannel(object):
     def getPeer(self):
         # We give an address so that getClientIP returns a non null entry,
         # causing us to record the MAU
-        return address.IPv4Address(b"TCP", "127.0.0.1", 3423)
+        return address.IPv4Address("TCP", "127.0.0.1", 3423)
 
     def getHost(self):
         return None

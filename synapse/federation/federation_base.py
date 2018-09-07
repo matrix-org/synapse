@@ -13,17 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from collections import namedtuple
 
 import six
 
 from twisted.internet import defer
+from twisted.internet.defer import DeferredList
 
-from synapse.api.constants import MAX_DEPTH
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
+from synapse.types import get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
 
 logger = logging.getLogger(__name__)
@@ -133,34 +136,25 @@ class FederationBase(object):
               * throws a SynapseError if the signature check failed.
             The deferreds run their callbacks in the sentinel logcontext.
         """
-
-        redacted_pdus = [
-            prune_event(pdu)
-            for pdu in pdus
-        ]
-
-        deferreds = self.keyring.verify_json_objects_for_server([
-            (p.origin, p.get_pdu_json())
-            for p in redacted_pdus
-        ])
+        deferreds = _check_sigs_on_pdus(self.keyring, pdus)
 
         ctx = logcontext.LoggingContext.current_context()
 
-        def callback(_, pdu, redacted):
+        def callback(_, pdu):
             with logcontext.PreserveLoggingContext(ctx):
                 if not check_event_content_hash(pdu):
                     logger.warn(
                         "Event content has been tampered, redacting %s: %s",
                         pdu.event_id, pdu.get_pdu_json()
                     )
-                    return redacted
+                    return prune_event(pdu)
 
                 if self.spam_checker.check_event_for_spam(pdu):
                     logger.warn(
                         "Event contains spam, redacting %s: %s",
                         pdu.event_id, pdu.get_pdu_json()
                     )
-                    return redacted
+                    return prune_event(pdu)
 
                 return pdu
 
@@ -173,14 +167,114 @@ class FederationBase(object):
                 )
             return failure
 
-        for deferred, pdu, redacted in zip(deferreds, pdus, redacted_pdus):
+        for deferred, pdu in zip(deferreds, pdus):
             deferred.addCallbacks(
                 callback, errback,
-                callbackArgs=[pdu, redacted],
+                callbackArgs=[pdu],
                 errbackArgs=[pdu],
             )
 
         return deferreds
+
+
+class PduToCheckSig(namedtuple("PduToCheckSig", [
+    "pdu", "redacted_pdu_json", "event_id_domain", "sender_domain", "deferreds",
+])):
+    pass
+
+
+def _check_sigs_on_pdus(keyring, pdus):
+    """Check that the given events are correctly signed
+
+    Args:
+        keyring (synapse.crypto.Keyring): keyring object to do the checks
+        pdus (Collection[EventBase]): the events to be checked
+
+    Returns:
+        List[Deferred]: a Deferred for each event in pdus, which will either succeed if
+           the signatures are valid, or fail (with a SynapseError) if not.
+    """
+
+    # (currently this is written assuming the v1 room structure; we'll probably want a
+    # separate function for checking v2 rooms)
+
+    # we want to check that the event is signed by:
+    #
+    # (a) the server which created the event_id
+    #
+    # (b) the sender's server.
+    #
+    #     - except in the case of invites created from a 3pid invite, which are exempt
+    #     from this check, because the sender has to match that of the original 3pid
+    #     invite, but the event may come from a different HS, for reasons that I don't
+    #     entirely grok (why do the senders have to match? and if they do, why doesn't the
+    #     joining server ask the inviting server to do the switcheroo with
+    #     exchange_third_party_invite?).
+    #
+    #     That's pretty awful, since redacting such an invite will render it invalid
+    #     (because it will then look like a regular invite without a valid signature),
+    #     and signatures are *supposed* to be valid whether or not an event has been
+    #     redacted. But this isn't the worst of the ways that 3pid invites are broken.
+    #
+    # let's start by getting the domain for each pdu, and flattening the event back
+    # to JSON.
+    pdus_to_check = [
+        PduToCheckSig(
+            pdu=p,
+            redacted_pdu_json=prune_event(p).get_pdu_json(),
+            event_id_domain=get_domain_from_id(p.event_id),
+            sender_domain=get_domain_from_id(p.sender),
+            deferreds=[],
+        )
+        for p in pdus
+    ]
+
+    # first make sure that the event is signed by the event_id's domain
+    deferreds = keyring.verify_json_objects_for_server([
+        (p.event_id_domain, p.redacted_pdu_json)
+        for p in pdus_to_check
+    ])
+
+    for p, d in zip(pdus_to_check, deferreds):
+        p.deferreds.append(d)
+
+    # now let's look for events where the sender's domain is different to the
+    # event id's domain (normally only the case for joins/leaves), and add additional
+    # checks.
+    pdus_to_check_sender = [
+        p for p in pdus_to_check
+        if p.sender_domain != p.event_id_domain and not _is_invite_via_3pid(p.pdu)
+    ]
+
+    more_deferreds = keyring.verify_json_objects_for_server([
+        (p.sender_domain, p.redacted_pdu_json)
+        for p in pdus_to_check_sender
+    ])
+
+    for p, d in zip(pdus_to_check_sender, more_deferreds):
+        p.deferreds.append(d)
+
+    # replace lists of deferreds with single Deferreds
+    return [_flatten_deferred_list(p.deferreds) for p in pdus_to_check]
+
+
+def _flatten_deferred_list(deferreds):
+    """Given a list of one or more deferreds, either return the single deferred, or
+    combine into a DeferredList.
+    """
+    if len(deferreds) > 1:
+        return DeferredList(deferreds, fireOnOneErrback=True, consumeErrors=True)
+    else:
+        assert len(deferreds) == 1
+        return deferreds[0]
+
+
+def _is_invite_via_3pid(event):
+    return (
+        event.type == EventTypes.Member
+        and event.membership == Membership.INVITE
+        and "third_party_invite" in event.content
+    )
 
 
 def event_from_pdu_json(pdu_json, outlier=False):

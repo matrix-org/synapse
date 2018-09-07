@@ -180,7 +180,7 @@ class StateTestCase(unittest.TestCase):
         graph = Graph(
             nodes={
                 "START": DictObj(
-                    type=EventTypes.Create, state_key="", content={}, depth=1,
+                    type=EventTypes.Create, state_key="", content={}, depth=1
                 ),
                 "A": DictObj(type=EventTypes.Message, depth=2),
                 "B": DictObj(type=EventTypes.Message, depth=3),
