@@ -46,7 +46,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
-            raise SynapseError(400, e.args[0])
+            raise SynapseError(400, str(e))
 
         requester = yield self.auth.get_user_by_req(request)
 
@@ -73,7 +73,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 content,
             )
         except InvalidRuleException as e:
-            raise SynapseError(400, e.args[0])
+            raise SynapseError(400, str(e))
 
         before = parse_string(request, "before")
         if before:
@@ -95,9 +95,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
             )
             self.notify_user(user_id)
         except InconsistentRuleException as e:
-            raise SynapseError(400, e.args[0])
+            raise SynapseError(400, str(e))
         except RuleNotFoundException as e:
-            raise SynapseError(400, e.args[0])
+            raise SynapseError(400, str(e))
 
         defer.returnValue((200, {}))
 

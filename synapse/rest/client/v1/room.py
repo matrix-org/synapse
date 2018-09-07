@@ -270,8 +270,6 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
                 room_identifier,
             ))
 
-        print(remote_room_hosts)
-
         yield self.room_member_handler.update_membership(
             requester=requester,
             target=requester.user,
