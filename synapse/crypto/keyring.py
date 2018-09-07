@@ -16,8 +16,9 @@
 
 import hashlib
 import logging
-import urllib
 from collections import namedtuple
+
+from six.moves import urllib
 
 from signedjson.key import (
     decode_verify_key_bytes,
@@ -432,7 +433,7 @@ class Keyring(object):
         # an incoming request.
         query_response = yield self.client.post_json(
             destination=perspective_name,
-            path=b"/_matrix/key/v2/query",
+            path="/_matrix/key/v2/query",
             data={
                 u"server_keys": {
                     server_name: {
@@ -513,8 +514,8 @@ class Keyring(object):
 
             (response, tls_certificate) = yield fetch_server_key(
                 server_name, self.hs.tls_client_options_factory,
-                path=(b"/_matrix/key/v2/server/%s" % (
-                    urllib.quote(requested_key_id),
+                path=("/_matrix/key/v2/server/%s" % (
+                    urllib.parse.quote(requested_key_id),
                 )).encode("ascii"),
             )
 
