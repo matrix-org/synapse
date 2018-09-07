@@ -82,6 +82,41 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return [to_ascii(r[0]) for r in txn]
         return self.runInteraction("get_users_in_room", f)
 
+    @cached(max_entries=100000, iterable=True)
+    def get_room_summary(self, room_id):
+        def f(txn):
+            sql = (
+                "SELECT m.user_id, m.membership, m.event_id FROM room_memberships as m"
+                " INNER JOIN current_state_events as c"
+                " ON m.event_id = c.event_id "
+                " AND m.room_id = c.room_id "
+                " AND m.user_id = c.state_key"
+                " WHERE c.type = 'm.room.member' AND c.room_id = ? limit ?"
+            )
+
+            txn.execute(sql, (room_id, 5))
+            res = {}
+            for r in txn:
+                summary = res.setdefault(to_ascii[r[1]], {})
+                summary['users'].append((to_ascii(r[0]), to_ascii(r[2])))
+
+            sql = (
+                "SELECT count(*) FROM room_memberships as m"
+                " INNER JOIN current_state_events as c"
+                " ON m.event_id = c.event_id "
+                " AND m.room_id = c.room_id "
+                " AND m.user_id = c.state_key"
+                " WHERE c.type = 'm.room.member' AND c.room_id = ? group by m.membership"
+            )
+
+            txn.execute(sql, (room_id, 5))
+            for r in txn:
+                summary['count'] = r[0]
+
+            return res
+
+        return self.runInteraction("get_room_summary", f)
+
     @cached()
     def get_invited_rooms_for_user(self, user_id):
         """ Get all the rooms the user is invited to

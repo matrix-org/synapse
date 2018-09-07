@@ -930,6 +930,10 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
                 )
 
                 self._invalidate_cache_and_stream(
+                    txn, self.get_room_summary, (room_id,)
+                )
+
+                self._invalidate_cache_and_stream(
                     txn, self.get_current_state_ids, (room_id,)
                 )
 

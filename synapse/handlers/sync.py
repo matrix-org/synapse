@@ -525,6 +525,8 @@ class SyncHandler(object):
              A deferred dict describing the room summary
         """
 
+        # FIXME: we could/should get this from room_stats when matthew/stats lands
+
         # FIXME: this promulgates https://github.com/matrix-org/synapse/issues/3305
         last_events, _ = yield self.store.get_recent_event_ids_for_room(
             room_id, end_token=now_token.room_key, limit=1,
@@ -537,44 +539,39 @@ class SyncHandler(object):
         last_event = last_events[-1]
         state_ids = yield self.store.get_state_ids_for_event(
             last_event.event_id, [
-                (EventTypes.Member, None),
                 (EventTypes.Name, ''),
                 (EventTypes.CanonicalAlias, ''),
             ]
         )
 
-        member_ids = {
-            state_key: event_id
-            for (t, state_key), event_id in state_ids.iteritems()
-            if t == EventTypes.Member
-        }
+        # this is heavily cached, thus: fast.
+        details = yield self.get_room_summary(room_id)
+
         name_id = state_ids.get((EventTypes.Name, ''))
         canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ''))
 
         summary = {}
 
-        # FIXME: it feels very heavy to load up every single membership event
-        # just to calculate the counts.
-        member_events = yield self.store.get_events(member_ids.values())
-
-        joined_user_ids = []
-        invited_user_ids = []
-
-        for ev in member_events.values():
-            if ev.content.get("membership") == Membership.JOIN:
-                joined_user_ids.append(ev.state_key)
-            elif ev.content.get("membership") == Membership.INVITE:
-                invited_user_ids.append(ev.state_key)
-
         # TODO: only send these when they change.
-        summary["m.joined_member_count"] = len(joined_user_ids)
-        summary["m.invited_member_count"] = len(invited_user_ids)
+        summary["m.joined_member_count"] = details.get(Membership.JOIN, {}).get('count', 0)
+        summary["m.invited_member_count"] = details.get(Membership.INVITE, {}).get('count', 0)
 
         if name_id or canonical_alias_id:
             defer.returnValue(summary)
 
-        # FIXME: order by stream ordering, not alphabetic
+        joined_user_ids = [r[0] for r in details.get(Membership.JOIN, {}).get('users', [])]
+        invited_user_ids = [r[0] for r in details.get(Membership.INVITE, {}).get('users', [])]
+        gone_user_ids = (
+            [r[0] for r in details.get(Membership.LEAVE, {}).get('users', [])] +
+            [r[0] for r in details.get(Membership.BAN, {}).get('users', [])]
+        )
 
+        member_ids = {}
+        for m in (Membership.JOIN, Membership.INVITE, Membership.LEAVE, Membership.BAN):
+            for r in details.get(m, {}).get('users', []):
+                member_ids[r[0]] = r[1]
+
+        # FIXME: order by stream ordering rather than as returned by SQL
         me = sync_config.user.to_string()
         if (joined_user_ids or invited_user_ids):
             summary['m.heroes'] = sorted(
@@ -586,7 +583,11 @@ class SyncHandler(object):
             )[0:5]
         else:
             summary['m.heroes'] = sorted(
-                [user_id for user_id in member_ids.keys() if user_id != me]
+                [
+                    user_id
+                    for user_id in gone_user_ids
+                    if user_id != me
+                ]
             )[0:5]
 
         if not sync_config.filter_collection.lazy_load_members():
@@ -1607,6 +1608,7 @@ class SyncHandler(object):
             sync_config.filter_collection.lazy_load_members() and
             (
                 any(ev.type == EventTypes.Member for ev in batch.events) or
+                (batch.limited and any(ev.type == EventTypes.Member for ev in batch.state)) or
                 since_token is None
             )
         ):
