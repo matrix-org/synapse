@@ -101,7 +101,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 summary['users'].append((to_ascii(r[0]), to_ascii(r[2])))
 
             sql = (
-                "SELECT count(*) FROM room_memberships as m"
+                "SELECT count(*), m.membership FROM room_memberships as m"
                 " INNER JOIN current_state_events as c"
                 " ON m.event_id = c.event_id "
                 " AND m.room_id = c.room_id "
@@ -111,9 +111,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             txn.execute(sql, (room_id,))
             for r in txn:
+                summary = res.setdefault(to_ascii(r[1]), {})
                 summary['count'] = r[0]
 
-            return summary
+            return res
 
         return self.runInteraction("get_room_summary", f)
 
