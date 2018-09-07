@@ -1,1 +1,0 @@
-Fix 'admin_uri' config variable and error parameter to be 'admin_contact' to match the spec.
