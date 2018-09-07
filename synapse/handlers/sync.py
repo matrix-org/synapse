@@ -1608,7 +1608,7 @@ class SyncHandler(object):
             sync_config.filter_collection.lazy_load_members() and
             (
                 any(ev.type == EventTypes.Member for ev in batch.events) or
-                (batch.limited and any(ev.type == EventTypes.Member for ev in batch.state)) or
+                (batch.limited and any(ev.type == EventTypes.Member for ev in state)) or
                 since_token is None
             )
         ):
