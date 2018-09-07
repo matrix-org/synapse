@@ -1,3 +1,12 @@
+Synapse 0.33.4 (2018-09-07)
+===========================
+
+Internal Changes
+----------------
+
+- Unignore synctl in .dockerignore to fix docker builds ([\#3802](https://github.com/matrix-org/synapse/issues/3802))
+
+
 Synapse 0.33.4rc2 (2018-09-06)
 ==============================
 
