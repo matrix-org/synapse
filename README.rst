@@ -742,6 +742,18 @@ so an example nginx configuration might look like::
       }
   }
 
+and an example apache configuration may look like::
+
+    <VirtualHost *:443>
+        SSLEngine on
+        ServerName matrix.example.com;
+
+        <Location /_matrix>
+            ProxyPass http://127.0.0.1:8008/_matrix nocanon
+            ProxyPassReverse http://127.0.0.1:8008/_matrix
+        </Location>
+    </VirtualHost>
+
 You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
 for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
 recorded correctly.
