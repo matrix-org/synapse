@@ -128,7 +128,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 " WHERE c.type = 'm.room.member' AND c.room_id = ? limit ?"
             )
 
-            txn.execute(sql, (room_id, 5))
+            # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
+            txn.execute(sql, (room_id, 6))
             for r in txn:
                 summary = res.get(to_ascii(r[1]))
                 members = summary.members
