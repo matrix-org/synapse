@@ -97,7 +97,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (room_id, 5))
             res = {}
             for r in txn:
-                summary = res.setdefault(to_ascii[r[1]], {})
+                summary = res.setdefault(to_ascii(r[1]), {})
                 summary['users'].append((to_ascii(r[0]), to_ascii(r[2])))
 
             sql = (
@@ -109,7 +109,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 " WHERE c.type = 'm.room.member' AND c.room_id = ? group by m.membership"
             )
 
-            txn.execute(sql, (room_id, 5))
+            txn.execute(sql, (room_id,))
             for r in txn:
                 summary['count'] = r[0]
 
