@@ -545,7 +545,7 @@ class SyncHandler(object):
         )
 
         # this is heavily cached, thus: fast.
-        details = yield self.get_room_summary(room_id)
+        details = yield self.store.get_room_summary(room_id)
 
         name_id = state_ids.get((EventTypes.Name, ''))
         canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ''))
