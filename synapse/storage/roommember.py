@@ -113,7 +113,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             for r in txn:
                 summary['count'] = r[0]
 
-            return res
+            return summary
 
         return self.runInteraction("get_room_summary", f)
 
