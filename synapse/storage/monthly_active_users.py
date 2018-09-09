@@ -199,8 +199,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Args:
             user_id(str): the user_id to query
         """
-
-        if self.hs.config.limit_usage_by_mau:
+        if self.hs.config.limit_usage_by_mau or self.hs.config.mau_stats_only:
             # Trial users and guests should not be included as part of MAU group
             is_guest = yield self.is_guest(user_id)
             if is_guest:
@@ -218,8 +217,12 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # but only update if we have not previously seen the user for
             # LAST_SEEN_GRANULARITY ms
             if last_seen_timestamp is None:
-                count = yield self.get_monthly_active_count()
-                if count < self.hs.config.max_mau_value:
+                # Optimize the db usage when not limiting usage
+                if not self.hs.config.limit_usage_by_mau:
                     yield self.upsert_monthly_active_user(user_id)
+                else:
+                    count = yield self.get_monthly_active_count()
+                    if count < self.hs.config.max_mau_value:
+                        yield self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 yield self.upsert_monthly_active_user(user_id)

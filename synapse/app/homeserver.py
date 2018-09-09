@@ -532,7 +532,7 @@ def run(hs):
     @defer.inlineCallbacks
     def generate_monthly_active_users():
         count = 0
-        if hs.config.limit_usage_by_mau:
+        if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
             count = yield hs.get_datastore().get_monthly_active_count()
         current_mau_gauge.set(float(count))
         max_mau_gauge.set(float(hs.config.max_mau_value))
@@ -541,7 +541,7 @@ def run(hs):
         hs.config.mau_limits_reserved_threepids
     )
     generate_monthly_active_users()
-    if hs.config.limit_usage_by_mau:
+    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
         clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
