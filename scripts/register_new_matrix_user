@@ -133,7 +133,7 @@ def register_new_user(user, password, server_location, shared_secret, admin):
             print "Passwords do not match"
             sys.exit(1)
 
-    if not admin:
+    if admin is None:
         admin = raw_input("Make admin [no]: ")
         if admin in ("y", "yes", "true"):
             admin = True
@@ -163,7 +163,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-a", "--admin",
         action="store_true",
-        help="Register new user as an admin. Will prompt if omitted.",
+        help="Register new user as an admin. Will prompt if --regular-user is not set.",
+    )
+    parser.add_argument(
+        "--regular-user",
+        action="store_true",
+        help="Register new user as a regular user.",
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
@@ -197,4 +202,10 @@ if __name__ == "__main__":
     else:
         secret = args.shared_secret
 
-    register_new_user(args.user, args.password, args.server_url, secret, args.admin)
+    if args.admin and args.regular_user:
+        print "Both --admin and --regular-user are set, choose either."
+        sys.exit(1)
+
+    admin = True if args.admin else False if args.regular_user else None
+
+    register_new_user(args.user, args.password, args.server_url, secret, admin)
