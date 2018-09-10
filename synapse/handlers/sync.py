@@ -763,8 +763,8 @@ class SyncHandler(object):
                     timeline_start=state_at_timeline_start,
                     previous=state_at_previous_sync,
                     current=current_state_ids,
-                    lazy_load_members=False,  # N.B. overridden to disable LL
-                )
+                    # we have to include LL members in case LL initial sync missed them
+                    lazy_load_members=lazy_load_members,
             else:
                 state_ids = {}
                 if lazy_load_members:
