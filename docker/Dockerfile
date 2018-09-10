@@ -26,8 +26,9 @@ RUN cd /synapse \
  && rm -rf \
         setup.cfg \
         setup.py \
-        synapse
-
+        synapse \
+ && apk del .nacl_deps
+ 
 VOLUME ["/data"]
 
 EXPOSE 8008/tcp 8448/tcp
