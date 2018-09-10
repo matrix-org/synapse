@@ -762,7 +762,7 @@ class SyncHandler(object):
                 state_ids = {}
                 if lazy_load_members:
                     if types:
-                        # We're returning an incremental sync, with no "gap" since
+                        # We're returning an incremental (or initial) sync, with no "gap" since
                         # the previous sync, so normally there would be no state to return
                         # But we're lazy-loading, so the client might need some more
                         # member events to understand the events in this timeline.
