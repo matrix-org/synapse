@@ -151,7 +151,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             _get_current_state_ids_txn,
         )
 
-    # FIXME: how should this be cached?
+    # FIXME: we should cache this if it turns out to be hit too often by /members
     def get_filtered_current_state_ids(self, room_id, types, filtered_types=None):
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
@@ -175,6 +175,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             # Turns out that postgres doesn't like doing a list of OR's and
             # is about 1000x slower, so we just issue a query for each specific
             # type seperately.
+            additional_args = ()
             if types:
                 clause_to_args = [
                     (
@@ -195,6 +196,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 # If types is None we fetch all the state, and so just use an
                 # empty where clause with no extra args.
                 clause_to_args = [("", [])]
+
             for where_clause, where_args in clause_to_args:
                 args = [room_id]
                 args.extend(where_args)
