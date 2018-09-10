@@ -765,6 +765,7 @@ class SyncHandler(object):
                     current=current_state_ids,
                     # we have to include LL members in case LL initial sync missed them
                     lazy_load_members=lazy_load_members,
+		)
             else:
                 state_ids = {}
                 if lazy_load_members:
