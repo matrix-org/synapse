@@ -126,12 +126,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                  AND m.room_id = c.room_id
                  AND m.user_id = c.state_key
                  WHERE c.type = 'm.room.member' AND c.room_id = ?
-                 ORDER BY (CASE m.membership WHEN '?' THEN 1 WHEN '?' THEN 2 ELSE 3) ASC
+                 ORDER BY CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC
                  LIMIT ?
             """
 
             # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
-            txn.execute(sql, (room_id, 6, Membership.JOIN, Membership.INVITE))
+            txn.execute(sql, (room_id, Membership.JOIN, Membership.INVITE, 6))
             for user_id, membership, event_id in txn:
                 summary = res[to_ascii(membership)]
                 # we will always have a summary for this membership type at this
