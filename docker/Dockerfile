@@ -1,5 +1,7 @@
 FROM docker.io/python:2-alpine3.8
 
+COPY . /synapse
+
 RUN apk add --no-cache --virtual .nacl_deps \
         build-base \
         libffi-dev \
@@ -9,12 +11,10 @@ RUN apk add --no-cache --virtual .nacl_deps \
         linux-headers \
         postgresql-dev \
         su-exec \
-        zlib-dev
-
-COPY . /synapse
-
+        zlib-dev \
+   
 # A wheel cache may be provided in ./cache for faster build
-RUN cd /synapse \
+ && cd /synapse \
  && pip install --upgrade \
         lxml \
         pip \
