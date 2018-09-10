@@ -88,7 +88,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return [to_ascii(r[0]) for r in txn]
         return self.runInteraction("get_users_in_room", f)
 
-    @cached(max_entries=100000, iterable=True)
+    @cached(max_entries=100000)
     def get_room_summary(self, room_id):
         """ Get the details of a room roughly suitable for use by the room
         summary extension to /sync. Useful when lazy loading room members.
@@ -99,45 +99,49 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 dict of membership states, pointing to a MemberSummary named tuple.
         """
 
-        def f(txn):
+        def _get_room_summary_txn(txn):
             # first get counts.
             # We do this all in one transaction to keep the cache small.
             # FIXME: get rid of this when we have room_stats
-            sql = (
-                "SELECT count(*), m.membership FROM room_memberships as m"
-                " INNER JOIN current_state_events as c"
-                " ON m.event_id = c.event_id"
-                " AND m.room_id = c.room_id"
-                " AND m.user_id = c.state_key"
-                " WHERE c.type = 'm.room.member' AND c.room_id = ?"
-                " GROUP BY m.membership"
-            )
+            sql = """
+                SELECT count(*), m.membership FROM room_memberships as m
+                 INNER JOIN current_state_events as c
+                 ON m.event_id = c.event_id
+                 AND m.room_id = c.room_id
+                 AND m.user_id = c.state_key
+                 WHERE c.type = 'm.room.member' AND c.room_id = ?
+                 GROUP BY m.membership
+            """
 
             txn.execute(sql, (room_id,))
             res = {}
-            for r in txn:
-                summary = res.setdefault(to_ascii(r[1]), MemberSummary([], r[0]))
+            for count, membership in txn:
+                summary = res.setdefault(to_ascii(membership), MemberSummary([], count))
 
-            sql = (
-                "SELECT m.user_id, m.membership, m.event_id "
-                "FROM room_memberships as m"
-                " INNER JOIN current_state_events as c"
-                " ON m.event_id = c.event_id"
-                " AND m.room_id = c.room_id"
-                " AND m.user_id = c.state_key"
-                " WHERE c.type = 'm.room.member' AND c.room_id = ? limit ?"
-            )
+            sql = """
+                SELECT m.user_id, m.membership, m.event_id
+                FROM room_memberships as m
+                 INNER JOIN current_state_events as c
+                 ON m.event_id = c.event_id
+                 AND m.room_id = c.room_id
+                 AND m.user_id = c.state_key
+                 WHERE c.type = 'm.room.member' AND c.room_id = ?
+                 ORDER BY (CASE m.membership WHEN '?' THEN 1 WHEN '?' THEN 2 ELSE 3) ASC
+                 LIMIT ?
+            """
 
             # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
-            txn.execute(sql, (room_id, 6))
-            for r in txn:
-                summary = res.get(to_ascii(r[1]))
+            txn.execute(sql, (room_id, 6, Membership.JOIN, Membership.INVITE))
+            for user_id, membership, event_id in txn:
+                summary = res[to_ascii(membership)]
+                # we will always have a summary for this membership type at this
+                # point given the summary currently contains the counts.
                 members = summary.members
-                members.append((to_ascii(r[0]), to_ascii(r[2])))
+                members.append((to_ascii(user_id), to_ascii(event_id)))
 
             return res
 
-        return self.runInteraction("get_room_summary", f)
+        return self.runInteraction("get_room_summary", _get_room_summary_txn)
 
     @cached()
     def get_invited_rooms_for_user(self, user_id):

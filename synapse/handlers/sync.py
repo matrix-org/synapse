@@ -578,14 +578,14 @@ class SyncHandler(object):
 
         # FIXME: only build up a member_ids list for our heroes
         member_ids = {}
-        for m in (
+        for membership in (
             Membership.JOIN,
             Membership.INVITE,
             Membership.LEAVE,
             Membership.BAN
         ):
-            for r in details.get(m, ([], 0))[0]:
-                member_ids[r[0]] = r[1]
+            for user_id, event_id in details.get(membership, empty_ms).members:
+                member_ids[user_id] = event_id
 
         # FIXME: order by stream ordering rather than as returned by SQL
         me = sync_config.user.to_string()
@@ -762,8 +762,9 @@ class SyncHandler(object):
                 state_ids = {}
                 if lazy_load_members:
                     if types:
-                        # We're returning an incremental (or initial) sync, with no "gap" since
-                        # the previous sync, so normally there would be no state to return
+                        # We're returning an incremental (or initial) sync, with no
+                        # "gap" since the previous sync, so normally there would be
+                        # no state to return.
                         # But we're lazy-loading, so the client might need some more
                         # member events to understand the events in this timeline.
                         # So we fish out all the member events corresponding to the
@@ -1633,15 +1634,23 @@ class SyncHandler(object):
         )
 
         summary = {}
+
+        # we include a summary in room responses when we're lazy loading
+        # members (as the client otherwise doesn't have enough info to form
+        # the name itself).
         if (
             sync_config.filter_collection.lazy_load_members() and
             (
+                # we recalulate the summary:
+                #   if there are membership changes in the timeline, or
+                #   if membership has changed during a gappy sync, or
+                #   if this is an initial sync.
                 any(ev.type == EventTypes.Member for ev in batch.events) or
                 (
                     # XXX: this may include false positives in the form of LL
                     # members which have snuck into state
                     batch.limited and
-                    any(t == EventTypes.Member for (t, k) in state.keys())
+                    any(t == EventTypes.Member for (t, k) in state)
                 ) or
                 since_token is None
             )
