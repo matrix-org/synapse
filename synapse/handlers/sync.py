@@ -736,10 +736,18 @@ class SyncHandler(object):
                     lazy_load_members=lazy_load_members,
                 )
             elif batch.limited:
+                state_at_timeline_start = yield self.store.get_state_ids_for_event(
+                    batch.events[0].event_id, types=types,
+                    filtered_types=filtered_types,
+                )
+
                 # for now, we disable LL for gappy syncs - see
                 # https://github.com/vector-im/riot-web/issues/7211#issuecomment-419976346
                 # N.B. this slows down incr syncs as we are now processing way
                 # more state in the server than if we were LLing.
+                #
+                # We still have to filter timeline_start to LL entries (above) in order
+                # for _calculate_state's LL logic to work.
                 types = None
                 filtered_types = None
 
@@ -753,10 +761,11 @@ class SyncHandler(object):
                     filtered_types=filtered_types,
                 )
 
-                state_at_timeline_start = yield self.store.get_state_ids_for_event(
-                    batch.events[0].event_id, types=types,
-                    filtered_types=filtered_types,
-                )
+                # pp = pprint.PrettyPrinter(indent=4)
+                # logger.info("timeline_contains: %s", pp.pformat(timeline_state))
+                # logger.info("timeline_start: %s", pp.pformat(state_at_timeline_start))
+                # logger.info("previous: %s", pp.pformat(state_at_previous_sync))
+                # logger.info("current: %s", pp.pformat(current_state_ids))
 
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
@@ -765,7 +774,9 @@ class SyncHandler(object):
                     current=current_state_ids,
                     # we have to include LL members in case LL initial sync missed them
                     lazy_load_members=lazy_load_members,
-		)
+                )
+
+                # logger.info("result: %s", pp.pformat(state_ids))
             else:
                 state_ids = {}
                 if lazy_load_members:
