@@ -766,12 +766,6 @@ class SyncHandler(object):
                     filtered_types=filtered_types,
                 )
 
-                # pp = pprint.PrettyPrinter(indent=4)
-                # logger.info("timeline_contains: %s", pp.pformat(timeline_state))
-                # logger.info("timeline_start: %s", pp.pformat(state_at_timeline_start))
-                # logger.info("previous: %s", pp.pformat(state_at_previous_sync))
-                # logger.info("current: %s", pp.pformat(current_state_ids))
-
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
                     timeline_start=state_at_timeline_start,
@@ -780,8 +774,6 @@ class SyncHandler(object):
                     # we have to include LL members in case LL initial sync missed them
                     lazy_load_members=lazy_load_members,
                 )
-
-                # logger.info("result: %s", pp.pformat(state_ids))
             else:
                 state_ids = {}
                 if lazy_load_members:
