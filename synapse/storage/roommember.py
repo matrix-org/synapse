@@ -118,6 +118,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             for count, membership in txn:
                 summary = res.setdefault(to_ascii(membership), MemberSummary([], count))
 
+            # we order by membership and then fairly arbitrarily by event_id so
+            # heroes are consistent
             sql = """
                 SELECT m.user_id, m.membership, m.event_id
                 FROM room_memberships as m
@@ -126,7 +128,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                  AND m.room_id = c.room_id
                  AND m.user_id = c.state_key
                  WHERE c.type = 'm.room.member' AND c.room_id = ?
-                 ORDER BY CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC
+                 ORDER BY
+                    CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
+                    m.event_id ASC
                  LIMIT ?
             """
 
