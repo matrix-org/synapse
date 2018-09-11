@@ -51,6 +51,12 @@ ProfileInfo = namedtuple(
     "ProfileInfo", ("avatar_url", "display_name")
 )
 
+# "members" points to a truncated list of (user_id, event_id) tuples for users of
+# a given membership type, suitable for use in calculating heroes for a room.
+# "count" points to the total numberr of users of a given membership type.
+MemberSummary = namedtuple(
+    "MemberSummary", ("members", "count")
+)
 
 _MEMBERSHIP_PROFILE_UPDATE_NAME = "room_membership_profile_update"
 
@@ -81,6 +87,65 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (room_id, Membership.JOIN,))
             return [to_ascii(r[0]) for r in txn]
         return self.runInteraction("get_users_in_room", f)
+
+    @cached(max_entries=100000)
+    def get_room_summary(self, room_id):
+        """ Get the details of a room roughly suitable for use by the room
+        summary extension to /sync. Useful when lazy loading room members.
+        Args:
+            room_id (str): The room ID to query
+        Returns:
+            Deferred[dict[str, MemberSummary]:
+                dict of membership states, pointing to a MemberSummary named tuple.
+        """
+
+        def _get_room_summary_txn(txn):
+            # first get counts.
+            # We do this all in one transaction to keep the cache small.
+            # FIXME: get rid of this when we have room_stats
+            sql = """
+                SELECT count(*), m.membership FROM room_memberships as m
+                 INNER JOIN current_state_events as c
+                 ON m.event_id = c.event_id
+                 AND m.room_id = c.room_id
+                 AND m.user_id = c.state_key
+                 WHERE c.type = 'm.room.member' AND c.room_id = ?
+                 GROUP BY m.membership
+            """
+
+            txn.execute(sql, (room_id,))
+            res = {}
+            for count, membership in txn:
+                summary = res.setdefault(to_ascii(membership), MemberSummary([], count))
+
+            # we order by membership and then fairly arbitrarily by event_id so
+            # heroes are consistent
+            sql = """
+                SELECT m.user_id, m.membership, m.event_id
+                FROM room_memberships as m
+                 INNER JOIN current_state_events as c
+                 ON m.event_id = c.event_id
+                 AND m.room_id = c.room_id
+                 AND m.user_id = c.state_key
+                 WHERE c.type = 'm.room.member' AND c.room_id = ?
+                 ORDER BY
+                    CASE m.membership WHEN ? THEN 1 WHEN ? THEN 2 ELSE 3 END ASC,
+                    m.event_id ASC
+                 LIMIT ?
+            """
+
+            # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
+            txn.execute(sql, (room_id, Membership.JOIN, Membership.INVITE, 6))
+            for user_id, membership, event_id in txn:
+                summary = res[to_ascii(membership)]
+                # we will always have a summary for this membership type at this
+                # point given the summary currently contains the counts.
+                members = summary.members
+                members.append((to_ascii(user_id), to_ascii(event_id)))
+
+            return res
+
+        return self.runInteraction("get_room_summary", _get_room_summary_txn)
 
     @cached()
     def get_invited_rooms_for_user(self, user_id):
