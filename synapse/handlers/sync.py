@@ -747,7 +747,12 @@ class SyncHandler(object):
                 # more state in the server than if we were LLing.
                 #
                 # We still have to filter timeline_start to LL entries (above) in order
-                # for _calculate_state's LL logic to work.
+                # for _calculate_state's LL logic to work, as we have to include LL
+                # members for timeline senders in case they weren't loaded in the initial
+                # sync.  We do this by (counterintuitively) by filtering timeline_start
+                # members to just be ones which were timeline senders, which then ensures
+                # all of the rest get included in the state block (if we need to know about
+                # them).
                 types = None
                 filtered_types = None
 
