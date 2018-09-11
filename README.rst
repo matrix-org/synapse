@@ -167,11 +167,6 @@ Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
-Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
-tested with VirtualBox/AWS/DigitalOcean - see 
-https://github.com/EMnify/matrix-synapse-auto-deploy
-for details.
-
 Configuring synapse
 -------------------
 
@@ -746,6 +741,18 @@ so an example nginx configuration might look like::
           proxy_set_header X-Forwarded-For $remote_addr;
       }
   }
+
+and an example apache configuration may look like::
+
+    <VirtualHost *:443>
+        SSLEngine on
+        ServerName matrix.example.com;
+
+        <Location /_matrix>
+            ProxyPass http://127.0.0.1:8008/_matrix nocanon
+            ProxyPassReverse http://127.0.0.1:8008/_matrix
+        </Location>
+    </VirtualHost>
 
 You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
 for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are

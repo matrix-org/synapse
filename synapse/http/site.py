@@ -204,14 +204,14 @@ class SynapseRequest(Request):
         self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(
-            self.start_time, name=servlet_name, method=self.method,
+            self.start_time, name=servlet_name, method=self.method.decode('ascii'),
         )
 
         self.site.access_logger.info(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),
             self.site.site_tag,
-            self.method,
+            self.method.decode('ascii'),
             self.get_redacted_uri()
         )
 

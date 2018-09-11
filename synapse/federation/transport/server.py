@@ -353,7 +353,7 @@ class FederationSendServlet(BaseFederationServlet):
 
         try:
             code, response = yield self.handler.on_incoming_transaction(
-                transaction_data
+                origin, transaction_data,
             )
         except Exception:
             logger.exception("on_incoming_transaction failed")

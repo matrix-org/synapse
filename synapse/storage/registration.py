@@ -26,6 +26,11 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 
 class RegistrationWorkerStore(SQLBaseStore):
+    def __init__(self, db_conn, hs):
+        super(RegistrationWorkerStore, self).__init__(db_conn, hs)
+
+        self.config = hs.config
+
     @cached()
     def get_user_by_id(self, user_id):
         return self._simple_select_one(
@@ -36,11 +41,32 @@ class RegistrationWorkerStore(SQLBaseStore):
             retcols=[
                 "name", "password_hash", "is_guest",
                 "consent_version", "consent_server_notice_sent",
-                "appservice_id",
+                "appservice_id", "creation_ts",
             ],
             allow_none=True,
             desc="get_user_by_id",
         )
+
+    @defer.inlineCallbacks
+    def is_trial_user(self, user_id):
+        """Checks if user is in the "trial" period, i.e. within the first
+        N days of registration defined by `mau_trial_days` config
+
+        Args:
+            user_id (str)
+
+        Returns:
+            Deferred[bool]
+        """
+
+        info = yield self.get_user_by_id(user_id)
+        if not info:
+            defer.returnValue(False)
+
+        now = self.clock.time_msec()
+        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
+        defer.returnValue(is_trial)
 
     @cached()
     def get_user_by_access_token(self, token):

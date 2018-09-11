@@ -37,10 +37,10 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
                 (
                     "INSERT INTO events ("
                     "   room_id, event_id, type, depth, topological_ordering,"
-                    "   content, processed, outlier) "
-                    "VALUES (?, ?, 'm.test', ?, ?, 'test', ?, ?)"
+                    "   content, processed, outlier, stream_ordering) "
+                    "VALUES (?, ?, 'm.test', ?, ?, 'test', ?, ?, ?)"
                 ),
-                (room_id, event_id, i, i, True, False),
+                (room_id, event_id, i, i, True, False, i),
             )
 
             txn.execute(

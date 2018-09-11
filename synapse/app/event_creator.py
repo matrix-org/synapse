@@ -90,10 +90,7 @@ class EventCreatorSlavedStore(
 
 
 class EventCreatorServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = EventCreatorSlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = EventCreatorSlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]

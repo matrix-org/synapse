@@ -74,10 +74,7 @@ class ClientReaderSlavedStore(
 
 
 class ClientReaderServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = ClientReaderSlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = ClientReaderSlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]

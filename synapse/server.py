@@ -19,6 +19,7 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+import abc
 import logging
 
 from twisted.enterprise import adbapi
@@ -81,7 +82,6 @@ from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStore
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -110,6 +110,8 @@ class HomeServer(object):
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
     """
+
+    __metaclass__ = abc.ABCMeta
 
     DEPENDENCIES = [
         'http_client',
@@ -172,6 +174,11 @@ class HomeServer(object):
         'room_context_handler',
     ]
 
+    # This is overridden in derived application classes
+    # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
+    # instantiated during setup() for future return by get_datastore()
+    DATASTORE_CLASS = abc.abstractproperty()
+
     def __init__(self, hostname, reactor=None, **kwargs):
         """
         Args:
@@ -188,13 +195,16 @@ class HomeServer(object):
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
 
+        self.datastore = None
+
         # Other kwargs are explicit dependencies
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = DataStore(self.get_db_conn(), self)
+        with self.get_db_conn() as conn:
+            self.datastore = self.DATASTORE_CLASS(conn, self)
         logger.info("Finished setting up.")
 
     def get_reactor(self):

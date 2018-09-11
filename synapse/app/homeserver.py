@@ -62,7 +62,7 @@ from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
-from synapse.storage import are_all_users_on_domain
+from synapse.storage import DataStore, are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
 from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
 from synapse.util.caches import CACHE_SIZE_FACTOR
@@ -111,6 +111,8 @@ def build_resource_for_web_client(hs):
 
 
 class SynapseHomeServer(HomeServer):
+    DATASTORE_CLASS = DataStore
+
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
         bind_addresses = listener_config["bind_addresses"]
@@ -356,13 +358,13 @@ def setup(config_options):
     logger.info("Preparing database: %s...", config.database_config['name'])
 
     try:
-        db_conn = hs.get_db_conn(run_new_connection=False)
-        prepare_database(db_conn, database_engine, config=config)
-        database_engine.on_new_connection(db_conn)
+        with hs.get_db_conn(run_new_connection=False) as db_conn:
+            prepare_database(db_conn, database_engine, config=config)
+            database_engine.on_new_connection(db_conn)
 
-        hs.run_startup_checks(db_conn, database_engine)
+            hs.run_startup_checks(db_conn, database_engine)
 
-        db_conn.commit()
+            db_conn.commit()
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"

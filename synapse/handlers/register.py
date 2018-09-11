@@ -125,6 +125,7 @@ class RegistrationHandler(BaseHandler):
         guest_access_token=None,
         make_guest=False,
         admin=False,
+        threepid=None,
     ):
         """Registers a new client on the server.
 
@@ -145,7 +146,7 @@ class RegistrationHandler(BaseHandler):
             RegistrationError if there was a problem registering.
         """
 
-        yield self.auth.check_auth_blocking()
+        yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:
             password_hash = yield self.auth_handler().hash(password)
