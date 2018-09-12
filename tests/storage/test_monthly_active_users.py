@@ -186,7 +186,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
 
     def test_get_reserved_real_user_account(self):
         # Test no reserved users, or reserved threepids
-        count = self.store.get_reserved_real_user_account()
+        count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), 0)
         # Test reserved users but no registered users
 
@@ -201,7 +201,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.hs.config.mau_limits_reserved_threepids = threepids
         self.store.initialise_reserved_users(threepids)
         self.pump()
-        count = self.store.get_reserved_real_user_account()
+        count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), 0)
 
         # Test reserved registed users
@@ -212,5 +212,5 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         now = int(self.hs.get_clock().time_msec())
         self.store.user_add_threepid(user1, "email", user1_email, now, now)
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
-        count = self.store.get_reserved_real_user_account()
+        count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), len(threepids))

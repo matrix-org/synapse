@@ -147,7 +147,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         return self.runInteraction("count_users", _count_users)
 
     @defer.inlineCallbacks
-    def get_reserved_real_user_account(self):
+    def get_registered_reserved_users_count(self):
         """Of the reserved threepids defined in config, how many are associated
         with registered users?
 
