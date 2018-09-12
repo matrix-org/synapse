@@ -280,7 +280,10 @@ class MatrixFederationHttpClient(object):
                 # :'(
                 # Update transactions table?
                 with logcontext.PreserveLoggingContext():
-                    body = yield treq.content(response)
+                    body = yield self._timeout_deferred(
+                        treq.content(response),
+                        timeout,
+                    )
                 raise HttpResponseException(
                     response.code, response.phrase, body
                 )
@@ -394,7 +397,10 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield treq.json_content(response)
+            body = yield self._timeout_deferred(
+                treq.json_content(response),
+                timeout,
+            )
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -444,7 +450,10 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield treq.json_content(response)
+            body = yield self._timeout_deferred(
+                treq.json_content(response),
+                timeout,
+            )
 
         defer.returnValue(body)
 
@@ -496,7 +505,10 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield treq.json_content(response)
+            body = yield self._timeout_deferred(
+                treq.json_content(response),
+                timeout,
+            )
 
         defer.returnValue(body)
 
@@ -543,7 +555,10 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield treq.json_content(response)
+            body = yield self._timeout_deferred(
+                treq.json_content(response),
+                timeout,
+            )
 
         defer.returnValue(body)
 
@@ -585,14 +600,37 @@ class MatrixFederationHttpClient(object):
 
         try:
             with logcontext.PreserveLoggingContext():
-                length = yield _readBodyToFile(
-                    response, output_stream, max_size
+                length = yield self._timeout_deferred(
+                    _readBodyToFile(
+                        response, output_stream, max_size
+                    ),
                 )
         except Exception:
             logger.exception("Failed to download body")
             raise
 
         defer.returnValue((length, headers))
+
+    def _timeout_deferred(self, deferred, timeout_ms=None):
+        """Times the deferred out after `timeout_ms` ms
+
+        Args:
+            deferred (Deferred)
+            timeout_ms (int|None): Timeout in milliseconds. If None defaults
+                to 60 seconds.
+
+        Returns:
+            Deferred
+        """
+
+        add_timeout_to_deferred(
+            deferred,
+            timeout_ms / 1000. if timeout_ms else 60,
+            self.hs.get_reactor(),
+            cancelled_to_request_timed_out_error,
+        )
+
+        return deferred
 
 
 class _ReadBodyToFileProtocol(protocol.Protocol):
