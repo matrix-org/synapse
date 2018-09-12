@@ -4,25 +4,24 @@ set -e
 
 # CircleCI doesn't give CIRCLE_PR_NUMBER in the environment for non-forked PRs. Wonderful.
 # In this case, we just need to do some ~shell magic~ to strip it out of the PULL_REQUEST URL.
-echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
+echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> "$BASH_ENV"
 source $BASH_ENV
 
-if [[ -n "${CIRCLE_PR_NUMBER}" ]]
+if [[ -z "${CIRCLE_PR_NUMBER}" ]]
 then
-    # Update PR refs for testing.
-    FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/head:pr/${CIRCLE_PR_NUMBER}/head"
-    FETCH_REFS="${FETCH_REFS} +refs/pull/${CIRCLE_PR_NUMBER}/merge:pr/${CIRCLE_PR_NUMBER}/merge"
-
-    # Retrieve the refs
-    git fetch -u origin ${FETCH_REFS}
-
-    # Checkout PR merge ref.
-    git checkout -qf "pr/${CIRCLE_PR_NUMBER}/merge"
-
-    # Test for merge conflicts.
-    git branch --merged | grep "pr/${CIRCLE_PR_NUMBER}/head" > /dev/null
-
+    echo "Can't figure out what the PR number is!"
+    exit 1
 fi
 
-# Log what we are
+# Get the reference, using the GitHub API
+GITBASE=`curl -q https://api.github.com/repos/matrix-org/synapse/pulls/${CIRCLE_PR_NUMBER} | jq -r '.base.ref'`
+
+# Show what we are before
+git show -s
+
+# Fetch and merge. If it doesn't work, it will raise due to set -e.
+git fetch -u origin $GITBASE
+git merge --no-edit origin/$GITBASE
+
+# Show what we are after.
 git show -s

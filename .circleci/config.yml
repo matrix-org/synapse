@@ -24,6 +24,10 @@ jobs:
           path: logs
   sytestpy2merged:
     machine: true
+    branches:
+      ignore:
+        - develop
+        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
@@ -34,8 +38,13 @@ jobs:
           destination: logs
       - store_test_results:
           path: logs
+
   sytestpy2postgresmerged:
     machine: true
+    branches:
+      ignore:
+        - develop
+        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
@@ -71,6 +80,10 @@ jobs:
           path: logs
   sytestpy3merged:
     machine: true
+    branches:
+      ignore:
+        - develop
+        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
@@ -83,6 +96,10 @@ jobs:
           path: logs
   sytestpy3postgresmerged:
     machine: true
+    branches:
+      ignore:
+        - develop
+        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
