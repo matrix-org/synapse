@@ -570,8 +570,15 @@ class SyncHandler(object):
         summary["m.joined_member_count"] = len(joined_user_ids)
         summary["m.invited_member_count"] = len(invited_user_ids)
 
-        if name_id or canonical_alias_id:
-            defer.returnValue(summary)
+        if name_id:
+            name = yield self.store.get_event(name_id)
+            if name.content:
+                defer.returnValue(summary)
+
+        if canonical_alias_id:
+            canonical_alias = yield self.store.get_event(canonical_alias_id)
+            if canonical_alias.content:
+                defer.returnValue(summary)
 
         # FIXME: order by stream ordering, not alphabetic
 
