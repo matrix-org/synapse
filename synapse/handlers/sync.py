@@ -1698,7 +1698,7 @@ class SyncHandler(object):
 
                 sync_result_builder.joined.append(room_sync)
 
-            if batch.limited:
+            if batch.limited and since_token:
                 user_id = sync_result_builder.sync_config.user.to_string()
                 logger.info(
                     "Incremental gappy sync of room %s for user %s with %d state events" % (
