@@ -101,8 +101,6 @@ workflows:
     jobs:
       - sytestpy2
       - sytestpy2postgres
-  build-merged:
-    jobs:
       - sytestpy2merged:
         filters:
           branches:
