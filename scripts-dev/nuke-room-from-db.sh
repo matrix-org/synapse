@@ -53,5 +53,6 @@ DELETE FROM public_room_list_stream WHERE room_id = '$ROOMID';
 DELETE FROM stream_ordering_to_exterm WHERE room_id = '$ROOMID';
 DELETE FROM event_auth WHERE room_id = '$ROOMID';
 DELETE FROM appservice_room_list WHERE room_id = '$ROOMID';
+DELETE FROM users_who_share_rooms WHERE room_id = '$ROOMID';
 VACUUM;
 EOF
