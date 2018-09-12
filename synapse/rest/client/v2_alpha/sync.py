@@ -89,7 +89,7 @@ class SyncRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        if "from" in request.args:
+        if b"from" in request.args:
             # /events used to use 'from', but /sync uses 'since'.
             # Lets be helpful and whine if we see a 'from'.
             raise SynapseError(

@@ -21,7 +21,7 @@ from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
 from .groups import GroupsConfig
-from .jwt import JWTConfig
+from .jwt_config import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
