@@ -19,6 +19,7 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+import abc
 import logging
 
 from twisted.enterprise import adbapi
@@ -56,7 +57,7 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
@@ -81,7 +82,6 @@ from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStore
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -110,6 +110,8 @@ class HomeServer(object):
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
     """
+
+    __metaclass__ = abc.ABCMeta
 
     DEPENDENCIES = [
         'http_client',
@@ -172,6 +174,11 @@ class HomeServer(object):
         'room_context_handler',
     ]
 
+    # This is overridden in derived application classes
+    # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
+    # instantiated during setup() for future return by get_datastore()
+    DATASTORE_CLASS = abc.abstractproperty()
+
     def __init__(self, hostname, reactor=None, **kwargs):
         """
         Args:
@@ -188,13 +195,16 @@ class HomeServer(object):
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
 
+        self.datastore = None
+
         # Other kwargs are explicit dependencies
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = DataStore(self.get_db_conn(), self)
+        with self.get_db_conn() as conn:
+            self.datastore = self.DATASTORE_CLASS(conn, self)
         logger.info("Finished setting up.")
 
     def get_reactor(self):
@@ -308,7 +318,10 @@ class HomeServer(object):
         return InitialSyncHandler(self)
 
     def build_profile_handler(self):
-        return ProfileHandler(self)
+        if self.config.worker_app:
+            return BaseProfileHandler(self)
+        else:
+            return MasterProfileHandler(self)
 
     def build_event_creation_handler(self):
         return EventCreationHandler(self)

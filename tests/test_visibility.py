@@ -21,7 +21,7 @@ from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
 
 import tests.unittest
-from tests.utils import setup_test_homeserver
+from tests.utils import create_room, setup_test_homeserver
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.store = self.hs.get_datastore()
+
+        yield create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM")
 
     @defer.inlineCallbacks
     def test_filtering(self):
@@ -94,7 +96,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         events_to_filter.append(evt)
 
         # the erasey user gets erased
-        self.hs.get_datastore().mark_user_erased("@erased:local_hs")
+        yield self.hs.get_datastore().mark_user_erased("@erased:local_hs")
 
         # ... and the filtering happens.
         filtered = yield filter_events_for_server(

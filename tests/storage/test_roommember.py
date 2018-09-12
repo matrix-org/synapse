@@ -22,7 +22,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.types import RoomID, UserID
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.utils import create_room, setup_test_homeserver
 
 
 class RoomMemberStoreTestCase(unittest.TestCase):
@@ -44,6 +44,8 @@ class RoomMemberStoreTestCase(unittest.TestCase):
         self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
         self.room = RoomID.from_string("!abc123:test")
+
+        yield create_room(hs, self.room.to_string(), self.u_alice.to_string())
 
     @defer.inlineCallbacks
     def inject_room_member(self, room, user, membership, replaces_state=None):

@@ -134,6 +134,7 @@ class KeyStore(SQLBaseStore):
         """
         key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
+        # XXX fix this to not need a lock (#3819)
         def _txn(txn):
             self._simple_upsert_txn(
                 txn,

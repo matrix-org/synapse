@@ -24,7 +24,7 @@ from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 
-from ._base import Cache, SQLBaseStore
+from ._base import Cache, SQLBaseStore, db_to_json
 
 logger = logging.getLogger(__name__)
 
@@ -411,7 +411,7 @@ class DeviceStore(SQLBaseStore):
                 if device is not None:
                     key_json = device.get("key_json", None)
                     if key_json:
-                        result["keys"] = json.loads(key_json)
+                        result["keys"] = db_to_json(key_json)
                     device_display_name = device.get("device_display_name", None)
                     if device_display_name:
                         result["device_display_name"] = device_display_name
@@ -466,7 +466,7 @@ class DeviceStore(SQLBaseStore):
             retcol="content",
             desc="_get_cached_user_device",
         )
-        defer.returnValue(json.loads(content))
+        defer.returnValue(db_to_json(content))
 
     @cachedInlineCallbacks()
     def _get_cached_devices_for_user(self, user_id):
@@ -479,7 +479,7 @@ class DeviceStore(SQLBaseStore):
             desc="_get_cached_devices_for_user",
         )
         defer.returnValue({
-            device["device_id"]: json.loads(device["content"])
+            device["device_id"]: db_to_json(device["content"])
             for device in devices
         })
 
@@ -511,7 +511,7 @@ class DeviceStore(SQLBaseStore):
 
                 key_json = device.get("key_json", None)
                 if key_json:
-                    result["keys"] = json.loads(key_json)
+                    result["keys"] = db_to_json(key_json)
                 device_display_name = device.get("device_display_name", None)
                 if device_display_name:
                     result["device_display_name"] = device_display_name

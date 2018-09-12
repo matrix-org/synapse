@@ -291,8 +291,9 @@ class FederationHandler(BaseHandler):
                             ev_ids, get_prev_content=False, check_redacted=False
                         )
 
+                    room_version = yield self.store.get_room_version(pdu.room_id)
                     state_map = yield resolve_events_with_factory(
-                        state_groups, {pdu.event_id: pdu}, fetch
+                        room_version, state_groups, {pdu.event_id: pdu}, fetch
                     )
 
                     state = (yield self.store.get_events(state_map.values())).values()
@@ -593,7 +594,7 @@ class FederationHandler(BaseHandler):
 
         required_auth = set(
             a_id
-            for event in events + state_events.values() + auth_events.values()
+            for event in events + list(state_events.values()) + list(auth_events.values())
             for a_id, _ in event.auth_events
         )
         auth_events.update({
@@ -801,7 +802,7 @@ class FederationHandler(BaseHandler):
                     )
                     continue
                 except NotRetryingDestination as e:
-                    logger.info(e.message)
+                    logger.info(str(e))
                     continue
                 except FederationDeniedError as e:
                     logger.info(e)
@@ -1357,7 +1358,7 @@ class FederationHandler(BaseHandler):
         )
 
         if state_groups:
-            _, state = state_groups.items().pop()
+            _, state = list(state_groups.items()).pop()
             results = state
 
             if event.is_state():
@@ -1828,7 +1829,10 @@ class FederationHandler(BaseHandler):
                     (d.type, d.state_key): d for d in different_events if d
                 })
 
-                new_state = self.state_handler.resolve_events(
+                room_version = yield self.store.get_room_version(event.room_id)
+
+                new_state = yield self.state_handler.resolve_events(
+                    room_version,
                     [list(local_view.values()), list(remote_view.values())],
                     event
                 )

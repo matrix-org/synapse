@@ -51,10 +51,7 @@ class AppserviceSlaveStore(
 
 
 class AppserviceServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = AppserviceSlaveStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = AppserviceSlaveStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]

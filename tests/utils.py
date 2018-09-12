@@ -24,12 +24,14 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 
+from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
+from synapse.config.server import ServerConfig
 from synapse.federation.transport import server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
-from synapse.storage import PostgresEngine
-from synapse.storage.engines import create_engine
+from synapse.storage import DataStore
+from synapse.storage.engines import PostgresEngine, create_engine
 from synapse.storage.prepare_database import (
     _get_or_create_schema_state,
     _setup_new_database,
@@ -40,6 +42,7 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
 USE_POSTGRES_FOR_TESTS = os.environ.get("SYNAPSE_POSTGRES", False)
+LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", "postgres")
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
@@ -91,10 +94,19 @@ def setupdb():
         atexit.register(_cleanup)
 
 
+class TestHomeServer(HomeServer):
+    DATASTORE_CLASS = DataStore
+
+
 @defer.inlineCallbacks
 def setup_test_homeserver(
-    cleanup_func, name="test", datastore=None, config=None, reactor=None,
-    homeserverToUse=HomeServer, **kargs
+    cleanup_func,
+    name="test",
+    datastore=None,
+    config=None,
+    reactor=None,
+    homeserverToUse=TestHomeServer,
+    **kargs
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -140,8 +152,11 @@ def setup_test_homeserver(
         config.hs_disabled_message = ""
         config.hs_disabled_limit_type = ""
         config.max_mau_value = 50
+        config.mau_trial_days = 0
         config.mau_limits_reserved_threepids = []
-        config.admin_uri = None
+        config.admin_contact = None
+        config.rc_messages_per_second = 10000
+        config.rc_message_burst_count = 10000
 
         # we need a sane default_room_version, otherwise attempts to create rooms will
         # fail.
@@ -150,6 +165,11 @@ def setup_test_homeserver(
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         config.update_user_directory = False
+
+        def is_threepid_reserved(threepid):
+            return ServerConfig.is_threepid_reserved(config, threepid)
+
+        config.is_threepid_reserved.side_effect = is_threepid_reserved
 
     config.use_frozen_dicts = True
     config.ldap_enabled = False
@@ -231,8 +251,9 @@ def setup_test_homeserver(
                 cur.close()
                 db_conn.close()
 
-            # Register the cleanup hook
-            cleanup_func(cleanup)
+            if not LEAVE_DB:
+                # Register the cleanup hook
+                cleanup_func(cleanup)
 
         hs.setup()
     else:
@@ -306,7 +327,9 @@ class MockHttpResource(HttpServer):
 
     @patch('twisted.web.http.Request')
     @defer.inlineCallbacks
-    def trigger(self, http_method, path, content, mock_request, federation_auth=False):
+    def trigger(
+        self, http_method, path, content, mock_request, federation_auth_origin=None
+    ):
         """ Fire an HTTP event.
 
         Args:
@@ -315,6 +338,7 @@ class MockHttpResource(HttpServer):
             content : The HTTP body
             mock_request : Mocked request to pass to the event so it can get
                            content.
+            federation_auth_origin (bytes|None): domain to authenticate as, for federation
         Returns:
             A tuple of (code, response)
         Raises:
@@ -335,8 +359,10 @@ class MockHttpResource(HttpServer):
         mock_request.getClientIP.return_value = "-"
 
         headers = {}
-        if federation_auth:
-            headers[b"Authorization"] = [b"X-Matrix origin=test,key=,sig="]
+        if federation_auth_origin is not None:
+            headers[b"Authorization"] = [
+                b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,)
+            ]
         mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
         # return the right path if the event requires it
@@ -539,3 +565,32 @@ class DeferredMockCallable(object):
                 "Expected not to received any calls, got:\n"
                 + "\n".join(["call(%s)" % _format_call(c[0], c[1]) for c in calls])
             )
+
+
+@defer.inlineCallbacks
+def create_room(hs, room_id, creator_id):
+    """Creates and persist a creation event for the given room
+
+    Args:
+        hs
+        room_id (str)
+        creator_id (str)
+    """
+
+    store = hs.get_datastore()
+    event_builder_factory = hs.get_event_builder_factory()
+    event_creation_handler = hs.get_event_creation_handler()
+
+    builder = event_builder_factory.new(
+        {
+            "type": EventTypes.Create,
+            "state_key": "",
+            "sender": creator_id,
+            "room_id": room_id,
+            "content": {},
+        }
+    )
+
+    event, context = yield event_creation_handler.create_new_client_event(builder)
+
+    yield store.persist_event(event, context)

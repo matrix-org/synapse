@@ -56,7 +56,7 @@ class Codes(object):
     SERVER_NOT_TRUSTED = "M_SERVER_NOT_TRUSTED"
     CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
     CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
-    RESOURCE_LIMIT_EXCEED = "M_RESOURCE_LIMIT_EXCEED"
+    RESOURCE_LIMIT_EXCEEDED = "M_RESOURCE_LIMIT_EXCEEDED"
     UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
 
@@ -238,11 +238,11 @@ class ResourceLimitError(SynapseError):
     """
     def __init__(
         self, code, msg,
-        errcode=Codes.RESOURCE_LIMIT_EXCEED,
-        admin_uri=None,
+        errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+        admin_contact=None,
         limit_type=None,
     ):
-        self.admin_uri = admin_uri
+        self.admin_contact = admin_contact
         self.limit_type = limit_type
         super(ResourceLimitError, self).__init__(code, msg, errcode=errcode)
 
@@ -250,7 +250,7 @@ class ResourceLimitError(SynapseError):
         return cs_error(
             self.msg,
             self.errcode,
-            admin_uri=self.admin_uri,
+            admin_contact=self.admin_contact,
             limit_type=self.limit_type
         )
 

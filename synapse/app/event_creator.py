@@ -45,6 +45,11 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.client.v1.profile import (
+    ProfileAvatarURLRestServlet,
+    ProfileDisplaynameRestServlet,
+    ProfileRestServlet,
+)
 from synapse.rest.client.v1.room import (
     JoinRoomAliasServlet,
     RoomMembershipRestServlet,
@@ -53,6 +58,7 @@ from synapse.rest.client.v1.room import (
 )
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
+from synapse.storage.user_directory import UserDirectoryStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
@@ -62,6 +68,9 @@ logger = logging.getLogger("synapse.app.event_creator")
 
 
 class EventCreatorSlavedStore(
+    # FIXME(#3714): We need to add UserDirectoryStore as we write directly
+    # rather than going via the correct worker.
+    UserDirectoryStore,
     DirectoryStore,
     SlavedTransactionStore,
     SlavedProfileStore,
@@ -81,10 +90,7 @@ class EventCreatorSlavedStore(
 
 
 class EventCreatorServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = EventCreatorSlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = EventCreatorSlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -101,6 +107,9 @@ class EventCreatorServer(HomeServer):
                     RoomMembershipRestServlet(self).register(resource)
                     RoomStateEventRestServlet(self).register(resource)
                     JoinRoomAliasServlet(self).register(resource)
+                    ProfileAvatarURLRestServlet(self).register(resource)
+                    ProfileDisplaynameRestServlet(self).register(resource)
+                    ProfileRestServlet(self).register(resource)
                     resources.update({
                         "/_matrix/client/r0": resource,
                         "/_matrix/client/unstable": resource,
