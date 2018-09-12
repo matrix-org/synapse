@@ -568,14 +568,14 @@ class SyncHandler(object):
         # haven't been "deleted" by blatting {} over the top.
         if name_id:
             name = yield self.store.get_event(name_id, allow_none=False)
-            if name.content:
+            if name and name.content:
                 defer.returnValue(summary)
 
         if canonical_alias_id:
             canonical_alias = yield self.store.get_event(
                 canonical_alias_id, allow_none=False,
             )
-            if canonical_alias.content:
+            if canonical_alias and canonical_alias.content:
                 defer.returnValue(summary)
 
         joined_user_ids = [
