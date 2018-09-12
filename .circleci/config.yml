@@ -104,15 +104,11 @@ workflows:
       - sytestpy2merged:
         filters:
           branches:
-            ignore:
-              - develop
-              - master
+            ignore: /develop|master/
       - sytestpy2postgresmerged:
         filters:
           branches:
-            ignore:
-              - develop
-              - master
+            ignore: /develop|master/
 # Currently broken while the Python 3 port is incomplete
 #      - sytestpy3
 #      - sytestpy3postgres
