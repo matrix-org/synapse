@@ -562,13 +562,19 @@ class SyncHandler(object):
             details.get(Membership.INVITE, empty_ms).count
         )
 
+        # if the room has a (non-deleted) name or canonical_alias, we can skip
+        # calculating heroes.  we assume that if the event has contents, it'll
+        # be a valid name or canonical_alias - i.e. we're checking that they
+        # haven't been deleted.
         if name_id:
-            name = yield self.store.get_event(name_id)
+            name = yield self.store.get_event(name_id, allow_none=False)
             if name.content:
                 defer.returnValue(summary)
 
         if canonical_alias_id:
-            canonical_alias = yield self.store.get_event(canonical_alias_id)
+            canonical_alias = yield self.store.get_event(
+                canonical_alias_id, allow_none=False,
+            )
             if canonical_alias.content:
                 defer.returnValue(summary)
 
