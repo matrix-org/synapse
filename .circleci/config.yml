@@ -24,10 +24,6 @@ jobs:
           path: logs
   sytestpy2merged:
     machine: true
-    branches:
-      ignore:
-        - develop
-        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
@@ -41,10 +37,6 @@ jobs:
 
   sytestpy2postgresmerged:
     machine: true
-    branches:
-      ignore:
-        - develop
-        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
@@ -80,10 +72,6 @@ jobs:
           path: logs
   sytestpy3merged:
     machine: true
-    branches:
-      ignore:
-        - develop
-        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
@@ -96,10 +84,6 @@ jobs:
           path: logs
   sytestpy3postgresmerged:
     machine: true
-    branches:
-      ignore:
-        - develop
-        - master
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
@@ -117,8 +101,20 @@ workflows:
     jobs:
       - sytestpy2
       - sytestpy2postgres
-      - sytestpy2merged
-      - sytestpy2postgresmerged
+  build-merged:
+    jobs:
+      - sytestpy2merged:
+        filters:
+          branches:
+            ignore:
+              - develop
+              - master
+      - sytestpy2postgresmerged:
+        filters:
+          branches:
+            ignore:
+              - develop
+              - master
 # Currently broken while the Python 3 port is incomplete
 #      - sytestpy3
 #      - sytestpy3postgres
