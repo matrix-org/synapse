@@ -90,8 +90,8 @@ class Authenticator(object):
     @defer.inlineCallbacks
     def authenticate_request(self, request, content):
         json_request = {
-            "method": request.method,
-            "uri": request.uri,
+            "method": request.method.decode('ascii'),
+            "uri": request.uri.decode('ascii'),
             "destination": self.server_name,
             "signatures": {},
         }
@@ -252,7 +252,7 @@ class BaseFederationServlet(object):
                     by the callback method. None if the request has already been handled.
             """
             content = None
-            if request.method in ["PUT", "POST"]:
+            if request.method in [b"PUT", b"POST"]:
                 # TODO: Handle other method types? other content types?
                 content = parse_json_object_from_request(request)
 
@@ -386,7 +386,7 @@ class FederationStateServlet(BaseFederationServlet):
         return self.handler.on_context_state_request(
             origin,
             context,
-            query.get("event_id", [None])[0],
+            parse_string_from_args(query, "event_id", None),
         )
 
 
@@ -397,7 +397,7 @@ class FederationStateIdsServlet(BaseFederationServlet):
         return self.handler.on_state_ids_request(
             origin,
             room_id,
-            query.get("event_id", [None])[0],
+            parse_string_from_args(query, "event_id", None),
         )
 
 
@@ -405,13 +405,11 @@ class FederationBackfillServlet(BaseFederationServlet):
     PATH = "/backfill/(?P<context>[^/]*)/"
 
     def on_GET(self, origin, content, query, context):
-        versions = query["v"]
-        limits = query["limit"]
+        versions = [x.decode('ascii') for x in query[b"v"]]
+        limit = parse_integer_from_args(query, "limit", None)
 
-        if not limits:
+        if not limit:
             return defer.succeed((400, {"error": "Did not include limit param"}))
-
-        limit = int(limits[-1])
 
         return self.handler.on_backfill_request(origin, context, versions, limit)
 
@@ -423,7 +421,7 @@ class FederationQueryServlet(BaseFederationServlet):
     def on_GET(self, origin, content, query, query_type):
         return self.handler.on_query_request(
             query_type,
-            {k: v[0].decode("utf-8") for k, v in query.items()}
+            {k.decode('utf8'): v[0].decode("utf-8") for k, v in query.items()}
         )
 
 
@@ -630,14 +628,14 @@ class OpenIdUserInfo(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
-        token = query.get("access_token", [None])[0]
+        token = query.get(b"access_token", [None])[0]
         if token is None:
             defer.returnValue((401, {
                 "errcode": "M_MISSING_TOKEN", "error": "Access Token required"
             }))
             return
 
-        user_id = yield self.handler.on_openid_userinfo(token)
+        user_id = yield self.handler.on_openid_userinfo(token.decode('ascii'))
 
         if user_id is None:
             defer.returnValue((401, {
