@@ -1930,15 +1930,22 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
         should_delete_params = ()
         if not delete_local_events:
             should_delete_expr += " AND event_id NOT LIKE ?"
-            should_delete_params += ("%:" + self.hs.hostname, )
+            should_delete_params += (
+                "%:" + self.hs.hostname,
+                "%:" + self.hs.hostname,
+            )
 
         should_delete_params += (room_id, token.topological)
 
+        # Note that we insert events that are outliers and aren't going to be
+        # deleted, as nothing will happen to them.
         txn.execute(
             "INSERT INTO events_to_purge"
             " SELECT event_id, %s"
             " FROM events AS e LEFT JOIN state_events USING (event_id)"
-            " WHERE e.room_id = ? AND topological_ordering < ?" % (
+            " WHERE (NOT outlier OR (%s)) AND e.room_id = ? AND topological_ordering < ?"
+            % (
+                should_delete_expr,
                 should_delete_expr,
             ),
             should_delete_params,
