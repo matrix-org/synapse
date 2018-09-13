@@ -91,6 +91,7 @@ class MatrixFederationHttpClient(object):
         self.server_name = hs.hostname
         reactor = hs.get_reactor()
         pool = HTTPConnectionPool(reactor)
+        pool.retryAutomatically = False
         pool.maxPersistentPerHost = 5
         pool.cachedConnectionTimeout = 2 * 60
         self.agent = Agent.usingEndpointFactory(
