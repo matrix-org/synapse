@@ -40,7 +40,6 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
-from synapse.http import cancelled_to_request_timed_out_error
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util import logcontext
 from synapse.util.logcontext import make_deferred_yieldable

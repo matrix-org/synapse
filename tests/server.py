@@ -6,7 +6,7 @@ from six import text_type
 import attr
 from zope.interface import implementer
 
-from twisted.internet import address, defer, threads, udp
+from twisted.internet import address, threads, udp
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address
 from twisted.internet.defer import Deferred
