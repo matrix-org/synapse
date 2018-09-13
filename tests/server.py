@@ -164,19 +164,29 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
     A MemoryReactorClock that supports callFromThread.
     """
+
     def __init__(self):
         self._udp = []
         self.lookups = {}
 
         class Resolver(object):
-            def resolveHostName(_self, resolutionReceiver, hostName, portNumber=0, addressTypes=None, transportSemantics='TCP'):
+            def resolveHostName(
+                _self,
+                resolutionReceiver,
+                hostName,
+                portNumber=0,
+                addressTypes=None,
+                transportSemantics='TCP',
+            ):
 
                 resolution = HostResolution(hostName)
                 resolutionReceiver.resolutionBegan(resolution)
                 if hostName not in self.lookups:
                     raise DNSLookupError("OH NO")
 
-                resolutionReceiver.addressResolved(IPv4Address('TCP', self.lookups[hostName], portNumber))
+                resolutionReceiver.addressResolved(
+                    IPv4Address('TCP', self.lookups[hostName], portNumber)
+                )
                 resolutionReceiver.resolutionComplete()
                 return resolution
 

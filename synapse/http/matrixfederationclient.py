@@ -43,7 +43,6 @@ from synapse.api.errors import (
 from synapse.http import cancelled_to_request_timed_out_error
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util import logcontext
-from synapse.util.async_helpers import add_timeout_to_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
@@ -102,6 +101,7 @@ class MatrixFederationHttpClient(object):
         self._store = hs.get_datastore()
         self.version_string = hs.version_string.encode('ascii')
         self._next_id = 1
+        self.default_timeout = 60
 
     def _create_url(self, destination, path_bytes, param_bytes, query_bytes):
         return urllib.parse.urlunparse(
@@ -148,7 +148,7 @@ class MatrixFederationHttpClient(object):
         if timeout:
             _sec_timeout = timeout / 1000
         else:
-            _sec_timeout = 60
+            _sec_timeout = self.default_timeout
 
         if (
             self.hs.config.federation_domain_whitelist is not None and
@@ -289,10 +289,9 @@ class MatrixFederationHttpClient(object):
                 # :'(
                 # Update transactions table?
                 with logcontext.PreserveLoggingContext():
-                    body = yield self._timeout_deferred(
-                        treq.content(response),
-                        timeout,
-                    )
+                    d = treq.content(response)
+                    d.addTimeout(_sec_timeout, self.hs.get_reactor())
+                    body = yield make_deferred_yieldable(d)
                 raise HttpResponseException(
                     response.code, response.phrase, body
                 )
@@ -406,10 +405,9 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield self._timeout_deferred(
-                treq.json_content(response),
-                timeout,
-            )
+            d = treq.json_content(response)
+            d.addTimeout(self.default_timeout, self.hs.get_reactor())
+            body = yield make_deferred_yieldable(d)
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -459,10 +457,14 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield self._timeout_deferred(
-                treq.json_content(response),
-                timeout,
-            )
+            d = treq.json_content(response)
+            if timeout:
+                _sec_timeout = timeout / 1000
+            else:
+                _sec_timeout = self.default_timeout
+
+            d.addTimeout(_sec_timeout, self.hs.get_reactor())
+            body = yield make_deferred_yieldable(d)
 
         defer.returnValue(body)
 
@@ -514,10 +516,9 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield self._timeout_deferred(
-                treq.json_content(response),
-                timeout,
-            )
+            d = treq.json_content(response)
+            d.addTimeout(self.default_timeout, self.hs.get_reactor())
+            body = yield make_deferred_yieldable(d)
 
         defer.returnValue(body)
 
@@ -564,10 +565,9 @@ class MatrixFederationHttpClient(object):
             check_content_type_is_json(response.headers)
 
         with logcontext.PreserveLoggingContext():
-            body = yield self._timeout_deferred(
-                treq.json_content(response),
-                timeout,
-            )
+            d = treq.json_content(response)
+            d.addTimeout(self.default_timeout, self.hs.get_reactor())
+            body = yield make_deferred_yieldable(d)
 
         defer.returnValue(body)
 
@@ -609,37 +609,14 @@ class MatrixFederationHttpClient(object):
 
         try:
             with logcontext.PreserveLoggingContext():
-                length = yield self._timeout_deferred(
-                    _readBodyToFile(
-                        response, output_stream, max_size
-                    ),
-                )
+                d = _readBodyToFile(response, output_stream, max_size)
+                d.addTimeout(self.default_timeout, self.hs.get_reactor())
+                length = yield make_deferred_yieldable(d)
         except Exception:
             logger.exception("Failed to download body")
             raise
 
         defer.returnValue((length, headers))
-
-    def _timeout_deferred(self, deferred, timeout_ms=None):
-        """Times the deferred out after `timeout_ms` ms
-
-        Args:
-            deferred (Deferred)
-            timeout_ms (int|None): Timeout in milliseconds. If None defaults
-                to 60 seconds.
-
-        Returns:
-            Deferred
-        """
-
-        add_timeout_to_deferred(
-            deferred,
-            timeout_ms / 1000. if timeout_ms else 60,
-            self.hs.get_reactor(),
-            cancelled_to_request_timed_out_error,
-        )
-
-        return deferred
 
 
 class _ReadBodyToFileProtocol(protocol.Protocol):
