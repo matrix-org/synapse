@@ -194,7 +194,6 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         super(ThreadedMemoryReactorClock, self).__init__()
 
     def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
-        print(port)
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
         p.startListening()
         self._udp.append(p)

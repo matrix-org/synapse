@@ -48,7 +48,8 @@ class FederationClientTests(HomeserverTestCase):
 
     def test_client_never_connect(self):
         """
-        If the HTTP request is not connected and is timed out, it'll give a ConnectingCancelledError.
+        If the HTTP request is not connected and is timed out, it'll give a
+        ConnectingCancelledError.
         """
         d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
 
@@ -74,7 +75,8 @@ class FederationClientTests(HomeserverTestCase):
 
     def test_client_connect_no_response(self):
         """
-        If the HTTP request is connected, but gets no response before being timed out, it'll give a ResponseNeverReceived.
+        If the HTTP request is connected, but gets no response before being
+        timed out, it'll give a ResponseNeverReceived.
         """
         d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
 
@@ -127,7 +129,8 @@ class FederationClientTests(HomeserverTestCase):
 
     def test_client_headers_no_body(self):
         """
-        If the HTTP request is connected, but gets no response before being timed out, it'll give a ResponseNeverReceived.
+        If the HTTP request is connected, but gets no response before being
+        timed out, it'll give a ResponseNeverReceived.
         """
         d = self.cl.post_json("testserv:8008", "foo/bar", timeout=10000)
 
@@ -143,7 +146,8 @@ class FederationClientTests(HomeserverTestCase):
 
         # Send it the HTTP response
         client.dataReceived(
-            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nServer: Fake\r\n\r\n"
+            (b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+             b"Server: Fake\r\n\r\n")
         )
 
         # Push by enough to time it out

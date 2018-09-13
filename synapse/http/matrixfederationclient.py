@@ -397,7 +397,7 @@ class MatrixFederationHttpClient(object):
             long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
-            backoff_on_404=backoff_on_404
+            backoff_on_404=backoff_on_404,
         )
 
         if 200 <= response.code < 300:
