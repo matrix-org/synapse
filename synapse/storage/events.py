@@ -1953,7 +1953,6 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
             " ON events_to_purge(event_id)",
         )
 
-
         txn.execute(
             "SELECT event_id, should_delete FROM events_to_purge"
         )
