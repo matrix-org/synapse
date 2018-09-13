@@ -221,7 +221,8 @@ class MatrixFederationHttpClient(object):
                         headers=Headers(headers_dict),
                         data=data,
                         agent=self.agent,
-                        reactor=self.hs.get_reactor()
+                        reactor=self.hs.get_reactor(),
+                        unbuffered=True
                     )
                     request_deferred.addTimeout(_sec_timeout, self.hs.get_reactor())
                     response = yield make_deferred_yieldable(
