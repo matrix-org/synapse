@@ -26,7 +26,7 @@ from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 
-from twisted.internet import defer, protocol, reactor
+from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
 from twisted.web._newclient import ResponseDone
 from twisted.web.client import Agent, HTTPConnectionPool
@@ -66,13 +66,14 @@ else:
 
 class MatrixFederationEndpointFactory(object):
     def __init__(self, hs):
+        self.reactor = hs.get_reactor()
         self.tls_client_options_factory = hs.tls_client_options_factory
 
     def endpointForURI(self, uri):
         destination = uri.netloc.decode('ascii')
 
         return matrix_federation_endpoint(
-            reactor, destination, timeout=10,
+            self.reactor, destination, timeout=10,
             tls_client_options_factory=self.tls_client_options_factory
         )
 
@@ -90,6 +91,7 @@ class MatrixFederationHttpClient(object):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+        reactor = hs.get_reactor()
         pool = HTTPConnectionPool(reactor)
         pool.maxPersistentPerHost = 5
         pool.cachedConnectionTimeout = 2 * 60
@@ -143,6 +145,11 @@ class MatrixFederationHttpClient(object):
             (May also fail with plenty of other Exceptions for things like DNS
                 failures, connection failures, SSL failures.)
         """
+        if timeout:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = 60
+
         if (
             self.hs.config.federation_domain_whitelist is not None and
             destination not in self.hs.config.federation_domain_whitelist
@@ -215,13 +222,9 @@ class MatrixFederationHttpClient(object):
                         headers=Headers(headers_dict),
                         data=data,
                         agent=self.agent,
+                        reactor=self.hs.get_reactor()
                     )
-                    add_timeout_to_deferred(
-                        request_deferred,
-                        timeout / 1000. if timeout else 60,
-                        self.hs.get_reactor(),
-                        cancelled_to_request_timed_out_error,
-                    )
+                    request_deferred.addTimeout(_sec_timeout, self.hs.get_reactor())
                     response = yield make_deferred_yieldable(
                         request_deferred,
                     )
@@ -260,6 +263,13 @@ class MatrixFederationHttpClient(object):
                             delay = 0.5 * 2 ** (MAX_SHORT_RETRIES - retries_left)
                             delay = min(delay, 2)
                             delay *= random.uniform(0.8, 1.4)
+
+                        logger.debug(
+                            "{%s} Waiting %s before sending to %s...",
+                            txn_id,
+                            delay,
+                            destination
+                        )
 
                         yield self.clock.sleep(delay)
                         retries_left -= 1
@@ -388,7 +398,7 @@ class MatrixFederationHttpClient(object):
             long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
-            backoff_on_404=backoff_on_404,
+            backoff_on_404=backoff_on_404
         )
 
         if 200 <= response.code < 300:
