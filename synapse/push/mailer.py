@@ -17,9 +17,10 @@ import email.mime.multipart
 import email.utils
 import logging
 import time
-import urllib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+from six.moves import urllib
 
 import bleach
 import jinja2
@@ -474,7 +475,7 @@ class Mailer(object):
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
             self.hs.config.public_baseurl,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
         )
 
 
@@ -561,7 +562,7 @@ def _create_mxc_to_http_filter(config):
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             config.public_baseurl,
             serverAndMediaId,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
             fragment or "",
         )
 
