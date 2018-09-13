@@ -153,7 +153,7 @@ class FederationBase(object):
                     # *actual* redacted copy to be on the safe side.)
                     redacted_event = prune_event(pdu)
                     if (
-                        set(six.iterkeys(redacted_event)) == set(six.iterkeys(pdu)) and
+                        set(redacted_event.keys()) == set(pdu.keys()) and
                         set(six.iterkeys(redacted_event.content))
                             == set(six.iterkeys(pdu.content))
                     ):

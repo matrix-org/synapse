@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import six
+
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -146,6 +148,9 @@ class EventBase(object):
 
     def items(self):
         return list(self._event_dict.items())
+
+    def keys(self):
+        return six.iterkeys(self._event_dict)
 
 
 class FrozenEvent(EventBase):
