@@ -19,6 +19,10 @@ GITBASE=`curl -q https://api.github.com/repos/matrix-org/synapse/pulls/${CIRCLE_
 # Show what we are before
 git show -s
 
+# Set up username so it can do a merge
+git config --global user.email bot@matrix.org
+git config --global user.name "A robot"
+
 # Fetch and merge. If it doesn't work, it will raise due to set -e.
 git fetch -u origin $GITBASE
 git merge --no-edit origin/$GITBASE
