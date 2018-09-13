@@ -348,7 +348,8 @@ class SimpleHttpClient(object):
 
         resp_headers = dict(response.headers.getAllRawHeaders())
 
-        if 'Content-Length' in resp_headers and resp_headers['Content-Length'] > max_size:
+        if (b'Content-Length' in resp_headers and
+                int(resp_headers[b'Content-Length']) > max_size):
             logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
                 502,
@@ -381,7 +382,12 @@ class SimpleHttpClient(object):
             )
 
         defer.returnValue(
-            (length, resp_headers, response.request.absoluteURI, response.code),
+            (
+                length,
+                resp_headers,
+                response.request.absoluteURI.decode('ascii'),
+                response.code,
+            ),
         )
 
 
@@ -466,9 +472,9 @@ class SpiderEndpointFactory(object):
     def endpointForURI(self, uri):
         logger.info("Getting endpoint for %s", uri.toBytes())
 
-        if uri.scheme == "http":
+        if uri.scheme == b"http":
             endpoint_factory = HostnameEndpoint
-        elif uri.scheme == "https":
+        elif uri.scheme == b"https":
             tlsCreator = self.policyForHTTPS.creatorForNetloc(uri.host, uri.port)
 
             def endpoint_factory(reactor, host, port, **kw):

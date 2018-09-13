@@ -15,6 +15,8 @@
 # limitations under the License.
 import logging
 
+import six
+
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -25,6 +27,9 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
 from . import push_rule_evaluator, push_tools
+
+if six.PY3:
+    long = int
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +101,7 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
-        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
+        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering or 0)
         yield self._process()
 
     @defer.inlineCallbacks
