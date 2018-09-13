@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, Codes
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
@@ -324,9 +324,15 @@ class RoomKeysVersionServlet(RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
-        info = yield self.e2e_room_keys_handler.get_version_info(
-            user_id, version
-        )
+        try:
+            info = yield self.e2e_room_keys_handler.get_version_info(
+                user_id, version
+            )
+        except SynapseError as e:
+            if e.code == 404:
+                e.errcode = Codes.NOT_FOUND
+                e.msg = "No backup found"
+                raise e
         defer.returnValue((200, info))
 
     @defer.inlineCallbacks
