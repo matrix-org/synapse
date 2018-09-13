@@ -4,7 +4,7 @@ set -e
 
 # CircleCI doesn't give CIRCLE_PR_NUMBER in the environment for non-forked PRs. Wonderful.
 # In this case, we just need to do some ~shell magic~ to strip it out of the PULL_REQUEST URL.
-echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> "$BASH_ENV"
+echo 'export CIRCLE_PR_NUMBER="${CIRCLE_PR_NUMBER:-${CIRCLE_PULL_REQUEST##*/}}"' >> $BASH_ENV
 source $BASH_ENV
 
 if [[ -z "${CIRCLE_PR_NUMBER}" ]]
