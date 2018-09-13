@@ -85,7 +85,7 @@ class SynapseRequest(Request):
         return "%s-%i" % (self.method, self.request_seq)
 
     def get_redacted_uri(self):
-        return redact_uri(self.uri)
+        return redact_uri(self.uri.decode('ascii'))
 
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
