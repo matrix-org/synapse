@@ -93,5 +93,10 @@ setup(
     zip_safe=False,
     long_description=long_description,
     scripts=["synctl"] + glob.glob("scripts/*"),
+    entry_points={
+        'console_scripts': [
+            'synapse=synapse.app.homeserver:main',
+        ],
+    },
     cmdclass={'test': TestCommand},
 )
