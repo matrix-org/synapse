@@ -100,8 +100,13 @@ class TestHomeServer(HomeServer):
 
 @defer.inlineCallbacks
 def setup_test_homeserver(
-    cleanup_func, name="test", datastore=None, config=None, reactor=None,
-    homeserverToUse=TestHomeServer, **kargs
+    cleanup_func,
+    name="test",
+    datastore=None,
+    config=None,
+    reactor=None,
+    homeserverToUse=TestHomeServer,
+    **kargs
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -147,6 +152,7 @@ def setup_test_homeserver(
         config.hs_disabled_message = ""
         config.hs_disabled_limit_type = ""
         config.max_mau_value = 50
+        config.mau_trial_days = 0
         config.mau_limits_reserved_threepids = []
         config.admin_contact = None
         config.rc_messages_per_second = 10000
@@ -322,8 +328,7 @@ class MockHttpResource(HttpServer):
     @patch('twisted.web.http.Request')
     @defer.inlineCallbacks
     def trigger(
-        self, http_method, path, content, mock_request,
-        federation_auth_origin=None,
+        self, http_method, path, content, mock_request, federation_auth_origin=None
     ):
         """ Fire an HTTP event.
 
@@ -356,7 +361,7 @@ class MockHttpResource(HttpServer):
         headers = {}
         if federation_auth_origin is not None:
             headers[b"Authorization"] = [
-                b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin, )
+                b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,)
             ]
         mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
 
@@ -576,16 +581,16 @@ def create_room(hs, room_id, creator_id):
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
 
-    builder = event_builder_factory.new({
-        "type": EventTypes.Create,
-        "state_key": "",
-        "sender": creator_id,
-        "room_id": room_id,
-        "content": {},
-    })
-
-    event, context = yield event_creation_handler.create_new_client_event(
-        builder
+    builder = event_builder_factory.new(
+        {
+            "type": EventTypes.Create,
+            "state_key": "",
+            "sender": creator_id,
+            "room_id": room_id,
+            "content": {},
+        }
     )
+
+    event, context = yield event_creation_handler.create_new_client_event(builder)
 
     yield store.persist_event(event, context)

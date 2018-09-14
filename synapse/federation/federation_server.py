@@ -838,9 +838,9 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
             )
 
         return self._send_edu(
-                edu_type=edu_type,
-                origin=origin,
-                content=content,
+            edu_type=edu_type,
+            origin=origin,
+            content=content,
         )
 
     def on_query(self, query_type, args):
@@ -851,6 +851,6 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
             return handler(args)
 
         return self._get_query_client(
-                query_type=query_type,
-                args=args,
+            query_type=query_type,
+            args=args,
         )

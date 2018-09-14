@@ -590,9 +590,9 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 pending_commands = LaterGauge(
     "synapse_replication_tcp_protocol_pending_commands",
     "",
-    ["name", "conn_id"],
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): len(p.pending_commands) for p in connected_connections
+        (p.name,): len(p.pending_commands) for p in connected_connections
     },
 )
 
@@ -607,9 +607,9 @@ def transport_buffer_size(protocol):
 transport_send_buffer = LaterGauge(
     "synapse_replication_tcp_protocol_transport_send_buffer",
     "",
-    ["name", "conn_id"],
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_buffer_size(p) for p in connected_connections
+        (p.name,): transport_buffer_size(p) for p in connected_connections
     },
 )
 
@@ -632,9 +632,9 @@ def transport_kernel_read_buffer_size(protocol, read=True):
 tcp_transport_kernel_send_buffer = LaterGauge(
     "synapse_replication_tcp_protocol_transport_kernel_send_buffer",
     "",
-    ["name", "conn_id"],
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_kernel_read_buffer_size(p, False)
+        (p.name,): transport_kernel_read_buffer_size(p, False)
         for p in connected_connections
     },
 )
@@ -643,9 +643,9 @@ tcp_transport_kernel_send_buffer = LaterGauge(
 tcp_transport_kernel_read_buffer = LaterGauge(
     "synapse_replication_tcp_protocol_transport_kernel_read_buffer",
     "",
-    ["name", "conn_id"],
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_kernel_read_buffer_size(p, True)
+        (p.name,): transport_kernel_read_buffer_size(p, True)
         for p in connected_connections
     },
 )
@@ -654,9 +654,9 @@ tcp_transport_kernel_read_buffer = LaterGauge(
 tcp_inbound_commands = LaterGauge(
     "synapse_replication_tcp_protocol_inbound_commands",
     "",
-    ["command", "name", "conn_id"],
+    ["command", "name"],
     lambda: {
-        (k[0], p.name, p.conn_id): count
+        (k[0], p.name,): count
         for p in connected_connections
         for k, count in iteritems(p.inbound_commands_counter)
     },
@@ -665,9 +665,9 @@ tcp_inbound_commands = LaterGauge(
 tcp_outbound_commands = LaterGauge(
     "synapse_replication_tcp_protocol_outbound_commands",
     "",
-    ["command", "name", "conn_id"],
+    ["command", "name"],
     lambda: {
-        (k[0], p.name, p.conn_id): count
+        (k[0], p.name,): count
         for p in connected_connections
         for k, count in iteritems(p.outbound_commands_counter)
     },

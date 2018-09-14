@@ -85,7 +85,10 @@ class SynapseRequest(Request):
         return "%s-%i" % (self.method, self.request_seq)
 
     def get_redacted_uri(self):
-        return redact_uri(self.uri)
+        uri = self.uri
+        if isinstance(uri, bytes):
+            uri = self.uri.decode('ascii')
+        return redact_uri(uri)
 
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
@@ -204,14 +207,14 @@ class SynapseRequest(Request):
         self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(
-            self.start_time, name=servlet_name, method=self.method,
+            self.start_time, name=servlet_name, method=self.method.decode('ascii'),
         )
 
         self.site.access_logger.info(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),
             self.site.site_tag,
-            self.method,
+            self.method.decode('ascii'),
             self.get_redacted_uri()
         )
 

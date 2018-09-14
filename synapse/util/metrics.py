@@ -20,6 +20,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
+from synapse.metrics import InFlightGauge
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,13 @@ block_db_txn_duration = Counter(
 # seconds spent waiting for a db connection, in this block
 block_db_sched_duration = Counter(
     "synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"])
+
+# Tracks the number of blocks currently active
+in_flight = InFlightGauge(
+    "synapse_util_metrics_block_in_flight", "",
+    labels=["block_name"],
+    sub_metrics=["real_time_max", "real_time_sum"],
+)
 
 
 def measure_func(name):
@@ -82,9 +90,13 @@ class Measure(object):
 
         self.start_usage = self.start_context.get_resource_usage()
 
+        in_flight.register((self.name,), self._update_in_flight)
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if isinstance(exc_type, Exception) or not self.start_context:
             return
+
+        in_flight.unregister((self.name,), self._update_in_flight)
 
         duration = self.clock.time() - self.start
 
@@ -120,3 +132,13 @@ class Measure(object):
 
         if self.created_context:
             self.start_context.__exit__(exc_type, exc_val, exc_tb)
+
+    def _update_in_flight(self, metrics):
+        """Gets called when processing in flight metrics
+        """
+        duration = self.clock.time() - self.start
+
+        metrics.real_time_max = max(metrics.real_time_max, duration)
+        metrics.real_time_sum += duration
+
+        # TODO: Add other in flight metrics.

@@ -1,0 +1,1 @@
+Only start postgres instance for postgres tests on Travis CI
