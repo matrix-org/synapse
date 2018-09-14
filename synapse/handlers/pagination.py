@@ -269,6 +269,7 @@ class PaginationHandler(object):
 
             if state_ids:
                 state = yield self.store.get_events(list(state_ids.values()))
+                state = state.values()
 
         time_now = self.clock.time_msec()
 
