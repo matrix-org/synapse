@@ -93,7 +93,7 @@ class SimpleHttpClient(object):
         outgoing_requests_counter.labels(method).inc()
 
         # log request but strip `access_token` (AS requests for example include this)
-        logger.info("Sending request %s %s", method, redact_uri(uri.encode('ascii')))
+        logger.info("Sending request %s %s", method, redact_uri(uri))
 
         try:
             request_deferred = treq.request(
@@ -108,14 +108,14 @@ class SimpleHttpClient(object):
             incoming_responses_counter.labels(method, response.code).inc()
             logger.info(
                 "Received response to  %s %s: %s",
-                method, redact_uri(uri.encode('ascii')), response.code
+                method, redact_uri(uri), response.code
             )
             defer.returnValue(response)
         except Exception as e:
             incoming_responses_counter.labels(method, "ERR").inc()
             logger.info(
                 "Error sending request to  %s %s: %s %s",
-                method, redact_uri(uri.encode('ascii')), type(e).__name__, e.args[0]
+                method, redact_uri(uri), type(e).__name__, e.args[0]
             )
             raise
 
