@@ -459,37 +459,8 @@ https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-
 
 Windows Install
 ---------------
-Synapse can be installed on Cygwin. It requires the following Cygwin packages:
 
-- gcc
-- git
-- libffi-devel
-- openssl (and openssl-devel, python-openssl)
-- python
-- python-setuptools
-
-The content repository requires additional packages and will be unable to process
-uploads without them:
-
-- libjpeg8
-- libjpeg8-devel
-- zlib
-
-If you choose to install Synapse without these packages, you will need to reinstall
-``pillow`` for changes to be applied, e.g. ``pip uninstall pillow`` ``pip install
-pillow --user``
-
-Troubleshooting:
-
-- You may need to upgrade ``setuptools`` to get this to work correctly:
-  ``pip install setuptools --upgrade``.
-- You may encounter errors indicating that ``ffi.h`` is missing, even with
-  ``libffi-devel`` installed. If you do, copy the ``.h`` files:
-  ``cp /usr/lib/libffi-3.0.13/include/*.h /usr/include``
-- You may need to install libsodium from source in order to install PyNacl. If
-  you do, you may need to create a symlink to ``libsodium.a`` so ``ld`` can find
-  it: ``ln -s /usr/local/lib/libsodium.a /usr/lib/libsodium.a``
-
+If you wish to run or develop Synapse on Windows, the Windows Subsystem For Linux provides a Linux environment on Windows 10 which is capable of using the Debian, Fedora, or source installation methods. More information about WSL can be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 .
 
 Troubleshooting
 ===============
