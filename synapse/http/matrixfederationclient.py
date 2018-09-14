@@ -42,6 +42,7 @@ from synapse.api.errors import (
 )
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util import logcontext
+from synapse.util.async_helpers import timeout_no_seriously
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
 
@@ -227,6 +228,16 @@ class MatrixFederationHttpClient(object):
                         unbuffered=True
                     )
                     request_deferred.addTimeout(_sec_timeout, self.hs.get_reactor())
+
+                    # Sometimes the timeout above doesn't work, so lets hack yet
+                    # another layer of timeouts in in the vain hope that at some
+                    # point the world made sense and this really really really
+                    # should work.
+                    request_deferred = timeout_no_seriously(
+                        request_deferred,
+                        timeout=_sec_timeout * 2,
+                        reactor=self.hs.get_reactor(),
+                    )
 
                     with Measure(self.clock, "outbound_request"):
                         response = yield make_deferred_yieldable(
