@@ -107,8 +107,6 @@ class InFlightGauge(object):
             will update.
     """
 
-    # TODO: Expand this to
-
     def __init__(self, name, desc, labels, sub_metrics):
         self.name = name
         self.desc = desc
