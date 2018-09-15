@@ -963,5 +963,13 @@ variable.  The default is 0.5, which can be decreased to reduce RAM usage
 in memory constrained enviroments, or increased if performance starts to
 degrade.
 
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall amount, and especially in terms of giving back RAM
+to the OS. To use it, the library must simply be put in the LD_PRELOAD
+environment variable when launching Synapse. On Debian, this can be done
+by installing the ``libjemalloc1`` package and adding this line to
+``/etc/default/matrix-synaspse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 .. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys
