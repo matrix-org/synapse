@@ -456,10 +456,11 @@ def timeout_no_seriously(deferred, timeout, reactor):
 
     def time_it_out():
         timed_out[0] = True
-        deferred.cancel()
 
         if not new_d.called:
             new_d.errback(DeferredTimeoutError(timeout, "Deferred"))
+
+        deferred.cancel()
 
     delayed_call = reactor.callLater(timeout, time_it_out)
 
