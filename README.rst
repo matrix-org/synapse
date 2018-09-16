@@ -657,7 +657,8 @@ Troubleshooting
 ---------------
 
 You can use the federation tester to check if your homeserver is all set:
-``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``
+raw json: ``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``
+GUI: ``https://neo.lain.haus/fed-tester#<your_server_name>``
 If any of the attributes under "checks" is false, federation won't work.
 
 The typical failure mode with federation is that when you try to join a room,
@@ -800,9 +801,9 @@ use a symbolic link to help make this process atomic.)
 
 The most common mistake when setting up federation is not to tell Synapse about
 your SSL certificate. To check it, you can visit
-``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``.
-Unfortunately, there is no UI for this yet, but, you should see
-``"MatchingTLSFingerprint": true``. If not, check that
+``https://neo.lain.haus/fed-tester#<your_server_name>``.
+You should see
+``"MatchingTLSFingerprint": true``. If not, use ``https://matrix.org/federationtester/api/report?server_name=<your_server_name>`` and check that
 ``Certificates[0].SHA256Fingerprint`` (the fingerprint of the certificate
 presented by your reverse-proxy) matches ``Keys.tls_fingerprints[0].sha256``
 (the fingerprint of the certificate Synapse is using).
