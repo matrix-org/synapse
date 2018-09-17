@@ -908,7 +908,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python2.7 env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs pip install
+    python -m synapse.python_dependencies | xargs pip install
     pip install lxml mock
 
 This will run a process of downloading and installing all the needed
