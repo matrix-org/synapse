@@ -244,7 +244,10 @@ class MatrixFederationHttpClient(object):
                             request_deferred,
                         )
 
-                    log_result = "%d %s" % (response.code, response.phrase,)
+                    log_result = "%d %s" % (
+                        response.code,
+                        response.phrase.decode('ascii', errors='replace'),
+                    )
                     break
                 except Exception as e:
                     if not retry_on_dns_fail and isinstance(e, DNSLookupError):
