@@ -458,7 +458,7 @@ def run(hs):
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
         version = sys.version_info
-        stats["python_version"] = (version.major) + (version.minor / 10) + (version.micro / 100)
+        stats["python_version"] = "{}.{}.{}".format(version.major, version.minor, version.micro)
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
