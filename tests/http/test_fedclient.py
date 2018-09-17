@@ -19,7 +19,10 @@ from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.web.client import ResponseNeverReceived
 
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.http.matrixfederationclient import (
+    MatrixFederationHttpClient,
+    MatrixFederationRequest,
+)
 
 from tests.unittest import HomeserverTestCase
 
@@ -40,7 +43,7 @@ class FederationClientTests(HomeserverTestCase):
         """
         If the DNS raising returns an error, it will bubble up.
         """
-        d = self.cl._request("testserv2:8008", "GET", "foo/bar", timeout=10000)
+        d = self.cl.get_json("testserv2:8008", "foo/bar", timeout=10000)
         self.pump()
 
         f = self.failureResultOf(d)
@@ -51,7 +54,7 @@ class FederationClientTests(HomeserverTestCase):
         If the HTTP request is not connected and is timed out, it'll give a
         ConnectingCancelledError.
         """
-        d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
+        d = self.cl.get_json("testserv:8008", "foo/bar", timeout=10000)
 
         self.pump()
 
@@ -78,7 +81,7 @@ class FederationClientTests(HomeserverTestCase):
         If the HTTP request is connected, but gets no response before being
         timed out, it'll give a ResponseNeverReceived.
         """
-        d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
+        d = self.cl.get_json("testserv:8008", "foo/bar", timeout=10000)
 
         self.pump()
 
@@ -108,7 +111,12 @@ class FederationClientTests(HomeserverTestCase):
         """
         Once the client gets the headers, _request returns successfully.
         """
-        d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
+        request = MatrixFederationRequest(
+            method="GET",
+            destination="testserv:8008",
+            path="foo/bar",
+        )
+        d = self.cl._send_request(request, timeout=10000)
 
         self.pump()
 
