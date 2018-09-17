@@ -71,7 +71,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
-from synapse.util.\\\\string import get_version_string
+from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
 
