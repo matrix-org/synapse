@@ -333,7 +333,7 @@ class DirectoryHandler(BaseHandler):
     def _user_can_delete_alias(self, alias, user_id):
         creator = yield self.store.get_room_alias_creator(alias.to_string())
 
-        if creator == user_id:
+        if creator is not None and creator == user_id:
             defer.returnValue(True)
 
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
