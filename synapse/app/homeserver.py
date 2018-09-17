@@ -71,7 +71,7 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.rlimit import change_resource_limit
-from synapse.util.versionstring import get_version_string
+from synapse.util.\\\\string import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -458,7 +458,9 @@ def run(hs):
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
         version = sys.version_info
-        stats["python_version"] = "{}.{}.{}".format(version.major, version.minor, version.micro)
+        stats["python_version"] = "{}.{}.{}".format(
+            version.major, version.minor, version.micro
+        )
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
