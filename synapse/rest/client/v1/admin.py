@@ -44,6 +44,7 @@ else:
     def compare_digest(a, b):
         return a == b
 
+
 class UsersRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/admin/users/(?P<user_id>[^/]*)")
 
