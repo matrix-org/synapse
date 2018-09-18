@@ -968,7 +968,7 @@ improvement in overall amount, and especially in terms of giving back RAM
 to the OS. To use it, the library must simply be put in the LD_PRELOAD
 environment variable when launching Synapse. On Debian, this can be done
 by installing the ``libjemalloc1`` package and adding this line to
-``/etc/default/matrix-synaspse``::
+``/etc/default/matrix-synapse``::
 
     LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
