@@ -1,0 +1,1 @@
+Fix incorrect server-name indication for outgoing federation requests
