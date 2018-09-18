@@ -72,10 +72,7 @@ class FederationReaderSlavedStore(
 
 
 class FederationReaderServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = FederationReaderSlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = FederationReaderSlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]

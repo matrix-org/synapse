@@ -59,7 +59,7 @@ class PushersRestServlet(ClientV1RestServlet):
         ]
 
         for p in pushers:
-            for k, v in p.items():
+            for k, v in list(p.items()):
                 if k not in allowed_keys:
                     del p[k]
 
@@ -126,7 +126,7 @@ class PushersSetRestServlet(ClientV1RestServlet):
                 profile_tag=content.get('profile_tag', ""),
             )
         except PusherConfigException as pce:
-            raise SynapseError(400, "Config Error: " + pce.message,
+            raise SynapseError(400, "Config Error: " + str(pce),
                                errcode=Codes.MISSING_PARAM)
 
         self.notifier.on_new_replication_data()

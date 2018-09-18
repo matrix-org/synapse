@@ -167,11 +167,6 @@ Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
-Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
-tested with VirtualBox/AWS/DigitalOcean - see 
-https://github.com/EMnify/matrix-synapse-auto-deploy
-for details.
-
 Configuring synapse
 -------------------
 
@@ -747,6 +742,18 @@ so an example nginx configuration might look like::
       }
   }
 
+and an example apache configuration may look like::
+
+    <VirtualHost *:443>
+        SSLEngine on
+        ServerName matrix.example.com;
+
+        <Location /_matrix>
+            ProxyPass http://127.0.0.1:8008/_matrix nocanon
+            ProxyPassReverse http://127.0.0.1:8008/_matrix
+        </Location>
+    </VirtualHost>
+
 You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
 for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
 recorded correctly.
@@ -901,7 +908,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python2.7 env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs pip install
+    python -m synapse.python_dependencies | xargs pip install
     pip install lxml mock
 
 This will run a process of downloading and installing all the needed
@@ -956,5 +963,13 @@ variable.  The default is 0.5, which can be decreased to reduce RAM usage
 in memory constrained enviroments, or increased if performance starts to
 degrade.
 
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall amount, and especially in terms of giving back RAM
+to the OS. To use it, the library must simply be put in the LD_PRELOAD
+environment variable when launching Synapse. On Debian, this can be done
+by installing the ``libjemalloc1`` package and adding this line to
+``/etc/default/matrix-synapse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 .. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys
