@@ -308,7 +308,7 @@ class XForwardedForRequest(SynapseRequest):
             C{b"-"}.
         """
         return self.requestHeaders.getRawHeaders(
-            b"x-forwarded-for", [b"-"])[0].split(b",")[0].strip()
+            b"x-forwarded-for", [b"-"])[0].split(b",")[0].strip().decode('ascii')
 
 
 class SynapseRequestFactory(object):
