@@ -17,6 +17,7 @@ import cgi
 import logging
 import random
 import sys
+from io import BytesIO
 
 from six import PY3, string_types
 from six.moves import urllib
@@ -29,8 +30,9 @@ from signedjson.sign import sign_json
 
 from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
+from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool
+from twisted.web.client import Agent, FileBodyProducer, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
@@ -185,6 +187,11 @@ class MatrixFederationHttpClient(object):
         self.version_string = hs.version_string.encode('ascii')
         self.default_timeout = 60
 
+        def schedule(x):
+            reactor.callLater(_EPSILON, x)
+
+        self._cooperator = Cooperator(scheduler=schedule)
+
     @defer.inlineCallbacks
     def _send_request(
         self,
@@ -292,11 +299,19 @@ class MatrixFederationHttpClient(object):
                         request.txn_id, destination, method, url
                     )
 
+                    if data:
+                        producer = FileBodyProducer(
+                            BytesIO(data),
+                            cooperator=self._cooperator
+                        )
+                    else:
+                        producer = None
+
                     request_deferred = treq.request(
                         method,
                         url,
                         headers=Headers(headers_dict),
-                        data=data,
+                        data=producer,
                         agent=self.agent,
                         reactor=self.hs.get_reactor(),
                         unbuffered=True

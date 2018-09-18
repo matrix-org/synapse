@@ -280,3 +280,65 @@ def get_clock():
     clock = ThreadedMemoryReactorClock()
     hs_clock = Clock(clock)
     return (clock, hs_clock)
+
+
+@attr.s
+class FakeTransport(object):
+
+    other = attr.ib()
+    _reactor = attr.ib()
+    disconnecting = False
+    buffer = attr.ib(default=b'')
+
+    def getPeer(self):
+        return None
+
+    def getHost(self):
+        return None
+
+    def loseConnection(self):
+        self.disconnecting = True
+        self.unregisterProducer()
+
+    def abortConnection(self):
+        self.disconnecting = True
+        self.unregisterProducer()
+
+    def pauseProducing(self):
+        self.producer.pauseProducing()
+
+    def unregisterProducer(self):
+        if hasattr(self.producer, "stopProducing"):
+            self.producer.stopProducing()
+
+        self.producer = None
+
+    def registerProducer(self, producer, streaming):
+        self.producer = producer
+
+        def _produce():
+            d = self.producer.resumeProducing()
+            d.addCallback(lambda x: self._reactor.callLater(0.1, _produce))
+
+        if streaming:
+            if hasattr(self.producer, "startProducing"):
+                self.producer.startProducing(self)
+        else:
+            self._reactor.callLater(0.0, _produce)
+
+    def write(self, byt):
+        self.buffer = self.buffer + byt
+
+        def _write():
+            if getattr(self.other, "transport") is not None:
+                self.other.dataReceived(self.buffer)
+                self.buffer = b""
+                return
+
+            self._reactor.callLater(0.0, _write)
+
+        _write()
+
+    def writeSequence(self, seq):
+        for x in seq:
+            self.write(x)
