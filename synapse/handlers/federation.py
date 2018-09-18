@@ -135,7 +135,6 @@ class FederationHandler(BaseHandler):
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
     @defer.inlineCallbacks
-    @log_function
     def on_receive_pdu(
             self, origin, pdu, get_missing=True, sent_to_us_directly=False,
     ):
@@ -153,6 +152,11 @@ class FederationHandler(BaseHandler):
 
         room_id = pdu.room_id
         event_id = pdu.event_id
+
+        logger.info(
+            "[%s %s] handling received PDU: %s",
+            room_id, event_id, pdu,
+        )
 
         # We reprocess pdus when we have seen them only as outliers
         existing = yield self.store.get_event(
@@ -231,7 +235,7 @@ class FederationHandler(BaseHandler):
             )
 
             logger.debug(
-                "[%s %s] _handle_new_pdu min_depth: %d",
+                "[%s %s] min_depth: %d",
                 room_id, event_id, min_depth,
             )
 
@@ -442,7 +446,6 @@ class FederationHandler(BaseHandler):
                 else:
                     raise
 
-    @log_function
     @defer.inlineCallbacks
     def _process_received_pdu(self, origin, event, state, auth_chain):
         """ Called when we have a new pdu. We need to do auth checks and put it
@@ -453,7 +456,7 @@ class FederationHandler(BaseHandler):
 
         logger.debug(
             "[%s %s] Processing event: %s",
-            room_id, event_id,
+            room_id, event_id, event,
         )
 
         # FIXME (erikj): Awful hack to make the case where we are not currently
@@ -1483,12 +1486,10 @@ class FederationHandler(BaseHandler):
         else:
             defer.returnValue(None)
 
-    @log_function
     def get_min_depth_for_context(self, context):
         return self.store.get_min_depth(context)
 
     @defer.inlineCallbacks
-    @log_function
     def _handle_new_event(self, origin, event, state=None, auth_events=None,
                           backfilled=False):
         context = yield self._prep_event(
