@@ -162,7 +162,7 @@ class RequestMetrics(object):
         with _in_flight_requests_lock:
             _in_flight_requests.add(self)
 
-    def stop(self, time_sec, request):
+    def stop(self, time_sec, response_code, sent_bytes):
         with _in_flight_requests_lock:
             _in_flight_requests.discard(self)
 
@@ -179,35 +179,35 @@ class RequestMetrics(object):
                 )
                 return
 
-        response_code = str(request.code)
+        response_code = str(response_code)
 
-        outgoing_responses_counter.labels(request.method, response_code).inc()
+        outgoing_responses_counter.labels(self.method, response_code).inc()
 
-        response_count.labels(request.method, self.name, tag).inc()
+        response_count.labels(self.method, self.name, tag).inc()
 
-        response_timer.labels(request.method, self.name, tag, response_code).observe(
+        response_timer.labels(self.method, self.name, tag, response_code).observe(
             time_sec - self.start
         )
 
         resource_usage = context.get_resource_usage()
 
-        response_ru_utime.labels(request.method, self.name, tag).inc(
+        response_ru_utime.labels(self.method, self.name, tag).inc(
             resource_usage.ru_utime,
         )
-        response_ru_stime.labels(request.method, self.name, tag).inc(
+        response_ru_stime.labels(self.method, self.name, tag).inc(
             resource_usage.ru_stime,
         )
-        response_db_txn_count.labels(request.method, self.name, tag).inc(
+        response_db_txn_count.labels(self.method, self.name, tag).inc(
             resource_usage.db_txn_count
         )
-        response_db_txn_duration.labels(request.method, self.name, tag).inc(
+        response_db_txn_duration.labels(self.method, self.name, tag).inc(
             resource_usage.db_txn_duration_sec
         )
-        response_db_sched_duration.labels(request.method, self.name, tag).inc(
+        response_db_sched_duration.labels(self.method, self.name, tag).inc(
             resource_usage.db_sched_duration_sec
         )
 
-        response_size.labels(request.method, self.name, tag).inc(request.sentLength)
+        response_size.labels(self.method, self.name, tag).inc(sent_bytes)
 
         # We always call this at the end to ensure that we update the metrics
         # regardless of whether a call to /metrics while the request was in
