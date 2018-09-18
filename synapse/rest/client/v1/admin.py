@@ -37,6 +37,13 @@ from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
+# use hmac.compare_digest if we have it (python 2.7.7), else just use equality
+if hasattr(hmac, "compare_digest"):
+    compare_digest = hmac.compare_digest
+else:
+    def compare_digest(a, b):
+        return a == b
+
 
 class UsersRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/admin/users/(?P<user_id>[^/]*)")
@@ -173,7 +180,7 @@ class UserRegisterServlet(ClientV1RestServlet):
         want_mac.update(b"admin" if admin else b"notadmin")
         want_mac = want_mac.hexdigest()
 
-        if not hmac.compare_digest(
+        if not compare_digest(
                 want_mac.encode('ascii'),
                 got_mac.encode('ascii')
         ):
