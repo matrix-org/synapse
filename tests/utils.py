@@ -259,7 +259,9 @@ def setup_test_homeserver(
                         db_conn.commit()
                         dropped = True
                     except psycopg2.OperationalError as e:
-                        warnings.warn("Couldn't drop old db: " + str(e), category=UserWarning)
+                        warnings.warn(
+                            "Couldn't drop old db: " + str(e), category=UserWarning
+                        )
                         time.sleep(0.5)
 
                 cur.close()
