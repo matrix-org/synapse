@@ -542,6 +542,7 @@ class SyncHandler(object):
             last_event.event_id, [
                 (EventTypes.Name, ''),
                 (EventTypes.CanonicalAlias, ''),
+                (EventTypes.RoomAvatar, ''),
             ]
         )
 
