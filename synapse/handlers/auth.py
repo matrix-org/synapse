@@ -683,13 +683,16 @@ class AuthHandler(BaseHandler):
 
         if login_type == LoginType.PASSWORD:
             known_login_type = True
+            if not self.hs.config.password_localdb:
+                raise LoginError(403, "Local DB Authentication Disabled",
+                                 errcode=Codes.FORBIDDEN)
+            else:
+                canonical_user_id = yield self._check_local_password(
+                    qualified_user_id, password,
+                )
 
-            canonical_user_id = yield self._check_local_password(
-                qualified_user_id, password,
-            )
-
-            if canonical_user_id:
-                defer.returnValue((canonical_user_id, None))
+                if canonical_user_id:
+                    defer.returnValue((canonical_user_id, None))
 
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
