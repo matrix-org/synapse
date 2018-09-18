@@ -384,7 +384,7 @@ class FederationHandler(BaseHandler):
         latest |= seen
 
         logger.info(
-            "[%s %s]: Missing %d prev_events: %s",
+            "[%s %s]: Requesting %d prev_events: %s",
             room_id, event_id, len(prevs - seen), shortstr(prevs - seen)
         )
 
@@ -418,7 +418,7 @@ class FederationHandler(BaseHandler):
         )
 
         logger.info(
-            "[%s %s]: Got %d events: %s",
+            "[%s %s]: Got %d prev_events: %s",
             room_id, event_id, len(missing_events), shortstr(missing_events),
         )
 
