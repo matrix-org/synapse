@@ -317,6 +317,7 @@ class MatrixFederationHttpClient(object):
                         response = yield make_deferred_yieldable(
                             request_deferred,
                         )
+
                     break
                 except Exception as e:
                     logger.warn(
@@ -358,7 +359,7 @@ class MatrixFederationHttpClient(object):
                 request.txn_id,
                 destination,
                 response.code,
-                response.phrase,
+                response.phrase.decode('ascii', errors='replace'),
             )
 
             if 200 <= response.code < 300:
