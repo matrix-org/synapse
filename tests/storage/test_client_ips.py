@@ -14,17 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
 import hashlib
 import hmac
 import json
 
+from mock import Mock
+
 from twisted.internet import defer
 
-
 from synapse.http.site import XForwardedForRequest
-from synapse.rest.client.v1 import login, admin
+from synapse.rest.client.v1 import admin, login
 
 from tests import unittest
 
@@ -179,7 +178,11 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         """
         The IP in X-Forwarded-For is entered into the client IPs table.
         """
-        self._runtest({b"X-Forwarded-For": b"127.9.0.1"}, "127.9.0.1", {"request": XForwardedForRequest})
+        self._runtest(
+            {b"X-Forwarded-For": b"127.9.0.1"},
+            "127.9.0.1",
+            {"request": XForwardedForRequest},
+        )
 
     def test_request_from_getPeer(self):
         """
@@ -210,7 +213,11 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(123456 - self.reactor.seconds())
 
         request, channel = self.make_request(
-            "GET", "/_matrix/client/r0/admin/users/" + self.user_id, body.encode('utf8'), access_token=access_token, **make_request_args
+            "GET",
+            "/_matrix/client/r0/admin/users/" + self.user_id,
+            body.encode('utf8'),
+            access_token=access_token,
+            **make_request_args
         )
         request.requestHeaders.addRawHeader(b"User-Agent", b"Mozzila pizza")
 
