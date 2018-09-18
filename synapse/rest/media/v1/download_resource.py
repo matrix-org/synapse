@@ -47,12 +47,12 @@ class DownloadResource(Resource):
     def _async_render_GET(self, request):
         set_cors_headers(request)
         request.setHeader(
-            "Content-Security-Policy",
-            "default-src 'none';"
-            " script-src 'none';"
-            " plugin-types application/pdf;"
-            " style-src 'unsafe-inline';"
-            " object-src 'self';"
+            b"Content-Security-Policy",
+            b"default-src 'none';"
+            b" script-src 'none';"
+            b" plugin-types application/pdf;"
+            b" style-src 'unsafe-inline';"
+            b" object-src 'self';"
         )
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:

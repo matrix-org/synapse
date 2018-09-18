@@ -148,6 +148,23 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         return self.runInteraction("count_users", _count_users)
 
     @defer.inlineCallbacks
+    def get_registered_reserved_users_count(self):
+        """Of the reserved threepids defined in config, how many are associated
+        with registered users?
+
+        Returns:
+            Defered[int]: Number of real reserved users
+        """
+        count = 0
+        for tp in self.hs.config.mau_limits_reserved_threepids:
+            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                tp["medium"], tp["address"]
+            )
+            if user_id:
+                count = count + 1
+        defer.returnValue(count)
+
+    @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member

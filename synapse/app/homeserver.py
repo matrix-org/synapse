@@ -307,6 +307,10 @@ class SynapseHomeServer(HomeServer):
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
 max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
+registered_reserved_users_mau_gauge = Gauge(
+    "synapse_admin_mau:registered_reserved_users",
+    "Registered users with reserved threepids"
+)
 
 
 def setup(config_options):
@@ -453,6 +457,10 @@ def run(hs):
         stats["homeserver"] = hs.config.server_name
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
+        version = sys.version_info
+        stats["python_version"] = "{}.{}.{}".format(
+            version.major, version.minor, version.micro
+        )
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
@@ -531,10 +539,14 @@ def run(hs):
 
     @defer.inlineCallbacks
     def generate_monthly_active_users():
-        count = 0
+        current_mau_count = 0
+        reserved_count = 0
+        store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
-            count = yield hs.get_datastore().get_monthly_active_count()
-        current_mau_gauge.set(float(count))
+            current_mau_count = yield store.get_monthly_active_count()
+            reserved_count = yield store.get_registered_reserved_users_count()
+        current_mau_gauge.set(float(current_mau_count))
+        registered_reserved_users_mau_gauge.set(float(reserved_count))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 
     hs.get_datastore().initialise_reserved_users(
