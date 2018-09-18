@@ -17,7 +17,10 @@ from mock import Mock
 
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
+from twisted.internet.protocol import ProtocolToConsumerAdapter
+from twisted.test import proto_helpers
 from twisted.web.client import ResponseNeverReceived
+from twisted.web.http import HTTPChannel
 
 from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
@@ -163,3 +166,30 @@ class FederationClientTests(HomeserverTestCase):
         f = self.failureResultOf(d)
 
         self.assertIsInstance(f.value, TimeoutError)
+
+    def test_client_sends_body(self):
+        d = self.cl.post_json(
+            "testserv:8008", "foo/bar", timeout=10000,
+            data={"a": "b"},
+        )
+
+        self.pump()
+
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        client = clients[0][2].buildProtocol(None)
+
+        # XXX is there a way to do this without a pair of intermediary StringTransports?
+        client_transport = proto_helpers.StringTransport()
+        client.makeConnection(client_transport)
+        client_transport.producer.resumeProducing()
+
+        server_transport = proto_helpers.StringTransport()
+        server = HTTPChannel()
+        server.makeConnection(server_transport)
+        server.dataReceived(client_transport.value())
+
+        self.assertEqual(len(server.requests), 1)
+        request = server.requests[0]
+        content = request.content.read()
+        self.assertEqual(content, '{"a":"b"}')
