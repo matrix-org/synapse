@@ -314,7 +314,7 @@ class RoomListHandler(BaseHandler):
                 EventTypes.CanonicalAlias,
                 EventTypes.RoomHistoryVisibility,
                 EventTypes.GuestAccess,
-                "m.room.avatar",
+                EventTypes.RoomAvatar,
             )
         ])
 
@@ -367,7 +367,7 @@ class RoomListHandler(BaseHandler):
             guest = guest_event.content.get("guest_access", None)
         result["guest_can_join"] = guest == "can_join"
 
-        avatar_event = current_state.get(("m.room.avatar", ""))
+        avatar_event = current_state.get((EventTypes.RoomAvatar, ""))
         if avatar_event:
             avatar_url = avatar_event.content.get("url", None)
             if avatar_url:

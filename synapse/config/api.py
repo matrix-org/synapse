@@ -24,6 +24,8 @@ class ApiConfig(Config):
             EventTypes.JoinRules,
             EventTypes.CanonicalAlias,
             EventTypes.RoomAvatar,
+            EventTypes.RoomSummary,
+            EventTypes.RoomEncryption,
             EventTypes.Name,
         ])
 
@@ -36,5 +38,7 @@ class ApiConfig(Config):
             - "{JoinRules}"
             - "{CanonicalAlias}"
             - "{RoomAvatar}"
+            - "{RoomSummary}"
+            - "{RoomEncryption}"
             - "{Name}"
         """.format(**vars(EventTypes))
