@@ -28,6 +28,7 @@ from twisted.trial import unittest
 from synapse.http.server import JsonResource
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
+from synapse.http.site import SynapseRequest
 from synapse.util.logcontext import LoggingContextFilter
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
@@ -236,7 +237,7 @@ class HomeserverTestCase(TestCase):
         Function to optionally be overridden in subclasses.
         """
 
-    def make_request(self, method, path, content=b""):
+    def make_request(self, method, path, content=b"", access_token=None, request=SynapseRequest):
         """
         Create a SynapseRequest at the path using the method and containing the
         given content.
@@ -254,7 +255,7 @@ class HomeserverTestCase(TestCase):
         if isinstance(content, dict):
             content = json.dumps(content).encode('utf8')
 
-        return make_request(method, path, content)
+        return make_request(method, path, content, access_token, request)
 
     def render(self, request):
         """
