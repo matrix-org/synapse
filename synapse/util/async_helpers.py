@@ -438,3 +438,55 @@ def _cancelled_to_timed_out_error(value, timeout):
         value.trap(CancelledError)
         raise DeferredTimeoutError(timeout, "Deferred")
     return value
+
+
+def timeout_no_seriously(deferred, timeout, reactor):
+    """The in build twisted deferred addTimeout (and the method above)
+    completely fail to time things out under some unknown circumstances.
+
+    Lets try a different way of timing things out and maybe that will make
+    things work?!
+
+    TODO: Kill this with fire.
+    """
+
+    new_d = defer.Deferred()
+
+    timed_out = [False]
+
+    def time_it_out():
+        timed_out[0] = True
+
+        if not new_d.called:
+            new_d.errback(DeferredTimeoutError(timeout, "Deferred"))
+
+        deferred.cancel()
+
+    delayed_call = reactor.callLater(timeout, time_it_out)
+
+    def convert_cancelled(value):
+        if timed_out[0]:
+            return _cancelled_to_timed_out_error(value, timeout)
+        return value
+
+    deferred.addBoth(convert_cancelled)
+
+    def cancel_timeout(result):
+        # stop the pending call to cancel the deferred if it's been fired
+        if delayed_call.active():
+            delayed_call.cancel()
+        return result
+
+    deferred.addBoth(cancel_timeout)
+
+    def success_cb(val):
+        if not new_d.called:
+            new_d.callback(val)
+
+    def failure_cb(val):
+        if not new_d.called:
+            new_d.errback(val)
+
+    deferred.addCallbacks(success_cb, failure_cb)
+
+    return new_d

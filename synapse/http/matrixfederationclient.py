@@ -42,7 +42,9 @@ from synapse.api.errors import (
 )
 from synapse.http.endpoint import matrix_federation_endpoint
 from synapse.util import logcontext
+from synapse.util.async_helpers import timeout_no_seriously
 from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 outbound_logger = logging.getLogger("synapse.http.outbound")
@@ -91,6 +93,7 @@ class MatrixFederationHttpClient(object):
         self.server_name = hs.hostname
         reactor = hs.get_reactor()
         pool = HTTPConnectionPool(reactor)
+        pool.retryAutomatically = False
         pool.maxPersistentPerHost = 5
         pool.cachedConnectionTimeout = 2 * 60
         self.agent = Agent.usingEndpointFactory(
@@ -221,14 +224,30 @@ class MatrixFederationHttpClient(object):
                         headers=Headers(headers_dict),
                         data=data,
                         agent=self.agent,
-                        reactor=self.hs.get_reactor()
+                        reactor=self.hs.get_reactor(),
+                        unbuffered=True
                     )
                     request_deferred.addTimeout(_sec_timeout, self.hs.get_reactor())
-                    response = yield make_deferred_yieldable(
+
+                    # Sometimes the timeout above doesn't work, so lets hack yet
+                    # another layer of timeouts in in the vain hope that at some
+                    # point the world made sense and this really really really
+                    # should work.
+                    request_deferred = timeout_no_seriously(
                         request_deferred,
+                        timeout=_sec_timeout * 2,
+                        reactor=self.hs.get_reactor(),
                     )
 
-                    log_result = "%d %s" % (response.code, response.phrase,)
+                    with Measure(self.clock, "outbound_request"):
+                        response = yield make_deferred_yieldable(
+                            request_deferred,
+                        )
+
+                    log_result = "%d %s" % (
+                        response.code,
+                        response.phrase.decode('ascii', errors='replace'),
+                    )
                     break
                 except Exception as e:
                     if not retry_on_dns_fail and isinstance(e, DNSLookupError):
