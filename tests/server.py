@@ -289,6 +289,7 @@ class FakeTransport(object):
     _reactor = attr.ib()
     disconnecting = False
     buffer = attr.ib(default=b'')
+    producer = attr.ib(default=None)
 
     def getPeer(self):
         return None
@@ -298,32 +299,28 @@ class FakeTransport(object):
 
     def loseConnection(self):
         self.disconnecting = True
-        self.unregisterProducer()
 
     def abortConnection(self):
         self.disconnecting = True
-        self.unregisterProducer()
 
     def pauseProducing(self):
         self.producer.pauseProducing()
 
     def unregisterProducer(self):
-        if hasattr(self.producer, "stopProducing"):
-            self.producer.stopProducing()
+        if not self.producer:
+            return
 
         self.producer = None
 
     def registerProducer(self, producer, streaming):
         self.producer = producer
+        self.producerStreaming = streaming
 
         def _produce():
             d = self.producer.resumeProducing()
             d.addCallback(lambda x: self._reactor.callLater(0.1, _produce))
 
-        if streaming:
-            if hasattr(self.producer, "startProducing"):
-                self.producer.startProducing(self)
-        else:
+        if not streaming:
             self._reactor.callLater(0.0, _produce)
 
     def write(self, byt):
