@@ -150,14 +150,14 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         body = yield make_deferred_yieldable(d)
     except Exception as e:
         logger.warn(
-            "{%s} [%d] Error reading response: %s",
+            "{%s} [%s] Error reading response: %s",
             request.txn_id,
             request.destination,
             e,
         )
         raise
     logger.info(
-        "{%s} [%d] Completed: %d %s",
+        "{%s} [%s] Completed: %d %s",
         request.txn_id,
         request.destination,
         response.code,
@@ -707,14 +707,14 @@ class MatrixFederationHttpClient(object):
             length = yield make_deferred_yieldable(d)
         except Exception as e:
             logger.warn(
-                "{%s} [%d] Error reading response: %s",
+                "{%s} [%s] Error reading response: %s",
                 request.txn_id,
                 request.destination,
                 e,
             )
             raise
         logger.info(
-            "{%s} [%d] Completed: %d %s [%d bytes]",
+            "{%s} [%s] Completed: %d %s [%d bytes]",
             request.txn_id,
             request.destination,
             response.code,
