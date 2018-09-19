@@ -156,7 +156,6 @@ class TransactionStore(SQLBaseStore):
         """
         pass
 
-    @cached(max_entries=10000)
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
 
@@ -211,10 +210,6 @@ class TransactionStore(SQLBaseStore):
     def _set_destination_retry_timings(self, txn, destination,
                                        retry_last_ts, retry_interval):
         self.database_engine.lock_table(txn, "destinations")
-
-        self._invalidate_cache_and_stream(
-            txn, self.get_destination_retry_timings, (destination,)
-        )
 
         # We need to be careful here as the data may have changed from under us
         # due to a worker setting the timings.
