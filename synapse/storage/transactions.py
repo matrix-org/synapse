@@ -23,7 +23,6 @@ from canonicaljson import encode_canonical_json
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore, db_to_json
 
