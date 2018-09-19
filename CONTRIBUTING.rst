@@ -38,7 +38,7 @@ Jenkins builds require an adminstrator to start them. If your change breaks the
 build, this will be shown in GitHub, so please keep an eye on the pull request
 for feedback.
 
-To run unit tests, you can use:
+To run unit tests in a local development environment, you can use:
 
 - ``tox -e py27`` (requires tox to be installed by ``pip install tox``) for
   SQLite-backed Synapse on Python 2.7.
@@ -95,7 +95,8 @@ AUTHORS.rst file for the project in question. Please feel free to include a
 change to AUTHORS.rst in your pull request to list yourself and a short
 description of the area(s) you've worked on. Also, we sometimes have swag to
 give away to contributors - if you feel that Matrix-branded apparel is missing
-from your life, please mail us your shipping address to matrix at matrix.org and we'll try to fix it :)
+from your life, please mail us your shipping address to matrix at matrix.org and
+we'll try to fix it :)
 
 Sign off
 ~~~~~~~~
@@ -162,4 +163,9 @@ flag to ``git commit``, which uses the name and email set in your
 Conclusion
 ~~~~~~~~~~
 
-That's it!  Matrix is a very open and collaborative project as you might expect given our obsession with open communication.  If we're going to successfully matrix together all the fragmented communication technologies out there we are reliant on contributions and collaboration from the community to do so.  So please get involved - and we hope you have as much fun hacking on Matrix as we do!
+That's it!  Matrix is a very open and collaborative project as you might expect
+given our obsession with open communication.  If we're going to successfully
+matrix together all the fragmented communication technologies out there we are
+reliant on contributions and collaboration from the community to do so.  So
+please get involved - and we hope you have as much fun hacking on Matrix as we
+do!
