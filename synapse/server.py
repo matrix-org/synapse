@@ -19,6 +19,7 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+import abc
 import logging
 
 from twisted.enterprise import adbapi
@@ -36,6 +37,7 @@ from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
     FederationServer,
+    ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.transaction_queue import TransactionQueue
@@ -52,12 +54,13 @@ from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
-from synapse.handlers.message import EventCreationHandler
+from synapse.handlers.message import EventCreationHandler, MessageHandler
+from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
-from synapse.handlers.room import RoomCreationHandler
+from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -79,7 +82,6 @@ from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStore
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -108,6 +110,8 @@ class HomeServer(object):
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
     """
+
+    __metaclass__ = abc.ABCMeta
 
     DEPENDENCIES = [
         'http_client',
@@ -165,7 +169,15 @@ class HomeServer(object):
         'federation_registry',
         'server_notices_manager',
         'server_notices_sender',
+        'message_handler',
+        'pagination_handler',
+        'room_context_handler',
     ]
+
+    # This is overridden in derived application classes
+    # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
+    # instantiated during setup() for future return by get_datastore()
+    DATASTORE_CLASS = abc.abstractproperty()
 
     def __init__(self, hostname, reactor=None, **kwargs):
         """
@@ -183,13 +195,16 @@ class HomeServer(object):
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
 
+        self.datastore = None
+
         # Other kwargs are explicit dependencies
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = DataStore(self.get_db_conn(), self)
+        with self.get_db_conn() as conn:
+            self.datastore = self.DATASTORE_CLASS(conn, self)
         logger.info("Finished setting up.")
 
     def get_reactor(self):
@@ -303,7 +318,10 @@ class HomeServer(object):
         return InitialSyncHandler(self)
 
     def build_profile_handler(self):
-        return ProfileHandler(self)
+        if self.config.worker_app:
+            return BaseProfileHandler(self)
+        else:
+            return MasterProfileHandler(self)
 
     def build_event_creation_handler(self):
         return EventCreationHandler(self)
@@ -419,7 +437,10 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        return FederationHandlerRegistry()
+        if self.config.worker_app:
+            return ReplicationFederationHandlerRegistry(self)
+        else:
+            return FederationHandlerRegistry()
 
     def build_server_notices_manager(self):
         if self.config.worker_app:
@@ -430,6 +451,15 @@ class HomeServer(object):
         if self.config.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
+
+    def build_message_handler(self):
+        return MessageHandler(self)
+
+    def build_pagination_handler(self):
+        return PaginationHandler(self)
+
+    def build_room_context_handler(self):
+        return RoomContextHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

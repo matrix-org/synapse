@@ -23,6 +23,7 @@ from twisted.internet import defer
 import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
+from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request
 from synapse.rest.client.v1.base import ClientV1RestServlet
 from synapse.types import create_requester
@@ -129,12 +130,9 @@ class RegisterRestServlet(ClientV1RestServlet):
             login_type = register_json["type"]
 
             is_application_server = login_type == LoginType.APPLICATION_SERVICE
-            is_using_shared_secret = login_type == LoginType.SHARED_SECRET
-
             can_register = (
                 self.enable_registration
                 or is_application_server
-                or is_using_shared_secret
             )
             if not can_register:
                 raise SynapseError(403, "Registration has been disabled")
@@ -144,7 +142,6 @@ class RegisterRestServlet(ClientV1RestServlet):
                 LoginType.PASSWORD: self._do_password,
                 LoginType.EMAIL_IDENTITY: self._do_email_identity,
                 LoginType.APPLICATION_SERVICE: self._do_app_service,
-                LoginType.SHARED_SECRET: self._do_shared_secret,
             }
 
             session_info = self._get_session_info(request, session)
@@ -285,12 +282,20 @@ class RegisterRestServlet(ClientV1RestServlet):
             register_json["user"].encode("utf-8")
             if "user" in register_json else None
         )
+        threepid = None
+        if session.get(LoginType.EMAIL_IDENTITY):
+            threepid = session["threepidCreds"]
 
         handler = self.handlers.registration_handler
         (user_id, token) = yield handler.register(
             localpart=desired_user_id,
-            password=password
+            password=password,
+            threepid=threepid,
         )
+        # Necessary due to auth checks prior to the threepid being
+        # written to the db
+        if is_threepid_reserved(self.hs.config, threepid):
+            yield self.store.upsert_monthly_active_user(user_id)
 
         if session[LoginType.EMAIL_IDENTITY]:
             logger.debug("Binding emails %s to %s" % (
@@ -324,56 +329,6 @@ class RegisterRestServlet(ClientV1RestServlet):
             "access_token": token,
             "home_server": self.hs.hostname,
         })
-
-    @defer.inlineCallbacks
-    def _do_shared_secret(self, request, register_json, session):
-        assert_params_in_dict(register_json, ["mac", "user", "password"])
-
-        if not self.hs.config.registration_shared_secret:
-            raise SynapseError(400, "Shared secret registration is not enabled")
-
-        user = register_json["user"].encode("utf-8")
-        password = register_json["password"].encode("utf-8")
-        admin = register_json.get("admin", None)
-
-        # Its important to check as we use null bytes as HMAC field separators
-        if b"\x00" in user:
-            raise SynapseError(400, "Invalid user")
-        if b"\x00" in password:
-            raise SynapseError(400, "Invalid password")
-
-        # str() because otherwise hmac complains that 'unicode' does not
-        # have the buffer interface
-        got_mac = str(register_json["mac"])
-
-        want_mac = hmac.new(
-            key=self.hs.config.registration_shared_secret.encode(),
-            digestmod=sha1,
-        )
-        want_mac.update(user)
-        want_mac.update(b"\x00")
-        want_mac.update(password)
-        want_mac.update(b"\x00")
-        want_mac.update(b"admin" if admin else b"notadmin")
-        want_mac = want_mac.hexdigest()
-
-        if compare_digest(want_mac, got_mac):
-            handler = self.handlers.registration_handler
-            user_id, token = yield handler.register(
-                localpart=user.lower(),
-                password=password,
-                admin=bool(admin),
-            )
-            self._remove_session(session)
-            defer.returnValue({
-                "user_id": user_id,
-                "access_token": token,
-                "home_server": self.hs.hostname,
-            })
-        else:
-            raise SynapseError(
-                403, "HMAC incorrect",
-            )
 
 
 class CreateUserRestServlet(ClientV1RestServlet):

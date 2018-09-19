@@ -1,0 +1,1 @@
+Adding the ability to change MAX_UPLOAD_SIZE for the docker container variables.

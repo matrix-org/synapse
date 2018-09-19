@@ -41,11 +41,10 @@ class EventStreamPermissionsTestCase(RestTestCase):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=[
-                "send_message",
-            ]),
+            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
         self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.send_message.return_value = (True, 0)
@@ -83,7 +82,7 @@ class EventStreamPermissionsTestCase(RestTestCase):
         # behaviour is used instead to be consistent with the r0 spec.
         # see issue #2602
         (code, response) = yield self.mock_resource.trigger_get(
-            "/events?access_token=%s" % ("invalid" + self.token, )
+            "/events?access_token=%s" % ("invalid" + self.token,)
         )
         self.assertEquals(401, code, msg=str(response))
 
@@ -98,18 +97,12 @@ class EventStreamPermissionsTestCase(RestTestCase):
 
     @defer.inlineCallbacks
     def test_stream_room_permissions(self):
-        room_id = yield self.create_room_as(
-            self.other_user,
-            tok=self.other_token
-        )
+        room_id = yield self.create_room_as(self.other_user, tok=self.other_token)
         yield self.send(room_id, tok=self.other_token)
 
         # invited to room (expect no content for room)
         yield self.invite(
-            room_id,
-            src=self.other_user,
-            targ=self.user_id,
-            tok=self.other_token
+            room_id, src=self.other_user, targ=self.user_id, tok=self.other_token
         )
 
         (code, response) = yield self.mock_resource.trigger_get(
@@ -120,13 +113,16 @@ class EventStreamPermissionsTestCase(RestTestCase):
         # We may get a presence event for ourselves down
         self.assertEquals(
             0,
-            len([
-                c for c in response["chunk"]
-                if not (
-                    c.get("type") == "m.presence"
-                    and c["content"].get("user_id") == self.user_id
-                )
-            ])
+            len(
+                [
+                    c
+                    for c in response["chunk"]
+                    if not (
+                        c.get("type") == "m.presence"
+                        and c["content"].get("user_id") == self.user_id
+                    )
+                ]
+            ),
         )
 
         # joined room (expect all content for room)

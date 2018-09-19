@@ -26,6 +26,7 @@ import synapse
 import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
+from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -74,7 +75,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Your email domain is not authorized to register on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
@@ -114,7 +117,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Phone numbers are not authorized to register on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
@@ -193,15 +198,15 @@ class RegisterRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        kind = "user"
-        if "kind" in request.args:
-            kind = request.args["kind"][0]
+        kind = b"user"
+        if b"kind" in request.args:
+            kind = request.args[b"kind"][0]
 
-        if kind == "guest":
+        if kind == b"guest":
             ret = yield self._do_guest_registration(body)
             defer.returnValue(ret)
             return
-        elif kind != "user":
+        elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
             )
@@ -372,7 +377,9 @@ class RegisterRestServlet(RestServlet):
 
                     if not check_3pid_allowed(self.hs, medium, address):
                         raise SynapseError(
-                            403, "Third party identifier is not allowed",
+                            403,
+                            "Third party identifiers (email/phone numbers)" +
+                            " are not authorized on this server",
                             Codes.THREEPID_DENIED,
                         )
 
@@ -389,18 +396,27 @@ class RegisterRestServlet(RestServlet):
             assert_params_in_dict(params, ["password"])
 
             desired_username = params.get("username", None)
-            new_password = params.get("password", None)
             guest_access_token = params.get("guest_access_token", None)
+            new_password = params.get("password", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
+
+            threepid = None
+            if auth_result:
+                threepid = auth_result.get(LoginType.EMAIL_IDENTITY)
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
                 password=new_password,
                 guest_access_token=guest_access_token,
                 generate_token=False,
+                threepid=threepid,
             )
+            # Necessary due to auth checks prior to the threepid being
+            # written to the db
+            if is_threepid_reserved(self.hs.config, threepid):
+                yield self.store.upsert_monthly_active_user(registered_user_id)
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)

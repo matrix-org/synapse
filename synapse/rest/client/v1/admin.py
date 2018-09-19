@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import logging
 
+from six import text_type
 from six.moves import http_client
 
 from twisted.internet import defer
@@ -100,7 +101,7 @@ class UserRegisterServlet(ClientV1RestServlet):
 
         nonce = self.hs.get_secrets().token_hex(64)
         self.nonces[nonce] = int(self.reactor.seconds())
-        return (200, {"nonce": nonce.encode('ascii')})
+        return (200, {"nonce": nonce})
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -131,7 +132,10 @@ class UserRegisterServlet(ClientV1RestServlet):
                 400, "username must be specified", errcode=Codes.BAD_JSON,
             )
         else:
-            if (not isinstance(body['username'], str) or len(body['username']) > 512):
+            if (
+                not isinstance(body['username'], text_type)
+                or len(body['username']) > 512
+            ):
                 raise SynapseError(400, "Invalid username")
 
             username = body["username"].encode("utf-8")
@@ -143,7 +147,10 @@ class UserRegisterServlet(ClientV1RestServlet):
                 400, "password must be specified", errcode=Codes.BAD_JSON,
             )
         else:
-            if (not isinstance(body['password'], str) or len(body['password']) > 512):
+            if (
+                not isinstance(body['password'], text_type)
+                or len(body['password']) > 512
+            ):
                 raise SynapseError(400, "Invalid password")
 
             password = body["password"].encode("utf-8")
@@ -157,7 +164,7 @@ class UserRegisterServlet(ClientV1RestServlet):
             key=self.hs.config.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
-        want_mac.update(nonce)
+        want_mac.update(nonce.encode('utf8'))
         want_mac.update(b"\x00")
         want_mac.update(username)
         want_mac.update(b"\x00")
@@ -166,17 +173,21 @@ class UserRegisterServlet(ClientV1RestServlet):
         want_mac.update(b"admin" if admin else b"notadmin")
         want_mac = want_mac.hexdigest()
 
-        if not hmac.compare_digest(want_mac, got_mac):
-            raise SynapseError(
-                403, "HMAC incorrect",
-            )
+        if not hmac.compare_digest(
+                want_mac.encode('ascii'),
+                got_mac.encode('ascii')
+        ):
+            raise SynapseError(403, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
         from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+
         register = RegisterRestServlet(self.hs)
 
         (user_id, _) = yield register.registration_handler.register(
-            localpart=username.lower(), password=password, admin=bool(admin),
+            localpart=body['username'].lower(),
+            password=body["password"],
+            admin=bool(admin),
             generate_token=False,
         )
 
@@ -244,7 +255,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             hs (synapse.server.HomeServer)
         """
         super(PurgeHistoryRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -319,7 +330,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = yield self.handlers.message_handler.start_purge_history(
+        purge_id = yield self.pagination_handler.start_purge_history(
             room_id, token,
             delete_local_events=delete_local_events,
         )
@@ -341,7 +352,7 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
             hs (synapse.server.HomeServer)
         """
         super(PurgeHistoryStatusRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, purge_id):
@@ -351,7 +362,7 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        purge_status = self.handlers.message_handler.get_purge_status(purge_id)
+        purge_status = self.pagination_handler.get_purge_status(purge_id)
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
@@ -383,10 +394,17 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        yield self._deactivate_account_handler.deactivate_account(
+        result = yield self._deactivate_account_handler.deactivate_account(
             target_user_id, erase,
         )
-        defer.returnValue((200, {}))
+        if result:
+            id_server_unbind_result = "success"
+        else:
+            id_server_unbind_result = "no-support"
+
+        defer.returnValue((200, {
+            "id_server_unbind_result": id_server_unbind_result,
+        }))
 
 
 class ShutdownRoomRestServlet(ClientV1RestServlet):

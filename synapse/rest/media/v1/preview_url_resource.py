@@ -41,7 +41,8 @@ from synapse.http.server import (
     wrap_json_request_handler,
 )
 from synapse.http.servlet import parse_integer, parse_string
-from synapse.util.async import ObservableDeferred
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.stringutils import is_ascii, random_string
@@ -81,7 +82,7 @@ class PreviewUrlResource(Resource):
         self._cache.start()
 
         self._cleaner_loop = self.clock.looping_call(
-            self._expire_url_cache_data, 10 * 1000
+            self._start_expire_url_cache_data, 10 * 1000,
         )
 
     def render_OPTIONS(self, request):
@@ -260,7 +261,7 @@ class PreviewUrlResource(Resource):
 
         logger.debug("Calculated OG for %s as %s" % (url, og))
 
-        jsonog = json.dumps(og)
+        jsonog = json.dumps(og).encode('utf8')
 
         # store OG in history-aware DB cache
         yield self.store.store_url_cache(
@@ -300,20 +301,20 @@ class PreviewUrlResource(Resource):
                 logger.warn("Error downloading %s: %r", url, e)
                 raise SynapseError(
                     500, "Failed to download content: %s" % (
-                        traceback.format_exception_only(sys.exc_type, e),
+                        traceback.format_exception_only(sys.exc_info()[0], e),
                     ),
                     Codes.UNKNOWN,
                 )
             yield finish()
 
         try:
-            if "Content-Type" in headers:
-                media_type = headers["Content-Type"][0]
+            if b"Content-Type" in headers:
+                media_type = headers[b"Content-Type"][0].decode('ascii')
             else:
                 media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
 
-            content_disposition = headers.get("Content-Disposition", None)
+            content_disposition = headers.get(b"Content-Disposition", None)
             if content_disposition:
                 _, params = cgi.parse_header(content_disposition[0],)
                 download_name = None
@@ -370,6 +371,11 @@ class PreviewUrlResource(Resource):
             "expires": 60 * 60 * 1000,
             "etag": headers["ETag"][0] if "ETag" in headers else None,
         })
+
+    def _start_expire_url_cache_data(self):
+        return run_as_background_process(
+            "expire_url_cache_data", self._expire_url_cache_data,
+        )
 
     @defer.inlineCallbacks
     def _expire_url_cache_data(self):

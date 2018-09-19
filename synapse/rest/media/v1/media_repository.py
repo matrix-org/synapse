@@ -20,7 +20,7 @@ import logging
 import os
 import shutil
 
-from six import iteritems
+from six import PY3, iteritems
 from six.moves.urllib import parse as urlparse
 
 import twisted.internet.error
@@ -35,12 +35,14 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-from synapse.util.async import Linearizer
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.async_helpers import Linearizer
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import is_ascii, random_string
 
 from ._base import FileInfo, respond_404, respond_with_responder
+from .config_resource import MediaConfigResource
 from .download_resource import DownloadResource
 from .filepath import MediaFilePaths
 from .identicon_resource import IdenticonResource
@@ -100,8 +102,13 @@ class MediaRepository(object):
         )
 
         self.clock.looping_call(
-            self._update_recently_accessed,
+            self._start_update_recently_accessed,
             UPDATE_RECENTLY_ACCESSED_TS,
+        )
+
+    def _start_update_recently_accessed(self):
+        return run_as_background_process(
+            "update_recently_accessed_media", self._update_recently_accessed,
         )
 
     @defer.inlineCallbacks
@@ -373,7 +380,7 @@ class MediaRepository(object):
                 logger.warn("HTTP error fetching remote media %s/%s: %s",
                             server_name, media_id, e.response)
                 if e.code == twisted.web.http.NOT_FOUND:
-                    raise SynapseError.from_http_response_exception(e)
+                    raise e.to_synapse_error()
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except SynapseError:
@@ -390,13 +397,13 @@ class MediaRepository(object):
 
             yield finish()
 
-        media_type = headers["Content-Type"][0]
+        media_type = headers[b"Content-Type"][0].decode('ascii')
 
         time_now_ms = self.clock.time_msec()
 
-        content_disposition = headers.get("Content-Disposition", None)
+        content_disposition = headers.get(b"Content-Disposition", None)
         if content_disposition:
-            _, params = cgi.parse_header(content_disposition[0],)
+            _, params = cgi.parse_header(content_disposition[0].decode('ascii'),)
             upload_name = None
 
             # First check if there is a valid UTF-8 filename
@@ -412,9 +419,13 @@ class MediaRepository(object):
                     upload_name = upload_name_ascii
 
             if upload_name:
-                upload_name = urlparse.unquote(upload_name)
+                if PY3:
+                    upload_name = urlparse.unquote(upload_name)
+                else:
+                    upload_name = urlparse.unquote(upload_name.encode('ascii'))
                 try:
-                    upload_name = upload_name.decode("utf-8")
+                    if isinstance(upload_name, bytes):
+                        upload_name = upload_name.decode("utf-8")
                 except UnicodeDecodeError:
                     upload_name = None
         else:
@@ -749,13 +760,14 @@ class MediaRepositoryResource(Resource):
 
         media_repo = hs.get_media_repository()
 
-        self.putChild("upload", UploadResource(hs, media_repo))
-        self.putChild("download", DownloadResource(hs, media_repo))
-        self.putChild("thumbnail", ThumbnailResource(
+        self.putChild(b"upload", UploadResource(hs, media_repo))
+        self.putChild(b"download", DownloadResource(hs, media_repo))
+        self.putChild(b"thumbnail", ThumbnailResource(
             hs, media_repo, media_repo.media_storage,
         ))
-        self.putChild("identicon", IdenticonResource())
+        self.putChild(b"identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
-            self.putChild("preview_url", PreviewUrlResource(
+            self.putChild(b"preview_url", PreviewUrlResource(
                 hs, media_repo, media_repo.media_storage,
             ))
+        self.putChild(b"config", MediaConfigResource(hs))
