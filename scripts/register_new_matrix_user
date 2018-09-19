@@ -164,12 +164,12 @@ if __name__ == "__main__":
     admin_group.add_argument(
         "-a", "--admin",
         action="store_true",
-        help="Register new user as an admin. Will prompt if --no-admin is not set.",
+        help="Register new user as an admin. Will prompt if --no-admin is not set either.",
     )
     admin_group.add_argument(
         "--no-admin",
         action="store_false",
-        help="Register new user as a regular user.",
+        help="Register new user as a regular user. Will prompt if --admin is not set either.",
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
