@@ -25,10 +25,7 @@ from synapse.api.errors import AuthError
 from synapse.handlers.presence import format_user_presence_state
 from synapse.metrics import LaterGauge
 from synapse.types import StreamToken
-from synapse.util.async_helpers import (
-    ObservableDeferred,
-    timeout_deferred,
-)
+from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
 from synapse.util.logcontext import PreserveLoggingContext, run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
