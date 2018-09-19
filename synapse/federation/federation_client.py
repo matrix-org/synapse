@@ -271,10 +271,10 @@ class FederationClient(FederationBase):
                     event_id, destination, e,
                 )
             except NotRetryingDestination as e:
-                logger.info(e.message)
+                logger.info(str(e))
                 continue
             except FederationDeniedError as e:
-                logger.info(e.message)
+                logger.info(str(e))
                 continue
             except Exception as e:
                 pdu_attempts[destination] = now
@@ -510,7 +510,7 @@ class FederationClient(FederationBase):
                 else:
                     logger.warn(
                         "Failed to %s via %s: %i %s",
-                        description, destination, e.code, e.message,
+                        description, destination, e.code, e.args[0],
                     )
             except Exception:
                 logger.warn(
@@ -875,7 +875,7 @@ class FederationClient(FederationBase):
             except Exception as e:
                 logger.exception(
                     "Failed to send_third_party_invite via %s: %s",
-                    destination, e.message
+                    destination, str(e)
                 )
 
         raise RuntimeError("Failed to send to any server.")

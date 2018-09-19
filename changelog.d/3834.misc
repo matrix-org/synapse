@@ -1,0 +1,1 @@
+Improved Dockerfile to remove build requirements after building reducing the image size.

@@ -51,7 +51,7 @@ class SyncTestCase(tests.unittest.TestCase):
         self.hs.config.hs_disabled = True
         with self.assertRaises(ResourceLimitError) as e:
             yield self.sync_handler.wait_for_sync_for_user(sync_config)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
         self.hs.config.hs_disabled = False
 
@@ -59,7 +59,7 @@ class SyncTestCase(tests.unittest.TestCase):
 
         with self.assertRaises(ResourceLimitError) as e:
             yield self.sync_handler.wait_for_sync_for_user(sync_config)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def _generate_sync_config(self, user_id):
         return SyncConfig(

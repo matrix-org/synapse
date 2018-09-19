@@ -249,10 +249,7 @@ class SynchrotronApplicationService(object):
 
 
 class SynchrotronServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = SynchrotronSlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = SynchrotronSlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]

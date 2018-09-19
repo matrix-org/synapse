@@ -1,6 +1,8 @@
 FROM docker.io/python:2-alpine3.8
 
-RUN apk add --no-cache --virtual .nacl_deps \
+COPY . /synapse
+
+RUN apk add --no-cache --virtual .build_deps \
         build-base \
         libffi-dev \
         libjpeg-turbo-dev \
@@ -8,13 +10,16 @@ RUN apk add --no-cache --virtual .nacl_deps \
         libxslt-dev \
         linux-headers \
         postgresql-dev \
-        su-exec \
-        zlib-dev
-
-COPY . /synapse
-
-# A wheel cache may be provided in ./cache for faster build
-RUN cd /synapse \
+        zlib-dev \
+ && cd /synapse \
+ && apk add --no-cache --virtual .runtime_deps \
+ 	libffi \
+        libjpeg-turbo \
+	libressl \
+	libxslt \
+	libpq \
+	zlib \
+	su-exec \
  && pip install --upgrade \
         lxml \
         pip \
@@ -26,8 +31,9 @@ RUN cd /synapse \
  && rm -rf \
         setup.cfg \
         setup.py \
-        synapse
-
+        synapse \
+ && apk del .build_deps
+ 
 VOLUME ["/data"]
 
 EXPOSE 8008/tcp 8448/tcp

@@ -78,6 +78,7 @@ class EventTypes(object):
     Name = "m.room.name"
 
     ServerACL = "m.room.server_acl"
+    Pinned = "m.room.pinned_events"
 
 
 class RejectedReason(object):
@@ -108,3 +109,6 @@ DEFAULT_ROOM_VERSION = RoomVersions.V1
 # vdh-test-version is a placeholder to get room versioning support working and tested
 # until we have a working v2.
 KNOWN_ROOM_VERSIONS = {RoomVersions.V1, RoomVersions.VDH_TEST}
+
+ServerNoticeMsgType = "m.server_notice"
+ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"

@@ -14,12 +14,12 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
-from synapse.server import HomeServer
 from synapse.types import GroupID, RoomAlias, UserID
 
 from tests import unittest
+from tests.utils import TestHomeServer
 
-mock_homeserver = HomeServer(hostname="my.domain")
+mock_homeserver = TestHomeServer(hostname="my.domain")
 
 
 class UserIDTestCase(unittest.TestCase):

@@ -123,6 +123,6 @@ class ClientTLSOptionsFactory(object):
 
     def get_options(self, host):
         return ClientTLSOptions(
-            host.decode('utf-8'),
+            host,
             CertificateOptions(verify=False).getContext()
         )

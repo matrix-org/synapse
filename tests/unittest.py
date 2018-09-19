@@ -22,6 +22,7 @@ from canonicaljson import json
 
 import twisted
 import twisted.logger
+from twisted.internet.defer import Deferred
 from twisted.trial import unittest
 
 from synapse.http.server import JsonResource
@@ -151,6 +152,7 @@ class HomeserverTestCase(TestCase):
         hijack_auth (bool): Whether to hijack auth to return the user specified
         in user_id.
     """
+
     servlets = []
     hijack_auth = True
 
@@ -279,3 +281,15 @@ class HomeserverTestCase(TestCase):
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
         return setup_test_homeserver(self.addCleanup, *args, **kwargs)
+
+    def pump(self, by=0.0):
+        """
+        Pump the reactor enough that Deferreds will fire.
+        """
+        self.reactor.pump([by] * 100)
+
+    def get_success(self, d):
+        if not isinstance(d, Deferred):
+            return d
+        self.pump()
+        return self.successResultOf(d)
