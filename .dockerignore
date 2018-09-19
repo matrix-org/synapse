@@ -2,6 +2,7 @@ Dockerfile
 .travis.yml
 .gitignore
 demo/etc
+synctl
 tox.ini
 .git/*
 .tox/*
