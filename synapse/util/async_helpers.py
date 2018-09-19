@@ -374,16 +374,10 @@ class ReadWriteLock(object):
         defer.returnValue(_ctx_manager())
 
 
-class DeferredTimeoutError(Exception):
-    """
-    This error is raised by default when a L{Deferred} times out.
-    """
-
-
 def _cancelled_to_timed_out_error(value, timeout):
     if isinstance(value, failure.Failure):
         value.trap(CancelledError)
-        raise DeferredTimeoutError(timeout, "Deferred")
+        raise defer.TimeoutError(timeout, "Deferred")
     return value
 
 
@@ -408,7 +402,7 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
             the timeout.
 
             The default callable (if none is provided) will translate a
-            CancelledError Failure into a DeferredTimeoutError.
+            CancelledError Failure into a defer.TimeoutError.
 
     Returns:
         Deferred
@@ -427,7 +421,7 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
             logger.exception("Canceller failed during timeout")
 
         if not new_d.called:
-            new_d.errback(DeferredTimeoutError(timeout, "Deferred"))
+            new_d.errback(defer.TimeoutError(timeout, "Deferred"))
 
     delayed_call = reactor.callLater(timeout, time_it_out)
 

@@ -26,7 +26,6 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.metrics import LaterGauge
 from synapse.types import StreamToken
 from synapse.util.async_helpers import (
-    DeferredTimeoutError,
     ObservableDeferred,
     timeout_deferred,
 )
@@ -354,7 +353,7 @@ class Notifier(object):
                     # Update the prev_token to the current_token since nothing
                     # has happened between the old prev_token and the current_token
                     prev_token = current_token
-                except DeferredTimeoutError:
+                except defer.TimeoutError:
                     break
                 except defer.CancelledError:
                     break
@@ -568,7 +567,7 @@ class Notifier(object):
             try:
                 with PreserveLoggingContext():
                     yield listener.deferred
-            except DeferredTimeoutError:
+            except defer.TimeoutError:
                 break
             except defer.CancelledError:
                 break
