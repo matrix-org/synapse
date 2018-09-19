@@ -147,6 +147,23 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         return self.runInteraction("count_users", _count_users)
 
     @defer.inlineCallbacks
+    def get_registered_reserved_users_count(self):
+        """Of the reserved threepids defined in config, how many are associated
+        with registered users?
+
+        Returns:
+            Defered[int]: Number of real reserved users
+        """
+        count = 0
+        for tp in self.hs.config.mau_limits_reserved_threepids:
+            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                tp["medium"], tp["address"]
+            )
+            if user_id:
+                count = count + 1
+        defer.returnValue(count)
+
+    @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member
@@ -199,10 +216,14 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Args:
             user_id(str): the user_id to query
         """
+
         if self.hs.config.limit_usage_by_mau:
+            # Trial users and guests should not be included as part of MAU group
+            is_guest = yield self.is_guest(user_id)
+            if is_guest:
+                return
             is_trial = yield self.is_trial_user(user_id)
             if is_trial:
-                # we don't track trial users in the MAU table.
                 return
 
             last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)

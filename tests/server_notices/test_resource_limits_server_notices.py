@@ -80,12 +80,11 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
 
         self._rlsn._auth.check_auth_blocking = Mock()
         mock_event = Mock(
-            type=EventTypes.Message,
-            content={"msgtype": ServerNoticeMsgType},
+            type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = Mock(return_value=defer.succeed(
-            {"123": mock_event}
-        ))
+        self._rlsn._store.get_events = Mock(
+            return_value=defer.succeed({"123": mock_event})
+        )
 
         yield self._rlsn.maybe_send_server_notice_to_user(self.user_id)
         # Would be better to check the content, but once == remove blocking event
@@ -99,12 +98,11 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
         )
 
         mock_event = Mock(
-            type=EventTypes.Message,
-            content={"msgtype": ServerNoticeMsgType},
+            type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
-        self._rlsn._store.get_events = Mock(return_value=defer.succeed(
-            {"123": mock_event}
-        ))
+        self._rlsn._store.get_events = Mock(
+            return_value=defer.succeed({"123": mock_event})
+        )
         yield self._rlsn.maybe_send_server_notice_to_user(self.user_id)
 
         self._send_notice.assert_not_called()
@@ -177,13 +175,9 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_server_notice_only_sent_once(self):
-        self.store.get_monthly_active_count = Mock(
-            return_value=1000,
-        )
+        self.store.get_monthly_active_count = Mock(return_value=1000)
 
-        self.store.user_last_seen_monthly_active = Mock(
-            return_value=1000,
-        )
+        self.store.user_last_seen_monthly_active = Mock(return_value=1000)
 
         # Call the function multiple times to ensure we only send the notice once
         yield self._rlsn.maybe_send_server_notice_to_user(self.user_id)
@@ -193,12 +187,12 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.TestCase):
         # Now lets get the last load of messages in the service notice room and
         # check that there is only one server notice
         room_id = yield self.server_notices_manager.get_notice_room_for_user(
-            self.user_id,
+            self.user_id
         )
 
         token = yield self.event_source.get_current_token()
         events, _ = yield self.store.get_recent_events_for_room(
-            room_id, limit=100, end_token=token.room_key,
+            room_id, limit=100, end_token=token.room_key
         )
 
         count = 0

@@ -261,7 +261,7 @@ class PreviewUrlResource(Resource):
 
         logger.debug("Calculated OG for %s as %s" % (url, og))
 
-        jsonog = json.dumps(og)
+        jsonog = json.dumps(og).encode('utf8')
 
         # store OG in history-aware DB cache
         yield self.store.store_url_cache(
@@ -301,20 +301,20 @@ class PreviewUrlResource(Resource):
                 logger.warn("Error downloading %s: %r", url, e)
                 raise SynapseError(
                     500, "Failed to download content: %s" % (
-                        traceback.format_exception_only(sys.exc_type, e),
+                        traceback.format_exception_only(sys.exc_info()[0], e),
                     ),
                     Codes.UNKNOWN,
                 )
             yield finish()
 
         try:
-            if "Content-Type" in headers:
-                media_type = headers["Content-Type"][0]
+            if b"Content-Type" in headers:
+                media_type = headers[b"Content-Type"][0].decode('ascii')
             else:
                 media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
 
-            content_disposition = headers.get("Content-Disposition", None)
+            content_disposition = headers.get(b"Content-Disposition", None)
             if content_disposition:
                 _, params = cgi.parse_header(content_disposition[0],)
                 download_name = None

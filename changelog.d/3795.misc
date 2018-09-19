@@ -1,0 +1,1 @@
+Make /sync slightly faster by avoiding needless copies

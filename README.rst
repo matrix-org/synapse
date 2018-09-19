@@ -157,7 +157,7 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-There is an offical synapse image available at 
+There is an offical synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with
 the docker-compose file available at `contrib/docker <contrib/docker>`_. Further information on
 this including configuration options is available in the README on
@@ -459,37 +459,13 @@ https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-
 
 Windows Install
 ---------------
-Synapse can be installed on Cygwin. It requires the following Cygwin packages:
 
-- gcc
-- git
-- libffi-devel
-- openssl (and openssl-devel, python-openssl)
-- python
-- python-setuptools
-
-The content repository requires additional packages and will be unable to process
-uploads without them:
-
-- libjpeg8
-- libjpeg8-devel
-- zlib
-
-If you choose to install Synapse without these packages, you will need to reinstall
-``pillow`` for changes to be applied, e.g. ``pip uninstall pillow`` ``pip install
-pillow --user``
-
-Troubleshooting:
-
-- You may need to upgrade ``setuptools`` to get this to work correctly:
-  ``pip install setuptools --upgrade``.
-- You may encounter errors indicating that ``ffi.h`` is missing, even with
-  ``libffi-devel`` installed. If you do, copy the ``.h`` files:
-  ``cp /usr/lib/libffi-3.0.13/include/*.h /usr/include``
-- You may need to install libsodium from source in order to install PyNacl. If
-  you do, you may need to create a symlink to ``libsodium.a`` so ``ld`` can find
-  it: ``ln -s /usr/local/lib/libsodium.a /usr/lib/libsodium.a``
-
+If you wish to run or develop Synapse on Windows, the Windows Subsystem For
+Linux provides a Linux environment on Windows 10 which is capable of using the
+Debian, Fedora, or source installation methods. More information about WSL can
+be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 for
+Windows 10 and https://docs.microsoft.com/en-us/windows/wsl/install-on-server
+for Windows Server.
 
 Troubleshooting
 ===============
@@ -742,6 +718,18 @@ so an example nginx configuration might look like::
       }
   }
 
+and an example apache configuration may look like::
+
+    <VirtualHost *:443>
+        SSLEngine on
+        ServerName matrix.example.com;
+
+        <Location /_matrix>
+            ProxyPass http://127.0.0.1:8008/_matrix nocanon
+            ProxyPassReverse http://127.0.0.1:8008/_matrix
+        </Location>
+    </VirtualHost>
+
 You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
 for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
 recorded correctly.
@@ -896,7 +884,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python2.7 env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs pip install
+    python -m synapse.python_dependencies | xargs pip install
     pip install lxml mock
 
 This will run a process of downloading and installing all the needed
@@ -951,5 +939,13 @@ variable.  The default is 0.5, which can be decreased to reduce RAM usage
 in memory constrained enviroments, or increased if performance starts to
 degrade.
 
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall amount, and especially in terms of giving back RAM
+to the OS. To use it, the library must simply be put in the LD_PRELOAD
+environment variable when launching Synapse. On Debian, this can be done
+by installing the ``libjemalloc1`` package and adding this line to
+``/etc/default/matrix-synapse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 .. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys
