@@ -284,9 +284,10 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_unread_push_actions_for_user_in_range_for_email(
-        self, user_id, min_stream_ordering, max_stream_ordering, limit=20
+        self, user_id, min_stream_ordering, max_stream_ordering,
+        msglimit=26, invlimit=4, room_ignore_list=[]
     ):
-        """Get a list of the most recent unread push actions for a given user,
+        """Get a list of the oldest and most recent unread push actions for a given user,
         within the given stream ordering range. Called by the emailpusher
 
         Args:
@@ -295,15 +296,17 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 stream ordering of event push actions to fetch.
             max_stream_ordering(int): The inclusive upper bound on the
                 stream ordering of event push actions to fetch.
-            limit (int): The maximum number of rows to return.
+            msglimit (int): The maximum number of message push actions to return.
+            invlimit (int): The maximum number of invite push actions to return.
         Returns:
             A promise which resolves to a list of dicts with the keys "event_id",
             "room_id", "stream_ordering", "actions", "received_ts".
             The list will be ordered by descending received_ts.
-            The list will have between 0~limit entries.
+            The list will have between 0~(msglimit+invlimit) entries.
         """
         # find rooms that have a read receipt in them and return the most recent
-        # push actions
+        # as well as the oldest push actions (otherwise we might never send notifications
+        # because of roll-over effects)
         def get_after_receipt(txn):
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
@@ -314,6 +317,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "   FROM events"
                 "   INNER JOIN receipts_linearized USING (room_id, event_id)"
                 "   WHERE receipt_type = 'm.read' AND user_id = ?"
+                "   AND room_id NOT IN ("
+                + ",".join("?" * len(room_ignore_list)) + ")"
                 "   GROUP BY room_id"
                 ") AS rl,"
                 " event_push_actions AS ep"
@@ -324,21 +329,27 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "   AND ep.user_id = ?"
                 "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
-                " ORDER BY ep.stream_ordering DESC LIMIT ?"
+                " ORDER BY ep.stream_ordering " + order + " LIMIT ?"
             )
-            args = [
-                user_id, user_id,
-                min_stream_ordering, max_stream_ordering, limit,
+            args = [user_id] + room_ignore_list + [
+                user_id,
+                min_stream_ordering, max_stream_ordering, msglimit/2,
             ]
             txn.execute(sql, args)
             return txn.fetchall()
-        after_read_receipt = yield self.runInteraction(
+
+        order = "DESC"
+        after_read_receipt_desc = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
         )
+        order = "ASC"
+        after_read_receipt_asc = yield self.runInteraction(
+            "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
+            )
 
         # There are rooms with push actions in them but you don't have a read receipt in
-        # them e.g. rooms you've been invited to, so get push actions for rooms which do
-        # not have read receipts in them too.
+        # them (rooms you've been invited to), so get push actions for rooms which do
+        # not have read receipts in them too. Again, get oldest and most recent.
         def get_no_receipt(txn):
             sql = (
                 "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
@@ -354,28 +365,45 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 "   AND ep.user_id = ?"
                 "   AND ep.stream_ordering > ?"
                 "   AND ep.stream_ordering <= ?"
-                " ORDER BY ep.stream_ordering DESC LIMIT ?"
+                " ORDER BY ep.stream_ordering " + order + " LIMIT ?"
             )
             args = [
                 user_id, user_id,
-                min_stream_ordering, max_stream_ordering, limit,
+                min_stream_ordering, max_stream_ordering, invlimit/2,
             ]
             txn.execute(sql, args)
             return txn.fetchall()
-        no_read_receipt = yield self.runInteraction(
+        order = "DESC"
+        no_read_receipt_desc = yield self.runInteraction(
+            "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
+        )
+        order = "ASC"
+        no_read_receipt_asc = yield self.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
         )
 
-        # Make a list of dicts from the two sets of results.
-        notifs = [
+        # Make a list of dicts from the sets of results.
+        notifs_duplicates = [
             {
                 "event_id": row[0],
                 "room_id": row[1],
                 "stream_ordering": row[2],
                 "actions": _deserialize_action(row[3], row[4]),
                 "received_ts": row[5],
-            } for row in after_read_receipt + no_read_receipt
+            } for row in (
+                after_read_receipt_desc + after_read_receipt_asc
+                + no_read_receipt_desc + no_read_receipt_asc
+                )
         ]
+
+        # Remove duplicates
+        notifs = []
+        event_ids = []
+        for notif in notifs_duplicates:
+            if notif["event_id"] in event_ids:
+                continue
+            notifs.append(notif)
+            event_ids.append(notif["event_id"])
 
         # Now sort it so it's ordered correctly, since currently it will
         # contain results from the first query, correctly ordered, followed
@@ -383,8 +411,9 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # by received_ts (most recent first)
         notifs.sort(key=lambda r: -(r['received_ts'] or 0))
 
-        # Now return the first `limit`
-        defer.returnValue(notifs[:limit])
+        # We can return the whole list because it will never be greater than
+        # (msglimit+invlimit)
+        defer.returnValue(notifs)
 
     def add_push_actions_to_staging(self, event_id, user_id_actions):
         """Add the push actions for the event to the push action staging area.
