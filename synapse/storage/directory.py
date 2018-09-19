@@ -75,7 +75,6 @@ class DirectoryWorkerStore(SQLBaseStore):
             },
             retcol="creator",
             desc="get_room_alias_creator",
-            allow_none=True
         )
 
     @cached(max_entries=5000)
