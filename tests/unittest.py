@@ -219,7 +219,8 @@ class HomeserverTestCase(TestCase):
 
         Function to be overridden in subclasses.
         """
-        raise NotImplementedError()
+        hs = self.setup_test_homeserver()
+        return hs
 
     def prepare(self, reactor, clock, homeserver):
         """
