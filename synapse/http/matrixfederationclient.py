@@ -44,7 +44,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.endpoint import matrix_federation_endpoint
-from synapse.util.async_helpers import timeout_no_seriously
+from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
 
@@ -145,8 +145,14 @@ def _handle_json_response(reactor, timeout_sec, request, response):
     """
     try:
         check_content_type_is_json(response.headers)
+
         d = treq.json_content(response)
-        d.addTimeout(timeout_sec, reactor)
+        d = timeout_deferred(
+            d,
+            timeout=timeout_sec,
+            reactor=reactor,
+        )
+
         body = yield make_deferred_yieldable(d)
     except Exception as e:
         logger.warn(
@@ -321,15 +327,10 @@ class MatrixFederationHttpClient(object):
                         reactor=self.hs.get_reactor(),
                         unbuffered=True
                     )
-                    request_deferred.addTimeout(_sec_timeout, self.hs.get_reactor())
 
-                    # Sometimes the timeout above doesn't work, so lets hack yet
-                    # another layer of timeouts in in the vain hope that at some
-                    # point the world made sense and this really really really
-                    # should work.
-                    request_deferred = timeout_no_seriously(
+                    request_deferred = timeout_deferred(
                         request_deferred,
-                        timeout=_sec_timeout * 2,
+                        timeout=_sec_timeout,
                         reactor=self.hs.get_reactor(),
                     )
 
@@ -388,7 +389,11 @@ class MatrixFederationHttpClient(object):
                 # :'(
                 # Update transactions table?
                 d = treq.content(response)
-                d.addTimeout(_sec_timeout, self.hs.get_reactor())
+                d = timeout_deferred(
+                    d,
+                    timeout=_sec_timeout,
+                    reactor=self.hs.get_reactor(),
+                )
                 body = yield make_deferred_yieldable(d)
                 raise HttpResponseException(
                     response.code, response.phrase, body

@@ -28,7 +28,7 @@ from synapse.types import StreamToken
 from synapse.util.async_helpers import (
     DeferredTimeoutError,
     ObservableDeferred,
-    add_timeout_to_deferred,
+    timeout_deferred,
 )
 from synapse.util.logcontext import PreserveLoggingContext, run_in_background
 from synapse.util.logutils import log_function
@@ -337,7 +337,7 @@ class Notifier(object):
                     # Now we wait for the _NotifierUserStream to be told there
                     # is a new token.
                     listener = user_stream.new_listener(prev_token)
-                    add_timeout_to_deferred(
+                    listener.deferred = timeout_deferred(
                         listener.deferred,
                         (end_time - now) / 1000.,
                         self.hs.get_reactor(),
@@ -559,11 +559,12 @@ class Notifier(object):
             if end_time <= now:
                 break
 
-            add_timeout_to_deferred(
-                listener.deferred.addTimeout,
-                (end_time - now) / 1000.,
-                self.hs.get_reactor(),
+            listener.deferred = timeout_deferred(
+                listener.deferred,
+                timeout=(end_time - now) / 1000.,
+                reactor=self.hs.get_reactor(),
             )
+
             try:
                 with PreserveLoggingContext():
                     yield listener.deferred
