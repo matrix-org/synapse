@@ -421,10 +421,13 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
     def time_it_out():
         timed_out[0] = True
 
+        try:
+            deferred.cancel()
+        except:   # noqa: E722, if we throw any exception it'll break time outs
+            logger.exception("Canceller failed during timeout")
+
         if not new_d.called:
             new_d.errback(DeferredTimeoutError(timeout, "Deferred"))
-
-        deferred.cancel()
 
     delayed_call = reactor.callLater(timeout, time_it_out)
 
