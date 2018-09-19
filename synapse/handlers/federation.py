@@ -279,7 +279,7 @@ class FederationHandler(BaseHandler):
                 elif missing_prevs:
                     logger.info(
                         "[%s %s] Not recursively fetching %d missing prev_events: %s",
-                        room_id, event_id, len(prevs - seen), shortstr(missing_prevs),
+                        room_id, event_id, len(missing_prevs), shortstr(missing_prevs),
                     )
 
             if sent_to_us_directly and prevs - seen:
@@ -288,7 +288,7 @@ class FederationHandler(BaseHandler):
                 # made a message referencing, we explode
                 logger.warn(
                     "[%s %s] Failed to fetch %d prev events: rejecting",
-                    room_id, event_id,
+                    room_id, event_id, len(prevs - seen),
                 )
                 raise FederationError(
                     "ERROR",
@@ -426,22 +426,22 @@ class FederationHandler(BaseHandler):
         # tell clients about them in order.
         missing_events.sort(key=lambda x: x.depth)
 
-        for e in missing_events:
+        for ev in missing_events:
             logger.info(
                 "[%s %s] Handling received prev_event %s",
-                room_id, event_id, e.event_id,
+                room_id, event_id, ev.event_id,
             )
             try:
                 yield self.on_receive_pdu(
                     origin,
-                    e,
+                    ev,
                     get_missing=False
                 )
             except FederationError as e:
                 if e.code == 403:
                     logger.warn(
                         "[%s %s] Received prev_event %s failed history check.",
-                        room_id, event_id, e.event_id,
+                        room_id, event_id, ev.event_id,
                     )
                 else:
                     raise
