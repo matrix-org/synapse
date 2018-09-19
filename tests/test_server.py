@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import logging
 import re
+
+from six import StringIO
 
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
@@ -159,7 +160,7 @@ class SiteTestCase(unittest.HomeserverTestCase):
                 return NOT_DONE_YET
 
         # Set up a logging handler that we can inspect afterwards
-        output = io.StringIO()
+        output = StringIO()
         handler = logging.StreamHandler(output)
         logger.addHandler(handler)
         old_level = logger.level
