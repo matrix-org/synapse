@@ -1,1 +1,1 @@
-Added "media-src: 'self'" to CSP for resources downloading
+Fix problem when playing media from Chrome using direct URL
