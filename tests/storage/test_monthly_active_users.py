@@ -183,3 +183,34 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store.populate_monthly_active_users('user_id')
         self.pump()
         self.store.upsert_monthly_active_user.assert_not_called()
+
+    def test_get_reserved_real_user_account(self):
+        # Test no reserved users, or reserved threepids
+        count = self.store.get_registered_reserved_users_count()
+        self.assertEquals(self.get_success(count), 0)
+        # Test reserved users but no registered users
+
+        user1 = '@user1:example.com'
+        user2 = '@user2:example.com'
+        user1_email = 'user1@example.com'
+        user2_email = 'user2@example.com'
+        threepids = [
+            {'medium': 'email', 'address': user1_email},
+            {'medium': 'email', 'address': user2_email},
+        ]
+        self.hs.config.mau_limits_reserved_threepids = threepids
+        self.store.initialise_reserved_users(threepids)
+        self.pump()
+        count = self.store.get_registered_reserved_users_count()
+        self.assertEquals(self.get_success(count), 0)
+
+        # Test reserved registed users
+        self.store.register(user_id=user1, token="123", password_hash=None)
+        self.store.register(user_id=user2, token="456", password_hash=None)
+        self.pump()
+
+        now = int(self.hs.get_clock().time_msec())
+        self.store.user_add_threepid(user1, "email", user1_email, now, now)
+        self.store.user_add_threepid(user2, "email", user2_email, now, now)
+        count = self.store.get_registered_reserved_users_count()
+        self.assertEquals(self.get_success(count), len(threepids))
