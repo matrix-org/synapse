@@ -196,7 +196,7 @@ class FederationHandler(BaseHandler):
         # queue up events for later processing.
         if room_id in self.room_queues:
             logger.info(
-                "[%s %s] Ignoring PDU from %s for now: join in progress",
+                "[%s %s] Queuing PDU from %s for now: join in progress",
                 room_id, event_id, origin,
             )
             self.room_queues[room_id].append((pdu, origin))
