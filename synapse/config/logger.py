@@ -168,7 +168,8 @@ def setup_logging(config, use_worker_options=False):
         if log_file:
             # TODO: Customisable file size / backup count
             handler = logging.handlers.RotatingFileHandler(
-                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3,
+                encoding='utf8'
             )
 
             def sighup(signum, stack):
@@ -226,7 +227,22 @@ def setup_logging(config, use_worker_options=False):
     #
     # However this may not be too much of a problem if we are just writing to a file.
     observer = STDLibLogObserver()
+
+    def _log(event):
+
+        if "log_text" in event:
+            if event["log_text"].startswith("DNSDatagramProtocol starting on "):
+                return
+
+            if event["log_text"].startswith("(UDP Port "):
+                return
+
+            if event["log_text"].startswith("Timing out client"):
+                return
+
+        return observer(event)
+
     globalLogBeginner.beginLoggingTo(
-        [observer],
+        [_log],
         redirectStandardIO=not config.no_redirect_stdio,
     )

@@ -36,7 +36,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def initialise_reserved_users(self, threepids):
-        # TODO Why can't I do this in init?
         store = self.hs.get_datastore()
         reserved_user_list = []
 
@@ -96,7 +95,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # While Postgres does not require 'LIMIT', but also does not support
             # negative LIMIT values. So there is no way to write it that both can
             # support
-            query_args = [self.hs.config.max_mau_value]
+            safe_guard = self.hs.config.max_mau_value - len(self.reserved_users)
+            # Must be greater than zero for postgres
+            safe_guard = safe_guard if safe_guard > 0 else 0
+            query_args = [safe_guard]
 
             base_sql = """
                 DELETE FROM monthly_active_users
@@ -144,6 +146,24 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             return count
         return self.runInteraction("count_users", _count_users)
 
+    @defer.inlineCallbacks
+    def get_registered_reserved_users_count(self):
+        """Of the reserved threepids defined in config, how many are associated
+        with registered users?
+
+        Returns:
+            Defered[int]: Number of real reserved users
+        """
+        count = 0
+        for tp in self.hs.config.mau_limits_reserved_threepids:
+            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                tp["medium"], tp["address"]
+            )
+            if user_id:
+                count = count + 1
+        defer.returnValue(count)
+
+    @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member
@@ -152,7 +172,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Deferred[bool]: True if a new entry was created, False if an
                 existing one was updated.
         """
-        is_insert = self._simple_upsert(
+        is_insert = yield self._simple_upsert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
             keyvalues={
@@ -196,7 +216,16 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Args:
             user_id(str): the user_id to query
         """
+
         if self.hs.config.limit_usage_by_mau:
+            # Trial users and guests should not be included as part of MAU group
+            is_guest = yield self.is_guest(user_id)
+            if is_guest:
+                return
+            is_trial = yield self.is_trial_user(user_id)
+            if is_trial:
+                return
+
             last_seen_timestamp = yield self.user_last_seen_monthly_active(user_id)
             now = self.hs.get_clock().time_msec()
 

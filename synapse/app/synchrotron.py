@@ -114,7 +114,10 @@ class SynchrotronPresence(object):
         logger.info("Presence process_id is %r", self.process_id)
 
     def send_user_sync(self, user_id, is_syncing, last_sync_ms):
-        self.hs.get_tcp_replication().send_user_sync(user_id, is_syncing, last_sync_ms)
+        if self.hs.config.use_presence:
+            self.hs.get_tcp_replication().send_user_sync(
+                user_id, is_syncing, last_sync_ms
+            )
 
     def mark_as_coming_online(self, user_id):
         """A user has started syncing. Send a UserSync to the master, unless they
@@ -211,10 +214,13 @@ class SynchrotronPresence(object):
         yield self.notify_from_replication(states, stream_id)
 
     def get_currently_syncing_users(self):
-        return [
-            user_id for user_id, count in iteritems(self.user_to_num_current_syncs)
-            if count > 0
-        ]
+        if self.hs.config.use_presence:
+            return [
+                user_id for user_id, count in iteritems(self.user_to_num_current_syncs)
+                if count > 0
+            ]
+        else:
+            return set()
 
 
 class SynchrotronTyping(object):
@@ -243,10 +249,7 @@ class SynchrotronApplicationService(object):
 
 
 class SynchrotronServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = SynchrotronSlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = SynchrotronSlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -332,8 +335,9 @@ class SyncReplicationHandler(ReplicationClientHandler):
         self.presence_handler = hs.get_presence_handler()
         self.notifier = hs.get_notifier()
 
+    @defer.inlineCallbacks
     def on_rdata(self, stream_name, token, rows):
-        super(SyncReplicationHandler, self).on_rdata(stream_name, token, rows)
+        yield super(SyncReplicationHandler, self).on_rdata(stream_name, token, rows)
         run_in_background(self.process_and_notify, stream_name, token, rows)
 
     def get_streams_to_replicate(self):

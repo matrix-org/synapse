@@ -156,7 +156,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
             edu_content = content["content"]
 
         logger.info(
-            "Got %r edu from $s",
+            "Got %r edu from %s",
             edu_type, origin,
         )
 

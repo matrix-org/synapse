@@ -25,7 +25,8 @@ from twisted.internet import defer
 import synapse.types
 from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, ResourceLimitError
+from synapse.config.server import is_threepid_reserved
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -211,7 +212,7 @@ class Auth(object):
             user_agent = request.requestHeaders.getRawHeaders(
                 b"User-Agent",
                 default=[b""]
-            )[0]
+            )[0].decode('ascii', 'surrogateescape')
             if user and access_token and ip_addr:
                 yield self.store.insert_client_ip(
                     user_id=user.to_string(),
@@ -682,7 +683,7 @@ class Auth(object):
         Returns:
             bool: False if no access_token was given, True otherwise.
         """
-        query_params = request.args.get("access_token")
+        query_params = request.args.get(b"access_token")
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
 
@@ -698,7 +699,7 @@ class Auth(object):
                 401 since some of the old clients depended on auth errors returning
                 403.
         Returns:
-            str: The access_token
+            unicode: The access_token
         Raises:
             AuthError: If there isn't an access_token in the request.
         """
@@ -720,9 +721,9 @@ class Auth(object):
                     "Too many Authorization headers.",
                     errcode=Codes.MISSING_TOKEN,
                 )
-            parts = auth_headers[0].split(" ")
-            if parts[0] == "Bearer" and len(parts) == 2:
-                return parts[1]
+            parts = auth_headers[0].split(b" ")
+            if parts[0] == b"Bearer" and len(parts) == 2:
+                return parts[1].decode('ascii')
             else:
                 raise AuthError(
                     token_not_found_http_status,
@@ -738,7 +739,7 @@ class Auth(object):
                     errcode=Codes.MISSING_TOKEN
                 )
 
-            return query_params[0]
+            return query_params[0].decode('ascii')
 
     @defer.inlineCallbacks
     def check_in_room_or_world_readable(self, room_id, user_id):
@@ -775,31 +776,56 @@ class Auth(object):
             )
 
     @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None):
+    def check_auth_blocking(self, user_id=None, threepid=None):
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
         Args:
             user_id(str|None): If present, checks for presence against existing
             MAU cohort
+
+            threepid(dict|None): If present, checks for presence against configured
+            reserved threepid. Used in cases where the user is trying register
+            with a MAU blocked server, normally they would be rejected but their
+            threepid is on the reserved list. user_id and
+            threepid should never be set at the same time.
         """
+
+        # Never fail an auth check for the server notices users
+        # This can be a problem where event creation is prohibited due to blocking
+        if user_id == self.hs.config.server_notices_mxid:
+            return
+
         if self.hs.config.hs_disabled:
-            raise AuthError(
+            raise ResourceLimitError(
                 403, self.hs.config.hs_disabled_message,
-                errcode=Codes.RESOURCE_LIMIT_EXCEED,
-                admin_uri=self.hs.config.admin_uri,
+                errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+                admin_contact=self.hs.config.admin_contact,
+                limit_type=self.hs.config.hs_disabled_limit_type
             )
         if self.hs.config.limit_usage_by_mau is True:
-            # If the user is already part of the MAU cohort
+            assert not (user_id and threepid)
+
+            # If the user is already part of the MAU cohort or a trial user
             if user_id:
                 timestamp = yield self.store.user_last_seen_monthly_active(user_id)
                 if timestamp:
                     return
+
+                is_trial = yield self.store.is_trial_user(user_id)
+                if is_trial:
+                    return
+            elif threepid:
+                # If the user does not exist yet, but is signing up with a
+                # reserved threepid then pass auth check
+                if is_threepid_reserved(self.hs.config, threepid):
+                    return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
             if current_mau >= self.hs.config.max_mau_value:
-                raise AuthError(
-                    403, "Monthly Active User Limits AU Limit Exceeded",
-                    admin_uri=self.hs.config.admin_uri,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEED
+                raise ResourceLimitError(
+                    403, "Monthly Active User Limit Exceeded",
+                    admin_contact=self.hs.config.admin_contact,
+                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+                    limit_type="monthly_active_user"
                 )

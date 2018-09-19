@@ -23,7 +23,7 @@ from twisted.internet import defer
 from synapse.api.constants import Membership
 
 from tests import unittest
-from tests.server import make_request, wait_until_result
+from tests.server import make_request, render
 
 
 class RestTestCase(unittest.TestCase):
@@ -171,8 +171,7 @@ class RestHelper(object):
         request, channel = make_request(
             "POST", path, json.dumps(content).encode('utf8')
         )
-        request.render(self.resource)
-        wait_until_result(self.hs.get_reactor(), channel)
+        render(request, self.resource, self.hs.get_reactor())
 
         assert channel.result["code"] == b"200", channel.result
         self.auth_user_id = temp_id
@@ -220,8 +219,7 @@ class RestHelper(object):
 
         request, channel = make_request("PUT", path, json.dumps(data).encode('utf8'))
 
-        request.render(self.resource)
-        wait_until_result(self.hs.get_reactor(), channel)
+        render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
@@ -242,7 +240,6 @@ class RestHelper(object):
         self.assertEquals(200, code)
         defer.returnValue(response)
 
-    @defer.inlineCallbacks
     def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
@@ -250,9 +247,16 @@ class RestHelper(object):
             body = "body_text_here"
 
         path = "/_matrix/client/r0/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
-        content = '{"msgtype":"m.text","body":"%s"}' % body
+        content = {"msgtype": "m.text", "body": body}
         if tok:
             path = path + "?access_token=%s" % tok
 
-        (code, response) = yield self.mock_resource.trigger("PUT", path, content)
-        self.assertEquals(expect_code, code, msg=str(response))
+        request, channel = make_request("PUT", path, json.dumps(content).encode('utf8'))
+        render(request, self.resource, self.hs.get_reactor())
+
+        assert int(channel.result["code"]) == expect_code, (
+            "Expected: %d, got: %d, resp: %r"
+            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        )
+
+        return channel.json_body

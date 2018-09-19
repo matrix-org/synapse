@@ -62,7 +62,7 @@ from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
-from synapse.storage import are_all_users_on_domain
+from synapse.storage import DataStore, are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
 from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
 from synapse.util.caches import CACHE_SIZE_FACTOR
@@ -111,6 +111,8 @@ def build_resource_for_web_client(hs):
 
 
 class SynapseHomeServer(HomeServer):
+    DATASTORE_CLASS = DataStore
+
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
         bind_addresses = listener_config["bind_addresses"]
@@ -305,6 +307,10 @@ class SynapseHomeServer(HomeServer):
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
 max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
+registered_reserved_users_mau_gauge = Gauge(
+    "synapse_admin_mau:registered_reserved_users",
+    "Registered users with reserved threepids"
+)
 
 
 def setup(config_options):
@@ -356,13 +362,13 @@ def setup(config_options):
     logger.info("Preparing database: %s...", config.database_config['name'])
 
     try:
-        db_conn = hs.get_db_conn(run_new_connection=False)
-        prepare_database(db_conn, database_engine, config=config)
-        database_engine.on_new_connection(db_conn)
+        with hs.get_db_conn(run_new_connection=False) as db_conn:
+            prepare_database(db_conn, database_engine, config=config)
+            database_engine.on_new_connection(db_conn)
 
-        hs.run_startup_checks(db_conn, database_engine)
+            hs.run_startup_checks(db_conn, database_engine)
 
-        db_conn.commit()
+            db_conn.commit()
     except UpgradeDatabaseException:
         sys.stderr.write(
             "\nFailed to upgrade database.\n"
@@ -451,6 +457,10 @@ def run(hs):
         stats["homeserver"] = hs.config.server_name
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
+        version = sys.version_info
+        stats["python_version"] = "{}.{}.{}".format(
+            version.major, version.minor, version.micro
+        )
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
@@ -525,13 +535,18 @@ def run(hs):
     clock.looping_call(
         hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60
     )
+    hs.get_datastore().reap_monthly_active_users()
 
     @defer.inlineCallbacks
     def generate_monthly_active_users():
-        count = 0
+        current_mau_count = 0
+        reserved_count = 0
+        store = hs.get_datastore()
         if hs.config.limit_usage_by_mau:
-            count = yield hs.get_datastore().get_monthly_active_count()
-        current_mau_gauge.set(float(count))
+            current_mau_count = yield store.get_monthly_active_count()
+            reserved_count = yield store.get_registered_reserved_users_count()
+        current_mau_gauge.set(float(current_mau_count))
+        registered_reserved_users_mau_gauge.set(float(reserved_count))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 
     hs.get_datastore().initialise_reserved_users(

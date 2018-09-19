@@ -58,6 +58,7 @@ class TransactionQueue(object):
     """
 
     def __init__(self, hs):
+        self.hs = hs
         self.server_name = hs.hostname
 
         self.store = hs.get_datastore()
@@ -308,6 +309,9 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
+        if not self.hs.config.use_presence:
+            # No-op if presence is disabled.
+            return
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
@@ -459,7 +463,19 @@ class TransactionQueue(object):
                 # pending_transactions flag.
 
                 pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
+
+                # We can only include at most 50 PDUs per transactions
+                pending_pdus, leftover_pdus = pending_pdus[:50], pending_pdus[50:]
+                if leftover_pdus:
+                    self.pending_pdus_by_dest[destination] = leftover_pdus
+
                 pending_edus = self.pending_edus_by_dest.pop(destination, [])
+
+                # We can only include at most 100 EDUs per transactions
+                pending_edus, leftover_edus = pending_edus[:100], pending_edus[100:]
+                if leftover_edus:
+                    self.pending_edus_by_dest[destination] = leftover_edus
+
                 pending_presence = self.pending_presence_by_dest.pop(destination, {})
 
                 pending_edus.extend(

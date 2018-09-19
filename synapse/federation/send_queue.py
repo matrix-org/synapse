@@ -32,7 +32,7 @@ Events are replicated via a separate events stream.
 import logging
 from collections import namedtuple
 
-from six import iteritems, itervalues
+from six import iteritems
 
 from sortedcontainers import SortedDict
 
@@ -117,7 +117,7 @@ class FederationRemoteSendQueue(object):
 
             user_ids = set(
                 user_id
-                for uids in itervalues(self.presence_changed)
+                for uids in self.presence_changed.values()
                 for user_id in uids
             )
 

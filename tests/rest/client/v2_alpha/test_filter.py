@@ -24,8 +24,8 @@ from tests import unittest
 from tests.server import (
     ThreadedMemoryReactorClock as MemoryReactorClock,
     make_request,
+    render,
     setup_test_homeserver,
-    wait_until_result,
 )
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
@@ -76,8 +76,7 @@ class FilterTestCase(unittest.TestCase):
             "/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
             self.EXAMPLE_FILTER_JSON,
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEqual(channel.json_body, {"filter_id": "0"})
@@ -91,8 +90,7 @@ class FilterTestCase(unittest.TestCase):
             "/_matrix/client/r0/user/%s/filter" % ("@watermelon:test"),
             self.EXAMPLE_FILTER_JSON,
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"403")
         self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
@@ -105,8 +103,7 @@ class FilterTestCase(unittest.TestCase):
             "/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
             self.EXAMPLE_FILTER_JSON,
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.hs.is_mine = _is_mine
         self.assertEqual(channel.result["code"], b"403")
@@ -121,8 +118,7 @@ class FilterTestCase(unittest.TestCase):
         request, channel = make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/%s" % (self.USER_ID, filter_id)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEquals(channel.json_body, self.EXAMPLE_FILTER)
@@ -131,8 +127,7 @@ class FilterTestCase(unittest.TestCase):
         request, channel = make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.USER_ID)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"400")
         self.assertEquals(channel.json_body["errcode"], Codes.NOT_FOUND)
@@ -143,8 +138,7 @@ class FilterTestCase(unittest.TestCase):
         request, channel = make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.USER_ID)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"400")
 
@@ -153,7 +147,6 @@ class FilterTestCase(unittest.TestCase):
         request, channel = make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/" % (self.USER_ID)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"400")

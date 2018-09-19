@@ -291,8 +291,9 @@ class FederationHandler(BaseHandler):
                             ev_ids, get_prev_content=False, check_redacted=False
                         )
 
+                    room_version = yield self.store.get_room_version(pdu.room_id)
                     state_map = yield resolve_events_with_factory(
-                        state_groups, {pdu.event_id: pdu}, fetch
+                        room_version, state_groups, {pdu.event_id: pdu}, fetch
                     )
 
                     state = (yield self.store.get_events(state_map.values())).values()
@@ -359,6 +360,35 @@ class FederationHandler(BaseHandler):
         # apparently.
         #
         # see https://github.com/matrix-org/synapse/pull/1744
+        #
+        # ----
+        #
+        # Update richvdh 2018/09/18: There are a number of problems with timing this
+        # request out agressively on the client side:
+        #
+        # - it plays badly with the server-side rate-limiter, which starts tarpitting you
+        #   if you send too many requests at once, so you end up with the server carefully
+        #   working through the backlog of your requests, which you have already timed
+        #   out.
+        #
+        # - for this request in particular, we now (as of
+        #   https://github.com/matrix-org/synapse/pull/3456) reject any PDUs where the
+        #   server can't produce a plausible-looking set of prev_events - so we becone
+        #   much more likely to reject the event.
+        #
+        # - contrary to what it says above, we do *not* fall back to fetching fresh state
+        #   for the room if get_missing_events times out. Rather, we give up processing
+        #   the PDU whose prevs we are missing, which then makes it much more likely that
+        #   we'll end up back here for the *next* PDU in the list, which exacerbates the
+        #   problem.
+        #
+        # - the agressive 10s timeout was introduced to deal with incoming federation
+        #   requests taking 8 hours to process. It's not entirely clear why that was going
+        #   on; certainly there were other issues causing traffic storms which are now
+        #   resolved, and I think in any case we may be more sensible about our locking
+        #   now. We're *certainly* more sensible about our logging.
+        #
+        # All that said: Let's try increasing the timout to 60s and see what happens.
 
         missing_events = yield self.federation_client.get_missing_events(
             origin,
@@ -367,7 +397,7 @@ class FederationHandler(BaseHandler):
             latest_events=[pdu],
             limit=10,
             min_depth=min_depth,
-            timeout=10000,
+            timeout=60000,
         )
 
         logger.info(
@@ -593,7 +623,7 @@ class FederationHandler(BaseHandler):
 
         required_auth = set(
             a_id
-            for event in events + state_events.values() + auth_events.values()
+            for event in events + list(state_events.values()) + list(auth_events.values())
             for a_id, _ in event.auth_events
         )
         auth_events.update({
@@ -801,7 +831,7 @@ class FederationHandler(BaseHandler):
                     )
                     continue
                 except NotRetryingDestination as e:
-                    logger.info(e.message)
+                    logger.info(str(e))
                     continue
                 except FederationDeniedError as e:
                     logger.info(e)
@@ -1357,7 +1387,7 @@ class FederationHandler(BaseHandler):
         )
 
         if state_groups:
-            _, state = state_groups.items().pop()
+            _, state = list(state_groups.items()).pop()
             results = state
 
             if event.is_state():
@@ -1828,7 +1858,10 @@ class FederationHandler(BaseHandler):
                     (d.type, d.state_key): d for d in different_events if d
                 })
 
-                new_state = self.state_handler.resolve_events(
+                room_version = yield self.store.get_room_version(event.room_id)
+
+                new_state = yield self.state_handler.resolve_events(
+                    room_version,
                     [list(local_view.values()), list(remote_view.values())],
                     event
                 )
@@ -2386,8 +2419,7 @@ class FederationHandler(BaseHandler):
             extra_users=extra_users
         )
 
-        logcontext.run_in_background(
-            self.pusher_pool.on_new_notifications,
+        self.pusher_pool.on_new_notifications(
             event_stream_id, max_stream_id,
         )
 
