@@ -1,14 +1,1 @@
-Synapse doesn’t allow for media resources to be played directly from
-Chrome. It is a problem for users on other networks (e.g. IRC)
-communicating with Matrix users through a gateway. The gateway sends
-them the raw URL for the resource when a Matrix user uploads a video
-and the video cannot be played directly in Chrome using that URL.
-
-Chrome argues it is not authorized to play the video because of the
-Content Security Policy. Chrome checks for the "media-src" policy which
-is missing, and defauts to the "default-src" policy which is "none".
-
-As Synapse already sends "object-src: 'self'" I thought it wouldn’t be
-a problem to add "media-src: 'self'" to the CSP to fix this problem.
-
-Contributed by Jérémy Farnaud
+Added "media-src: 'self'" to CSP for resources downloading
