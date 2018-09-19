@@ -160,14 +160,15 @@ if __name__ == "__main__":
         default=None,
         help="New password for user. Will prompt if omitted.",
     )
-    parser.add_argument(
+    admin_group = parser.add_mutually_exclusive_group()
+    admin_group.add_argument(
         "-a", "--admin",
         action="store_true",
-        help="Register new user as an admin. Will prompt if --regular-user is not set.",
+        help="Register new user as an admin. Will prompt if --no-admin is not set.",
     )
-    parser.add_argument(
-        "--regular-user",
-        action="store_true",
+    admin_group.add_argument(
+        "--no-admin",
+        action="store_false",
         help="Register new user as a regular user.",
     )
 
@@ -202,10 +203,6 @@ if __name__ == "__main__":
     else:
         secret = args.shared_secret
 
-    if args.admin and args.regular_user:
-        print "Both --admin and --regular-user are set, choose either."
-        sys.exit(1)
-
-    admin = True if args.admin else False if args.regular_user else None
+    admin = args.admin or not args.no_admin or None
 
     register_new_user(args.user, args.password, args.server_url, secret, admin)
