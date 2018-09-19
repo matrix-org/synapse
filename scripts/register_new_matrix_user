@@ -133,7 +133,6 @@ def register_new_user(user, password, server_location, shared_secret, admin):
             print "Passwords do not match"
             sys.exit(1)
 
-    print admin
     if admin is None:
         admin = raw_input("Make admin [no]: ")
         if admin in ("y", "yes", "true"):
