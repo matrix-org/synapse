@@ -157,7 +157,7 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-There is an offical synapse image available at 
+There is an offical synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with
 the docker-compose file available at `contrib/docker <contrib/docker>`_. Further information on
 this including configuration options is available in the README on
@@ -460,7 +460,12 @@ https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-
 Windows Install
 ---------------
 
-If you wish to run or develop Synapse on Windows, the Windows Subsystem For Linux provides a Linux environment on Windows 10 which is capable of using the Debian, Fedora, or source installation methods. More information about WSL can be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 .
+If you wish to run or develop Synapse on Windows, the Windows Subsystem For
+Linux provides a Linux environment on Windows 10 which is capable of using the
+Debian, Fedora, or source installation methods. More information about WSL can
+be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 for
+Windows 10 and https://docs.microsoft.com/en-us/windows/wsl/install-on-server
+for Windows Server.
 
 Troubleshooting
 ===============
