@@ -269,14 +269,7 @@ class PaginationHandler(object):
 
             if state_ids:
                 state = yield self.store.get_events(list(state_ids.values()))
-
-            if state:
-                state = yield filter_events_for_client(
-                    self.store,
-                    user_id,
-                    state.values(),
-                    is_peeking=(member_event_id is None),
-                )
+                state = state.values()
 
         time_now = self.clock.time_msec()
 

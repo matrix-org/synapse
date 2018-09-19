@@ -50,7 +50,7 @@ def fetch_server_key(server_name, tls_client_options_factory, path=KEY_API_V1):
                 defer.returnValue((server_response, server_certificate))
         except SynapseKeyClientError as e:
             logger.warn("Error getting key for %r: %s", server_name, e)
-            if e.status.startswith("4"):
+            if e.status.startswith(b"4"):
                 # Don't retry for 4xx responses.
                 raise IOError("Cannot get key for %r" % server_name)
         except (ConnectError, DomainError) as e:
@@ -81,6 +81,12 @@ class SynapseKeyClientProtocol(HTTPClient):
     def connectionMade(self):
         self._peer = self.transport.getPeer()
         logger.debug("Connected to %s", self._peer)
+
+        if not isinstance(self.path, bytes):
+            self.path = self.path.encode('ascii')
+
+        if not isinstance(self.host, bytes):
+            self.host = self.host.encode('ascii')
 
         self.sendCommand(b"GET", self.path)
         if self.host:

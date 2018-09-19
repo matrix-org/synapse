@@ -20,7 +20,14 @@ import string
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, CodeMessageException, Codes, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    CodeMessageException,
+    Codes,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+)
 from synapse.types import RoomAlias, UserID, get_domain_from_id
 
 from ._base import BaseHandler
@@ -109,7 +116,13 @@ class DirectoryHandler(BaseHandler):
     def delete_association(self, requester, user_id, room_alias):
         # association deletion for human users
 
-        can_delete = yield self._user_can_delete_alias(room_alias, user_id)
+        try:
+            can_delete = yield self._user_can_delete_alias(room_alias, user_id)
+        except StoreError as e:
+            if e.code == 404:
+                raise NotFoundError("Unknown room alias")
+            raise
+
         if not can_delete:
             raise AuthError(
                 403, "You don't have permission to delete the alias.",
@@ -320,7 +333,7 @@ class DirectoryHandler(BaseHandler):
     def _user_can_delete_alias(self, alias, user_id):
         creator = yield self.store.get_room_alias_creator(alias.to_string())
 
-        if creator and creator == user_id:
+        if creator is not None and creator == user_id:
             defer.returnValue(True)
 
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))

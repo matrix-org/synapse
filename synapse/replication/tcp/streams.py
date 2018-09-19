@@ -196,7 +196,7 @@ class Stream(object):
             )
 
             if len(rows) >= MAX_EVENTS_BEHIND:
-                raise Exception("stream %s has fallen behined" % (self.NAME))
+                raise Exception("stream %s has fallen behind" % (self.NAME))
         else:
             rows = yield self.update_function(
                 from_token, current_token,

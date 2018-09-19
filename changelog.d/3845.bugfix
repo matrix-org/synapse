@@ -1,0 +1,1 @@
+Fix outbound requests occasionally wedging, which can result in federation breaking between servers.

@@ -82,10 +82,13 @@ class SynapseRequest(Request):
         )
 
     def get_request_id(self):
-        return "%s-%i" % (self.method, self.request_seq)
+        return "%s-%i" % (self.method.decode('ascii'), self.request_seq)
 
     def get_redacted_uri(self):
-        return redact_uri(self.uri)
+        uri = self.uri
+        if isinstance(uri, bytes):
+            uri = self.uri.decode('ascii')
+        return redact_uri(uri)
 
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
@@ -116,7 +119,7 @@ class SynapseRequest(Request):
             # dispatching to the handler, so that the handler
             # can update the servlet name in the request
             # metrics
-            requests_counter.labels(self.method,
+            requests_counter.labels(self.method.decode('ascii'),
                                     self.request_metrics.name).inc()
 
     @contextlib.contextmanager
@@ -204,14 +207,14 @@ class SynapseRequest(Request):
         self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(
-            self.start_time, name=servlet_name, method=self.method,
+            self.start_time, name=servlet_name, method=self.method.decode('ascii'),
         )
 
         self.site.access_logger.info(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),
             self.site.site_tag,
-            self.method,
+            self.method.decode('ascii'),
             self.get_redacted_uri()
         )
 
@@ -277,15 +280,15 @@ class SynapseRequest(Request):
             int(usage.db_txn_count),
             self.sentLength,
             code,
-            self.method,
+            self.method.decode('ascii'),
             self.get_redacted_uri(),
-            self.clientproto,
+            self.clientproto.decode('ascii', errors='replace'),
             user_agent,
             usage.evt_db_fetch_count,
         )
 
         try:
-            self.request_metrics.stop(self.finish_time, self)
+            self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
             logger.warn("Failed to stop metrics: %r", e)
 
