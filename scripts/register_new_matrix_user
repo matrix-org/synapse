@@ -203,6 +203,6 @@ if __name__ == "__main__":
     else:
         secret = args.shared_secret
 
-    admin = args.admin or not args.no_admin or None
+    admin = args.admin or args.no_admin or None
 
     register_new_user(args.user, args.password, args.server_url, secret, admin)
