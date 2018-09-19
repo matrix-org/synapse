@@ -28,8 +28,6 @@ exclude jenkins*.sh
 exclude jenkins*
 exclude Dockerfile
 exclude .dockerignore
-exclude Dockerfile-pgtests
-exclude docker_run_pg_tests.sh
 exclude test_postgresql.sh
 recursive-exclude jenkins *.sh
 
