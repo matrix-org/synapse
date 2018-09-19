@@ -1,1 +1,1 @@
-Fix log format error in matrixfederationclient.py
+Improve logging of outbound federation requests
