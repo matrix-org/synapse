@@ -137,8 +137,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 )
             except Exception as e:
                 # Failed to upsert, log and continue
-                logger.error("Failed to insert client IP: %r", entry)
-
+                logger.error("Failed to insert client IP %r: %r", entry, e)
 
     @defer.inlineCallbacks
     def get_last_client_ip_by_device(self, user_id, device_id):
