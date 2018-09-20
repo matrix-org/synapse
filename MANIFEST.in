@@ -28,6 +28,7 @@ exclude jenkins*.sh
 exclude jenkins*
 exclude Dockerfile
 exclude .dockerignore
+exclude test_postgresql.sh
 recursive-exclude jenkins *.sh
 
 include pyproject.toml

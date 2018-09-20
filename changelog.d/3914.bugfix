@@ -1,0 +1,1 @@
+Fix bug where outbound federation would stop talking to some servers when using workers

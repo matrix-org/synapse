@@ -534,4 +534,5 @@ class RegistrationHandler(BaseHandler):
             room_id=room_id,
             remote_room_hosts=remote_room_hosts,
             action="join",
+            ratelimit=False,
         )
