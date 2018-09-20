@@ -30,8 +30,7 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use `Jenkins <http://matrix.org/jenkins>`_, `CircleCI
-<https://circleci.com/gh/matrix-org>`_ and `Travis
+We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI 
 <https://travis-ci.org/matrix-org/synapse>`_ for continuous integration. All
 pull requests to synapse get automatically tested by Travis and CircleCI; the
 Jenkins builds require an adminstrator to start them. If your change breaks the
