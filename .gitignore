@@ -1,6 +1,7 @@
 *.pyc
 .*.swp
 *~
+*.lock
 
 .DS_Store
 _trial_temp/
