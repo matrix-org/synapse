@@ -32,10 +32,9 @@ changes will then land on master when we next do a release.
 
 We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI 
 <https://travis-ci.org/matrix-org/synapse>`_ for continuous integration. All
-pull requests to synapse get automatically tested by Travis and CircleCI; the
-Jenkins builds require an adminstrator to start them. If your change breaks the
-build, this will be shown in GitHub, so please keep an eye on the pull request
-for feedback.
+pull requests to synapse get automatically tested by Travis and CircleCI.
+If your change breaks the build, this will be shown in GitHub, so please
+keep an eye on the pull request for feedback.
 
 To run unit tests in a local development environment, you can use:
 
