@@ -98,7 +98,7 @@ class FakeSite:
         return FakeLogger()
 
 
-def make_request(method, path, content=b"", access_token=None):
+def make_request(method, path, content=b"", access_token=None, request=SynapseRequest):
     """
     Make a web request using the given method and path, feed it the
     content, and return the Request and the Channel underneath.
@@ -120,14 +120,16 @@ def make_request(method, path, content=b"", access_token=None):
     site = FakeSite()
     channel = FakeChannel()
 
-    req = SynapseRequest(site, channel)
+    req = request(site, channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
 
     if access_token:
         req.requestHeaders.addRawHeader(b"Authorization", b"Bearer " + access_token)
 
-    req.requestHeaders.addRawHeader(b"X-Forwarded-For", b"127.0.0.1")
+    if content:
+        req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
+
     req.requestReceived(method, path, b"1.1")
 
     return req, channel
