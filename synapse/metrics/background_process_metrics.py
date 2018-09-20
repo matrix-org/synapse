@@ -191,6 +191,8 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
             try:
                 yield func(*args, **kwargs)
+            except Exception:
+                logger.exception("Background process '%s' threw an exception", desc)
             finally:
                 proc.update_metrics()
 
