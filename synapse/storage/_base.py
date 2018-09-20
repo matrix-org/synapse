@@ -117,7 +117,7 @@ class LoggingTransaction(object):
                 sql, *args
             )
         except Exception as e:
-            logger.error("[SQL FAIL] {%s} %s", self.name, e)
+            logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
         finally:
             secs = time.time() - start

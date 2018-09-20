@@ -253,6 +253,10 @@ def setup_test_homeserver(
                 db_conn.autocommit = True
                 cur = db_conn.cursor()
 
+                # Try a few times to drop the DB. Some things may hold on to the
+                # database for a few more seconds due to flakiness, preventing
+                # us from dropping it when the test is over. If we can't drop
+                # it, warn and move on.
                 for x in range(5):
                     try:
                         cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
