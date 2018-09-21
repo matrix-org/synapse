@@ -16,6 +16,8 @@
 import logging
 from collections import OrderedDict
 
+from six import iteritems
+
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches import register_cache
 
@@ -127,7 +129,7 @@ class ExpiringCache(object):
 
         keys_to_delete = set()
 
-        for key, cache_entry in self._cache.items():
+        for key, cache_entry in iteritems(self._cache):
             if now - cache_entry.time > self._expiry_ms:
                 keys_to_delete.add(key)
 
@@ -149,6 +151,8 @@ class ExpiringCache(object):
 
 
 class _CacheEntry(object):
+    __slots__ = ["time", "value"]
+
     def __init__(self, time, value):
         self.time = time
         self.value = value
