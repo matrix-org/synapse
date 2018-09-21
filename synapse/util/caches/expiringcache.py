@@ -24,6 +24,9 @@ from synapse.util.caches import register_cache
 logger = logging.getLogger(__name__)
 
 
+SENTINEL = object()
+
+
 class ExpiringCache(object):
     def __init__(self, cache_name, clock, max_len=0, expiry_ms=0,
                  reset_expiry_on_get=False, iterable=False):
@@ -101,6 +104,16 @@ class ExpiringCache(object):
             entry.time = self._clock.time_msec()
 
         return entry.value
+
+    def pop(self, key, default=None):
+        value = self._cache.pop(key, SENTINEL)
+        if value is SENTINEL:
+            return default
+
+        if self.iterable:
+            self._size_estimate -= len(value.value)
+
+        return value
 
     def __contains__(self, key):
         return key in self._cache
