@@ -58,7 +58,6 @@ class ExpiringCache(object):
 
         self.metrics = register_cache("expiring", cache_name, self)
 
-    def start(self):
         if not self._expiry_ms:
             # Don't bother starting the loop if things never expire
             return
