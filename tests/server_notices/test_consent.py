@@ -32,7 +32,7 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        self.consent_notice_message = "fghfgfh"
+        self.consent_notice_message = "consent %(consent_uri)s"
         config = self.default_config()
         config.user_consent_version = "1"
         config.user_consent_server_notice_content = {
@@ -84,4 +84,4 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
             x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
         ]
         self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0]["content"]["body"], self.consent_notice_message)
+        self.assertTrue(messages[0]["content"]["body"].startswith("consent https://example.com/_matrix/consent"))
