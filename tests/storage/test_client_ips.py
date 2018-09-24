@@ -176,7 +176,6 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET",
             "/_matrix/client/r0/admin/users/" + self.user_id,
-            body.encode('utf8'),
             access_token=access_token,
             **make_request_args
         )
