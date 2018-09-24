@@ -151,6 +151,7 @@ def default_config(name):
 
     return config
 
+
 class TestHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
 

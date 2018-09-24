@@ -346,11 +346,7 @@ class HomeserverTestCase(TestCase):
 
     def login(self, username, password, device_id=None):
 
-        body = {
-            "type": "m.login.password",
-            "user": username,
-            "password": password
-        }
+        body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
             body["device_id"] = device_id
 

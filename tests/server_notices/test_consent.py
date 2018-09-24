@@ -23,14 +23,22 @@ from tests import unittest
 
 class ConsentNoticesTests(unittest.HomeserverTestCase):
 
-    servlets = [sync.register_servlets, admin.register_servlets, login.register_servlets, room.register_servlets]
+    servlets = [
+        sync.register_servlets,
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
 
     def make_homeserver(self, reactor, clock):
 
         self.consent_notice_message = "fghfgfh"
         config = self.default_config()
         config.user_consent_version = "1"
-        config.user_consent_server_notice_content = {"msgtype": "m.text", "body": self.consent_notice_message}
+        config.user_consent_server_notice_content = {
+            "msgtype": "m.text",
+            "body": self.consent_notice_message,
+        }
         config.public_baseurl = "https://example.com/"
         config.form_secret = "123abc"
 
@@ -50,9 +58,7 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
     def test_get_sync_message(self):
 
         request, channel = self.make_request(
-            "GET",
-            "/_matrix/client/r0/sync",
-            access_token=self.access_token
+            "GET", "/_matrix/client/r0/sync", access_token=self.access_token
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
@@ -62,20 +68,20 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/" + room_id + "/join",
-            access_token=self.access_token
+            access_token=self.access_token,
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
 
         request, channel = self.make_request(
-            "GET",
-            "/_matrix/client/r0/sync",
-            access_token=self.access_token
+            "GET", "/_matrix/client/r0/sync", access_token=self.access_token
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
 
         room = channel.json_body["rooms"]["join"][room_id]
-        messages = [x for x in room["timeline"]["events"] if x["type"] == "m.room.message"]
+        messages = [
+            x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
+        ]
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0]["content"]["body"], self.consent_notice_message)
