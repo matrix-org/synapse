@@ -1,0 +1,2 @@
+Fix incompatibility with older Twisted version in tests. Thanks 
+@OlegGirko!
