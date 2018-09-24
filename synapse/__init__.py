@@ -27,4 +27,4 @@ try:
 except ImportError:
     pass
 
-__version__ = "0.33.5"
+__version__ = "0.33.5.1"

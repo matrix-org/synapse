@@ -49,7 +49,7 @@ class FederationClientTests(HomeserverTestCase):
     def test_client_never_connect(self):
         """
         If the HTTP request is not connected and is timed out, it'll give a
-        ConnectingCancelledError.
+        ConnectingCancelledError or TimeoutError.
         """
         d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
 
@@ -71,7 +71,7 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, ConnectingCancelledError)
+        self.assertIsInstance(f.value, (ConnectingCancelledError, TimeoutError))
 
     def test_client_connect_no_response(self):
         """

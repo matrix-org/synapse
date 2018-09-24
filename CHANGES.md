@@ -1,3 +1,13 @@
+Synapse 0.33.5.1 (2018-09-25)
+=============================
+
+Internal Changes
+----------------
+
+- Fix incompatibility with older Twisted version in tests. Thanks 
+  @OlegGirko! ([\#3940](https://github.com/matrix-org/synapse/issues/3940))
+
+
 Synapse 0.33.5 (2018-09-24)
 ===========================
 
