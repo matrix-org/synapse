@@ -46,7 +46,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
         requester = yield self.auth.get_user_by_req(request)
 
@@ -73,7 +73,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 content,
             )
         except InvalidRuleException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
         before = parse_string(request, "before")
         if before:
@@ -95,9 +95,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
             )
             self.notify_user(user_id)
         except InconsistentRuleException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
         except RuleNotFoundException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
         defer.returnValue((200, {}))
 
@@ -142,10 +142,10 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
             )
 
-        if path[0] == '':
+        if path[0] == b'':
             defer.returnValue((200, rules))
-        elif path[0] == 'global':
-            path = path[1:]
+        elif path[0] == b'global':
+            path = [x.decode('ascii') for x in path[1:]]
             result = _filter_ruleset_with_path(rules['global'], path)
             defer.returnValue((200, result))
         else:
@@ -192,10 +192,10 @@ class PushRuleRestServlet(ClientV1RestServlet):
 def _rule_spec_from_path(path):
     if len(path) < 2:
         raise UnrecognizedRequestError()
-    if path[0] != 'pushrules':
+    if path[0] != b'pushrules':
         raise UnrecognizedRequestError()
 
-    scope = path[1]
+    scope = path[1].decode('ascii')
     path = path[2:]
     if scope != 'global':
         raise UnrecognizedRequestError()
@@ -203,13 +203,13 @@ def _rule_spec_from_path(path):
     if len(path) == 0:
         raise UnrecognizedRequestError()
 
-    template = path[0]
+    template = path[0].decode('ascii')
     path = path[1:]
 
     if len(path) == 0 or len(path[0]) == 0:
         raise UnrecognizedRequestError()
 
-    rule_id = path[0]
+    rule_id = path[0].decode('ascii')
 
     spec = {
         'scope': scope,
@@ -220,7 +220,7 @@ def _rule_spec_from_path(path):
     path = path[1:]
 
     if len(path) > 0 and len(path[0]) > 0:
-        spec['attr'] = path[0]
+        spec['attr'] = path[0].decode('ascii')
 
     return spec
 

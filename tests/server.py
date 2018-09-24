@@ -4,9 +4,14 @@ from io import BytesIO
 from six import text_type
 
 import attr
+from zope.interface import implementer
 
-from twisted.internet import address, threads
+from twisted.internet import address, threads, udp
+from twisted.internet._resolver import HostResolution
+from twisted.internet.address import IPv4Address
 from twisted.internet.defer import Deferred
+from twisted.internet.error import DNSLookupError
+from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactorClock
 
@@ -65,7 +70,7 @@ class FakeChannel(object):
     def getPeer(self):
         # We give an address so that getClientIP returns a non null entry,
         # causing us to record the MAU
-        return address.IPv4Address(b"TCP", "127.0.0.1", 3423)
+        return address.IPv4Address("TCP", "127.0.0.1", 3423)
 
     def getHost(self):
         return None
@@ -154,10 +159,45 @@ def render(request, resource, clock):
     wait_until_result(clock, request)
 
 
+@implementer(IReactorPluggableNameResolver)
 class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
     A MemoryReactorClock that supports callFromThread.
     """
+
+    def __init__(self):
+        self._udp = []
+        self.lookups = {}
+
+        class Resolver(object):
+            def resolveHostName(
+                _self,
+                resolutionReceiver,
+                hostName,
+                portNumber=0,
+                addressTypes=None,
+                transportSemantics='TCP',
+            ):
+
+                resolution = HostResolution(hostName)
+                resolutionReceiver.resolutionBegan(resolution)
+                if hostName not in self.lookups:
+                    raise DNSLookupError("OH NO")
+
+                resolutionReceiver.addressResolved(
+                    IPv4Address('TCP', self.lookups[hostName], portNumber)
+                )
+                resolutionReceiver.resolutionComplete()
+                return resolution
+
+        self.nameResolver = Resolver()
+        super(ThreadedMemoryReactorClock, self).__init__()
+
+    def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
+        p = udp.Port(port, protocol, interface, maxPacketSize, self)
+        p.startListening()
+        self._udp.append(p)
+        return p
 
     def callFromThread(self, callback, *args, **kwargs):
         """

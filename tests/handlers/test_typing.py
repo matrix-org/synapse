@@ -43,9 +43,7 @@ def _expect_edu_transaction(edu_type, content, origin="test"):
 
 
 def _make_edu_transaction_json(edu_type, content):
-    return json.dumps(_expect_edu_transaction(edu_type, content)).encode(
-        'utf8'
-    )
+    return json.dumps(_expect_edu_transaction(edu_type, content)).encode('utf8')
 
 
 class TypingNotificationsTestCase(unittest.TestCase):

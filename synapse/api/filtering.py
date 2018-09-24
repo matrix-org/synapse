@@ -251,6 +251,7 @@ class FilterCollection(object):
             "include_leave", False
         )
         self.event_fields = filter_json.get("event_fields", [])
+        self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)

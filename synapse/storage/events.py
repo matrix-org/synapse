@@ -930,6 +930,10 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
                 )
 
                 self._invalidate_cache_and_stream(
+                    txn, self.get_room_summary, (room_id,)
+                )
+
+                self._invalidate_cache_and_stream(
                     txn, self.get_current_state_ids, (room_id,)
                 )
 
@@ -1886,20 +1890,6 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
             ")"
         )
 
-        # create an index on should_delete because later we'll be looking for
-        # the should_delete / shouldn't_delete subsets
-        txn.execute(
-            "CREATE INDEX events_to_purge_should_delete"
-            " ON events_to_purge(should_delete)",
-        )
-
-        # We do joins against events_to_purge for e.g. calculating state
-        # groups to purge, etc., so lets make an index.
-        txn.execute(
-            "CREATE INDEX events_to_purge_id"
-            " ON events_to_purge(event_id)",
-        )
-
         # First ensure that we're not about to delete all the forward extremeties
         txn.execute(
             "SELECT e.event_id, e.depth FROM events as e "
@@ -1926,19 +1916,45 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
         should_delete_params = ()
         if not delete_local_events:
             should_delete_expr += " AND event_id NOT LIKE ?"
-            should_delete_params += ("%:" + self.hs.hostname, )
+
+            # We include the parameter twice since we use the expression twice
+            should_delete_params += (
+                "%:" + self.hs.hostname,
+                "%:" + self.hs.hostname,
+            )
 
         should_delete_params += (room_id, token.topological)
 
+        # Note that we insert events that are outliers and aren't going to be
+        # deleted, as nothing will happen to them.
         txn.execute(
             "INSERT INTO events_to_purge"
             " SELECT event_id, %s"
             " FROM events AS e LEFT JOIN state_events USING (event_id)"
-            " WHERE e.room_id = ? AND topological_ordering < ?" % (
+            " WHERE (NOT outlier OR (%s)) AND e.room_id = ? AND topological_ordering < ?"
+            % (
+                should_delete_expr,
                 should_delete_expr,
             ),
             should_delete_params,
         )
+
+        # We create the indices *after* insertion as that's a lot faster.
+
+        # create an index on should_delete because later we'll be looking for
+        # the should_delete / shouldn't_delete subsets
+        txn.execute(
+            "CREATE INDEX events_to_purge_should_delete"
+            " ON events_to_purge(should_delete)",
+        )
+
+        # We do joins against events_to_purge for e.g. calculating state
+        # groups to purge, etc., so lets make an index.
+        txn.execute(
+            "CREATE INDEX events_to_purge_id"
+            " ON events_to_purge(event_id)",
+        )
+
         txn.execute(
             "SELECT event_id, should_delete FROM events_to_purge"
         )
