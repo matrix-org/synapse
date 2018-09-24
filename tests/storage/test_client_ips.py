@@ -145,34 +145,8 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, hs, reactor, clock):
-        self.hs.config.registration_shared_secret = u"shared"
         self.store = self.hs.get_datastore()
-
-        # Create the user
-        request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
-        self.render(request)
-        nonce = channel.json_body["nonce"]
-
-        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
-        want_mac = want_mac.hexdigest()
-
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": "bob",
-                "password": "abc123",
-                "admin": True,
-                "mac": want_mac,
-            }
-        )
-        request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/admin/register", body.encode('utf8')
-        )
-        self.render(request)
-
-        self.assertEqual(channel.code, 200)
-        self.user_id = channel.json_body["user_id"]
+        self.user_id = self.register_user("bob", "abc123", True)
 
     def test_request_with_xforwarded(self):
         """
@@ -194,20 +168,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
     def _runtest(self, headers, expected_ip, make_request_args):
         device_id = "bleb"
 
-        body = json.dumps(
-            {
-                "type": "m.login.password",
-                "user": "bob",
-                "password": "abc123",
-                "device_id": device_id,
-            }
-        )
-        request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", body.encode('utf8'), **make_request_args
-        )
-        self.render(request)
-        self.assertEqual(channel.code, 200)
-        access_token = channel.json_body["access_token"].encode('ascii')
+        access_token = self.login("bob", "abc123", device_id=device_id)
 
         # Advance to a known time
         self.reactor.advance(123456 - self.reactor.seconds())
