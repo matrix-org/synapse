@@ -5,7 +5,7 @@ jobs:
     steps:
       - checkout
       - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:$CIRCLE_TAG .
-      - run: docker login --username matrixdotorg --password $DOCKER_HUB_PASSWORD
+      - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
       - run: docker push
   sytestpy2:
     machine: true
