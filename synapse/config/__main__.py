@@ -25,7 +25,7 @@ if __name__ == "__main__":
         try:
             config = HomeServerConfig.load_config("", sys.argv[3:])
         except ConfigError as e:
-            sys.stderr.write("\n" + e.message + "\n")
+            sys.stderr.write("\n" + str(e) + "\n")
             sys.exit(1)
 
         print (getattr(config, key))
