@@ -13,10 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
-
-from synapse.rest.client.v2_alpha import sync
 from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
 
@@ -84,4 +82,8 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
             x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
         ]
         self.assertEqual(len(messages), 1)
-        self.assertTrue(messages[0]["content"]["body"].startswith("consent https://example.com/_matrix/consent"))
+        self.assertTrue(
+            messages[0]["content"]["body"].startswith(
+                "consent https://example.com/_matrix/consent"
+            )
+        )

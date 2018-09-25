@@ -14,10 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import logging
-import hmac
 import hashlib
+import hmac
+import logging
 
 from mock import Mock
 
@@ -34,8 +33,8 @@ from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContextFilter
 
-from tests.utils import default_config
 from tests.server import get_clock, make_request, render, setup_test_homeserver
+from tests.utils import default_config
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
