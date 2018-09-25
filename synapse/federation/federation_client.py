@@ -66,6 +66,14 @@ class FederationClient(FederationBase):
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
 
+        self._get_pdu_cache = ExpiringCache(
+            cache_name="get_pdu_cache",
+            clock=self._clock,
+            max_len=1000,
+            expiry_ms=120 * 1000,
+            reset_expiry_on_get=False,
+        )
+
     def _clear_tried_cache(self):
         """Clear pdu_destination_tried cache"""
         now = self._clock.time_msec()
@@ -81,17 +89,6 @@ class FederationClient(FederationBase):
             }
             if destination_dict:
                 self.pdu_destination_tried[event_id] = destination_dict
-
-    def start_get_pdu_cache(self):
-        self._get_pdu_cache = ExpiringCache(
-            cache_name="get_pdu_cache",
-            clock=self._clock,
-            max_len=1000,
-            expiry_ms=120 * 1000,
-            reset_expiry_on_get=False,
-        )
-
-        self._get_pdu_cache.start()
 
     @log_function
     def make_query(self, destination, query_type, args,
@@ -229,10 +226,9 @@ class FederationClient(FederationBase):
 
         # TODO: Rate limit the number of times we try and get the same event.
 
-        if self._get_pdu_cache:
-            ev = self._get_pdu_cache.get(event_id)
-            if ev:
-                defer.returnValue(ev)
+        ev = self._get_pdu_cache.get(event_id)
+        if ev:
+            defer.returnValue(ev)
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
@@ -285,7 +281,7 @@ class FederationClient(FederationBase):
                 )
                 continue
 
-        if self._get_pdu_cache is not None and signed_pdu:
+        if signed_pdu:
             self._get_pdu_cache[event_id] = signed_pdu
 
         defer.returnValue(signed_pdu)
