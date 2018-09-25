@@ -58,7 +58,9 @@ REQUIREMENTS = {
     "phonenumbers>=8.2.0": ["phonenumbers"],
     "six": ["six"],
     "prometheus_client": ["prometheus_client"],
-    "attrs": ["attr"],
+
+    # we use attr.s(slots), which arrived in 16.0.0
+    "attrs>=16.0.0": ["attr>=16.0.0"],
     "netaddr>=0.7.18": ["netaddr"],
 }
 
