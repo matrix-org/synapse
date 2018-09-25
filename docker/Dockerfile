@@ -13,7 +13,6 @@ RUN apk add --no-cache --virtual .build_deps \
         postgresql-dev \
         zlib-dev \
  && cd /synapse \
- && sed -i 's/\["synctl"\] + //' setup.py \
  && apk add --no-cache --virtual .runtime_deps \
  	libffi \
         libjpeg-turbo \
