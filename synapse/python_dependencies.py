@@ -33,12 +33,12 @@ logger = logging.getLogger(__name__)
 # [2] https://setuptools.readthedocs.io/en/latest/setuptools.html#declaring-dependencies
 REQUIREMENTS = {
     "jsonschema>=2.5.1": ["jsonschema>=2.5.1"],
-    "frozendict>=0.4": ["frozendict"],
+    "frozendict>=1": ["frozendict"],
     "unpaddedbase64>=1.1.0": ["unpaddedbase64>=1.1.0"],
     "canonicaljson>=1.1.3": ["canonicaljson>=1.1.3"],
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "pynacl>=1.2.1": ["nacl>=1.2.1", "nacl.bindings"],
-    "service_identity>=1.0.0": ["service_identity>=1.0.0"],
+    "service_identity>=16.0.0": ["service_identity>=16.0.0"],
     "Twisted>=17.1.0": ["twisted>=17.1.0"],
     "treq>=15.1": ["treq>=15.1"],
 
@@ -52,7 +52,7 @@ REQUIREMENTS = {
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
     "sortedcontainers": ["sortedcontainers"],
-    "pysaml2>=3.0.0": ["saml2>=3.0.0"],
+    "pysaml2>=3.0.0": ["saml2"],
     "pymacaroons-pynacl": ["pymacaroons"],
     "msgpack-python>=0.3.0": ["msgpack"],
     "phonenumbers>=8.2.0": ["phonenumbers"],
