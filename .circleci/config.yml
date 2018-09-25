@@ -1,5 +1,12 @@
 version: 2
 jobs:
+  dockerhubupload:
+    machine: true
+    steps:
+      - checkout
+      - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:$CIRCLE_TAG .
+      - run: docker login --username matrixdotorg --password $DOCKER_HUB_PASSWORD
+      - run: docker push
   sytestpy2:
     machine: true
     steps:
@@ -131,3 +138,7 @@ workflows:
           filters:
             branches:
               ignore: /develop|master|release-.*/
+      - dockerhub:
+          filters:
+            tags:
+              only: /v[0-9].[0-9]+.[0-9]+(.[0-9]+)?/
