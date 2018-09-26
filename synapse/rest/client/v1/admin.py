@@ -14,16 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
+import hmac
+import logging
+
+from six import text_type
+from six.moves import http_client
+
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.errors import AuthError, SynapseError, Codes, NotFoundError
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.servlet import (
+    assert_params_in_dict,
+    parse_integer,
+    parse_json_object_from_request,
+    parse_string,
+)
 from synapse.types import UserID, create_requester
-from synapse.http.servlet import parse_json_object_from_request
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +64,135 @@ class UsersRestServlet(ClientV1RestServlet):
         ret = yield self.handlers.admin_handler.get_users()
 
         defer.returnValue((200, ret))
+
+
+class UserRegisterServlet(ClientV1RestServlet):
+    """
+    Attributes:
+         NONCE_TIMEOUT (int): Seconds until a generated nonce won't be accepted
+         nonces (dict[str, int]): The nonces that we will accept. A dict of
+             nonce to the time it was generated, in int seconds.
+    """
+    PATTERNS = client_path_patterns("/admin/register")
+    NONCE_TIMEOUT = 60
+
+    def __init__(self, hs):
+        super(UserRegisterServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+        self.reactor = hs.get_reactor()
+        self.nonces = {}
+        self.hs = hs
+
+    def _clear_old_nonces(self):
+        """
+        Clear out old nonces that are older than NONCE_TIMEOUT.
+        """
+        now = int(self.reactor.seconds())
+
+        for k, v in list(self.nonces.items()):
+            if now - v > self.NONCE_TIMEOUT:
+                del self.nonces[k]
+
+    def on_GET(self, request):
+        """
+        Generate a new nonce.
+        """
+        self._clear_old_nonces()
+
+        nonce = self.hs.get_secrets().token_hex(64)
+        self.nonces[nonce] = int(self.reactor.seconds())
+        return (200, {"nonce": nonce})
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        self._clear_old_nonces()
+
+        if not self.hs.config.registration_shared_secret:
+            raise SynapseError(400, "Shared secret registration is not enabled")
+
+        body = parse_json_object_from_request(request)
+
+        if "nonce" not in body:
+            raise SynapseError(
+                400, "nonce must be specified", errcode=Codes.BAD_JSON,
+            )
+
+        nonce = body["nonce"]
+
+        if nonce not in self.nonces:
+            raise SynapseError(
+                400, "unrecognised nonce",
+            )
+
+        # Delete the nonce, so it can't be reused, even if it's invalid
+        del self.nonces[nonce]
+
+        if "username" not in body:
+            raise SynapseError(
+                400, "username must be specified", errcode=Codes.BAD_JSON,
+            )
+        else:
+            if (
+                not isinstance(body['username'], text_type)
+                or len(body['username']) > 512
+            ):
+                raise SynapseError(400, "Invalid username")
+
+            username = body["username"].encode("utf-8")
+            if b"\x00" in username:
+                raise SynapseError(400, "Invalid username")
+
+        if "password" not in body:
+            raise SynapseError(
+                400, "password must be specified", errcode=Codes.BAD_JSON,
+            )
+        else:
+            if (
+                not isinstance(body['password'], text_type)
+                or len(body['password']) > 512
+            ):
+                raise SynapseError(400, "Invalid password")
+
+            password = body["password"].encode("utf-8")
+            if b"\x00" in password:
+                raise SynapseError(400, "Invalid password")
+
+        admin = body.get("admin", None)
+        got_mac = body["mac"]
+
+        want_mac = hmac.new(
+            key=self.hs.config.registration_shared_secret.encode(),
+            digestmod=hashlib.sha1,
+        )
+        want_mac.update(nonce.encode('utf8'))
+        want_mac.update(b"\x00")
+        want_mac.update(username)
+        want_mac.update(b"\x00")
+        want_mac.update(password)
+        want_mac.update(b"\x00")
+        want_mac.update(b"admin" if admin else b"notadmin")
+        want_mac = want_mac.hexdigest()
+
+        if not hmac.compare_digest(
+                want_mac.encode('ascii'),
+                got_mac.encode('ascii')
+        ):
+            raise SynapseError(403, "HMAC incorrect")
+
+        # Reuse the parts of RegisterRestServlet to reduce code duplication
+        from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+
+        register = RegisterRestServlet(self.hs)
+
+        (user_id, _) = yield register.registration_handler.register(
+            localpart=body['username'].lower(),
+            password=body["password"],
+            admin=bool(admin),
+            generate_token=False,
+        )
+
+        result = yield register._create_registration_details(user_id, body)
+        defer.returnValue((200, result))
 
 
 class WhoisRestServlet(ClientV1RestServlet):
@@ -96,16 +235,8 @@ class PurgeMediaCacheRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        before_ts = request.args.get("before_ts", None)
-        if not before_ts:
-            raise SynapseError(400, "Missing 'before_ts' arg")
-
-        logger.info("before_ts: %r", before_ts[0])
-
-        try:
-            before_ts = int(before_ts[0])
-        except Exception:
-            raise SynapseError(400, "Invalid 'before_ts' arg")
+        before_ts = parse_integer(request, "before_ts", required=True)
+        logger.info("before_ts: %r", before_ts)
 
         ret = yield self.media_repository.delete_old_remote_media(before_ts)
 
@@ -124,7 +255,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
             hs (synapse.server.HomeServer)
         """
         super(PurgeHistoryRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -169,16 +300,12 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 yield self.store.find_first_stream_ordering_after_ts(ts)
             )
 
-            room_event_after_stream_ordering = (
+            r = (
                 yield self.store.get_room_event_after_stream_ordering(
                     room_id, stream_ordering,
                 )
             )
-            if room_event_after_stream_ordering:
-                token = yield self.store.get_topological_token_for_event(
-                    room_event_after_stream_ordering,
-                )
-            else:
+            if not r:
                 logger.warn(
                     "[purge] purging events not possible: No event found "
                     "(received_ts %i => stream_ordering %i)",
@@ -189,8 +316,10 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                     "there is no event to be purged",
                     errcode=Codes.NOT_FOUND,
                 )
+            (stream, topo, _event_id) = r
+            token = "t%d-%d" % (topo, stream)
             logger.info(
-                "[purge] purging up to token %d (received_ts %i => "
+                "[purge] purging up to token %s (received_ts %i => "
                 "stream_ordering %i)",
                 token, ts, stream_ordering,
             )
@@ -201,7 +330,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        purge_id = yield self.handlers.message_handler.start_purge_history(
+        purge_id = yield self.pagination_handler.start_purge_history(
             room_id, token,
             delete_local_events=delete_local_events,
         )
@@ -223,7 +352,7 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
             hs (synapse.server.HomeServer)
         """
         super(PurgeHistoryStatusRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, purge_id):
@@ -233,7 +362,7 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        purge_status = self.handlers.message_handler.get_purge_status(purge_id)
+        purge_status = self.pagination_handler.get_purge_status(purge_id)
         if purge_status is None:
             raise NotFoundError("purge id '%s' not found" % purge_id)
 
@@ -249,6 +378,15 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
+        body = parse_json_object_from_request(request, allow_empty_body=True)
+        erase = body.get("erase", False)
+        if not isinstance(erase, bool):
+            raise SynapseError(
+                http_client.BAD_REQUEST,
+                "Param 'erase' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
         is_admin = yield self.auth.is_server_admin(requester.user)
@@ -256,8 +394,17 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        yield self._deactivate_account_handler.deactivate_account(target_user_id)
-        defer.returnValue((200, {}))
+        result = yield self._deactivate_account_handler.deactivate_account(
+            target_user_id, erase,
+        )
+        if result:
+            id_server_unbind_result = "success"
+        else:
+            id_server_unbind_result = "no-support"
+
+        defer.returnValue((200, {
+            "id_server_unbind_result": id_server_unbind_result,
+        }))
 
 
 class ShutdownRoomRestServlet(ClientV1RestServlet):
@@ -289,10 +436,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             raise AuthError(403, "You are not a server admin")
 
         content = parse_json_object_from_request(request)
-
-        new_room_user_id = content.get("new_room_user_id")
-        if not new_room_user_id:
-            raise SynapseError(400, "Please provide field `new_room_user_id`")
+        assert_params_in_dict(content, ["new_room_user_id"])
+        new_room_user_id = content["new_room_user_id"]
 
         room_creator_requester = create_requester(new_room_user_id)
 
@@ -453,9 +598,8 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
             raise AuthError(403, "You are not a server admin")
 
         params = parse_json_object_from_request(request)
+        assert_params_in_dict(params, ["new_password"])
         new_password = params['new_password']
-        if not new_password:
-            raise SynapseError(400, "Missing 'new_password' arg")
 
         logger.info("new_password: %r", new_password)
 
@@ -503,12 +647,9 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Can only users a local user")
 
         order = "name"  # order by name in user table
-        start = request.args.get("start")[0]
-        limit = request.args.get("limit")[0]
-        if not limit:
-            raise SynapseError(400, "Missing 'limit' arg")
-        if not start:
-            raise SynapseError(400, "Missing 'start' arg")
+        start = parse_integer(request, "start", required=True)
+        limit = parse_integer(request, "limit", required=True)
+
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(
@@ -540,12 +681,9 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
 
         order = "name"  # order by name in user table
         params = parse_json_object_from_request(request)
+        assert_params_in_dict(params, ["limit", "start"])
         limit = params['limit']
         start = params['start']
-        if not limit:
-            raise SynapseError(400, "Missing 'limit' arg")
-        if not start:
-            raise SynapseError(400, "Missing 'start' arg")
         logger.info("limit: %s, start: %s", limit, start)
 
         ret = yield self.handlers.admin_handler.get_users_paginate(
@@ -593,10 +731,7 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
 
-        term = request.args.get("term")[0]
-        if not term:
-            raise SynapseError(400, "Missing 'term' arg")
-
+        term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
         ret = yield self.handlers.admin_handler.search_users(
@@ -618,3 +753,4 @@ def register_servlets(hs, http_server):
     ShutdownRoomRestServlet(hs).register(http_server)
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
+    UserRegisterServlet(hs).register(http_server)

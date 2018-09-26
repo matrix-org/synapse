@@ -13,19 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six import binary_type, text_type
+
+from canonicaljson import json
 from frozendict import frozendict
-import simplejson as json
 
 
 def freeze(o):
-    t = type(o)
-    if t is dict:
+    if isinstance(o, dict):
         return frozendict({k: freeze(v) for k, v in o.items()})
 
-    if t is frozendict:
+    if isinstance(o, frozendict):
         return o
 
-    if t is str or t is unicode:
+    if isinstance(o, (binary_type, text_type)):
         return o
 
     try:
@@ -37,11 +38,10 @@ def freeze(o):
 
 
 def unfreeze(o):
-    t = type(o)
-    if t is dict or t is frozendict:
+    if isinstance(o, (dict, frozendict)):
         return dict({k: unfreeze(v) for k, v in o.items()})
 
-    if t is str or t is unicode:
+    if isinstance(o, (binary_type, text_type)):
         return o
 
     try:

@@ -14,23 +14,23 @@
 # limitations under the License.
 
 
-from twisted.internet import defer, reactor
+import threading
+
 from mock import NonCallableMock
+from six import StringIO
+
+from twisted.internet import defer, reactor
 
 from synapse.util.file_consumer import BackgroundFileConsumer
 
 from tests import unittest
-from six import StringIO
-
-import threading
 
 
 class FileConsumerTests(unittest.TestCase):
-
     @defer.inlineCallbacks
     def test_pull_consumer(self):
         string_file = StringIO()
-        consumer = BackgroundFileConsumer(string_file)
+        consumer = BackgroundFileConsumer(string_file, reactor=reactor)
 
         try:
             producer = DummyPullProducer()
@@ -54,7 +54,7 @@ class FileConsumerTests(unittest.TestCase):
     @defer.inlineCallbacks
     def test_push_consumer(self):
         string_file = BlockingStringWrite()
-        consumer = BackgroundFileConsumer(string_file)
+        consumer = BackgroundFileConsumer(string_file, reactor=reactor)
 
         try:
             producer = NonCallableMock(spec_set=[])
@@ -80,13 +80,15 @@ class FileConsumerTests(unittest.TestCase):
     @defer.inlineCallbacks
     def test_push_producer_feedback(self):
         string_file = BlockingStringWrite()
-        consumer = BackgroundFileConsumer(string_file)
+        consumer = BackgroundFileConsumer(string_file, reactor=reactor)
 
         try:
             producer = NonCallableMock(spec_set=["pauseProducing", "resumeProducing"])
 
             resume_deferred = defer.Deferred()
-            producer.resumeProducing.side_effect = lambda: resume_deferred.callback(None)
+            producer.resumeProducing.side_effect = lambda: resume_deferred.callback(
+                None
+            )
 
             consumer.registerProducer(producer, True)
 

@@ -16,6 +16,9 @@
 import logging
 import sys
 
+from twisted.internet import defer, reactor
+from twisted.web.resource import NoResource
+
 import synapse
 from synapse import events
 from synapse.api.errors import SynapseError
@@ -25,10 +28,9 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.crypto import context_factory
 from synapse.http.server import JsonResource
-from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request,
-)
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
+from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -36,6 +38,7 @@ from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.client.v1.base import ClientV1RestServlet, client_path_patterns
 from synapse.rest.client.v2_alpha._base import client_v2_patterns
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -43,10 +46,37 @@ from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
-from twisted.internet import defer, reactor
-from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.frontend_proxy")
+
+
+class PresenceStatusStubServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/presence/(?P<user_id>[^/]*)/status")
+
+    def __init__(self, hs):
+        super(PresenceStatusStubServlet, self).__init__(hs)
+        self.http_client = hs.get_simple_http_client()
+        self.auth = hs.get_auth()
+        self.main_uri = hs.config.worker_main_http_uri
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, user_id):
+        # Pass through the auth headers, if any, in case the access token
+        # is there.
+        auth_headers = request.requestHeaders.getRawHeaders("Authorization", [])
+        headers = {
+            "Authorization": auth_headers,
+        }
+        result = yield self.http_client.get_json(
+            self.main_uri + request.uri,
+            headers=headers,
+        )
+        defer.returnValue((200, result))
+
+    @defer.inlineCallbacks
+    def on_PUT(self, request, user_id):
+        yield self.auth.get_user_by_req(request)
+        defer.returnValue((200, {}))
 
 
 class KeyUploadServlet(RestServlet):
@@ -118,10 +148,7 @@ class FrontendProxySlavedStore(
 
 
 class FrontendProxyServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = FrontendProxySlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = FrontendProxySlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -131,10 +158,16 @@ class FrontendProxyServer(HomeServer):
         for res in listener_config["resources"]:
             for name in res["names"]:
                 if name == "metrics":
-                    resources[METRICS_PREFIX] = MetricsResource(self)
+                    resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
                     KeyUploadServlet(self).register(resource)
+
+                    # If presence is disabled, use the stub servlet that does
+                    # not allow sending presence
+                    if not self.config.use_presence:
+                        PresenceStatusStubServlet(self).register(resource)
+
                     resources.update({
                         "/_matrix/client/r0": resource,
                         "/_matrix/client/unstable": resource,
@@ -153,7 +186,8 @@ class FrontendProxyServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
+            reactor=self.get_reactor()
         )
 
         logger.info("Synapse client reader now listening on port %d", port)
@@ -172,6 +206,13 @@ class FrontendProxyServer(HomeServer):
                         globals={"hs": self},
                     )
                 )
+            elif listener["type"] == "metrics":
+                if not self.get_config().enable_metrics:
+                    logger.warn(("Metrics listener configured, but "
+                                 "enable_metrics is not True!"))
+                else:
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -201,11 +242,13 @@ def start(config_options):
     database_engine = create_engine(config.database_config)
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
+    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
     ss = FrontendProxyServer(
         config.server_name,
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
+        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
@@ -215,7 +258,6 @@ def start(config_options):
     ss.start_listening(config.worker_listeners)
 
     def start():
-        ss.get_state_handler().start_caching()
         ss.get_datastore().start_profiling()
 
     reactor.callWhenRunning(start)

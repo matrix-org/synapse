@@ -13,29 +13,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer, threads
 
-from ._base import BaseHandler
+import logging
+import unicodedata
+
+import attr
+import bcrypt
+import pymacaroons
+from canonicaljson import json
+
+from twisted.internet import defer, threads
+from twisted.web.client import PartialDownloadError
+
+import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
-    AuthError, Codes, InteractiveAuthIncompleteError, LoginError, StoreError,
+    AuthError,
+    Codes,
+    InteractiveAuthIncompleteError,
+    LoginError,
+    StoreError,
     SynapseError,
 )
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
-from synapse.util.async import run_on_reactor
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable
 
-from twisted.web.client import PartialDownloadError
-
-import logging
-import bcrypt
-import pymacaroons
-import simplejson
-
-import synapse.util.stringutils as stringutils
-
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +254,7 @@ class AuthHandler(BaseHandler):
                 errordict = e.error_dict()
 
         for f in flows:
-            if len(set(f) - set(creds.keys())) == 0:
+            if len(set(f) - set(creds)) == 0:
                 # it's very useful to know what args are stored, but this can
                 # include the password in the case of registering, so only log
                 # the keys (confusingly, clientdict may contain a password
@@ -257,12 +262,12 @@ class AuthHandler(BaseHandler):
                 # and is not sensitive).
                 logger.info(
                     "Auth completed with creds: %r. Client dict has keys: %r",
-                    creds, clientdict.keys()
+                    creds, list(clientdict)
                 )
                 defer.returnValue((creds, clientdict, session['id']))
 
         ret = self._auth_dict_for_flows(flows, session)
-        ret['completed'] = creds.keys()
+        ret['completed'] = list(creds)
         ret.update(errordict)
         raise InteractiveAuthIncompleteError(
             ret,
@@ -402,7 +407,7 @@ class AuthHandler(BaseHandler):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
-            resp_body = simplejson.loads(data)
+            resp_body = json.loads(data)
 
         if 'success' in resp_body:
             # Note that we do NOT check the hostname here: we explicitly
@@ -423,15 +428,11 @@ class AuthHandler(BaseHandler):
     def _check_msisdn(self, authdict, _):
         return self._check_threepid('msisdn', authdict)
 
-    @defer.inlineCallbacks
     def _check_dummy_auth(self, authdict, _):
-        yield run_on_reactor()
-        defer.returnValue(True)
+        return defer.succeed(True)
 
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict):
-        yield run_on_reactor()
-
         if 'threepid_creds' not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
@@ -519,6 +520,7 @@ class AuthHandler(BaseHandler):
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
+        yield self.auth.check_auth_blocking(user_id)
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -626,6 +628,7 @@ class AuthHandler(BaseHandler):
         # special case to check for "password" for the check_password interface
         # for the auth providers
         password = login_submission.get("password")
+
         if login_type == LoginType.PASSWORD:
             if not self._password_enabled:
                 raise SynapseError(400, "Password login has been disabled.")
@@ -707,9 +710,10 @@ class AuthHandler(BaseHandler):
         multiple inexact matches.
 
         Args:
-            user_id (str): complete @user:id
+            user_id (unicode): complete @user:id
+            password (unicode): the provided password
         Returns:
-            (str) the canonical_user_id, or None if unknown user / bad password
+            (unicode) the canonical_user_id, or None if unknown user / bad password
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
@@ -728,15 +732,18 @@ class AuthHandler(BaseHandler):
                                                   device_id)
         defer.returnValue(access_token)
 
+    @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
         auth_api = self.hs.get_auth()
+        user_id = None
         try:
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
             user_id = auth_api.get_user_id_from_macaroon(macaroon)
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
-            return user_id
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+        yield self.auth.check_auth_blocking(user_id)
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def delete_access_token(self, access_token):
@@ -821,14 +828,37 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def delete_threepid(self, user_id, medium, address):
+        """Attempts to unbind the 3pid on the identity servers and deletes it
+        from the local database.
+
+        Args:
+            user_id (str)
+            medium (str)
+            address (str)
+
+        Returns:
+            Deferred[bool]: Returns True if successfully unbound the 3pid on
+            the identity server, False if identity server doesn't support the
+            unbind API.
+        """
+
         # 'Canonicalise' email addresses as per above
         if medium == 'email':
             address = address.lower()
 
-        ret = yield self.store.user_delete_threepid(
+        identity_handler = self.hs.get_handlers().identity_handler
+        result = yield identity_handler.try_unbind_threepid(
+            user_id,
+            {
+                'medium': medium,
+                'address': address,
+            },
+        )
+
+        yield self.store.user_delete_threepid(
             user_id, medium, address,
         )
-        defer.returnValue(ret)
+        defer.returnValue(result)
 
     def _save_session(self, session):
         # TODO: Persistent storage
@@ -840,45 +870,64 @@ class AuthHandler(BaseHandler):
         """Computes a secure hash of password.
 
         Args:
-            password (str): Password to hash.
+            password (unicode): Password to hash.
 
         Returns:
-            Deferred(str): Hashed password.
+            Deferred(unicode): Hashed password.
         """
         def _do_hash():
-            return bcrypt.hashpw(password.encode('utf8') + self.hs.config.password_pepper,
-                                 bcrypt.gensalt(self.bcrypt_rounds))
+            # Normalise the Unicode in the password
+            pw = unicodedata.normalize("NFKC", password)
 
-        return make_deferred_yieldable(threads.deferToThread(_do_hash))
+            return bcrypt.hashpw(
+                pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
+                bcrypt.gensalt(self.bcrypt_rounds),
+            ).decode('ascii')
+
+        return make_deferred_yieldable(
+            threads.deferToThreadPool(
+                self.hs.get_reactor(), self.hs.get_reactor().getThreadPool(), _do_hash
+            ),
+        )
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
 
         Args:
-            password (str): Password to hash.
-            stored_hash (str): Expected hash value.
+            password (unicode): Password to hash.
+            stored_hash (bytes): Expected hash value.
 
         Returns:
             Deferred(bool): Whether self.hash(password) == stored_hash.
         """
-
         def _do_validate_hash():
+            # Normalise the Unicode in the password
+            pw = unicodedata.normalize("NFKC", password)
+
             return bcrypt.checkpw(
-                password.encode('utf8') + self.hs.config.password_pepper,
-                stored_hash.encode('utf8')
+                pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
+                stored_hash
             )
 
         if stored_hash:
-            return make_deferred_yieldable(threads.deferToThread(_do_validate_hash))
+            if not isinstance(stored_hash, bytes):
+                stored_hash = stored_hash.encode('ascii')
+
+            return make_deferred_yieldable(
+                threads.deferToThreadPool(
+                    self.hs.get_reactor(),
+                    self.hs.get_reactor().getThreadPool(),
+                    _do_validate_hash,
+                ),
+            )
         else:
             return defer.succeed(False)
 
 
-class MacaroonGeneartor(object):
-    def __init__(self, hs):
-        self.clock = hs.get_clock()
-        self.server_name = hs.config.server_name
-        self.macaroon_secret_key = hs.config.macaroon_secret_key
+@attr.s
+class MacaroonGenerator(object):
+
+    hs = attr.ib()
 
     def generate_access_token(self, user_id, extra_caveats=None):
         extra_caveats = extra_caveats or []
@@ -896,7 +945,7 @@ class MacaroonGeneartor(object):
     def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
-        now = self.clock.time_msec()
+        now = self.hs.get_clock().time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
         return macaroon.serialize()
@@ -908,9 +957,9 @@ class MacaroonGeneartor(object):
 
     def _generate_base_macaroon(self, user_id):
         macaroon = pymacaroons.Macaroon(
-            location=self.server_name,
+            location=self.hs.config.server_name,
             identifier="key",
-            key=self.macaroon_secret_key)
+            key=self.hs.config.macaroon_secret_key)
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon

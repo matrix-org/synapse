@@ -49,33 +49,42 @@ indicate which side is sending, these are *not* included on the wire::
     * connection closed by server *
 """
 
+import fcntl
+import logging
+import struct
+from collections import defaultdict
+
+from six import iteritems, iterkeys
+
+from prometheus_client import Counter
+
 from twisted.internet import defer
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
+from synapse.metrics import LaterGauge
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
+from synapse.util.stringutils import random_string
+
 from .commands import (
-    COMMAND_MAP, VALID_CLIENT_COMMANDS, VALID_SERVER_COMMANDS,
-    ErrorCommand, ServerCommand, RdataCommand, PositionCommand, PingCommand,
-    NameCommand, ReplicateCommand, UserSyncCommand, SyncCommand,
+    COMMAND_MAP,
+    VALID_CLIENT_COMMANDS,
+    VALID_SERVER_COMMANDS,
+    ErrorCommand,
+    NameCommand,
+    PingCommand,
+    PositionCommand,
+    RdataCommand,
+    ReplicateCommand,
+    ServerCommand,
+    SyncCommand,
+    UserSyncCommand,
 )
 from .streams import STREAMS_MAP
 
-from synapse.util.stringutils import random_string
-from synapse.metrics.metric import CounterMetric
-
-import logging
-import synapse.metrics
-import struct
-import fcntl
-
-from six import iterkeys, iteritems
-
-metrics = synapse.metrics.get_metrics_for(__name__)
-
-connection_close_counter = metrics.register_counter(
-    "close_reason", labels=["reason_type"],
-)
-
+connection_close_counter = Counter(
+    "synapse_replication_tcp_protocol_close_reason", "", ["reason_type"])
 
 # A list of all connected protocols. This allows us to send metrics about the
 # connections.
@@ -137,12 +146,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         # The LoopingCall for sending pings.
         self._send_ping_loop = None
 
-        self.inbound_commands_counter = CounterMetric(
-            "inbound_commands", labels=["command"],
-        )
-        self.outbound_commands_counter = CounterMetric(
-            "outbound_commands", labels=["command"],
-        )
+        self.inbound_commands_counter = defaultdict(int)
+        self.outbound_commands_counter = defaultdict(int)
 
     def connectionMade(self):
         logger.info("[%s] Connection established", self.id())
@@ -202,7 +207,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         self.last_received_command = self.clock.time_msec()
 
-        self.inbound_commands_counter.inc(cmd_name)
+        self.inbound_commands_counter[cmd_name] = (
+            self.inbound_commands_counter[cmd_name] + 1)
 
         cmd_cls = COMMAND_MAP[cmd_name]
         try:
@@ -218,7 +224,11 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         # Now lets try and call on_<CMD_NAME> function
         try:
-            getattr(self, "on_%s" % (cmd_name,))(cmd)
+            run_as_background_process(
+                "replication-" + cmd.get_logcontext_id(),
+                getattr(self, "on_%s" % (cmd_name,)),
+                cmd,
+            )
         except Exception:
             logger.exception("[%s] Failed to handle line: %r", self.id(), line)
 
@@ -252,8 +262,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             self._queue_command(cmd)
             return
 
-        self.outbound_commands_counter.inc(cmd.NAME)
-
+        self.outbound_commands_counter[cmd.NAME] = (
+            self.outbound_commands_counter[cmd.NAME] + 1)
         string = "%s %s" % (cmd.NAME, cmd.to_line(),)
         if "\n" in string:
             raise Exception("Unexpected newline in command: %r", string)
@@ -318,9 +328,9 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def connectionLost(self, reason):
         logger.info("[%s] Replication connection closed: %r", self.id(), reason)
         if isinstance(reason, Failure):
-            connection_close_counter.inc(reason.type.__name__)
+            connection_close_counter.labels(reason.type.__name__).inc()
         else:
-            connection_close_counter.inc(reason.__class__.__name__)
+            connection_close_counter.labels(reason.__class__.__name__).inc()
 
         try:
             # Remove us from list of connections to be monitored
@@ -383,7 +393,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.name = cmd.data
 
     def on_USER_SYNC(self, cmd):
-        self.streamer.on_user_sync(
+        return self.streamer.on_user_sync(
             self.conn_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms,
         )
 
@@ -393,22 +403,33 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         if stream_name == "ALL":
             # Subscribe to all streams we're publishing to.
-            for stream in iterkeys(self.streamer.streams_by_name):
-                self.subscribe_to_stream(stream, token)
+            deferreds = [
+                run_in_background(
+                    self.subscribe_to_stream,
+                    stream, token,
+                )
+                for stream in iterkeys(self.streamer.streams_by_name)
+            ]
+
+            return make_deferred_yieldable(
+                defer.gatherResults(deferreds, consumeErrors=True)
+            )
         else:
-            self.subscribe_to_stream(stream_name, token)
+            return self.subscribe_to_stream(stream_name, token)
 
     def on_FEDERATION_ACK(self, cmd):
-        self.streamer.federation_ack(cmd.token)
+        return self.streamer.federation_ack(cmd.token)
 
     def on_REMOVE_PUSHER(self, cmd):
-        self.streamer.on_remove_pusher(cmd.app_id, cmd.push_key, cmd.user_id)
+        return self.streamer.on_remove_pusher(
+            cmd.app_id, cmd.push_key, cmd.user_id,
+        )
 
     def on_INVALIDATE_CACHE(self, cmd):
-        self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
+        return self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
 
     def on_USER_IP(self, cmd):
-        self.streamer.on_user_ip(
+        return self.streamer.on_user_ip(
             cmd.user_id, cmd.access_token, cmd.ip, cmd.user_agent, cmd.device_id,
             cmd.last_seen,
         )
@@ -519,7 +540,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
     def on_RDATA(self, cmd):
         stream_name = cmd.stream_name
-        inbound_rdata_count.inc(stream_name)
+        inbound_rdata_count.labels(stream_name).inc()
 
         try:
             row = STREAMS_MAP[stream_name].ROW_TYPE(*cmd.row)
@@ -538,14 +559,13 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             # Check if this is the last of a batch of updates
             rows = self.pending_batches.pop(stream_name, [])
             rows.append(row)
-
-            self.handler.on_rdata(stream_name, cmd.token, rows)
+            return self.handler.on_rdata(stream_name, cmd.token, rows)
 
     def on_POSITION(self, cmd):
-        self.handler.on_position(cmd.stream_name, cmd.token)
+        return self.handler.on_position(cmd.stream_name, cmd.token)
 
     def on_SYNC(self, cmd):
-        self.handler.on_sync(cmd.data)
+        return self.handler.on_sync(cmd.data)
 
     def replicate(self, stream_name, token):
         """Send the subscription request to the server
@@ -567,13 +587,13 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
 # The following simply registers metrics for the replication connections
 
-metrics.register_callback(
-    "pending_commands",
+pending_commands = LaterGauge(
+    "synapse_replication_tcp_protocol_pending_commands",
+    "",
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): len(p.pending_commands)
-        for p in connected_connections
+        (p.name,): len(p.pending_commands) for p in connected_connections
     },
-    labels=["name", "conn_id"],
 )
 
 
@@ -584,13 +604,13 @@ def transport_buffer_size(protocol):
     return 0
 
 
-metrics.register_callback(
-    "transport_send_buffer",
+transport_send_buffer = LaterGauge(
+    "synapse_replication_tcp_protocol_transport_send_buffer",
+    "",
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_buffer_size(p)
-        for p in connected_connections
+        (p.name,): transport_buffer_size(p) for p in connected_connections
     },
-    labels=["name", "conn_id"],
 )
 
 
@@ -609,48 +629,51 @@ def transport_kernel_read_buffer_size(protocol, read=True):
     return 0
 
 
-metrics.register_callback(
-    "transport_kernel_send_buffer",
+tcp_transport_kernel_send_buffer = LaterGauge(
+    "synapse_replication_tcp_protocol_transport_kernel_send_buffer",
+    "",
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_kernel_read_buffer_size(p, False)
+        (p.name,): transport_kernel_read_buffer_size(p, False)
         for p in connected_connections
     },
-    labels=["name", "conn_id"],
 )
 
 
-metrics.register_callback(
-    "transport_kernel_read_buffer",
+tcp_transport_kernel_read_buffer = LaterGauge(
+    "synapse_replication_tcp_protocol_transport_kernel_read_buffer",
+    "",
+    ["name"],
     lambda: {
-        (p.name, p.conn_id): transport_kernel_read_buffer_size(p, True)
+        (p.name,): transport_kernel_read_buffer_size(p, True)
         for p in connected_connections
     },
-    labels=["name", "conn_id"],
 )
 
 
-metrics.register_callback(
-    "inbound_commands",
+tcp_inbound_commands = LaterGauge(
+    "synapse_replication_tcp_protocol_inbound_commands",
+    "",
+    ["command", "name"],
     lambda: {
-        (k[0], p.name, p.conn_id): count
+        (k[0], p.name,): count
         for p in connected_connections
-        for k, count in iteritems(p.inbound_commands_counter.counts)
+        for k, count in iteritems(p.inbound_commands_counter)
     },
-    labels=["command", "name", "conn_id"],
 )
 
-metrics.register_callback(
-    "outbound_commands",
+tcp_outbound_commands = LaterGauge(
+    "synapse_replication_tcp_protocol_outbound_commands",
+    "",
+    ["command", "name"],
     lambda: {
-        (k[0], p.name, p.conn_id): count
+        (k[0], p.name,): count
         for p in connected_connections
-        for k, count in iteritems(p.outbound_commands_counter.counts)
+        for k, count in iteritems(p.outbound_commands_counter)
     },
-    labels=["command", "name", "conn_id"],
 )
 
 # number of updates received for each RDATA stream
-inbound_rdata_count = metrics.register_counter(
-    "inbound_rdata_count",
-    labels=["stream_name"],
+inbound_rdata_count = Counter(
+    "synapse_replication_tcp_protocol_inbound_rdata_count", "", ["stream_name"]
 )

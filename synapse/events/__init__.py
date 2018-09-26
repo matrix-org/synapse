@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.frozenutils import freeze
-from synapse.util.caches import intern_dict
+import six
 
+from synapse.util.caches import intern_dict
+from synapse.util.frozenutils import freeze
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
 # bugs where we accidentally share e.g. signature dicts. However, converting
@@ -146,7 +147,10 @@ class EventBase(object):
         return field in self._event_dict
 
     def items(self):
-        return self._event_dict.items()
+        return list(self._event_dict.items())
+
+    def keys(self):
+        return six.iterkeys(self._event_dict)
 
 
 class FrozenEvent(EventBase):

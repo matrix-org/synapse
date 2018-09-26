@@ -30,12 +30,28 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use `Jenkins <http://matrix.org/jenkins>`_ and 
-`Travis <https://travis-ci.org/matrix-org/synapse>`_ for continuous
-integration. All pull requests to synapse get automatically tested by Travis; 
-the Jenkins builds require an adminstrator to start them. If your change 
-breaks the build, this will be shown in github, so please keep an eye on the 
-pull request for feedback.
+We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI 
+<https://travis-ci.org/matrix-org/synapse>`_ for continuous integration. All
+pull requests to synapse get automatically tested by Travis and CircleCI.
+If your change breaks the build, this will be shown in GitHub, so please
+keep an eye on the pull request for feedback.
+
+To run unit tests in a local development environment, you can use:
+
+- ``tox -e py27`` (requires tox to be installed by ``pip install tox``) for
+  SQLite-backed Synapse on Python 2.7.
+- ``tox -e py35`` for SQLite-backed Synapse on Python 3.5.
+- ``tox -e py36`` for SQLite-backed Synapse on Python 3.6.
+- ``tox -e py27-postgres`` for PostgreSQL-backed Synapse on Python 2.7
+  (requires a running local PostgreSQL with access to create databases).
+- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 2.7
+  (requires Docker). Entirely self-contained, recommended if you don't want to
+  set up PostgreSQL yourself.
+
+Docker images are available for running the integration tests (SyTest) locally,
+see the `documentation in the SyTest repo
+<https://github.com/matrix-org/sytest/blob/develop/docker/README.md>`_ for more
+information.
 
 Code style
 ~~~~~~~~~~
@@ -48,6 +64,27 @@ Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
 makes it horribly hard to review otherwise.
 
+Changelog
+~~~~~~~~~
+
+All changes, even minor ones, need a corresponding changelog / newsfragment
+entry. These are managed by Towncrier
+(https://github.com/hawkowl/towncrier).
+
+To create a changelog entry, make a new file in the ``changelog.d``
+file named in the format of ``PRnumber.type``. The type can be
+one of ``feature``, ``bugfix``, ``removal`` (also used for
+deprecations), or ``misc`` (for internal-only changes). The content of
+the file is your changelog entry, which can contain Markdown
+formatting. Adding credits to the changelog is encouraged, we value
+your contributions and would like to have you shouted out in the
+release notes!
+
+For example, a fix in PR #1234 would have its changelog entry in
+``changelog.d/1234.bugfix``, and contain content like "The security levels of
+Florbs are now validated when recieved over federation. Contributed by Jane
+Matrix".
+
 Attribution
 ~~~~~~~~~~~
 
@@ -56,7 +93,8 @@ AUTHORS.rst file for the project in question. Please feel free to include a
 change to AUTHORS.rst in your pull request to list yourself and a short
 description of the area(s) you've worked on. Also, we sometimes have swag to
 give away to contributors - if you feel that Matrix-branded apparel is missing
-from your life, please mail us your shipping address to matrix at matrix.org and we'll try to fix it :)
+from your life, please mail us your shipping address to matrix at matrix.org and
+we'll try to fix it :)
 
 Sign off
 ~~~~~~~~
@@ -105,18 +143,27 @@ the contribution or otherwise have the right to contribute it to Matrix::
         personal information I submit with it, including my sign-off) is
         maintained indefinitely and may be redistributed consistent with
         this project or the open source license(s) involved.
-        
+
 If you agree to this for your contribution, then all that's needed is to
 include the line in your commit or pull request comment::
 
     Signed-off-by: Your Name <your@email.example.org>
-    
-...using your real name; unfortunately pseudonyms and anonymous contributions
-can't be accepted. Git makes this trivial - just use the -s flag when you do
-``git commit``, having first set ``user.name`` and ``user.email`` git configs
-(which you should have done anyway :)
+
+We accept contributions under a legally identifiable name, such as
+your name on government documentation or common-law names (names
+claimed by legitimate usage or repute). Unfortunately, we cannot
+accept anonymous contributions at this time.
+
+Git allows you to add this signoff automatically when using the ``-s``
+flag to ``git commit``, which uses the name and email set in your
+``user.name`` and ``user.email`` git configs.
 
 Conclusion
 ~~~~~~~~~~
 
-That's it!  Matrix is a very open and collaborative project as you might expect given our obsession with open communication.  If we're going to successfully matrix together all the fragmented communication technologies out there we are reliant on contributions and collaboration from the community to do so.  So please get involved - and we hope you have as much fun hacking on Matrix as we do!
+That's it!  Matrix is a very open and collaborative project as you might expect
+given our obsession with open communication.  If we're going to successfully
+matrix together all the fragmented communication technologies out there we are
+reliant on contributions and collaboration from the community to do so.  So
+please get involved - and we hope you have as much fun hacking on Matrix as we
+do!

@@ -13,17 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
+import logging
+from collections import namedtuple
 
-from twisted.internet import defer
+import six
 
 from canonicaljson import encode_canonical_json
 
-from collections import namedtuple
+from twisted.internet import defer
 
-import logging
-import simplejson as json
+from synapse.metrics.background_process_metrics import run_as_background_process
+
+from ._base import SQLBaseStore, db_to_json
+
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = buffer
+else:
+    db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +57,7 @@ class TransactionStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
         super(TransactionStore, self).__init__(db_conn, hs)
 
-        self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
+        self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
 
     def get_received_txn_response(self, transaction_id, origin):
         """For an incoming transaction from a given origin, check if we have
@@ -86,7 +94,8 @@ class TransactionStore(SQLBaseStore):
         )
 
         if result and result["response_code"]:
-            return result["response_code"], json.loads(str(result["response_json"]))
+            return result["response_code"], db_to_json(result["response_json"])
+
         else:
             return None
 
@@ -110,7 +119,7 @@ class TransactionStore(SQLBaseStore):
                 "transaction_id": transaction_id,
                 "origin": origin,
                 "response_code": code,
-                "response_json": buffer(encode_canonical_json(response_dict)),
+                "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
             or_ignore=True,
@@ -146,7 +155,6 @@ class TransactionStore(SQLBaseStore):
         """
         pass
 
-    @cached(max_entries=10000)
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
 
@@ -188,8 +196,6 @@ class TransactionStore(SQLBaseStore):
             retry_interval (int) - how long until next retry in ms
         """
 
-        # XXX: we could chose to not bother persisting this if our cache thinks
-        # this is a NOOP
         return self.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
@@ -201,10 +207,6 @@ class TransactionStore(SQLBaseStore):
     def _set_destination_retry_timings(self, txn, destination,
                                        retry_last_ts, retry_interval):
         self.database_engine.lock_table(txn, "destinations")
-
-        self._invalidate_cache_and_stream(
-            txn, self.get_destination_retry_timings, (destination,)
-        )
 
         # We need to be careful here as the data may have changed from under us
         # due to a worker setting the timings.
@@ -262,6 +264,11 @@ class TransactionStore(SQLBaseStore):
 
         txn.execute(query, (self._clock.time_msec(),))
         return self.cursor_to_dict(txn)
+
+    def _start_cleanup_transactions(self):
+        return run_as_background_process(
+            "cleanup_transactions", self._cleanup_transactions,
+        )
 
     def _cleanup_transactions(self):
         now = self._clock.time_msec()

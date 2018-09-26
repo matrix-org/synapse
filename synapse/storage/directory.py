@@ -13,15 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached
-
-from synapse.api.errors import SynapseError
+from collections import namedtuple
 
 from twisted.internet import defer
 
-from collections import namedtuple
+from synapse.api.errors import SynapseError
+from synapse.util.caches.descriptors import cached
 
+from ._base import SQLBaseStore
 
 RoomAliasMapping = namedtuple(
     "RoomAliasMapping",
@@ -76,7 +75,6 @@ class DirectoryWorkerStore(SQLBaseStore):
             },
             retcol="creator",
             desc="get_room_alias_creator",
-            allow_none=True
         )
 
     @cached(max_entries=5000)

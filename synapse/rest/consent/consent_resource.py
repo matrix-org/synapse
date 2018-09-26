@@ -13,27 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from hashlib import sha256
 import hmac
 import logging
+from hashlib import sha256
 from os import path
+
 from six.moves import http_client
 
 import jinja2
 from jinja2 import TemplateNotFound
+
 from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
-from synapse.api.errors import NotFoundError, SynapseError, StoreError
+from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import (
-    finish_request,
-    wrap_html_request_handler,
-)
+from synapse.http.server import finish_request, wrap_html_request_handler
 from synapse.http.servlet import parse_string
 from synapse.types import UserID
-
 
 # language to use for the templates. TODO: figure this out from Accept-Language
 TEMPLATE_LANGUAGE = "en"
@@ -142,7 +140,7 @@ class ConsentResource(Resource):
         version = parse_string(request, "v",
                                default=self._default_consent_version)
         username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True)
+        userhmac = parse_string(request, "h", required=True, encoding=None)
 
         self._check_hash(username, userhmac)
 
@@ -177,7 +175,7 @@ class ConsentResource(Resource):
         """
         version = parse_string(request, "v", required=True)
         username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True)
+        userhmac = parse_string(request, "h", required=True, encoding=None)
 
         self._check_hash(username, userhmac)
 
@@ -212,9 +210,18 @@ class ConsentResource(Resource):
         finish_request(request)
 
     def _check_hash(self, userid, userhmac):
+        """
+        Args:
+            userid (unicode):
+            userhmac (bytes):
+
+        Raises:
+              SynapseError if the hash doesn't match
+
+        """
         want_mac = hmac.new(
             key=self._hmac_secret,
-            msg=userid,
+            msg=userid.encode('utf-8'),
             digestmod=sha256,
         ).hexdigest()
 

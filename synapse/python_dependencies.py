@@ -39,10 +39,11 @@ REQUIREMENTS = {
     "signedjson>=1.0.0": ["signedjson>=1.0.0"],
     "pynacl>=1.2.1": ["nacl>=1.2.1", "nacl.bindings"],
     "service_identity>=1.0.0": ["service_identity>=1.0.0"],
-    "Twisted>=16.0.0": ["twisted>=16.0.0"],
+    "Twisted>=17.1.0": ["twisted>=17.1.0"],
+    "treq>=15.1": ["treq>=15.1"],
 
-    # We use crypto.get_elliptic_curve which is only supported in >=0.15
-    "pyopenssl>=0.15": ["OpenSSL>=0.15"],
+    # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
+    "pyopenssl>=16.0.0": ["OpenSSL>=16.0.0"],
 
     "pyyaml": ["yaml"],
     "pyasn1": ["pyasn1"],
@@ -50,19 +51,22 @@ REQUIREMENTS = {
     "bcrypt": ["bcrypt>=3.1.0"],
     "pillow": ["PIL"],
     "pydenticon": ["pydenticon"],
-    "blist": ["blist"],
+    "sortedcontainers": ["sortedcontainers"],
     "pysaml2>=3.0.0": ["saml2>=3.0.0"],
     "pymacaroons-pynacl": ["pymacaroons"],
     "msgpack-python>=0.3.0": ["msgpack"],
     "phonenumbers>=8.2.0": ["phonenumbers"],
     "six": ["six"],
+    "prometheus_client": ["prometheus_client"],
+
+    # we use attr.s(slots), which arrived in 16.0.0
+    "attrs>=16.0.0": ["attr>=16.0.0"],
+    "netaddr>=0.7.18": ["netaddr"],
 }
+
 CONDITIONAL_REQUIREMENTS = {
     "web_client": {
         "matrix_angular_sdk>=0.6.8": ["syweb>=0.6.8"],
-    },
-    "preview_url": {
-        "netaddr>=0.7.18": ["netaddr"],
     },
     "email.enable_notifs": {
         "Jinja2>=2.8": ["Jinja2>=2.8"],
@@ -77,6 +81,9 @@ CONDITIONAL_REQUIREMENTS = {
     "affinity": {
         "affinity": ["affinity"],
     },
+    "postgres": {
+        "psycopg2>=2.6": ["psycopg2"]
+    }
 }
 
 

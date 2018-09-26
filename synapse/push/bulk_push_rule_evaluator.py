@@ -15,43 +15,40 @@
 # limitations under the License.
 
 import logging
+from collections import namedtuple
+
+from six import iteritems, itervalues
+
+from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from .push_rule_evaluator import PushRuleEvaluatorForEvent
-
-from synapse.event_auth import get_user_power_level
 from synapse.api.constants import EventTypes, Membership
-from synapse.metrics import get_metrics_for
-from synapse.util.caches import metrics as cache_metrics
-from synapse.util.caches.descriptors import cached
-from synapse.util.async import Linearizer
+from synapse.event_auth import get_user_power_level
 from synapse.state import POWER_KEY
+from synapse.util.async_helpers import Linearizer
+from synapse.util.caches import register_cache
+from synapse.util.caches.descriptors import cached
 
-from collections import namedtuple
-
-from six import itervalues, iteritems
+from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 logger = logging.getLogger(__name__)
 
 
 rules_by_room = {}
 
-push_metrics = get_metrics_for(__name__)
 
-push_rules_invalidation_counter = push_metrics.register_counter(
-    "push_rules_invalidation_counter"
-)
-push_rules_state_size_counter = push_metrics.register_counter(
-    "push_rules_state_size_counter"
-)
+push_rules_invalidation_counter = Counter(
+    "synapse_push_bulk_push_rule_evaluator_push_rules_invalidation_counter", "")
+push_rules_state_size_counter = Counter(
+    "synapse_push_bulk_push_rule_evaluator_push_rules_state_size_counter", "")
 
 # Measures whether we use the fast path of using state deltas, or if we have to
 # recalculate from scratch
-push_rules_delta_state_cache_metric = cache_metrics.register_cache(
+push_rules_delta_state_cache_metric = register_cache(
     "cache",
-    size_callback=lambda: 0,  # Meaningless size, as this isn't a cache that stores values
-    cache_name="push_rules_delta_state_cache_metric",
+    "push_rules_delta_state_cache_metric",
+    cache=[],  # Meaningless size, as this isn't a cache that stores values
 )
 
 
@@ -65,10 +62,10 @@ class BulkPushRuleEvaluator(object):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-        self.room_push_rule_cache_metrics = cache_metrics.register_cache(
+        self.room_push_rule_cache_metrics = register_cache(
             "cache",
-            size_callback=lambda: 0,  # There's not good value for this
-            cache_name="room_push_rule_cache",
+            "room_push_rule_cache",
+            cache=[],  # Meaningless size, as this isn't a cache that stores values
         )
 
     @defer.inlineCallbacks
@@ -115,7 +112,8 @@ class BulkPushRuleEvaluator(object):
 
     @defer.inlineCallbacks
     def _get_power_levels_and_sender_level(self, event, context):
-        pl_event_id = context.prev_state_ids.get(POWER_KEY)
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        pl_event_id = prev_state_ids.get(POWER_KEY)
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
@@ -123,7 +121,7 @@ class BulkPushRuleEvaluator(object):
             auth_events = {POWER_KEY: pl_event}
         else:
             auth_events_ids = yield self.auth.compute_auth_events(
-                event, context.prev_state_ids, for_verification=False,
+                event, prev_state_ids, for_verification=False,
             )
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {
@@ -307,10 +305,10 @@ class RulesForRoom(object):
 
                 push_rules_delta_state_cache_metric.inc_hits()
             else:
-                current_state_ids = context.current_state_ids
+                current_state_ids = yield context.get_current_state_ids(self.store)
                 push_rules_delta_state_cache_metric.inc_misses()
 
-            push_rules_state_size_counter.inc_by(len(current_state_ids))
+            push_rules_state_size_counter.inc(len(current_state_ids))
 
             logger.debug(
                 "Looking for member changes in %r %r", state_group, current_state_ids

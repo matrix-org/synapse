@@ -13,13 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import six
+
+from unpaddedbase64 import encode_base64
+
 from twisted.internet import defer
+
+from synapse.crypto.event_signing import compute_event_reference_hash
+from synapse.util.caches.descriptors import cached, cachedList
 
 from ._base import SQLBaseStore
 
-from unpaddedbase64 import encode_base64
-from synapse.crypto.event_signing import compute_event_reference_hash
-from synapse.util.caches.descriptors import cached, cachedList
+# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
+# despite being deprecated and removed in favor of memoryview
+if six.PY2:
+    db_binary_type = buffer
+else:
+    db_binary_type = memoryview
 
 
 class SignatureWorkerStore(SQLBaseStore):
@@ -56,7 +66,7 @@ class SignatureWorkerStore(SQLBaseStore):
             for e_id, h in hashes.items()
         }
 
-        defer.returnValue(hashes.items())
+        defer.returnValue(list(hashes.items()))
 
     def _get_event_reference_hashes_txn(self, txn, event_id):
         """Get all the hashes for a given PDU.
@@ -64,7 +74,7 @@ class SignatureWorkerStore(SQLBaseStore):
             txn (cursor):
             event_id (str): Id for the Event.
         Returns:
-            A dict of algorithm -> hash.
+            A dict[unicode, bytes] of algorithm -> hash.
         """
         query = (
             "SELECT algorithm, hash"
@@ -91,7 +101,7 @@ class SignatureStore(SignatureWorkerStore):
             vals.append({
                 "event_id": event.event_id,
                 "algorithm": ref_alg,
-                "hash": buffer(ref_hash_bytes),
+                "hash": db_binary_type(ref_hash_bytes),
             })
 
         self._simple_insert_many_txn(

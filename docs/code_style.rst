@@ -16,7 +16,7 @@
       print("I am a fish %s" %
             "moo")
 
-      and this::
+    and this::
 
         print(
             "I am a fish %s" %

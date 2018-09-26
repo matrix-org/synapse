@@ -14,33 +14,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
+import logging
+from collections import namedtuple
+
+from six.moves import urllib
+
+from signedjson.key import (
+    decode_verify_key_bytes,
+    encode_verify_key_base64,
+    is_signing_algorithm_supported,
+)
+from signedjson.sign import (
+    SignatureVerifyException,
+    encode_canonical_json,
+    sign_json,
+    signature_ids,
+    verify_signed_json,
+)
+from unpaddedbase64 import decode_base64, encode_base64
+
+from OpenSSL import crypto
+from twisted.internet import defer
+
+from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyclient import fetch_server_key
-from synapse.api.errors import SynapseError, Codes
-from synapse.util import unwrapFirstError, logcontext
+from synapse.util import logcontext, unwrapFirstError
 from synapse.util.logcontext import (
+    LoggingContext,
     PreserveLoggingContext,
     preserve_fn,
     run_in_background,
 )
 from synapse.util.metrics import Measure
-
-from twisted.internet import defer
-
-from signedjson.sign import (
-    verify_signed_json, signature_ids, sign_json, encode_canonical_json
-)
-from signedjson.key import (
-    is_signing_algorithm_supported, decode_verify_key_bytes
-)
-from unpaddedbase64 import decode_base64, encode_base64
-
-from OpenSSL import crypto
-
-from collections import namedtuple
-import urllib
-import hashlib
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +62,7 @@ Attributes:
     key_ids(set(str)): The set of key_ids to that could be used to verify the
         JSON object
     json_object(dict): The JSON object to verify.
-    deferred(twisted.internet.defer.Deferred):
+    deferred(Deferred[str, str, nacl.signing.VerifyKey]):
         A deferred (server_name, key_id, verify_key) tuple that resolves when
         a verify key has been fetched. The deferreds' callbacks are run with no
         logcontext.
@@ -212,23 +218,34 @@ class Keyring(object):
             servers have completed. Follows the synapse rules of logcontext
             preservation.
         """
+        loop_count = 1
         while True:
             wait_on = [
-                self.key_downloads[server_name]
+                (server_name, self.key_downloads[server_name])
                 for server_name in server_names
                 if server_name in self.key_downloads
             ]
-            if wait_on:
-                with PreserveLoggingContext():
-                    yield defer.DeferredList(wait_on)
-            else:
+            if not wait_on:
                 break
+            logger.info(
+                "Waiting for existing lookups for %s to complete [loop %i]",
+                [w[0] for w in wait_on], loop_count,
+            )
+            with PreserveLoggingContext():
+                yield defer.DeferredList((w[1] for w in wait_on))
+
+            loop_count += 1
+
+        ctx = LoggingContext.current_context()
 
         def rm(r, server_name_):
-            self.key_downloads.pop(server_name_, None)
+            with PreserveLoggingContext(ctx):
+                logger.debug("Releasing key lookup lock on %s", server_name_)
+                self.key_downloads.pop(server_name_, None)
             return r
 
         for server_name, deferred in server_to_deferred.items():
+            logger.debug("Got key lookup lock on %s", server_name)
             self.key_downloads[server_name] = deferred
             deferred.addBoth(rm, server_name)
 
@@ -428,7 +445,7 @@ class Keyring(object):
         # an incoming request.
         query_response = yield self.client.post_json(
             destination=perspective_name,
-            path=b"/_matrix/key/v2/query",
+            path="/_matrix/key/v2/query",
             data={
                 u"server_keys": {
                     server_name: {
@@ -508,9 +525,9 @@ class Keyring(object):
                 continue
 
             (response, tls_certificate) = yield fetch_server_key(
-                server_name, self.hs.tls_server_context_factory,
-                path=(b"/_matrix/key/v2/server/%s" % (
-                    urllib.quote(requested_key_id),
+                server_name, self.hs.tls_client_options_factory,
+                path=("/_matrix/key/v2/server/%s" % (
+                    urllib.parse.quote(requested_key_id),
                 )).encode("ascii"),
             )
 
@@ -651,7 +668,7 @@ class Keyring(object):
         # Try to fetch the key from the remote server.
 
         (response, tls_certificate) = yield fetch_server_key(
-            server_name, self.hs.tls_server_context_factory
+            server_name, self.hs.tls_client_options_factory
         )
 
         # Check the response.
@@ -736,6 +753,17 @@ class Keyring(object):
 
 @defer.inlineCallbacks
 def _handle_key_deferred(verify_request):
+    """Waits for the key to become available, and then performs a verification
+
+    Args:
+        verify_request (VerifyKeyRequest):
+
+    Returns:
+        Deferred[None]
+
+    Raises:
+        SynapseError if there was a problem performing the verification
+    """
     server_name = verify_request.server_name
     try:
         with PreserveLoggingContext():
@@ -768,11 +796,17 @@ def _handle_key_deferred(verify_request):
     ))
     try:
         verify_signed_json(json_object, server_name, verify_key)
-    except Exception:
+    except SignatureVerifyException as e:
+        logger.debug(
+            "Error verifying signature for %s:%s:%s with key %s: %s",
+            server_name, verify_key.alg, verify_key.version,
+            encode_verify_key_base64(verify_key),
+            str(e),
+        )
         raise SynapseError(
             401,
-            "Invalid signature for server %s with key %s:%s" % (
-                server_name, verify_key.alg, verify_key.version
+            "Invalid signature for server %s with key %s:%s: %s" % (
+                server_name, verify_key.alg, verify_key.version, str(e),
             ),
             Codes.UNAUTHORIZED,
         )

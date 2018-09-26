@@ -12,21 +12,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+
+from six import iteritems, itervalues
+
+from twisted.internet import defer
+
 from synapse.api import errors
 from synapse.api.constants import EventTypes
 from synapse.api.errors import FederationDeniedError
+from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.metrics import measure_func
-from synapse.types import get_domain_from_id, RoomStreamToken
-from twisted.internet import defer
+from synapse.util.retryutils import NotRetryingDestination
+
 from ._base import BaseHandler
-
-import logging
-
-from six import itervalues, iteritems
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +116,7 @@ class DeviceHandler(BaseHandler):
             user_id, device_id=None
         )
 
-        devices = device_map.values()
+        devices = list(device_map.values())
         for device in devices:
             _update_device_from_client_ips(device, ips)
 
@@ -187,7 +189,7 @@ class DeviceHandler(BaseHandler):
             defer.Deferred:
         """
         device_map = yield self.store.get_devices_by_user(user_id)
-        device_ids = device_map.keys()
+        device_ids = list(device_map)
         if except_device_id is not None:
             device_ids = [d for d in device_ids if d != except_device_id]
         yield self.delete_devices(user_id, device_ids)
@@ -537,7 +539,7 @@ class DeviceListEduUpdater(object):
                 yield self.device_handler.notify_device_update(user_id, device_ids)
             else:
                 # Simply update the single device, since we know that is the only
-                # change (becuase of the single prev_id matching the current cache)
+                # change (because of the single prev_id matching the current cache)
                 for device_id, stream_id, prev_ids, content in pending_updates:
                     yield self.store.update_remote_device_list_cache_entry(
                         user_id, device_id, content, stream_id,

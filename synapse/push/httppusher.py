@@ -15,27 +15,27 @@
 # limitations under the License.
 import logging
 
-from twisted.internet import defer, reactor
+import six
+
+from prometheus_client import Counter
+
+from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
-from . import push_rule_evaluator
-from . import push_tools
-import synapse
 from synapse.push import PusherConfigException
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure
 
+from . import push_rule_evaluator, push_tools
+
+if six.PY3:
+    long = int
+
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
+http_push_processed_counter = Counter("synapse_http_httppusher_http_pushes_processed", "")
 
-http_push_processed_counter = metrics.register_counter(
-    "http_pushes_processed",
-)
-
-http_push_failed_counter = metrics.register_counter(
-    "http_pushes_failed",
-)
+http_push_failed_counter = Counter("synapse_http_httppusher_http_pushes_failed", "")
 
 
 class HttpPusher(object):
@@ -101,7 +101,7 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
-        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
+        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering or 0)
         yield self._process()
 
     @defer.inlineCallbacks
@@ -225,7 +225,9 @@ class HttpPusher(object):
                     )
                 else:
                     logger.info("Push failed: delaying for %ds", self.backoff_delay)
-                    self.timed_call = reactor.callLater(self.backoff_delay, self.on_timer)
+                    self.timed_call = self.hs.get_reactor().callLater(
+                        self.backoff_delay, self.on_timer
+                    )
                     self.backoff_delay = min(self.backoff_delay * 2, self.MAX_BACKOFF_SEC)
                     break
 

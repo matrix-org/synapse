@@ -14,7 +14,8 @@
 # limitations under the License.
 import logging
 
-from six import (iteritems, string_types)
+from six import iteritems, string_types
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError

@@ -17,6 +17,9 @@
 import logging
 import sys
 
+from twisted.internet import defer, reactor
+from twisted.web.resource import NoResource
+
 import synapse
 from synapse import events
 from synapse.app import _base
@@ -26,6 +29,7 @@ from synapse.config.logger import setup_logging
 from synapse.crypto import context_factory
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
+from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -42,8 +46,6 @@ from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext, run_in_background
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
-from twisted.internet import reactor, defer
-from twisted.web.resource import NoResource
 
 logger = logging.getLogger("synapse.app.user_dir")
 
@@ -92,10 +94,7 @@ class UserDirectorySlaveStore(
 
 
 class UserDirectoryServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = UserDirectorySlaveStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = UserDirectorySlaveStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -105,7 +104,7 @@ class UserDirectoryServer(HomeServer):
         for res in listener_config["resources"]:
             for name in res["names"]:
                 if name == "metrics":
-                    resources[METRICS_PREFIX] = MetricsResource(self)
+                    resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
                     user_directory.register_servlets(self, resource)
@@ -146,6 +145,13 @@ class UserDirectoryServer(HomeServer):
                         globals={"hs": self},
                     )
                 )
+            elif listener["type"] == "metrics":
+                if not self.get_config().enable_metrics:
+                    logger.warn(("Metrics listener configured, but "
+                                 "enable_metrics is not True!"))
+                else:
+                    _base.listen_metrics(listener["bind_addresses"],
+                                         listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
 
@@ -160,8 +166,9 @@ class UserDirectoryReplicationHandler(ReplicationClientHandler):
         super(UserDirectoryReplicationHandler, self).__init__(hs.get_datastore())
         self.user_directory = hs.get_user_directory_handler()
 
+    @defer.inlineCallbacks
     def on_rdata(self, stream_name, token, rows):
-        super(UserDirectoryReplicationHandler, self).on_rdata(
+        yield super(UserDirectoryReplicationHandler, self).on_rdata(
             stream_name, token, rows
         )
         if stream_name == "current_state_deltas":
@@ -205,11 +212,13 @@ def start(config_options):
     config.update_user_directory = True
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
+    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
     ps = UserDirectoryServer(
         config.server_name,
         db_config=config.database_config,
         tls_server_context_factory=tls_server_context_factory,
+        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
@@ -220,7 +229,6 @@ def start(config_options):
 
     def start():
         ps.get_datastore().start_profiling()
-        ps.get_state_handler().start_caching()
 
     reactor.callWhenRunning(start)
 

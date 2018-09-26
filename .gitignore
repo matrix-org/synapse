@@ -1,8 +1,11 @@
 *.pyc
 .*.swp
+*~
+*.lock
 
 .DS_Store
 _trial_temp/
+_trial_temp*/
 logs/
 dbs/
 *.egg
@@ -13,6 +16,7 @@ docs/build/
 cmdclient_config.json
 homeserver*.db
 homeserver*.log
+homeserver*.log.*
 homeserver*.pid
 homeserver*.yaml
 
@@ -40,6 +44,9 @@ media_store/
 *.tac
 
 build/
+venv/
+venv*/
+*venv/
 
 localhost-800*/
 static/client/register/register_config.js

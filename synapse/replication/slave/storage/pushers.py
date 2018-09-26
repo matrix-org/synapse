@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.pusher import PusherWorkerStore
+
 from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
-
-from synapse.storage.pusher import PusherWorkerStore
 
 
 class SlavedPusherStore(PusherWorkerStore, BaseSlavedStore):

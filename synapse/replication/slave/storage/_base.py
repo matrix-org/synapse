@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
-
-import logging
 
 logger = logging.getLogger(__name__)
 

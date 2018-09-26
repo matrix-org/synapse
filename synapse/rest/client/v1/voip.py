@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+import hashlib
+import hmac
+
 from twisted.internet import defer
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-
-import hmac
-import hashlib
-import base64
 
 
 class VoipRestServlet(ClientV1RestServlet):
@@ -43,7 +42,11 @@ class VoipRestServlet(ClientV1RestServlet):
             expiry = (self.hs.get_clock().time_msec() + userLifetime) / 1000
             username = "%d:%s" % (expiry, requester.user.to_string())
 
-            mac = hmac.new(turnSecret, msg=username, digestmod=hashlib.sha1)
+            mac = hmac.new(
+                turnSecret.encode(),
+                msg=username.encode(),
+                digestmod=hashlib.sha1
+            )
             # We need to use standard padded base64 encoding here
             # encode_base64 because we need to add the standard padding to get the
             # same result as the TURN server.

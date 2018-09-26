@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import (
-    respond_with_json_bytes, wrap_json_request_handler,
-)
-from synapse.http.servlet import parse_integer, parse_json_object_from_request
-from synapse.api.errors import SynapseError, Codes
-from synapse.crypto.keyring import KeyLookupError
+import logging
+from io import BytesIO
 
+from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
-from twisted.internet import defer
 
+from synapse.api.errors import Codes, SynapseError
+from synapse.crypto.keyring import KeyLookupError
+from synapse.http.server import respond_with_json_bytes, wrap_json_request_handler
+from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
-from io import BytesIO
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -105,7 +103,7 @@ class RemoteKey(Resource):
     def async_render_GET(self, request):
         if len(request.postpath) == 1:
             server, = request.postpath
-            query = {server: {}}
+            query = {server.decode('ascii'): {}}
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
             minimum_valid_until_ts = parse_integer(
@@ -114,11 +112,12 @@ class RemoteKey(Resource):
             arguments = {}
             if minimum_valid_until_ts is not None:
                 arguments["minimum_valid_until_ts"] = minimum_valid_until_ts
-            query = {server: {key_id: arguments}}
+            query = {server.decode('ascii'): {key_id.decode('ascii'): arguments}}
         else:
             raise SynapseError(
                 404, "Not found %r" % request.postpath, Codes.NOT_FOUND
             )
+
         yield self.query_keys(request, query, query_remote_on_cache_miss=True)
 
     def render_POST(self, request):
@@ -137,6 +136,7 @@ class RemoteKey(Resource):
     @defer.inlineCallbacks
     def query_keys(self, request, query, query_remote_on_cache_miss=False):
         logger.info("Handling query for keys %r", query)
+
         store_queries = []
         for server_name, key_ids in query.items():
             if (

@@ -13,20 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import unittest
+from mock import Mock
+
 from twisted.internet import defer
 from twisted.names import dns, error
-
-from mock import Mock
 
 from synapse.http.endpoint import resolve_service
 
 from tests.utils import MockClock
 
+from . import unittest
+
 
 @unittest.DEBUG
 class DnsTestCase(unittest.TestCase):
-
     @defer.inlineCallbacks
     def test_resolve(self):
         dns_client_mock = Mock()
@@ -35,14 +35,11 @@ class DnsTestCase(unittest.TestCase):
         host_name = "example.com"
 
         answer_srv = dns.RRHeader(
-            type=dns.SRV,
-            payload=dns.Record_SRV(
-                target=host_name,
-            )
+            type=dns.SRV, payload=dns.Record_SRV(target=host_name)
         )
 
         dns_client_mock.lookupService.return_value = defer.succeed(
-            ([answer_srv], None, None),
+            ([answer_srv], None, None)
         )
 
         cache = {}
@@ -62,14 +59,12 @@ class DnsTestCase(unittest.TestCase):
         dns_client_mock = Mock()
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSServerError())
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         entry = Mock(spec_set=["expires"])
         entry.expires = 0
 
-        cache = {
-            service_name: [entry]
-        }
+        cache = {service_name: [entry]}
 
         servers = yield resolve_service(
             service_name, dns_client=dns_client_mock, cache=cache
@@ -87,17 +82,15 @@ class DnsTestCase(unittest.TestCase):
         dns_client_mock = Mock(spec_set=['lookupService'])
         dns_client_mock.lookupService = Mock(spec_set=[])
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         entry = Mock(spec_set=["expires"])
         entry.expires = 999999999
 
-        cache = {
-            service_name: [entry]
-        }
+        cache = {service_name: [entry]}
 
         servers = yield resolve_service(
-            service_name, dns_client=dns_client_mock, cache=cache, clock=clock,
+            service_name, dns_client=dns_client_mock, cache=cache, clock=clock
         )
 
         self.assertFalse(dns_client_mock.lookupService.called)
@@ -111,14 +104,12 @@ class DnsTestCase(unittest.TestCase):
 
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSServerError())
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         cache = {}
 
         with self.assertRaises(error.DNSServerError):
-            yield resolve_service(
-                service_name, dns_client=dns_client_mock, cache=cache
-            )
+            yield resolve_service(service_name, dns_client=dns_client_mock, cache=cache)
 
     @defer.inlineCallbacks
     def test_name_error(self):
@@ -126,7 +117,7 @@ class DnsTestCase(unittest.TestCase):
 
         dns_client_mock.lookupService.return_value = defer.fail(error.DNSNameError())
 
-        service_name = "test_service.examle.com"
+        service_name = "test_service.example.com"
 
         cache = {}
 

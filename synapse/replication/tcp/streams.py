@@ -24,11 +24,10 @@ Each stream is defined by the following information:
     update_function:    The function that returns a list of updates between two tokens
 """
 
-from twisted.internet import defer
+import logging
 from collections import namedtuple
 
-import logging
-
+from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +196,7 @@ class Stream(object):
             )
 
             if len(rows) >= MAX_EVENTS_BEHIND:
-                raise Exception("stream %s has fallen behined" % (self.NAME))
+                raise Exception("stream %s has fallen behind" % (self.NAME))
         else:
             rows = yield self.update_function(
                 from_token, current_token,

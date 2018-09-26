@@ -13,30 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import email.mime.multipart
+import email.utils
+import logging
+import time
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+from six.moves import urllib
+
+import bleach
+import jinja2
+
 from twisted.internet import defer
 from twisted.mail.smtp import sendmail
 
-import email.utils
-import email.mime.multipart
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-from synapse.util.async import concurrently_execute
+from synapse.api.constants import EventTypes
+from synapse.api.errors import StoreError
 from synapse.push.presentable_names import (
-    calculate_room_name, name_from_member_event, descriptor_from_member_events
+    calculate_room_name,
+    descriptor_from_member_events,
+    name_from_member_event,
 )
 from synapse.types import UserID
-from synapse.api.errors import StoreError
-from synapse.api.constants import EventTypes
+from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
-import jinja2
-import bleach
-
-import time
-import urllib
-
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -229,7 +231,8 @@ class Mailer(object):
                 if room_vars['notifs'] and 'messages' in room_vars['notifs'][-1]:
                     prev_messages = room_vars['notifs'][-1]['messages']
                     for message in notifvars['messages']:
-                        pm = filter(lambda pm: pm['id'] == message['id'], prev_messages)
+                        pm = list(filter(lambda pm: pm['id'] == message['id'],
+                                         prev_messages))
                         if pm:
                             if not message["is_historical"]:
                                 pm[0]["is_historical"] = False
@@ -438,7 +441,7 @@ class Mailer(object):
 
     def make_room_link(self, room_id):
         if self.hs.config.email_riot_base_url:
-            base_url = self.hs.config.email_riot_base_url
+            base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             base_url = "https://vector.im/beta/#/room"
@@ -472,7 +475,7 @@ class Mailer(object):
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
             self.hs.config.public_baseurl,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
         )
 
 
@@ -559,7 +562,7 @@ def _create_mxc_to_http_filter(config):
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             config.public_baseurl,
             serverAndMediaId,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
             fragment or "",
         )
 
