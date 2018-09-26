@@ -107,9 +107,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.room, [e2.event_id])
         self.assertEqual(len(state_group_map), 1)
         state_list = list(state_group_map.values())[0]
-        self.assertListEqual(
-            [ev.event_id for ev in state_list],
-            [e1.event_id, e2.event_id],
+
+        self.assertEqual(
+            {ev.event_id for ev in state_list},
+            {e1.event_id, e2.event_id},
         )
 
     @defer.inlineCallbacks
