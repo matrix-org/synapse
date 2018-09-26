@@ -106,7 +106,7 @@ class FederationHandler(BaseHandler):
 
         self.hs = hs
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -325,12 +325,17 @@ class FederationHandler(BaseHandler):
 
                 # Calculate the state of the previous events, and
                 # de-conflict them to find the current state.
-                state_groups = []
                 auth_chains = set()
                 try:
                     # Get the state of the events we know about
-                    ours = yield self.store.get_state_groups(room_id, list(seen))
-                    state_groups.append(ours)
+                    ours = yield self.store.get_state_groups_ids(room_id, seen)
+
+                    # state_maps is a list of mappings from (type, state_key) to event_id
+                    # type: list[dict[tuple[str, str], str]]
+                    state_maps = list(ours.values())
+
+                    # we don't need this any more, let's delete it.
+                    del ours
 
                     # Ask the remote server for the states we don't
                     # know about
@@ -355,10 +360,10 @@ class FederationHandler(BaseHandler):
                             # hoped.
                             auth_chains.update(got_auth_chain)
 
-                            state_group = {
+                            remote_state_map = {
                                 (x.type, x.state_key): x.event_id for x in remote_state
                             }
-                            state_groups.append(state_group)
+                            state_maps.append(remote_state_map)
 
                     # Resolve any conflicting state
                     def fetch(ev_ids):
@@ -368,7 +373,7 @@ class FederationHandler(BaseHandler):
 
                     room_version = yield self.store.get_room_version(room_id)
                     state_map = yield resolve_events_with_factory(
-                        room_version, state_groups, {event_id: pdu}, fetch
+                        room_version, state_maps, {event_id: pdu}, fetch,
                     )
 
                     state = (yield self.store.get_events(state_map.values())).values()
