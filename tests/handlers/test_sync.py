@@ -22,9 +22,16 @@ from synapse.types import UserID
 import tests.unittest
 import tests.utils
 from tests.utils import setup_test_homeserver
+from tests.unittest import HomeserverTestCase
+
+from tests.server import (
+    ThreadedMemoryReactorClock,
+)
+
+ONE_HOUR = 60 * 60 * 1000
 
 
-class SyncTestCase(tests.unittest.TestCase):
+class SyncTestCase(HomeserverTestCase):
     """ Tests Sync Handler. """
 
     @defer.inlineCallbacks
@@ -32,6 +39,7 @@ class SyncTestCase(tests.unittest.TestCase):
         self.hs = yield setup_test_homeserver(self.addCleanup)
         self.sync_handler = SyncHandler(self.hs)
         self.store = self.hs.get_datastore()
+        self.reactor = ThreadedMemoryReactorClock()
 
     @defer.inlineCallbacks
     def test_wait_for_sync_for_user_auth_blocking(self):
@@ -44,7 +52,7 @@ class SyncTestCase(tests.unittest.TestCase):
         self.hs.config.max_mau_value = 1
 
         # Check that the happy case does not throw errors
-        yield self.store.upsert_monthly_active_user(user_id1)
+        self.store.upsert_monthly_active_user(user_id1)
         yield self.sync_handler.wait_for_sync_for_user(sync_config)
 
         # Test that global lock works
@@ -56,7 +64,11 @@ class SyncTestCase(tests.unittest.TestCase):
         self.hs.config.hs_disabled = False
 
         sync_config = self._generate_sync_config(user_id2)
+        print 'pre wait'
+        self.reactor.advance(ONE_HOUR)
+        self.pump()
 
+        print 'post wait'
         with self.assertRaises(ResourceLimitError) as e:
             yield self.sync_handler.wait_for_sync_for_user(sync_config)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)

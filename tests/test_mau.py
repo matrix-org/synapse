@@ -16,6 +16,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
+import logging
 
 from mock import Mock, NonCallableMock
 
@@ -32,6 +33,9 @@ from tests.server import (
     render,
     setup_test_homeserver,
 )
+logger = logging.getLogger(__name__)
+
+ONE_HOUR = 60 * 60 * 1000
 
 
 class TestMauLimit(unittest.TestCase):
@@ -69,12 +73,15 @@ class TestMauLimit(unittest.TestCase):
         sync.register_servlets(self.hs, self.resource)
 
     def test_simple_deny_mau(self):
+
         # Create and sync so that the MAU counts get updated
         token1 = self.create_user("kermit1")
+        logger.debug("create kermit1 token is %s" % token1)
         self.do_sync_for_user(token1)
         token2 = self.create_user("kermit2")
         self.do_sync_for_user(token2)
-
+        # Because adding to
+        self.reactor.advance(ONE_HOUR)
         # We've created and activated two users, we shouldn't be able to
         # register new users
         with self.assertRaises(SynapseError) as cm:
@@ -102,6 +109,7 @@ class TestMauLimit(unittest.TestCase):
         token3 = self.create_user("kermit3")
         self.do_sync_for_user(token3)
 
+    @unittest.DEBUG
     def test_trial_delay(self):
         self.hs.config.mau_trial_days = 1
 
@@ -119,6 +127,8 @@ class TestMauLimit(unittest.TestCase):
         # Two users should be able to sync
         self.do_sync_for_user(token1)
         self.do_sync_for_user(token2)
+
+        self.reactor.advance(ONE_HOUR)
 
         # But the third should fail
         with self.assertRaises(SynapseError) as cm:
