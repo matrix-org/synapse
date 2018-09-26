@@ -212,7 +212,7 @@ class LoggingContext(object):
         self.usage_start = None
 
         self.main_thread = threading.current_thread()
-        self.request = request
+        self.request = None
         self.tag = ""
         self.alive = True
 
@@ -220,6 +220,10 @@ class LoggingContext(object):
 
         if self.parent_context is not None:
             self.parent_context.copy_to(self)
+
+        if request is not None:
+            # the request param overrides the request from the parent context
+            self.request = request
 
     def __str__(self):
         return "%s@%x" % (self.name, id(self))
