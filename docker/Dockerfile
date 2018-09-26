@@ -1,4 +1,5 @@
-FROM docker.io/python:2-alpine3.8
+ARG PYTHON_VERSION=2
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.8
 
 COPY . /synapse
 
