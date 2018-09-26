@@ -341,10 +341,9 @@ class FederationHandler(BaseHandler):
                         )
 
                         with logcontext.nested_logging_context(p):
-                            # XXX if any of the missing prevs share missing state or auth
-                            # events, we'll end up requesting those missing events for
-                            # *each* missing prev, contributing to the hammering of /event
-                            # as per https://github.com/matrix-org/synapse/issues/2164.
+                            # note that if any of the missing prevs share missing state or
+                            # auth events, the requests to fetch those events are deduped
+                            # by the get_pdu_cache in federation_client.
                             remote_state, got_auth_chain = (
                                 yield self.federation_client.get_state_for_room(
                                     origin, room_id, p,
