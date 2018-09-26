@@ -20,7 +20,7 @@ from six import iteritems
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import (SynapseError, HttpResponseException)
 from synapse.types import get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,18 @@ def _create_rerouter(func_name):
             )
         else:
             destination = get_domain_from_id(group_id)
-            return getattr(self.transport_client, func_name)(
+            logger.info("Triggering call")
+            d = getattr(self.transport_client, func_name)(
                 destination, group_id, *args, **kwargs
             )
+            def h(failure):
+                failure.trap(HttpResponseException)
+                e = failure.value
+                if e.code >= 400 and e.code < 500:
+                    raise SynapseError(e.code, e.msg)
+                failure.raiseException()
+            d.addErrback(h)
+            return d
     return f
 
 
