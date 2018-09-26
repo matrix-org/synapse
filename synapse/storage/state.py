@@ -263,7 +263,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             event_ids (iterable[str]): ids of the events
 
         Returns:
-            Deferred[dict[int, dict[(type, state_key), str]]]:
+            Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
         if not event_ids:
@@ -337,7 +337,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         Returns:
         Returns:
-            Deferred[dict[int, dict[(type, state_key), str]]]:
+            Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
         results = {}
@@ -746,7 +746,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            Deferred[dict[int, dict[(type, state_key), str]]]:
+            Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
         if types is not None:
@@ -802,7 +802,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            Deferred[dict[int, dict[(type, state_key), str]]]:
+            Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
         if types:
