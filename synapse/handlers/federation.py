@@ -341,14 +341,23 @@ class FederationHandler(BaseHandler):
                         )
 
                         with logcontext.nested_logging_context(p):
-                            state, got_auth_chain = (
+                            # XXX if any of the missing prevs share missing state or auth
+                            # events, we'll end up requesting those missing events for
+                            # *each* missing prev, contributing to the hammering of /event
+                            # as per https://github.com/matrix-org/synapse/issues/2164.
+                            remote_state, got_auth_chain = (
                                 yield self.federation_client.get_state_for_room(
                                     origin, room_id, p,
                                 )
                             )
+
+                            # XXX hrm I'm not convinced that duplicate events will compare
+                            # for equality, so I'm not sure this does what the author
+                            # hoped.
                             auth_chains.update(got_auth_chain)
+
                             state_group = {
-                                (x.type, x.state_key): x.event_id for x in state
+                                (x.type, x.state_key): x.event_id for x in remote_state
                             }
                             state_groups.append(state_group)
 
