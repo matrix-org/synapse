@@ -104,7 +104,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
         )
 
         state_group_map = yield self.store.get_state_groups(
-            self.room, [e1.event_id, e2.event_id])
+            self.room, [e2.event_id])
         self.assertEqual(len(state_group_map), 1)
         state_list = list(state_group_map.values())[0]
         self.assertListEqual(
