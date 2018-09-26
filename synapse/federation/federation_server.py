@@ -618,7 +618,7 @@ class FederationServer(FederationBase):
             )
 
         yield self.handler.on_receive_pdu(
-            origin, pdu, get_missing=True, sent_to_us_directly=True,
+            origin, pdu, sent_to_us_directly=True,
         )
 
     def __str__(self):
