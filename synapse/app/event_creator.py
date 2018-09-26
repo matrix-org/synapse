@@ -199,7 +199,6 @@ def start(config_options):
     ss.start_listening(config.worker_listeners)
 
     def start():
-        ss.get_state_handler().start_caching()
         ss.get_datastore().start_profiling()
 
     reactor.callWhenRunning(start)
