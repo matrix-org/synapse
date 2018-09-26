@@ -200,7 +200,7 @@ class LoggingContext(object):
 
     sentinel = Sentinel()
 
-    def __init__(self, name=None, parent_context=None):
+    def __init__(self, name=None, parent_context=None, request=None):
         self.previous_context = LoggingContext.current_context()
         self.name = name
 
@@ -212,7 +212,7 @@ class LoggingContext(object):
         self.usage_start = None
 
         self.main_thread = threading.current_thread()
-        self.request = None
+        self.request = request
         self.tag = ""
         self.alive = True
 
@@ -462,9 +462,10 @@ def nested_logging_context(suffix, parent_context=None):
     """
     if parent_context is None:
         parent_context = LoggingContext.current_context()
-    nested_context = LoggingContext(parent_context=parent_context)
-    nested_context.request = parent_context.request + "-" + suffix
-    return nested_context
+    return LoggingContext(
+        parent_context=parent_context,
+        request=parent_context.request + "-" + suffix,
+    )
 
 
 def preserve_fn(f):
