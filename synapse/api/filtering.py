@@ -226,7 +226,7 @@ class Filtering(object):
             jsonschema.validate(user_filter_json, USER_FILTER_SCHEMA,
                                 format_checker=FormatChecker())
         except jsonschema.ValidationError as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
 
 class FilterCollection(object):
