@@ -359,6 +359,21 @@ class RegisterRestServlet(RestServlet):
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
                 ])
 
+        if self.hs.config.block_events_without_consent_error is not None:
+            new_flows = []
+            for flow in flows:
+                # To only allow registration if completing GDPR auth,
+                # making clients that don't support it use fallback auth.
+                #flow.append(LoginType.TERMS)
+
+                # or to duplicate all the flows above with the GDPR flow on the
+                # end so clients that support it can use it but clients that don't
+                # continue to consent via the DM from server notices bot.
+                new_flows.extend([
+                    flow + [LoginType.TERMS]
+                ])
+            flows.extend(new_flows)
+
         auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )

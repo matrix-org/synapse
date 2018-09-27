@@ -133,6 +133,26 @@ class AuthRestServlet(RestServlet):
             request.write(html_bytes)
             finish_request(request)
             defer.returnValue(None)
+        elif stagetype == LoginType.TERMS:
+            session = request.args['session'][0]
+            authdict = {
+                'session': session,
+            }
+            success = yield self.auth_handler.add_oob_auth(
+                LoginType.TERMS,
+                authdict,
+                self.hs.get_ip_from_request(request)
+            )
+
+            html = "<html><body>hai</body></html>"
+            html_bytes = html.encode("utf8")
+            request.setResponseCode(200)
+            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+            request.write(html_bytes)
+            finish_request(request)
+            defer.returnValue(None)
         else:
             raise SynapseError(404, "Unknown auth stage type")
 

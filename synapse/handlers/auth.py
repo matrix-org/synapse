@@ -59,6 +59,7 @@ class AuthHandler(BaseHandler):
             LoginType.EMAIL_IDENTITY: self._check_email_identity,
             LoginType.MSISDN: self._check_msisdn,
             LoginType.DUMMY: self._check_dummy_auth,
+            LoginType.TERMS: self._check_terms_auth,
         }
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
@@ -429,6 +430,9 @@ class AuthHandler(BaseHandler):
         return self._check_threepid('msisdn', authdict)
 
     def _check_dummy_auth(self, authdict, _):
+        return defer.succeed(True)
+
+    def _check_terms_auth(self, authdict, _):
         return defer.succeed(True)
 
     @defer.inlineCallbacks
