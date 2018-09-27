@@ -1,0 +1,1 @@
+Fix error when running under python 3.6.1, where an exception e doesn't have a attribute e.message anymore.  Contributed by Schnuffle
