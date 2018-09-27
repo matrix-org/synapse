@@ -1,1 +1,1 @@
-Replaced all occurences of e.message with str(e)Replaced all occurences of e.message with str(e). Contributed by Schnuffle
+Replaced all occurences of e.message with str(e). Contributed by Schnuffle
