@@ -289,8 +289,7 @@ class FederationClient(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def get_state_for_room(self, destination, room_id, event_id):
-        """Requests all of the `current` state PDUs for a given room from
-        a remote home server.
+        """Requests all of the room state at a given event from a remote home server.
 
         Args:
             destination (str): The remote homeserver to query for the state.
@@ -298,9 +297,10 @@ class FederationClient(FederationBase):
             event_id (str): The id of the event we want the state at.
 
         Returns:
-            Deferred: Results in a list of PDUs.
+            Deferred[Tuple[List[EventBase], List[EventBase]]]:
+                A list of events in the state, and a list of events in the auth chain
+                for the given event.
         """
-
         try:
             # First we try and ask for just the IDs, as thats far quicker if
             # we have most of the state and auth_chain already.
