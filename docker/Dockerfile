@@ -14,13 +14,13 @@ RUN apk add --no-cache --virtual .build_deps \
         zlib-dev \
  && cd /synapse \
  && apk add --no-cache --virtual .runtime_deps \
- 	libffi \
+        libffi \
         libjpeg-turbo \
-	libressl \
-	libxslt \
-	libpq \
-	zlib \
-	su-exec \
+        libressl \
+        libxslt \
+        libpq \
+        zlib \
+        su-exec \
  && pip install --upgrade \
         lxml \
         pip \
@@ -29,12 +29,10 @@ RUN apk add --no-cache --virtual .build_deps \
  && mkdir -p /synapse/cache \
  && pip install -f /synapse/cache --upgrade --process-dependency-links . \
  && mv /synapse/docker/start.py /synapse/docker/conf / \
- && rm -rf \
-        setup.cfg \
-        setup.py \
-        synapse \
+ && rm -rf /synapse \
+ && rm -rf /root/.cache \
  && apk del .build_deps
- 
+
 VOLUME ["/data"]
 
 EXPOSE 8008/tcp 8448/tcp
