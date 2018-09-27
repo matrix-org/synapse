@@ -16,6 +16,8 @@
 import logging
 from collections import OrderedDict
 
+from six import itervalues
+
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches import register_cache
 
@@ -54,11 +56,8 @@ class ExpiringCache(object):
 
         self.iterable = iterable
 
-        self._size_estimate = 0
-
         self.metrics = register_cache("expiring", cache_name, self)
 
-    def start(self):
         if not self._expiry_ms:
             # Don't bother starting the loop if things never expire
             return
@@ -75,16 +74,11 @@ class ExpiringCache(object):
         now = self._clock.time_msec()
         self._cache[key] = _CacheEntry(now, value)
 
-        if self.iterable:
-            self._size_estimate += len(value)
-
         # Evict if there are now too many items
         while self._max_len and len(self) > self._max_len:
             _key, value = self._cache.popitem(last=False)
             if self.iterable:
-                removed_len = len(value.value)
-                self.metrics.inc_evictions(removed_len)
-                self._size_estimate -= removed_len
+                self.metrics.inc_evictions(len(value.value))
             else:
                 self.metrics.inc_evictions()
 
@@ -135,7 +129,9 @@ class ExpiringCache(object):
         for k in keys_to_delete:
             value = self._cache.pop(k)
             if self.iterable:
-                self._size_estimate -= len(value.value)
+                self.metrics.inc_evictions(len(value.value))
+            else:
+                self.metrics.inc_evictions()
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",
@@ -144,7 +140,7 @@ class ExpiringCache(object):
 
     def __len__(self):
         if self.iterable:
-            return self._size_estimate
+            return sum(len(entry.value) for entry in itervalues(self._cache))
         else:
             return len(self._cache)
 

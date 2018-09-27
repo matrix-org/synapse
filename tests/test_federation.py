@@ -6,6 +6,7 @@ from twisted.internet.defer import maybeDeferred, succeed
 from synapse.events import FrozenEvent
 from synapse.types import Requester, UserID
 from synapse.util import Clock
+from synapse.util.logcontext import LoggingContext
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
@@ -117,9 +118,10 @@ class MessageAcceptTests(unittest.TestCase):
             }
         )
 
-        d = self.handler.on_receive_pdu(
-            "test.serv", lying_event, sent_to_us_directly=True
-        )
+        with LoggingContext(request="lying_event"):
+            d = self.handler.on_receive_pdu(
+                "test.serv", lying_event, sent_to_us_directly=True
+            )
 
         # Step the reactor, so the database fetches come back
         self.reactor.advance(1)
@@ -209,11 +211,12 @@ class MessageAcceptTests(unittest.TestCase):
             }
         )
 
-        d = self.handler.on_receive_pdu(
-            "test.serv", good_event, sent_to_us_directly=True
-        )
-        self.reactor.advance(1)
-        self.assertEqual(self.successResultOf(d), None)
+        with LoggingContext(request="good_event"):
+            d = self.handler.on_receive_pdu(
+                "test.serv", good_event, sent_to_us_directly=True
+            )
+            self.reactor.advance(1)
+            self.assertEqual(self.successResultOf(d), None)
 
         bad_event = FrozenEvent(
             {
@@ -230,10 +233,11 @@ class MessageAcceptTests(unittest.TestCase):
             }
         )
 
-        d = self.handler.on_receive_pdu(
-            "test.serv", bad_event, sent_to_us_directly=True
-        )
-        self.reactor.advance(1)
+        with LoggingContext(request="bad_event"):
+            d = self.handler.on_receive_pdu(
+                "test.serv", bad_event, sent_to_us_directly=True
+            )
+            self.reactor.advance(1)
 
         extrem = maybeDeferred(
             self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id

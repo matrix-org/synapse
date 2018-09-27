@@ -1,1 +1,0 @@
-Remove connection ID for replication prometheus metrics, as it creates a large number of new series.

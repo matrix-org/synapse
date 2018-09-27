@@ -301,7 +301,7 @@ class SynapseHomeServer(HomeServer):
         try:
             database_engine.check_database(db_conn.cursor())
         except IncorrectDatabaseSetup as e:
-            quit_with_error(e.message)
+            quit_with_error(str(e))
 
 
 # Gauges to expose monthly active user control metrics
@@ -328,7 +328,7 @@ def setup(config_options):
             config_options,
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     if not config:
@@ -384,7 +384,6 @@ def setup(config_options):
 
     def start():
         hs.get_pusherpool().start()
-        hs.get_state_handler().start_caching()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
         hs.get_federation_client().start_get_pdu_cache()
