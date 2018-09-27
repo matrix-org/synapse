@@ -1,12 +1,21 @@
 version: 2
 jobs:
-  dockerhubupload:
+  dockerhubuploadrelease:
     machine: true
     steps:
       - checkout
       - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:$CIRCLE_TAG .
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker push
+      - run: docker push matrixdotorg/synapse:$CIRCLE_TAG
+  dockerhubuploadlatest:
+    machine: true
+    steps:
+      - checkout
+      - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:$CIRCLE_SHA1 .
+      - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+      - run: docker tag matrixdotorg/synapse:$CIRCLE_SHA1 matrixdotorg/synapse:latest
+      - run: docker push matrixdotorg/synapse:$CIRCLE_SHA1
+      - run: docker push matrixdotorg/synapse:latest
   sytestpy2:
     machine: true
     steps:
@@ -138,9 +147,13 @@ workflows:
           filters:
             branches:
               ignore: /develop|master|release-.*/
-      - dockerhubupload:
+      - dockerhubuploadrelease:
           filters:
             tags:
               only: /^v[0-9].[0-9]+.[0-9]+(.[0-9]+)?/
             branches:
               ignore: /.*/
+      - dockerhubuploadlatest:
+          filters:
+            branches:
+              only: master
