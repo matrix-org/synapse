@@ -54,7 +54,11 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         self.access_token = self.login("bob", "abc123")
 
     def test_get_sync_message(self):
-
+        """
+        When user consent server notices are enabled, a sync will cause a notice
+        to fire (in a room which the user is invited to). The notice contains
+        the notice URL + an authentication code.
+        """
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=self.access_token
         )
