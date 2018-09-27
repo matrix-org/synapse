@@ -209,8 +209,6 @@ class FederationClient(FederationBase):
         Will attempt to get the PDU from each destination in the list until
         one succeeds.
 
-        This will persist the PDU locally upon receipt.
-
         Args:
             destinations (list): Which home servers to query
             event_id (str): event to fetch

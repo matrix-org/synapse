@@ -341,14 +341,22 @@ class FederationHandler(BaseHandler):
                         )
 
                         with logcontext.nested_logging_context(p):
-                            state, got_auth_chain = (
+                            # note that if any of the missing prevs share missing state or
+                            # auth events, the requests to fetch those events are deduped
+                            # by the get_pdu_cache in federation_client.
+                            remote_state, got_auth_chain = (
                                 yield self.federation_client.get_state_for_room(
                                     origin, room_id, p,
                                 )
                             )
+
+                            # XXX hrm I'm not convinced that duplicate events will compare
+                            # for equality, so I'm not sure this does what the author
+                            # hoped.
                             auth_chains.update(got_auth_chain)
+
                             state_group = {
-                                (x.type, x.state_key): x.event_id for x in state
+                                (x.type, x.state_key): x.event_id for x in remote_state
                             }
                             state_groups.append(state_group)
 
