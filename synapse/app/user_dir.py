@@ -229,7 +229,6 @@ def start(config_options):
 
     def start():
         ps.get_datastore().start_profiling()
-        ps.get_state_handler().start_caching()
 
     reactor.callWhenRunning(start)
 

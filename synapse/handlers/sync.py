@@ -36,6 +36,8 @@ from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
 
+SYNC_RESPONSE_CACHE_MS = 2 * 60 * 1000
+
 # Store the cache that tracks which lazy-loaded members have been sent to a given
 # client for no more than 30 minutes.
 LAZY_LOADED_MEMBERS_CACHE_MAX_AGE = 30 * 60 * 1000
@@ -192,7 +194,9 @@ class SyncHandler(object):
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
-        self.response_cache = ResponseCache(hs, "sync")
+        self.response_cache = ResponseCache(
+            hs, "sync", timeout_ms=SYNC_RESPONSE_CACHE_MS,
+        )
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
 
@@ -722,6 +726,13 @@ class SyncHandler(object):
             }
 
             if full_state:
+                if lazy_load_members:
+                    # always make sure we LL ourselves so we know we're in the room
+                    # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
+                    # We only need apply this on full state syncs given we disabled
+                    # LL for incr syncs in #3840.
+                    types.append((EventTypes.Member, sync_config.user.to_string()))
+
                 if batch:
                     current_state_ids = yield self.store.get_state_ids_for_event(
                         batch.events[-1].event_id, types=types,
@@ -790,7 +801,7 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    if types:
+                    if types and batch.events:
                         # We're returning an incremental sync, with no
                         # "gap" since the previous sync, so normally there would be
                         # no state to return.

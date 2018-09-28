@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import threading
 
 import six
@@ -22,6 +23,9 @@ from prometheus_client.core import REGISTRY, Counter, GaugeMetricFamily
 from twisted.internet import defer
 
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+
+logger = logging.getLogger(__name__)
+
 
 _background_process_start_count = Counter(
     "synapse_background_process_start_count",
@@ -191,6 +195,8 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
             try:
                 yield func(*args, **kwargs)
+            except Exception:
+                logger.exception("Background process '%s' threw an exception", desc)
             finally:
                 proc.update_metrics()
 

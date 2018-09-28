@@ -384,7 +384,6 @@ def setup(config_options):
 
     def start():
         hs.get_pusherpool().start()
-        hs.get_state_handler().start_caching()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
         hs.get_federation_client().start_get_pdu_cache()
@@ -457,6 +456,10 @@ def run(hs):
         stats["homeserver"] = hs.config.server_name
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
+        version = sys.version_info
+        stats["python_version"] = "{}.{}.{}".format(
+            version.major, version.minor, version.micro
+        )
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()

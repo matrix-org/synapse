@@ -1,0 +1,1 @@
+When we join a room, always try the server we used for the alias lookup first, to avoid unresponsive and out-of-date servers.

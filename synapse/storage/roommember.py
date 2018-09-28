@@ -72,7 +72,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         hosts = frozenset(get_domain_from_id(user_id) for user_id in user_ids)
         defer.returnValue(hosts)
 
-    @cached(max_entries=100000, iterable=True)
+    @cachedInlineCallbacks(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
         def f(txn):
             sql = (
@@ -86,7 +86,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             txn.execute(sql, (room_id, Membership.JOIN,))
             return [to_ascii(r[0]) for r in txn]
-        return self.runInteraction("get_users_in_room", f)
+        start_time = self._clock.time_msec()
+        result = yield self.runInteraction("get_users_in_room", f)
+        end_time = self._clock.time_msec()
+        logger.info(
+            "Fetched room membership for %s (%i users) in %i ms",
+            room_id, len(result), end_time - start_time,
+        )
+        defer.returnValue(result)
 
     @cached(max_entries=100000)
     def get_room_summary(self, room_id):

@@ -66,6 +66,7 @@ class RoomMemberHandler(object):
         self.event_creation_hander = hs.get_event_creation_handler()
 
         self.member_linearizer = Linearizer(name="member")
+        self.member_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
@@ -241,18 +242,37 @@ class RoomMemberHandler(object):
     ):
         key = (room_id,)
 
-        with (yield self.member_linearizer.queue(key)):
-            result = yield self._update_membership(
-                requester,
-                target,
-                room_id,
-                action,
-                txn_id=txn_id,
-                remote_room_hosts=remote_room_hosts,
-                third_party_signed=third_party_signed,
-                ratelimit=ratelimit,
-                content=content,
-            )
+        as_id = object()
+        if requester.app_service:
+            as_id = requester.app_service.id
+
+        then = self.clock.time_msec()
+
+        with (yield self.member_limiter.queue(as_id)):
+            diff = self.clock.time_msec() - then
+
+            if diff > 80 * 1000:
+                # haproxy would have timed the request out anyway...
+                raise SynapseError(504, "took to long to process")
+
+            with (yield self.member_linearizer.queue(key)):
+                diff = self.clock.time_msec() - then
+
+                if diff > 80 * 1000:
+                    # haproxy would have timed the request out anyway...
+                    raise SynapseError(504, "took to long to process")
+
+                result = yield self._update_membership(
+                    requester,
+                    target,
+                    room_id,
+                    action,
+                    txn_id=txn_id,
+                    remote_room_hosts=remote_room_hosts,
+                    third_party_signed=third_party_signed,
+                    ratelimit=ratelimit,
+                    content=content,
+                )
 
         defer.returnValue(result)
 
@@ -582,6 +602,11 @@ class RoomMemberHandler(object):
 
         room_id = mapping["room_id"]
         servers = mapping["servers"]
+
+        # put the server which owns the alias at the front of the server list.
+        if room_alias.domain in servers:
+            servers.remove(room_alias.domain)
+        servers.insert(0, room_alias.domain)
 
         defer.returnValue((RoomID.from_string(room_id), servers))
 

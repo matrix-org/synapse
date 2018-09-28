@@ -32,7 +32,7 @@ from twisted.internet import defer
 logger = logging.getLogger(__name__)
 
 
-MAX_EVENTS_BEHIND = 10000
+MAX_EVENTS_BEHIND = 500000
 
 
 EventStreamRow = namedtuple("EventStreamRow", (
