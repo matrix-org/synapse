@@ -59,14 +59,17 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         to fire (in a room which the user is invited to). The notice contains
         the notice URL + an authentication code.
         """
+        # Initial sync, to get the user consent room invite
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=self.access_token
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
 
+        # Get the Room ID to join
         room_id = list(channel.json_body["rooms"]["invite"].keys())[0]
 
+        # Join the room
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/" + room_id + "/join",
@@ -75,16 +78,20 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 200)
 
+        # Sync again, to get the message in the room
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=self.access_token
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
 
+        # Get the message
         room = channel.json_body["rooms"]["join"][room_id]
         messages = [
             x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
         ]
+
+        # One message, with the consent URL
         self.assertEqual(len(messages), 1)
         self.assertTrue(
             messages[0]["content"]["body"].startswith(

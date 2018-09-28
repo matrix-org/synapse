@@ -308,7 +308,18 @@ class HomeserverTestCase(TestCase):
         return self.successResultOf(d)
 
     def register_user(self, username, password, admin=False):
+        """
+        Register a user. Requires the Admin API be registered.
 
+        Args:
+            username (bytes/unicode): The user part of the new user.
+            password (bytes/unicode): The password of the new user.
+            admin (bool): Whether the user should be created as an admin
+                or not.
+
+        Returns:
+            The MXID of the new user (unicode).
+        """
         self.hs.config.registration_shared_secret = u"shared"
 
         # Create the user
@@ -344,7 +355,11 @@ class HomeserverTestCase(TestCase):
         return user_id
 
     def login(self, username, password, device_id=None):
+        """
+        Log in a user, and get an access token. Requires the Login API be
+        registered.
 
+        """
         body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
             body["device_id"] = device_id
