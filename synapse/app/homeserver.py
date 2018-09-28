@@ -386,7 +386,6 @@ def setup(config_options):
         hs.get_pusherpool().start()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
-        hs.get_federation_client().start_get_pdu_cache()
 
     reactor.callWhenRunning(start)
 
