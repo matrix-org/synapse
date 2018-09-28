@@ -5,22 +5,9 @@ ARG PYTHON_VERSION=2
 ###
 FROM docker.io/python:${PYTHON_VERSION}-alpine3.8 as builder
 
-# first of all, install the runtime deps; this layer can then be used in the
-# final stage as well.
+# install the OS build deps
 
-RUN apk add --no-cache --virtual .runtime_deps \
-        libffi \
-        libjpeg-turbo \
-        libressl \
-        libxslt \
-        libpq \
-        zlib \
-        su-exec
-
-# install the OS build deps, and build wheels for the python libs which have
-# slow build steps, as more layers which can be cached independently
-
-RUN apk add --no-cache --virtual .build_deps \
+RUN apk add \
         build-base \
         libffi-dev \
         libjpeg-turbo-dev \
@@ -30,18 +17,24 @@ RUN apk add --no-cache --virtual .build_deps \
         postgresql-dev \
         zlib-dev
 
+# build things which have slow build steps, before we copy synapse, so that
+# the layer can be cached.
+#
+# (we really just care about caching a wheel here, as the "pip install" below
+# will install them again.)
+
 RUN pip install --prefix="/install" --no-warn-script-location \
         cryptography \
-        lxml \
         msgpack-python \
         pillow \
-        psycopg2 \
         pynacl
 
 # now install synapse and all of the python deps to /install.
 
 COPY . /synapse
 RUN pip install --prefix="/install" --no-warn-script-location \
+        lxml \
+        psycopg2 \
         /synapse
 
 ###
