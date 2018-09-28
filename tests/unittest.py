@@ -121,7 +121,7 @@ class TestCase(unittest.TestCase):
             try:
                 self.assertEquals(attrs[key], getattr(obj, key))
             except AssertionError as e:
-                raise (type(e))(e.message + " for '.%s'" % key)
+                raise (type(e))(str(e) + " for '.%s'" % key)
 
     def assert_dict(self, required, actual):
         """Does a partial assert of a dict.
