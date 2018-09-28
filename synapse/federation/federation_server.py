@@ -46,6 +46,7 @@ from synapse.replication.http.federation import (
 from synapse.types import get_domain_from_id
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.logcontext import nested_logging_context
 from synapse.util.logutils import log_function
 
 # when processing incoming transactions, we try to handle multiple rooms in
@@ -187,21 +188,22 @@ class FederationServer(FederationBase):
 
             for pdu in pdus_by_room[room_id]:
                 event_id = pdu.event_id
-                try:
-                    yield self._handle_received_pdu(
-                        origin, pdu
-                    )
-                    pdu_results[event_id] = {}
-                except FederationError as e:
-                    logger.warn("Error handling PDU %s: %s", event_id, e)
-                    pdu_results[event_id] = {"error": str(e)}
-                except Exception as e:
-                    f = failure.Failure()
-                    pdu_results[event_id] = {"error": str(e)}
-                    logger.error(
-                        "Failed to handle PDU %s: %s",
-                        event_id, f.getTraceback().rstrip(),
-                    )
+                with nested_logging_context(event_id):
+                    try:
+                        yield self._handle_received_pdu(
+                            origin, pdu
+                        )
+                        pdu_results[event_id] = {}
+                    except FederationError as e:
+                        logger.warn("Error handling PDU %s: %s", event_id, e)
+                        pdu_results[event_id] = {"error": str(e)}
+                    except Exception as e:
+                        f = failure.Failure()
+                        pdu_results[event_id] = {"error": str(e)}
+                        logger.error(
+                            "Failed to handle PDU %s: %s",
+                            event_id, f.getTraceback().rstrip(),
+                        )
 
         yield concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(),
@@ -618,7 +620,7 @@ class FederationServer(FederationBase):
             )
 
         yield self.handler.on_receive_pdu(
-            origin, pdu, get_missing=True, sent_to_us_directly=True,
+            origin, pdu, sent_to_us_directly=True,
         )
 
     def __str__(self):

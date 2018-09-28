@@ -95,10 +95,6 @@ class StateHandler(object):
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
-    def start_caching(self):
-        # TODO: remove this shim
-        self._state_resolution_handler.start_caching()
-
     @defer.inlineCallbacks
     def get_current_state(self, room_id, event_type=None, state_key="",
                           latest_event_ids=None):
@@ -428,9 +424,6 @@ class StateResolutionHandler(object):
         self._state_cache = None
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
-    def start_caching(self):
-        logger.debug("start_caching")
-
         self._state_cache = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
@@ -439,8 +432,6 @@ class StateResolutionHandler(object):
             iterable=True,
             reset_expiry_on_get=True,
         )
-
-        self._state_cache.start()
 
     @defer.inlineCallbacks
     @log_function

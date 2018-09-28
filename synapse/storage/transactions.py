@@ -23,7 +23,6 @@ from canonicaljson import encode_canonical_json
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util.caches.descriptors import cached
 
 from ._base import SQLBaseStore, db_to_json
 
@@ -156,7 +155,6 @@ class TransactionStore(SQLBaseStore):
         """
         pass
 
-    @cached(max_entries=10000)
     def get_destination_retry_timings(self, destination):
         """Gets the current retry timings (if any) for a given destination.
 
@@ -198,8 +196,6 @@ class TransactionStore(SQLBaseStore):
             retry_interval (int) - how long until next retry in ms
         """
 
-        # XXX: we could chose to not bother persisting this if our cache thinks
-        # this is a NOOP
         return self.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
@@ -211,10 +207,6 @@ class TransactionStore(SQLBaseStore):
     def _set_destination_retry_timings(self, txn, destination,
                                        retry_last_ts, retry_interval):
         self.database_engine.lock_table(txn, "destinations")
-
-        self._invalidate_cache_and_stream(
-            txn, self.get_destination_retry_timings, (destination,)
-        )
 
         # We need to be careful here as the data may have changed from under us
         # due to a worker setting the timings.

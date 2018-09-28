@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 
 import six
 from six.moves import intern
 
 from prometheus_client.core import REGISTRY, Gauge, GaugeMetricFamily
+
+logger = logging.getLogger(__name__)
 
 CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
 
@@ -76,16 +79,20 @@ def register_cache(cache_type, cache_name, cache):
             return []
 
         def collect(self):
-            if cache_type == "response_cache":
-                response_cache_size.labels(cache_name).set(len(cache))
-                response_cache_hits.labels(cache_name).set(self.hits)
-                response_cache_evicted.labels(cache_name).set(self.evicted_size)
-                response_cache_total.labels(cache_name).set(self.hits + self.misses)
-            else:
-                cache_size.labels(cache_name).set(len(cache))
-                cache_hits.labels(cache_name).set(self.hits)
-                cache_evicted.labels(cache_name).set(self.evicted_size)
-                cache_total.labels(cache_name).set(self.hits + self.misses)
+            try:
+                if cache_type == "response_cache":
+                    response_cache_size.labels(cache_name).set(len(cache))
+                    response_cache_hits.labels(cache_name).set(self.hits)
+                    response_cache_evicted.labels(cache_name).set(self.evicted_size)
+                    response_cache_total.labels(cache_name).set(self.hits + self.misses)
+                else:
+                    cache_size.labels(cache_name).set(len(cache))
+                    cache_hits.labels(cache_name).set(self.hits)
+                    cache_evicted.labels(cache_name).set(self.evicted_size)
+                    cache_total.labels(cache_name).set(self.hits + self.misses)
+            except Exception as e:
+                logger.warn("Error calculating metrics for %s: %s", cache_name, e)
+                raise
 
             yield GaugeMetricFamily("__unused", "")
 
