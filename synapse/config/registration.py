@@ -44,6 +44,7 @@ class RegistrationConfig(Config):
         )
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
+        self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", true)
 
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
@@ -98,6 +99,9 @@ class RegistrationConfig(Config):
         # to these rooms
         #auto_join_rooms:
         #    - "#example:example.com"
+
+        # Have first user on server autocreate autojoin rooms
+        autocreate_auto_join_rooms: true
         """ % locals()
 
     def add_arguments(self, parser):
