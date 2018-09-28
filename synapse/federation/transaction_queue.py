@@ -354,7 +354,7 @@ class TransactionQueue(object):
             content=content,
         )
 
-        if not destination == self.server_name:
+        if destination == self.server_name:
             logger.info("Not sending EDU to ourselves")
             return
 
@@ -372,6 +372,7 @@ class TransactionQueue(object):
     def send_device_messages(self, destination):
         if destination == self.server_name:
             logger.info("Not sending device update to ourselves")
+            return
 
         self._attempt_new_transaction(destination)
 
