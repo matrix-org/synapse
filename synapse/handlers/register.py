@@ -50,8 +50,6 @@ class RegistrationHandler(BaseHandler):
         self._auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
-        self._room_creation_handler = hs.get_room_creation_handler()
-        self._directory_handler = hs.get_handlers().directory_handler
         self.captcha_client = CaptchaServerHttpClient(hs)
 
         self._next_generated_user_id = None
@@ -520,7 +518,8 @@ class RegistrationHandler(BaseHandler):
         if self.config.autocreate_auto_join_rooms:
             count = yield self.store.count_all_users()
             if count == 1 and RoomAlias.is_valid(room_identifier):
-                info = yield self._room_creation_handler.create_room(
+                room_creation_handler = hs.get_room_creation_handler()
+                info = yield room_creation_handler.create_room(
                     requester,
                     config={
                         "preset": "public_chat",
@@ -529,7 +528,13 @@ class RegistrationHandler(BaseHandler):
                 )
                 room_id = info["room_id"]
 
-                yield create_association(self, requester.user, room_identifier, room_id)
+                directory_handler = hs.get_handlers().directory_handler
+                yield directory_handler.create_association(
+                    self,
+                    requester.user,
+                    room_identifier,
+                    room_id
+                )
 
         room_id = None
         room_member_handler = self.hs.get_room_member_handler()

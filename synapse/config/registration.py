@@ -44,7 +44,7 @@ class RegistrationConfig(Config):
         )
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
-        self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", true)
+        self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
