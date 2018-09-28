@@ -21,6 +21,9 @@ matrix:
     env: TOX_ENV=py27
 
   - python: 2.7
+    env: TOX_ENV=py27-old
+
+  - python: 2.7
     env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
     services:
       - postgresql

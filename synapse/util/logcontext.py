@@ -200,7 +200,7 @@ class LoggingContext(object):
 
     sentinel = Sentinel()
 
-    def __init__(self, name=None, parent_context=None):
+    def __init__(self, name=None, parent_context=None, request=None):
         self.previous_context = LoggingContext.current_context()
         self.name = name
 
@@ -217,6 +217,13 @@ class LoggingContext(object):
         self.alive = True
 
         self.parent_context = parent_context
+
+        if self.parent_context is not None:
+            self.parent_context.copy_to(self)
+
+        if request is not None:
+            # the request param overrides the request from the parent context
+            self.request = request
 
     def __str__(self):
         return "%s@%x" % (self.name, id(self))
@@ -255,9 +262,6 @@ class LoggingContext(object):
                 self.previous_context, old_context
             )
         self.alive = True
-
-        if self.parent_context is not None:
-            self.parent_context.copy_to(self)
 
         return self
 
@@ -437,6 +441,35 @@ class PreserveLoggingContext(object):
                     "Restoring dead context: %s",
                     self.current_context,
                 )
+
+
+def nested_logging_context(suffix, parent_context=None):
+    """Creates a new logging context as a child of another.
+
+    The nested logging context will have a 'request' made up of the parent context's
+    request, plus the given suffix.
+
+    CPU/db usage stats will be added to the parent context's on exit.
+
+    Normal usage looks like:
+
+        with nested_logging_context(suffix):
+            # ... do stuff
+
+    Args:
+        suffix (str): suffix to add to the parent context's 'request'.
+        parent_context (LoggingContext|None): parent context. Will use the current context
+            if None.
+
+    Returns:
+        LoggingContext: new logging context.
+    """
+    if parent_context is None:
+        parent_context = LoggingContext.current_context()
+    return LoggingContext(
+        parent_context=parent_context,
+        request=parent_context.request + "-" + suffix,
+    )
 
 
 def preserve_fn(f):

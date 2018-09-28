@@ -75,6 +75,45 @@ class StateStoreTestCase(tests.unittest.TestCase):
         self.assertEqual(len(s1), len(s2))
 
     @defer.inlineCallbacks
+    def test_get_state_groups_ids(self):
+        e1 = yield self.inject_state_event(
+            self.room, self.u_alice, EventTypes.Create, '', {}
+        )
+        e2 = yield self.inject_state_event(
+            self.room, self.u_alice, EventTypes.Name, '', {"name": "test room"}
+        )
+
+        state_group_map = yield self.store.get_state_groups_ids(self.room, [e2.event_id])
+        self.assertEqual(len(state_group_map), 1)
+        state_map = list(state_group_map.values())[0]
+        self.assertDictEqual(
+            state_map,
+            {
+                (EventTypes.Create, ''): e1.event_id,
+                (EventTypes.Name, ''): e2.event_id,
+            },
+        )
+
+    @defer.inlineCallbacks
+    def test_get_state_groups(self):
+        e1 = yield self.inject_state_event(
+            self.room, self.u_alice, EventTypes.Create, '', {}
+        )
+        e2 = yield self.inject_state_event(
+            self.room, self.u_alice, EventTypes.Name, '', {"name": "test room"}
+        )
+
+        state_group_map = yield self.store.get_state_groups(
+            self.room, [e2.event_id])
+        self.assertEqual(len(state_group_map), 1)
+        state_list = list(state_group_map.values())[0]
+
+        self.assertEqual(
+            {ev.event_id for ev in state_list},
+            {e1.event_id, e2.event_id},
+        )
+
+    @defer.inlineCallbacks
     def test_get_state_for_event(self):
 
         # this defaults to a linear DAG as each new injection defaults to whatever
