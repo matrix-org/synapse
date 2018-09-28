@@ -1,9 +1,11 @@
 *.pyc
 .*.swp
 *~
+*.lock
 
 .DS_Store
 _trial_temp/
+_trial_temp*/
 logs/
 dbs/
 *.egg

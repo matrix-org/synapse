@@ -16,7 +16,9 @@
 import atexit
 import hashlib
 import os
+import time
 import uuid
+import warnings
 from inspect import getcallargs
 
 from mock import Mock, patch
@@ -237,8 +239,12 @@ def setup_test_homeserver(
         else:
             # We need to do cleanup on PostgreSQL
             def cleanup():
+                import psycopg2
+
                 # Close all the db pools
                 hs.get_db_pool().close()
+
+                dropped = False
 
                 # Drop the test database
                 db_conn = db_engine.module.connect(
@@ -246,10 +252,27 @@ def setup_test_homeserver(
                 )
                 db_conn.autocommit = True
                 cur = db_conn.cursor()
-                cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
-                db_conn.commit()
+
+                # Try a few times to drop the DB. Some things may hold on to the
+                # database for a few more seconds due to flakiness, preventing
+                # us from dropping it when the test is over. If we can't drop
+                # it, warn and move on.
+                for x in range(5):
+                    try:
+                        cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
+                        db_conn.commit()
+                        dropped = True
+                    except psycopg2.OperationalError as e:
+                        warnings.warn(
+                            "Couldn't drop old db: " + str(e), category=UserWarning
+                        )
+                        time.sleep(0.5)
+
                 cur.close()
                 db_conn.close()
+
+                if not dropped:
+                    warnings.warn("Failed to drop old DB.", category=UserWarning)
 
             if not LEAVE_DB:
                 # Register the cleanup hook

@@ -713,6 +713,10 @@ class SyncHandler(object):
                     )
                 ]
 
+                # always make sure we LL ourselves so we know we're in the room
+                # (if we are), to fix https://github.com/vector-im/riot-web/issues/7209
+                types.append((EventTypes.Member, sync_config.user.to_string()))
+
                 # only apply the filtering to room members
                 filtered_types = [EventTypes.Member]
 

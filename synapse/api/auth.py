@@ -822,6 +822,7 @@ class Auth(object):
                     return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
+            print ("auth check, current_mau %d" % current_mau)
             if current_mau >= self.hs.config.max_mau_value:
                 raise ResourceLimitError(
                     403, "Monthly Active User Limit Exceeded",

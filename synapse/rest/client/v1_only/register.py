@@ -295,7 +295,7 @@ class RegisterRestServlet(ClientV1RestServlet):
         # Necessary due to auth checks prior to the threepid being
         # written to the db
         if is_threepid_reserved(self.hs.config, threepid):
-            yield self.store.upsert_monthly_active_user(user_id)
+            self.store.upsert_monthly_active_user(user_id)
 
         if session[LoginType.EMAIL_IDENTITY]:
             logger.debug("Binding emails %s to %s" % (

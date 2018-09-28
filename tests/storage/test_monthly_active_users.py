@@ -19,6 +19,7 @@ from twisted.internet import defer
 from tests.unittest import HomeserverTestCase
 
 FORTY_DAYS = 40 * 24 * 60 * 60
+ONE_HOUR = 60 *60
 
 
 class MonthlyActiveUsersTestCase(HomeserverTestCase):
@@ -54,6 +55,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
         self.store.initialise_reserved_users(threepids)
         self.pump()
+        self.reactor.advance(ONE_HOUR)
 
         active_count = self.store.get_monthly_active_count()
 
@@ -81,7 +83,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         ru_count = 2
         self.store.upsert_monthly_active_user("@ru1:server")
         self.store.upsert_monthly_active_user("@ru2:server")
-        self.pump()
+        self.reactor.advance(ONE_HOUR)
 
         active_count = self.store.get_monthly_active_count()
         self.assertEqual(self.get_success(active_count), user_num + ru_count)
@@ -94,12 +96,14 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
 
     def test_can_insert_and_count_mau(self):
         count = self.store.get_monthly_active_count()
+        self.pump()
         self.assertEqual(0, self.get_success(count))
 
         self.store.upsert_monthly_active_user("@user:server")
-        self.pump()
+        self.reactor.advance(ONE_HOUR)
 
         count = self.store.get_monthly_active_count()
+        self.pump()
         self.assertEqual(1, self.get_success(count))
 
     def test_user_last_seen_monthly_active(self):
@@ -112,7 +116,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
 
         self.store.upsert_monthly_active_user(user_id1)
         self.store.upsert_monthly_active_user(user_id2)
-        self.pump()
+        self.reactor.advance(ONE_HOUR)
 
         result = self.store.user_last_seen_monthly_active(user_id1)
         self.assertGreater(self.get_success(result), 0)
@@ -125,7 +129,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         initial_users = 10
         for i in range(initial_users):
             self.store.upsert_monthly_active_user("@user%d:server" % i)
-        self.pump()
+        self.reactor.advance(ONE_HOUR)
 
         count = self.store.get_monthly_active_count()
         self.assertTrue(self.get_success(count), initial_users)

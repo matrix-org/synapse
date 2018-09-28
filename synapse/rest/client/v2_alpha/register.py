@@ -416,7 +416,7 @@ class RegisterRestServlet(RestServlet):
             # Necessary due to auth checks prior to the threepid being
             # written to the db
             if is_threepid_reserved(self.hs.config, threepid):
-                yield self.store.upsert_monthly_active_user(registered_user_id)
+                self.store.upsert_monthly_active_user(registered_user_id)
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
