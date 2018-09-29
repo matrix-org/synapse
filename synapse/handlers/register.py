@@ -515,10 +515,10 @@ class RegistrationHandler(BaseHandler):
     def _join_user_to_room(self, requester, room_identifier):
 
         # try to create the room if we're the first user on the server
-        if self.config.autocreate_auto_join_rooms:
+        if self.hs.config.autocreate_auto_join_rooms:
             count = yield self.store.count_all_users()
             if count == 1 and RoomAlias.is_valid(room_identifier):
-                room_creation_handler = hs.get_room_creation_handler()
+                room_creation_handler = self.hs.get_room_creation_handler()
                 info = yield room_creation_handler.create_room(
                     requester,
                     config={
@@ -528,11 +528,11 @@ class RegistrationHandler(BaseHandler):
                 )
                 room_id = info["room_id"]
 
-                directory_handler = hs.get_handlers().directory_handler
+                directory_handler = self.hs.get_handlers().directory_handler
+                room_alias = RoomAlias.from_string(room_identifier)
                 yield directory_handler.create_association(
-                    self,
-                    requester.user,
-                    room_identifier,
+                    requester.user.to_string(),
+                    room_alias,
                     room_id
                 )
 
