@@ -531,9 +531,14 @@ class RegistrationHandler(BaseHandler):
                 directory_handler = self.hs.get_handlers().directory_handler
                 room_alias = RoomAlias.from_string(room_identifier)
                 yield directory_handler.create_association(
-                    requester.user.to_string(),
-                    room_alias,
-                    room_id
+                    user_id=requester.user.to_string(),
+                    room_alias=room_alias,
+                    room_id=room_id,
+                    servers=[self.hs.hostname],
+                )
+
+                yield directory_handler.send_room_alias_update_event(
+                    requester, requester.user.to_string(), room_id
                 )
 
         room_id = None
