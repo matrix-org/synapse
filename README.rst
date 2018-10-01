@@ -81,7 +81,7 @@ Thanks for using Matrix!
 Synapse Installation
 ====================
 
-Synapse is the reference python/twisted Matrix homeserver implementation.
+Synapse is the reference Python/Twisted Matrix homeserver implementation.
 
 System requirements:
 
@@ -91,12 +91,13 @@ System requirements:
 
 Installing from source
 ----------------------
+
 (Prebuilt packages are available for some platforms - see `Platform-Specific
 Instructions`_.)
 
-Synapse is written in python but some of the libraries it uses are written in
-C. So before we can install synapse itself we need a working C compiler and the
-header files for python C extensions.
+Synapse is written in Python but some of the libraries it uses are written in
+C. So before we can install Synapse itself we need a working C compiler and the
+header files for Python C extensions.
 
 Installing prerequisites on Ubuntu or Debian::
 
@@ -143,17 +144,23 @@ Installing prerequisites on OpenBSD::
     doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
                  libxslt
 
-To install the synapse homeserver run::
+To install the Synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
     source ~/.synapse/bin/activate
     pip install --upgrade pip
     pip install --upgrade setuptools
-    pip install https://github.com/matrix-org/synapse/tarball/master
+    pip install matrix-synapse
 
-This installs synapse, along with the libraries it uses, into a virtual
+This installs Synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.  Feel free to pick a different directory
 if you prefer.
+
+This Synapse installation can then be later upgraded by using pip again with the
+update flag::
+
+    source ~/.synapse/bin/activate
+    pip install -U matrix-synapse
 
 In case of problems, please see the _`Troubleshooting` section below.
 
@@ -167,7 +174,7 @@ Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
-Configuring synapse
+Configuring Synapse
 -------------------
 
 Before you can start Synapse, you will need to generate a configuration
