@@ -256,26 +256,6 @@ Setting up a TURN server
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See `<docs/turn-howto.rst>`_ for details.
 
-IPv6
-----
-
-As of Synapse 0.19 we finally support IPv6, many thanks to @kyrias and @glyph
-for providing PR #1696.
-
-However, for federation to work on hosts with IPv6 DNS servers you **must**
-be running Twisted 17.1.0 or later - see https://github.com/matrix-org/synapse/issues/1002
-for details.  We can't make Synapse depend on Twisted 17.1 by default
-yet as it will break most older distributions (see https://github.com/matrix-org/synapse/pull/1909)
-so if you are using operating system dependencies you'll have to install your
-own Twisted 17.1 package via pip or backports etc.
-
-If you're running in a virtualenv then pip should have installed the newest
-Twisted automatically, but if your virtualenv is old you will need to manually
-upgrade to a newer Twisted dependency via:
-
-    pip install Twisted>=17.1.0
-
-
 Running Synapse
 ===============
 
@@ -451,8 +431,7 @@ settings require a slightly more difficult installation process.
    using the ``.`` command, rather than ``bash``'s ``source``.
 5) Optionally, use ``pip`` to install ``lxml``, which Synapse needs to parse
    webpages for their titles.
-6) Use ``pip`` to install this repository: ``pip install
-   https://github.com/matrix-org/synapse/tarball/master``
+6) Use ``pip`` to install this repository: ``pip install matrix-synapse``
 7) Optionally, change ``_synapse``'s shell to ``/bin/false`` to reduce the
    chance of a compromised Synapse server being used to take over your box.
 
@@ -533,9 +512,7 @@ fix try re-installing from PyPI or directly from
 
     # Install from PyPI
     pip install --user --upgrade --force pynacl
-
-    # Install from github
-    pip install --user https://github.com/pyca/pynacl/tarball/master
+    pip install --user matrix-synapse
 
 Running out of File Handles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
