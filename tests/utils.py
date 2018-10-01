@@ -48,6 +48,9 @@ LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", "postgres")
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
+# Disable frozendicts by default, but enable if the environment var is set.
+USE_FROZEN_DICTS = os.environ.get("SYNAPSE_USE_FROZEN_DICTS", False)
+
 
 def setupdb():
 
@@ -136,8 +139,8 @@ def default_config(name):
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
 
-    # Disable frozendicts, like in production.
-    config.use_frozen_dicts = False
+    # Use frozendicts if they're asked for.
+    config.use_frozen_dicts = bool(USE_FROZEN_DICTS)
 
     # we need a sane default_room_version, otherwise attempts to create rooms will
     # fail.
