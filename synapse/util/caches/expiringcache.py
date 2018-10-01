@@ -16,12 +16,15 @@
 import logging
 from collections import OrderedDict
 
-from six import itervalues
+from six import iteritems, itervalues
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
+
+
+SENTINEL = object()
 
 
 class ExpiringCache(object):
@@ -95,6 +98,21 @@ class ExpiringCache(object):
 
         return entry.value
 
+    def pop(self, key, default=SENTINEL):
+        """Removes and returns the value with the given key from the cache.
+
+        If the key isn't in the cache then `default` will be returned if
+        specified, otherwise `KeyError` will get raised.
+
+        Identical functionality to `dict.pop(..)`.
+        """
+
+        value = self._cache.pop(key, default)
+        if value is SENTINEL:
+            raise KeyError(key)
+
+        return value
+
     def __contains__(self, key):
         return key in self._cache
 
@@ -122,7 +140,7 @@ class ExpiringCache(object):
 
         keys_to_delete = set()
 
-        for key, cache_entry in self._cache.items():
+        for key, cache_entry in iteritems(self._cache):
             if now - cache_entry.time > self._expiry_ms:
                 keys_to_delete.add(key)
 
@@ -146,6 +164,8 @@ class ExpiringCache(object):
 
 
 class _CacheEntry(object):
+    __slots__ = ["time", "value"]
+
     def __init__(self, time, value):
         self.time = time
         self.value = value
