@@ -6,6 +6,7 @@ from twisted.internet.defer import maybeDeferred, succeed
 from synapse.events import FrozenEvent
 from synapse.types import Requester, UserID
 from synapse.util import Clock
+from synapse.util.logcontext import LoggingContext
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
@@ -117,9 +118,10 @@ class MessageAcceptTests(unittest.TestCase):
             }
         )
 
-        d = self.handler.on_receive_pdu(
-            "test.serv", lying_event, sent_to_us_directly=True
-        )
+        with LoggingContext(request="lying_event"):
+            d = self.handler.on_receive_pdu(
+                "test.serv", lying_event, sent_to_us_directly=True
+            )
 
         # Step the reactor, so the database fetches come back
         self.reactor.advance(1)
@@ -139,107 +141,3 @@ class MessageAcceptTests(unittest.TestCase):
             self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
         )
         self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")
-
-    def test_cant_hide_past_history(self):
-        """
-        If you send a message, you must be able to provide the direct
-        prev_events that said event references.
-        """
-
-        def post_json(destination, path, data, headers=None, timeout=0):
-            if path.startswith("/_matrix/federation/v1/get_missing_events/"):
-                return {
-                    "events": [
-                        {
-                            "room_id": self.room_id,
-                            "sender": "@baduser:test.serv",
-                            "event_id": "three:test.serv",
-                            "depth": 1000,
-                            "origin_server_ts": 1,
-                            "type": "m.room.message",
-                            "origin": "test.serv",
-                            "content": "hewwo?",
-                            "auth_events": [],
-                            "prev_events": [("four:test.serv", {})],
-                        }
-                    ]
-                }
-
-        self.http_client.post_json = post_json
-
-        def get_json(destination, path, args, headers=None):
-            if path.startswith("/_matrix/federation/v1/state_ids/"):
-                d = self.successResultOf(
-                    self.homeserver.datastore.get_state_ids_for_event("one:test.serv")
-                )
-
-                return succeed(
-                    {
-                        "pdu_ids": [
-                            y
-                            for x, y in d.items()
-                            if x == ("m.room.member", "@us:test")
-                        ],
-                        "auth_chain_ids": list(d.values()),
-                    }
-                )
-
-        self.http_client.get_json = get_json
-
-        # Figure out what the most recent event is
-        most_recent = self.successResultOf(
-            maybeDeferred(
-                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
-            )
-        )[0]
-
-        # Make a good event
-        good_event = FrozenEvent(
-            {
-                "room_id": self.room_id,
-                "sender": "@baduser:test.serv",
-                "event_id": "one:test.serv",
-                "depth": 1000,
-                "origin_server_ts": 1,
-                "type": "m.room.message",
-                "origin": "test.serv",
-                "content": "hewwo?",
-                "auth_events": [],
-                "prev_events": [(most_recent, {})],
-            }
-        )
-
-        d = self.handler.on_receive_pdu(
-            "test.serv", good_event, sent_to_us_directly=True
-        )
-        self.reactor.advance(1)
-        self.assertEqual(self.successResultOf(d), None)
-
-        bad_event = FrozenEvent(
-            {
-                "room_id": self.room_id,
-                "sender": "@baduser:test.serv",
-                "event_id": "two:test.serv",
-                "depth": 1000,
-                "origin_server_ts": 1,
-                "type": "m.room.message",
-                "origin": "test.serv",
-                "content": "hewwo?",
-                "auth_events": [],
-                "prev_events": [("one:test.serv", {}), ("three:test.serv", {})],
-            }
-        )
-
-        d = self.handler.on_receive_pdu(
-            "test.serv", bad_event, sent_to_us_directly=True
-        )
-        self.reactor.advance(1)
-
-        extrem = maybeDeferred(
-            self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
-        )
-        self.assertEqual(self.successResultOf(extrem)[0], "two:test.serv")
-
-        state = self.homeserver.get_state_handler().get_current_state_ids(self.room_id)
-        self.reactor.advance(1)
-        self.assertIn(("m.room.member", "@us:test"), self.successResultOf(state).keys())

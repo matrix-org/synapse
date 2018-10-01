@@ -65,10 +65,15 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
         for event_ids in itervalues(conflicted_state)
         for event_id in event_ids
     )
+    needed_event_count = len(needed_events)
     if event_map is not None:
         needed_events -= set(iterkeys(event_map))
 
-    logger.info("Asking for %d conflicted events", len(needed_events))
+    logger.info(
+        "Asking for %d/%d conflicted events",
+        len(needed_events),
+        needed_event_count,
+    )
 
     # dict[str, FrozenEvent]: a map from state event id to event. Only includes
     # the state events which are in conflict (and those in event_map)
@@ -85,11 +90,16 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
     )
 
     new_needed_events = set(itervalues(auth_events))
+    new_needed_event_count = len(new_needed_events)
     new_needed_events -= needed_events
     if event_map is not None:
         new_needed_events -= set(iterkeys(event_map))
 
-    logger.info("Asking for %d auth events", len(new_needed_events))
+    logger.info(
+        "Asking for %d/%d auth events",
+        len(new_needed_events),
+        new_needed_event_count,
+    )
 
     state_map_new = yield state_map_factory(new_needed_events)
     state_map.update(state_map_new)
