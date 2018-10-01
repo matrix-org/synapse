@@ -21,7 +21,7 @@ from synapse.util.frozenutils import freeze
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
 # bugs where we accidentally share e.g. signature dicts. However, converting
 # a dict to frozen_dicts is expensive.
-USE_FROZEN_DICTS = True
+USE_FROZEN_DICTS = False
 
 
 class _EventInternalMetadata(object):
