@@ -459,7 +459,7 @@ Troubleshooting
 Troubleshooting Installation
 ----------------------------
 
-Synapse requires pip 1.7 or later, so if your OS provides too old a version you
+Synapse requires pip 8 or later, so if your OS provides too old a version you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
@@ -493,26 +493,6 @@ happens, you will have to individually install the dependencies which are
 failing, e.g.::
 
     pip install twisted
-
-On OS X, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
-will need to export CFLAGS=-Qunused-arguments.
-
-Troubleshooting Running
------------------------
-
-If synapse fails with ``missing "sodium.h"`` crypto errors, you may need
-to manually upgrade PyNaCL, as synapse uses NaCl (https://nacl.cr.yp.to/) for
-encryption and digital signatures.
-Unfortunately PyNACL currently has a few issues
-(https://github.com/pyca/pynacl/issues/53) and
-(https://github.com/pyca/pynacl/issues/79) that mean it may not install
-correctly, causing all tests to fail with errors about missing "sodium.h". To
-fix try re-installing from PyPI or directly from
-(https://github.com/pyca/pynacl)::
-
-    # Install from PyPI
-    pip install --user --upgrade --force pynacl
-    pip install --user matrix-synapse
 
 Running out of File Handles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
