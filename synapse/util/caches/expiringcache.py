@@ -98,10 +98,18 @@ class ExpiringCache(object):
 
         return entry.value
 
-    def pop(self, key, default=None):
-        value = self._cache.pop(key, SENTINEL)
+    def pop(self, key, default=SENTINEL):
+        """Removes and returns the value with the given key from the cache.
+
+        If the key isn't in the cache then `default` will be returned if
+        specified, otherwise `KeyError` will get raised.
+
+        Identical functionality to `dict.pop(..)`.
+        """
+
+        value = self._cache.pop(key, default)
         if value is SENTINEL:
-            return default
+            raise KeyError(key)
 
         return value
 
