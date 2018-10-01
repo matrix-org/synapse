@@ -136,6 +136,9 @@ def default_config(name):
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
 
+    # Disable frozendicts, like in production.
+    config.use_frozen_dicts = False
+
     # we need a sane default_room_version, otherwise attempts to create rooms will
     # fail.
     config.default_room_version = "1"
@@ -182,7 +185,6 @@ def setup_test_homeserver(
     if config is None:
         config = default_config(name)
 
-    config.use_frozen_dicts = True
     config.ldap_enabled = False
 
     if "clock" not in kargs:
