@@ -103,11 +103,6 @@ class ExpiringCache(object):
         if value is SENTINEL:
             return default
 
-        if self.iterable:
-            self.metrics.inc_evictions(len(value.value))
-        else:
-            self.metrics.inc_evictions()
-
         return value
 
     def __contains__(self, key):
