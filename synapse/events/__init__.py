@@ -13,15 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import six
 
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
-# bugs where we accidentally share e.g. signature dicts. However, converting
-# a dict to frozen_dicts is expensive.
-USE_FROZEN_DICTS = False
+# bugs where we accidentally share e.g. signature dicts. However, converting a
+# dict to frozen_dicts is expensive.
+#
+# NOTE: This is overridden by the configuration by the Synapse script entry
+# points, but for the sake of tests, it is set here while it cannot be
+# configured on the homeserver object itself.
+USE_FROZEN_DICTS = os.environ.get("SYNAPSE_USE_FROZEN_DICTS", False)
 
 
 class _EventInternalMetadata(object):
