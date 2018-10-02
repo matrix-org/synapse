@@ -555,16 +555,6 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
         existing_prevs = yield self._get_events_which_are_prevs(result)
         result.difference_update(existing_prevs)
 
-        if not result:
-            logger.warn(
-                "Forward extremity list A+B-C-D is now empty in %s. "
-                "Old extremities (A): %s, new events (B): %s, "
-                "existing events which are reffed by new events (C): %s, "
-                "new events which are reffed by existing events (D): %s",
-                room_id, latest_event_ids, new_events,
-                [e_id for event in new_events for e_id, _ in event.prev_events],
-                existing_prevs,
-            )
         defer.returnValue(result)
 
     @defer.inlineCallbacks
