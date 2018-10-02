@@ -34,4 +34,6 @@ prune .github
 prune demo/etc
 prune docker
 prune .circleci
+
+exclude jenkins*
 recursive-exclude jenkins *.sh
