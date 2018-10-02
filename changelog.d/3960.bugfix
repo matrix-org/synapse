@@ -1,0 +1,1 @@
+Fix error message for events with m.room.create missing from auth_events
