@@ -21,6 +21,9 @@ matrix:
     env: TOX_ENV=py27
 
   - python: 2.7
+    env: TOX_ENV=py27-old
+
+  - python: 2.7
     env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
     services:
       - postgresql
@@ -30,6 +33,11 @@ matrix:
 
   - python: 3.6
     env: TOX_ENV=py36
+
+  - python: 3.6
+    env: TOX_ENV=py36-postgres TRIAL_FLAGS="-j 4"
+    services:
+      - postgresql
 
   - python: 3.6
     env: TOX_ENV=check_isort

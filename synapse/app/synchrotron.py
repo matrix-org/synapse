@@ -410,7 +410,7 @@ def start(config_options):
             "Synapse synchrotron", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.synchrotron"
@@ -435,7 +435,6 @@ def start(config_options):
 
     def start():
         ss.get_datastore().start_profiling()
-        ss.get_state_handler().start_caching()
 
     reactor.callWhenRunning(start)
 

@@ -1,8 +1,13 @@
-FROM docker.io/python:2-alpine3.8
+ARG PYTHON_VERSION=2
 
-COPY . /synapse
+###
+### Stage 0: builder
+###
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.8 as builder
 
-RUN apk add --no-cache --virtual .build_deps \
+# install the OS build deps
+
+RUN apk add \
         build-base \
         libffi-dev \
         libjpeg-turbo-dev \
@@ -10,30 +15,47 @@ RUN apk add --no-cache --virtual .build_deps \
         libxslt-dev \
         linux-headers \
         postgresql-dev \
-        zlib-dev \
- && cd /synapse \
- && apk add --no-cache --virtual .runtime_deps \
- 	libffi \
-        libjpeg-turbo \
-	libressl \
-	libxslt \
-	libpq \
-	zlib \
-	su-exec \
- && pip install --upgrade \
+        zlib-dev
+
+# build things which have slow build steps, before we copy synapse, so that
+# the layer can be cached.
+#
+# (we really just care about caching a wheel here, as the "pip install" below
+# will install them again.)
+
+RUN pip install --prefix="/install" --no-warn-script-location \
+        cryptography \
+        msgpack-python \
+        pillow \
+        pynacl
+
+# now install synapse and all of the python deps to /install.
+
+COPY . /synapse
+RUN pip install --prefix="/install" --no-warn-script-location \
         lxml \
-        pip \
         psycopg2 \
-        setuptools \
- && mkdir -p /synapse/cache \
- && pip install -f /synapse/cache --upgrade --process-dependency-links . \
- && mv /synapse/docker/start.py /synapse/docker/conf / \
- && rm -rf \
-        setup.cfg \
-        setup.py \
-        synapse \
- && apk del .build_deps
- 
+        /synapse
+
+###
+### Stage 1: runtime
+###
+
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.8
+
+RUN apk add --no-cache --virtual .runtime_deps \
+        libffi \
+        libjpeg-turbo \
+        libressl \
+        libxslt \
+        libpq \
+        zlib \
+        su-exec
+
+COPY --from=builder /install /usr/local
+COPY ./docker/start.py /start.py
+COPY ./docker/conf /conf
+
 VOLUME ["/data"]
 
 EXPOSE 8008/tcp 8448/tcp

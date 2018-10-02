@@ -98,9 +98,9 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
     creation_event = auth_events.get((EventTypes.Create, ""), None)
 
     if not creation_event:
-        raise SynapseError(
+        raise AuthError(
             403,
-            "Room %r does not exist" % (event.room_id,)
+            "No create event in auth events",
         )
 
     creating_domain = get_domain_from_id(event.room_id)

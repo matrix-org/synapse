@@ -79,7 +79,6 @@ class PreviewUrlResource(Resource):
             # don't spider URLs more often than once an hour
             expiry_ms=60 * 60 * 1000,
         )
-        self._cache.start()
 
         self._cleaner_loop = self.clock.looping_call(
             self._start_expire_url_cache_data, 10 * 1000,

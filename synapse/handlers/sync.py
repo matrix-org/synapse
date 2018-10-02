@@ -567,13 +567,13 @@ class SyncHandler(object):
         # be a valid name or canonical_alias - i.e. we're checking that they
         # haven't been "deleted" by blatting {} over the top.
         if name_id:
-            name = yield self.store.get_event(name_id, allow_none=False)
+            name = yield self.store.get_event(name_id, allow_none=True)
             if name and name.content:
                 defer.returnValue(summary)
 
         if canonical_alias_id:
             canonical_alias = yield self.store.get_event(
-                canonical_alias_id, allow_none=False,
+                canonical_alias_id, allow_none=True,
             )
             if canonical_alias and canonical_alias.content:
                 defer.returnValue(summary)
@@ -722,6 +722,13 @@ class SyncHandler(object):
             }
 
             if full_state:
+                if lazy_load_members:
+                    # always make sure we LL ourselves so we know we're in the room
+                    # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
+                    # We only need apply this on full state syncs given we disabled
+                    # LL for incr syncs in #3840.
+                    types.append((EventTypes.Member, sync_config.user.to_string()))
+
                 if batch:
                     current_state_ids = yield self.store.get_state_ids_for_event(
                         batch.events[-1].event_id, types=types,
@@ -790,7 +797,7 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    if types:
+                    if types and batch.events:
                         # We're returning an incremental sync, with no
                         # "gap" since the previous sync, so normally there would be
                         # no state to return.
