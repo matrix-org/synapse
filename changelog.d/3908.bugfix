@@ -1,1 +1,0 @@
-Fix adding client IPs to the database failing on Python 3.
