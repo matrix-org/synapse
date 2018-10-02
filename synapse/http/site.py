@@ -75,20 +75,35 @@ class SynapseRequest(Request):
         return '<%s at 0x%x method=%r uri=%r clientproto=%r site=%r>' % (
             self.__class__.__name__,
             id(self),
-            self.method.decode('ascii', errors='replace'),
+            self.get_method(),
             self.get_redacted_uri(),
             self.clientproto.decode('ascii', errors='replace'),
             self.site.site_tag,
         )
 
     def get_request_id(self):
-        return "%s-%i" % (self.method.decode('ascii'), self.request_seq)
+        return "%s-%i" % (self.get_method(), self.request_seq)
 
     def get_redacted_uri(self):
         uri = self.uri
         if isinstance(uri, bytes):
             uri = self.uri.decode('ascii')
         return redact_uri(uri)
+
+    def get_method(self):
+        """Gets the method associated with the request (or placeholder if not
+        method has yet been received).
+
+        Note: This is necessary as the placeholder value in twisted is str
+        rather than bytes, so we need to sanitise `self.method`.
+
+        Returns:
+            str
+        """
+        method = self.method
+        if isinstance(method, bytes):
+            method = self.method.decode('ascii')
+        return method
 
     def get_user_agent(self):
         return self.requestHeaders.getRawHeaders(b"User-Agent", [None])[-1]
@@ -119,7 +134,7 @@ class SynapseRequest(Request):
             # dispatching to the handler, so that the handler
             # can update the servlet name in the request
             # metrics
-            requests_counter.labels(self.method.decode('ascii'),
+            requests_counter.labels(self.get_method(),
                                     self.request_metrics.name).inc()
 
     @contextlib.contextmanager
@@ -207,14 +222,14 @@ class SynapseRequest(Request):
         self.start_time = time.time()
         self.request_metrics = RequestMetrics()
         self.request_metrics.start(
-            self.start_time, name=servlet_name, method=self.method.decode('ascii'),
+            self.start_time, name=servlet_name, method=self.get_method(),
         )
 
         self.site.access_logger.info(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),
             self.site.site_tag,
-            self.method.decode('ascii'),
+            self.get_method(),
             self.get_redacted_uri()
         )
 
@@ -280,7 +295,7 @@ class SynapseRequest(Request):
             int(usage.db_txn_count),
             self.sentLength,
             code,
-            self.method.decode('ascii'),
+            self.get_method(),
             self.get_redacted_uri(),
             self.clientproto.decode('ascii', errors='replace'),
             user_agent,
