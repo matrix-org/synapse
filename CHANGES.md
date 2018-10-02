@@ -35,17 +35,14 @@ Bugfixes
 - Replaced all occurences of e.message with str(e). Contributed by Schnuffle ([\#3970](https://github.com/matrix-org/synapse/issues/3970))
 - Fix lazy loaded sync in the presence of rejected state events ([\#3986](https://github.com/matrix-org/synapse/issues/3986))
 - Fix error when logging incomplete HTTP requests ([\#3990](https://github.com/matrix-org/synapse/issues/3990))
-- Add a cache to get_destination_retry_timings ([\#3991](https://github.com/matrix-org/synapse/issues/3991))
 
 
 Internal Changes
 ----------------
 
-- Unit tests can now be run under PostgreSQL in Docker using 
-  ``test_postgresql.sh``. ([\#3699](https://github.com/matrix-org/synapse/issues/3699))
+- Unit tests can now be run under PostgreSQL in Docker using ``test_postgresql.sh``. ([\#3699](https://github.com/matrix-org/synapse/issues/3699))
 - Speed up calculation of typing updates for replication ([\#3794](https://github.com/matrix-org/synapse/issues/3794))
-- Remove documentation regarding installation on Cygwin, the use of WSL is 
-  recommended instead. ([\#3873](https://github.com/matrix-org/synapse/issues/3873))
+- Remove documentation regarding installation on Cygwin, the use of WSL is recommended instead. ([\#3873](https://github.com/matrix-org/synapse/issues/3873))
 - Fix typo in README, synaspse -> synapse ([\#3897](https://github.com/matrix-org/synapse/issues/3897))
 - Increase the timeout when filling missing events in federation requests ([\#3903](https://github.com/matrix-org/synapse/issues/3903))
 - Improve the logging when handling a federation transaction ([\#3904](https://github.com/matrix-org/synapse/issues/3904), [\#3966](https://github.com/matrix-org/synapse/issues/3966))
@@ -55,7 +52,7 @@ Internal Changes
 - Comments and interface cleanup for on_receive_pdu ([\#3924](https://github.com/matrix-org/synapse/issues/3924))
 - Fix spurious exceptions when remote http client closes conncetion ([\#3925](https://github.com/matrix-org/synapse/issues/3925))
 - Log exceptions thrown by background tasks ([\#3927](https://github.com/matrix-org/synapse/issues/3927))
-- Add a cache to get_destination_retry_timings ([\#3933](https://github.com/matrix-org/synapse/issues/3933))
+- Add a cache to get_destination_retry_timings ([\#3933](https://github.com/matrix-org/synapse/issues/3933), [\#3991](https://github.com/matrix-org/synapse/issues/3991))
 - Automate pushes to docker hub ([\#3946](https://github.com/matrix-org/synapse/issues/3946))
 - Require attrs 16.0.0 or later ([\#3947](https://github.com/matrix-org/synapse/issues/3947))
 - Fix incompatibility with python3 on alpine ([\#3948](https://github.com/matrix-org/synapse/issues/3948))
@@ -79,8 +76,7 @@ Synapse 0.33.5.1 (2018-09-25)
 Internal Changes
 ----------------
 
-- Fix incompatibility with older Twisted version in tests. Thanks 
-  @OlegGirko! ([\#3940](https://github.com/matrix-org/synapse/issues/3940))
+- Fix incompatibility with older Twisted version in tests. Thanks @OlegGirko! ([\#3940](https://github.com/matrix-org/synapse/issues/3940))
 
 
 Synapse 0.33.5 (2018-09-24)
