@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+from distutils.util import strtobool
 
 import six
 
@@ -24,10 +25,10 @@ from synapse.util.frozenutils import freeze
 # bugs where we accidentally share e.g. signature dicts. However, converting a
 # dict to frozen_dicts is expensive.
 #
-# NOTE: This is overridden by the configuration by the Synapse script entry
-# points, but for the sake of tests, it is set here while it cannot be
-# configured on the homeserver object itself.
-USE_FROZEN_DICTS = os.environ.get("SYNAPSE_USE_FROZEN_DICTS", False)
+# NOTE: This is overridden by the configuration by the Synapse worker apps, but
+# for the sake of tests, it is set here while it cannot be configured on the
+# homeserver object itself.
+USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 
 
 class _EventInternalMetadata(object):
