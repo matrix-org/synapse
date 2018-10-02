@@ -216,7 +216,7 @@ class TransactionStore(SQLBaseStore):
             retry_interval (int) - how long until next retry in ms
         """
 
-        self._destination_retry_cache.pop(destination)
+        self._destination_retry_cache.pop(destination, None)
         return self.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
