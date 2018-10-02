@@ -23,13 +23,9 @@ recursive-include synapse/static *.gif
 recursive-include synapse/static *.html
 recursive-include synapse/static *.js
 
-exclude jenkins.sh
-exclude jenkins*.sh
-exclude jenkins*
 exclude Dockerfile
 exclude .dockerignore
 exclude test_postgresql.sh
-recursive-exclude jenkins *.sh
 
 include pyproject.toml
 recursive-include changelog.d *
@@ -38,3 +34,6 @@ prune .github
 prune demo/etc
 prune docker
 prune .circleci
+
+exclude jenkins*
+recursive-exclude jenkins *.sh
