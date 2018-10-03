@@ -68,6 +68,29 @@ function captchaDone() {
 </html>
 """
 
+TERMS_TEMPLATE = """
+<html>
+<head>
+<title>Authentication</title>
+<meta name='viewport' content='width=device-width, initial-scale=1,
+    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
+<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
+</head>
+<body>
+<form id="registrationForm" method="post" action="%(myurl)s">
+    <div>
+        <p>
+            Please click the button below if you agree to the
+            <a href="%(terms_url)s">privacy policy of this homeserver.</a>
+        </p>
+        <input type="hidden" name="session" value="%(session)s" />
+        <input type="submit" value="Agree" />
+    </div>
+</form>
+</body>
+</html>
+"""
+
 SUCCESS_TEMPLATE = """
 <html>
 <head>
@@ -138,13 +161,16 @@ class AuthRestServlet(RestServlet):
             authdict = {
                 'session': session,
             }
-            success = yield self.auth_handler.add_oob_auth(
-                LoginType.TERMS,
-                authdict,
-                self.hs.get_ip_from_request(request)
-            )
 
-            html = "<html><body>hai</body></html>"
+            html = TERMS_TEMPLATE % {
+                'session': session,
+                'terms_url': "%s/_matrix/consent/public" % (
+                    self.hs.config.public_baseurl,
+                ),
+                'myurl': "%s/auth/%s/fallback/web" % (
+                    CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS
+                ),
+            }
             html_bytes = html.encode("utf8")
             request.setResponseCode(200)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
@@ -159,7 +185,7 @@ class AuthRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, stagetype):
         yield
-        if stagetype == "m.login.recaptcha":
+        if stagetype == LoginType.RECAPTCHA:
             if ('g-recaptcha-response' not in request.args or
                     len(request.args['g-recaptcha-response'])) == 0:
                 raise SynapseError(400, "No captcha response supplied")
@@ -198,6 +224,40 @@ class AuthRestServlet(RestServlet):
             request.write(html_bytes)
             finish_request(request)
 
+            defer.returnValue(None)
+        elif stagetype == LoginType.TERMS:
+            if ('session' not in request.args or
+                    len(request.args['session'])) == 0:
+                raise SynapseError(400, "No session supplied")
+
+            session = request.args['session'][0]
+            authdict = {'session': session}
+
+            success = yield self.auth_handler.add_oob_auth(
+                LoginType.TERMS,
+                authdict,
+                self.hs.get_ip_from_request(request)
+            )
+
+            if success:
+                html = SUCCESS_TEMPLATE
+            else:
+                html = TERMS_TEMPLATE % {
+                    'session': session,
+                    'terms_url': "%s/_matrix/consent/public" % (
+                        self.hs.config.public_baseurl,
+                    ),
+                    'myurl': "%s/auth/%s/fallback/web" % (
+                        CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS
+                    ),
+                }
+            html_bytes = html.encode("utf8")
+            request.setResponseCode(200)
+            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+            request.write(html_bytes)
+            finish_request(request)
             defer.returnValue(None)
         else:
             raise SynapseError(404, "Unknown auth stage type")
