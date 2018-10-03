@@ -30,7 +30,7 @@ from twisted.web.server import NOT_DONE_YET
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
 from synapse.http.server import finish_request, wrap_html_request_handler
-from synapse.http.servlet import parse_string
+from synapse.http.servlet import parse_string, parse_boolean
 from synapse.types import UserID
 
 # language to use for the templates. TODO: figure this out from Accept-Language
@@ -137,27 +137,35 @@ class ConsentResource(Resource):
             request (twisted.web.http.Request):
         """
 
-        version = parse_string(request, "v",
-                               default=self._default_consent_version)
-        username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True, encoding=None)
+        public_version = parse_boolean(request, "public", default=False)
 
-        self._check_hash(username, userhmac)
+        version = self._default_consent_version
+        username = None
+        userhmac = None
+        has_consented = False
+        if not public_version:
+            version = parse_string(request, "v",
+                                default=self._default_consent_version)
+            username = parse_string(request, "u", required=True)
+            userhmac = parse_string(request, "h", required=True, encoding=None)
 
-        if username.startswith('@'):
-            qualified_user_id = username
-        else:
-            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+            self._check_hash(username, userhmac)
 
-        u = yield self.store.get_user_by_id(qualified_user_id)
-        if u is None:
-            raise NotFoundError("Unknown user")
+            if username.startswith('@'):
+                qualified_user_id = username
+            else:
+                qualified_user_id = UserID(username, self.hs.hostname).to_string()
+
+            u = yield self.store.get_user_by_id(qualified_user_id)
+            if u is None:
+                raise NotFoundError("Unknown user")
+            has_consented = u["consent_version"] == version
 
         try:
             self._render_template(
                 request, "%s.html" % (version,),
                 user=username, userhmac=userhmac, version=version,
-                has_consented=(u["consent_version"] == version),
+                has_consented=has_consented, public_version=public_version,
             )
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")
