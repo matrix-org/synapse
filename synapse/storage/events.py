@@ -560,7 +560,7 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
     @defer.inlineCallbacks
     def _get_events_which_are_prevs(self, event_ids):
         """Filter the supplied list of event_ids to get those which are prev_events of
-        existing (non-outlier) events.
+        existing (non-outlier/rejected) events.
 
         Args:
             event_ids (Iterable[str]): event ids to filter
@@ -578,6 +578,7 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
                 LEFT JOIN rejections USING (event_id)
             WHERE
                 prev_event_id IN (%s)
+                AND NOT events.outlier
                 AND rejections.event_id IS NULL
             """ % (
                 ",".join("?" for _ in batch),
