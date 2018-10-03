@@ -157,7 +157,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
             raise AuthError(
                 403, (
                     "You cannot issue a third party invite for %s." %
-                    (event.content.display_name,)
+                    (event.content.get("display_name", "<Unknown>"),)
                 )
             )
         else:
