@@ -460,6 +460,12 @@ class RegisterRestServlet(RestServlet):
                 params.get("bind_msisdn")
             )
 
+        if auth_result and LoginType.TERMS in auth_result:
+            logger.info("User %s has consented to the privacy policy" % registered_user_id)
+            yield self.store.user_set_consent_version(
+                registered_user_id, self.hs.config.user_consent_version,
+            )
+
         defer.returnValue((200, return_dict))
 
     def on_OPTIONS(self, _):
