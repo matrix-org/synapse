@@ -466,6 +466,15 @@ class AuthHandler(BaseHandler):
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
 
+    def _get_params_terms(self):
+        return {
+            "policies": [{
+                "name": "Privacy Policy",
+                "version": self.hs.config.user_consent_version,
+                "url": "%s/_matrix/consent/public" % (self.hs.config.public_baseurl,),
+            }],
+        }
+
     def _auth_dict_for_flows(self, flows, session):
         public_flows = []
         for f in flows:
