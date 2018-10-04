@@ -149,6 +149,7 @@ def setup_test_homeserver(
         config.block_events_without_consent_error = None
         config.media_storage_providers = []
         config.auto_join_rooms = []
+        config.autocreate_auto_join_rooms = True
         config.limit_usage_by_mau = False
         config.hs_disabled = False
         config.hs_disabled_message = ""

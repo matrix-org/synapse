@@ -220,8 +220,26 @@ class RegistrationHandler(BaseHandler):
 
         # auto-join the user to any rooms we're supposed to dump them into
         fake_requester = create_requester(user_id)
+
+        # try to create the room if we're the first user on the server
+        if self.hs.config.autocreate_auto_join_rooms:
+            count = yield self.store.count_all_users()
+            auto_create_rooms = count == 1
+
         for r in self.hs.config.auto_join_rooms:
             try:
+                if auto_create_rooms and RoomAlias.is_valid(r):
+                    room_creation_handler = self.hs.get_room_creation_handler()
+                    # create room expects the localpart of the room alias
+                    room_alias_localpart = RoomAlias.from_string(r).localpart
+                    yield room_creation_handler.create_room(
+                        fake_requester,
+                        config={
+                            "preset": "public_chat",
+                            "room_alias_name": room_alias_localpart
+                        },
+                        ratelimit=False,
+                    )
                 yield self._join_user_to_room(fake_requester, r)
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
@@ -513,33 +531,6 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _join_user_to_room(self, requester, room_identifier):
-
-        # try to create the room if we're the first user on the server
-        if self.hs.config.autocreate_auto_join_rooms:
-            count = yield self.store.count_all_users()
-            if count == 1 and RoomAlias.is_valid(room_identifier):
-                room_creation_handler = self.hs.get_room_creation_handler()
-                info = yield room_creation_handler.create_room(
-                    requester,
-                    config={
-                        "preset": "public_chat",
-                    },
-                    ratelimit=False,
-                )
-                room_id = info["room_id"]
-
-                directory_handler = self.hs.get_handlers().directory_handler
-                room_alias = RoomAlias.from_string(room_identifier)
-                yield directory_handler.create_association(
-                    user_id=requester.user.to_string(),
-                    room_alias=room_alias,
-                    room_id=room_id,
-                    servers=[self.hs.hostname],
-                )
-
-                yield directory_handler.send_room_alias_update_event(
-                    requester, requester.user.to_string(), room_id
-                )
 
         room_id = None
         room_member_handler = self.hs.get_room_member_handler()
