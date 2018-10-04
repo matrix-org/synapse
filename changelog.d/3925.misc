@@ -1,1 +1,0 @@
-Fix spurious exceptions when remote http client closes conncetion

@@ -1,1 +1,0 @@
-Include eventid in log lines when processing incoming federation transactions
