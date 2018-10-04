@@ -2025,6 +2025,7 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
         logger.info("[purge] finding state groups which depend on redundant"
                     " state groups")
         remaining_state_groups = []
+        unreferenced_state_groups = 0
         for i in range(0, len(state_rows), 100):
             chunk = [sg for sg, in state_rows[i:i + 100]]
             # look for state groups whose prev_state_group is one we are about
@@ -2037,13 +2038,33 @@ class EventsStore(EventFederationStore, EventsWorkerStore, BackgroundUpdateStore
                 retcols=["state_group"],
                 keyvalues={},
             )
-            remaining_state_groups.extend(
-                row["state_group"] for row in rows
 
-                # exclude state groups we are about to delete: no point in
-                # updating them
-                if row["state_group"] not in state_groups_to_delete
-            )
+            for row in rows:
+                sg = row["state_group"]
+
+                if sg in state_groups_to_delete:
+                    # exclude state groups we are about to delete: no point in
+                    # updating them
+                    continue
+
+                if not self._is_state_group_referenced(txn, sg):
+                    # Let's also delete unreferenced state groups while we're
+                    # here, since otherwise we'd need to de-delta them
+                    state_groups_to_delete.add(sg)
+                    unreferenced_state_groups += 1
+                    continue
+
+                remaining_state_groups.append(sg)
+
+        logger.info(
+            "[purge] found %i extra unreferenced state groups to delete",
+            unreferenced_state_groups,
+        )
+
+        logger.info(
+            "[purge] de-delta-ing %i remaining state groups",
+            len(remaining_state_groups),
+        )
 
         # Now we turn the state groups that reference to-be-deleted state
         # groups to non delta versions.

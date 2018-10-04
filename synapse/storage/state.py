@@ -1041,6 +1041,56 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return count
 
+    def _is_state_group_referenced(self, txn, state_group):
+        """Checks if a given state group is referenced, or is safe to delete.
+
+        A state groups is referenced if it or any of its descendants are
+        pointed at by an event. (A descendant is a group which has the given
+        state_group as a prev group)
+        """
+
+        # We check this by doing a depth first search to look for any
+        # descendant referenced by `event_to_state_groups`.
+
+        # State groups we need to check, contains state groups that are
+        # descendants of `state_group`
+        state_groups_to_search = [state_group]
+
+        # Set of state groups we've already checked
+        state_groups_searched = set()
+
+        while state_groups_to_search:
+            state_group = state_groups_to_search.pop()  # Next state group to check
+
+            is_referenced = self._simple_select_one_onecol_txn(
+                txn,
+                table="event_to_state_groups",
+                keyvalues={"state_group": state_group},
+                retcol="event_id",
+                allow_none=True,
+            )
+            if is_referenced:
+                # A descendant is referenced by event_to_state_groups, so
+                # original state group is referenced.
+                return True
+
+            state_groups_searched.add(state_group)
+
+            # Find all children of current state group and add to search
+            references = self._simple_select_onecol_txn(
+                txn,
+                table="state_group_edges",
+                keyvalues={"prev_state_group": state_group},
+                retcol="state_group",
+            )
+            state_groups_to_search.extend(references)
+
+            # Lets be paranoid and check for cycles
+            if state_groups_searched.intersection(references):
+                raise Exception("State group %s has cyclic dependency", state_group)
+
+        return False
+
 
 class StateStore(StateGroupWorkerStore, BackgroundUpdateStore):
     """ Keeps track of the state at a given event.
