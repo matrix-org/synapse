@@ -1,3 +1,12 @@
+Synapse 0.33.6 (2018-10-04)
+===========================
+
+Internal Changes
+----------------
+
+- Pin to prometheus_client<0.4 to avoid renaming all of our metrics ([\#4002](https://github.com/matrix-org/synapse/issues/4002))
+
+
 Synapse 0.33.6rc1 (2018-10-03)
 ==============================
 
