@@ -1,1 +1,0 @@
-Replaced all occurences of e.message with str(e). Contributed by Schnuffle

@@ -58,7 +58,10 @@ REQUIREMENTS = {
     "msgpack-python>=0.3.0": ["msgpack"],
     "phonenumbers>=8.2.0": ["phonenumbers"],
     "six>=1.10": ["six"],
-    "prometheus_client>=0.0.18": ["prometheus_client"],
+
+    # prometheus_client 0.4.0 changed the format of counter metrics
+    # (cf https://github.com/matrix-org/synapse/issues/4001)
+    "prometheus_client>=0.0.18,<0.4.0": ["prometheus_client"],
 
     # we use attr.s(slots), which arrived in 16.0.0
     "attrs>=16.0.0": ["attr>=16.0.0"],

@@ -1,0 +1,1 @@
+Fix bug in event persistence logic which caused 'NoneType is not iterable'

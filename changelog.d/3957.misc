@@ -1,1 +1,0 @@
-CircleCI now only runs merged jobs on PRs, and commit jobs on develop, master, and release branches.

@@ -101,9 +101,13 @@ class _Collector(object):
             labels=["name"],
         )
 
-        # We copy the dict so that it doesn't change from underneath us
+        # We copy the dict so that it doesn't change from underneath us.
+        # We also copy the process lists as that can also change
         with _bg_metrics_lock:
-            _background_processes_copy = dict(_background_processes)
+            _background_processes_copy = {
+                k: list(v)
+                for k, v in six.iteritems(_background_processes)
+            }
 
         for desc, processes in six.iteritems(_background_processes_copy):
             background_process_in_flight_count.add_metric(
