@@ -749,6 +749,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
+
+        # First, lets split up the types and filtered types into non-member vs
+        # member sets.
         if types is not None:
             non_member_types = [t for t in types if t[0] != EventTypes.Member]
 
@@ -762,22 +765,87 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             non_member_types = None
             member_types = None
 
-        non_member_state = yield self._get_state_for_groups_using_cache(
+        # Now we look them up in the member and non-member caches
+        r_nm = yield self._get_state_for_groups_using_cache(
             groups, self._state_group_cache, non_member_types, filtered_types,
         )
-        # XXX: we could skip this entirely if member_types is []
-        member_state = yield self._get_state_for_groups_using_cache(
+        non_member_state, missing_groups_nm, = r_nm
+
+        r_m = yield self._get_state_for_groups_using_cache(
             # we set filtered_types=None as member_state only ever contain members.
             groups, self._state_group_members_cache, member_types, None,
         )
+        member_state, missing_groups_m, = r_m
 
         state = non_member_state
         for group in groups:
             state[group].update(member_state[group])
 
+        # Now fetch any missing groups from the database
+
+        missing_groups = missing_groups_m | missing_groups_nm
+
+        if missing_groups:
+            cache_sequence_nm = self._state_group_cache.sequence
+            cache_sequence_m = self._state_group_members_cache.sequence
+
+            # the DictionaryCache knows if it has *all* the state, but
+            # does not know if it has all of the keys of a particular type,
+            # which makes wildcard lookups expensive unless we have a complete
+            # cache. Hence, if we are doing a wildcard lookup, populate the
+            # cache fully so that we can do an efficient lookup next time.
+            if filtered_types or (types and any(k is None for (t, k) in types)):
+                types_to_fetch = None
+
+                # Record what we're fetching, split by member vs non-member, so
+                # we can record that when updating the caches.
+                non_member_types_fetched = None
+                member_types_fetched = None
+            else:
+                types_to_fetch = types
+
+                non_member_types_fetched = [
+                    t for t in types if t[0] != EventTypes.Member
+                ]
+                member_types_fetched = [
+                    t for t in types if t[0] == EventTypes.Member
+                ]
+
+            group_to_state_dict = yield self._get_state_groups_from_groups(
+                list(missing_groups), types_to_fetch,
+            )
+
+            # Now lets update the caches
+
+            self._insert_into_cache(
+                self._state_group_cache, cache_sequence_nm, non_member_state,
+                group_to_state_dict, non_member_types_fetched,
+            )
+
+            self._insert_into_cache(
+                self._state_group_members_cache, cache_sequence_m,
+                member_state, group_to_state_dict, member_types_fetched,
+            )
+
+            # And finally update the result dict, by filtering out any extra
+            # stuff we pulled out of the database.
+
+            for group, group_state_dict in iteritems(group_to_state_dict):
+                state_dict = state[group]
+
+                if types:
+                    for k, v in iteritems(group_state_dict):
+                        (typ, _) = k
+                        if (
+                            (k in types or (typ, None) in types) or
+                            (filtered_types and typ not in filtered_types)
+                        ):
+                            state_dict[k] = v
+                else:
+                    state_dict.update(group_state_dict)
+
         defer.returnValue(state)
 
-    @defer.inlineCallbacks
     def _get_state_for_groups_using_cache(
         self, groups, cache, types=None, filtered_types=None
     ):
@@ -802,13 +870,14 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            Deferred[dict[int, dict[tuple[str, str], str]]]:
-                dict of state_group_id -> (dict of (type, state_key) -> event id)
+            tuple[dict[int, dict[tuple[str, str], str]], set[dict]]: Tuple of
+            dict of state_group_id -> (dict of (type, state_key) -> event id)
+            of entries in the cache, and the state groups missing from the cache
         """
         if types:
             types = frozenset(types)
         results = {}
-        missing_groups = []
+        missing_groups = set()
         if types is not None:
             for group in set(groups):
                 state_dict_ids, got_all = self._get_some_state_from_cache(
@@ -817,7 +886,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 results[group] = state_dict_ids
 
                 if not got_all:
-                    missing_groups.append(group)
+                    missing_groups.add(group)
         else:
             for group in set(groups):
                 state_dict_ids, got_all = self._get_all_state_from_cache(
@@ -827,52 +896,49 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 results[group] = state_dict_ids
 
                 if not got_all:
-                    missing_groups.append(group)
+                    missing_groups.add(group)
 
-        if missing_groups:
-            # Okay, so we have some missing_types, let's fetch them.
-            cache_seq_num = cache.sequence
+        return results, missing_groups
 
-            # the DictionaryCache knows if it has *all* the state, but
-            # does not know if it has all of the keys of a particular type,
-            # which makes wildcard lookups expensive unless we have a complete
-            # cache. Hence, if we are doing a wildcard lookup, populate the
-            # cache fully so that we can do an efficient lookup next time.
+    def _insert_into_cache(self, cache, cache_seq_num, existing_state,
+                           group_to_state_dict, types_fetched):
+        """Inserts results from querying the database into the relevant cache.
 
-            if filtered_types or (types and any(k is None for (t, k) in types)):
-                types_to_fetch = None
+        Args:
+            cache (DictionaryCache)
+            cache_seq_num (int): Sequence number of cache since last lookup in cache
+            existing_state (dict): The existing entries in the cache. Map from
+                state group to state dict.
+            group_to_state_dict (dict): The new entries pulled from database.
+                Map from state group to state dict
+            types_fetched (None|iterable[(str, None|str)]):
+                indicates the state type/keys fetched from database. If None,
+                the whole state was fetched.
+
+                Otherwise, each entry should be a `(type, state_key)` tuple. A
+                `state_key` of None is a wildcard meaning that we fetched all
+                state with that type.
+        """
+
+        for group, group_state_dict in iteritems(group_to_state_dict):
+            state_dict = dict(existing_state[group])
+
+            if types_fetched is not None:
+                for k, v in iteritems(group_state_dict):
+                    (typ, _) = k
+                    if k in types_fetched or (typ, None) in types_fetched:
+                        state_dict[k] = v
             else:
-                types_to_fetch = types
+                state_dict.update(group_state_dict)
 
-            group_to_state_dict = yield self._get_state_groups_from_groups(
-                missing_groups, types_to_fetch, cache == self._state_group_members_cache,
+            # update the cache with all the things we fetched from the
+            # database.
+            cache.update(
+                cache_seq_num,
+                key=group,
+                value=state_dict,
+                fetched_keys=types_fetched,
             )
-
-            for group, group_state_dict in iteritems(group_to_state_dict):
-                state_dict = results[group]
-
-                # update the result, filtering by `types`.
-                if types:
-                    for k, v in iteritems(group_state_dict):
-                        (typ, _) = k
-                        if (
-                            (k in types or (typ, None) in types) or
-                            (filtered_types and typ not in filtered_types)
-                        ):
-                            state_dict[k] = v
-                else:
-                    state_dict.update(group_state_dict)
-
-                # update the cache with all the things we fetched from the
-                # database.
-                cache.update(
-                    cache_seq_num,
-                    key=group,
-                    value=group_state_dict,
-                    fetched_keys=types_to_fetch,
-                )
-
-        defer.returnValue(results)
 
     def store_state_group(self, event_id, room_id, prev_group, delta_ids,
                           current_state_ids):
