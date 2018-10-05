@@ -32,7 +32,8 @@ CREATE TABLE e2e_room_keys_versions (
     user_id TEXT NOT NULL,
     version TEXT NOT NULL,
     algorithm TEXT NOT NULL,
-    auth_data TEXT NOT NULL
+    auth_data TEXT NOT NULL,
+    deleted SMALLINT DEFAULT 0 NOT NULL
 );
 
 CREATE UNIQUE INDEX e2e_room_keys_versions_idx ON e2e_room_keys_versions(user_id, version);

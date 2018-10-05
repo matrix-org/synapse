@@ -193,7 +193,8 @@ class EndToEndRoomKeyStore(SQLBaseStore):
     @staticmethod
     def _get_current_version(txn, user_id):
         txn.execute(
-            "SELECT MAX(version) FROM e2e_room_keys_versions WHERE user_id=?",
+            "SELECT MAX(version) FROM e2e_room_keys_versions "
+            "WHERE user_id=? AND deleted=0",
             (user_id,)
         )
         row = txn.fetchone()
@@ -226,6 +227,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 keyvalues={
                     "user_id": user_id,
                     "version": this_version,
+                    "deleted": 0,
                 },
                 retcols=(
                     "version",
@@ -300,13 +302,16 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             else:
                 this_version = version
 
-            return self._simple_delete_one_txn(
+            return self._simple_update_one_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={
                     "user_id": user_id,
                     "version": this_version,
                 },
+                updatevalues={
+                    "deleted": 1,
+                }
             )
 
         return self.runInteraction(
