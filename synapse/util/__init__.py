@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import logging
 from itertools import islice
 
@@ -66,7 +67,7 @@ class Clock(object):
             f(function): The function to call repeatedly.
             msec(float): How long to wait between calls in milliseconds.
         """
-        call = task.LoopingCall(f)
+        call = task.LoopingCall(_log_exception_wrapper(f))
         call.clock = self._reactor
         call.start(msec / 1000.0, now=False)
         return call
@@ -109,3 +110,19 @@ def batch_iter(iterable, size):
     sourceiter = iter(iterable)
     # call islice until it returns an empty tuple
     return iter(lambda: tuple(islice(sourceiter, size)), ())
+
+
+def _log_exception_wrapper(f):
+    """Used to wrap looping calls to log loudly if they get killed
+    """
+
+    @functools.wraps(f)
+    def wrap(*args, **kwargs):
+        try:
+            logger.info("Running looping call")
+            return f(*args, **kwargs)
+        except:  # noqa: E722, as we reraise the exception this is fine.
+            logger.exception("Looping called died")
+            raise
+
+    return wrap
