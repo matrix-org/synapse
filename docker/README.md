@@ -72,8 +72,11 @@ Otherwise, a dynamic configuration file will be used. The following environment
 variables are available for configuration:
 
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the current server public hostname.
+* ``SYNAPSE_PROXIED``, Use the X-Forwarded-For header as the client IP if running behind a reverse proxy.
 * ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
+* ``SYNAPSE_TLS_CERT``, Path to TLS certificate.
+* ``SYNAPSE_TLS_KEY``, Path to TLS key.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
   you run your own TLS-capable reverse proxy).
 * ``SYNAPSE_ENABLE_REGISTRATION``, set this variable to enable registration on
