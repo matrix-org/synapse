@@ -44,6 +44,17 @@ jobs:
           destination: logs
       - store_test_results:
           path: logs
+  sytestpy2workers:
+    machine: true
+    steps:
+      - checkout
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 -e WORKERS=1 matrixdotorg/sytest-synapsepy2
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+      - store_test_results:
+          path: logs
   sytestpy2merged:
     machine: true
     steps:
@@ -56,7 +67,6 @@ jobs:
           destination: logs
       - store_test_results:
           path: logs
-
   sytestpy2postgresmerged:
     machine: true
     steps:
@@ -64,6 +74,18 @@ jobs:
       - run: bash .circleci/merge_base_branch.sh
       - run: docker pull matrixdotorg/sytest-synapsepy2
       - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy2
+      - store_artifacts:
+          path: ~/project/logs
+          destination: logs
+      - store_test_results:
+          path: logs
+  sytestpy2workersmerged:
+    machine: true
+    steps:
+      - checkout
+      - run: bash .circleci/merge_base_branch.sh
+      - run: docker pull matrixdotorg/sytest-synapsepy2
+      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 -e WORKERS=1 matrixdotorg/sytest-synapsepy2
       - store_artifacts:
           path: ~/project/logs
           destination: logs
@@ -125,6 +147,10 @@ workflows:
           filters:
             branches:
               only: /develop|master|release-.*/
+      - sytestpy2workers:
+          filters:
+            branches:
+              only: /develop|master|release-.*/
       - sytestpy2postgres:
           filters:
             branches:
@@ -138,6 +164,10 @@ workflows:
             branches:
               only: /develop|master|release-.*/
       - sytestpy2merged:
+          filters:
+            branches:
+              ignore: /develop|master|release-.*/
+      - sytestpy2workersmerged:
           filters:
             branches:
               ignore: /develop|master|release-.*/
