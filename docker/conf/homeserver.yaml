@@ -2,9 +2,15 @@
 
 ## TLS ##
 
+{% if SYNAPSE_TLS_CERT and SYNAPSE_TLS_KEY %}
+tls_certificate_path: "{{ SYNAPSE_TLS_CERT }}"
+tls_private_key_path: "{{ SYNAPSE_TLS_KEY }}"
+tls_dh_params_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.dh"
+{% else %}
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
 tls_dh_params_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.dh"
+{% endif %}
 no_tls: {{ "True" if SYNAPSE_NO_TLS else "False" }}
 tls_fingerprints: []
 
@@ -14,6 +20,9 @@ server_name: "{{ SYNAPSE_SERVER_NAME }}"
 pid_file: /homeserver.pid
 web_client: False
 soft_file_limit: 0
+
+# Set to false to disable presence tracking on this homeserver.
+use_presence: true
 
 ## Ports ##
 
@@ -36,7 +45,7 @@ listeners:
     tls: false
     bind_addresses: ['0.0.0.0']
     type: http
-    x_forwarded: false
+    x_forwarded: {{ "true" if SYNAPSE_PROXIED else "false" }}
 
     resources:
       - names: [client]
