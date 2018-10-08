@@ -69,9 +69,9 @@ class Clock(object):
         call = task.LoopingCall(f)
         call.clock = self._reactor
         d = call.start(msec / 1000.0, now=False)
-        d.addErrback(make_log_failure_errback(
-            "Looping call died", consumeErrors=False,
-        ))
+        d.addErrback(
+            log_failure, "Looping call died", consumeErrors=False,
+        )
         return call
 
     def call_later(self, delay, callback, *args, **kwargs):
@@ -114,7 +114,7 @@ def batch_iter(iterable, size):
     return iter(lambda: tuple(islice(sourceiter, size)), ())
 
 
-def make_log_failure_errback(msg, consumeErrors=True):
+def log_failure(failure, msg, consumeErrors=True):
     """Creates a function suitable for passing to `Deferred.addErrback` that
     logs any failures that occur.
 
@@ -127,17 +127,14 @@ def make_log_failure_errback(msg, consumeErrors=True):
         func(Failure)
     """
 
-    def log_failure(failure):
-        logger.error(
-            msg,
-            exc_info=(
-                failure.type,
-                failure.value,
-                failure.getTracebackObject()
-            )
+    logger.error(
+        msg,
+        exc_info=(
+            failure.type,
+            failure.value,
+            failure.getTracebackObject()
         )
+    )
 
-        if not consumeErrors:
-            return failure
-
-    return log_failure
+    if not consumeErrors:
+        return failure
