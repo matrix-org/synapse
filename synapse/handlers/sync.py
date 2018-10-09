@@ -24,6 +24,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.push.clientformat import format_push_rules_for_user
+from synapse.storage.roommember import MemberSummary
 from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -525,6 +526,8 @@ class SyncHandler(object):
              A deferred dict describing the room summary
         """
 
+        # FIXME: we could/should get this from room_stats when matthew/stats lands
+
         # FIXME: this promulgates https://github.com/matrix-org/synapse/issues/3305
         last_events, _ = yield self.store.get_recent_event_ids_for_room(
             room_id, end_token=now_token.room_key, limit=1,
@@ -537,44 +540,67 @@ class SyncHandler(object):
         last_event = last_events[-1]
         state_ids = yield self.store.get_state_ids_for_event(
             last_event.event_id, [
-                (EventTypes.Member, None),
                 (EventTypes.Name, ''),
                 (EventTypes.CanonicalAlias, ''),
             ]
         )
 
-        member_ids = {
-            state_key: event_id
-            for (t, state_key), event_id in state_ids.iteritems()
-            if t == EventTypes.Member
-        }
+        # this is heavily cached, thus: fast.
+        details = yield self.store.get_room_summary(room_id)
+
         name_id = state_ids.get((EventTypes.Name, ''))
         canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ''))
 
         summary = {}
-
-        # FIXME: it feels very heavy to load up every single membership event
-        # just to calculate the counts.
-        member_events = yield self.store.get_events(member_ids.values())
-
-        joined_user_ids = []
-        invited_user_ids = []
-
-        for ev in member_events.values():
-            if ev.content.get("membership") == Membership.JOIN:
-                joined_user_ids.append(ev.state_key)
-            elif ev.content.get("membership") == Membership.INVITE:
-                invited_user_ids.append(ev.state_key)
+        empty_ms = MemberSummary([], 0)
 
         # TODO: only send these when they change.
-        summary["m.joined_member_count"] = len(joined_user_ids)
-        summary["m.invited_member_count"] = len(invited_user_ids)
+        summary["m.joined_member_count"] = (
+            details.get(Membership.JOIN, empty_ms).count
+        )
+        summary["m.invited_member_count"] = (
+            details.get(Membership.INVITE, empty_ms).count
+        )
 
-        if name_id or canonical_alias_id:
-            defer.returnValue(summary)
+        # if the room has a name or canonical_alias set, we can skip
+        # calculating heroes.  we assume that if the event has contents, it'll
+        # be a valid name or canonical_alias - i.e. we're checking that they
+        # haven't been "deleted" by blatting {} over the top.
+        if name_id:
+            name = yield self.store.get_event(name_id, allow_none=True)
+            if name and name.content:
+                defer.returnValue(summary)
 
-        # FIXME: order by stream ordering, not alphabetic
+        if canonical_alias_id:
+            canonical_alias = yield self.store.get_event(
+                canonical_alias_id, allow_none=True,
+            )
+            if canonical_alias and canonical_alias.content:
+                defer.returnValue(summary)
 
+        joined_user_ids = [
+            r[0] for r in details.get(Membership.JOIN, empty_ms).members
+        ]
+        invited_user_ids = [
+            r[0] for r in details.get(Membership.INVITE, empty_ms).members
+        ]
+        gone_user_ids = (
+            [r[0] for r in details.get(Membership.LEAVE, empty_ms).members] +
+            [r[0] for r in details.get(Membership.BAN, empty_ms).members]
+        )
+
+        # FIXME: only build up a member_ids list for our heroes
+        member_ids = {}
+        for membership in (
+            Membership.JOIN,
+            Membership.INVITE,
+            Membership.LEAVE,
+            Membership.BAN
+        ):
+            for user_id, event_id in details.get(membership, empty_ms).members:
+                member_ids[user_id] = event_id
+
+        # FIXME: order by stream ordering rather than as returned by SQL
         me = sync_config.user.to_string()
         if (joined_user_ids or invited_user_ids):
             summary['m.heroes'] = sorted(
@@ -586,7 +612,11 @@ class SyncHandler(object):
             )[0:5]
         else:
             summary['m.heroes'] = sorted(
-                [user_id for user_id in member_ids.keys() if user_id != me]
+                [
+                    user_id
+                    for user_id in gone_user_ids
+                    if user_id != me
+                ]
             )[0:5]
 
         if not sync_config.filter_collection.lazy_load_members():
@@ -692,6 +722,13 @@ class SyncHandler(object):
             }
 
             if full_state:
+                if lazy_load_members:
+                    # always make sure we LL ourselves so we know we're in the room
+                    # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
+                    # We only need apply this on full state syncs given we disabled
+                    # LL for incr syncs in #3840.
+                    types.append((EventTypes.Member, sync_config.user.to_string()))
+
                 if batch:
                     current_state_ids = yield self.store.get_state_ids_for_event(
                         batch.events[-1].event_id, types=types,
@@ -719,6 +756,26 @@ class SyncHandler(object):
                     lazy_load_members=lazy_load_members,
                 )
             elif batch.limited:
+                state_at_timeline_start = yield self.store.get_state_ids_for_event(
+                    batch.events[0].event_id, types=types,
+                    filtered_types=filtered_types,
+                )
+
+                # for now, we disable LL for gappy syncs - see
+                # https://github.com/vector-im/riot-web/issues/7211#issuecomment-419976346
+                # N.B. this slows down incr syncs as we are now processing way
+                # more state in the server than if we were LLing.
+                #
+                # We still have to filter timeline_start to LL entries (above) in order
+                # for _calculate_state's LL logic to work, as we have to include LL
+                # members for timeline senders in case they weren't loaded in the initial
+                # sync.  We do this by (counterintuitively) by filtering timeline_start
+                # members to just be ones which were timeline senders, which then ensures
+                # all of the rest get included in the state block (if we need to know
+                # about them).
+                types = None
+                filtered_types = None
+
                 state_at_previous_sync = yield self.get_state_at(
                     room_id, stream_position=since_token, types=types,
                     filtered_types=filtered_types,
@@ -729,25 +786,29 @@ class SyncHandler(object):
                     filtered_types=filtered_types,
                 )
 
-                state_at_timeline_start = yield self.store.get_state_ids_for_event(
-                    batch.events[0].event_id, types=types,
-                    filtered_types=filtered_types,
-                )
-
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
                     timeline_start=state_at_timeline_start,
                     previous=state_at_previous_sync,
                     current=current_state_ids,
+                    # we have to include LL members in case LL initial sync missed them
                     lazy_load_members=lazy_load_members,
                 )
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    if types:
+                    if types and batch.events:
+                        # We're returning an incremental sync, with no
+                        # "gap" since the previous sync, so normally there would be
+                        # no state to return.
+                        # But we're lazy-loading, so the client might need some more
+                        # member events to understand the events in this timeline.
+                        # So we fish out all the member events corresponding to the
+                        # timeline here, and then dedupe any redundant ones below.
+
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id, types=types,
-                            filtered_types=filtered_types,
+                            filtered_types=None,  # we only want members!
                         )
 
             if lazy_load_members and not include_redundant_members:
@@ -767,7 +828,7 @@ class SyncHandler(object):
                     logger.debug("filtering state from %r...", state_ids)
                     state_ids = {
                         t: event_id
-                        for t, event_id in state_ids.iteritems()
+                        for t, event_id in iteritems(state_ids)
                         if cache.get(t[1]) != event_id
                     }
                     logger.debug("...to %r", state_ids)
@@ -1568,6 +1629,19 @@ class SyncHandler(object):
             newly_joined_room=newly_joined,
         )
 
+        # When we join the room (or the client requests full_state), we should
+        # send down any existing tags. Usually the user won't have tags in a
+        # newly joined room, unless either a) they've joined before or b) the
+        # tag was added by synapse e.g. for server notice rooms.
+        if full_state:
+            user_id = sync_result_builder.sync_config.user.to_string()
+            tags = yield self.store.get_tags_for_room(user_id, room_id)
+
+            # If there aren't any tags, don't send the empty tags list down
+            # sync
+            if not tags:
+                tags = None
+
         account_data_events = []
         if tags is not None:
             account_data_events.append({
@@ -1596,10 +1670,24 @@ class SyncHandler(object):
         )
 
         summary = {}
+
+        # we include a summary in room responses when we're lazy loading
+        # members (as the client otherwise doesn't have enough info to form
+        # the name itself).
         if (
             sync_config.filter_collection.lazy_load_members() and
             (
+                # we recalulate the summary:
+                #   if there are membership changes in the timeline, or
+                #   if membership has changed during a gappy sync, or
+                #   if this is an initial sync.
                 any(ev.type == EventTypes.Member for ev in batch.events) or
+                (
+                    # XXX: this may include false positives in the form of LL
+                    # members which have snuck into state
+                    batch.limited and
+                    any(t == EventTypes.Member for (t, k) in state)
+                ) or
                 since_token is None
             )
         ):
@@ -1629,6 +1717,16 @@ class SyncHandler(object):
                     unread_notifications["highlight_count"] = notifs["highlight_count"]
 
                 sync_result_builder.joined.append(room_sync)
+
+            if batch.limited and since_token:
+                user_id = sync_result_builder.sync_config.user.to_string()
+                logger.info(
+                    "Incremental gappy sync of %s for user %s with %d state events" % (
+                        room_id,
+                        user_id,
+                        len(state),
+                    )
+                )
         elif room_builder.rtype == "archived":
             room_sync = ArchivedSyncResult(
                 room_id=room_id,
@@ -1722,17 +1820,17 @@ def _calculate_state(
     event_id_to_key = {
         e: key
         for key, e in itertools.chain(
-            timeline_contains.items(),
-            previous.items(),
-            timeline_start.items(),
-            current.items(),
+            iteritems(timeline_contains),
+            iteritems(previous),
+            iteritems(timeline_start),
+            iteritems(current),
         )
     }
 
-    c_ids = set(e for e in current.values())
-    ts_ids = set(e for e in timeline_start.values())
-    p_ids = set(e for e in previous.values())
-    tc_ids = set(e for e in timeline_contains.values())
+    c_ids = set(e for e in itervalues(current))
+    ts_ids = set(e for e in itervalues(timeline_start))
+    p_ids = set(e for e in itervalues(previous))
+    tc_ids = set(e for e in itervalues(timeline_contains))
 
     # If we are lazyloading room members, we explicitly add the membership events
     # for the senders in the timeline into the state block returned by /sync,
@@ -1746,7 +1844,7 @@ def _calculate_state(
 
     if lazy_load_members:
         p_ids.difference_update(
-            e for t, e in timeline_start.iteritems()
+            e for t, e in iteritems(timeline_start)
             if t[0] == EventTypes.Member
         )
 

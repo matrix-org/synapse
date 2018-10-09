@@ -1,1 +1,0 @@
-Fix bug where we resent "limit exceeded" server notices repeatedly

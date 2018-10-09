@@ -1,9 +1,11 @@
 *.pyc
 .*.swp
 *~
+*.lock
 
 .DS_Store
 _trial_temp/
+_trial_temp*/
 logs/
 dbs/
 *.egg
@@ -44,6 +46,7 @@ media_store/
 build/
 venv/
 venv*/
+*venv/
 
 localhost-800*/
 static/client/register/register_config.js

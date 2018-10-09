@@ -118,7 +118,7 @@ class ResourceLimitsServerNotices(object):
                     'body': event_content,
                     'msgtype': ServerNoticeMsgType,
                     'server_notice_type': ServerNoticeLimitReached,
-                    'admin_uri': self._config.admin_uri,
+                    'admin_contact': self._config.admin_contact,
                     'limit_type': event_limit_type
                 }
                 event = yield self._server_notices_manager.send_notice(
@@ -146,11 +146,10 @@ class ResourceLimitsServerNotices(object):
             user_id(str): the user in question
             room_id(str): the server notices room for that user
         """
-        tags = yield self._store.get_tags_for_user(user_id)
-        server_notices_tags = tags.get(room_id)
+        tags = yield self._store.get_tags_for_room(user_id, room_id)
         need_to_set_tag = True
-        if server_notices_tags:
-            if server_notices_tags.get(SERVER_NOTICE_ROOM_TAG):
+        if tags:
+            if SERVER_NOTICE_ROOM_TAG in tags:
                 # tag already present, nothing to do here
                 need_to_set_tag = False
         if need_to_set_tag:

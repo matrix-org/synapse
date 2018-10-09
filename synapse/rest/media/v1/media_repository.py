@@ -20,7 +20,7 @@ import logging
 import os
 import shutil
 
-from six import iteritems
+from six import PY3, iteritems
 from six.moves.urllib import parse as urlparse
 
 import twisted.internet.error
@@ -397,13 +397,13 @@ class MediaRepository(object):
 
             yield finish()
 
-        media_type = headers["Content-Type"][0]
+        media_type = headers[b"Content-Type"][0].decode('ascii')
 
         time_now_ms = self.clock.time_msec()
 
-        content_disposition = headers.get("Content-Disposition", None)
+        content_disposition = headers.get(b"Content-Disposition", None)
         if content_disposition:
-            _, params = cgi.parse_header(content_disposition[0],)
+            _, params = cgi.parse_header(content_disposition[0].decode('ascii'),)
             upload_name = None
 
             # First check if there is a valid UTF-8 filename
@@ -419,9 +419,13 @@ class MediaRepository(object):
                     upload_name = upload_name_ascii
 
             if upload_name:
-                upload_name = urlparse.unquote(upload_name)
+                if PY3:
+                    upload_name = urlparse.unquote(upload_name)
+                else:
+                    upload_name = urlparse.unquote(upload_name.encode('ascii'))
                 try:
-                    upload_name = upload_name.decode("utf-8")
+                    if isinstance(upload_name, bytes):
+                        upload_name = upload_name.decode("utf-8")
                 except UnicodeDecodeError:
                     upload_name = None
         else:
@@ -755,14 +759,15 @@ class MediaRepositoryResource(Resource):
         Resource.__init__(self)
 
         media_repo = hs.get_media_repository()
-        self.putChild("upload", UploadResource(hs, media_repo))
-        self.putChild("download", DownloadResource(hs, media_repo))
-        self.putChild("thumbnail", ThumbnailResource(
+
+        self.putChild(b"upload", UploadResource(hs, media_repo))
+        self.putChild(b"download", DownloadResource(hs, media_repo))
+        self.putChild(b"thumbnail", ThumbnailResource(
             hs, media_repo, media_repo.media_storage,
         ))
-        self.putChild("identicon", IdenticonResource())
+        self.putChild(b"identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
-            self.putChild("preview_url", PreviewUrlResource(
+            self.putChild(b"preview_url", PreviewUrlResource(
                 hs, media_repo, media_repo.media_storage,
             ))
-        self.putChild("config", MediaConfigResource(hs))
+        self.putChild(b"config", MediaConfigResource(hs))

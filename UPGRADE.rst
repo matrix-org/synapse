@@ -18,7 +18,7 @@ instructions that may be required are listed later in this document.
 
    .. code:: bash
 
-       pip install --upgrade --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+       pip install --upgrade --process-dependency-links matrix-synapse
 
        # restart synapse
        synctl restart
@@ -48,11 +48,11 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
-Upgrading to $NEXT_VERSION
+Upgrading to v0.27.3
 ====================
 
 This release expands the anonymous usage stats sent if the opt-in
-``report_stats`` configuration is set to ``true``. We now capture RSS memory 
+``report_stats`` configuration is set to ``true``. We now capture RSS memory
 and cpu use at a very coarse level. This requires administrators to install
 the optional ``psutil`` python module.
 

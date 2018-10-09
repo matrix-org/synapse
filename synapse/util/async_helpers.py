@@ -374,29 +374,25 @@ class ReadWriteLock(object):
         defer.returnValue(_ctx_manager())
 
 
-class DeferredTimeoutError(Exception):
-    """
-    This error is raised by default when a L{Deferred} times out.
-    """
+def _cancelled_to_timed_out_error(value, timeout):
+    if isinstance(value, failure.Failure):
+        value.trap(CancelledError)
+        raise defer.TimeoutError(timeout, "Deferred")
+    return value
 
 
-def add_timeout_to_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
-    """
-    Add a timeout to a deferred by scheduling it to be cancelled after
-    timeout seconds.
+def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
+    """The in built twisted `Deferred.addTimeout` fails to time out deferreds
+    that have a canceller that throws exceptions. This method creates a new
+    deferred that wraps and times out the given deferred, correctly handling
+    the case where the given deferred's canceller throws.
 
-    This is essentially a backport of deferred.addTimeout, which was introduced
-    in twisted 16.5.
-
-    If the deferred gets timed out, it errbacks with a DeferredTimeoutError,
-    unless a cancelable function was passed to its initialization or unless
-    a different on_timeout_cancel callable is provided.
+    NOTE: Unlike `Deferred.addTimeout`, this function returns a new deferred
 
     Args:
-        deferred (defer.Deferred): deferred to be timed out
-        timeout (Number): seconds to time out after
-        reactor (twisted.internet.reactor): the Twisted reactor to use
-
+        deferred (Deferred)
+        timeout (float): Timeout in seconds
+        reactor (twisted.internet.reactor): The twisted reactor to use
         on_timeout_cancel (callable): A callable which is called immediately
             after the deferred times out, and not if this deferred is
             otherwise cancelled before the timeout.
@@ -406,13 +402,26 @@ def add_timeout_to_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
             the timeout.
 
             The default callable (if none is provided) will translate a
-            CancelledError Failure into a DeferredTimeoutError.
+            CancelledError Failure into a defer.TimeoutError.
+
+    Returns:
+        Deferred
     """
+
+    new_d = defer.Deferred()
+
     timed_out = [False]
 
     def time_it_out():
         timed_out[0] = True
-        deferred.cancel()
+
+        try:
+            deferred.cancel()
+        except:   # noqa: E722, if we throw any exception it'll break time outs
+            logger.exception("Canceller failed during timeout")
+
+        if not new_d.called:
+            new_d.errback(defer.TimeoutError(timeout, "Deferred"))
 
     delayed_call = reactor.callLater(timeout, time_it_out)
 
@@ -432,9 +441,14 @@ def add_timeout_to_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
 
     deferred.addBoth(cancel_timeout)
 
+    def success_cb(val):
+        if not new_d.called:
+            new_d.callback(val)
 
-def _cancelled_to_timed_out_error(value, timeout):
-    if isinstance(value, failure.Failure):
-        value.trap(CancelledError)
-        raise DeferredTimeoutError(timeout, "Deferred")
-    return value
+    def failure_cb(val):
+        if not new_d.called:
+            new_d.errback(val)
+
+    deferred.addCallbacks(success_cb, failure_cb)
+
+    return new_d

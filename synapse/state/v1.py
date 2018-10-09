@@ -30,34 +30,6 @@ logger = logging.getLogger(__name__)
 POWER_KEY = (EventTypes.PowerLevels, "")
 
 
-def resolve_events_with_state_map(state_sets, state_map):
-    """
-    Args:
-        state_sets(list): List of dicts of (type, state_key) -> event_id,
-            which are the different state groups to resolve.
-        state_map(dict): a dict from event_id to event, for all events in
-            state_sets.
-
-    Returns
-        dict[(str, str), str]:
-            a map from (type, state_key) to event_id.
-    """
-    if len(state_sets) == 1:
-        return state_sets[0]
-
-    unconflicted_state, conflicted_state = _seperate(
-        state_sets,
-    )
-
-    auth_events = _create_auth_events_from_maps(
-        unconflicted_state, conflicted_state, state_map
-    )
-
-    return _resolve_with_state(
-        unconflicted_state, conflicted_state, auth_events, state_map
-    )
-
-
 @defer.inlineCallbacks
 def resolve_events_with_factory(state_sets, event_map, state_map_factory):
     """
@@ -93,10 +65,15 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
         for event_ids in itervalues(conflicted_state)
         for event_id in event_ids
     )
+    needed_event_count = len(needed_events)
     if event_map is not None:
         needed_events -= set(iterkeys(event_map))
 
-    logger.info("Asking for %d conflicted events", len(needed_events))
+    logger.info(
+        "Asking for %d/%d conflicted events",
+        len(needed_events),
+        needed_event_count,
+    )
 
     # dict[str, FrozenEvent]: a map from state event id to event. Only includes
     # the state events which are in conflict (and those in event_map)
@@ -113,11 +90,16 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
     )
 
     new_needed_events = set(itervalues(auth_events))
+    new_needed_event_count = len(new_needed_events)
     new_needed_events -= needed_events
     if event_map is not None:
         new_needed_events -= set(iterkeys(event_map))
 
-    logger.info("Asking for %d auth events", len(new_needed_events))
+    logger.info(
+        "Asking for %d/%d auth events",
+        len(new_needed_events),
+        new_needed_event_count,
+    )
 
     state_map_new = yield state_map_factory(new_needed_events)
     state_map.update(state_map_new)

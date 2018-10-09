@@ -56,7 +56,7 @@ class ContentRepoResource(resource.Resource):
         # servers.
 
         # TODO: A little crude here, we could do this better.
-        filename = request.path.split('/')[-1]
+        filename = request.path.decode('ascii').split('/')[-1]
         # be paranoid
         filename = re.sub("[^0-9A-z.-_]", "", filename)
 
@@ -78,7 +78,7 @@ class ContentRepoResource(resource.Resource):
             # select private. don't bother setting Expires as all our matrix
             # clients are smart enough to be happy with Cache-Control (right?)
             request.setHeader(
-                "Cache-Control", "public,max-age=86400,s-maxage=86400"
+                b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
             )
 
             d = FileSender().beginFileTransfer(f, request)

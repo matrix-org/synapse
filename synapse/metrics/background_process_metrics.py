@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import threading
 
 import six
@@ -22,6 +23,9 @@ from prometheus_client.core import REGISTRY, Counter, GaugeMetricFamily
 from twisted.internet import defer
 
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+
+logger = logging.getLogger(__name__)
+
 
 _background_process_start_count = Counter(
     "synapse_background_process_start_count",
@@ -97,9 +101,13 @@ class _Collector(object):
             labels=["name"],
         )
 
-        # We copy the dict so that it doesn't change from underneath us
+        # We copy the dict so that it doesn't change from underneath us.
+        # We also copy the process lists as that can also change
         with _bg_metrics_lock:
-            _background_processes_copy = dict(_background_processes)
+            _background_processes_copy = {
+                k: list(v)
+                for k, v in six.iteritems(_background_processes)
+            }
 
         for desc, processes in six.iteritems(_background_processes_copy):
             background_process_in_flight_count.add_metric(
@@ -191,6 +199,8 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
             try:
                 yield func(*args, **kwargs)
+            except Exception:
+                logger.exception("Background process '%s' threw an exception", desc)
             finally:
                 proc.update_metrics()
 

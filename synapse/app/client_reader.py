@@ -74,10 +74,7 @@ class ClientReaderSlavedStore(
 
 
 class ClientReaderServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = ClientReaderSlavedStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = ClientReaderSlavedStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -156,7 +153,7 @@ def start(config_options):
             "Synapse client reader", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.client_reader"
@@ -184,7 +181,6 @@ def start(config_options):
     ss.start_listening(config.worker_listeners)
 
     def start():
-        ss.get_state_handler().start_caching()
         ss.get_datastore().start_profiling()
 
     reactor.callWhenRunning(start)

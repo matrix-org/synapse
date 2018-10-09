@@ -226,7 +226,7 @@ class Filtering(object):
             jsonschema.validate(user_filter_json, USER_FILTER_SCHEMA,
                                 format_checker=FormatChecker())
         except jsonschema.ValidationError as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
 
 class FilterCollection(object):
@@ -251,6 +251,7 @@ class FilterCollection(object):
             "include_leave", False
         )
         self.event_fields = filter_json.get("event_fields", [])
+        self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
