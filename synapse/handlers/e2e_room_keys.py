@@ -15,6 +15,7 @@
 
 import logging
 
+from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.errors import RoomKeysVersionError, StoreError, SynapseError
@@ -137,8 +138,8 @@ class E2eRoomKeysHandler(object):
 
             # go through the room_keys.
             # XXX: this should/could be done concurrently, given we're in a lock.
-            for room_id, room in room_keys['rooms'].iteritems():
-                for session_id, session in room['sessions'].iteritems():
+            for room_id, room in iteritems(room_keys['rooms']):
+                for session_id, session in iteritems(room['sessions']):
                     yield self._upload_room_key(
                         user_id, version, room_id, session_id, session
                     )
