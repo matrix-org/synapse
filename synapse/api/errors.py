@@ -344,7 +344,7 @@ class IncompatibleRoomVersionError(SynapseError):
         return cs_error(
             self.msg,
             self.errcode,
-            room_version=self.current_version,
+            room_version=self._room_version,
         )
 
 
