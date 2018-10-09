@@ -20,6 +20,8 @@ import logging
 
 from six import iteritems, itervalues
 
+from prometheus_client import Counter
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -35,6 +37,13 @@ from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
+
+
+# Counts the number of times we got asked for a lazy loaded sync. Type is one of
+# initial_sync, full_sate_sync or incremental_sync
+lazy_member_sync_counter = Counter(
+    "synapse_handlers_sync_lazy_member_sync", "", ["type"],
+)
 
 # Store the cache that tracks which lazy-loaded members have been sent to a given
 # client for no more than 30 minutes.
@@ -227,14 +236,19 @@ class SyncHandler(object):
     @defer.inlineCallbacks
     def _wait_for_sync_for_user(self, sync_config, since_token, timeout,
                                 full_state):
+        if since_token is None:
+            sync_type = "initial_sync"
+        elif full_state:
+            sync_type = "full_state_sync"
+        else:
+            sync_type = "incremental_sync"
+
         context = LoggingContext.current_context()
         if context:
-            if since_token is None:
-                context.tag = "initial_sync"
-            elif full_state:
-                context.tag = "full_state_sync"
-            else:
-                context.tag = "incremental_sync"
+            context.tag = sync_type
+
+        if sync_config.filter_collection.lazy_load_members():
+            lazy_member_sync_counter.labels(sync_type).inc()
 
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
