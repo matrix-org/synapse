@@ -16,6 +16,7 @@
 import logging
 
 from six import iteritems
+
 from twisted.internet import defer
 
 from synapse.api.errors import RoomKeysVersionError, StoreError, SynapseError
