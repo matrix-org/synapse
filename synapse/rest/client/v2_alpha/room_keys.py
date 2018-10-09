@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
