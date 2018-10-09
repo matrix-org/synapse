@@ -155,10 +155,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
 
         if user_level < invite_level:
             raise AuthError(
-                403, (
-                    "You cannot issue a third party invite for %s." %
-                    (event.content.display_name,)
-                )
+                403, "You don't have permission to invite users",
             )
         else:
             logger.debug("Allowing! %s", event)
@@ -305,7 +302,7 @@ def _is_membership_change_allowed(event, auth_events):
 
             if user_level < invite_level:
                 raise AuthError(
-                    403, "You cannot invite user %s." % target_user_id
+                    403, "You don't have permission to invite users",
                 )
     elif Membership.JOIN == membership:
         # Joins are valid iff caller == target and they were:
