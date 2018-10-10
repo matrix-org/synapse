@@ -322,7 +322,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def _get_state_groups_from_groups(self, groups, types, members=None):
+    def _get_state_groups_from_groups(self, groups, types):
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
@@ -331,9 +331,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             types (Iterable[str, str|None]|None): list of 2-tuples of the form
                 (`type`, `state_key`), where a `state_key` of `None` matches all
                 state_keys for the `type`. If None, all types are returned.
-            members (bool|None): If not None, then, in addition to any filtering
-                implied by types, the results are also filtered to only include
-                member events (if True), or to exclude member events (if False)
 
         Returns:
         Returns:
@@ -346,14 +343,14 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         for chunk in chunks:
             res = yield self.runInteraction(
                 "_get_state_groups_from_groups",
-                self._get_state_groups_from_groups_txn, chunk, types, members,
+                self._get_state_groups_from_groups_txn, chunk, types,
             )
             results.update(res)
 
         defer.returnValue(results)
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, types=None, members=None,
+        self, txn, groups, types=None,
     ):
         results = {group: {} for group in groups}
 
@@ -390,11 +387,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 )
                 %s
             """)
-
-            if members is True:
-                sql += " AND type = '%s'" % (EventTypes.Member,)
-            elif members is False:
-                sql += " AND type <> '%s'" % (EventTypes.Member,)
 
             # Turns out that postgres doesn't like doing a list of OR's and
             # is about 1000x slower, so we just issue a query for each specific
@@ -442,11 +434,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 where_clause = "AND (%s)" % (" OR ".join(where_clauses))
             else:
                 where_clause = ""
-
-            if members is True:
-                where_clause += " AND type = '%s'" % EventTypes.Member
-            elif members is False:
-                where_clause += " AND type <> '%s'" % EventTypes.Member
 
             # We don't use WITH RECURSIVE on sqlite3 as there are distributions
             # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
@@ -750,8 +737,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
 
-        # First, lets split up the types and filtered types into non-member vs
-        # member sets.
+        # First, let's split up the types into non-member vs member sets.
         if types is not None:
             non_member_types = [t for t in types if t[0] != EventTypes.Member]
 
@@ -766,16 +752,18 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             member_types = None
 
         # Now we look them up in the member and non-member caches
-        r_nm = yield self._get_state_for_groups_using_cache(
-            groups, self._state_group_cache, non_member_types, filtered_types,
+        non_member_state, incomplete_groups_nm, = (
+            yield self._get_state_for_groups_using_cache(
+                groups, self._state_group_cache, non_member_types, filtered_types,
+            )
         )
-        non_member_state, missing_groups_nm, = r_nm
 
-        r_m = yield self._get_state_for_groups_using_cache(
-            # we set filtered_types=None as member_state only ever contain members.
-            groups, self._state_group_members_cache, member_types, None,
+        member_state, incomplete_groups_m, = (
+            yield self._get_state_for_groups_using_cache(
+                # we set filtered_types=None as member_state only ever contain members.
+                groups, self._state_group_members_cache, member_types, None,
+            )
         )
-        member_state, missing_groups_m, = r_m
 
         state = non_member_state
         for group in groups:
@@ -783,9 +771,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         # Now fetch any missing groups from the database
 
-        missing_groups = missing_groups_m | missing_groups_nm
+        incomplete_groups = incomplete_groups_m | incomplete_groups_nm
 
-        if missing_groups:
+        if incomplete_groups:
             cache_sequence_nm = self._state_group_cache.sequence
             cache_sequence_m = self._state_group_members_cache.sequence
 
@@ -812,7 +800,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 ]
 
             group_to_state_dict = yield self._get_state_groups_from_groups(
-                list(missing_groups), types_to_fetch,
+                list(incomplete_groups), types_to_fetch,
             )
 
             # Now lets update the caches
@@ -870,14 +858,15 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 If None, `types` filtering is applied to all events.
 
         Returns:
-            tuple[dict[int, dict[tuple[str, str], str]], set[dict]]: Tuple of
+            tuple[dict[int, dict[tuple[str, str], str]], set[int]]: Tuple of
             dict of state_group_id -> (dict of (type, state_key) -> event id)
-            of entries in the cache, and the state groups missing from the cache
+            of entries in the cache, and the state group ids either missing
+            from the cache or incomplete.
         """
         if types:
             types = frozenset(types)
         results = {}
-        missing_groups = set()
+        incomplete_groups = set()
         if types is not None:
             for group in set(groups):
                 state_dict_ids, got_all = self._get_some_state_from_cache(
@@ -886,7 +875,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 results[group] = state_dict_ids
 
                 if not got_all:
-                    missing_groups.add(group)
+                    incomplete_groups.add(group)
         else:
             for group in set(groups):
                 state_dict_ids, got_all = self._get_all_state_from_cache(
@@ -896,9 +885,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 results[group] = state_dict_ids
 
                 if not got_all:
-                    missing_groups.add(group)
+                    incomplete_groups.add(group)
 
-        return results, missing_groups
+        return results, incomplete_groups
 
     def _insert_into_cache(self, cache, cache_seq_num, existing_state,
                            group_to_state_dict, types_fetched):
@@ -931,8 +920,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             else:
                 state_dict.update(group_state_dict)
 
-            # update the cache with all the things we fetched from the
-            # database.
             cache.update(
                 cache_seq_num,
                 key=group,
