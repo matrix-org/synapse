@@ -44,7 +44,11 @@ logger = logging.getLogger(__name__)
 # "true" or "false" depending on if the request asked for lazy loaded members or
 # not.
 non_empty_sync_counter = Counter(
-    "synapse_handlers_sync_nonempty_total", "", ["type", "lazy_loaded"],
+    "synapse_handlers_sync_nonempty_total",
+    "Count of non empty sync responses. type is initial_sync/full_state_sync"
+    "/incremental_sync. lazy_loaded indicates if lazy loaded members were "
+    "enabled for that request.",
+    ["type", "lazy_loaded"],
 )
 
 # Store the cache that tracks which lazy-loaded members have been sent to a given
