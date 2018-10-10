@@ -72,6 +72,10 @@ class UserDirectoryHandler(object):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
+        logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        logger.info(self.update_user_directory)
+        logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
         if self.update_user_directory:
             self.notifier.add_replication_callback(self.notify_new_event)
 
