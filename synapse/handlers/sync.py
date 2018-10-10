@@ -40,9 +40,9 @@ logger = logging.getLogger(__name__)
 
 
 # Counts the number of times we got asked for a lazy loaded sync. Type is one of
-# initial_sync, full_sate_sync or incremental_sync
+# initial_sync, full_state_sync or incremental_sync
 lazy_member_sync_counter = Counter(
-    "synapse_handlers_sync_lazy_member_sync", "", ["type"],
+    "synapse_handlers_sync_lazy_member_sync_total", "", ["type"],
 )
 
 # Store the cache that tracks which lazy-loaded members have been sent to a given
