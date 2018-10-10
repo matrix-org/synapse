@@ -1,1 +1,1 @@
-Add metric to count lazy member sync requests
+Add metric to count number of non-empty sync responses
