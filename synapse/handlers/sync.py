@@ -39,10 +39,12 @@ from synapse.visibility import filter_events_for_client
 logger = logging.getLogger(__name__)
 
 
-# Counts the number of times we got asked for a lazy loaded sync. Type is one of
-# initial_sync, full_state_sync or incremental_sync
-lazy_member_sync_counter = Counter(
-    "synapse_handlers_sync_lazy_member_sync_total", "", ["type"],
+# Counts the number of times we returned a non-empty sync. `type` is one of
+# "initial_sync", "full_state_sync" or "incremental_sync", `lazy_loaded` is
+# "true" or "false" depending on if the request asked for lazy loaded members or
+# not.
+non_empty_sync_counter = Counter(
+    "synapse_handlers_sync_nonempty_total", "", ["type", "lazy_loaded"],
 )
 
 # Store the cache that tracks which lazy-loaded members have been sent to a given
@@ -247,16 +249,12 @@ class SyncHandler(object):
         if context:
             context.tag = sync_type
 
-        if sync_config.filter_collection.lazy_load_members():
-            lazy_member_sync_counter.labels(sync_type).inc()
-
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
             result = yield self.current_sync_for_user(
                 sync_config, since_token, full_state=full_state,
             )
-            defer.returnValue(result)
         else:
             def current_sync_callback(before_token, after_token):
                 return self.current_sync_for_user(sync_config, since_token)
@@ -265,7 +263,15 @@ class SyncHandler(object):
                 sync_config.user.to_string(), timeout, current_sync_callback,
                 from_token=since_token,
             )
-            defer.returnValue(result)
+
+        if result:
+            if sync_config.filter_collection.lazy_load_members():
+                lazy_loaded = "true"
+            else:
+                lazy_loaded = "false"
+            non_empty_sync_counter.labels(sync_type, lazy_loaded).inc()
+
+        defer.returnValue(result)
 
     def current_sync_for_user(self, sync_config, since_token=None,
                               full_state=False):
