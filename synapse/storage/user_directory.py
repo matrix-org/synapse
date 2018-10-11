@@ -573,12 +573,6 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
     def get_current_state_deltas(self, prev_stream_id):
-
-        logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        logger.info(self._curr_state_delta_stream_cache)
-        logger.info("!!!!!!!!!!!!!!!!!!")
-
-
         prev_stream_id = int(prev_stream_id)
         if not self._curr_state_delta_stream_cache.has_any_entity_changed(prev_stream_id):
             return []
