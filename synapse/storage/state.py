@@ -19,6 +19,8 @@ from collections import namedtuple
 from six import iteritems, itervalues
 from six.moves import range
 
+import attr
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
@@ -46,6 +48,151 @@ class _GetStateGroupDelta(namedtuple("_GetStateGroupDelta", ("prev_group", "delt
 
     def __len__(self):
         return len(self.delta_ids) if self.delta_ids else 0
+
+
+@attr.s(slots=True)
+class StateFilter(object):
+    """A filter used when querying for state.
+
+    The default, `StateFilter()`, is equivalent to no filter.
+
+    Attributes:
+        types (Iterable[str, str|None]|None): list of 2-tuples of the form
+            (`type`, `state_key`), where a `state_key` of `None` matches all
+            state_keys for the `type`. If None, all types are returned.
+        filtered_types(list[str]|None): Only apply filtering via `types` to this
+            list of event types.  Other types of events are returned unfiltered.
+            If None, `types` filtering is applied to all events.
+    """
+
+    types = attr.ib(default=None)
+    filtered_types = attr.ib(default=None)
+
+    def get_member_split(self):
+        """Split the filter into member vs non-member types.
+
+        Returns:
+            tuple[Iterable[str, str|None]|None]: Returns a tuple of member,
+            non-member types in the same format as `types`.
+        """
+        if self.types is not None:
+            non_member_types = [t for t in self.types if t[0] != EventTypes.Member]
+
+            if (self.filtered_types is not None
+                    and EventTypes.Member not in self.filtered_types):
+                # we want all of the membership events
+                member_types = None
+            else:
+                if any(s is None for t, s in self.types if t == EventTypes.Member):
+                    member_types = None
+                else:
+                    member_types = [t for t in self.types if t[0] == EventTypes.Member]
+
+        else:
+            non_member_types = None
+            member_types = None
+
+        return member_types, non_member_types
+
+    def return_expanded(self):
+        """Creates a new StateFilter where type wild cards have been removed
+        (except for memberships). The returned filter is a superset of the
+        current one, i.e. anything that passes the current filter will pass
+        the returned filter.
+
+        This is used to help cache hits when using the DictionaryCache
+
+        Returns:
+            StateFilter
+        """
+        member_types, non_member_types = self.get_member_split()
+
+        get_all_members = member_types is None
+
+        if self.types is not None:
+            get_all_non_members = False
+            for t, s in self.types:
+                if s is None and t != EventTypes.Member:
+                    get_all_non_members = True
+        else:
+            get_all_non_members = True
+
+        if get_all_members:
+            if get_all_non_members:
+                return StateFilter(None, None)
+            else:
+                # self.types can't be None here
+                new_types = list(self.types) + [(EventTypes.Member, None)]
+                return StateFilter(new_types, None)
+        else:
+            if get_all_non_members:
+                return StateFilter(member_types, [EventTypes.Member])
+            else:
+                return self
+
+    def make_sql_filter_clause(self):
+        """Converts the filter to an SQL clause.
+
+        For example:
+
+            f = StateFilter([("m.room.create", "")], None)
+            f.make_sql_filter_clause()
+            f[0] == "(type = ? AND state_key = ?)"
+            f[1] == ['m.room.create', '']
+
+
+        Returns:
+            tuple[str, list]: The SQL string (may be empty) and arguments
+        """
+
+        where_clause = ""
+        where_args = []
+
+        if self.types is None:
+            return where_clause, where_args
+
+        types = set(self.types)
+
+        where_clause = " OR ".join(
+            "(type = ? AND state_key = ?)"
+            if state_key is not None
+            else "(type = ?)"
+            for etype, state_key in types
+        )
+
+        for etype, state_key in types:
+            if state_key is not None:
+                where_args.extend((etype, state_key))
+            else:
+                where_args.append(etype)
+
+        if self.filtered_types is not None:
+            if where_clause:
+                where_clause += " OR "
+            where_clause += "type NOT IN (%s)" % (
+                ",".join(["?"] * len(self.filtered_types)),
+            )
+            where_args.extend(self.filtered_types)
+
+        return where_clause, where_args
+
+    def max_entries_returned(self):
+        """Returns the maximum number of entries this filter will return if
+        known, otherwise returns None.
+
+        For example a simple state filter asking for `("m.room.create", "")`
+        will return 1, whereas the default state filter will return None.
+
+        This is used to bail out early if the right number of entries have been
+        fetched.
+        """
+        if self.types is None or self.filtered_types is not None:
+            return None
+
+        if any(s is None for t, s in self.types):
+            return None
+
+        return len(self.types)
 
 
 # this inherits from EventsWorkerStore because it calls self.get_events
@@ -322,17 +469,13 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def _get_state_groups_from_groups(self, groups, types):
+    def _get_state_groups_from_groups(self, groups, state_filter=StateFilter()):
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
         Args:
             groups(list[int]): list of state group IDs to query
-            types (Iterable[str, str|None]|None): list of 2-tuples of the form
-                (`type`, `state_key`), where a `state_key` of `None` matches all
-                state_keys for the `type`. If None, all types are returned.
-
-        Returns:
+            state_filter (StateFilter)
         Returns:
             Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
@@ -343,19 +486,23 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         for chunk in chunks:
             res = yield self.runInteraction(
                 "_get_state_groups_from_groups",
-                self._get_state_groups_from_groups_txn, chunk, types,
+                self._get_state_groups_from_groups_txn, chunk, state_filter,
             )
             results.update(res)
 
         defer.returnValue(results)
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, types=None,
+        self, txn, groups, state_filter=StateFilter(),
     ):
         results = {group: {} for group in groups}
 
-        if types is not None:
-            types = list(set(types))  # deduplicate types list
+        where_clause, where_args = state_filter.make_sql_filter_clause()
+
+        # Unless the filter clause is empty, we're going to append it after an
+        # existing where clause
+        if where_clause:
+            where_clause = " AND (%s)" % (where_clause,)
 
         if isinstance(self.database_engine, PostgresEngine):
             # Temporarily disable sequential scans in this transaction. This is
@@ -378,7 +525,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                     SELECT prev_state_group FROM state_group_edges e, state s
                     WHERE s.state_group = e.state_group
                 )
-                SELECT type, state_key, last_value(event_id) OVER (
+                SELECT DISTINCT type, state_key, last_value(event_id) OVER (
                     PARTITION BY type, state_key ORDER BY state_group ASC
                     ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                 ) AS event_id FROM state_groups_state
@@ -388,52 +535,17 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 %s
             """)
 
-            # Turns out that postgres doesn't like doing a list of OR's and
-            # is about 1000x slower, so we just issue a query for each specific
-            # type seperately.
-            if types is not None:
-                clause_to_args = [
-                    (
-                        "AND type = ? AND state_key = ?",
-                        (etype, state_key)
-                    ) if state_key is not None else (
-                        "AND type = ?",
-                        (etype,)
-                    )
-                    for etype, state_key in types
-                ]
-            else:
-                # If types is None we fetch all the state, and so just use an
-                # empty where clause with no extra args.
-                clause_to_args = [("", [])]
+            for group in groups:
+                args = [group]
+                args.extend(where_args)
 
-            for where_clause, where_args in clause_to_args:
-                for group in groups:
-                    args = [group]
-                    args.extend(where_args)
-
-                    txn.execute(sql % (where_clause,), args)
-                    for row in txn:
-                        typ, state_key, event_id = row
-                        key = (typ, state_key)
-                        results[group][key] = event_id
+                txn.execute(sql % (where_clause,), args)
+                for row in txn:
+                    typ, state_key, event_id = row
+                    key = (typ, state_key)
+                    results[group][key] = event_id
         else:
-            where_args = []
-            where_clauses = []
-            wildcard_types = False
-            if types is not None:
-                for typ in types:
-                    if typ[1] is None:
-                        where_clauses.append("(type = ?)")
-                        where_args.append(typ[0])
-                        wildcard_types = True
-                    else:
-                        where_clauses.append("(type = ? AND state_key = ?)")
-                        where_args.extend([typ[0], typ[1]])
-
-                where_clause = "AND (%s)" % (" OR ".join(where_clauses))
-            else:
-                where_clause = ""
+            max_entries_returned = state_filter.max_entries_returned()
 
             # We don't use WITH RECURSIVE on sqlite3 as there are distributions
             # that ship with an sqlite3 version that doesn't support it (e.g. wheezy)
@@ -447,8 +559,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                     # without the right indices (which we can't add until
                     # after we finish deduping state, which requires this func)
                     args = [next_group]
-                    if types:
-                        args.extend(where_args)
+                    args.extend(where_args)
 
                     txn.execute(
                         "SELECT type, state_key, event_id FROM state_groups_state"
@@ -468,9 +579,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                     # wildcards (i.e. Nones) in which case we have to do an exhaustive
                     # search
                     if (
-                        types is not None and
-                        not wildcard_types and
-                        len(results[group]) == len(types)
+                        max_entries_returned and
+                        len(results[group]) == max_entries_returned
                     ):
                         break
 
@@ -737,19 +847,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
 
-        # First, let's split up the types into non-member vs member sets.
-        if types is not None:
-            non_member_types = [t for t in types if t[0] != EventTypes.Member]
-
-            if filtered_types is not None and EventTypes.Member not in filtered_types:
-                # we want all of the membership events
-                member_types = None
-            else:
-                member_types = [t for t in types if t[0] == EventTypes.Member]
-
-        else:
-            non_member_types = None
-            member_types = None
+        state_filter = StateFilter(types, filtered_types)
+        member_types, non_member_types = state_filter.get_member_split()
 
         # Now we look them up in the member and non-member caches
         non_member_state, incomplete_groups_nm, = (
@@ -765,7 +864,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             )
         )
 
-        state = non_member_state
+        state = dict(non_member_state)
         for group in groups:
             state[group].update(member_state[group])
 
@@ -773,69 +872,54 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         incomplete_groups = incomplete_groups_m | incomplete_groups_nm
 
-        if incomplete_groups:
-            cache_sequence_nm = self._state_group_cache.sequence
-            cache_sequence_m = self._state_group_members_cache.sequence
+        if not incomplete_groups:
+            defer.returnValue(state)
 
-            # the DictionaryCache knows if it has *all* the state, but
-            # does not know if it has all of the keys of a particular type,
-            # which makes wildcard lookups expensive unless we have a complete
-            # cache. Hence, if we are doing a wildcard lookup, populate the
-            # cache fully so that we can do an efficient lookup next time.
-            if filtered_types or (types and any(k is None for (t, k) in types)):
-                types_to_fetch = None
+        cache_sequence_nm = self._state_group_cache.sequence
+        cache_sequence_m = self._state_group_members_cache.sequence
 
-                # Record what we're fetching, split by member vs non-member, so
-                # we can record that when updating the caches.
-                non_member_types_fetched = None
-                member_types_fetched = None
+        # the DictionaryCache knows if it has *all* the state, but
+        # does not know if it has all of the keys of a particular type,
+        # which makes wildcard lookups expensive unless we have a complete
+        # cache. Hence, if we are doing a wildcard lookup, populate the
+        # cache fully so that we can do an efficient lookup next time.
+        db_state_filter = state_filter.return_expanded()
+
+        group_to_state_dict = yield self._get_state_groups_from_groups(
+            list(incomplete_groups),
+            state_filter=db_state_filter,
+        )
+
+        # Now lets update the caches
+
+        self._insert_into_cache(
+            group_to_state_dict,
+            db_state_filter,
+            cache_seq_num_members=cache_sequence_m,
+            cache_seq_num_non_members=cache_sequence_nm,
+        )
+
+        # And finally update the result dict, by filtering out any extra
+        # stuff we pulled out of the database.
+
+        for group, group_state_dict in iteritems(group_to_state_dict):
+            state_dict = state[group]
+
+            if types:
+                for k, v in iteritems(group_state_dict):
+                    (typ, _) = k
+                    if (
+                        (k in types or (typ, None) in types) or
+                        (filtered_types and typ not in filtered_types)
+                    ):
+                        state_dict[k] = v
             else:
-                types_to_fetch = types
-
-                non_member_types_fetched = [
-                    t for t in types if t[0] != EventTypes.Member
-                ]
-                member_types_fetched = [
-                    t for t in types if t[0] == EventTypes.Member
-                ]
-
-            group_to_state_dict = yield self._get_state_groups_from_groups(
-                list(incomplete_groups), types_to_fetch,
-            )
-
-            # Now lets update the caches
-
-            self._insert_into_cache(
-                self._state_group_cache, cache_sequence_nm, non_member_state,
-                group_to_state_dict, non_member_types_fetched,
-            )
-
-            self._insert_into_cache(
-                self._state_group_members_cache, cache_sequence_m,
-                member_state, group_to_state_dict, member_types_fetched,
-            )
-
-            # And finally update the result dict, by filtering out any extra
-            # stuff we pulled out of the database.
-
-            for group, group_state_dict in iteritems(group_to_state_dict):
-                state_dict = state[group]
-
-                if types:
-                    for k, v in iteritems(group_state_dict):
-                        (typ, _) = k
-                        if (
-                            (k in types or (typ, None) in types) or
-                            (filtered_types and typ not in filtered_types)
-                        ):
-                            state_dict[k] = v
-                else:
-                    state_dict.update(group_state_dict)
+                state_dict.update(group_state_dict)
 
         defer.returnValue(state)
 
     def _get_state_for_groups_using_cache(
-        self, groups, cache, types=None, filtered_types=None
+        self, groups, cache, types=None, filtered_types=None,
     ):
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key, querying from a specific cache.
@@ -889,42 +973,45 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return results, incomplete_groups
 
-    def _insert_into_cache(self, cache, cache_seq_num, existing_state,
-                           group_to_state_dict, types_fetched):
+    def _insert_into_cache(self, group_to_state_dict, state_filter,
+                           cache_seq_num_members, cache_seq_num_non_members):
         """Inserts results from querying the database into the relevant cache.
 
         Args:
-            cache (DictionaryCache)
-            cache_seq_num (int): Sequence number of cache since last lookup in cache
-            existing_state (dict): The existing entries in the cache. Map from
-                state group to state dict.
             group_to_state_dict (dict): The new entries pulled from database.
                 Map from state group to state dict
-            types_fetched (None|iterable[(str, None|str)]):
-                indicates the state type/keys fetched from database. If None,
-                the whole state was fetched.
-
-                Otherwise, each entry should be a `(type, state_key)` tuple. A
-                `state_key` of None is a wildcard meaning that we fetched all
-                state with that type.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
+            cache_seq_num_members (int): Sequence number of member cache since
+                last lookup in cache
+            cache_seq_num_non_members (int): Sequence number of member cache since
+                last lookup in cache
         """
 
+        member_types, non_member_types = state_filter.get_member_split()
+
         for group, group_state_dict in iteritems(group_to_state_dict):
-            state_dict = dict(existing_state[group])
+            state_dict_members = {}
+            state_dict_non_members = {}
 
-            if types_fetched is not None:
-                for k, v in iteritems(group_state_dict):
-                    (typ, _) = k
-                    if k in types_fetched or (typ, None) in types_fetched:
-                        state_dict[k] = v
-            else:
-                state_dict.update(group_state_dict)
+            for k, v in iteritems(group_state_dict):
+                if k[0] == EventTypes.Member:
+                    state_dict_members[k] = v
+                else:
+                    state_dict_non_members[k] = v
 
-            cache.update(
-                cache_seq_num,
+            self._state_group_members_cache.update(
+                cache_seq_num_members,
                 key=group,
-                value=state_dict,
-                fetched_keys=types_fetched,
+                value=state_dict_members,
+                fetched_keys=member_types,
+            )
+
+            self._state_group_cache.update(
+                cache_seq_num_non_members,
+                key=group,
+                value=state_dict_non_members,
+                fetched_keys=non_member_types,
             )
 
     def store_state_group(self, event_id, room_id, prev_group, delta_ids,
@@ -1234,12 +1321,12 @@ class StateStore(StateGroupWorkerStore, BackgroundUpdateStore):
                         continue
 
                     prev_state = self._get_state_groups_from_groups_txn(
-                        txn, [prev_group], types=None
+                        txn, [prev_group],
                     )
                     prev_state = prev_state[prev_group]
 
                     curr_state = self._get_state_groups_from_groups_txn(
-                        txn, [state_group], types=None
+                        txn, [state_group],
                     )
                     curr_state = curr_state[state_group]
 
