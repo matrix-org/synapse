@@ -85,7 +85,7 @@ def start_reactor(
             logger.info("Running")
             if cpu_affinity is not None:
                 # Turn the bitmask into bits, reverse it so we go from 0 up
-                mask_to_bits = bin(int(cpu_affinity, 16))[2:].reverse()
+                mask_to_bits = bin(cpu_affinity)[2:].reverse()
 
                 cpus = []
                 cpu_num = 0
