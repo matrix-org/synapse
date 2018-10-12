@@ -32,7 +32,7 @@ from synapse.api.constants import (
     JoinRules,
     RoomCreationPreset,
 )
-from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
@@ -97,9 +97,11 @@ class RoomCreationHandler(BaseHandler):
 
         with (yield self._upgrade_linearizer.queue(old_room_id)):
             # start by allocating a new room id
-            is_public = False  # XXX fixme
+            r = yield self.store.get_room(old_room_id)
+            if r is None:
+                raise NotFoundError("Unknown room id %s" % (old_room_id,))
             new_room_id = yield self._generate_room_id(
-                creator_id=user_id, is_public=is_public,
+                creator_id=user_id, is_public=r["is_public"],
             )
 
             # we create and auth the tombstone event before properly creating the new
