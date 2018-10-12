@@ -630,7 +630,21 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_all_new_events_stream(self, from_id, current_id, limit):
-        """Get all new events"""
+        """Get all new events
+
+         Returns all events with from_id < stream_ordering <= current_id.
+
+         Args:
+             from_id (int):  the stream_ordering of the last event we processed
+             current_id (int):  the stream_ordering of the most recently processed event
+             limit (int): the maximum number of events to return
+
+         Returns:
+             Deferred[Tuple[int, list[FrozenEvent]]]: A tuple of (next_id, events), where
+             `next_id` is the next value to pass as `from_id` (it will either be the
+             stream_ordering of the last returned event, or, if fewer than `limit` events
+             were found, `current_id`.
+         """
 
         def get_all_new_events_stream_txn(txn):
             sql = (

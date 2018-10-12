@@ -20,6 +20,8 @@ import logging
 
 from six import iteritems, itervalues
 
+from prometheus_client import Counter
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -35,6 +37,19 @@ from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
+
+
+# Counts the number of times we returned a non-empty sync. `type` is one of
+# "initial_sync", "full_state_sync" or "incremental_sync", `lazy_loaded` is
+# "true" or "false" depending on if the request asked for lazy loaded members or
+# not.
+non_empty_sync_counter = Counter(
+    "synapse_handlers_sync_nonempty_total",
+    "Count of non empty sync responses. type is initial_sync/full_state_sync"
+    "/incremental_sync. lazy_loaded indicates if lazy loaded members were "
+    "enabled for that request.",
+    ["type", "lazy_loaded"],
+)
 
 # Store the cache that tracks which lazy-loaded members have been sent to a given
 # client for no more than 30 minutes.
@@ -227,14 +242,16 @@ class SyncHandler(object):
     @defer.inlineCallbacks
     def _wait_for_sync_for_user(self, sync_config, since_token, timeout,
                                 full_state):
+        if since_token is None:
+            sync_type = "initial_sync"
+        elif full_state:
+            sync_type = "full_state_sync"
+        else:
+            sync_type = "incremental_sync"
+
         context = LoggingContext.current_context()
         if context:
-            if since_token is None:
-                context.tag = "initial_sync"
-            elif full_state:
-                context.tag = "full_state_sync"
-            else:
-                context.tag = "incremental_sync"
+            context.tag = sync_type
 
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
@@ -242,7 +259,6 @@ class SyncHandler(object):
             result = yield self.current_sync_for_user(
                 sync_config, since_token, full_state=full_state,
             )
-            defer.returnValue(result)
         else:
             def current_sync_callback(before_token, after_token):
                 return self.current_sync_for_user(sync_config, since_token)
@@ -251,7 +267,15 @@ class SyncHandler(object):
                 sync_config.user.to_string(), timeout, current_sync_callback,
                 from_token=since_token,
             )
-            defer.returnValue(result)
+
+        if result:
+            if sync_config.filter_collection.lazy_load_members():
+                lazy_loaded = "true"
+            else:
+                lazy_loaded = "false"
+            non_empty_sync_counter.labels(sync_type, lazy_loaded).inc()
+
+        defer.returnValue(result)
 
     def current_sync_for_user(self, sync_config, since_token=None,
                               full_state=False):

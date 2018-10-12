@@ -280,7 +280,7 @@ def main():
             if worker.cache_factor:
                 os.environ["SYNAPSE_CACHE_FACTOR"] = str(worker.cache_factor)
 
-            for cache_name, factor in worker.cache_factors.iteritems():
+            for cache_name, factor in iteritems(worker.cache_factors):
                 os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
             start_worker(worker.app, configfile, worker.configfile)

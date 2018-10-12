@@ -82,9 +82,6 @@ CONDITIONAL_REQUIREMENTS = {
     "psutil": {
         "psutil>=2.0.0": ["psutil>=2.0.0"],
     },
-    "affinity": {
-        "affinity": ["affinity"],
-    },
     "postgres": {
         "psycopg2>=2.6": ["psycopg2"]
     }
