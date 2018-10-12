@@ -296,13 +296,17 @@ class MatrixFederationHttpClient(object):
                 try:
                     json = request.get_json()
                     if json:
-                        data = encode_canonical_json(json)
                         headers_dict["Content-Type"] = ["application/json"]
                         self.sign_request(
                             destination, method, http_url, headers_dict, json
                         )
+                        data = encode_canonical_json(json)
+                        producer = FileBodyProducer(
+                            BytesIO(data),
+                            cooperator=self._cooperator,
+                        )
                     else:
-                        data = None
+                        producer = None
                         self.sign_request(destination, method, http_url, headers_dict)
 
                     logger.info(
@@ -310,22 +314,13 @@ class MatrixFederationHttpClient(object):
                         request.txn_id, destination, method, url
                     )
 
-                    if data:
-                        producer = FileBodyProducer(
-                            BytesIO(data),
-                            cooperator=self._cooperator
-                        )
-                    else:
-                        producer = None
-
-                    request_deferred = treq.request(
+                    # we don't want all the fancy cookie and redirect handling that
+                    # treq.request gives: just use the raw Agent.
+                    request_deferred = self.agent.request(
                         method,
                         url,
                         headers=Headers(headers_dict),
-                        data=producer,
-                        agent=self.agent,
-                        reactor=self.hs.get_reactor(),
-                        unbuffered=True
+                        bodyProducer=producer,
                     )
 
                     request_deferred = timeout_deferred(
