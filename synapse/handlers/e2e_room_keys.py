@@ -53,7 +53,8 @@ class E2eRoomKeysHandler(object):
             user_id(str): the user whose keys we're getting
             version(str): the version ID of the backup we're getting keys from
             room_id(string): room ID to get keys for, for None to get keys for all rooms
-            session_id(string): session ID to get keys for, for None to get keys for all sessions
+            session_id(string): session ID to get keys for, for None to get keys for all
+                sessions
         Returns:
             A deferred list of dicts giving the session_data and message metadata for
             these room keys.
@@ -80,8 +81,10 @@ class E2eRoomKeysHandler(object):
         Args:
             user_id(str): the user whose backup we're deleting
             version(str): the version ID of the backup we're deleting
-            room_id(string): room ID to delete keys for, for None to delete keys for all rooms
-            session_id(string): session ID to delete keys for, for None to delete keys for all sessions
+            room_id(string): room ID to delete keys for, for None to delete keys for all
+                rooms
+            session_id(string): session ID to delete keys for, for None to delete keys
+                for all sessions
         Returns:
             A deferred of the deletion transaction
         """
@@ -138,7 +141,9 @@ class E2eRoomKeysHandler(object):
             if version_info['version'] != version:
                 # Check that the version we're trying to upload actually exists
                 try:
-                    version_info = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+                    version_info = yield self.store.get_e2e_room_keys_version_info(
+                        user_id, version,
+                    )
                     # if we get this far, the version must exist
                     raise RoomKeysVersionError(current_version=version_info['version'])
                 except StoreError as e:
