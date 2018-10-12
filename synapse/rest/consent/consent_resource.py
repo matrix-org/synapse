@@ -30,7 +30,7 @@ from twisted.web.server import NOT_DONE_YET
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
 from synapse.http.server import finish_request, wrap_html_request_handler
-from synapse.http.servlet import parse_string, parse_boolean
+from synapse.http.servlet import parse_string
 from synapse.types import UserID
 
 # language to use for the templates. TODO: figure this out from Accept-Language
@@ -137,16 +137,12 @@ class ConsentResource(Resource):
             request (twisted.web.http.Request):
         """
 
-        public_version = parse_boolean(request, "public", default=False)
-
-        version = self._default_consent_version
-        username = None
+        version = parse_string(request, "v", default=self._default_consent_version)
+        username = parse_string(request, "u", required=False, default="")
         userhmac = None
         has_consented = False
+        public_version = username != ""
         if not public_version:
-            version = parse_string(request, "v",
-                                default=self._default_consent_version)
-            username = parse_string(request, "u", required=True)
             userhmac = parse_string(request, "h", required=True, encoding=None)
 
             self._check_hash(username, userhmac)
