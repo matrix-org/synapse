@@ -339,9 +339,7 @@ class RoomKeysVersionServlet(RestServlet):
             )
         except SynapseError as e:
             if e.code == 404:
-                e.errcode = Codes.NOT_FOUND
-                e.msg = "No backup found"
-                raise e
+                raise SynapseError(404, "No backup found", Codes.NOT_FOUND)
         defer.returnValue((200, info))
 
     @defer.inlineCallbacks
@@ -356,7 +354,7 @@ class RoomKeysVersionServlet(RestServlet):
         {}
         """
         if version is None:
-            raise SynapseError(400, "No version specified to delete")
+            raise SynapseError(400, "No version specified to delete", Codes.NOT_FOUND)
 
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
