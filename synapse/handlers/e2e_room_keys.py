@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2017 New Vector Ltd
+# Copyright 2017, 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,6 +49,11 @@ class E2eRoomKeysHandler(object):
         room, or a given session.
         See EndToEndRoomKeyStore.get_e2e_room_keys for full details.
 
+        Args:
+            user_id(str): the user whose keys we're getting
+            version(str): the version ID of the backup we're getting keys from
+            room_id(string): room ID to get keys for, for None to get keys for all rooms
+            session_id(string): session ID to get keys for, for None to get keys for all sessions
         Returns:
             A deferred list of dicts giving the session_data and message metadata for
             these room keys.
@@ -72,6 +77,11 @@ class E2eRoomKeysHandler(object):
         room or a given session.
         See EndToEndRoomKeyStore.delete_e2e_room_keys for full details.
 
+        Args:
+            user_id(str): the user whose backup we're deleting
+            version(str): the version ID of the backup we're deleting
+            room_id(string): room ID to delete keys for, for None to delete keys for all rooms
+            session_id(string): session ID to delete keys for, for None to delete keys for all sessions
         Returns:
             A deferred of the deletion transaction
         """
@@ -118,24 +128,24 @@ class E2eRoomKeysHandler(object):
 
             # Check that the version we're trying to upload is the current version
             try:
-                version_info = yield self._get_version_info_unlocked(user_id)
+                version_info = yield self.store.get_e2e_room_keys_version_info(user_id)
             except StoreError as e:
                 if e.code == 404:
                     raise SynapseError(404, "Version '%s' not found" % (version,))
                 else:
-                    raise e
+                    raise
 
             if version_info['version'] != version:
                 # Check that the version we're trying to upload actually exists
                 try:
-                    version_info = yield self._get_version_info_unlocked(user_id, version)
+                    version_info = yield self.store.get_e2e_room_keys_version_info(user_id, version)
                     # if we get this far, the version must exist
                     raise RoomKeysVersionError(current_version=version_info['version'])
                 except StoreError as e:
                     if e.code == 404:
                         raise SynapseError(404, "Version '%s' not found" % (version,))
                     else:
-                        raise e
+                        raise
 
             # go through the room_keys.
             # XXX: this should/could be done concurrently, given we're in a lock.
@@ -168,9 +178,9 @@ class E2eRoomKeysHandler(object):
             if e.code == 404:
                 pass
             else:
-                raise e
+                raise
 
-        if E2eRoomKeysHandler._should_replace_room_key(current_room_key, room_key):
+        if self._should_replace_room_key(current_room_key, room_key):
             yield self.store.set_e2e_room_key(
                 user_id, version, room_id, session_id, room_key
             )
@@ -195,14 +205,14 @@ class E2eRoomKeysHandler(object):
             # purely for legibility.
 
             if room_key['is_verified'] and not current_room_key['is_verified']:
-                pass
+                return True
             elif (
                 room_key['first_message_index'] <
                 current_room_key['first_message_index']
             ):
-                pass
+                return True
             elif room_key['forwarded_count'] < current_room_key['forwarded_count']:
-                pass
+                return True
             else:
                 return False
         return True
@@ -256,17 +266,8 @@ class E2eRoomKeysHandler(object):
         """
 
         with (yield self._upload_linearizer.queue(user_id)):
-            res = yield self._get_version_info_unlocked(user_id, version)
+            res = yield self.store.get_e2e_room_keys_version_info(user_id, version)
             defer.returnValue(res)
-
-    @defer.inlineCallbacks
-    def _get_version_info_unlocked(self, user_id, version=None):
-        """Get the info about a given version of the user's backup
-        without obtaining the upload_linearizer lock.  For params see get_version_info
-        """
-
-        results = yield self.store.get_e2e_room_keys_version_info(user_id, version)
-        defer.returnValue(results)
 
     @defer.inlineCallbacks
     def delete_version(self, user_id, version=None):

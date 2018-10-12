@@ -348,14 +348,6 @@ class IncompatibleRoomVersionError(SynapseError):
         )
 
 
-def cs_exception(exception):
-    if isinstance(exception, CodeMessageException):
-        return exception.error_dict()
-    else:
-        logger.error("Unknown exception type: %s", type(exception))
-        return {}
-
-
 def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
     """ Utility method for constructing an error response for client-server
     interactions.
