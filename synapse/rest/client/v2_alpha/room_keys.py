@@ -240,9 +240,9 @@ class RoomKeysServlet(RestServlet):
         defer.returnValue((200, {}))
 
 
-class RoomKeysVersionServlet(RestServlet):
+class RoomKeysNewVersionServlet(RestServlet):
     PATTERNS = client_v2_patterns(
-        "/room_keys/version(/(?P<version>[^/]+))?$"
+        "/room_keys/version$"
     )
 
     def __init__(self, hs):
@@ -250,12 +250,12 @@ class RoomKeysVersionServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysVersionServlet, self).__init__()
+        super(RoomKeysNewVersionServlet, self).__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
     @defer.inlineCallbacks
-    def on_POST(self, request, version):
+    def on_POST(self, request):
         """
         Create a new backup version for this user's room_keys with the given
         info.  The version is allocated by the server and returned to the user
@@ -285,10 +285,6 @@ class RoomKeysVersionServlet(RestServlet):
             "version": 12345
         }
         """
-
-        if version:
-            raise SynapseError(405, "Cannot POST to a specific version")
-
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         info = parse_json_object_from_request(request)
@@ -300,6 +296,20 @@ class RoomKeysVersionServlet(RestServlet):
 
     # we deliberately don't have a PUT /version, as these things really should
     # be immutable to avoid people footgunning
+
+class RoomKeysVersionServlet(RestServlet):
+    PATTERNS = client_v2_patterns(
+        "/room_keys/version(/(?P<version>[^/]+))?$"
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(RoomKeysVersionServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, version):
@@ -320,7 +330,6 @@ class RoomKeysVersionServlet(RestServlet):
             "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
         }
         """
-
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
@@ -346,6 +355,8 @@ class RoomKeysVersionServlet(RestServlet):
         HTTP/1.1 200 OK
         {}
         """
+        if version is None:
+            raise SynapseError(400, "No version specified to delete")
 
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
@@ -359,3 +370,4 @@ class RoomKeysVersionServlet(RestServlet):
 def register_servlets(hs, http_server):
     RoomKeysServlet(hs).register(http_server)
     RoomKeysVersionServlet(hs).register(http_server)
+    RoomKeysNewVersionServlet(hs).register(http_server)
