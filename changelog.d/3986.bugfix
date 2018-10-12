@@ -1,1 +1,0 @@
-Fix lazy loaded sync in the presence of rejected state events
