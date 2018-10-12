@@ -297,6 +297,7 @@ class RoomKeysNewVersionServlet(RestServlet):
     # we deliberately don't have a PUT /version, as these things really should
     # be immutable to avoid people footgunning
 
+
 class RoomKeysVersionServlet(RestServlet):
     PATTERNS = client_v2_patterns(
         "/room_keys/version(/(?P<version>[^/]+))?$"
