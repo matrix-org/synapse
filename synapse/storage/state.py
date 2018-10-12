@@ -83,6 +83,8 @@ class StateFilter(object):
                 # we want all of the membership events
                 member_types = None
             else:
+                # Check if there is a ("m.room.member", None) entry, if there
+                # is we can just return None.
                 if any(s is None for t, s in self.types if t == EventTypes.Member):
                     member_types = None
                 else:
@@ -109,25 +111,27 @@ class StateFilter(object):
 
         get_all_members = member_types is None
 
-        if self.types is not None:
-            get_all_non_members = False
-            for t, s in self.types:
-                if s is None and t != EventTypes.Member:
-                    get_all_non_members = True
+        if non_member_types is not None:
+            get_all_non_members = any(s is None for t, s in non_member_types)
         else:
             get_all_non_members = True
 
         if get_all_members:
             if get_all_non_members:
-                return StateFilter(None, None)
+                # We want to return everything.
+                return StateFilter()
             else:
-                # self.types can't be None here
-                new_types = list(self.types) + [(EventTypes.Member, None)]
+                # We want to return all members, but only the specified types
+                # (non_member_types can't be None here)
+                new_types = list(non_member_types) + [(EventTypes.Member, None)]
                 return StateFilter(new_types, None)
         else:
             if get_all_non_members:
+                # We want to return all non-members, but only particular
+                # memberships
                 return StateFilter(member_types, [EventTypes.Member])
             else:
+                # There aren't any wildcards in play, so nothing to do
                 return self
 
     def make_sql_filter_clause(self):
@@ -193,6 +197,30 @@ class StateFilter(object):
             return None
 
         return len(self.types)
+
+    def filter_state(self, state_dict):
+        """Returns the state filtered with by this StateFilter
+
+        Args:
+            state (dict[tuple[str, str], Any]): The state map to filter
+
+        Returns:
+            dict[tuple[str, str], Any]: The filtered state map
+        """
+        filtered_state = {}
+        if self.types:
+            for k, v in iteritems(state_dict):
+                typ, _ = k
+
+                if k in self.types or (typ, None) in self.types:
+                    filtered_state[k] = v
+
+                if self.filtered_types and typ not in self.filtered_types:
+                    filtered_state[k] = v
+        else:
+            filtered_state = state_dict
+
+        return filtered_state
 
 
 # this inherits from EventsWorkerStore because it calls self.get_events
@@ -891,7 +919,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         # Now lets update the caches
-
         self._insert_into_cache(
             group_to_state_dict,
             db_state_filter,
@@ -901,20 +928,10 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         # And finally update the result dict, by filtering out any extra
         # stuff we pulled out of the database.
-
         for group, group_state_dict in iteritems(group_to_state_dict):
-            state_dict = state[group]
-
-            if types:
-                for k, v in iteritems(group_state_dict):
-                    (typ, _) = k
-                    if (
-                        (k in types or (typ, None) in types) or
-                        (filtered_types and typ not in filtered_types)
-                    ):
-                        state_dict[k] = v
-            else:
-                state_dict.update(group_state_dict)
+            # We just replace any existing entries, as we will have loaded
+            # everything we need from the database anyway.
+            state[group] = state_filter.filter_state(group_state_dict)
 
         defer.returnValue(state)
 
