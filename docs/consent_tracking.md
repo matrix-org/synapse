@@ -31,7 +31,7 @@ Note that the templates must be stored under a name giving the language of the
 template - currently this must always be `en` (for "English");
 internationalisation support is intended for the future.
 
-The template for the policy itself should be versioned and named according to 
+The template for the policy itself should be versioned and named according to
 the version: for example `1.0.html`. The version of the policy which the user
 has agreed to is stored in the database.
 
@@ -81,9 +81,9 @@ should be a matter of `pip install Jinja2`. On debian, try `apt-get install
 python-jinja2`.
 
 Once this is complete, and the server has been restarted, try visiting
-`https://<server>/_matrix/consent`. If correctly configured, this should give
-an error "Missing string query parameter 'u'". It is now possible to manually
-construct URIs where users can give their consent.
+`https://<server>/_matrix/consent`. If correctly configured, you should see a
+default policy document. It is now possible to manually construct URIs where
+users can give their consent.
 
 ### Constructing the consent URI
 
@@ -104,6 +104,11 @@ query parameters:
 
    This should result in a URI which looks something like:
    `https://<server>/_matrix/consent?u=<user>&h=68a152465a4d...`.
+
+
+Note that not providing a `u` parameter will be interpreted as wanting to view
+the document from an unauthenticated perspective, such as prior to registration.
+Therefore, the `h` parameter is not required in this scenario.
 
 
 Sending users a server notice asking them to agree to the policy
