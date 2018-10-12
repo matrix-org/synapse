@@ -26,6 +26,7 @@ from synapse.api.errors import (
     RegistrationError,
     SynapseError,
 )
+from synapse.config._base import ConfigError
 from synapse.http.client import CaptchaServerHttpClient
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
@@ -222,14 +223,19 @@ class RegistrationHandler(BaseHandler):
         fake_requester = create_requester(user_id)
 
         # try to create the room if we're the first user on the server
+        should_auto_create_rooms = False
         if self.hs.config.autocreate_auto_join_rooms:
             count = yield self.store.count_all_users()
-            auto_create_rooms = count == 1
+            should_auto_create_rooms = count == 1
 
         for r in self.hs.config.auto_join_rooms:
             try:
-                if auto_create_rooms and RoomAlias.is_valid(r):
+                if should_auto_create_rooms:
                     room_creation_handler = self.hs.get_room_creation_handler()
+                    if self.hs.hostname != RoomAlias.from_string(r).domain:
+                        raise ConfigError(
+                            'Cannot create room alias %s, it does not match server domain'
+                        )
                     # create room expects the localpart of the room alias
                     room_alias_localpart = RoomAlias.from_string(r).localpart
                     yield room_creation_handler.create_room(
@@ -531,7 +537,6 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _join_user_to_room(self, requester, room_identifier):
-
         room_id = None
         room_member_handler = self.hs.get_room_member_handler()
         if RoomID.is_valid(room_identifier):

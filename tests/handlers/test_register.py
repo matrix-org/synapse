@@ -47,7 +47,6 @@ class RegistrationTestCase(unittest.TestCase):
             generate_access_token=Mock(return_value='secret')
         )
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
-        # self.hs.handlers = RegistrationHandlers(self.hs)
         self.handler = self.hs.get_handlers().registration_handler
         self.store = self.hs.get_datastore()
         self.hs.config.max_mau_value = 50
@@ -148,9 +147,7 @@ class RegistrationTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
-        self.hs.config.autocreate_auto_join_rooms = True
         self.hs.config.auto_join_rooms = [room_alias_str]
-
         res = yield self.handler.register(localpart='jeff')
         rooms = yield self.store.get_rooms_for_user(res[0])
 
@@ -163,11 +160,27 @@ class RegistrationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_auto_create_auto_join_rooms_with_no_rooms(self):
-        self.hs.config.autocreate_auto_join_rooms = True
         self.hs.config.auto_join_rooms = []
         frank = UserID.from_string("@frank:test")
         res = yield self.handler.register(frank.localpart)
         self.assertEqual(res[0], frank.to_string())
         rooms = yield self.store.get_rooms_for_user(res[0])
+        self.assertEqual(len(rooms), 0)
 
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_where_room_is_another_domain(self):
+        self.hs.config.auto_join_rooms = ["#room:another"]
+        frank = UserID.from_string("@frank:test")
+        res = yield self.handler.register(frank.localpart)
+        self.assertEqual(res[0], frank.to_string())
+        rooms = yield self.store.get_rooms_for_user(res[0])
+        self.assertEqual(len(rooms), 0)
+
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_where_auto_create_is_false(self):
+        self.hs.config.autocreate_auto_join_rooms = False
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+        res = yield self.handler.register(localpart='jeff')
+        rooms = yield self.store.get_rooms_for_user(res[0])
         self.assertEqual(len(rooms), 0)

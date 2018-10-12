@@ -15,6 +15,8 @@
 
 from distutils.util import strtobool
 
+from synapse.config._base import ConfigError
+from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string_with_symbols
 
 from ._base import Config
@@ -44,6 +46,9 @@ class RegistrationConfig(Config):
         )
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
+        for room_alias in self.auto_join_rooms:
+            if not RoomAlias.is_valid(room_alias):
+                raise ConfigError('Invalid auto_join_rooms entry %s' % room_alias)
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
     def default_config(self, **kwargs):
@@ -100,7 +105,11 @@ class RegistrationConfig(Config):
         #auto_join_rooms:
         #    - "#example:example.com"
 
-        # Have first user on server autocreate autojoin rooms
+        # Where auto_join_rooms are specified, setting this flag ensures that the
+        # the rooms exists by creating them when the first user on the
+        # homeserver registers.
+        # Setting to false means that if the rooms are not manually created,
+        # users cannot be auto joined since they do not exist.
         autocreate_auto_join_rooms: true
         """ % locals()
 
