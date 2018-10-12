@@ -179,7 +179,13 @@ class RoomCreationHandler(BaseHandler):
             }
         }
 
-        initial_state = OrderedDict()
+        initial_state = dict()
+
+        old_room_state_ids = yield self.store.get_current_state_ids(old_room_id)
+        pl_event_id = old_room_state_ids.get((EventTypes.PowerLevels, ""))
+        if pl_event_id:
+            pl_event = yield self.store.get_event(pl_event_id)
+            initial_state[(EventTypes.PowerLevels, "")] = pl_event.content
 
         yield self._send_events_for_new_room(
             requester,
