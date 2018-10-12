@@ -1,2 +1,0 @@
-Unit tests can now be run under PostgreSQL in Docker using 
-``test_postgresql.sh``.
