@@ -167,9 +167,6 @@ class RoomCreationHandler(BaseHandler):
         # canonical_alias = None
 
         # XXX create association in directory handler
-        # XXX preset
-
-        preset_config = RoomCreationPreset.PRIVATE_CHAT
 
         creation_content = {
             "room_version": new_room_version,
@@ -181,23 +178,41 @@ class RoomCreationHandler(BaseHandler):
 
         initial_state = dict()
 
-        old_room_state_ids = yield self.store.get_current_state_ids(old_room_id)
-        pl_event_id = old_room_state_ids.get((EventTypes.PowerLevels, ""))
-        if pl_event_id:
-            pl_event = yield self.store.get_event(pl_event_id)
-            initial_state[(EventTypes.PowerLevels, "")] = pl_event.content
+        types_to_copy = (
+            (EventTypes.PowerLevels, ""),
+            (EventTypes.JoinRules, ""),
+            (EventTypes.Name, ""),
+            (EventTypes.Topic, ""),
+            (EventTypes.RoomHistoryVisibility, ""),
+            (EventTypes.GuestAccess, "")
+        )
+
+        old_room_state_ids = yield self.store.get_filtered_current_state_ids(
+            old_room_id, StateFilter.from_types(types_to_copy),
+        )
+        # map from event_id to BaseEvent
+        old_room_state_events = yield self.store.get_events(old_room_state_ids.values())
+
+        for k in types_to_copy:
+            old_event_id = old_room_state_ids.get(k)
+            if old_event_id:
+                old_event = old_room_state_events.get(old_event_id)
+                if old_event:
+                    initial_state[k] = old_event.content
 
         yield self._send_events_for_new_room(
             requester,
             new_room_id,
-            preset_config=preset_config,
+
+            # we expect to override all the presets with initial_state, so this is
+            # somewhat arbitrary.
+            preset_config=RoomCreationPreset.PRIVATE_CHAT,
+
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
         )
 
-        # XXX name
-        # XXX topic
         # XXX invites/joins
         # XXX 3pid invites
         # XXX directory_handler.send_room_alias_update_event
