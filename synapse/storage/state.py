@@ -1044,9 +1044,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     def _is_state_group_referenced(self, txn, state_group):
         """Checks if a given state group is referenced, or is safe to delete.
 
-        A state groups is referenced if it or any of its descendants are
-        pointed at by an event. (A descendant is a group which has the given
-        state_group as a prev group)
+        A state group is referenced if it or any of its descendants are
+        pointed at by an event. (A descendant is a state_group whose chain of
+        prev_groups includes the given state_group.)
         """
 
         # We check this by doing a depth first search to look for any
