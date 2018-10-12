@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import simplejson as json
+import json
 
 from twisted.internet import defer
 
@@ -76,7 +76,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             session_id(str): the session whose room_key we're setting
             room_key(dict): the room_key being set
         Raises:
-            StoreError if stuff goes wrong, probably
+            StoreError
         """
 
         yield self._simple_upsert(
