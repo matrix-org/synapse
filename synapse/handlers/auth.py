@@ -468,11 +468,14 @@ class AuthHandler(BaseHandler):
 
     def _get_params_terms(self):
         return {
-            "policies": [{
-                "name": "Privacy Policy",
+            "policies": {
+                "privacy_policy": {
                 "version": self.hs.config.user_consent_version,
-                "url": "%s/_matrix/consent?public=true" % (self.hs.config.public_baseurl,),
-            }],
+                "en": {
+                    "name": "Privacy Policy",
+                    "url": "%s/_matrix/consent" % (self.hs.config.public_baseurl,),
+                },
+            },
         }
 
     def _auth_dict_for_flows(self, flows, session):
