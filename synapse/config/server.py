@@ -86,6 +86,8 @@ class ServerConfig(Config):
             "mau_trial_days", 0,
         )
 
+        self.autocreate_support_user = config.get('autocreate_support_user', None)
+
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")

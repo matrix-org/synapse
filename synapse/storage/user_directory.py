@@ -86,6 +86,9 @@ class UserDirectoryStore(SQLBaseStore):
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
+        # TODO Filter out support user
+
+
         if isinstance(self.database_engine, PostgresEngine):
             # We weight the loclpart most highly, then display name and finally
             # server name
