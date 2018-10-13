@@ -246,7 +246,8 @@ class RegistrationHandler(BaseHandler):
                         },
                         ratelimit=False,
                     )
-                yield self._join_user_to_room(fake_requester, r)
+                else:
+                    yield self._join_user_to_room(fake_requester, r)
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
