@@ -174,6 +174,12 @@ Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
+Slavi Pantaleev has created an Ansible playbook,
+which installs the offical Docker image of Matrix Synapse
+along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
+For more details, see
+https://github.com/spantaleev/matrix-docker-ansible-deploy
+
 Configuring Synapse
 -------------------
 
