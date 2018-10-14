@@ -219,7 +219,7 @@ def filter_events_for_server(store, server_name, events):
     # Whatever else we do, we need to check for senders which have requested
     # erasure of their data.
     erased_senders = yield store.are_users_erased(
-        e.sender for e in events,
+        (e.sender for e in events),
     )
 
     def redact_disallowed(event, state):
