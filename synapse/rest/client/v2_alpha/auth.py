@@ -158,9 +158,6 @@ class AuthRestServlet(RestServlet):
             defer.returnValue(None)
         elif stagetype == LoginType.TERMS:
             session = request.args['session'][0]
-            authdict = {
-                'session': session,
-            }
 
             html = TERMS_TEMPLATE % {
                 'session': session,

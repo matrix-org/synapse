@@ -359,19 +359,11 @@ class RegisterRestServlet(RestServlet):
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
                 ])
 
+        # Append m.login.terms to all flows if we're requiring consent
         if self.hs.config.block_events_without_consent_error is not None:
             new_flows = []
             for flow in flows:
-                # To only allow registration if completing GDPR auth,
-                # making clients that don't support it use fallback auth.
                 flow.append(LoginType.TERMS)
-
-                # or to duplicate all the flows above with the GDPR flow on the
-                # end so clients that support it can use it but clients that don't
-                # continue to consent via the DM from server notices bot.
-                #new_flows.extend([
-                #    flow + [LoginType.TERMS]
-                #])
             flows.extend(new_flows)
 
         auth_result, params, session_id = yield self.auth_handler.check_auth(
@@ -461,7 +453,7 @@ class RegisterRestServlet(RestServlet):
             )
 
         if auth_result and LoginType.TERMS in auth_result:
-            logger.info("User %s has consented to the privacy policy" % registered_user_id)
+            logger.info("%s has consented to the privacy policy" % registered_user_id)
             yield self.store.user_set_consent_version(
                 registered_user_id, self.hs.config.user_consent_version,
             )
