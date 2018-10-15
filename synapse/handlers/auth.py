@@ -469,11 +469,12 @@ class AuthHandler(BaseHandler):
     def _get_params_terms(self):
         return {
             "policies": {
-                "privacy_policy": {
-                "version": self.hs.config.user_consent_version,
-                "en": {
-                    "name": "Privacy Policy",
-                    "url": "%s/_matrix/consent" % (self.hs.config.public_baseurl,),
+                    "privacy_policy": {
+                    "version": self.hs.config.user_consent_version,
+                    "en": {
+                        "name": "Privacy Policy",
+                        "url": "%s/_matrix/consent" % (self.hs.config.public_baseurl,),
+                    },
                 },
             },
         }
