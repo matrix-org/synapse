@@ -1,3 +1,31 @@
+Synapse 0.33.7rc1 (2018-10-15)
+==============================
+
+Features
+--------
+
+- Add support for end-to-end key backup (MSC1687) ([\#4019](https://github.com/matrix-org/synapse/issues/4019))
+
+
+Bugfixes
+--------
+
+- Fix bug in event persistence logic which caused 'NoneType is not iterable' ([\#3995](https://github.com/matrix-org/synapse/issues/3995))
+- Fix exception in background metrics collection ([\#3996](https://github.com/matrix-org/synapse/issues/3996))
+- Fix exception handling in fetching remote profiles ([\#3997](https://github.com/matrix-org/synapse/issues/3997))
+- Fix handling of rejected threepid invites ([\#3999](https://github.com/matrix-org/synapse/issues/3999))
+- Workers now start on Python 3. ([\#4027](https://github.com/matrix-org/synapse/issues/4027))
+- Synapse now starts on Python 3.7. ([\#4033](https://github.com/matrix-org/synapse/issues/4033))
+
+
+Internal Changes
+----------------
+
+- Log exceptions in looping calls ([\#4008](https://github.com/matrix-org/synapse/issues/4008))
+- Optimisation for serving federation requests ([\#4017](https://github.com/matrix-org/synapse/issues/4017))
+- Add metric to count number of non-empty sync responses ([\#4022](https://github.com/matrix-org/synapse/issues/4022))
+
+
 Synapse 0.33.6 (2018-10-04)
 ===========================
 
