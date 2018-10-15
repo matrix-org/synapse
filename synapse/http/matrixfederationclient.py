@@ -195,7 +195,7 @@ class MatrixFederationHttpClient(object):
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
-        self.version_string = hs.version_string.encode('ascii')
+        self.version_string_bytes = hs.version_string.encode('ascii')
         self.default_timeout = 60
 
         def schedule(x):
@@ -261,8 +261,8 @@ class MatrixFederationHttpClient(object):
             ignore_backoff=ignore_backoff,
         )
 
-        method = request.method
-        destination = request.destination
+        method_bytes = request.method.encode("ascii")
+        destination_bytes = request.destination.encode("ascii")
         path_bytes = request.path.encode("ascii")
         if request.query:
             query_bytes = encode_query_args(request.query)
@@ -270,8 +270,8 @@ class MatrixFederationHttpClient(object):
             query_bytes = b""
 
         headers_dict = {
-            "User-Agent": [self.version_string],
-            "Host": [request.destination],
+            b"User-Agent": [self.version_string_bytes],
+            b"Host": [destination_bytes],
         }
 
         with limiter:
@@ -282,23 +282,25 @@ class MatrixFederationHttpClient(object):
             else:
                 retries_left = MAX_SHORT_RETRIES
 
-            url = urllib.parse.urlunparse((
-                b"matrix", destination.encode("ascii"),
+            url_bytes = urllib.parse.urlunparse((
+                b"matrix", destination_bytes,
                 path_bytes, None, query_bytes, b"",
-            )).decode('ascii')
+            ))
+            url_str = url_bytes.decode('ascii')
 
-            http_url = urllib.parse.urlunparse((
+            url_to_sign_bytes = urllib.parse.urlunparse((
                 b"", b"",
                 path_bytes, None, query_bytes, b"",
-            )).decode('ascii')
+            ))
 
             while True:
                 try:
                     json = request.get_json()
                     if json:
-                        headers_dict["Content-Type"] = ["application/json"]
+                        headers_dict[b"Content-Type"] = [b"application/json"]
                         self.sign_request(
-                            destination, method, http_url, headers_dict, json
+                            destination_bytes, method_bytes, url_to_sign_bytes,
+                            headers_dict, json,
                         )
                         data = encode_canonical_json(json)
                         producer = FileBodyProducer(
@@ -307,18 +309,22 @@ class MatrixFederationHttpClient(object):
                         )
                     else:
                         producer = None
-                        self.sign_request(destination, method, http_url, headers_dict)
+                        self.sign_request(
+                            destination_bytes, method_bytes, url_to_sign_bytes,
+                            headers_dict,
+                        )
 
                     logger.info(
                         "{%s} [%s] Sending request: %s %s",
-                        request.txn_id, destination, method, url
+                        request.txn_id, request.destination, request.method,
+                        url_str,
                     )
 
                     # we don't want all the fancy cookie and redirect handling that
                     # treq.request gives: just use the raw Agent.
                     request_deferred = self.agent.request(
-                        method,
-                        url,
+                        method_bytes,
+                        url_bytes,
                         headers=Headers(headers_dict),
                         bodyProducer=producer,
                     )
@@ -339,9 +345,9 @@ class MatrixFederationHttpClient(object):
                     logger.warn(
                         "{%s} [%s] Request failed: %s %s: %s",
                         request.txn_id,
-                        destination,
-                        method,
-                        url,
+                        request.destination,
+                        request.method,
+                        url_str,
                         _flatten_response_never_received(e),
                     )
 
@@ -361,7 +367,7 @@ class MatrixFederationHttpClient(object):
                         logger.debug(
                             "{%s} [%s] Waiting %ss before re-sending...",
                             request.txn_id,
-                            destination,
+                            request.destination,
                             delay,
                         )
 
@@ -373,7 +379,7 @@ class MatrixFederationHttpClient(object):
             logger.info(
                 "{%s} [%s] Got response headers: %d %s",
                 request.txn_id,
-                destination,
+                request.destination,
                 response.code,
                 response.phrase.decode('ascii', errors='replace'),
             )
@@ -406,8 +412,9 @@ class MatrixFederationHttpClient(object):
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
             url_bytes (bytes): The URI path of the request
-            headers_dict (dict): Dictionary of request headers to append to
-            content (bytes): The body of the request
+            headers_dict (dict[bytes, list[bytes]]): Dictionary of request headers to
+                append to
+            content (object): The body of the request
             destination_is (bytes): As 'destination', but if the destination is an
                 identity server
 
