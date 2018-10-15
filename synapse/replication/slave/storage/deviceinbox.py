@@ -17,7 +17,7 @@ from synapse.storage import DataStore
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
-from ._base import BaseSlavedStore
+from ._base import BaseSlavedStore, __func__
 from ._slaved_id_tracker import SlavedIdTracker
 
 
@@ -43,11 +43,11 @@ class SlavedDeviceInboxStore(BaseSlavedStore):
             expiry_ms=30 * 60 * 1000,
         )
 
-    get_to_device_stream_token = DataStore.get_to_device_stream_token.__func__
-    get_new_messages_for_device = DataStore.get_new_messages_for_device.__func__
-    get_new_device_msgs_for_remote = DataStore.get_new_device_msgs_for_remote.__func__
-    delete_messages_for_device = DataStore.delete_messages_for_device.__func__
-    delete_device_msgs_for_remote = DataStore.delete_device_msgs_for_remote.__func__
+    get_to_device_stream_token = __func__(DataStore.get_to_device_stream_token)
+    get_new_messages_for_device = __func__(DataStore.get_new_messages_for_device)
+    get_new_device_msgs_for_remote = __func__(DataStore.get_new_device_msgs_for_remote)
+    delete_messages_for_device = __func__(DataStore.delete_messages_for_device)
+    delete_device_msgs_for_remote = __func__(DataStore.delete_device_msgs_for_remote)
 
     def stream_positions(self):
         result = super(SlavedDeviceInboxStore, self).stream_positions()
