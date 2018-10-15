@@ -47,8 +47,8 @@ handlers:
         class: logging.handlers.RotatingFileHandler
         formatter: precise
         filename: ${log_file}
-        maxBytes: 104857600
-        backupCount: 10
+        maxBytes: 10485760
+        backupCount: 3
         filters: [context]
     console:
         class: logging.StreamHandler
@@ -56,16 +56,17 @@ handlers:
         filters: [context]
 
 loggers:
+    # log levels are (in this order of verbosity): DEBUG, INFO, ERROR
     synapse:
-        level: INFO
+        level: ERROR
 
     synapse.storage.SQL:
         # beware: increasing this to DEBUG will make synapse log sensitive
         # information such as access tokens.
-        level: INFO
+        level: ERROR
 
 root:
-    level: INFO
+    level: ERROR
     handlers: [file, console]
 """)
 
