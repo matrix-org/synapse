@@ -25,15 +25,6 @@ class RoomListTestCase(tests.unittest.TestCase):
     def setUp(self):
         pass
 
-    def test_check_create_batch_tokens(self):
-        batch_token = RoomListNextBatch(
-            stream_ordering="abcdef",
-            public_room_stream_id="123",
-            current_limit=20,
-            direction_is_forward=True,
-        ).to_token()
-        self.assertEquals(batch_token, "hKFzpmFiY2RlZqFwozEyM6FuFKFkww")
-
     def test_check_read_batch_tokens(self):
         batch_token = RoomListNextBatch(
             stream_ordering="abcdef",
