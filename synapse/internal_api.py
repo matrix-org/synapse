@@ -58,4 +58,4 @@ class InternalApi(object):
                     logger.warn("Error calling %s on %r: %r", event_name, plugin, e)
             else:
                 logger.warn("Error calling %s on %r: Function not callable",
-                    event_name, plugin)
+                            event_name, plugin)

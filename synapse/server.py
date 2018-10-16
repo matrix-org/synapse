@@ -71,6 +71,7 @@ from synapse.handlers.typing import TypingHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.internal_api import InternalApi
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
@@ -86,7 +87,6 @@ from synapse.state import StateHandler, StateResolutionHandler
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
-from synapse.internal_api import InternalApi
 
 logger = logging.getLogger(__name__)
 
