@@ -208,7 +208,7 @@ class Auth(object):
                         access_token=access_token,
                         ip=ip_addr,
                         user_agent=user_agent,
-                        device_id="",  # stubbed
+                        device_id="dummy-device",  # stubbed
                     )
 
                 defer.returnValue(
