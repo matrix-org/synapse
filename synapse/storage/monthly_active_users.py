@@ -240,7 +240,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             if last_seen_timestamp is None:
                 # In the case where mau_stats_only is True and limit_usage_by_mau is
                 # False, there is no point in checking get_monthly_active_count - it
-                # adds no valid and will break the logic if max_mau_value is exceeded.
+                # adds no value and will break the logic if max_mau_value is exceeded.
                 if not self.hs.config.limit_usage_by_mau:
                     yield self.upsert_monthly_active_user(user_id)
                 else:
