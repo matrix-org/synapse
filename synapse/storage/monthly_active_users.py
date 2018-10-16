@@ -147,6 +147,23 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         return self.runInteraction("count_users", _count_users)
 
     @defer.inlineCallbacks
+    def get_registered_reserved_users_count(self):
+        """Of the reserved threepids defined in config, how many are associated
+        with registered users?
+
+        Returns:
+            Defered[int]: Number of real reserved users
+        """
+        count = 0
+        for tp in self.hs.config.mau_limits_reserved_threepids:
+            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                tp["medium"], tp["address"]
+            )
+            if user_id:
+                count = count + 1
+        defer.returnValue(count)
+
+    @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
         """
             Updates or inserts monthly active user member
@@ -155,6 +172,10 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             Deferred[bool]: True if a new entry was created, False if an
                 existing one was updated.
         """
+        # Am consciously deciding to lock the table on the basis that is ought
+        # never be a big table and alternative approaches (batching multiple
+        # upserts into a single txn) introduced a lot of extra complexity.
+        # See https://github.com/matrix-org/synapse/issues/3854 for more
         is_insert = yield self._simple_upsert(
             desc="upsert_monthly_active_user",
             table="monthly_active_users",
@@ -164,7 +185,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             values={
                 "timestamp": int(self._clock.time_msec()),
             },
-            lock=False,
         )
         if is_insert:
             self.user_last_seen_monthly_active.invalidate((user_id,))

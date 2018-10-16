@@ -1,1 +1,0 @@
-Bump dependency on pyopenssl 16.x, to avoid incompatibility with recent Twisted.

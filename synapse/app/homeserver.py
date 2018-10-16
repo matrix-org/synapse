@@ -301,12 +301,16 @@ class SynapseHomeServer(HomeServer):
         try:
             database_engine.check_database(db_conn.cursor())
         except IncorrectDatabaseSetup as e:
-            quit_with_error(e.message)
+            quit_with_error(str(e))
 
 
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
 max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
+registered_reserved_users_mau_gauge = Gauge(
+    "synapse_admin_mau:registered_reserved_users",
+    "Registered users with reserved threepids"
+)
 
 
 def setup(config_options):
@@ -324,7 +328,7 @@ def setup(config_options):
             config_options,
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     if not config:
@@ -380,10 +384,8 @@ def setup(config_options):
 
     def start():
         hs.get_pusherpool().start()
-        hs.get_state_handler().start_caching()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
-        hs.get_federation_client().start_get_pdu_cache()
 
     reactor.callWhenRunning(start)
 
@@ -453,6 +455,10 @@ def run(hs):
         stats["homeserver"] = hs.config.server_name
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
+        version = sys.version_info
+        stats["python_version"] = "{}.{}.{}".format(
+            version.major, version.minor, version.micro
+        )
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
@@ -531,10 +537,14 @@ def run(hs):
 
     @defer.inlineCallbacks
     def generate_monthly_active_users():
-        count = 0
+        current_mau_count = 0
+        reserved_count = 0
+        store = hs.get_datastore()
         if hs.config.limit_usage_by_mau:
-            count = yield hs.get_datastore().get_monthly_active_count()
-        current_mau_gauge.set(float(count))
+            current_mau_count = yield store.get_monthly_active_count()
+            reserved_count = yield store.get_registered_reserved_users_count()
+        current_mau_gauge.set(float(current_mau_count))
+        registered_reserved_users_mau_gauge.set(float(reserved_count))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 
     hs.get_datastore().initialise_reserved_users(

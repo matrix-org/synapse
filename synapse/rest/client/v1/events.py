@@ -45,20 +45,20 @@ class EventStreamRestServlet(ClientV1RestServlet):
         is_guest = requester.is_guest
         room_id = None
         if is_guest:
-            if "room_id" not in request.args:
+            if b"room_id" not in request.args:
                 raise SynapseError(400, "Guest users must specify room_id param")
-        if "room_id" in request.args:
-            room_id = request.args["room_id"][0]
+        if b"room_id" in request.args:
+            room_id = request.args[b"room_id"][0].decode('ascii')
 
         pagin_config = PaginationConfig.from_request(request)
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS
-        if "timeout" in request.args:
+        if b"timeout" in request.args:
             try:
-                timeout = int(request.args["timeout"][0])
+                timeout = int(request.args[b"timeout"][0])
             except ValueError:
                 raise SynapseError(400, "timeout must be in milliseconds.")
 
-        as_client_event = "raw" not in request.args
+        as_client_event = b"raw" not in request.args
 
         chunk = yield self.event_stream_handler.get_stream(
             requester.user.to_string(),

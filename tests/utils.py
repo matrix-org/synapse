@@ -16,7 +16,9 @@
 import atexit
 import hashlib
 import os
+import time
 import uuid
+import warnings
 from inspect import getcallargs
 
 from mock import Mock, patch
@@ -94,6 +96,64 @@ def setupdb():
         atexit.register(_cleanup)
 
 
+def default_config(name):
+    """
+    Create a reasonable test config.
+    """
+    config = Mock()
+    config.signing_key = [MockKey()]
+    config.event_cache_size = 1
+    config.enable_registration = True
+    config.macaroon_secret_key = "not even a little secret"
+    config.expire_access_token = False
+    config.server_name = name
+    config.trusted_third_party_id_servers = []
+    config.room_invite_state_types = []
+    config.password_providers = []
+    config.worker_replication_url = ""
+    config.worker_app = None
+    config.email_enable_notifs = False
+    config.block_non_admin_invites = False
+    config.federation_domain_whitelist = None
+    config.federation_rc_reject_limit = 10
+    config.federation_rc_sleep_limit = 10
+    config.federation_rc_sleep_delay = 100
+    config.federation_rc_concurrent = 10
+    config.filter_timeline_limit = 5000
+    config.user_directory_search_all_users = False
+    config.user_consent_server_notice_content = None
+    config.block_events_without_consent_error = None
+    config.media_storage_providers = []
+    config.auto_join_rooms = []
+    config.limit_usage_by_mau = False
+    config.hs_disabled = False
+    config.hs_disabled_message = ""
+    config.hs_disabled_limit_type = ""
+    config.max_mau_value = 50
+    config.mau_trial_days = 0
+    config.mau_limits_reserved_threepids = []
+    config.admin_contact = None
+    config.rc_messages_per_second = 10000
+    config.rc_message_burst_count = 10000
+
+    config.use_frozen_dicts = False
+
+    # we need a sane default_room_version, otherwise attempts to create rooms will
+    # fail.
+    config.default_room_version = "1"
+
+    # disable user directory updates, because they get done in the
+    # background, which upsets the test runner.
+    config.update_user_directory = False
+
+    def is_threepid_reserved(threepid):
+        return ServerConfig.is_threepid_reserved(config, threepid)
+
+    config.is_threepid_reserved.side_effect = is_threepid_reserved
+
+    return config
+
+
 class TestHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
 
@@ -122,56 +182,8 @@ def setup_test_homeserver(
         from twisted.internet import reactor
 
     if config is None:
-        config = Mock()
-        config.signing_key = [MockKey()]
-        config.event_cache_size = 1
-        config.enable_registration = True
-        config.macaroon_secret_key = "not even a little secret"
-        config.expire_access_token = False
-        config.server_name = name
-        config.trusted_third_party_id_servers = []
-        config.room_invite_state_types = []
-        config.password_providers = []
-        config.worker_replication_url = ""
-        config.worker_app = None
-        config.email_enable_notifs = False
-        config.block_non_admin_invites = False
-        config.federation_domain_whitelist = None
-        config.federation_rc_reject_limit = 10
-        config.federation_rc_sleep_limit = 10
-        config.federation_rc_sleep_delay = 100
-        config.federation_rc_concurrent = 10
-        config.filter_timeline_limit = 5000
-        config.user_directory_search_all_users = False
-        config.user_consent_server_notice_content = None
-        config.block_events_without_consent_error = None
-        config.media_storage_providers = []
-        config.auto_join_rooms = []
-        config.limit_usage_by_mau = False
-        config.hs_disabled = False
-        config.hs_disabled_message = ""
-        config.hs_disabled_limit_type = ""
-        config.max_mau_value = 50
-        config.mau_trial_days = 0
-        config.mau_limits_reserved_threepids = []
-        config.admin_contact = None
-        config.rc_messages_per_second = 10000
-        config.rc_message_burst_count = 10000
+        config = default_config(name)
 
-        # we need a sane default_room_version, otherwise attempts to create rooms will
-        # fail.
-        config.default_room_version = "1"
-
-        # disable user directory updates, because they get done in the
-        # background, which upsets the test runner.
-        config.update_user_directory = False
-
-        def is_threepid_reserved(threepid):
-            return ServerConfig.is_threepid_reserved(config, threepid)
-
-        config.is_threepid_reserved.side_effect = is_threepid_reserved
-
-    config.use_frozen_dicts = True
     config.ldap_enabled = False
 
     if "clock" not in kargs:
@@ -237,8 +249,12 @@ def setup_test_homeserver(
         else:
             # We need to do cleanup on PostgreSQL
             def cleanup():
+                import psycopg2
+
                 # Close all the db pools
                 hs.get_db_pool().close()
+
+                dropped = False
 
                 # Drop the test database
                 db_conn = db_engine.module.connect(
@@ -246,10 +262,27 @@ def setup_test_homeserver(
                 )
                 db_conn.autocommit = True
                 cur = db_conn.cursor()
-                cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
-                db_conn.commit()
+
+                # Try a few times to drop the DB. Some things may hold on to the
+                # database for a few more seconds due to flakiness, preventing
+                # us from dropping it when the test is over. If we can't drop
+                # it, warn and move on.
+                for x in range(5):
+                    try:
+                        cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
+                        db_conn.commit()
+                        dropped = True
+                    except psycopg2.OperationalError as e:
+                        warnings.warn(
+                            "Couldn't drop old db: " + str(e), category=UserWarning
+                        )
+                        time.sleep(0.5)
+
                 cur.close()
                 db_conn.close()
+
+                if not dropped:
+                    warnings.warn("Failed to drop old DB.", category=UserWarning)
 
             if not LEAVE_DB:
                 # Register the cleanup hook

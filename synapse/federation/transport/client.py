@@ -15,7 +15,8 @@
 # limitations under the License.
 
 import logging
-import urllib
+
+from six.moves import urllib
 
 from twisted.internet import defer
 
@@ -951,4 +952,4 @@ def _create_path(prefix, path, *args):
     Returns:
         str
     """
-    return prefix + path % tuple(urllib.quote(arg, "") for arg in args)
+    return prefix + path % tuple(urllib.parse.quote(arg, "") for arg in args)
