@@ -199,7 +199,8 @@ class TestMauLimit(unittest.TestCase):
         # We do want to verify that the number of tracked users
         # matches what we want though
         count = self.store.get_monthly_active_count()
-        self.assertEqual(2, self.get_success(count))
+        self.reactor.advance(100)
+        self.assertEqual(2, self.successResultOf(count))
 
     def create_user(self, localpart):
         request_data = json.dumps(
