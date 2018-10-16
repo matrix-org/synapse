@@ -57,4 +57,5 @@ class InternalApi(object):
                     # Don't let plugin errors bubble up to synapse
                     logger.warn("Error calling %s on %r: %r", event_name, plugin, e)
             else:
-                logger.warn("Error calling %s on %r: Function not callable", event_name, plugin)
+                logger.warn("Error calling %s on %r: Function not callable",
+                    event_name, plugin)
