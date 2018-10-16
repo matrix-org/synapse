@@ -21,6 +21,7 @@ from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
 from .groups import GroupsConfig
+from .internal_api import InternalApiConfig
 from .jwt_config import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
@@ -35,8 +36,6 @@ from .saml2 import SAML2Config
 from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig
-from .internal_api import InternalApiConfig
-from .groups import GroupsConfig
 from .tls import TlsConfig
 from .user_directory import UserDirectoryConfig
 from .voip import VoipConfig

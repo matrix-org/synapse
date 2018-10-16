@@ -50,6 +50,7 @@ class DirectoryHandler(BaseHandler):
         )
 
         self.spam_checker = hs.get_spam_checker()
+        self.internal_api = hs.get_internal_api()
 
     @defer.inlineCallbacks
     def _create_association(self, room_alias, room_id, servers=None, creator=None):
@@ -78,7 +79,7 @@ class DirectoryHandler(BaseHandler):
             servers,
             creator=creator,
         )
-        self.hs.get_internal_api().raise_event("room_directory_association_created", {
+        self.internal_api.raise_event("room_directory_association_created", {
             "room_alias": room_alias.to_string(),
             "room_id": room_id,
             "servers": servers,

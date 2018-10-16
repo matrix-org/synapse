@@ -21,7 +21,7 @@ class MyCoolSynapseHook(object):
     # This is where your init routine would go
     self._config = config  # The config from the homeserver.yaml
     self._api = api  # A reference to the InternalApi in synapse
-    
+
     # This is required by synapse. Here you can parse and validate your configuration.
     # Be sure to return the object you expect in your constructor.
     @staticmethod
@@ -60,5 +60,7 @@ Event body:
 ## Accessing synapse from your module
 
 **CAUTION**: The synapse code base should be considered highly volatile and may change at any time! Hooking in to the homeserver directly is dangerous and can cause unexpected results or may break between releases, even minor ones.
+
+**CAUTION**: Event handlers are called asynchronously. Always ensure you are on the right thread before accessing the homeserver.
 
 With that being said, if you *really* want to use the homeserver, the `synapse.server.HomeServer` object is exposed on the `api` (`synapse.internal_api.InternalApi`) object given to your constructor as `hs`.

@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 class InternalApi(object):
     def __init__(self, hs):
         self.hs = hs
-        self._store = hs.get_datastore()
 
         self._plugins = []
 
@@ -55,5 +54,7 @@ class InternalApi(object):
                     logger.info("Calling %s on %r", event_name, plugin)
                     fn(content)
                 except Exception as e:
+                    # Don't let plugin errors bubble up to synapse
                     logger.warn("Error calling %s on %r: %r", event_name, plugin, e)
-                    pass  # Don't let plugin errors bubble up to synapse
+            else:
+                logger.warn("Error calling %s on %r: Function not callable", event_name, plugin)
