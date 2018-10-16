@@ -178,6 +178,9 @@ def start(config_options):
 
     setup_logging(config, use_worker_options=True)
 
+    # This should only be done on the user directory worker or the master
+    config.update_user_directory = False
+
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
