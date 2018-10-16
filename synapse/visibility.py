@@ -219,7 +219,7 @@ def filter_events_for_server(store, server_name, events):
     # Whatever else we do, we need to check for senders which have requested
     # erasure of their data.
     erased_senders = yield store.are_users_erased(
-        e.sender for e in events,
+        (e.sender for e in events),
     )
 
     def redact_disallowed(event, state):
@@ -324,14 +324,13 @@ def filter_events_for_server(store, server_name, events):
     # server's domain.
     #
     # event_to_state_ids contains lots of duplicates, so it turns out to be
-    # cheaper to build a complete set of unique
-    # ((type, state_key), event_id) tuples, and then filter out the ones we
-    # don't want.
+    # cheaper to build a complete event_id => (type, state_key) dict, and then
+    # filter out the ones we don't want
     #
-    state_key_to_event_id_set = {
-        e
+    event_id_to_state_key = {
+        event_id: key
         for key_to_eid in itervalues(event_to_state_ids)
-        for e in key_to_eid.items()
+        for key, event_id in iteritems(key_to_eid)
     }
 
     def include(typ, state_key):
@@ -346,7 +345,7 @@ def filter_events_for_server(store, server_name, events):
 
     event_map = yield store.get_events([
         e_id
-        for key, e_id in state_key_to_event_id_set
+        for e_id, key in iteritems(event_id_to_state_key)
         if include(key[0], key[1])
     ])
 

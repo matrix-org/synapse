@@ -16,7 +16,7 @@
 from synapse.storage import DataStore
 from synapse.storage.keys import KeyStore
 
-from ._base import BaseSlavedStore
+from ._base import BaseSlavedStore, __func__
 
 
 class SlavedKeyStore(BaseSlavedStore):
@@ -24,11 +24,11 @@ class SlavedKeyStore(BaseSlavedStore):
         "_get_server_verify_key"
     ]
 
-    get_server_verify_keys = DataStore.get_server_verify_keys.__func__
-    store_server_verify_key = DataStore.store_server_verify_key.__func__
+    get_server_verify_keys = __func__(DataStore.get_server_verify_keys)
+    store_server_verify_key = __func__(DataStore.store_server_verify_key)
 
-    get_server_certificate = DataStore.get_server_certificate.__func__
-    store_server_certificate = DataStore.store_server_certificate.__func__
+    get_server_certificate = __func__(DataStore.get_server_certificate)
+    store_server_certificate = __func__(DataStore.store_server_certificate)
 
-    get_server_keys_json = DataStore.get_server_keys_json.__func__
-    store_server_keys_json = DataStore.store_server_keys_json.__func__
+    get_server_keys_json = __func__(DataStore.get_server_keys_json)
+    store_server_keys_json = __func__(DataStore.store_server_keys_json)

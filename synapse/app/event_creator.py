@@ -169,7 +169,7 @@ def start(config_options):
             "Synapse event creator", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.event_creator"
@@ -177,6 +177,9 @@ def start(config_options):
     assert config.worker_replication_http_port is not None
 
     setup_logging(config, use_worker_options=True)
+
+    # This should only be done on the user directory worker or the master
+    config.update_user_directory = False
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
