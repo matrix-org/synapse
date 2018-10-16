@@ -434,10 +434,10 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
 ))):
 
     KEY_DICT = {
-        "stream_ordering": "s",
-        "public_room_stream_id": "p",
-        "current_limit": "n",
-        "direction_is_forward": "d",
+        "stream_ordering": b"s",
+        "public_room_stream_id": b"p",
+        "current_limit": b"n",
+        "direction_is_forward": b"d",
     }
 
     REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
