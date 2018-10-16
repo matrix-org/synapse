@@ -25,7 +25,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, RoomVersions
 from synapse.events.snapshot import EventContext
-from synapse.state import v1
+from synapse.state import v1, v2
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -607,8 +607,12 @@ def resolve_events_with_factory(room_version, state_sets, event_map, state_map_f
         Deferred[dict[(str, str), str]]:
             a map from (type, state_key) to event_id.
     """
-    if room_version in (RoomVersions.V1, RoomVersions.VDH_TEST,):
+    if room_version == RoomVersions.V1:
         return v1.resolve_events_with_factory(
+            state_sets, event_map, state_map_factory,
+        )
+    elif room_version == RoomVersions.VDH_TEST:
+        return v2.resolve_events_with_factory(
             state_sets, event_map, state_map_factory,
         )
     else:
