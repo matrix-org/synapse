@@ -238,7 +238,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # but only update if we have not previously seen the user for
             # LAST_SEEN_GRANULARITY ms
             if last_seen_timestamp is None:
-                # Optimize the db usage when not limiting usage
+                # In the case where mau_stats_only is True and limit_usage_by_mau is
+                # False, there is no point in checking get_monthly_active_count - it
+                # adds no valid and will break the logic if max_mau_value is exceeded.
                 if not self.hs.config.limit_usage_by_mau:
                     yield self.upsert_monthly_active_user(user_id)
                 else:
