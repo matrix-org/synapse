@@ -1,7 +1,10 @@
 Synapse 0.33.7rc2 (2018-10-17)
 ==============================
 
-**Warning**: This release removes the example email notification templates from `res/templates` (they are now internal to the python package). This should only affect you if you (a) deploy your Synapse instance from a git checkout or a github snapshot URL, and (b) have email notifications enabled.
+**Warning**: This release removes the example email notification templates from
+`res/templates` (they are now internal to the python package). This should only
+affect you if you (a) deploy your Synapse instance from a git checkout or a
+github snapshot URL, and (b) have email notifications enabled.
 
 If you have email notifications enabled, you should ensure that
 `email.template_dir` is either configured to point at a directory where you
