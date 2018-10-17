@@ -49,5 +49,5 @@ class UserDirectoryConfig(Config):
         #   If this is set, user search will be delegated to this ID server instead
         #   of synapse performing the search itself.
         #   This is an experimental API.
-        #   defer_to_id_server: id.example.com
+        #   defer_to_id_server: https://id.example.com
         """
