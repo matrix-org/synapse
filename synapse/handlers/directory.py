@@ -43,6 +43,7 @@ class DirectoryHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.config = hs.config
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -109,6 +110,14 @@ class DirectoryHandler(BaseHandler):
             if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
                 raise AuthError(
                     403, "This user is not permitted to create this alias",
+                )
+
+            if not self.config.is_alias_creation_allowed(user_id, room_alias.to_string()):
+                # Lets just return a generic message, as there may be all sorts of
+                # reasons why we said no. TODO: Allow configurable error messages
+                # per alias creation rule?
+                raise SynapseError(
+                    403, "Not allowed to create alias",
                 )
 
             can_create = yield self.can_modify_alias(

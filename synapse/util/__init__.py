@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import re
 from itertools import islice
 
 import attr
@@ -138,3 +139,23 @@ def log_failure(failure, msg, consumeErrors=True):
 
     if not consumeErrors:
         return failure
+
+
+def glob_to_regex(glob):
+    """Converts a glob to a compiled regex object
+
+    Args:
+        glob (str)
+
+    Returns:
+        re.RegexObject
+    """
+    res = ''
+    for c in glob:
+        if c == '*':
+            res = res + '.*'
+        elif c == '?':
+            res = res + '.'
+        else:
+            res = res + re.escape(c)
+    return re.compile(res + "\\Z", re.IGNORECASE)
