@@ -445,9 +445,8 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
     @classmethod
     def from_token(cls, token):
         return RoomListNextBatch(**{
-            cls.REVERSE_KEY_DICT[key.decode("utf-8")]:
-            (val if not isinstance(val, bytes) else val.decode('utf-8'))
-            for key, val in msgpack.loads(decode_base64(token)).items()
+            cls.REVERSE_KEY_DICT[key]: val
+            for key, val in msgpack.loads(decode_base64(token), raw=False).items()
         })
 
     def to_token(self):
