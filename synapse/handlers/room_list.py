@@ -434,10 +434,10 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
 ))):
 
     KEY_DICT = {
-        "stream_ordering": b"s",
-        "public_room_stream_id": b"p",
-        "current_limit": b"n",
-        "direction_is_forward": b"d",
+        "stream_ordering": "s",
+        "public_room_stream_id": "p",
+        "current_limit": "n",
+        "direction_is_forward": "d",
     }
 
     REVERSE_KEY_DICT = {v: k for k, v in KEY_DICT.items()}
@@ -445,7 +445,7 @@ class RoomListNextBatch(namedtuple("RoomListNextBatch", (
     @classmethod
     def from_token(cls, token):
         return RoomListNextBatch(**{
-            cls.REVERSE_KEY_DICT[key]: val
+            cls.REVERSE_KEY_DICT[key.decode("utf-8")]: (val if not isinstance(val, bytes) else val.decode('utf-8'))
             for key, val in msgpack.loads(decode_base64(token)).items()
         })
 

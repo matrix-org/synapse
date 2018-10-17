@@ -33,7 +33,7 @@ class RoomListTestCase(tests.unittest.TestCase):
             direction_is_forward=True,
         ).to_token()
         next_batch = RoomListNextBatch.from_token(batch_token)
-        self.assertEquals(next_batch.stream_ordering, b"abcdef")
-        self.assertEquals(next_batch.public_room_stream_id, b"123")
+        self.assertEquals(next_batch.stream_ordering, "abcdef")
+        self.assertEquals(next_batch.public_room_stream_id, "123")
         self.assertEquals(next_batch.current_limit, 20)
         self.assertEquals(next_batch.direction_is_forward, True)
