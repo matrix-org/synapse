@@ -26,7 +26,6 @@ from synapse.api.errors import (
     RegistrationError,
     SynapseError,
 )
-from synapse.config._base import ConfigError
 from synapse.http.client import CaptchaServerHttpClient
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
@@ -51,6 +50,7 @@ class RegistrationHandler(BaseHandler):
         self._auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
+        self.room_creation_handler = self.hs.get_room_creation_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
 
         self._next_generated_user_id = None
@@ -231,21 +231,23 @@ class RegistrationHandler(BaseHandler):
         for r in self.hs.config.auto_join_rooms:
             try:
                 if should_auto_create_rooms:
-                    room_creation_handler = self.hs.get_room_creation_handler()
                     if self.hs.hostname != RoomAlias.from_string(r).domain:
-                        raise ConfigError(
-                            'Cannot create room alias %s, it does not match server domain'
+                        logger.warn(
+                            'Cannot create room alias %s, '
+                            'it does not match server domain' % (r,)
                         )
-                    # create room expects the localpart of the room alias
-                    room_alias_localpart = RoomAlias.from_string(r).localpart
-                    yield room_creation_handler.create_room(
-                        fake_requester,
-                        config={
-                            "preset": "public_chat",
-                            "room_alias_name": room_alias_localpart
-                        },
-                        ratelimit=False,
-                    )
+                        raise SynapseError()
+                    else:
+                        # create room expects the localpart of the room alias
+                        room_alias_localpart = RoomAlias.from_string(r).localpart
+                        yield self.room_creation_handler.create_room(
+                            fake_requester,
+                            config={
+                                "preset": "public_chat",
+                                "room_alias_name": room_alias_localpart
+                            },
+                            ratelimit=False,
+                        )
                 else:
                     yield self._join_user_to_room(fake_requester, r)
             except Exception as e:
