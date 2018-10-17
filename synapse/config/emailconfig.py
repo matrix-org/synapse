@@ -26,6 +26,12 @@ from ._base import Config
 
 logger = logging.getLogger(__name__)
 
+TEMPLATE_DIR_WARNING = """\
+WARNING: The email notifier is configured to look for templates in '%(template_dir)s',
+but no templates could be found there. We will fall back to using the example templates;
+to get rid of this warning, leave 'email.template_dir' unset.
+"""
+
 
 class EmailConfig(Config):
     def read_config(self, config):
@@ -81,12 +87,9 @@ class EmailConfig(Config):
                     os.path.join(self.email_template_dir, self.email_notif_template_text)
                 )
             ):
-                t = """\
-WARNING: The email notifier is configured to look for templates in '%s', but no templates
-could be found there. We will fall back to using the example templates; to get rid of this
-warning, leave 'email.template_dir' unset.
-""" % (self.email_template_dir,)
-
+                t = TEMPLATE_DIR_WARNING % {
+                    "template_dir": self.email_template_dir,
+                }
                 print(textwrap.fill(t, width=80) + "\n", file=sys.stderr)
                 self.email_template_dir = None
 
