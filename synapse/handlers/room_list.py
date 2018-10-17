@@ -16,7 +16,7 @@
 import logging
 from collections import namedtuple
 
-from six import iteritems, PY3
+from six import PY3, iteritems
 from six.moves import range
 
 import msgpack
