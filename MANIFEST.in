@@ -12,12 +12,12 @@ recursive-include synapse/storage/schema *.sql
 recursive-include synapse/storage/schema *.py
 
 recursive-include docs *
-recursive-include res *
 recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include synapse *.pyi
 recursive-include tests *.py
 
+recursive-include synapse/res *
 recursive-include synapse/static *.css
 recursive-include synapse/static *.gif
 recursive-include synapse/static *.html
