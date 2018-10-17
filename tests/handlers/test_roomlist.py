@@ -12,12 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
 
 from synapse.handlers.room_list import RoomListNextBatch
 
 import tests.unittest
 import tests.utils
+
 
 class RoomListTestCase(tests.unittest.TestCase):
     """ Tests RoomList's RoomListNextBatch. """
@@ -32,7 +32,7 @@ class RoomListTestCase(tests.unittest.TestCase):
             current_limit=20,
             direction_is_forward=True,
         ).to_token()
-        next_batch = RoomListNextBatch.from_token("hKFzpmFiY2RlZqFwozEyM6FuFKFkww")
+        next_batch = RoomListNextBatch.from_token(batch_token)
         self.assertEquals(next_batch.stream_ordering, b"abcdef")
         self.assertEquals(next_batch.public_room_stream_id, b"123")
         self.assertEquals(next_batch.current_limit, 20)
