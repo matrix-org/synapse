@@ -1,4 +1,5 @@
 import json
+import six
 
 from mock import Mock
 
@@ -175,18 +176,35 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
+
+class TermsTestCase(unittest.HomeserverTestCase):
+    servlets = [register_servlets]
+
+    def prepare(self, reactor, clock, hs):
+        self.clock = MemoryReactorClock()
+        self.hs_clock = Clock(self.clock)
+        self.url = "/_matrix/client/r0/register"
+        self.registration_handler = Mock()
+        self.auth_handler = Mock()
+        self.device_handler = Mock()
+        hs.config.enable_registration = True
+        hs.config.registrations_require_3pid = []
+        hs.config.auto_join_rooms = []
+        hs.config.enable_registration_captcha = False
+
     def test_POST_terms_auth(self):
         self.hs.config.block_events_without_consent_error = True
         self.hs.config.public_baseurl = "https://example.org"
         self.hs.config.user_consent_version = "1.0"
 
         # Do a UI auth request
-        request, channel = make_request(b"POST", self.url, b"{}")
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
-        self.assertIsInstance(channel.json_body["session"], str)
+        self.assertTrue(channel.json_body is not None)
+        self.assertIsInstance(channel.json_body["session"], six.text_type)
 
         self.assertIsInstance(channel.json_body["flows"], list)
         for flow in channel.json_body["flows"]:
@@ -210,40 +228,47 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.assertIsInstance(channel.json_body["params"], dict)
         self.assertDictContainsSubset(channel.json_body["params"], expected_params)
 
-        # Completing the stage should result in the stage being completed
-
-        user_id = "@kermit:muppet"
-        token = "kermits_access_token"
-        device_id = "frogfone"
+        # We have to complete the dummy auth stage before completing the terms stage
         request_data = json.dumps(
             {
                 "username": "kermit",
                 "password": "monkey",
-                "device_id": device_id,
+                "auth": {
+                    "session": channel.json_body["session"],
+                    "type": "m.login.dummy",
+                },
+            }
+        )
+
+        self.registration_handler.check_username = Mock(return_value=True)
+
+        request, channel = make_request(b"POST", self.url, request_data)
+        self.render(request)
+
+        # We don't bother checking that the response is correct - we'll leave that to
+        # other tests. We just want to make sure we're on the right path.
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+
+        # Finish the UI auth for terms
+        request_data = json.dumps(
+            {
+                "username": "kermit",
+                "password": "monkey",
                 "auth": {
                     "session": channel.json_body["session"],
                     "type": "m.login.terms",
                 },
             }
         )
-        self.registration_handler.check_username = Mock(return_value=True)
-        self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
-        self.registration_handler.register = Mock(return_value=(user_id, None))
-        self.auth_handler.get_access_token_for_user_id = Mock(return_value=token)
-        self.device_handler.check_device_registered = Mock(return_value=device_id)
-
-
         request, channel = make_request(b"POST", self.url, request_data)
-        render(request, self.resource, self.clock)
+        self.render(request)
 
-        det_data = {
-            "user_id": user_id,
-            "access_token": token,
-            "home_server": self.hs.hostname,
-            "device_id": device_id,
-        }
+        # We're interested in getting a response that looks like a successful registration,
+        # not so much that the details are exactly what we want.
+
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        self.assertDictContainsSubset(det_data, channel.json_body)
-        self.auth_handler.get_login_tuple_for_user_id(
-            user_id, device_id=device_id, initial_device_display_name=None
-        )
+
+        self.assertTrue(channel.json_body is not None)
+        self.assertIsInstance(channel.json_body["user_id"], six.text_type)
+        self.assertIsInstance(channel.json_body["access_token"], six.text_type)
+        self.assertIsInstance(channel.json_body["device_id"], six.text_type)
