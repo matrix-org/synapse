@@ -181,7 +181,7 @@ class RegisterRestServletTestCase(unittest.TestCase):
         self.hs.config.user_consent_version = "1.0"
 
         # Do a UI auth request
-        reqest, channel = make_request(b"POST", self.url, b"{}")
+        request, channel = make_request(b"POST", self.url, b"{}")
         render(request, self.resource, self.clock)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
@@ -220,7 +220,10 @@ class RegisterRestServletTestCase(unittest.TestCase):
                 "username": "kermit",
                 "password": "monkey",
                 "device_id": device_id,
-                "session": channel.json_body["session"],
+                "auth": {
+                    "session": channel.json_body["session"],
+                    "type": "m.login.terms",
+                },
             }
         )
         self.registration_handler.check_username = Mock(return_value=True)
