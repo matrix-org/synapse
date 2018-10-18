@@ -1,1 +1,0 @@
-Fix bug which made get_missing_events return too few events
