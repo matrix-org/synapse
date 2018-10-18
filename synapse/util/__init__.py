@@ -142,7 +142,9 @@ def log_failure(failure, msg, consumeErrors=True):
 
 
 def glob_to_regex(glob):
-    """Converts a glob to a compiled regex object
+    """Converts a glob to a compiled regex object.
+
+    The regex is anchored at the beginning and end of the string.
 
     Args:
         glob (str)
@@ -158,4 +160,6 @@ def glob_to_regex(glob):
             res = res + '.'
         else:
             res = res + re.escape(c)
-    return re.compile(res + "\\Z", re.IGNORECASE)
+
+    # \A anchors at start of string, \Z at end of string
+    return re.compile(r"\A" + res + r"\Z", re.IGNORECASE)
