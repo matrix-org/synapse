@@ -51,6 +51,7 @@ from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
+from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
@@ -130,6 +131,7 @@ class HomeServer(object):
         'auth_handler',
         'device_handler',
         'e2e_keys_handler',
+        'e2e_room_keys_handler',
         'event_handler',
         'event_stream_handler',
         'initial_sync_handler',
@@ -298,6 +300,9 @@ class HomeServer(object):
 
     def build_e2e_keys_handler(self):
         return E2eKeysHandler(self)
+
+    def build_e2e_room_keys_handler(self):
+        return E2eRoomKeysHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)

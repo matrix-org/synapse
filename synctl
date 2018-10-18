@@ -48,7 +48,16 @@ def pid_running(pid):
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
-    if colour == NORMAL:
+    # Lets check if we're writing to a TTY before colouring
+    should_colour = False
+    try:
+        should_colour = stream.isatty()
+    except AttributeError:
+        # Just in case `isatty` isn't defined on everything. The python
+        # docs are incredibly vague.
+        pass
+
+    if not should_colour:
         stream.write(message + "\n")
     else:
         stream.write(colour + message + NORMAL + "\n")

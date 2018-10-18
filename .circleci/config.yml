@@ -23,99 +23,106 @@ jobs:
       - run: docker push matrixdotorg/synapse:latest
       - run: docker push matrixdotorg/synapse:latest-py3
   sytestpy2:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy2
+    working_directory: /src
     steps:
       - checkout
-      - run: docker pull matrixdotorg/sytest-synapsepy2
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy2
+      - run: /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
+          path: /logs
   sytestpy2postgres:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy2
+    working_directory: /src
     steps:
       - checkout
-      - run: docker pull matrixdotorg/sytest-synapsepy2
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy2
+      - run: POSTGRES=1 /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
+          path: /logs
   sytestpy2merged:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy2
+    working_directory: /src
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
-      - run: docker pull matrixdotorg/sytest-synapsepy2
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy2
+      - run: /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
-
+          path: /logs
   sytestpy2postgresmerged:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy2
+    working_directory: /src
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
-      - run: docker pull matrixdotorg/sytest-synapsepy2
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy2
+      - run: POSTGRES=1 /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
+          path: /logs
 
   sytestpy3:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy3
+    working_directory: /src
     steps:
       - checkout
-      - run: docker pull matrixdotorg/sytest-synapsepy3
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy3
+      - run: /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
+          path: /logs
   sytestpy3postgres:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy3
+    working_directory: /src
     steps:
       - checkout
-      - run: docker pull matrixdotorg/sytest-synapsepy3
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy3
+      - run: POSTGRES=1 /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
+          path: /logs
   sytestpy3merged:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy3
+    working_directory: /src
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
-      - run: docker pull matrixdotorg/sytest-synapsepy3
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs matrixdotorg/sytest-synapsepy3
+      - run: /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
+          path: /logs
   sytestpy3postgresmerged:
-    machine: true
+    docker:
+      - image: matrixdotorg/sytest-synapsepy3
+    working_directory: /src
     steps:
       - checkout
       - run: bash .circleci/merge_base_branch.sh
-      - run: docker pull matrixdotorg/sytest-synapsepy3
-      - run: docker run --rm -it -v $(pwd)\:/src -v $(pwd)/logs\:/logs -e POSTGRES=1 matrixdotorg/sytest-synapsepy3
+      - run: POSTGRES=1 /synapse_sytest.sh
       - store_artifacts:
-          path: ~/project/logs
+          path: /logs
           destination: logs
       - store_test_results:
-          path: logs
+          path: /logs
 
 workflows:
   version: 2
