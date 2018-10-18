@@ -196,7 +196,7 @@ class Notifier(object):
 
         LaterGauge(
             "synapse_notifier_rooms", "", [],
-            lambda: count(bool, list(self.room_to_user_streams.values()),
+            lambda: count(bool, list(self.room_to_user_streams.values())),
         )
         LaterGauge(
             "synapse_notifier_users", "", [],
