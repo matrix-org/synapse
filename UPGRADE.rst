@@ -48,6 +48,23 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v0.33.7
+====================
+
+This release removes the example email notification templates from
+``res/templates`` (they are now internal to the python package). This should
+only affect you if you (a) deploy your Synapse instance from a git checkout or
+a github snapshot URL, and (b) have email notifications enabled.
+
+If you have email notifications enabled, you should ensure that
+``email.template_dir`` is either configured to point at a directory where you
+have installed customised templates, or leave it unset to use the default
+templates.
+
+The configuration parser will try to detect the situation where
+``email.template_dir`` is incorrectly set to ``res/templates`` and do the right
+thing, but will warn about this.
+
 Upgrading to v0.27.3
 ====================
 
