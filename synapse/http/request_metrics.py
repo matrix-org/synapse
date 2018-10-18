@@ -222,8 +222,11 @@ class RequestMetrics(object):
         diff = new_stats - self._request_stats
         self._request_stats = new_stats
 
-        in_flight_requests_ru_utime.labels(self.method, self.name).inc(diff.ru_utime)
-        in_flight_requests_ru_stime.labels(self.method, self.name).inc(diff.ru_stime)
+        # max() is used since rapid use of ru_stime/ru_utime can end up with the
+        # count going backwards due to NTP, time smearing, fine-grained
+        # correction, or floating points. Who knows, really?
+        in_flight_requests_ru_utime.labels(self.method, self.name).inc(max(diff.ru_utime, 0))
+        in_flight_requests_ru_stime.labels(self.method, self.name).inc(max(diff.ru_stime, 0))
 
         in_flight_requests_db_txn_count.labels(self.method, self.name).inc(
             diff.db_txn_count
