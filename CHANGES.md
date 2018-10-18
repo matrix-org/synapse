@@ -1,5 +1,5 @@
-Synapse 0.33.7rc2 (2018-10-17)
-==============================
+Synapse 0.33.7 (2018-10-18)
+===========================
 
 **Warning**: This release removes the example email notification templates from
 `res/templates` (they are now internal to the python package). This should only
@@ -14,6 +14,9 @@ templates.
 The configuration parser will try to detect the situation where
 `email.template_dir` is incorrectly set to `res/templates` and do the right
 thing, but will warn about this.
+
+Synapse 0.33.7rc2 (2018-10-17)
+==============================
 
 Features
 --------
