@@ -18,7 +18,9 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.config.room_directory import RoomDirectoryConfig
 from synapse.handlers.directory import DirectoryHandler
+from synapse.rest.client.v1 import directory, room
 from synapse.types import RoomAlias
 
 from tests import unittest
@@ -102,3 +104,49 @@ class DirectoryTestCase(unittest.TestCase):
         )
 
         self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
+
+
+class TestCreateAliasACL(unittest.HomeserverTestCase):
+    user_id = "@test:test"
+
+    servlets = [directory.register_servlets, room.register_servlets]
+
+    def prepare(self, hs, reactor, clock):
+        # We cheekily override the config to add custom alias creation rules
+        config = {}
+        config["alias_creation_rules"] = [
+            {
+                "user_id": "*",
+                "alias": "#unofficial_*",
+                "action": "allowed",
+            }
+        ]
+
+        rd_config = RoomDirectoryConfig()
+        rd_config.read_config(config)
+
+        self.hs.config.is_alias_creation_allowed = rd_config.is_alias_creation_allowed
+
+        return hs
+
+    def test_denied(self):
+        room_id = self.helper.create_room_as(self.user_id)
+
+        request, channel = self.make_request(
+            "PUT",
+            b"directory/room/%23test%3Atest",
+            ('{"room_id":"%s"}' % (room_id,)).encode('ascii'),
+        )
+        self.render(request)
+        self.assertEquals(403, channel.code, channel.result)
+
+    def test_allowed(self):
+        room_id = self.helper.create_room_as(self.user_id)
+
+        request, channel = self.make_request(
+            "PUT",
+            b"directory/room/%23unofficial_test%3Atest",
+            ('{"room_id":"%s"}' % (room_id,)).encode('ascii'),
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
