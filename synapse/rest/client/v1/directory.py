@@ -74,38 +74,11 @@ class ClientDirectoryServer(ClientV1RestServlet):
         if room is None:
             raise SynapseError(400, "Room does not exist")
 
-        dir_handler = self.handlers.directory_handler
+        requester = yield self.auth.get_user_by_req(request)
 
-        try:
-            # try to auth as a user
-            requester = yield self.auth.get_user_by_req(request)
-            try:
-                user_id = requester.user.to_string()
-                yield dir_handler.create_association(
-                    user_id, room_alias, room_id, servers
-                )
-                yield dir_handler.send_room_alias_update_event(
-                    requester,
-                    user_id,
-                    room_id
-                )
-            except SynapseError as e:
-                raise e
-            except Exception:
-                logger.exception("Failed to create association")
-                raise
-        except AuthError:
-            # try to auth as an application service
-            service = yield self.auth.get_appservice_by_req(request)
-            yield dir_handler.create_appservice_association(
-                service, room_alias, room_id, servers
-            )
-            logger.info(
-                "Application service at %s created alias %s pointing to %s",
-                service.url,
-                room_alias.to_string(),
-                room_id
-            )
+        yield self.handlers.directory_handler.create_association(
+            requester, room_alias, room_id, servers
+        )
 
         defer.returnValue((200, {}))
 
@@ -135,7 +108,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
         room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
-            requester, user.to_string(), room_alias
+            requester, room_alias
         )
 
         logger.info(
