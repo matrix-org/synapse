@@ -92,10 +92,11 @@ class _AliasRule(object):
             boolean
         """
 
-        if not self._user_id_regex.search(user_id):
+        # Note: The regexes are anchored at both ends
+        if not self._user_id_regex.match(user_id):
             return False
 
-        if not self._alias_regex.search(alias):
+        if not self._alias_regex.match(alias):
             return False
 
         return True
