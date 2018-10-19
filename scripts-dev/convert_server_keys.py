@@ -13,7 +13,7 @@ from signedjson.sign import sign_json
 from unpaddedbase64 import encode_base64
 
 if six.PY2:
-    db_type = six.builtins.buffer
+    db_type = six.moves.builtins.buffer
 else:
     db_type = memoryview
 
