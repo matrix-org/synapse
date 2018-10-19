@@ -18,7 +18,7 @@ import threading
 import time
 
 from six import PY2, iteritems, iterkeys, itervalues
-from six.moves import intern, range, builtins
+from six.moves import builtins, intern, range
 
 from canonicaljson import json
 from prometheus_client import Histogram
