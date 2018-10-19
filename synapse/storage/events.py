@@ -2041,7 +2041,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
             INNER JOIN event_to_state_groups USING (event_id)
         """)
 
-        referenced_state_groups =  set(sg for sg, in txn)
+        referenced_state_groups = set(sg for sg, in txn)
         logger.info(
             "[purge] found %i referenced state groups",
             len(referenced_state_groups),
