@@ -70,6 +70,8 @@ def manhole(username, password, globals):
     Returns:
         twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
+    if not isinstance(password, bytes):
+        password = password.encode('ascii')
 
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(
         **{username: password}
