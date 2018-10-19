@@ -186,9 +186,9 @@ class Notifier(object):
         def count_listeners():
             all_user_streams = set()
 
-            for x in self.room_to_user_streams.values():
+            for x in list(self.room_to_user_streams.values()):
                 all_user_streams |= x
-            for x in self.user_to_user_stream.values():
+            for x in list(self.user_to_user_stream.values()):
                 all_user_streams.add(x)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
@@ -196,7 +196,7 @@ class Notifier(object):
 
         LaterGauge(
             "synapse_notifier_rooms", "", [],
-            lambda: count(bool, self.room_to_user_streams.values()),
+            lambda: count(bool, list(self.room_to_user_streams.values())),
         )
         LaterGauge(
             "synapse_notifier_users", "", [],
