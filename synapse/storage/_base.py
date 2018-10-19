@@ -17,7 +17,7 @@ import sys
 import threading
 import time
 
-from six import PY2, builtins, iteritems, iterkeys, itervalues
+from six import PY2, builtin, iteritems, iterkeys, itervalues
 from six.moves import intern, range
 
 from canonicaljson import json
@@ -1233,7 +1233,7 @@ def db_to_json(db_content):
 
     # psycopg2 on Python 2 returns buffer objects, which we need to cast to
     # bytes to decode
-    if PY2 and isinstance(db_content, builtins.buffer):
+    if PY2 and isinstance(db_content, builtin.buffer):
         db_content = bytes(db_content)
 
     # Decode it to a Unicode string before feeding it to json.loads, so we
