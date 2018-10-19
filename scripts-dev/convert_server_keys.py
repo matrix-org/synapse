@@ -39,7 +39,9 @@ def select_v2_json(connection):
     cursor.close()
     results = {}
     for server_name, key_id, key_json in rows:
-        results.setdefault(server_name, {})[key_id] = json.loads(str(key_json).decode("utf-8"))
+        results.setdefault(server_name, {})[key_id] = json.loads(
+            str(key_json).decode("utf-8")
+        )
     return results
 
 
@@ -47,10 +49,7 @@ def convert_v1_to_v2(server_name, valid_until, keys, certificate):
     return {
         "old_verify_keys": {},
         "server_name": server_name,
-        "verify_keys": {
-            key_id: {"key": key}
-            for key_id, key in keys.items()
-        },
+        "verify_keys": {key_id: {"key": key} for key_id, key in keys.items()},
         "valid_until_ts": valid_until,
         "tls_fingerprints": [fingerprint(certificate)],
     }
@@ -96,10 +95,7 @@ def main():
 
     yaml.safe_dump(result, sys.stdout, default_flow_style=False)
 
-    rows = list(
-        row for server, json in result.items()
-        for row in rows_v2(server, json)
-    )
+    rows = list(row for server, json in result.items() for row in rows_v2(server, json))
 
     cursor = connection.cursor()
     cursor.executemany(
@@ -107,7 +103,7 @@ def main():
         " server_name, key_id, from_server,"
         " ts_added_ms, ts_valid_until_ms, key_json"
         ") VALUES (%s, %s, %s, %s, %s, %s)",
-        rows
+        rows,
     )
     connection.commit()
 
