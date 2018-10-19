@@ -526,12 +526,8 @@ def load_jinja2_templates(config):
     Returns:
         (notif_template_html, notif_template_text)
     """
-    logger.info("loading jinja2")
-
-    if config.email_template_dir:
-        loader = jinja2.FileSystemLoader(config.email_template_dir)
-    else:
-        loader = jinja2.PackageLoader('synapse', 'res/templates')
+    logger.info("loading email templates from '%s'", config.email_template_dir)
+    loader = jinja2.FileSystemLoader(config.email_template_dir)
     env = jinja2.Environment(loader=loader)
     env.filters["format_ts"] = format_ts_filter
     env.filters["mxc_to_http"] = _create_mxc_to_http_filter(config)
