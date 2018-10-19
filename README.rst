@@ -684,6 +684,7 @@ so an example nginx configuration might look like::
   }
 
 an example caddy configuration may look like::
+
     example.com {
       proxy /_matrix http://localhost:8008 {
         transparent
