@@ -36,12 +36,9 @@ from __future__ import print_function
 
 import argparse
 import logging
-
-import sys
-
 import os
-
 import shutil
+import sys
 
 from synapse.rest.media.v1.filepath import MediaFilePaths
 

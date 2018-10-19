@@ -1,9 +1,10 @@
 #! /usr/bin/python
 
-import ast
 import argparse
+import ast
 import os
 import sys
+
 import yaml
 
 PATTERNS_V1 = []

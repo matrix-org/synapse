@@ -1,8 +1,9 @@
-import requests
 import collections
+import json
 import sys
 import time
-import json
+
+import requests
 
 Entry = collections.namedtuple("Entry", "name position rows")
 
@@ -53,7 +54,7 @@ def main():
     while True:
         try:
             results = replicate(server, streams)
-        except:
+        except Exception:
             sys.stdout.write("connection_lost(" + repr(streams) + ")\n")
             break
         for update in results.values():
