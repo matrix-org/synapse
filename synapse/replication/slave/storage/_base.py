@@ -15,12 +15,21 @@
 
 import logging
 
+import six
+
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
 
 logger = logging.getLogger(__name__)
+
+
+def __func__(inp):
+    if six.PY3:
+        return inp
+    else:
+        return inp.__func__
 
 
 class BaseSlavedStore(SQLBaseStore):

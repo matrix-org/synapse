@@ -13,10 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
+import logging
+import os
+import sys
+import textwrap
 
 from ._base import Config
+
+logger = logging.getLogger(__name__)
+
+TEMPLATE_DIR_WARNING = """\
+WARNING: The email notifier is configured to look for templates in '%(template_dir)s',
+but no templates could be found there. We will fall back to using the example templates;
+to get rid of this warning, leave 'email.template_dir' unset.
+"""
 
 
 class EmailConfig(Config):
@@ -38,7 +52,6 @@ class EmailConfig(Config):
                 "smtp_host",
                 "smtp_port",
                 "notif_from",
-                "template_dir",
                 "notif_template_html",
                 "notif_template_text",
             ]
@@ -62,9 +75,24 @@ class EmailConfig(Config):
             self.email_smtp_host = email_config["smtp_host"]
             self.email_smtp_port = email_config["smtp_port"]
             self.email_notif_from = email_config["notif_from"]
-            self.email_template_dir = email_config["template_dir"]
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
+
+            self.email_template_dir = email_config.get("template_dir")
+
+            # backwards-compatibility hack
+            if (
+                self.email_template_dir == "res/templates"
+                and not os.path.isfile(
+                    os.path.join(self.email_template_dir, self.email_notif_template_text)
+                )
+            ):
+                t = TEMPLATE_DIR_WARNING % {
+                    "template_dir": self.email_template_dir,
+                }
+                print(textwrap.fill(t, width=80) + "\n", file=sys.stderr)
+                self.email_template_dir = None
+
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
@@ -113,7 +141,9 @@ class EmailConfig(Config):
         #   require_transport_security: False
         #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
         #   app_name: Matrix
-        #   template_dir: res/templates
+        #   # if template_dir is unset, uses the example templates that are part of
+        #   # the Synapse distribution.
+        #   #template_dir: res/templates
         #   notif_template_html: notif_mail.html
         #   notif_template_text: notif_mail.txt
         #   notif_for_new_users: True

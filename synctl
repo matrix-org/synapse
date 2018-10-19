@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +49,16 @@ def pid_running(pid):
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
-    if colour == NORMAL:
+    # Lets check if we're writing to a TTY before colouring
+    should_colour = False
+    try:
+        should_colour = stream.isatty()
+    except AttributeError:
+        # Just in case `isatty` isn't defined on everything. The python
+        # docs are incredibly vague.
+        pass
+
+    if not should_colour:
         stream.write(message + "\n")
     else:
         stream.write(colour + message + NORMAL + "\n")
@@ -77,7 +87,7 @@ def start(configfile):
 
 def start_worker(app, configfile, worker_configfile):
     args = [
-        "python", "-B",
+        sys.executable, "-B",
         "-m", app,
         "-c", configfile,
         "-c", worker_configfile
@@ -280,7 +290,7 @@ def main():
             if worker.cache_factor:
                 os.environ["SYNAPSE_CACHE_FACTOR"] = str(worker.cache_factor)
 
-            for cache_name, factor in worker.cache_factors.iteritems():
+            for cache_name, factor in iteritems(worker.cache_factors):
                 os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
             start_worker(worker.app, configfile, worker.configfile)

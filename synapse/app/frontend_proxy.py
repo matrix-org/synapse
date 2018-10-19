@@ -68,7 +68,7 @@ class PresenceStatusStubServlet(ClientV1RestServlet):
             "Authorization": auth_headers,
         }
         result = yield self.http_client.get_json(
-            self.main_uri + request.uri,
+            self.main_uri + request.uri.decode('ascii'),
             headers=headers,
         )
         defer.returnValue((200, result))
@@ -125,7 +125,7 @@ class KeyUploadServlet(RestServlet):
                 "Authorization": auth_headers,
             }
             result = yield self.http_client.post_json_get_json(
-                self.main_uri + request.uri,
+                self.main_uri + request.uri.decode('ascii'),
                 body,
                 headers=headers,
             )

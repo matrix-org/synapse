@@ -17,18 +17,13 @@ import gc
 import logging
 import sys
 
+import psutil
 from daemonize import Daemonize
 
 from twisted.internet import error, reactor
 
 from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
-
-try:
-    import affinity
-except Exception:
-    affinity = None
-
 
 logger = logging.getLogger(__name__)
 
@@ -89,15 +84,20 @@ def start_reactor(
         with PreserveLoggingContext():
             logger.info("Running")
             if cpu_affinity is not None:
-                if not affinity:
-                    quit_with_error(
-                        "Missing package 'affinity' required for cpu_affinity\n"
-                        "option\n\n"
-                        "Install by running:\n\n"
-                        "   pip install affinity\n\n"
-                    )
-                logger.info("Setting CPU affinity to %s" % cpu_affinity)
-                affinity.set_process_affinity_mask(0, cpu_affinity)
+                # Turn the bitmask into bits, reverse it so we go from 0 up
+                mask_to_bits = bin(cpu_affinity)[2:][::-1]
+
+                cpus = []
+                cpu_num = 0
+
+                for i in mask_to_bits:
+                    if i == "1":
+                        cpus.append(cpu_num)
+                    cpu_num += 1
+
+                p = psutil.Process()
+                p.cpu_affinity(cpus)
+
             change_resource_limit(soft_file_limit)
             if gc_thresholds:
                 gc.set_threshold(*gc_thresholds)
