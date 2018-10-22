@@ -94,13 +94,12 @@ class EmailPusher(object):
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
         self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
         self._start_processing()
-        return defer.succeed(None)
 
     def on_new_receipts(self, min_stream_id, max_stream_id):
         # We could wake up and cancel the timer but there tend to be quite a
         # lot of read receipts so it's probably less work to just let the
         # timer fire
-        return defer.succeed(None)
+        pass
 
     def on_timer(self):
         self.timed_call = None

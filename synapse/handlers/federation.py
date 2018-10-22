@@ -2520,7 +2520,7 @@ class FederationHandler(BaseHandler):
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
-                    self._notify_persisted_event(event, max_stream_id)
+                    yield self._notify_persisted_event(event, max_stream_id)
 
     def _notify_persisted_event(self, event, max_stream_id):
         """Checks to see if notifier/pushers should be notified about the
@@ -2553,7 +2553,7 @@ class FederationHandler(BaseHandler):
             extra_users=extra_users
         )
 
-        self.pusher_pool.on_new_notifications(
+        return self.pusher_pool.on_new_notifications(
             event_stream_id, max_stream_id,
         )
 

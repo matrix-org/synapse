@@ -98,7 +98,6 @@ class HttpPusher(object):
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
         self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering or 0)
         self._start_processing()
-        return defer.suceed(None)
 
     def on_new_receipts(self, min_stream_id, max_stream_id):
         # Note that the min here shouldn't be relied upon to be accurate.
@@ -106,7 +105,6 @@ class HttpPusher(object):
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
         run_as_background_process("http_pusher.on_new_receipts", self._update_badge)
-        return defer.succeed(None)
 
     @defer.inlineCallbacks
     def _update_badge(self):
