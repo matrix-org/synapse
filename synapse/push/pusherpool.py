@@ -18,6 +18,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push.pusher import PusherFactory
 
 logger = logging.getLogger(__name__)
@@ -45,9 +46,13 @@ class PusherPool:
         self.clock = self.hs.get_clock()
         self.pushers = {}
 
-    @defer.inlineCallbacks
     def start(self):
-        yield self._start_pushers()
+        """Starts the pushers off in a background process.
+        """
+        if not self.start_pushers:
+            logger.info("Not starting pushers because they are disabled in the config")
+            return
+        run_as_background_process("start_pushers", self._start_pushers)
 
     @defer.inlineCallbacks
     def add_pusher(self, user_id, access_token, kind, app_id,
@@ -192,9 +197,6 @@ class PusherPool:
         Returns:
             Deferred
         """
-        if not self.start_pushers:
-            logger.info("Not starting pushers because they are disabled in the config")
-            return
         pushers = yield self.store.get_all_pushers()
         logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
