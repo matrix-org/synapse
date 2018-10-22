@@ -192,6 +192,9 @@ class PusherPool:
     @defer.inlineCallbacks
     def start_pusher_by_id(self, app_id, pushkey, user_id):
         """Look up the details for the given pusher, and start it"""
+        if not self._start_pushers:
+            return
+
         resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(
             app_id, pushkey
         )
@@ -202,8 +205,7 @@ class PusherPool:
                 p = r
 
         if p:
-
-            self._start_pushers([p])
+            self._start_pusher(p)
 
     def _start_pushers(self, pushers):
         if not self.start_pushers:
@@ -211,24 +213,37 @@ class PusherPool:
             return
         logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
-            try:
-                p = self.pusher_factory.create_pusher(pusherdict)
-            except Exception:
-                logger.exception("Couldn't start a pusher: caught Exception")
-                continue
-            if p:
-                appid_pushkey = "%s:%s" % (
-                    pusherdict['app_id'],
-                    pusherdict['pushkey'],
-                )
-                byuser = self.pushers.setdefault(pusherdict['user_name'], {})
-
-                if appid_pushkey in byuser:
-                    byuser[appid_pushkey].on_stop()
-                byuser[appid_pushkey] = p
-                run_in_background(p.on_started)
-
+            self._start_pusher(pusherdict)
         logger.info("Started pushers")
+
+    def _start_pusher(self, pusherdict):
+        """Start the given pusher
+
+        Args:
+            pusherdict (dict):
+
+        Returns:
+            None
+        """
+        try:
+            p = self.pusher_factory.create_pusher(pusherdict)
+        except Exception:
+            logger.exception("Couldn't start a pusher: caught Exception")
+            return
+
+        if not p:
+            return
+
+        appid_pushkey = "%s:%s" % (
+            pusherdict['app_id'],
+            pusherdict['pushkey'],
+        )
+        byuser = self.pushers.setdefault(pusherdict['user_name'], {})
+
+        if appid_pushkey in byuser:
+            byuser[appid_pushkey].on_stop()
+        byuser[appid_pushkey] = p
+        run_in_background(p.on_started)
 
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_id):
