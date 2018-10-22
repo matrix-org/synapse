@@ -86,7 +86,7 @@ class PusherPool:
             last_stream_ordering=last_stream_ordering,
             profile_tag=profile_tag,
         )
-        yield self._refresh_pusher(app_id, pushkey, user_id)
+        yield self.start_pusher_by_id(app_id, pushkey, user_id)
 
     @defer.inlineCallbacks
     def remove_pushers_by_app_id_and_pushkey_not_user(self, app_id, pushkey,
@@ -190,7 +190,8 @@ class PusherPool:
             logger.exception("Exception in pusher on_new_receipts")
 
     @defer.inlineCallbacks
-    def _refresh_pusher(self, app_id, pushkey, user_id):
+    def start_pusher_by_id(self, app_id, pushkey, user_id):
+        """Look up the details for the given pusher, and start it"""
         resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(
             app_id, pushkey
         )
