@@ -36,8 +36,7 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def start(self):
-        pushers = yield self.store.get_all_pushers()
-        self._start_pushers(pushers)
+        yield self._start_pushers()
 
     @defer.inlineCallbacks
     def add_pusher(self, user_id, access_token, kind, app_id,
@@ -207,10 +206,17 @@ class PusherPool:
         if p:
             self._start_pusher(p)
 
-    def _start_pushers(self, pushers):
+    @defer.inlineCallbacks
+    def _start_pushers(self):
+        """Start all the pushers
+
+        Returns:
+            Deferred
+        """
         if not self.start_pushers:
             logger.info("Not starting pushers because they are disabled in the config")
             return
+        pushers = yield self.store.get_all_pushers()
         logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
             self._start_pusher(pusherdict)
