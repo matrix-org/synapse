@@ -19,12 +19,24 @@ import logging
 from twisted.internet import defer
 
 from synapse.push.pusher import PusherFactory
-from synapse.util.logcontext import run_in_background
 
 logger = logging.getLogger(__name__)
 
 
 class PusherPool:
+    """
+    The pusher pool. This is responsible for dispatching notifications of new events to
+    the http and email pushers.
+
+    It provides three methods which are designed to be called by the rest of the
+    application: `start`, `on_new_notifications`, and `on_new_receipts`: each of these
+    delegates to each of the relevant pushers.
+
+    Note that it is expected that each pusher will have its own 'processing' loop which
+    will send out the notifications in the background, rather than blocking until the
+    notifications are sent; accordingly Pusher.on_started, Pusher.on_new_notifications and
+    Pusher.on_new_receipts are not expected to return deferreds.
+    """
     def __init__(self, _hs):
         self.hs = _hs
         self.pusher_factory = PusherFactory(_hs)
@@ -216,7 +228,7 @@ class PusherPool:
         if appid_pushkey in byuser:
             byuser[appid_pushkey].on_stop()
         byuser[appid_pushkey] = p
-        run_in_background(p.on_started)
+        p.on_started()
 
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_id):

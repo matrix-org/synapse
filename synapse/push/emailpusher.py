@@ -72,16 +72,9 @@ class EmailPusher(object):
 
         self.processing = False
 
-    @defer.inlineCallbacks
     def on_started(self):
         if self.mailer is not None:
-            try:
-                self.throttle_params = yield self.store.get_throttle_params_by_room(
-                    self.pusher_id
-                )
-                self._start_processing()
-            except Exception:
-                logger.exception("Error starting email pusher")
+            self._start_processing()
 
     def on_stop(self):
         if self.timed_call:
@@ -115,6 +108,12 @@ class EmailPusher(object):
     def _process(self):
         try:
             self.processing = True
+
+            if self.throttle_params is None:
+                # this is our first loop: load up the throttle params
+                self.throttle_params = yield self.store.get_throttle_params_by_room(
+                    self.pusher_id
+                )
 
             # if the max ordering changes while we're running _unsafe_process,
             # call it again, and so on until we've caught up.

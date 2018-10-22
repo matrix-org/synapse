@@ -93,7 +93,6 @@ class HttpPusher(object):
 
     def on_started(self):
         self._start_processing()
-        return defer.succeed(None)
 
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
         self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering or 0)
