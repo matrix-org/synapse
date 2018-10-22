@@ -110,11 +110,12 @@ class UserDirectoryHandler(object):
 
         @defer.inlineCallbacks
         def process():
-            self._is_processing = True
             try:
                 yield self._unsafe_process()
             finally:
                 self._is_processing = False
+
+        self._is_processing = True
         run_as_background_process("user_directory.notify_new_event", process)
 
     @defer.inlineCallbacks
