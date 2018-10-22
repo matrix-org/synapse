@@ -35,7 +35,7 @@ from synapse.push.presentable_names import (
     name_from_member_event,
 )
 from synapse.types import UserID
-from synapse.util.async import concurrently_execute
+from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)

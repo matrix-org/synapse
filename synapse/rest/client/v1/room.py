@@ -34,7 +34,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.streams.config import PaginationConfig
-from synapse.types import RoomAlias, RoomID, ThirdPartyInstanceID, UserID
+from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -90,6 +90,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         self.handlers = hs.get_handlers()
         self.event_creation_hander = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self.message_handler = hs.get_message_handler()
 
     def register(self, http_server):
         # /room/$roomid/state/$eventtype
@@ -124,7 +125,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
         format = parse_string(request, "format", default="content",
                               allowed_values=["content", "event"])
 
-        msg_handler = self.handlers.message_handler
+        msg_handler = self.message_handler
         data = yield msg_handler.get_room_data(
             user_id=requester.user.to_string(),
             room_id=room_id,
@@ -377,22 +378,45 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomMemberListRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.message_handler = hs.get_message_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
         requester = yield self.auth.get_user_by_req(request)
-        handler = self.handlers.message_handler
+        handler = self.message_handler
+
+        # request the state as of a given event, as identified by a stream token,
+        # for consistency with /messages etc.
+        # useful for getting the membership in retrospect as of a given /sync
+        # response.
+        at_token_string = parse_string(request, "at")
+        if at_token_string is None:
+            at_token = None
+        else:
+            at_token = StreamToken.from_string(at_token_string)
+
+        # let you filter down on particular memberships.
+        # XXX: this may not be the best shape for this API - we could pass in a filter
+        # instead, except filters aren't currently aware of memberships.
+        # See https://github.com/matrix-org/matrix-doc/issues/1337 for more details.
+        membership = parse_string(request, "membership")
+        not_membership = parse_string(request, "not_membership")
+
         events = yield handler.get_state_events(
             room_id=room_id,
             user_id=requester.user.to_string(),
+            at_token=at_token,
+            types=[(EventTypes.Member, None)],
         )
 
         chunk = []
 
         for event in events:
-            if event["type"] != EventTypes.Member:
+            if (
+                (membership and event['content'].get("membership") != membership) or
+                (not_membership and event['content'].get("membership") == not_membership)
+            ):
                 continue
             chunk.append(event)
 
@@ -401,12 +425,14 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
         }))
 
 
+# deprecated in favour of /members?membership=join?
+# except it does custom AS logic and has a simpler return format
 class JoinedRoomMemberListRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$")
 
     def __init__(self, hs):
         super(JoinedRoomMemberListRestServlet, self).__init__(hs)
-        self.message_handler = hs.get_handlers().message_handler
+        self.message_handler = hs.get_message_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -427,7 +453,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomMessageListRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.pagination_handler = hs.get_pagination_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -442,8 +468,7 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
-        handler = self.handlers.message_handler
-        msgs = yield handler.get_messages(
+        msgs = yield self.pagination_handler.get_messages(
             room_id=room_id,
             requester=requester,
             pagin_config=pagination_config,
@@ -460,14 +485,13 @@ class RoomStateRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomStateRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.message_handler = hs.get_message_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        handler = self.handlers.message_handler
         # Get all the current state for this room
-        events = yield handler.get_state_events(
+        events = yield self.message_handler.get_state_events(
             room_id=room_id,
             user_id=requester.user.to_string(),
             is_guest=requester.is_guest,
@@ -508,7 +532,7 @@ class RoomEventServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
         requester = yield self.auth.get_user_by_req(request)
-        event = yield self.event_handler.get_event(requester.user, event_id)
+        event = yield self.event_handler.get_event(requester.user, room_id, event_id)
 
         time_now = self.clock.time_msec()
         if event:
@@ -525,7 +549,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomEventContextServlet, self).__init__(hs)
         self.clock = hs.get_clock()
-        self.handlers = hs.get_handlers()
+        self.room_context_handler = hs.get_room_context_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
@@ -533,11 +557,20 @@ class RoomEventContextServlet(ClientV1RestServlet):
 
         limit = parse_integer(request, "limit", default=10)
 
-        results = yield self.handlers.room_context_handler.get_event_context(
+        # picking the API shape for symmetry with /messages
+        filter_bytes = parse_string(request, "filter")
+        if filter_bytes:
+            filter_json = urlparse.unquote(filter_bytes).decode("UTF-8")
+            event_filter = Filter(json.loads(filter_json))
+        else:
+            event_filter = None
+
+        results = yield self.room_context_handler.get_event_context(
             requester.user,
             room_id,
             event_id,
             limit,
+            event_filter,
         )
 
         if not results:
@@ -832,10 +865,13 @@ def register_servlets(hs, http_server):
     RoomSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
-    RoomInitialSyncRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
     JoinedRoomsRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
+
+
+def register_deprecated_servlets(hs, http_server):
+    RoomInitialSyncRestServlet(hs).register(http_server)

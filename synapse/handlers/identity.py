@@ -26,7 +26,7 @@ from twisted.internet import defer
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
-    MatrixCodeMessageException,
+    HttpResponseException,
     SynapseError,
 )
 
@@ -85,7 +85,6 @@ class IdentityHandler(BaseHandler):
             )
             defer.returnValue(None)
 
-        data = {}
         try:
             data = yield self.http_client.get_json(
                 "https://%s%s" % (
@@ -94,11 +93,9 @@ class IdentityHandler(BaseHandler):
                 ),
                 {'sid': creds['sid'], 'client_secret': client_secret}
             )
-        except MatrixCodeMessageException as e:
+        except HttpResponseException as e:
             logger.info("getValidated3pid failed with Matrix error: %r", e)
-            raise SynapseError(e.code, e.msg, e.errcode)
-        except CodeMessageException as e:
-            data = json.loads(e.msg)
+            raise e.to_synapse_error()
 
         if 'medium' in data:
             defer.returnValue(data)
@@ -136,19 +133,23 @@ class IdentityHandler(BaseHandler):
             )
             logger.debug("bound threepid %r to %s", creds, mxid)
         except CodeMessageException as e:
-            data = json.loads(e.msg)
+            data = json.loads(e.msg)  # XXX WAT?
         defer.returnValue(data)
 
     @defer.inlineCallbacks
-    def unbind_threepid(self, mxid, threepid):
-        """
-        Removes a binding from an identity server
+    def try_unbind_threepid(self, mxid, threepid):
+        """Removes a binding from an identity server
+
         Args:
             mxid (str): Matrix user ID of binding to be removed
             threepid (dict): Dict with medium & address of binding to be removed
 
+        Raises:
+            SynapseError: If we failed to contact the identity server
+
         Returns:
-            Deferred[bool]: True on success, otherwise False
+            Deferred[bool]: True on success, otherwise False if the identity
+            server doesn't support unbinding
         """
         logger.debug("unbinding threepid %r from %s", threepid, mxid)
         if not self.trusted_id_servers:
@@ -178,11 +179,21 @@ class IdentityHandler(BaseHandler):
             content=content,
             destination_is=id_server,
         )
-        yield self.http_client.post_json_get_json(
-            url,
-            content,
-            headers,
-        )
+        try:
+            yield self.http_client.post_json_get_json(
+                url,
+                content,
+                headers,
+            )
+        except HttpResponseException as e:
+            if e.code in (400, 404, 501,):
+                # The remote server probably doesn't support unbinding (yet)
+                logger.warn("Received %d response while unbinding threepid", e.code)
+                defer.returnValue(False)
+            else:
+                logger.error("Failed to unbind threepid on identity server: %s", e)
+                raise SynapseError(502, "Failed to contact identity server")
+
         defer.returnValue(True)
 
     @defer.inlineCallbacks
@@ -209,12 +220,9 @@ class IdentityHandler(BaseHandler):
                 params
             )
             defer.returnValue(data)
-        except MatrixCodeMessageException as e:
-            logger.info("Proxied requestToken failed with Matrix error: %r", e)
-            raise SynapseError(e.code, e.msg, e.errcode)
-        except CodeMessageException as e:
+        except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
-            raise e
+            raise e.to_synapse_error()
 
     @defer.inlineCallbacks
     def requestMsisdnToken(
@@ -244,9 +252,6 @@ class IdentityHandler(BaseHandler):
                 params
             )
             defer.returnValue(data)
-        except MatrixCodeMessageException as e:
-            logger.info("Proxied requestToken failed with Matrix error: %r", e)
-            raise SynapseError(e.code, e.msg, e.errcode)
-        except CodeMessageException as e:
+        except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
-            raise e
+            raise e.to_synapse_error()

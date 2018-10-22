@@ -137,7 +137,7 @@ class DomainSpecificString(
     @classmethod
     def from_string(cls, s):
         """Parse the string given by 's' into a structure object."""
-        if len(s) < 1 or s[0] != cls.SIGIL:
+        if len(s) < 1 or s[0:1] != cls.SIGIL:
             raise SynapseError(400, "Expected %s string to start with '%s'" % (
                 cls.__name__, cls.SIGIL,
             ))

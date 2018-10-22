@@ -25,7 +25,7 @@ from twisted.internet import defer
 import synapse.types
 from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, ResourceLimitError
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -65,8 +65,9 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_from_context(self, event, context, do_sig_check=True):
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
         auth_events_ids = yield self.compute_auth_events(
-            event, context.prev_state_ids, for_verification=True,
+            event, prev_state_ids, for_verification=True,
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {
@@ -210,9 +211,9 @@ class Auth(object):
             user_agent = request.requestHeaders.getRawHeaders(
                 b"User-Agent",
                 default=[b""]
-            )[0]
+            )[0].decode('ascii', 'surrogateescape')
             if user and access_token and ip_addr:
-                self.store.insert_client_ip(
+                yield self.store.insert_client_ip(
                     user_id=user.to_string(),
                     access_token=access_token,
                     ip=ip_addr,
@@ -251,10 +252,10 @@ class Auth(object):
             if ip_address not in app_service.ip_range_whitelist:
                 defer.returnValue((None, None))
 
-        if "user_id" not in request.args:
+        if b"user_id" not in request.args:
             defer.returnValue((app_service.sender, app_service))
 
-        user_id = request.args["user_id"][0]
+        user_id = request.args[b"user_id"][0].decode('utf8')
         if app_service.sender == user_id:
             defer.returnValue((app_service.sender, app_service))
 
@@ -544,7 +545,8 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def add_auth_events(self, builder, context):
-        auth_ids = yield self.compute_auth_events(builder, context.prev_state_ids)
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        auth_ids = yield self.compute_auth_events(builder, prev_state_ids)
 
         auth_events_entries = yield self.store.add_event_hashes(
             auth_ids
@@ -680,7 +682,7 @@ class Auth(object):
         Returns:
             bool: False if no access_token was given, True otherwise.
         """
-        query_params = request.args.get("access_token")
+        query_params = request.args.get(b"access_token")
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
 
@@ -696,7 +698,7 @@ class Auth(object):
                 401 since some of the old clients depended on auth errors returning
                 403.
         Returns:
-            str: The access_token
+            unicode: The access_token
         Raises:
             AuthError: If there isn't an access_token in the request.
         """
@@ -718,9 +720,9 @@ class Auth(object):
                     "Too many Authorization headers.",
                     errcode=Codes.MISSING_TOKEN,
                 )
-            parts = auth_headers[0].split(" ")
-            if parts[0] == "Bearer" and len(parts) == 2:
-                return parts[1]
+            parts = auth_headers[0].split(b" ")
+            if parts[0] == b"Bearer" and len(parts) == 2:
+                return parts[1].decode('ascii')
             else:
                 raise AuthError(
                     token_not_found_http_status,
@@ -736,4 +738,71 @@ class Auth(object):
                     errcode=Codes.MISSING_TOKEN
                 )
 
-            return query_params[0]
+            return query_params[0].decode('ascii')
+
+    @defer.inlineCallbacks
+    def check_in_room_or_world_readable(self, room_id, user_id):
+        """Checks that the user is or was in the room or the room is world
+        readable. If it isn't then an exception is raised.
+
+        Returns:
+            Deferred[tuple[str, str|None]]: Resolves to the current membership of
+            the user in the room and the membership event ID of the user. If
+            the user is not in the room and never has been, then
+            `(Membership.JOIN, None)` is returned.
+        """
+
+        try:
+            # check_user_was_in_room will return the most recent membership
+            # event for the user if:
+            #  * The user is a non-guest user, and was ever in the room
+            #  * The user is a guest user, and has joined the room
+            # else it will throw.
+            member_event = yield self.check_user_was_in_room(room_id, user_id)
+            defer.returnValue((member_event.membership, member_event.event_id))
+        except AuthError:
+            visibility = yield self.state.get_current_state(
+                room_id, EventTypes.RoomHistoryVisibility, ""
+            )
+            if (
+                visibility and
+                visibility.content["history_visibility"] == "world_readable"
+            ):
+                defer.returnValue((Membership.JOIN, None))
+                return
+            raise AuthError(
+                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+            )
+
+    @defer.inlineCallbacks
+    def check_auth_blocking(self, user_id=None):
+        """Checks if the user should be rejected for some external reason,
+        such as monthly active user limiting or global disable flag
+
+        Args:
+            user_id(str|None): If present, checks for presence against existing
+            MAU cohort
+        """
+        if self.hs.config.hs_disabled:
+            raise ResourceLimitError(
+                403, self.hs.config.hs_disabled_message,
+                errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                admin_uri=self.hs.config.admin_uri,
+                limit_type=self.hs.config.hs_disabled_limit_type
+            )
+        if self.hs.config.limit_usage_by_mau is True:
+            # If the user is already part of the MAU cohort
+            if user_id:
+                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
+                if timestamp:
+                    return
+            # Else if there is no room in the MAU bucket, bail
+            current_mau = yield self.store.get_monthly_active_count()
+            if current_mau >= self.hs.config.max_mau_value:
+                raise ResourceLimitError(
+                    403, "Monthly Active User Limit Exceeded",
+
+                    admin_uri=self.hs.config.admin_uri,
+                    errcode=Codes.RESOURCE_LIMIT_EXCEED,
+                    limit_type="monthly_active_user"
+                )

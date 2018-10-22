@@ -24,14 +24,10 @@ from tests import unittest
 
 
 def _regex(regex, exclusive=True):
-    return {
-        "regex": re.compile(regex),
-        "exclusive": exclusive
-    }
+    return {"regex": re.compile(regex), "exclusive": exclusive}
 
 
 class ApplicationServiceTestCase(unittest.TestCase):
-
     def setUp(self):
         self.service = ApplicationService(
             id="unique_identifier",
@@ -41,8 +37,8 @@ class ApplicationServiceTestCase(unittest.TestCase):
             namespaces={
                 ApplicationService.NS_USERS: [],
                 ApplicationService.NS_ROOMS: [],
-                ApplicationService.NS_ALIASES: []
-            }
+                ApplicationService.NS_ALIASES: [],
+            },
         )
         self.event = Mock(
             type="m.something", room_id="!foo:bar", sender="@someone:somewhere"
@@ -52,25 +48,19 @@ class ApplicationServiceTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_regex_user_id_prefix_match(self):
-        self.service.namespaces[ApplicationService.NS_USERS].append(
-            _regex("@irc_.*")
-        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@irc_foobar:matrix.org"
         self.assertTrue((yield self.service.is_interested(self.event)))
 
     @defer.inlineCallbacks
     def test_regex_user_id_prefix_no_match(self):
-        self.service.namespaces[ApplicationService.NS_USERS].append(
-            _regex("@irc_.*")
-        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@someone_else:matrix.org"
         self.assertFalse((yield self.service.is_interested(self.event)))
 
     @defer.inlineCallbacks
     def test_regex_room_member_is_checked(self):
-        self.service.namespaces[ApplicationService.NS_USERS].append(
-            _regex("@irc_.*")
-        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@someone_else:matrix.org"
         self.event.type = "m.room.member"
         self.event.state_key = "@irc_foobar:matrix.org"
@@ -98,60 +88,47 @@ class ApplicationServiceTestCase(unittest.TestCase):
             _regex("#irc_.*:matrix.org")
         )
         self.store.get_aliases_for_room.return_value = [
-            "#irc_foobar:matrix.org", "#athing:matrix.org"
+            "#irc_foobar:matrix.org",
+            "#athing:matrix.org",
         ]
         self.store.get_users_in_room.return_value = []
-        self.assertTrue((yield self.service.is_interested(
-            self.event, self.store
-        )))
+        self.assertTrue((yield self.service.is_interested(self.event, self.store)))
 
     def test_non_exclusive_alias(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org", exclusive=False)
         )
-        self.assertFalse(self.service.is_exclusive_alias(
-            "#irc_foobar:matrix.org"
-        ))
+        self.assertFalse(self.service.is_exclusive_alias("#irc_foobar:matrix.org"))
 
     def test_non_exclusive_room(self):
         self.service.namespaces[ApplicationService.NS_ROOMS].append(
             _regex("!irc_.*:matrix.org", exclusive=False)
         )
-        self.assertFalse(self.service.is_exclusive_room(
-            "!irc_foobar:matrix.org"
-        ))
+        self.assertFalse(self.service.is_exclusive_room("!irc_foobar:matrix.org"))
 
     def test_non_exclusive_user(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
             _regex("@irc_.*:matrix.org", exclusive=False)
         )
-        self.assertFalse(self.service.is_exclusive_user(
-            "@irc_foobar:matrix.org"
-        ))
+        self.assertFalse(self.service.is_exclusive_user("@irc_foobar:matrix.org"))
 
     def test_exclusive_alias(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org", exclusive=True)
         )
-        self.assertTrue(self.service.is_exclusive_alias(
-            "#irc_foobar:matrix.org"
-        ))
+        self.assertTrue(self.service.is_exclusive_alias("#irc_foobar:matrix.org"))
 
     def test_exclusive_user(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(
             _regex("@irc_.*:matrix.org", exclusive=True)
         )
-        self.assertTrue(self.service.is_exclusive_user(
-            "@irc_foobar:matrix.org"
-        ))
+        self.assertTrue(self.service.is_exclusive_user("@irc_foobar:matrix.org"))
 
     def test_exclusive_room(self):
         self.service.namespaces[ApplicationService.NS_ROOMS].append(
             _regex("!irc_.*:matrix.org", exclusive=True)
         )
-        self.assertTrue(self.service.is_exclusive_room(
-            "!irc_foobar:matrix.org"
-        ))
+        self.assertTrue(self.service.is_exclusive_room("!irc_foobar:matrix.org"))
 
     @defer.inlineCallbacks
     def test_regex_alias_no_match(self):
@@ -159,47 +136,36 @@ class ApplicationServiceTestCase(unittest.TestCase):
             _regex("#irc_.*:matrix.org")
         )
         self.store.get_aliases_for_room.return_value = [
-            "#xmpp_foobar:matrix.org", "#athing:matrix.org"
+            "#xmpp_foobar:matrix.org",
+            "#athing:matrix.org",
         ]
         self.store.get_users_in_room.return_value = []
-        self.assertFalse((yield self.service.is_interested(
-            self.event, self.store
-        )))
+        self.assertFalse((yield self.service.is_interested(self.event, self.store)))
 
     @defer.inlineCallbacks
     def test_regex_multiple_matches(self):
         self.service.namespaces[ApplicationService.NS_ALIASES].append(
             _regex("#irc_.*:matrix.org")
         )
-        self.service.namespaces[ApplicationService.NS_USERS].append(
-            _regex("@irc_.*")
-        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.sender = "@irc_foobar:matrix.org"
         self.store.get_aliases_for_room.return_value = ["#irc_barfoo:matrix.org"]
         self.store.get_users_in_room.return_value = []
-        self.assertTrue((yield self.service.is_interested(
-            self.event, self.store
-        )))
+        self.assertTrue((yield self.service.is_interested(self.event, self.store)))
 
     @defer.inlineCallbacks
     def test_interested_in_self(self):
         # make sure invites get through
         self.service.sender = "@appservice:name"
-        self.service.namespaces[ApplicationService.NS_USERS].append(
-            _regex("@irc_.*")
-        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.event.type = "m.room.member"
-        self.event.content = {
-            "membership": "invite"
-        }
+        self.event.content = {"membership": "invite"}
         self.event.state_key = self.service.sender
         self.assertTrue((yield self.service.is_interested(self.event)))
 
     @defer.inlineCallbacks
     def test_member_list_match(self):
-        self.service.namespaces[ApplicationService.NS_USERS].append(
-            _regex("@irc_.*")
-        )
+        self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
         self.store.get_users_in_room.return_value = [
             "@alice:here",
             "@irc_fo:here",  # AS user
@@ -208,6 +174,6 @@ class ApplicationServiceTestCase(unittest.TestCase):
         self.store.get_aliases_for_room.return_value = []
 
         self.event.sender = "@xmpp_foobar:matrix.org"
-        self.assertTrue((yield self.service.is_interested(
-            event=self.event, store=self.store
-        )))
+        self.assertTrue(
+            (yield self.service.is_interested(event=self.event, store=self.store))
+        )

@@ -69,10 +69,7 @@ class GroupIDTestCase(unittest.TestCase):
         self.assertEqual("my.domain", group_id.domain)
 
     def test_validate(self):
-        bad_ids = [
-            "$badsigil:domain",
-            "+:empty",
-        ] + [
+        bad_ids = ["$badsigil:domain", "+:empty"] + [
             "+group" + c + ":domain" for c in "A%?æ£"
         ]
         for id_string in bad_ids:

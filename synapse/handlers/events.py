@@ -19,10 +19,12 @@ import random
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.events.utils import serialize_event
 from synapse.types import UserID
 from synapse.util.logutils import log_function
+from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
 
@@ -129,11 +131,13 @@ class EventStreamHandler(BaseHandler):
 class EventHandler(BaseHandler):
 
     @defer.inlineCallbacks
-    def get_event(self, user, event_id):
+    def get_event(self, user, room_id, event_id):
         """Retrieve a single specified event.
 
         Args:
             user (synapse.types.UserID): The user requesting the event
+            room_id (str|None): The expected room id. We'll return None if the
+                event's room does not match.
             event_id (str): The event ID to obtain.
         Returns:
             dict: An event, or None if there is no event matching this ID.
@@ -142,13 +146,26 @@ class EventHandler(BaseHandler):
             AuthError if the user does not have the rights to inspect this
             event.
         """
-        event = yield self.store.get_event(event_id)
+        event = yield self.store.get_event(event_id, check_room_id=room_id)
 
         if not event:
             defer.returnValue(None)
             return
 
-        if hasattr(event, "room_id"):
-            yield self.auth.check_joined_room(event.room_id, user.to_string())
+        users = yield self.store.get_users_in_room(event.room_id)
+        is_peeking = user.to_string() not in users
+
+        filtered = yield filter_events_for_client(
+            self.store,
+            user.to_string(),
+            [event],
+            is_peeking=is_peeking
+        )
+
+        if not filtered:
+            raise AuthError(
+                403,
+                "You don't have permission to access that event."
+            )
 
         defer.returnValue(event)

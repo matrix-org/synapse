@@ -36,6 +36,7 @@ from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
     FederationServer,
+    ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.transaction_queue import TransactionQueue
@@ -52,12 +53,13 @@ from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
-from synapse.handlers.message import EventCreationHandler
+from synapse.handlers.message import EventCreationHandler, MessageHandler
+from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
-from synapse.handlers.room import RoomCreationHandler
+from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -74,6 +76,7 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
+from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
@@ -158,11 +161,15 @@ class HomeServer(object):
         'groups_server_handler',
         'groups_attestation_signing',
         'groups_attestation_renewer',
+        'secrets',
         'spam_checker',
         'room_member_handler',
         'federation_registry',
         'server_notices_manager',
         'server_notices_sender',
+        'message_handler',
+        'pagination_handler',
+        'room_context_handler',
     ]
 
     def __init__(self, hostname, reactor=None, **kwargs):
@@ -405,6 +412,9 @@ class HomeServer(object):
     def build_groups_attestation_renewer(self):
         return GroupAttestionRenewer(self)
 
+    def build_secrets(self):
+        return Secrets()
+
     def build_spam_checker(self):
         return SpamChecker(self)
 
@@ -414,7 +424,10 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        return FederationHandlerRegistry()
+        if self.config.worker_app:
+            return ReplicationFederationHandlerRegistry(self)
+        else:
+            return FederationHandlerRegistry()
 
     def build_server_notices_manager(self):
         if self.config.worker_app:
@@ -425,6 +438,15 @@ class HomeServer(object):
         if self.config.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
+
+    def build_message_handler(self):
+        return MessageHandler(self)
+
+    def build_pagination_handler(self):
+        return PaginationHandler(self)
+
+    def build_room_context_handler(self):
+        return RoomContextHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

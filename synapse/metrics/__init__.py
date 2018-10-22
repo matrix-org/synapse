@@ -174,6 +174,19 @@ sent_transactions_counter = Counter("synapse_federation_client_sent_transactions
 
 events_processed_counter = Counter("synapse_federation_client_events_processed", "")
 
+event_processing_loop_counter = Counter(
+    "synapse_event_processing_loop_count",
+    "Event processing loop iterations",
+    ["name"],
+)
+
+event_processing_loop_room_count = Counter(
+    "synapse_event_processing_loop_room_count",
+    "Rooms seen per event processing loop iteration",
+    ["name"],
+)
+
+
 # Used to track where various components have processed in the event stream,
 # e.g. federation sending, appservice sending, etc.
 event_processing_positions = Gauge("synapse_event_processing_positions", "", ["name"])

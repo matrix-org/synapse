@@ -25,7 +25,7 @@ from synapse.api.errors import AuthError
 from synapse.handlers.presence import format_user_presence_state
 from synapse.metrics import LaterGauge
 from synapse.types import StreamToken
-from synapse.util.async import (
+from synapse.util.async_helpers import (
     DeferredTimeoutError,
     ObservableDeferred,
     add_timeout_to_deferred,
@@ -274,7 +274,7 @@ class Notifier(object):
             logger.exception("Error notifying application services of event")
 
     def on_new_event(self, stream_key, new_token, users=[], rooms=[]):
-        """ Used to inform listeners that something has happend event wise.
+        """ Used to inform listeners that something has happened event wise.
 
         Will wake up all listeners for the given users and rooms.
         """

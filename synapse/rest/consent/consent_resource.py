@@ -140,7 +140,7 @@ class ConsentResource(Resource):
         version = parse_string(request, "v",
                                default=self._default_consent_version)
         username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True)
+        userhmac = parse_string(request, "h", required=True, encoding=None)
 
         self._check_hash(username, userhmac)
 
@@ -175,7 +175,7 @@ class ConsentResource(Resource):
         """
         version = parse_string(request, "v", required=True)
         username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True)
+        userhmac = parse_string(request, "h", required=True, encoding=None)
 
         self._check_hash(username, userhmac)
 
@@ -210,9 +210,18 @@ class ConsentResource(Resource):
         finish_request(request)
 
     def _check_hash(self, userid, userhmac):
+        """
+        Args:
+            userid (unicode):
+            userhmac (bytes):
+
+        Raises:
+              SynapseError if the hash doesn't match
+
+        """
         want_mac = hmac.new(
             key=self._hmac_secret,
-            msg=userid,
+            msg=userid.encode('utf-8'),
             digestmod=sha256,
         ).hexdigest()
 

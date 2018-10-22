@@ -26,11 +26,37 @@ import yaml
 
 
 def request_registration(user, password, server_location, shared_secret, admin=False):
+    req = urllib2.Request(
+        "%s/_matrix/client/r0/admin/register" % (server_location,),
+        headers={'Content-Type': 'application/json'}
+    )
+
+    try:
+        if sys.version_info[:3] >= (2, 7, 9):
+            # As of version 2.7.9, urllib2 now checks SSL certs
+            import ssl
+            f = urllib2.urlopen(req, context=ssl.SSLContext(ssl.PROTOCOL_SSLv23))
+        else:
+            f = urllib2.urlopen(req)
+        body = f.read()
+        f.close()
+        nonce = json.loads(body)["nonce"]
+    except urllib2.HTTPError as e:
+        print "ERROR! Received %d %s" % (e.code, e.reason,)
+        if 400 <= e.code < 500:
+            if e.info().type == "application/json":
+                resp = json.load(e)
+                if "error" in resp:
+                    print resp["error"]
+        sys.exit(1)
+
     mac = hmac.new(
         key=shared_secret,
         digestmod=hashlib.sha1,
     )
 
+    mac.update(nonce)
+    mac.update("\x00")
     mac.update(user)
     mac.update("\x00")
     mac.update(password)
@@ -40,10 +66,10 @@ def request_registration(user, password, server_location, shared_secret, admin=F
     mac = mac.hexdigest()
 
     data = {
-        "user": user,
+        "nonce": nonce,
+        "username": user,
         "password": password,
         "mac": mac,
-        "type": "org.matrix.login.shared_secret",
         "admin": admin,
     }
 
@@ -52,7 +78,7 @@ def request_registration(user, password, server_location, shared_secret, admin=F
     print "Sending registration request..."
 
     req = urllib2.Request(
-        "%s/_matrix/client/api/v1/register" % (server_location,),
+        "%s/_matrix/client/r0/admin/register" % (server_location,),
         data=json.dumps(data),
         headers={'Content-Type': 'application/json'}
     )

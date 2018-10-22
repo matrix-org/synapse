@@ -15,4 +15,7 @@
 
 from twisted.trial import util
 
+from tests import utils
+
 util.DEFAULT_TIMEOUT_DURATION = 10
+utils.setupdb()

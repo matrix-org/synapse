@@ -71,7 +71,7 @@ We'd like to invite you to join #matrix:matrix.org (via
 https://matrix.org/docs/projects/try-matrix-now.html), run a homeserver, take a look
 at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 `APIs <https://matrix.org/docs/api>`_ and `Client SDKs
-<http://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
+<https://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
 
 Thanks for using Matrix!
 
@@ -157,12 +157,19 @@ if you prefer.
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-There is an offical synapse image available at https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with the docker-compose file available at `contrib/docker`. Further information on this including configuration options is available in `contrib/docker/README.md`.
+There is an offical synapse image available at 
+https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with
+the docker-compose file available at `contrib/docker <contrib/docker>`_. Further information on
+this including configuration options is available in the README on
+hub.docker.com.
 
-Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a Dockerfile to automate a synapse server in a single Docker image, at https://hub.docker.com/r/avhost/docker-matrix/tags/
+Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
+Dockerfile to automate a synapse server in a single Docker image, at
+https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
-tested with VirtualBox/AWS/DigitalOcean - see https://github.com/EMnify/matrix-synapse-auto-deploy
+tested with VirtualBox/AWS/DigitalOcean - see 
+https://github.com/EMnify/matrix-synapse-auto-deploy
 for details.
 
 Configuring synapse
@@ -283,7 +290,7 @@ Connecting to Synapse from a client
 
 The easiest way to try out your new Synapse installation is by connecting to it
 from a web client. The easiest option is probably the one at
-http://riot.im/app. You will need to specify a "Custom server" when you log on
+https://riot.im/app. You will need to specify a "Custom server" when you log on
 or register: set this to ``https://domain.tld`` if you setup a reverse proxy
 following the recommended setup, or ``https://localhost:8448`` - remember to specify the
 port (``:8448``) if not ``:443`` unless you changed the configuration. (Leave the identity
@@ -329,7 +336,7 @@ Security Note
 =============
 
 Matrix serves raw user generated data in some APIs - specifically the `content
-repository endpoints <http://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
+repository endpoints <https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
 
 Whilst we have tried to mitigate against possible XSS attacks (e.g.
 https://github.com/matrix-org/synapse/pull/1021) we recommend running
@@ -348,7 +355,7 @@ Platform-Specific Instructions
 Debian
 ------
 
-Matrix provides official Debian packages via apt from http://matrix.org/packages/debian/.
+Matrix provides official Debian packages via apt from https://matrix.org/packages/debian/.
 Note that these packages do not include a client - choose one from
 https://matrix.org/docs/projects/try-matrix-now.html (or build your own with one of our SDKs :)
 
@@ -361,6 +368,19 @@ Synapse is in the Fedora repositories as ``matrix-synapse``::
 
 Oleg Girko provides Fedora RPMs at
 https://obs.infoserver.lv/project/monitor/matrix-synapse
+
+OpenSUSE
+--------
+
+Synapse is in the OpenSUSE repositories as ``matrix-synapse``::
+
+    sudo zypper install matrix-synapse
+
+SUSE Linux Enterprise Server
+----------------------------
+
+Unofficial package are built for SLES 15 in the openSUSE:Backports:SLE-15 repository at
+https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15/standard/
 
 ArchLinux
 ---------
@@ -524,7 +544,7 @@ Troubleshooting Running
 -----------------------
 
 If synapse fails with ``missing "sodium.h"`` crypto errors, you may need
-to manually upgrade PyNaCL, as synapse uses NaCl (http://nacl.cr.yp.to/) for
+to manually upgrade PyNaCL, as synapse uses NaCl (https://nacl.cr.yp.to/) for
 encryption and digital signatures.
 Unfortunately PyNACL currently has a few issues
 (https://github.com/pyca/pynacl/issues/53) and
@@ -672,8 +692,8 @@ useful just for development purposes. See `<demo/README>`_.
 Using PostgreSQL
 ================
 
-As of Synapse 0.9, `PostgreSQL <http://www.postgresql.org>`_ is supported as an
-alternative to the `SQLite <http://sqlite.org/>`_ database that Synapse has
+As of Synapse 0.9, `PostgreSQL <https://www.postgresql.org>`_ is supported as an
+alternative to the `SQLite <https://sqlite.org/>`_ database that Synapse has
 traditionally used for convenience and simplicity.
 
 The advantages of Postgres include:
@@ -697,7 +717,7 @@ Using a reverse proxy with Synapse
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
 `Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
-`HAProxy <http://www.haproxy.org/>`_ in front of Synapse. One advantage of
+`HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 

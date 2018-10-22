@@ -28,7 +28,7 @@ class KeyStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver()
+        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -39,15 +39,12 @@ class KeyStoreTestCase(tests.unittest.TestCase):
         key2 = signedjson.key.decode_verify_key_base64(
             "ed25519", "key2", "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
         )
-        yield self.store.store_server_verify_key(
-            "server1", "from_server", 0, key1
-        )
-        yield self.store.store_server_verify_key(
-            "server1", "from_server", 0, key2
-        )
+        yield self.store.store_server_verify_key("server1", "from_server", 0, key1)
+        yield self.store.store_server_verify_key("server1", "from_server", 0, key2)
 
         res = yield self.store.get_server_verify_keys(
-            "server1", ["ed25519:key1", "ed25519:key2", "ed25519:key3"])
+            "server1", ["ed25519:key1", "ed25519:key2", "ed25519:key3"]
+        )
 
         self.assertEqual(len(res.keys()), 2)
         self.assertEqual(res["ed25519:key1"].version, "key1")

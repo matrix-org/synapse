@@ -1,4 +1,3 @@
-import json
 import re
 
 from twisted.internet.defer import Deferred
@@ -9,7 +8,7 @@ from synapse.http.server import JsonResource
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, setup_test_homeserver
+from tests.server import make_request, render, setup_test_homeserver
 
 
 class JsonResourceTests(unittest.TestCase):
@@ -17,7 +16,7 @@ class JsonResourceTests(unittest.TestCase):
         self.reactor = MemoryReactorClock()
         self.hs_clock = Clock(self.reactor)
         self.homeserver = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.reactor
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.reactor
         )
 
     def test_handler_for_request(self):
@@ -38,7 +37,7 @@ class JsonResourceTests(unittest.TestCase):
         )
 
         request, channel = make_request(b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(request.args, {b'a': [u"\N{SNOWMAN}".encode('utf8')]})
         self.assertEqual(got_kwargs, {u"room_id": u"\N{SNOWMAN}"})
@@ -56,7 +55,7 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foo")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'500')
 
@@ -79,13 +78,8 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foo")
-        request.render(res)
+        render(request, res, self.reactor)
 
-        # No error has been raised yet
-        self.assertTrue("code" not in channel.result)
-
-        # Advance time, now there's an error
-        self.reactor.advance(1)
         self.assertEqual(channel.result["code"], b'500')
 
     def test_callback_synapseerror(self):
@@ -101,12 +95,11 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foo")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'403')
-        reply_body = json.loads(channel.result["body"])
-        self.assertEqual(reply_body["error"], "Forbidden!!one!")
-        self.assertEqual(reply_body["errcode"], "M_FORBIDDEN")
+        self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
     def test_no_handler(self):
         """
@@ -123,9 +116,8 @@ class JsonResourceTests(unittest.TestCase):
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
         request, channel = make_request(b"GET", b"/_matrix/foobar")
-        request.render(res)
+        render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'400')
-        reply_body = json.loads(channel.result["body"])
-        self.assertEqual(reply_body["error"], "Unrecognized request")
-        self.assertEqual(reply_body["errcode"], "M_UNRECOGNIZED")
+        self.assertEqual(channel.json_body["error"], "Unrecognized request")
+        self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")

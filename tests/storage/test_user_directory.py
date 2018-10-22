@@ -29,7 +29,7 @@ BOBBY = "@bobby:a"
 class UserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver()
+        self.hs = yield setup_test_homeserver(self.addCleanup)
         self.store = UserDirectoryStore(None, self.hs)
 
         # alice and bob are both in !room_id. bobby is not but shares
@@ -39,20 +39,12 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
             {
                 ALICE: ProfileInfo(None, "alice"),
                 BOB: ProfileInfo(None, "bob"),
-                BOBBY: ProfileInfo(None, "bobby")
+                BOBBY: ProfileInfo(None, "bobby"),
             },
         )
-        yield self.store.add_users_to_public_room(
-            "!room:id",
-            [ALICE, BOB],
-        )
+        yield self.store.add_users_to_public_room("!room:id", [ALICE, BOB])
         yield self.store.add_users_who_share_room(
-            "!room:id",
-            False,
-            (
-                (ALICE, BOB),
-                (BOB, ALICE),
-            ),
+            "!room:id", False, ((ALICE, BOB), (BOB, ALICE))
         )
 
     @defer.inlineCallbacks
@@ -62,11 +54,9 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         r = yield self.store.search_user_dir(ALICE, "bob", 10)
         self.assertFalse(r["limited"])
         self.assertEqual(1, len(r["results"]))
-        self.assertDictEqual(r["results"][0], {
-            "user_id": BOB,
-            "display_name": "bob",
-            "avatar_url": None,
-        })
+        self.assertDictEqual(
+            r["results"][0], {"user_id": BOB, "display_name": "bob", "avatar_url": None}
+        )
 
     @defer.inlineCallbacks
     def test_search_user_dir_all_users(self):
@@ -75,15 +65,13 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
             r = yield self.store.search_user_dir(ALICE, "bob", 10)
             self.assertFalse(r["limited"])
             self.assertEqual(2, len(r["results"]))
-            self.assertDictEqual(r["results"][0], {
-                "user_id": BOB,
-                "display_name": "bob",
-                "avatar_url": None,
-            })
-            self.assertDictEqual(r["results"][1], {
-                "user_id": BOBBY,
-                "display_name": "bobby",
-                "avatar_url": None,
-            })
+            self.assertDictEqual(
+                r["results"][0],
+                {"user_id": BOB, "display_name": "bob", "avatar_url": None},
+            )
+            self.assertDictEqual(
+                r["results"][1],
+                {"user_id": BOBBY, "display_name": "bobby", "avatar_url": None},
+            )
         finally:
             self.hs.config.user_directory_search_all_users = False

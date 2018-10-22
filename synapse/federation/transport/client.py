@@ -195,7 +195,7 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_membership_event(self, destination, room_id, user_id, membership):
+    def make_membership_event(self, destination, room_id, user_id, membership, params):
         """Asks a remote server to build and sign us a membership event
 
         Note that this does not append any events to any graphs.
@@ -205,6 +205,8 @@ class TransportLayerClient(object):
             room_id (str): room to join/leave
             user_id (str): user to be joined/left
             membership (str): one of join/leave
+            params (dict[str, str|Iterable[str]]): Query parameters to include in the
+                request.
 
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
@@ -241,6 +243,7 @@ class TransportLayerClient(object):
         content = yield self.client.get_json(
             destination=destination,
             path=path,
+            args=params,
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=20000,
             ignore_backoff=ignore_backoff,

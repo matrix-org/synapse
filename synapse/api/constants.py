@@ -96,3 +96,11 @@ class RoomCreationPreset(object):
 class ThirdPartyEntityKind(object):
     USER = "user"
     LOCATION = "location"
+
+
+# the version we will give rooms which are created on this server
+DEFAULT_ROOM_VERSION = "1"
+
+# vdh-test-version is a placeholder to get room versioning support working and tested
+# until we have a working v2.
+KNOWN_ROOM_VERSIONS = {"1", "vdh-test-version"}

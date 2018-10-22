@@ -177,7 +177,7 @@ class MediaStorage(object):
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(
-                        open(local_path, "w"), self.hs.get_reactor())
+                        open(local_path, "wb"), self.hs.get_reactor())
                     yield res.write_to_consumer(consumer)
                     yield consumer.wait()
                 defer.returnValue(local_path)

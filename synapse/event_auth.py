@@ -20,7 +20,7 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, EventSizeError, SynapseError
 from synapse.types import UserID, get_domain_from_id
 
@@ -83,6 +83,14 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
                 403,
                 "Creation event's room_id domain does not match sender's"
             )
+
+        room_version = event.content.get("room_version", "1")
+        if room_version not in KNOWN_ROOM_VERSIONS:
+            raise AuthError(
+                403,
+                "room appears to have unsupported version %s" % (
+                    room_version,
+                ))
         # FIXME
         logger.debug("Allowing! %s", event)
         return

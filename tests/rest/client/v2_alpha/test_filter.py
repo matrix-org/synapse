@@ -21,15 +21,19 @@ from synapse.types import UserID
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import ThreadedMemoryReactorClock as MemoryReactorClock
-from tests.server import make_request, setup_test_homeserver, wait_until_result
+from tests.server import (
+    ThreadedMemoryReactorClock as MemoryReactorClock,
+    make_request,
+    render,
+    setup_test_homeserver,
+)
 
 PATH_PREFIX = "/_matrix/client/v2_alpha"
 
 
 class FilterTestCase(unittest.TestCase):
 
-    USER_ID = b"@apple:test"
+    USER_ID = "@apple:test"
     EXAMPLE_FILTER = {"room": {"timeline": {"types": ["m.room.message"]}}}
     EXAMPLE_FILTER_JSON = b'{"room": {"timeline": {"types": ["m.room.message"]}}}'
     TO_REGISTER = [filter]
@@ -39,7 +43,7 @@ class FilterTestCase(unittest.TestCase):
         self.hs_clock = Clock(self.clock)
 
         self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
         )
 
         self.auth = self.hs.get_auth()
@@ -68,12 +72,11 @@ class FilterTestCase(unittest.TestCase):
 
     def test_add_filter(self):
         request, channel = make_request(
-            b"POST",
-            b"/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
+            "POST",
+            "/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
             self.EXAMPLE_FILTER_JSON,
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEqual(channel.json_body, {"filter_id": "0"})
@@ -83,12 +86,11 @@ class FilterTestCase(unittest.TestCase):
 
     def test_add_filter_for_other_user(self):
         request, channel = make_request(
-            b"POST",
-            b"/_matrix/client/r0/user/%s/filter" % (b"@watermelon:test"),
+            "POST",
+            "/_matrix/client/r0/user/%s/filter" % ("@watermelon:test"),
             self.EXAMPLE_FILTER_JSON,
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"403")
         self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
@@ -97,12 +99,11 @@ class FilterTestCase(unittest.TestCase):
         _is_mine = self.hs.is_mine
         self.hs.is_mine = lambda target_user: False
         request, channel = make_request(
-            b"POST",
-            b"/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
+            "POST",
+            "/_matrix/client/r0/user/%s/filter" % (self.USER_ID),
             self.EXAMPLE_FILTER_JSON,
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.hs.is_mine = _is_mine
         self.assertEqual(channel.result["code"], b"403")
@@ -115,20 +116,18 @@ class FilterTestCase(unittest.TestCase):
         self.clock.advance(1)
         filter_id = filter_id.result
         request, channel = make_request(
-            b"GET", b"/_matrix/client/r0/user/%s/filter/%s" % (self.USER_ID, filter_id)
+            "GET", "/_matrix/client/r0/user/%s/filter/%s" % (self.USER_ID, filter_id)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEquals(channel.json_body, self.EXAMPLE_FILTER)
 
     def test_get_filter_non_existant(self):
         request, channel = make_request(
-            b"GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.USER_ID)
+            "GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.USER_ID)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"400")
         self.assertEquals(channel.json_body["errcode"], Codes.NOT_FOUND)
@@ -137,19 +136,17 @@ class FilterTestCase(unittest.TestCase):
     # in errors.py
     def test_get_filter_invalid_id(self):
         request, channel = make_request(
-            b"GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.USER_ID)
+            "GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.USER_ID)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"400")
 
     # No ID also returns an invalid_id error
     def test_get_filter_no_id(self):
         request, channel = make_request(
-            b"GET", "/_matrix/client/r0/user/%s/filter/" % (self.USER_ID)
+            "GET", "/_matrix/client/r0/user/%s/filter/" % (self.USER_ID)
         )
-        request.render(self.resource)
-        wait_until_result(self.clock, channel)
+        render(request, self.resource, self.clock)
 
         self.assertEqual(channel.result["code"], b"400")
