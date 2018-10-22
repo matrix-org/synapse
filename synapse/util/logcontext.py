@@ -598,7 +598,7 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
 
     def g():
         with LoggingContext(parent_context=logcontext):
-            f(*args, **kwargs)
+            return f(*args, **kwargs)
 
     return make_deferred_yieldable(
         threads.deferToThreadPool(reactor, threadpool, g)
