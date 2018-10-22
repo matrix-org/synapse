@@ -108,6 +108,7 @@ class UserDirectoryHandler(object):
         if self._is_processing:
             return
 
+        @defer.inlineCallbacks
         def process():
             self._is_processing = True
             try:
