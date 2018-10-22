@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     """Check whether the hash for this PDU matches the contents"""
-    name, expected_hash = compute_content_hash(event, hash_algorithm)
+    name, expected_hash = _compute_content_hash(event, hash_algorithm)
     logger.debug("Expecting hash: %s", encode_base64(expected_hash))
 
     # some malformed events lack a 'hashes'. Protect against it being missing
@@ -42,9 +42,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     if name not in hashes:
         raise SynapseError(
             400,
-            "Algorithm %s not in hashes %s" % (
-                name, list(hashes),
-            ),
+            "Algorithm %s not in hashes %s" % (name, list(hashes)),
             Codes.UNAUTHORIZED,
         )
     message_hash_base64 = hashes[name]
@@ -52,14 +50,12 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
         message_hash_bytes = decode_base64(message_hash_base64)
     except Exception:
         raise SynapseError(
-            400,
-            "Invalid base64: %s" % (message_hash_base64,),
-            Codes.UNAUTHORIZED,
+            400, "Invalid base64: %s" % (message_hash_base64,), Codes.UNAUTHORIZED
         )
     return message_hash_bytes == expected_hash
 
 
-def compute_content_hash(event, hash_algorithm):
+def _compute_content_hash(event, hash_algorithm):
     event_json = event.get_pdu_json()
     event_json.pop("age_ts", None)
     event_json.pop("unsigned", None)
@@ -96,8 +92,9 @@ def compute_event_signature(event, signature_name, signing_key):
     return redact_json["signatures"]
 
 
-def add_hashes_and_signatures(event, signature_name, signing_key,
-                              hash_algorithm=hashlib.sha256):
+def add_hashes_and_signatures(
+    event, signature_name, signing_key, hash_algorithm=hashlib.sha256
+):
     # if hasattr(event, "old_state_events"):
     #     state_json_bytes = encode_canonical_json(
     #         [e.event_id for e in event.old_state_events.values()]
@@ -107,14 +104,12 @@ def add_hashes_and_signatures(event, signature_name, signing_key,
     #         hashed.name: encode_base64(hashed.digest())
     #     }
 
-    name, digest = compute_content_hash(event, hash_algorithm=hash_algorithm)
+    name, digest = _compute_content_hash(event, hash_algorithm=hash_algorithm)
 
     if not hasattr(event, "hashes"):
         event.hashes = {}
     event.hashes[name] = encode_base64(digest)
 
     event.signatures = compute_event_signature(
-        event,
-        signature_name=signature_name,
-        signing_key=signing_key,
+        event, signature_name=signature_name, signing_key=signing_key
     )
