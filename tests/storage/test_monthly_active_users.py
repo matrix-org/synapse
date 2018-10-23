@@ -28,6 +28,8 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store = hs.get_datastore()
         hs.config.limit_usage_by_mau = True
         hs.config.max_mau_value = 50
+        hs.config.support_user_id = "@support:test"
+        hs.config.support_user_pass = "password"
         # Advance the clock a bit
         reactor.advance(FORTY_DAYS)
 
@@ -214,3 +216,14 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
         count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), len(threepids))
+
+    def test_support_user_not_add_to_mau_limits(self):
+        count = self.store.get_monthly_active_count()
+        self.pump()
+        self.assertEqual(self.get_success(count), 0)
+        self.store.upsert_monthly_active_user(
+            self.hs.config.support_user
+        )
+        count = self.store.get_monthly_active_count()
+        self.pump()
+        self.assertEqual(self.get_success(count), 0)

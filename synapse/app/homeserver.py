@@ -580,7 +580,6 @@ def run(hs):
                 password=password,
             )
 
-
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000)

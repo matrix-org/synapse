@@ -85,8 +85,13 @@ class ServerConfig(Config):
         self.mau_trial_days = config.get(
             "mau_trial_days", 0,
         )
-
-        self.autocreate_support_user = config.get('autocreate_support_user', None)
+        self.support_user_pass = None
+        self.support_user_id = None
+        autocreate_support_user = config.get('autocreate_support_user', None)
+        if autocreate_support_user:
+            self.support_user_pass = autocreate_support_user['password']
+            localpart = autocreate_support_user['localpart']
+            self.support_user_id = UserID(localpart, hs.hostname).to_string()
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)

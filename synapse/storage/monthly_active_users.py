@@ -33,8 +33,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self._clock = hs.get_clock()
         self.hs = hs
         self.reserved_users = ()
-        localpart = self.hs.config.autocreate_support_user['localpart']
-        self.support_user = UserId(localpart, hs.hostName).to_sting()
+        self.support_user = None
 
     @defer.inlineCallbacks
     def initialise_reserved_users(self, threepids):
@@ -175,8 +174,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 existing one was updated.
         """
         # Support user never to be included in MAU stats
-        if user_id is self.support_user:
-            return False
+        if user_id is self.hs.config.support_user:
+            return
         # Am consciously deciding to lock the table on the basis that is ought
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
