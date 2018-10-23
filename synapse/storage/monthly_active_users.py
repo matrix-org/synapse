@@ -38,8 +38,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         )
 
     def initialise_reserved_users(self, txn, threepids):
-        """
-        Ensures that reserved threepids are accounted for in the MAU table, should
+        """Ensures that reserved threepids are accounted for in the MAU table, should
         be called on start up.
 
         Arguments:
