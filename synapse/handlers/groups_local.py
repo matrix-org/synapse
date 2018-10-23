@@ -41,6 +41,11 @@ def _create_rerouter(func_name):
                 destination, group_id, *args, **kwargs
             )
 
+            # Capture errors returned by the remote homeserver and
+            # re-throw specific errors as SynapseErrors. This is so
+            # when the remote end responds with things like 403 Not
+            # In Group, we can communicate that to the client instead
+            # of a 500.
             def h(failure):
                 failure.trap(HttpResponseException)
                 e = failure.value
