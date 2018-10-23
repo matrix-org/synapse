@@ -884,9 +884,7 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode('ascii')
 
-        return logcontext.defer_to_threadpool(
-            self.hs.get_reactor(), self.hs.get_reactor().getThreadPool(), _do_hash,
-        )
+        return logcontext.defer_to_thread(self.hs.get_reactor(), _do_hash)
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
@@ -911,11 +909,7 @@ class AuthHandler(BaseHandler):
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode('ascii')
 
-            return logcontext.defer_to_threadpool(
-                self.hs.get_reactor(),
-                self.hs.get_reactor().getThreadPool(),
-                _do_validate_hash,
-            )
+            return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
 

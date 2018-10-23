@@ -492,9 +492,8 @@ class MediaRepository(object):
         ))
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield logcontext.defer_to_threadpool(
+        t_byte_source = yield logcontext.defer_to_thread(
             self.hs.get_reactor(),
-            self.hs.get_reactor().getThreadPool(),
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
         )
@@ -536,9 +535,8 @@ class MediaRepository(object):
         ))
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield logcontext.defer_to_threadpool(
+        t_byte_source = yield logcontext.defer_to_thread(
             self.hs.get_reactor(),
-            self.hs.get_reactor().getThreadPool(),
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
         )
@@ -624,16 +622,14 @@ class MediaRepository(object):
         for (t_width, t_height, t_type), t_method in iteritems(thumbnails):
             # Generate the thumbnail
             if t_method == "crop":
-                t_byte_source = yield logcontext.defer_to_threadpool(
+                t_byte_source = yield logcontext.defer_to_thread(
                     self.hs.get_reactor(),
-                    self.hs.get_reactor().getThreadPool(),
                     thumbnailer.crop,
                     t_width, t_height, t_type,
                 )
             elif t_method == "scale":
-                t_byte_source = yield logcontext.defer_to_threadpool(
+                t_byte_source = yield logcontext.defer_to_thread(
                     self.hs.get_reactor(),
-                    self.hs.get_reactor().getThreadPool(),
                     thumbnailer.scale,
                     t_width, t_height, t_type,
                 )

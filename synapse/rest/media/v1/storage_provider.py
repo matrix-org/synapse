@@ -121,9 +121,8 @@ class FileStorageProviderBackend(StorageProvider):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        return logcontext.defer_to_threadpool(
+        return logcontext.defer_to_thread(
             self.hs.get_reactor(),
-            self.hs.get_reactor().getThreadPool(),
             shutil.copyfile, primary_fname, backup_fname,
         )
 

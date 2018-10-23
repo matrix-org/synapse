@@ -65,9 +65,8 @@ class MediaStorage(object):
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
             # Write to the main repository
-            yield logcontext.defer_to_threadpool(
+            yield logcontext.defer_to_thread(
                 self.hs.get_reactor(),
-                self.hs.get_reactor().getThreadPool(),
                 _write_file_synchronously, source, f,
             )
             yield finish_cb()
