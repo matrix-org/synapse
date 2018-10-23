@@ -29,7 +29,16 @@ logger = logging.getLogger(__name__)
 
 
 def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
-    """Check whether the hash for this PDU matches the contents"""
+    """Check whether the hash for this PDU matches the contents
+
+    Args:
+        event (EventBase)
+        hash_algorithm (hashlib.hash)
+        room_version (RoomVersions)
+
+    Returns
+        bool
+    """
     name, expected_hash = _compute_content_hash(event, hash_algorithm)
     logger.debug("Expecting hash: %s", encode_base64(expected_hash))
 
@@ -71,6 +80,16 @@ def _compute_content_hash(event, hash_algorithm):
 
 
 def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
+    """Compute the event reference hash
+
+    Args:
+        event (EventBase)
+        hash_algorithm (hashlib.hash)
+        room_version (RoomVersions)
+
+    Returns
+        tuple[str, bytes]: Tuple of hash name and digest bytes
+    """
     tmp_event = prune_event(event)
     event_json = tmp_event.get_pdu_json()
     event_json.pop("signatures", None)
@@ -82,6 +101,19 @@ def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
 
 
 def compute_event_signature(event, signature_name, signing_key):
+    """Returns signature for the event with given name and key.
+
+    Args:
+        event (EventBase)
+        signature_name (str): The name of the entity signing, usually the
+            server name.
+        signing_key: A signing key for the entity, as returned by `signedjson`
+        room_version (RoomVersions)
+
+    Returns:
+        dict[str, dict[str, str]]: Dictionary that contains the event
+        signature. Maps from entity name to key ID to base64 encoded signature.
+    """
     tmp_event = prune_event(event)
     redact_json = tmp_event.get_pdu_json()
     redact_json.pop("age_ts", None)
@@ -95,14 +127,16 @@ def compute_event_signature(event, signature_name, signing_key):
 def add_hashes_and_signatures(
     event, signature_name, signing_key, hash_algorithm=hashlib.sha256
 ):
-    # if hasattr(event, "old_state_events"):
-    #     state_json_bytes = encode_canonical_json(
-    #         [e.event_id for e in event.old_state_events.values()]
-    #     )
-    #     hashed = hash_algorithm(state_json_bytes)
-    #     event.state_hash = {
-    #         hashed.name: encode_base64(hashed.digest())
-    #     }
+    """Adds content hash and signature to the event
+
+    Args:
+        event (EventBuilder)
+        signature_name (str): The name of the entity signing, usually the
+            server name.
+        signing_key: A signing key for the entity, as returned by `signedjson`
+        hash_algorithm (hashlib.hash)
+        room_version (RoomVersions)
+    """
 
     name, digest = _compute_content_hash(event, hash_algorithm=hash_algorithm)
 

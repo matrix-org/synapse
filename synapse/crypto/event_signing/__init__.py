@@ -23,18 +23,50 @@ from synapse.crypto.event_signing import v1
 def check_event_content_hash(
     event, hash_algorithm=hashlib.sha256, room_version=RoomVersions.V1
 ):
-    """Check whether the hash for this PDU matches the contents"""
+    """Check whether the hash for this PDU matches the contents
+
+    Args:
+        event (EventBase)
+        hash_algorithm (hashlib.hash)
+        room_version (RoomVersions)
+
+    Returns
+        bool
+    """
     return v1.check_event_content_hash(event, hash_algorithm)
 
 
 def compute_event_reference_hash(
     event, hash_algorithm=hashlib.sha256, room_version=RoomVersions.V1
 ):
+    """Compute the event reference hash
+
+    Args:
+        event (EventBase)
+        hash_algorithm (hashlib.hash)
+        room_version (RoomVersions)
+
+    Returns
+        tuple[str, bytes]: Tuple of hash name and digest bytes
+    """
     return v1.compute_event_reference_hash(event, hash_algorithm)
 
 
 def compute_event_signature(event, signature_name, signing_key,
                             room_version=RoomVersions.V1):
+    """Returns signature for the event with given name and key.
+
+    Args:
+        event (EventBase)
+        signature_name (str): The name of the entity signing, usually the
+            server name.
+        signing_key: A signing key for the entity, as returned by `signedjson`
+        room_version (RoomVersions)
+
+    Returns:
+        dict[str, dict[str, str]]: Dictionary that contains the event
+        signature. Maps from entity name to key ID to base64 encoded signature.
+    """
     return v1.compute_event_signature(
         event, signature_name, signing_key,
     )
@@ -47,6 +79,16 @@ def add_hashes_and_signatures(
     hash_algorithm=hashlib.sha256,
     room_version=RoomVersions.V1,
 ):
+    """Adds content hash and signature to the event
+
+    Args:
+        event (EventBuilder)
+        signature_name (str): The name of the entity signing, usually the
+            server name.
+        signing_key: A signing key for the entity, as returned by `signedjson`
+        hash_algorithm (hashlib.hash)
+        room_version (RoomVersions)
+    """
     return v1.add_hashes_and_signatures(
         event, signature_name, signing_key, hash_algorithm
     )
