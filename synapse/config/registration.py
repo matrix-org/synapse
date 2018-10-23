@@ -18,7 +18,7 @@ from distutils.util import strtobool
 from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string_with_symbols
 
-from ._base import Config, ConfigError
+from synapse.config._base import Config, ConfigError
 
 
 class RegistrationConfig(Config):

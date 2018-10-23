@@ -231,15 +231,15 @@ class RegistrationHandler(BaseHandler):
         for r in self.hs.config.auto_join_rooms:
             try:
                 if should_auto_create_rooms:
-                    if self.hs.hostname != RoomAlias.from_string(r).domain:
-                        logger.warn(
+                    room_alias = RoomAlias.from_string(r)
+                    if self.hs.hostname != room_alias.domain:
+                        logger.warning(
                             'Cannot create room alias %s, '
-                            'it does not match server domain' % (r,)
+                            'it does not match server domain', (r,)
                         )
-                        raise SynapseError()
                     else:
                         # create room expects the localpart of the room alias
-                        room_alias_localpart = RoomAlias.from_string(r).localpart
+                        room_alias_localpart = room_alias.localpart
                         yield self.room_creation_handler.create_room(
                             fake_requester,
                             config={

@@ -1,1 +1,1 @@
-Servers with auto-join rooms, should automatically create those rooms when first user registers
+Servers with auto-join rooms, will now automatically create those rooms when the first user registers
