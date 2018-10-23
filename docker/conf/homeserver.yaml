@@ -211,7 +211,9 @@ email:
    require_transport_security: False
    notif_from: "{{ SYNAPSE_SMTP_FROM or "hostmaster@" + SYNAPSE_SERVER_NAME }}"
    app_name: Matrix
-   template_dir: res/templates
+   # if template_dir is unset, uses the example templates that are part of
+   # the Synapse distribution.
+   #template_dir: res/templates
    notif_template_html: notif_mail.html
    notif_template_text: notif_mail.txt
    notif_for_new_users: True

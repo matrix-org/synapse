@@ -309,8 +309,8 @@ class FederationHandler(BaseHandler):
 
                 if sent_to_us_directly:
                     logger.warn(
-                        "[%s %s] Failed to fetch %d prev events: rejecting",
-                        room_id, event_id, len(prevs - seen),
+                        "[%s %s] Rejecting: failed to fetch %d prev events: %s",
+                        room_id, event_id, len(prevs - seen), shortstr(prevs - seen)
                     )
                     raise FederationError(
                         "ERROR",
@@ -452,8 +452,8 @@ class FederationHandler(BaseHandler):
         latest |= seen
 
         logger.info(
-            "[%s %s]: Requesting %d prev_events: %s",
-            room_id, event_id, len(prevs - seen), shortstr(prevs - seen)
+            "[%s %s]: Requesting missing events between %s and %s",
+            room_id, event_id, shortstr(latest), event_id,
         )
 
         # XXX: we set timeout to 10s to help workaround
@@ -1852,7 +1852,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_get_missing_events(self, origin, room_id, earliest_events,
-                              latest_events, limit, min_depth):
+                              latest_events, limit):
         in_room = yield self.auth.check_host_in_room(
             room_id,
             origin
@@ -1861,14 +1861,12 @@ class FederationHandler(BaseHandler):
             raise AuthError(403, "Host not in room.")
 
         limit = min(limit, 20)
-        min_depth = max(min_depth, 0)
 
         missing_events = yield self.store.get_missing_events(
             room_id=room_id,
             earliest_events=earliest_events,
             latest_events=latest_events,
             limit=limit,
-            min_depth=min_depth,
         )
 
         missing_events = yield filter_events_for_server(
