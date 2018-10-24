@@ -121,8 +121,8 @@ class StateFilter(object):
                 # We want to return everything.
                 return StateFilter()
             else:
-                # We want to return all members, but only the specified types
-                # (non_member_types can't be None here)
+                # We want to return all members, but only the specified
+                # non-member types (non_member_types can't be None here)
                 new_types = list(non_member_types) + [(EventTypes.Member, None)]
                 return StateFilter(new_types, None)
         else:
