@@ -1,5 +1,4 @@
 import json
-import six
 
 from mock import Mock
 

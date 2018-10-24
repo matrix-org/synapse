@@ -19,13 +19,11 @@ from mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
 
-from synapse.api.errors import InteractiveAuthIncompleteError
-from synapse.http.server import JsonResource
 from synapse.rest.client.v2_alpha.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, render, setup_test_homeserver
+from tests.server import make_request
 
 
 class TermsTestCase(unittest.HomeserverTestCase):
@@ -114,8 +112,8 @@ class TermsTestCase(unittest.HomeserverTestCase):
         request, channel = make_request(b"POST", self.url, request_data)
         self.render(request)
 
-        # We're interested in getting a response that looks like a successful registration,
-        # not so much that the details are exactly what we want.
+        # We're interested in getting a response that looks like a successful
+        # registration, not so much that the details are exactly what we want.
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
