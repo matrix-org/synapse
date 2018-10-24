@@ -54,47 +54,51 @@ class _GetStateGroupDelta(namedtuple("_GetStateGroupDelta", ("prev_group", "delt
 class StateFilter(object):
     """A filter used when querying for state.
 
-    The default, `StateFilter()`, is equivalent to no filter.
-
     Attributes:
-        types (Iterable[str, str|None]|None): list of 2-tuples of the form
-            (`type`, `state_key`), where a `state_key` of `None` matches all
-            state_keys for the `type`. If None, all types are returned.
-        filtered_types(list[str]|None): Only apply filtering via `types` to this
-            list of event types.  Other types of events are returned unfiltered.
-            If None, `types` filtering is applied to all events.
+        types (dict[str, set[str]|None): Map from type to set of state keys (or
+            None). This specifies which state_keys for the given type to fetch
+            from the DB. If None then all events with that type are fetched. If
+            the set is empty then no events with that type are fetched.
+        include_others (bool): Whether to fetch events with types that do not
+            appear in `types`.
     """
 
-    types = attr.ib(default=None)
-    filtered_types = attr.ib(default=None)
+    types = attr.ib()
+    include_others = attr.ib(default=False)
 
-    def get_member_split(self):
-        """Split the filter into member vs non-member types.
+    @staticmethod
+    def all():
+        """Creates a filter that fetches everything.
 
         Returns:
-            tuple[Iterable[str, str|None]|None]: Returns a tuple of member,
-            non-member types in the same format as `types`.
+            StateFilter
         """
-        if self.types is not None:
-            non_member_types = [t for t in self.types if t[0] != EventTypes.Member]
+        return StateFilter(types={}, include_others=True)
 
-            if (self.filtered_types is not None
-                    and EventTypes.Member not in self.filtered_types):
-                # we want all of the membership events
-                member_types = None
-            else:
-                # Check if there is a ("m.room.member", None) entry, if there
-                # is we can just return None.
-                if any(s is None for t, s in self.types if t == EventTypes.Member):
-                    member_types = None
-                else:
-                    member_types = [t for t in self.types if t[0] == EventTypes.Member]
+    @staticmethod
+    def none():
+        """Creates a filter that fetches nothing.
 
-        else:
-            non_member_types = None
-            member_types = None
+        Returns:
+            StateFilter
+        """
+        return StateFilter(types={}, include_others=False)
 
-        return member_types, non_member_types
+    @staticmethod
+    def from_types(types):
+        type_dict = {}
+        for typ, s in types:
+            if typ in type_dict:
+                if type_dict[typ] is None:
+                    continue
+
+            if s is None:
+                type_dict[typ] = None
+                continue
+
+            type_dict.setdefault(typ, set()).add(s)
+
+        return StateFilter(types=type_dict)
 
     def return_expanded(self):
         """Creates a new StateFilter where type wild cards have been removed
@@ -107,39 +111,60 @@ class StateFilter(object):
         Returns:
             StateFilter
         """
-        member_types, non_member_types = self.get_member_split()
 
-        get_all_members = member_types is None
+        if self.is_full():
+            # If we're going to return everything then there's nothing to do
+            return self
 
-        if non_member_types is not None:
-            get_all_non_members = any(s is None for t, s in non_member_types)
+        if not self.has_wildcards():
+            # If there are no wild cards, there's nothing to do
+            return self
+
+        if EventTypes.Member in self.types:
+            get_all_members = self.types[EventTypes.Member] is None
         else:
-            get_all_non_members = True
+            get_all_members = self.include_others
+
+        if self.include_others:
+            # If `include_others` is True then we want to fetch all
+            # non-member events.
+
+            if get_all_members:
+                return StateFilter.all()
+            else:
+                return StateFilter(
+                    types={EventTypes.Member: self.types[EventTypes.Member]},
+                    include_others=True
+                )
+
+        get_all_non_members = any(
+            s is None
+            for t, state_keys in iteritems(self.types)
+            for s in state_keys
+            if t != EventTypes.Member
+        )
+
+        if not get_all_non_members:
+            # include_others must be False, so we can just return ourselves.
+            return self
 
         if get_all_members:
-            if get_all_non_members:
-                # We want to return everything.
-                return StateFilter()
-            else:
-                # We want to return all members, but only the specified
-                # non-member types (non_member_types can't be None here)
-                new_types = list(non_member_types) + [(EventTypes.Member, None)]
-                return StateFilter(new_types, None)
+            # We want to return everything.
+            return StateFilter.all()
         else:
-            if get_all_non_members:
-                # We want to return all non-members, but only particular
-                # memberships
-                return StateFilter(member_types, [EventTypes.Member])
-            else:
-                # There aren't any wildcards in play, so nothing to do
-                return self
+            # We want to return all non-members, but only particular
+            # memberships
+            return StateFilter(
+                types={EventTypes.Member: self.types[EventTypes.Member]},
+                include_others=True,
+            )
 
     def make_sql_filter_clause(self):
         """Converts the filter to an SQL clause.
 
         For example:
 
-            f = StateFilter([("m.room.create", "")], None)
+            f = StateFilter.from_types([("m.room.create", "")])
             f.make_sql_filter_clause()
             f[0] == "(type = ? AND state_key = ?)"
             f[1] == ['m.room.create', '']
@@ -152,31 +177,34 @@ class StateFilter(object):
         where_clause = ""
         where_args = []
 
-        if self.types is None:
+        if self.is_full():
             return where_clause, where_args
 
-        types = set(self.types)
-
-        where_clause = " OR ".join(
-            "(type = ? AND state_key = ?)"
-            if state_key is not None
-            else "(type = ?)"
-            for etype, state_key in types
-        )
-
-        for etype, state_key in types:
-            if state_key is not None:
-                where_args.extend((etype, state_key))
-            else:
+        # First we build up a lost of clauses for each type/state_key combo
+        clauses = []
+        for etype, state_keys in iteritems(self.types):
+            if state_keys is None:
+                clauses.append("(type = ?)")
                 where_args.append(etype)
+                continue
 
-        if self.filtered_types is not None:
+            for state_key in state_keys:
+                clauses.append("(type = ? AND state_key = ?)")
+                where_args.extend((etype, state_key))
+
+        # This will match anything that appears in `self.types`
+        where_clause = " OR ".join(clauses)
+
+        # If we want to include stuff that's not in the types dict then we add
+        # a `OR type NOT IN (...)` clause to the end.
+        if self.include_others:
             if where_clause:
                 where_clause += " OR "
+            types = list(self.types)
             where_clause += "type NOT IN (%s)" % (
-                ",".join(["?"] * len(self.filtered_types)),
+                ",".join(["?"] * len(types)),
             )
-            where_args.extend(self.filtered_types)
+            where_args.extend(types)
 
         return where_clause, where_args
 
@@ -193,7 +221,7 @@ class StateFilter(object):
         if self.has_wildcards():
             return None
 
-        return len(self.types)
+        return sum(self.concrete_types())
 
     def filter_state(self, state_dict):
         """Returns the state filtered with by this StateFilter
@@ -204,18 +232,18 @@ class StateFilter(object):
         Returns:
             dict[tuple[str, str], Any]: The filtered state map
         """
+        if self.is_full():
+            return dict(state_dict)
+
         filtered_state = {}
-        if self.types is not None:
-            for k, v in iteritems(state_dict):
-                typ, _ = k
-
-                if k in self.types or (typ, None) in self.types:
+        for k, v in iteritems(state_dict):
+            typ, state_key = k
+            if typ in self.types:
+                state_keys = self.types[typ]
+                if state_keys is None or state_key in state_keys:
                     filtered_state[k] = v
-
-                if self.filtered_types and typ not in self.filtered_types:
-                    filtered_state[k] = v
-        else:
-            filtered_state = state_dict
+            elif self.include_others:
+                filtered_state[k] = v
 
         return filtered_state
 
@@ -225,7 +253,7 @@ class StateFilter(object):
         Returns:
             bool
         """
-        return self.types is None
+        return self.include_others and not self.types
 
     def has_wildcards(self):
         """Whether the filter includes wildcards or is attempting to fetch
@@ -236,10 +264,61 @@ class StateFilter(object):
         """
 
         return (
-            self.types is None
-            or self.filtered_types is not None
-            or any(s is None for t, s in self.types)
+            self.include_others
+            or any(
+                s is None
+                for t, state_keys in iteritems(self.types)
+                for s in state_keys
+            )
         )
+
+    def concrete_types(self):
+        """Returns a list of concrete type/state_keys (i.e. not None) that
+        will be fetched. This will be a complete list if `has_wildcards`
+        returns False, but otherwise will be a subset (or even empty).
+
+        Returns:
+            list[tuple[str,str]]
+        """
+        return [
+            (t, s)
+            for t, state_keys in iteritems(self.types)
+            if state_keys is not None
+            for s in state_keys
+        ]
+
+    def get_member_split(self):
+        """Return the filter split into two, one which assumes its exclusively
+        matching against member state, and one which assumes its matching
+        against non member state.
+
+        This is useful due to the returned filters giving correct results for
+        `is_full()`, `has_wildcards()`, etc, when operating against maps that
+        either exclusively container member events or only contain non-member
+        events. (Which is the case when dealing with the member vs non-member
+        state caches).
+
+        Returns:
+            tuple[StateFilter, StateFilter]: The member and non member filters
+        """
+
+        if EventTypes.Member in self.types:
+            state_keys = self.types[EventTypes.Member]
+            if state_keys is None:
+                member_filter = StateFilter.all()
+            else:
+                member_filter = StateFilter({EventTypes.Member: state_keys})
+        elif self.include_others:
+            member_filter = StateFilter.all()
+        else:
+            member_filter = StateFilter.none()
+
+        non_member_filter = StateFilter(
+            types={k: v for k, v in iteritems(self.types) if k != EventTypes.Member},
+            include_others=self.include_others,
+        )
+
+        return member_filter, non_member_filter
 
 
 # this inherits from EventsWorkerStore because it calls self.get_events
@@ -346,7 +425,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
     # FIXME: how should this be cached?
-    def get_filtered_current_state_ids(self, room_id, state_filter=StateFilter()):
+    def get_filtered_current_state_ids(self, room_id, state_filter=StateFilter.all()):
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
         of doing a fresh state resolution as per state_handler.get_current_state
@@ -496,7 +575,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def _get_state_groups_from_groups(self, groups, state_filter=StateFilter()):
+    def _get_state_groups_from_groups(self, groups, state_filter=StateFilter.all()):
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
@@ -521,7 +600,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue(results)
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, state_filter=StateFilter(),
+        self, txn, groups, state_filter=StateFilter.all(),
     ):
         results = {group: {} for group in groups}
 
@@ -622,7 +701,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return results
 
     @defer.inlineCallbacks
-    def get_state_for_events(self, event_ids, state_filter=StateFilter()):
+    def get_state_for_events(self, event_ids, state_filter=StateFilter.all()):
         """Given a list of event_ids and type tuples, return a list of state
         dicts for each event.
 
@@ -658,7 +737,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
     @defer.inlineCallbacks
-    def get_state_ids_for_events(self, event_ids, state_filter=StateFilter()):
+    def get_state_ids_for_events(self, event_ids, state_filter=StateFilter.all()):
         """
         Get the state dicts corresponding to a list of events, containing the event_ids
         of the state events (as opposed to the events themselves)
@@ -686,7 +765,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
     @defer.inlineCallbacks
-    def get_state_for_event(self, event_id, state_filter=StateFilter()):
+    def get_state_for_event(self, event_id, state_filter=StateFilter.all()):
         """
         Get the state dict corresponding to a particular event
 
@@ -702,7 +781,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue(state_map[event_id])
 
     @defer.inlineCallbacks
-    def get_state_ids_for_event(self, event_id, state_filter=StateFilter()):
+    def get_state_ids_for_event(self, event_id, state_filter=StateFilter.all()):
         """
         Get the state dict corresponding to a particular event
 
@@ -762,6 +841,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         is_all, known_absent, state_dict_ids = cache.get(group)
 
         if is_all or state_filter.is_full():
+            # Either we have everything or want everything, either way
+            # `is_all` tells us whether we've gotten everything.
             return state_filter.filter_state(state_dict_ids), is_all
 
         # tracks whether any of our requested types are missing from the cache
@@ -774,7 +855,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             # and the cache may be incomplete.
             missing_types = True
         else:
-            for key in state_filter.types:
+            # There aren't any wild cards, so `concrete_types()` returns the
+            # complete list of event types we're wanting.
+            for key in state_filter.concrete_types():
                 if key not in state_dict_ids and key not in known_absent:
                     missing_types = True
                     break
@@ -782,7 +865,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return state_filter.filter_state(state_dict_ids), not missing_types
 
     @defer.inlineCallbacks
-    def _get_state_for_groups(self, groups, state_filter=StateFilter()):
+    def _get_state_for_groups(self, groups, state_filter=StateFilter.all()):
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -796,23 +879,20 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
 
-        member_types, non_member_types = state_filter.get_member_split()
+        member_filter, non_member_filter = state_filter.get_member_split()
 
         # Now we look them up in the member and non-member caches
         non_member_state, incomplete_groups_nm, = (
             yield self._get_state_for_groups_using_cache(
                 groups, self._state_group_cache,
-                state_filter=StateFilter(
-                    types=non_member_types,
-                    filtered_types=state_filter.filtered_types
-                ),
+                state_filter=non_member_filter,
             )
         )
 
         member_state, incomplete_groups_m, = (
             yield self._get_state_for_groups_using_cache(
                 groups, self._state_group_members_cache,
-                state_filter=StateFilter(member_types),
+                state_filter=member_filter,
             )
         )
 
@@ -908,7 +988,24 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 last lookup in cache
         """
 
-        member_types, non_member_types = state_filter.get_member_split()
+        # We need to work out which types we've fetched from the DB for the
+        # member vs non-member caches. This should be as accurate as possible,
+        # but can be an underestimate (e.g. when we have wild cards)
+        member_filter, non_member_filter = state_filter.get_member_split()
+
+        if member_filter.is_full():
+            # We fetched all member events
+            member_types = None
+        else:
+            # `concrete_types()` will only return a subset when there are wild
+            # cards in the filter, but that's fine.
+            member_types = member_filter.concrete_types()
+
+        if non_member_filter.is_full():
+            # We fetched all non member events
+            non_member_types = None
+        else:
+            non_member_types = non_member_filter.concrete_types()
 
         for group, group_state_dict in iteritems(group_to_state_dict):
             state_dict_members = {}

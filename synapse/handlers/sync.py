@@ -446,7 +446,7 @@ class SyncHandler(object):
         ))
 
     @defer.inlineCallbacks
-    def get_state_after_event(self, event, state_filter=StateFilter()):
+    def get_state_after_event(self, event, state_filter=StateFilter.all()):
         """
         Get the room state after the given event
 
@@ -467,7 +467,7 @@ class SyncHandler(object):
         defer.returnValue(state_ids)
 
     @defer.inlineCallbacks
-    def get_state_at(self, room_id, stream_position, state_filter=StateFilter()):
+    def get_state_at(self, room_id, stream_position, state_filter=StateFilter.all()):
         """ Get the room state at a particular stream position
 
         Args:
@@ -532,7 +532,7 @@ class SyncHandler(object):
         last_event = last_events[-1]
         state_ids = yield self.store.get_state_ids_for_event(
             last_event.event_id,
-            state_filter=StateFilter([
+            state_filter=StateFilter.from_types([
                 (EventTypes.Name, ''),
                 (EventTypes.CanonicalAlias, ''),
             ]),
@@ -686,8 +686,7 @@ class SyncHandler(object):
 
         with Measure(self.clock, "compute_state_delta"):
 
-            types = None
-            filtered_types = None
+            members_to_fetch = None
 
             lazy_load_members = sync_config.filter_collection.lazy_load_members()
             include_redundant_members = (
@@ -698,23 +697,26 @@ class SyncHandler(object):
                 # We only request state for the members needed to display the
                 # timeline:
 
-                types = [
-                    (EventTypes.Member, state_key)
-                    for state_key in set(
-                        event.sender  # FIXME: we also care about invite targets etc.
-                        for event in batch.events
-                    )
-                ]
+                members_to_fetch = set(
+                    event.sender  # FIXME: we also care about invite targets etc.
+                    for event in batch.events
+                )
 
-                # only apply the filtering to room members
-                filtered_types = [EventTypes.Member]
+                if full_state:
+                    # always make sure we LL ourselves so we know we're in the room
+                    # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
+                    # We only need apply this on full state syncs given we disabled
+                    # LL for incr syncs in #3840.
+                    members_to_fetch.add(sync_config.user.to_string())
 
                 state_filter = StateFilter(
-                    types=types,
-                    filtered_types=filtered_types,
+                    types={
+                        EventTypes.Member: members_to_fetch,
+                    },
+                    include_others=True,
                 )
             else:
-                state_filter = StateFilter()
+                state_filter = StateFilter.all()
 
             timeline_state = {
                 (event.type, event.state_key): event.event_id
@@ -722,13 +724,6 @@ class SyncHandler(object):
             }
 
             if full_state:
-                if lazy_load_members:
-                    # always make sure we LL ourselves so we know we're in the room
-                    # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
-                    # We only need apply this on full state syncs given we disabled
-                    # LL for incr syncs in #3840.
-                    types.append((EventTypes.Member, sync_config.user.to_string()))
-
                 if batch:
                     current_state_ids = yield self.store.get_state_ids_for_event(
                         batch.events[-1].event_id, state_filter=state_filter,
@@ -770,7 +765,7 @@ class SyncHandler(object):
                 # members to just be ones which were timeline senders, which then ensures
                 # all of the rest get included in the state block (if we need to know
                 # about them).
-                state_filter = StateFilter()
+                state_filter = StateFilter.all()
 
                 state_at_previous_sync = yield self.get_state_at(
                     room_id, stream_position=since_token,
@@ -792,7 +787,7 @@ class SyncHandler(object):
             else:
                 state_ids = {}
                 if lazy_load_members:
-                    if types and batch.events:
+                    if members_to_fetch and batch.events:
                         # We're returning an incremental sync, with no
                         # "gap" since the previous sync, so normally there would be
                         # no state to return.
@@ -804,8 +799,10 @@ class SyncHandler(object):
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id,
                             state_filter=StateFilter(
-                                types=types,
-                                filtered_types=None,  # we only want members!
+                                types={
+                                    EventTypes.Member: members_to_fetch,
+                                },
+                                include_others=False,  # we only want members!
                             ),
                         )
 

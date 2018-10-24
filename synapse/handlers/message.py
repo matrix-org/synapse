@@ -81,7 +81,7 @@ class MessageHandler(object):
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             room_state = yield self.store.get_state_for_events(
-                [membership_event_id], StateFilter([key])
+                [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
 
@@ -89,7 +89,7 @@ class MessageHandler(object):
 
     @defer.inlineCallbacks
     def get_state_events(
-        self, user_id, room_id, state_filter=StateFilter(),
+        self, user_id, room_id, state_filter=StateFilter.all(),
         at_token=None, is_guest=False,
     ):
         """Retrieve all state events for a given room. If the user is

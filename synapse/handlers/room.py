@@ -495,15 +495,14 @@ class RoomContextHandler(object):
                 (results["event"],),
                 results["events_after"],
             ))
-            filtered_types = [EventTypes.Member]
-            types = [(EventTypes.Member, member) for member in members]
-
             state_filter = StateFilter(
-                types=types,
-                filtered_types=filtered_types,
+                types={EventTypes.Member: members},
+                include_others=True,
             )
+
+            logger.info("state_filter %s", state_filter)
         else:
-            state_filter = StateFilter()
+            state_filter = StateFilter.all()
 
         # XXX: why do we return the state as of the last event rather than the
         # first? Shouldn't we be consistent with /sync?

@@ -257,13 +257,12 @@ class PaginationHandler(object):
             # TODO: remove redundant members
 
             state_filter = StateFilter(
-                types=[
-                    (EventTypes.Member, state_key)
-                    for state_key in set(
+                types={
+                    EventTypes.Member: set(
                         event.sender  # FIXME: we also care about invite targets etc.
                         for event in events
-                    )
-                ],
+                    ),
+                },
             )
 
             state_ids = yield self.store.get_state_ids_for_event(
