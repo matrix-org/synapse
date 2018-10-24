@@ -1,0 +1,1 @@
+Fix bug which prevented backslashes being used in event field filters
