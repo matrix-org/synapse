@@ -178,7 +178,7 @@ class ContentRepositoryConfig(Config):
     def default_config(self, **kwargs):
         media_store = self.default_path("media_store")
         uploads_path = self.default_path("uploads")
-        return """
+        return r"""
         # Directory where uploaded images and attachments are stored.
         media_store_path: "%(media_store)s"
 

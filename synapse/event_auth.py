@@ -690,7 +690,7 @@ def auth_types_for_event(event):
     auth_types = []
 
     auth_types.append((EventTypes.PowerLevels, "", ))
-    auth_types.append((EventTypes.Member, event.user_id, ))
+    auth_types.append((EventTypes.Member, event.sender, ))
     auth_types.append((EventTypes.Create, "", ))
 
     if event.type == EventTypes.Member:

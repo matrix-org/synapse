@@ -55,7 +55,7 @@ def fetch_server_key(server_name, tls_client_options_factory, path=KEY_API_V1):
                 raise IOError("Cannot get key for %r" % server_name)
         except (ConnectError, DomainError) as e:
             logger.warn("Error getting key for %r: %s", server_name, e)
-        except Exception as e:
+        except Exception:
             logger.exception("Error getting key for %r", server_name)
     raise IOError("Cannot get key for %r" % server_name)
 
