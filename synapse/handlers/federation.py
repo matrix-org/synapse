@@ -390,6 +390,11 @@ class FederationHandler(BaseHandler):
                         state_res_store=StateResolutionStore(self.store),
                     )
 
+                    # We need to give _process_received_pdu the actual state events
+                    # rather than event ids, so generate that now.
+
+                    # First though we need to fetch all the events that are in
+                    # state_map, so we can build up the state below.
                     evs = yield self.store.get_events(
                         list(state_map.values()),
                         get_prev_content=False,
@@ -397,8 +402,6 @@ class FederationHandler(BaseHandler):
                     )
                     event_map.update(evs)
 
-                    # we need to give _process_received_pdu the actual state events
-                    # rather than event ids, so generate that now.
                     state = [
                         event_map[e] for e in six.itervalues(state_map)
                     ]
