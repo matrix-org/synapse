@@ -606,7 +606,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                     # wildcards (i.e. Nones) in which case we have to do an exhaustive
                     # search
                     if (
-                        max_entries_returned and
+                        max_entries_returned is not None and
                         len(results[group]) == max_entries_returned
                     ):
                         break
