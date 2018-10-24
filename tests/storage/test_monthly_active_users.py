@@ -54,7 +54,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
 
         self.store.runInteraction(
-            "initialise", self.store.initialise_reserved_users, threepids
+            "initialise", self.store._initialise_reserved_users, threepids
         )
         self.pump()
 
@@ -203,7 +203,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         ]
         self.hs.config.mau_limits_reserved_threepids = threepids
         self.store.runInteraction(
-            "initialise", self.store.initialise_reserved_users, threepids
+            "initialise", self.store._initialise_reserved_users, threepids
         )
 
         self.pump()
