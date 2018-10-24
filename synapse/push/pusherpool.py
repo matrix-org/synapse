@@ -41,7 +41,7 @@ class PusherPool:
     def __init__(self, _hs):
         self.hs = _hs
         self.pusher_factory = PusherFactory(_hs)
-        self.start_pushers = _hs.config.start_pushers
+        self._should_start_pushers = _hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
         self.pushers = {}
@@ -49,7 +49,7 @@ class PusherPool:
     def start(self):
         """Starts the pushers off in a background process.
         """
-        if not self.start_pushers:
+        if not self._should_start_pushers:
             logger.info("Not starting pushers because they are disabled in the config")
             return
         run_as_background_process("start_pushers", self._start_pushers)
@@ -175,7 +175,7 @@ class PusherPool:
     @defer.inlineCallbacks
     def start_pusher_by_id(self, app_id, pushkey, user_id):
         """Look up the details for the given pusher, and start it"""
-        if not self._start_pushers:
+        if not self._should_start_pushers:
             return
 
         resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(
