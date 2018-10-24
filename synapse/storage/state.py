@@ -546,7 +546,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             # group for the given type, state_key.
             # This may return multiple rows per (type, state_key), but last_value
             # should be the same.
-            sql = ("""
+            sql = """
                 WITH RECURSIVE state(state_group) AS (
                     VALUES(?::bigint)
                     UNION ALL
@@ -560,14 +560,13 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 WHERE state_group IN (
                     SELECT state_group FROM state
                 )
-                %s
-            """)
+            """
 
             for group in groups:
                 args = [group]
                 args.extend(where_args)
 
-                txn.execute(sql % (where_clause,), args)
+                txn.execute(sql + where_clause, args)
                 for row in txn:
                     typ, state_key, event_id = row
                     key = (typ, state_key)
@@ -591,7 +590,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
                     txn.execute(
                         "SELECT type, state_key, event_id FROM state_groups_state"
-                        " WHERE state_group = ? %s" % (where_clause,),
+                        " WHERE state_group = ? " + where_clause,
                         args
                     )
                     results[group].update(
