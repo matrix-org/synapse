@@ -507,19 +507,19 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def on_get_missing_events(self, origin, room_id, earliest_events,
-                              latest_events, limit, min_depth):
+                              latest_events, limit):
         with (yield self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)
             yield self.check_server_matches_acl(origin_host, room_id)
 
             logger.info(
                 "on_get_missing_events: earliest_events: %r, latest_events: %r,"
-                " limit: %d, min_depth: %d",
-                earliest_events, latest_events, limit, min_depth
+                " limit: %d",
+                earliest_events, latest_events, limit,
             )
 
             missing_events = yield self.handler.on_get_missing_events(
-                origin, room_id, earliest_events, latest_events, limit, min_depth
+                origin, room_id, earliest_events, latest_events, limit,
             )
 
             if len(missing_events) < 5:
@@ -800,7 +800,7 @@ class FederationHandlerRegistry(object):
             yield handler(origin, content)
         except SynapseError as e:
             logger.info("Failed to handle edu %r: %r", edu_type, e)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to handle edu %r", edu_type)
 
     def on_query(self, query_type, args):

@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 
 import argparse
 import getpass
@@ -22,19 +23,23 @@ import hmac
 import json
 import sys
 import urllib2
+
+from six import input
+
 import yaml
 
 
 def request_registration(user, password, server_location, shared_secret, admin=False):
     req = urllib2.Request(
         "%s/_matrix/client/r0/admin/register" % (server_location,),
-        headers={'Content-Type': 'application/json'}
+        headers={'Content-Type': 'application/json'},
     )
 
     try:
         if sys.version_info[:3] >= (2, 7, 9):
             # As of version 2.7.9, urllib2 now checks SSL certs
             import ssl
+
             f = urllib2.urlopen(req, context=ssl.SSLContext(ssl.PROTOCOL_SSLv23))
         else:
             f = urllib2.urlopen(req)
@@ -42,18 +47,15 @@ def request_registration(user, password, server_location, shared_secret, admin=F
         f.close()
         nonce = json.loads(body)["nonce"]
     except urllib2.HTTPError as e:
-        print "ERROR! Received %d %s" % (e.code, e.reason,)
+        print("ERROR! Received %d %s" % (e.code, e.reason))
         if 400 <= e.code < 500:
             if e.info().type == "application/json":
                 resp = json.load(e)
                 if "error" in resp:
-                    print resp["error"]
+                    print(resp["error"])
         sys.exit(1)
 
-    mac = hmac.new(
-        key=shared_secret,
-        digestmod=hashlib.sha1,
-    )
+    mac = hmac.new(key=shared_secret, digestmod=hashlib.sha1)
 
     mac.update(nonce)
     mac.update("\x00")
@@ -75,30 +77,31 @@ def request_registration(user, password, server_location, shared_secret, admin=F
 
     server_location = server_location.rstrip("/")
 
-    print "Sending registration request..."
+    print("Sending registration request...")
 
     req = urllib2.Request(
         "%s/_matrix/client/r0/admin/register" % (server_location,),
         data=json.dumps(data),
-        headers={'Content-Type': 'application/json'}
+        headers={'Content-Type': 'application/json'},
     )
     try:
         if sys.version_info[:3] >= (2, 7, 9):
             # As of version 2.7.9, urllib2 now checks SSL certs
             import ssl
+
             f = urllib2.urlopen(req, context=ssl.SSLContext(ssl.PROTOCOL_SSLv23))
         else:
             f = urllib2.urlopen(req)
         f.read()
         f.close()
-        print "Success."
+        print("Success.")
     except urllib2.HTTPError as e:
-        print "ERROR! Received %d %s" % (e.code, e.reason,)
+        print("ERROR! Received %d %s" % (e.code, e.reason))
         if 400 <= e.code < 500:
             if e.info().type == "application/json":
                 resp = json.load(e)
                 if "error" in resp:
-                    print resp["error"]
+                    print(resp["error"])
         sys.exit(1)
 
 
@@ -106,35 +109,35 @@ def register_new_user(user, password, server_location, shared_secret, admin):
     if not user:
         try:
             default_user = getpass.getuser()
-        except:
+        except Exception:
             default_user = None
 
         if default_user:
-            user = raw_input("New user localpart [%s]: " % (default_user,))
+            user = input("New user localpart [%s]: " % (default_user,))
             if not user:
                 user = default_user
         else:
-            user = raw_input("New user localpart: ")
+            user = input("New user localpart: ")
 
     if not user:
-        print "Invalid user name"
+        print("Invalid user name")
         sys.exit(1)
 
     if not password:
         password = getpass.getpass("Password: ")
 
         if not password:
-            print "Password cannot be blank."
+            print("Password cannot be blank.")
             sys.exit(1)
 
         confirm_password = getpass.getpass("Confirm password: ")
 
         if password != confirm_password:
-            print "Passwords do not match"
+            print("Passwords do not match")
             sys.exit(1)
 
     if admin is None:
-        admin = raw_input("Make admin [no]: ")
+        admin = input("Make admin [no]: ")
         if admin in ("y", "yes", "true"):
             admin = True
         else:
@@ -146,42 +149,51 @@ def register_new_user(user, password, server_location, shared_secret, admin):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Used to register new users with a given home server when"
-                    " registration has been disabled. The home server must be"
-                    " configured with the 'registration_shared_secret' option"
-                    " set.",
+        " registration has been disabled. The home server must be"
+        " configured with the 'registration_shared_secret' option"
+        " set."
     )
     parser.add_argument(
-        "-u", "--user",
+        "-u",
+        "--user",
         default=None,
         help="Local part of the new user. Will prompt if omitted.",
     )
     parser.add_argument(
-        "-p", "--password",
+        "-p",
+        "--password",
         default=None,
         help="New password for user. Will prompt if omitted.",
     )
     admin_group = parser.add_mutually_exclusive_group()
     admin_group.add_argument(
-        "-a", "--admin",
+        "-a",
+        "--admin",
         action="store_true",
-        help="Register new user as an admin. Will prompt if --no-admin is not set either.",
+        help=(
+            "Register new user as an admin. "
+            "Will prompt if --no-admin is not set either."
+        ),
     )
     admin_group.add_argument(
         "--no-admin",
         action="store_true",
-        help="Register new user as a regular user. Will prompt if --admin is not set either.",
+        help=(
+            "Register new user as a regular user. "
+            "Will prompt if --admin is not set either."
+        ),
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         type=argparse.FileType('r'),
         help="Path to server config file. Used to read in shared secret.",
     )
 
     group.add_argument(
-        "-k", "--shared-secret",
-        help="Shared secret as defined in server config file.",
+        "-k", "--shared-secret", help="Shared secret as defined in server config file."
     )
 
     parser.add_argument(
@@ -189,7 +201,7 @@ if __name__ == "__main__":
         default="https://localhost:8448",
         nargs='?',
         help="URL to use to talk to the home server. Defaults to "
-             " 'https://localhost:8448'.",
+        " 'https://localhost:8448'.",
     )
 
     args = parser.parse_args()
@@ -198,7 +210,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(args.config)
         secret = config.get("registration_shared_secret", None)
         if not secret:
-            print "No 'registration_shared_secret' defined in config."
+            print("No 'registration_shared_secret' defined in config.")
             sys.exit(1)
     else:
         secret = args.shared_secret

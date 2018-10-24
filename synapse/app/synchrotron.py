@@ -33,7 +33,7 @@ from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
-from synapse.replication.slave.storage._base import BaseSlavedStore
+from synapse.replication.slave.storage._base import BaseSlavedStore, __func__
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
@@ -147,7 +147,7 @@ class SynchrotronPresence(object):
         and haven't come back yet. If there are poke the master about them.
         """
         now = self.clock.time_msec()
-        for user_id, last_sync_ms in self.users_going_offline.items():
+        for user_id, last_sync_ms in list(self.users_going_offline.items()):
             if now - last_sync_ms > 10 * 1000:
                 self.users_going_offline.pop(user_id, None)
                 self.send_user_sync(user_id, False, last_sync_ms)
@@ -156,9 +156,9 @@ class SynchrotronPresence(object):
         # TODO Hows this supposed to work?
         pass
 
-    get_states = PresenceHandler.get_states.__func__
-    get_state = PresenceHandler.get_state.__func__
-    current_state_for_users = PresenceHandler.current_state_for_users.__func__
+    get_states = __func__(PresenceHandler.get_states)
+    get_state = __func__(PresenceHandler.get_state)
+    current_state_for_users = __func__(PresenceHandler.current_state_for_users)
 
     def user_syncing(self, user_id, affect_presence):
         if affect_presence:
@@ -208,7 +208,7 @@ class SynchrotronPresence(object):
         ) for row in rows]
 
         for state in states:
-            self.user_to_current_state[row.user_id] = state
+            self.user_to_current_state[state.user_id] = state
 
         stream_id = token
         yield self.notify_from_replication(states, stream_id)

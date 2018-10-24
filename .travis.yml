@@ -4,6 +4,13 @@ language: python
 # tell travis to cache ~/.cache/pip
 cache: pip
 
+# only build branches we care about (PRs are built seperately)
+branches:
+  only:
+    - master
+    - develop
+    - /^release-v/
+
 before_script:
   - git remote set-branches --add origin develop
   - git fetch origin develop
@@ -14,7 +21,7 @@ matrix:
   - python: 2.7
     env: TOX_ENV=packaging
 
-  - python: 2.7
+  - python: 3.6
     env: TOX_ENV=pep8
 
   - python: 2.7

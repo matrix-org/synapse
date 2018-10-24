@@ -1,0 +1,1 @@
+Fix some metrics being racy and causing exceptions when polled by Prometheus.
