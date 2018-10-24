@@ -106,7 +106,15 @@ class StateFilter(object):
         current one, i.e. anything that passes the current filter will pass
         the returned filter.
 
-        This is used to help cache hits when using the DictionaryCache
+        This helps the caching as the DictionaryCache knows if it has *all* the
+        state, but does not know if it has all of the keys of a particular type,
+        which makes wildcard lookups expensive unless we have a complete cache.
+        Hence, if we are doing a wildcard lookup, populate the cache fully so
+        that we can do an efficient lookup next time.
+
+        Note that since we have two caches, one for members and one for
+        non-members, we can be a bit more clever than simply returning
+        `StateFilter.all()` if `has_wildcards()` is True.
 
         Returns:
             StateFilter
@@ -910,11 +918,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         cache_sequence_nm = self._state_group_cache.sequence
         cache_sequence_m = self._state_group_members_cache.sequence
 
-        # the DictionaryCache knows if it has *all* the state, but
-        # does not know if it has all of the keys of a particular type,
-        # which makes wildcard lookups expensive unless we have a complete
-        # cache. Hence, if we are doing a wildcard lookup, populate the
-        # cache fully so that we can do an efficient lookup next time.
+        # Help the cache hit ratio by expanding the filter a bit
         db_state_filter = state_filter.return_expanded()
 
         group_to_state_dict = yield self._get_state_groups_from_groups(
