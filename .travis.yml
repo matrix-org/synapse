@@ -9,7 +9,7 @@ branches:
   only:
     - master
     - develop
-    - /release-v.*/
+    - /^release-v/
 
 before_script:
   - git remote set-branches --add origin develop
