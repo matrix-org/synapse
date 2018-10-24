@@ -190,10 +190,7 @@ class StateFilter(object):
         This is used to bail out early if the right number of entries have been
         fetched.
         """
-        if self.types is None or self.filtered_types is not None:
-            return None
-
-        if any(s is None for t, s in self.types):
+        if self.has_wildcards():
             return None
 
         return len(self.types)
@@ -208,7 +205,7 @@ class StateFilter(object):
             dict[tuple[str, str], Any]: The filtered state map
         """
         filtered_state = {}
-        if self.types:
+        if self.types is not None:
             for k, v in iteritems(state_dict):
                 typ, _ = k
 
@@ -221,6 +218,28 @@ class StateFilter(object):
             filtered_state = state_dict
 
         return filtered_state
+
+    def is_full(self):
+        """Whether this filter fetches everything or not
+
+        Returns:
+            bool
+        """
+        return self.types is None
+
+    def has_wildcards(self):
+        """Whether the filter includes wildcards or is attempting to fetch
+        specific state.
+
+        Returns:
+            bool
+        """
+
+        return (
+            self.types is None
+            or self.filtered_types is not None
+            or any(s is None for t, s in self.types)
+        )
 
 
 # this inherits from EventsWorkerStore because it calls self.get_events
@@ -726,18 +745,14 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         defer.returnValue({row["event_id"]: row["state_group"] for row in rows})
 
-    def _get_some_state_from_cache(self, cache, group, types, filtered_types=None):
+    def _get_state_for_group_using_cache(self, cache, group, state_filter):
         """Checks if group is in cache. See `_get_state_for_groups`
 
         Args:
             cache(DictionaryCache): the state group cache to use
             group(int): The state group to lookup
-            types(list[str, str|None]): List of 2-tuples of the form
-                (`type`, `state_key`), where a `state_key` of `None` matches all
-                state_keys for the `type`.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
 
         Returns 2-tuple (`state_dict`, `got_all`).
         `got_all` is a bool indicating if we successfully retrieved all
@@ -746,69 +761,25 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         is_all, known_absent, state_dict_ids = cache.get(group)
 
-        type_to_key = {}
+        if is_all or state_filter.is_full():
+            return state_filter.filter_state(state_dict_ids), is_all
 
         # tracks whether any of our requested types are missing from the cache
         missing_types = False
 
-        for typ, state_key in types:
-            key = (typ, state_key)
-
-            if (
-                state_key is None or
-                (filtered_types is not None and typ not in filtered_types)
-            ):
-                type_to_key[typ] = None
-                # we mark the type as missing from the cache because
-                # when the cache was populated it might have been done with a
-                # restricted set of state_keys, so the wildcard will not work
-                # and the cache may be incomplete.
-                missing_types = True
-            else:
-                if type_to_key.get(typ, object()) is not None:
-                    type_to_key.setdefault(typ, set()).add(state_key)
-
+        if state_filter.has_wildcards():
+            # we mark the type as missing from the cache because
+            # when the cache was populated it might have been done with a
+            # restricted set of state_keys, so the wildcard will not work
+            # and the cache may be incomplete.
+            missing_types = True
+        else:
+            for key in state_filter.types:
                 if key not in state_dict_ids and key not in known_absent:
                     missing_types = True
+                    break
 
-        sentinel = object()
-
-        def include(typ, state_key):
-            valid_state_keys = type_to_key.get(typ, sentinel)
-            if valid_state_keys is sentinel:
-                return filtered_types is not None and typ not in filtered_types
-            if valid_state_keys is None:
-                return True
-            if state_key in valid_state_keys:
-                return True
-            return False
-
-        got_all = is_all
-        if not got_all:
-            # the cache is incomplete. We may still have got all the results we need, if
-            # we don't have any wildcards in the match list.
-            if not missing_types and filtered_types is None:
-                got_all = True
-
-        return {
-            k: v for k, v in iteritems(state_dict_ids)
-            if include(k[0], k[1])
-        }, got_all
-
-    def _get_all_state_from_cache(self, cache, group):
-        """Checks if group is in cache. See `_get_state_for_groups`
-
-        Returns 2-tuple (`state_dict`, `got_all`). `got_all` is a bool
-        indicating if we successfully retrieved all requests state from the
-        cache, if False we need to query the DB for the missing state.
-
-        Args:
-            cache(DictionaryCache): the state group cache to use
-            group: The state group to lookup
-        """
-        is_all, _, state_dict_ids = cache.get(group)
-
-        return state_dict_ids, is_all
+        return state_filter.filter_state(state_dict_ids), not missing_types
 
     @defer.inlineCallbacks
     def _get_state_for_groups(self, groups, state_filter=StateFilter()):
@@ -831,14 +802,17 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         non_member_state, incomplete_groups_nm, = (
             yield self._get_state_for_groups_using_cache(
                 groups, self._state_group_cache,
-                non_member_types, state_filter.filtered_types,
+                state_filter=StateFilter(
+                    types=non_member_types,
+                    filtered_types=state_filter.filtered_types
+                ),
             )
         )
 
         member_state, incomplete_groups_m, = (
             yield self._get_state_for_groups_using_cache(
-                # we set filtered_types=None as member_state only ever contain members.
-                groups, self._state_group_members_cache, member_types, None,
+                groups, self._state_group_members_cache,
+                state_filter=StateFilter(member_types),
             )
         )
 
@@ -886,7 +860,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue(state)
 
     def _get_state_for_groups_using_cache(
-        self, groups, cache, types=None, filtered_types=None,
+        self, groups, cache, state_filter,
     ):
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key, querying from a specific cache.
@@ -897,16 +871,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             cache (DictionaryCache): the cache of group ids to state dicts which
                 we will pass through - either the normal state cache or the specific
                 members state cache.
-            types (None|iterable[(str, None|str)]):
-                indicates the state type/keys required. If None, the whole
-                state is fetched and returned.
-
-                Otherwise, each entry should be a `(type, state_key)` tuple to
-                include in the response. A `state_key` of None is a wildcard
-                meaning that we require all state with that type.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
 
         Returns:
             tuple[dict[int, dict[tuple[str, str], str]], set[int]]: Tuple of
@@ -914,29 +880,16 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             of entries in the cache, and the state group ids either missing
             from the cache or incomplete.
         """
-        if types:
-            types = frozenset(types)
         results = {}
         incomplete_groups = set()
-        if types is not None:
-            for group in set(groups):
-                state_dict_ids, got_all = self._get_some_state_from_cache(
-                    cache, group, types, filtered_types
-                )
-                results[group] = state_dict_ids
+        for group in set(groups):
+            state_dict_ids, got_all = self._get_state_for_group_using_cache(
+                cache, group, state_filter
+            )
+            results[group] = state_dict_ids
 
-                if not got_all:
-                    incomplete_groups.add(group)
-        else:
-            for group in set(groups):
-                state_dict_ids, got_all = self._get_all_state_from_cache(
-                    cache, group
-                )
-
-                results[group] = state_dict_ids
-
-                if not got_all:
-                    incomplete_groups.add(group)
+            if not got_all:
+                incomplete_groups.add(group)
 
         return results, incomplete_groups
 
