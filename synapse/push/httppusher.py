@@ -60,7 +60,7 @@ class HttpPusher(object):
         self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
         self.failing_since = pusherdict['failing_since']
         self.timed_call = None
-        self.processing = False
+        self._is_processing = False
 
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
@@ -122,15 +122,18 @@ class HttpPusher(object):
             self.timed_call = None
 
     def _start_processing(self):
-        if self.processing:
+        if self._is_processing:
             return
 
         run_as_background_process("httppush.process", self._process)
 
     @defer.inlineCallbacks
     def _process(self):
+        # we should never get here if we are already processing
+        assert not self._is_processing
+
         try:
-            self.processing = True
+            self._is_processing = True
             # if the max ordering changes while we're running _unsafe_process,
             # call it again, and so on until we've caught up.
             while True:
@@ -142,7 +145,7 @@ class HttpPusher(object):
                 if self.max_stream_ordering == starting_max_ordering:
                     break
         finally:
-            self.processing = False
+            self._is_processing = False
 
     @defer.inlineCallbacks
     def _unsafe_process(self):

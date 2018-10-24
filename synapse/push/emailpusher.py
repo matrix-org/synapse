@@ -70,7 +70,7 @@ class EmailPusher(object):
         # See httppusher
         self.max_stream_ordering = None
 
-        self.processing = False
+        self._is_processing = False
 
     def on_started(self):
         if self.mailer is not None:
@@ -99,15 +99,18 @@ class EmailPusher(object):
         self._start_processing()
 
     def _start_processing(self):
-        if self.processing:
+        if self._is_processing:
             return
 
         run_as_background_process("emailpush.process", self._process)
 
     @defer.inlineCallbacks
     def _process(self):
+        # we should never get here if we are already processing
+        assert not self._is_processing
+
         try:
-            self.processing = True
+            self._is_processing = True
 
             if self.throttle_params is None:
                 # this is our first loop: load up the throttle params
@@ -126,7 +129,7 @@ class EmailPusher(object):
                 if self.max_stream_ordering == starting_max_ordering:
                     break
         finally:
-            self.processing = False
+            self._is_processing = False
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
