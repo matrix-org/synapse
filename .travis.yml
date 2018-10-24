@@ -22,7 +22,7 @@ matrix:
     env: TOX_ENV=packaging
 
   - python: 3.6
-    env: TOX_ENV=pep8
+    env: TOX_ENV="pep8, check_isort"
 
   - python: 2.7
     env: TOX_ENV=py27
@@ -45,9 +45,6 @@ matrix:
     env: TOX_ENV=py36-postgres TRIAL_FLAGS="-j 4"
     services:
       - postgresql
-
-  - python: 3.6
-    env: TOX_ENV=check_isort
 
   - # we only need to check for the newsfragment if it's a PR build
     if: type = pull_request
