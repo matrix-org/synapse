@@ -56,7 +56,7 @@ def request_registration(
 
     nonce = r.json()["nonce"]
 
-    mac = hmac.new(key=shared_secret, digestmod=hashlib.sha1)
+    mac = hmac.new(key=shared_secret.encode('utf8'), digestmod=hashlib.sha1)
 
     mac.update(nonce.encode('utf8'))
     mac.update(b"\x00")
