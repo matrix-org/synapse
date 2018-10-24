@@ -18,6 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
+from synapse.storage.state import StateFilter
 from synapse.types import RoomID, UserID
 
 import tests.unittest
@@ -148,7 +149,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # check we get the full state as of the final event
         state = yield self.store.get_state_for_event(
-            e5.event_id, None, filtered_types=None
+            e5.event_id,
         )
 
         self.assertIsNotNone(e4)
@@ -166,21 +167,21 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # check we can filter to the m.room.name event (with a '' state key)
         state = yield self.store.get_state_for_event(
-            e5.event_id, [(EventTypes.Name, '')], filtered_types=None
+            e5.event_id, StateFilter([(EventTypes.Name, '')])
         )
 
         self.assertStateMapEqual({(e2.type, e2.state_key): e2}, state)
 
         # check we can filter to the m.room.name event (with a wildcard None state key)
         state = yield self.store.get_state_for_event(
-            e5.event_id, [(EventTypes.Name, None)], filtered_types=None
+            e5.event_id, StateFilter([(EventTypes.Name, None)])
         )
 
         self.assertStateMapEqual({(e2.type, e2.state_key): e2}, state)
 
         # check we can grab the m.room.member events (with a wildcard None state key)
         state = yield self.store.get_state_for_event(
-            e5.event_id, [(EventTypes.Member, None)], filtered_types=None
+            e5.event_id, StateFilter([(EventTypes.Member, None)])
         )
 
         self.assertStateMapEqual(
@@ -191,8 +192,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
         # without filtering out the other event types
         state = yield self.store.get_state_for_event(
             e5.event_id,
-            [(EventTypes.Member, self.u_alice.to_string())],
-            filtered_types=[EventTypes.Member],
+            state_filter=StateFilter(
+                types=[(EventTypes.Member, self.u_alice.to_string())],
+                filtered_types=[EventTypes.Member],
+            )
         )
 
         self.assertStateMapEqual(
@@ -207,7 +210,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
         # check that types=[], filtered_types=[EventTypes.Member]
         # doesn't return all members
         state = yield self.store.get_state_for_event(
-            e5.event_id, [], filtered_types=[EventTypes.Member]
+            e5.event_id, state_filter=StateFilter(
+                types=[],
+                filtered_types=[EventTypes.Member],
+            ),
         )
 
         self.assertStateMapEqual(

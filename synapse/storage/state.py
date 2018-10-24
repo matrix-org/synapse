@@ -327,61 +327,41 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
     # FIXME: how should this be cached?
-    def get_filtered_current_state_ids(self, room_id, types, filtered_types=None):
+    def get_filtered_current_state_ids(self, room_id, state_filter=StateFilter()):
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
         of doing a fresh state resolution as per state_handler.get_current_state
+
         Args:
             room_id (str)
-            types (list[(Str, (Str|None))]): List of (type, state_key) tuples
-                which are used to filter the state fetched. `state_key` may be
-                None, which matches any `state_key`
-            filtered_types (list[Str]|None): List of types to apply the above filter to.
-        Returns:
-            deferred: dict of (type, state_key) -> event
-        """
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
 
-        include_other_types = False if filtered_types is None else True
+        Returns:
+            Deferred[Dict[tuple[str, str], str]]]: Map from type/state_key to
+            event ID.
+        """
 
         def _get_filtered_current_state_ids_txn(txn):
             results = {}
-            sql = """SELECT type, state_key, event_id FROM current_state_events
-                     WHERE room_id = ? %s"""
-            # Turns out that postgres doesn't like doing a list of OR's and
-            # is about 1000x slower, so we just issue a query for each specific
-            # type seperately.
-            if types:
-                clause_to_args = [
-                    (
-                        "AND type = ? AND state_key = ?",
-                        (etype, state_key)
-                    ) if state_key is not None else (
-                        "AND type = ?",
-                        (etype,)
-                    )
-                    for etype, state_key in types
-                ]
+            sql = """
+                SELECT type, state_key, event_id FROM current_state_events
+                WHERE room_id = ?
+            """
 
-                if include_other_types:
-                    unique_types = set(filtered_types)
-                    clause_to_args.append(
-                        (
-                            "AND type <> ? " * len(unique_types),
-                            list(unique_types)
-                        )
-                    )
-            else:
-                # If types is None we fetch all the state, and so just use an
-                # empty where clause with no extra args.
-                clause_to_args = [("", [])]
-            for where_clause, where_args in clause_to_args:
-                args = [room_id]
-                args.extend(where_args)
-                txn.execute(sql % (where_clause,), args)
-                for row in txn:
-                    typ, state_key, event_id = row
-                    key = (intern_string(typ), intern_string(state_key))
-                    results[key] = event_id
+            where_clause, where_args = state_filter.make_sql_filter_clause()
+
+            if where_clause:
+                where_clause = " AND (%s)" % (where_clause,)
+
+            args = [room_id]
+            args.extend(where_args)
+            txn.execute(sql + where_clause, args)
+            for row in txn:
+                typ, state_key, event_id = row
+                key = (intern_string(typ), intern_string(state_key))
+                results[key] = event_id
+
             return results
 
         return self.runInteraction(
@@ -503,7 +483,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         Args:
             groups(list[int]): list of state group IDs to query
-            state_filter (StateFilter)
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
         Returns:
             Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
@@ -622,20 +603,14 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return results
 
     @defer.inlineCallbacks
-    def get_state_for_events(self, event_ids, types, filtered_types=None):
+    def get_state_for_events(self, event_ids, state_filter=StateFilter()):
         """Given a list of event_ids and type tuples, return a list of state
-        dicts for each event. The state dicts will only have the type/state_keys
-        that are in the `types` list.
+        dicts for each event.
 
         Args:
             event_ids (list[string])
-            types (list[(str, str|None)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.
-                May be None, which matches any key.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
 
         Returns:
             deferred: A dict of (event_id) -> (type, state_key) -> [state_events]
@@ -645,7 +620,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self._get_state_for_groups(groups, types, filtered_types)
+        group_to_state = yield self._get_state_for_groups(groups, state_filter)
 
         state_event_map = yield self.get_events(
             [ev_id for sd in itervalues(group_to_state) for ev_id in itervalues(sd)],
@@ -664,20 +639,15 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
     @defer.inlineCallbacks
-    def get_state_ids_for_events(self, event_ids, types=None, filtered_types=None):
+    def get_state_ids_for_events(self, event_ids, state_filter=StateFilter()):
         """
         Get the state dicts corresponding to a list of events, containing the event_ids
         of the state events (as opposed to the events themselves)
 
         Args:
             event_ids(list(str)): events whose state should be returned
-            types(list[(str, str|None)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.
-                May be None, which matches any key.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
 
         Returns:
             A deferred dict from event_id -> (type, state_key) -> event_id
@@ -687,7 +657,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         groups = set(itervalues(event_to_groups))
-        group_to_state = yield self._get_state_for_groups(groups, types, filtered_types)
+        group_to_state = yield self._get_state_for_groups(groups, state_filter)
 
         event_to_state = {
             event_id: group_to_state[group]
@@ -697,45 +667,35 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         defer.returnValue({event: event_to_state[event] for event in event_ids})
 
     @defer.inlineCallbacks
-    def get_state_for_event(self, event_id, types=None, filtered_types=None):
+    def get_state_for_event(self, event_id, state_filter=StateFilter()):
         """
         Get the state dict corresponding to a particular event
 
         Args:
             event_id(str): event whose state should be returned
-            types(list[(str, str|None)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.
-                May be None, which matches any key.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
 
         Returns:
             A deferred dict from (type, state_key) -> state_event
         """
-        state_map = yield self.get_state_for_events([event_id], types, filtered_types)
+        state_map = yield self.get_state_for_events([event_id], state_filter)
         defer.returnValue(state_map[event_id])
 
     @defer.inlineCallbacks
-    def get_state_ids_for_event(self, event_id, types=None, filtered_types=None):
+    def get_state_ids_for_event(self, event_id, state_filter=StateFilter()):
         """
         Get the state dict corresponding to a particular event
 
         Args:
             event_id(str): event whose state should be returned
-            types(list[(str, str|None)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.
-                May be None, which matches any key.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
 
         Returns:
             A deferred dict from (type, state_key) -> state_event
         """
-        state_map = yield self.get_state_ids_for_events([event_id], types, filtered_types)
+        state_map = yield self.get_state_ids_for_events([event_id], state_filter)
         defer.returnValue(state_map[event_id])
 
     @cached(max_entries=50000)
@@ -851,36 +811,27 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return state_dict_ids, is_all
 
     @defer.inlineCallbacks
-    def _get_state_for_groups(self, groups, types=None, filtered_types=None):
+    def _get_state_for_groups(self, groups, state_filter=StateFilter()):
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
         Args:
             groups (iterable[int]): list of state groups for which we want
                 to get the state.
-            types (None|iterable[(str, None|str)]):
-                indicates the state type/keys required. If None, the whole
-                state is fetched and returned.
-
-                Otherwise, each entry should be a `(type, state_key)` tuple to
-                include in the response. A `state_key` of None is a wildcard
-                meaning that we require all state with that type.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
-
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
         Returns:
             Deferred[dict[int, dict[tuple[str, str], str]]]:
                 dict of state_group_id -> (dict of (type, state_key) -> event id)
         """
 
-        state_filter = StateFilter(types, filtered_types)
         member_types, non_member_types = state_filter.get_member_split()
 
         # Now we look them up in the member and non-member caches
         non_member_state, incomplete_groups_nm, = (
             yield self._get_state_for_groups_using_cache(
-                groups, self._state_group_cache, non_member_types, filtered_types,
+                groups, self._state_group_cache,
+                non_member_types, state_filter.filtered_types,
             )
         )
 

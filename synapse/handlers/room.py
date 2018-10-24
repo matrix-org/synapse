@@ -33,6 +33,7 @@ from synapse.api.constants import (
     RoomCreationPreset,
 )
 from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
 from synapse.visibility import filter_events_for_client
@@ -488,8 +489,6 @@ class RoomContextHandler(object):
         else:
             last_event_id = event_id
 
-        types = None
-        filtered_types = None
         if event_filter and event_filter.lazy_load_members():
             members = set(ev.sender for ev in itertools.chain(
                 results["events_before"],
@@ -499,12 +498,19 @@ class RoomContextHandler(object):
             filtered_types = [EventTypes.Member]
             types = [(EventTypes.Member, member) for member in members]
 
+            state_filter = StateFilter(
+                types=types,
+                filtered_types=filtered_types,
+            )
+        else:
+            state_filter = StateFilter()
+
         # XXX: why do we return the state as of the last event rather than the
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
 
         state = yield self.store.get_state_for_events(
-            [last_event_id], types, filtered_types=filtered_types,
+            [last_event_id], state_filter=state_filter,
         )
         results["state"] = list(state[last_event_id].values())
 
