@@ -779,7 +779,7 @@ class EventCreationHandler(object):
             event, context=context
         )
 
-        self.pusher_pool.on_new_notifications(
+        yield self.pusher_pool.on_new_notifications(
             event_stream_id, max_stream_id,
         )
 
