@@ -4,6 +4,10 @@ language: python
 # tell travis to cache ~/.cache/pip
 cache: pip
 
+# don't clone the whole repo history, one commit will do
+git:
+  depth: 1
+
 # only build branches we care about (PRs are built seperately)
 branches:
   only:
