@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from tests.unittest import TestCase
 
@@ -21,12 +21,12 @@ from synapse._scripts.register_new_matrix_user import request_registration
 
 
 class RegisterTestCase(TestCase):
-
     def test_success(self):
         """
         The script will fetch a nonce, and then generate a MAC with it, and then
         post that MAC.
         """
+
         def get(url):
             r = Mock()
             r.status_code = 200
@@ -53,7 +53,16 @@ class RegisterTestCase(TestCase):
         out = []
         err_code = []
 
-        request_registration("user", "pass", "matrix.org", "shared", admin=False, requests=requests, _print=out.append, exit=err_code.append)
+        request_registration(
+            "user",
+            "pass",
+            "matrix.org",
+            "shared",
+            admin=False,
+            requests=requests,
+            _print=out.append,
+            exit=err_code.append,
+        )
 
         # We should get the success message making sure everything is OK.
         self.assertIn("Success!", out)
@@ -65,6 +74,7 @@ class RegisterTestCase(TestCase):
         """
         If the script fails to fetch a nonce, it throws an error and quits.
         """
+
         def get(url):
             r = Mock()
             r.status_code = 404
@@ -79,7 +89,16 @@ class RegisterTestCase(TestCase):
         out = []
         err_code = []
 
-        request_registration("user", "pass", "matrix.org", "shared", admin=False, requests=requests, _print=out.append, exit=err_code.append)
+        request_registration(
+            "user",
+            "pass",
+            "matrix.org",
+            "shared",
+            admin=False,
+            requests=requests,
+            _print=out.append,
+            exit=err_code.append,
+        )
 
         # Exit was called
         self.assertEqual(err_code, [1])
@@ -93,6 +112,7 @@ class RegisterTestCase(TestCase):
         The script will fetch a nonce, and then if the final POST fails, will
         report an error and quit.
         """
+
         def get(url):
             r = Mock()
             r.status_code = 200
@@ -121,7 +141,16 @@ class RegisterTestCase(TestCase):
         out = []
         err_code = []
 
-        request_registration("user", "pass", "matrix.org", "shared", admin=False, requests=requests, _print=out.append, exit=err_code.append)
+        request_registration(
+            "user",
+            "pass",
+            "matrix.org",
+            "shared",
+            admin=False,
+            requests=requests,
+            _print=out.append,
+            exit=err_code.append,
+        )
 
         # Exit was called
         self.assertEqual(err_code, [1])

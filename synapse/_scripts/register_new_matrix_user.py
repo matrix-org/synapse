@@ -23,7 +23,6 @@ import sys
 
 import yaml
 import hmac
-import sys
 
 from six.moves import input
 
@@ -46,7 +45,7 @@ def request_registration(
     # Get the nonce
     r = requests.get(url)
 
-    if not r.status_code is 200:
+    if r.status_code is not 200:
         _print("ERROR! Received %d %s" % (r.status_code, r.reason))
         if 400 <= r.status_code < 500:
             try:
@@ -80,7 +79,7 @@ def request_registration(
     _print("Sending registration request...")
     r = requests.post(url, json=data)
 
-    if not r.status_code is 200:
+    if r.status_code is not 200:
         _print("ERROR! Received %d %s" % (r.status_code, r.reason))
         if 400 <= r.status_code < 500:
             try:
