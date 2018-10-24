@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 @defer.inlineCallbacks
-def resolve_events_with_factory(state_sets, event_map, state_res_store):
+def resolve_events_with_store(state_sets, event_map, state_res_store):
     """Resolves the state using the v2 state resolution algorithm
 
     Args:

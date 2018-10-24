@@ -24,7 +24,7 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import FrozenEvent
 from synapse.state.v2 import (
     lexicographical_topological_sort,
-    resolve_events_with_factory,
+    resolve_events_with_store,
 )
 from synapse.types import EventID
 
@@ -541,7 +541,7 @@ class StateTestCase(unittest.TestCase):
             elif len(prev_events) == 1:
                 state_before = dict(state_at_event[prev_events[0]])
             else:
-                state_d = resolve_events_with_factory(
+                state_d = resolve_events_with_store(
                     [state_at_event[n] for n in prev_events],
                     event_map=event_map,
                     state_res_store=TestStateResolutionStore(event_map),

@@ -53,7 +53,7 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
-from synapse.state import StateResolutionStore, resolve_events_with_factory
+from synapse.state import StateResolutionStore, resolve_events_with_store
 from synapse.types import UserID, get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
@@ -385,7 +385,7 @@ class FederationHandler(BaseHandler):
                                 event_map[x.event_id] = x
 
                     room_version = yield self.store.get_room_version(room_id)
-                    state_map = yield resolve_events_with_factory(
+                    state_map = yield resolve_events_with_store(
                         room_version, state_maps, event_map,
                         state_res_store=StateResolutionStore(self.store),
                     )

@@ -394,7 +394,7 @@ class StateHandler(object):
         }
 
         with Measure(self.clock, "state._resolve_events"):
-            new_state = yield resolve_events_with_factory(
+            new_state = yield resolve_events_with_store(
                 room_version, state_set_ids,
                 event_map=state_map,
                 state_res_store=StateResolutionStore(self.store),
@@ -478,10 +478,10 @@ class StateResolutionHandler(object):
 
             # start by assuming we won't have any conflicted state, and build up the new
             # state map by iterating through the state groups. If we discover a conflict,
-            # we give up and instead use `resolve_events_with_factory`.
+            # we give up and instead use `resolve_events_with_store`.
             #
             # XXX: is this actually worthwhile, or should we just let
-            # resolve_events_with_factory do it?
+            # resolve_events_with_store do it?
             new_state = {}
             conflicted_state = False
             for st in itervalues(state_groups_ids):
@@ -496,7 +496,7 @@ class StateResolutionHandler(object):
             if conflicted_state:
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
-                    new_state = yield resolve_events_with_factory(
+                    new_state = yield resolve_events_with_store(
                         room_version,
                         list(itervalues(state_groups_ids)),
                         event_map=event_map,
@@ -581,7 +581,7 @@ def _make_state_cache_entry(
     )
 
 
-def resolve_events_with_factory(room_version, state_sets, event_map, state_res_store):
+def resolve_events_with_store(room_version, state_sets, event_map, state_res_store):
     """
     Args:
         room_version(str): Version of the room
@@ -604,11 +604,11 @@ def resolve_events_with_factory(room_version, state_sets, event_map, state_res_s
             a map from (type, state_key) to event_id.
     """
     if room_version == RoomVersions.V1:
-        return v1.resolve_events_with_factory(
+        return v1.resolve_events_with_store(
             state_sets, event_map, state_res_store.get_events,
         )
     elif room_version == RoomVersions.VDH_TEST:
-        return v2.resolve_events_with_factory(
+        return v2.resolve_events_with_store(
             state_sets, event_map, state_res_store,
         )
     else:
