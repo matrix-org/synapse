@@ -235,7 +235,8 @@ class RegistrationHandler(BaseHandler):
                     if self.hs.hostname != room_alias.domain:
                         logger.warning(
                             'Cannot create room alias %s, '
-                            'it does not match server domain', (r,)
+                            'it does not match server domain', 
+                            r,
                         )
                     else:
                         # create room expects the localpart of the room alias
