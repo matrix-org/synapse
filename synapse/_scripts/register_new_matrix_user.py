@@ -16,17 +16,16 @@
 
 from __future__ import print_function
 
+import argparse
 import getpass
 import hashlib
-import argparse
-import sys
-
-import yaml
 import hmac
+import sys
 
 from six.moves import input
 
 import requests as _requests
+import yaml
 
 
 def request_registration(
