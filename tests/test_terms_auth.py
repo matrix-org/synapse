@@ -12,6 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
+import six
+from mock import Mock
+
+from twisted.test.proto_helpers import MemoryReactorClock
+
+from synapse.api.errors import InteractiveAuthIncompleteError
+from synapse.http.server import JsonResource
+from synapse.rest.client.v2_alpha.register import register_servlets
+from synapse.util import Clock
+
+from tests import unittest
+from tests.server import make_request, render, setup_test_homeserver
+
+
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
