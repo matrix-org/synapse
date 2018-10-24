@@ -172,7 +172,10 @@ USER_FILTER_SCHEMA = {
                 # events a lot easier as we can then use a negative lookbehind
                 # assertion to split '\.' If we allowed \\ then it would
                 # incorrectly split '\\.' See synapse.events.utils.serialize_event
-                "pattern": "^((?!\\\).)*$"
+                #
+                # Note that because this is a regular expression, we have to escape
+                # each backslash in the pattern.
+                "pattern": r"^((?!\\\\).)*$"
             }
         }
     },
