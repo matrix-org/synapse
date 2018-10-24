@@ -500,8 +500,6 @@ class RoomContextHandler(object):
                 types={EventTypes.Member: members},
                 include_others=True,
             )
-
-            logger.info("state_filter %s", state_filter)
         else:
             state_filter = StateFilter.all()
 
