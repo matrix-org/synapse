@@ -53,7 +53,9 @@ matrix:
   - python: 3.6
     env: TOX_ENV=check_isort
 
-  - python: 3.6
+  - # we only need to check for the newsfragment if it's a PR build
+    if: type = pull_request
+    python: 3.6
     env: TOX_ENV=check-newsfragment
 
 install:
