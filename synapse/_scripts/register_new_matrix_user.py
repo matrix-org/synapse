@@ -18,16 +18,27 @@ from __future__ import print_function
 
 import getpass
 import hashlib
+import argparse
+import sys
+
+import yaml
 import hmac
 import sys
 
-from six import input
+from six.moves import input
 
 import requests as _requests
 
 
 def request_registration(
-    user, password, server_location, shared_secret, admin=False, requests=_requests
+    user,
+    password,
+    server_location,
+    shared_secret,
+    admin=False,
+    requests=_requests,
+    _print=print,
+    exit=sys.exit,
 ):
 
     url = "%s/_matrix/client/r0/admin/register" % (server_location,)
@@ -35,14 +46,14 @@ def request_registration(
     # Get the nonce
     r = requests.get(url)
 
-    if not r.ok:
-        print("ERROR! Received %d %s" % (r.status_code, r.reason))
+    if not r.status_code is 200:
+        _print("ERROR! Received %d %s" % (r.status_code, r.reason))
         if 400 <= r.status_code < 500:
             try:
-                print(r.json()["error"])
+                _print(r.json()["error"])
             except Exception:
                 pass
-        sys.exit(1)
+        return exit(1)
 
     nonce = r.json()["nonce"]
 
@@ -66,19 +77,19 @@ def request_registration(
         "admin": admin,
     }
 
-    print("Sending registration request...")
+    _print("Sending registration request...")
     r = requests.post(url, json=data)
 
-    if not r.ok:
-        print("ERROR! Received %d %s" % (r.status_code, r.reason))
+    if not r.status_code is 200:
+        _print("ERROR! Received %d %s" % (r.status_code, r.reason))
         if 400 <= r.status_code < 500:
             try:
-                print(r.json()["error"])
+                _print(r.json()["error"])
             except Exception:
                 pass
-        sys.exit(1)
+        return exit(1)
 
-    print("Success!")
+    _print("Success!")
 
 
 def register_new_user(user, password, server_location, shared_secret, admin):
@@ -120,3 +131,83 @@ def register_new_user(user, password, server_location, shared_secret, admin):
             admin = False
 
     request_registration(user, password, server_location, shared_secret, bool(admin))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Used to register new users with a given home server when"
+        " registration has been disabled. The home server must be"
+        " configured with the 'registration_shared_secret' option"
+        " set."
+    )
+    parser.add_argument(
+        "-u",
+        "--user",
+        default=None,
+        help="Local part of the new user. Will prompt if omitted.",
+    )
+    parser.add_argument(
+        "-p",
+        "--password",
+        default=None,
+        help="New password for user. Will prompt if omitted.",
+    )
+    admin_group = parser.add_mutually_exclusive_group()
+    admin_group.add_argument(
+        "-a",
+        "--admin",
+        action="store_true",
+        help=(
+            "Register new user as an admin. "
+            "Will prompt if --no-admin is not set either."
+        ),
+    )
+    admin_group.add_argument(
+        "--no-admin",
+        action="store_true",
+        help=(
+            "Register new user as a regular user. "
+            "Will prompt if --admin is not set either."
+        ),
+    )
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "-c",
+        "--config",
+        type=argparse.FileType('r'),
+        help="Path to server config file. Used to read in shared secret.",
+    )
+
+    group.add_argument(
+        "-k", "--shared-secret", help="Shared secret as defined in server config file."
+    )
+
+    parser.add_argument(
+        "server_url",
+        default="https://localhost:8448",
+        nargs='?',
+        help="URL to use to talk to the home server. Defaults to "
+        " 'https://localhost:8448'.",
+    )
+
+    args = parser.parse_args()
+
+    if "config" in args and args.config:
+        config = yaml.safe_load(args.config)
+        secret = config.get("registration_shared_secret", None)
+        if not secret:
+            print("No 'registration_shared_secret' defined in config.")
+            sys.exit(1)
+    else:
+        secret = args.shared_secret
+
+    admin = None
+    if args.admin or args.no_admin:
+        admin = args.admin
+
+    register_new_user(args.user, args.password, args.server_url, secret, admin)
+
+
+if __name__ == "__main__":
+    main()
