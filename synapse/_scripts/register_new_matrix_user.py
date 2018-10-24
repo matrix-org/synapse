@@ -14,41 +14,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def request_registration(user, password, server_location, shared_secret, admin=False):
-    req = urllib2.Request(
-        "%s/_matrix/client/r0/admin/register" % (server_location,),
-        headers={'Content-Type': 'application/json'},
-    )
+from __future__ import print_function
 
-    try:
-        if sys.version_info[:3] >= (2, 7, 9):
-            # As of version 2.7.9, urllib2 now checks SSL certs
-            import ssl
+import getpass
+import hashlib
+import hmac
+import sys
 
-            f = urllib2.urlopen(req, context=ssl.SSLContext(ssl.PROTOCOL_SSLv23))
-        else:
-            f = urllib2.urlopen(req)
-        body = f.read()
-        f.close()
-        nonce = json.loads(body)["nonce"]
-    except urllib2.HTTPError as e:
-        print("ERROR! Received %d %s" % (e.code, e.reason))
-        if 400 <= e.code < 500:
-            if e.info().type == "application/json":
-                resp = json.load(e)
-                if "error" in resp:
-                    print(resp["error"])
+from six import input
+
+import requests as _requests
+
+
+def request_registration(
+    user, password, server_location, shared_secret, admin=False, requests=_requests
+):
+
+    url = "%s/_matrix/client/r0/admin/register" % (server_location,)
+
+    # Get the nonce
+    r = requests.get(url)
+
+    if not r.ok:
+        print("ERROR! Received %d %s" % (r.status_code, r.reason))
+        if 400 <= r.status_code < 500:
+            try:
+                print(r.json()["error"])
+            except Exception:
+                pass
         sys.exit(1)
+
+    nonce = r.json()["nonce"]
 
     mac = hmac.new(key=shared_secret, digestmod=hashlib.sha1)
 
-    mac.update(nonce)
-    mac.update("\x00")
-    mac.update(user)
-    mac.update("\x00")
-    mac.update(password)
-    mac.update("\x00")
-    mac.update("admin" if admin else "notadmin")
+    mac.update(nonce.encode('utf8'))
+    mac.update(b"\x00")
+    mac.update(user.encode('utf8'))
+    mac.update(b"\x00")
+    mac.update(password.encode('utf8'))
+    mac.update(b"\x00")
+    mac.update(b"admin" if admin else b"notadmin")
 
     mac = mac.hexdigest()
 
@@ -60,34 +66,19 @@ def request_registration(user, password, server_location, shared_secret, admin=F
         "admin": admin,
     }
 
-    server_location = server_location.rstrip("/")
-
     print("Sending registration request...")
+    r = requests.post(url, json=data)
 
-    req = urllib2.Request(
-        "%s/_matrix/client/r0/admin/register" % (server_location,),
-        data=json.dumps(data),
-        headers={'Content-Type': 'application/json'},
-    )
-    try:
-        if sys.version_info[:3] >= (2, 7, 9):
-            # As of version 2.7.9, urllib2 now checks SSL certs
-            import ssl
-
-            f = urllib2.urlopen(req, context=ssl.SSLContext(ssl.PROTOCOL_SSLv23))
-        else:
-            f = urllib2.urlopen(req)
-        f.read()
-        f.close()
-        print("Success.")
-    except urllib2.HTTPError as e:
-        print("ERROR! Received %d %s" % (e.code, e.reason))
-        if 400 <= e.code < 500:
-            if e.info().type == "application/json":
-                resp = json.load(e)
-                if "error" in resp:
-                    print(resp["error"])
+    if not r.ok:
+        print("ERROR! Received %d %s" % (r.status_code, r.reason))
+        if 400 <= r.status_code < 500:
+            try:
+                print(r.json()["error"])
+            except Exception:
+                pass
         sys.exit(1)
+
+    print("Success!")
 
 
 def register_new_user(user, password, server_location, shared_secret, admin):
