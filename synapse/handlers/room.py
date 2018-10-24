@@ -136,7 +136,49 @@ class RoomCreationHandler(BaseHandler):
                 requester, tombstone_event, tombstone_context,
             )
 
-            # XXX send a power_levels in the old room, if possible
+            # ... and restrict the PLs in the old room, if possible.
+            old_room_pl_state = yield self.state_handler.get_current_state(
+                old_room_id,
+                event_type=EventTypes.PowerLevels,
+                latest_event_ids=(tombstone_event.event_id, ),
+            )
+
+            if old_room_pl_state is None:
+                logger.warning(
+                    "Not supported: upgrading a room with no PL event. Not setting PLs "
+                    "in old room.",
+                )
+            else:
+                pl_content = dict(old_room_pl_state.content)
+                users_default = int(pl_content.get("users_default", 0))
+                restricted_level = max(users_default + 1, 50)
+
+                updated = False
+                for v in ("invite", "events_default"):
+                    current = int(pl_content.get(v, 0))
+                    if current < restricted_level:
+                        logger.debug(
+                            "Setting level for %s in %s to %i (was %i)",
+                            v, old_room_id, restricted_level, current,
+                        )
+                        pl_content[v] = restricted_level
+                        updated = True
+                    else:
+                        logger.debug(
+                            "Not setting level for %s (already %i)",
+                            v, current,
+                        )
+
+                if updated:
+                    yield self.event_creation_handler.create_and_send_nonmember_event(
+                        requester, {
+                            "type": EventTypes.PowerLevels,
+                            "state_key": '',
+                            "room_id": old_room_id,
+                            "sender": user_id,
+                            "content": pl_content,
+                        }, ratelimit=False,
+                    )
 
         defer.returnValue(new_room_id)
 
