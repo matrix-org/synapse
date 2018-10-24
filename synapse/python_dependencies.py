@@ -53,6 +53,7 @@ REQUIREMENTS = {
     "pillow>=3.1.2": ["PIL"],
     "pydenticon>=0.2": ["pydenticon"],
     "sortedcontainers>=1.4.4": ["sortedcontainers"],
+    "psutil>=2.0.0": ["psutil>=2.0.0"],
     "pysaml2>=3.0.0": ["saml2"],
     "pymacaroons-pynacl>=0.9.3": ["pymacaroons"],
     "msgpack-python>=0.4.2": ["msgpack"],
@@ -78,9 +79,6 @@ CONDITIONAL_REQUIREMENTS = {
     },
     "matrix-synapse-ldap3": {
         "matrix-synapse-ldap3>=0.1": ["ldap_auth_provider"],
-    },
-    "psutil": {
-        "psutil>=2.0.0": ["psutil>=2.0.0"],
     },
     "postgres": {
         "psycopg2>=2.6": ["psycopg2"]

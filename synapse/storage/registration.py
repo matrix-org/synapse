@@ -567,7 +567,7 @@ class RegistrationStore(RegistrationWorkerStore,
         def _find_next_generated_user_id(txn):
             txn.execute("SELECT name FROM users")
 
-            regex = re.compile("^@(\d+):")
+            regex = re.compile(r"^@(\d+):")
 
             found = set()
 

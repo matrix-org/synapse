@@ -70,6 +70,8 @@ def manhole(username, password, globals):
     Returns:
         twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
+    if not isinstance(password, bytes):
+        password = password.encode('ascii')
 
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(
         **{username: password}
@@ -82,7 +84,7 @@ def manhole(username, password, globals):
     )
 
     factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-    factory.publicKeys['ssh-rsa'] = Key.fromString(PUBLIC_KEY)
-    factory.privateKeys['ssh-rsa'] = Key.fromString(PRIVATE_KEY)
+    factory.publicKeys[b'ssh-rsa'] = Key.fromString(PUBLIC_KEY)
+    factory.privateKeys[b'ssh-rsa'] = Key.fromString(PRIVATE_KEY)
 
     return factory

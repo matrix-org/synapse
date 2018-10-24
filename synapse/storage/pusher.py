@@ -29,7 +29,7 @@ from ._base import SQLBaseStore
 logger = logging.getLogger(__name__)
 
 if six.PY2:
-    db_binary_type = buffer
+    db_binary_type = six.moves.builtins.buffer
 else:
     db_binary_type = memoryview
 

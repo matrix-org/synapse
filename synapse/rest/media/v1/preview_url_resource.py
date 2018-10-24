@@ -674,7 +674,7 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
         # This splits the paragraph into words, but keeping the
         # (preceeding) whitespace intact so we can easily concat
         # words back together.
-        for match in re.finditer("\s*\S+", description):
+        for match in re.finditer(r"\s*\S+", description):
             word = match.group()
 
             # Keep adding words while the total length is less than

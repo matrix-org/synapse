@@ -230,7 +230,7 @@ class MatrixFederationHttpClient(object):
         Returns:
             Deferred: resolves with the http response object on success.
 
-            Fails with ``HTTPRequestException``: if we get an HTTP response
+            Fails with ``HttpResponseException``: if we get an HTTP response
                 code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -480,7 +480,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -534,7 +534,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -589,7 +589,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -640,7 +640,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -684,7 +684,7 @@ class MatrixFederationHttpClient(object):
             Deferred: resolves with an (int,dict) tuple of the file length and
             a dict of the response headers.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response code
+            Fails with ``HttpResponseException`` if we get an HTTP response code
             >= 300
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
