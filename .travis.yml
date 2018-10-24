@@ -15,10 +15,6 @@ branches:
     - develop
     - /^release-v/
 
-before_script:
-  - git remote set-branches --add origin develop
-  - git fetch origin develop
-
 matrix:
   fast_finish: true
   include:
@@ -57,6 +53,10 @@ matrix:
     if: type = pull_request
     python: 3.6
     env: TOX_ENV=check-newsfragment
+    script:
+      - git remote set-branches --add origin develop
+      - git fetch origin develop
+      - tox -e $TOX_ENV
 
 install:
   - pip install tox
