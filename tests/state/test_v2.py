@@ -22,10 +22,7 @@ import attr
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.event_auth import auth_types_for_event
 from synapse.events import FrozenEvent
-from synapse.state.v2 import (
-    lexicographical_topological_sort,
-    resolve_events_with_store,
-)
+from synapse.state.v2 import lexicographical_topological_sort, resolve_events_with_store
 from synapse.types import EventID
 
 from tests import unittest
