@@ -28,7 +28,7 @@ if __name__ == "__main__":
             sys.stderr.write("\n" + str(e) + "\n")
             sys.exit(1)
 
-        print (getattr(config, key))
+        print(getattr(config, key))
         sys.exit(0)
     else:
         sys.stderr.write("Unknown command %r\n" % (action,))

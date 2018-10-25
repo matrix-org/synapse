@@ -1,12 +1,27 @@
 sudo: false
 language: python
 
-# tell travis to cache ~/.cache/pip
-cache: pip
+cache:
+  directories:
+    # we only bother to cache the wheels; parts of the http cache get
+    # invalidated every build (because they get served with a max-age of 600
+    # seconds), which means that we end up re-uploading the whole cache for
+    # every build, which is time-consuming In any case, it's not obvious that
+    # downloading the cache from S3 would be much faster than downloading the
+    # originals from pypi.
+    #
+    - $HOME/.cache/pip/wheels
 
-before_script:
-  - git remote set-branches --add origin develop
-  - git fetch origin develop
+# don't clone the whole repo history, one commit will do
+git:
+  depth: 1
+
+# only build branches we care about (PRs are built seperately)
+branches:
+  only:
+    - master
+    - develop
+    - /^release-v/
 
 matrix:
   fast_finish: true
@@ -14,8 +29,8 @@ matrix:
   - python: 2.7
     env: TOX_ENV=packaging
 
-  - python: 2.7
-    env: TOX_ENV=pep8
+  - python: 3.6
+    env: TOX_ENV="pep8,check_isort"
 
   - python: 2.7
     env: TOX_ENV=py27
@@ -39,11 +54,14 @@ matrix:
     services:
       - postgresql
 
-  - python: 3.6
-    env: TOX_ENV=check_isort
-
-  - python: 3.6
+  - # we only need to check for the newsfragment if it's a PR build
+    if: type = pull_request
+    python: 3.6
     env: TOX_ENV=check-newsfragment
+    script:
+      - git remote set-branches --add origin develop
+      - git fetch origin develop
+      - tox -e $TOX_ENV
 
 install:
   - pip install tox
