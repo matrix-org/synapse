@@ -30,7 +30,7 @@ matrix:
     env: TOX_ENV=packaging
 
   - python: 3.6
-    env: TOX_ENV="pep8, check_isort"
+    env: TOX_ENV="pep8,check_isort"
 
   - python: 2.7
     env: TOX_ENV=py27
