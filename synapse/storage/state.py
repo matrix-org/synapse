@@ -297,7 +297,7 @@ class StateFilter(object):
 
     def get_member_split(self):
         """Return the filter split into two: one which assumes it's exclusively
-        matching against member state, and one which assumes its matching
+        matching against member state, and one which assumes it's matching
         against non member state.
 
         This is useful due to the returned filters giving correct results for
