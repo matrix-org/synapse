@@ -156,9 +156,8 @@ class StateFilter(object):
                 )
 
         get_all_non_members = any(
-            s is None
+            state_keys is None
             for t, state_keys in iteritems(self.types)
-            for s in state_keys
             if t != EventTypes.Member
         )
 
@@ -284,9 +283,8 @@ class StateFilter(object):
         return (
             self.include_others
             or any(
-                s is None
-                for t, state_keys in iteritems(self.types)
-                for s in state_keys
+                state_keys is None
+                for state_keys in itervalues(self.types)
             )
         )
 
