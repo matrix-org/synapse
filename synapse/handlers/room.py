@@ -73,6 +73,7 @@ class RoomCreationHandler(BaseHandler):
 
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.room_member_handler = hs.get_room_member_handler()
 
     @defer.inlineCallbacks
     def create_room(self, requester, config, ratelimit=True,
@@ -195,12 +196,9 @@ class RoomCreationHandler(BaseHandler):
         # override any attempt to set room versions via the creation_content
         creation_content["room_version"] = room_version
 
-        room_member_handler = self.hs.get_room_member_handler()
-
         yield self._send_events_for_new_room(
             requester,
             room_id,
-            room_member_handler,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
@@ -242,7 +240,7 @@ class RoomCreationHandler(BaseHandler):
             if is_direct:
                 content["is_direct"] = is_direct
 
-            yield room_member_handler.update_membership(
+            yield self.room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
                 room_id,
@@ -280,7 +278,6 @@ class RoomCreationHandler(BaseHandler):
             self,
             creator,  # A Requester object.
             room_id,
-            room_member_handler,
             preset_config,
             invite_list,
             initial_state,
@@ -325,7 +322,7 @@ class RoomCreationHandler(BaseHandler):
             content=creation_content,
         )
 
-        yield room_member_handler.update_membership(
+        yield self.room_member_handler.update_membership(
             creator,
             creator.user,
             room_id,

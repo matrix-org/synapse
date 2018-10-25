@@ -50,7 +50,6 @@ class RegistrationHandler(BaseHandler):
         self._auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
-        self.room_creation_handler = self.hs.get_room_creation_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
 
         self._next_generated_user_id = None
@@ -241,7 +240,10 @@ class RegistrationHandler(BaseHandler):
                     else:
                         # create room expects the localpart of the room alias
                         room_alias_localpart = room_alias.localpart
-                        yield self.room_creation_handler.create_room(
+
+                        # getting the RoomCreationHandler during init gives a dependency
+                        # loop
+                        yield self.hs.get_room_creation_handler().create_room(
                             fake_requester,
                             config={
                                 "preset": "public_chat",
