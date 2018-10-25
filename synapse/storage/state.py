@@ -600,7 +600,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         })
 
     @defer.inlineCallbacks
-    def _get_state_groups_from_groups(self, groups, state_filter=StateFilter.all()):
+    def _get_state_groups_from_groups(self, groups, state_filter):
         """Returns the state groups for a given set of groups, filtering on
         types of state events.
 
