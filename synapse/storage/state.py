@@ -229,7 +229,7 @@ class StateFilter(object):
         if self.has_wildcards():
             return None
 
-        return sum(self.concrete_types())
+        return len(self.concrete_types())
 
     def filter_state(self, state_dict):
         """Returns the state filtered with by this StateFilter
