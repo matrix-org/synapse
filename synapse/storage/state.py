@@ -302,7 +302,7 @@ class StateFilter(object):
 
         This is useful due to the returned filters giving correct results for
         `is_full()`, `has_wildcards()`, etc, when operating against maps that
-        either exclusively container member events or only contain non-member
+        either exclusively contain member events or only contain non-member
         events. (Which is the case when dealing with the member vs non-member
         state caches).
 
