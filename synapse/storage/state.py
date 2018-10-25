@@ -338,6 +338,15 @@ class StateFilter(object):
 
         return member_filter, non_member_filter
 
+    def __attrs_post_init__(self):
+        # If `include_others` is set we canonicalise the filter by removing
+        # wildcards from the types dictionary
+        if self.include_others:
+            self.types = {
+                k: v for k, v in iteritems(self.types)
+                if v is not None
+            }
+
 
 # this inherits from EventsWorkerStore because it calls self.get_events
 class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
