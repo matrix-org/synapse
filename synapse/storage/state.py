@@ -475,11 +475,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             where_clause, where_args = state_filter.make_sql_filter_clause()
 
             if where_clause:
-                where_clause = " AND (%s)" % (where_clause,)
+                sql += " AND (%s)" % (where_clause,)
 
             args = [room_id]
             args.extend(where_args)
-            txn.execute(sql + where_clause, args)
+            txn.execute(sql, args)
             for row in txn:
                 typ, state_key, event_id = row
                 key = (intern_string(typ), intern_string(state_key))
