@@ -491,14 +491,13 @@ class RoomContextHandler(object):
             last_event_id = event_id
 
         if event_filter and event_filter.lazy_load_members():
-            members = set(ev.sender for ev in itertools.chain(
-                results["events_before"],
-                (results["event"],),
-                results["events_after"],
-            ))
-            state_filter = StateFilter(
-                types={EventTypes.Member: members},
-                include_others=True,
+            state_filter = StateFilter.from_lazy_load_member_list(
+                ev.sender
+                for ev in itertools.chain(
+                    results["events_before"],
+                    (results["event"],),
+                    results["events_after"],
+                )
             )
         else:
             state_filter = StateFilter.all()

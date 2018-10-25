@@ -110,6 +110,22 @@ class StateFilter(object):
 
         return StateFilter(types=type_dict)
 
+    @staticmethod
+    def from_lazy_load_member_list(members):
+        """Creates a filter that returns all non-member events, plus the member
+        events for the given users
+
+        Args:
+            members (iterable[str]): Set of user IDs
+
+        Returns:
+            StateFilter
+        """
+        return StateFilter(
+            types={EventTypes.Member: set(members)},
+            include_others=True,
+        )
+
     def return_expanded(self):
         """Creates a new StateFilter where type wild cards have been removed
         (except for memberships). The returned filter is a superset of the

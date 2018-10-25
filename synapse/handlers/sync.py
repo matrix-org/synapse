@@ -733,12 +733,7 @@ class SyncHandler(object):
                     # LL for incr syncs in #3840.
                     members_to_fetch.add(sync_config.user.to_string())
 
-                state_filter = StateFilter(
-                    types={
-                        EventTypes.Member: members_to_fetch,
-                    },
-                    include_others=True,
-                )
+                state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
             else:
                 state_filter = StateFilter.all()
 
