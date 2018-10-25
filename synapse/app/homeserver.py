@@ -553,14 +553,6 @@ def run(hs):
             generate_monthly_active_users,
         )
 
-    # XXX is this really supposed to be a background process? it looks
-    # like it needs to complete before some of the other stuff runs.
-    run_as_background_process(
-        "initialise_reserved_users",
-        hs.get_datastore().initialise_reserved_users,
-        hs.config.mau_limits_reserved_threepids,
-    )
-
     start_generate_monthly_active_users()
     if hs.config.limit_usage_by_mau:
         clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)

@@ -207,6 +207,7 @@ class HomeServer(object):
         logger.info("Setting up.")
         with self.get_db_conn() as conn:
             self.datastore = self.DATASTORE_CLASS(conn, self)
+            conn.commit()
         logger.info("Finished setting up.")
 
     def get_reactor(self):

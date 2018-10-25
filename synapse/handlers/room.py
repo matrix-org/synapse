@@ -33,6 +33,7 @@ from synapse.api.constants import (
     RoomCreationPreset,
 )
 from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
 from synapse.visibility import filter_events_for_client
@@ -190,10 +191,11 @@ class RoomCreationHandler(BaseHandler):
         if room_alias:
             directory_handler = self.hs.get_handlers().directory_handler
             yield directory_handler.create_association(
-                user_id=user_id,
+                requester=requester,
                 room_id=room_id,
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
+                send_event=False,
             )
 
         preset_config = config.get(
@@ -289,7 +291,7 @@ class RoomCreationHandler(BaseHandler):
         if room_alias:
             result["room_alias"] = room_alias.to_string()
             yield directory_handler.send_room_alias_update_event(
-                requester, user_id, room_id
+                requester, room_id
             )
 
         defer.returnValue(result)
@@ -488,23 +490,24 @@ class RoomContextHandler(object):
         else:
             last_event_id = event_id
 
-        types = None
-        filtered_types = None
         if event_filter and event_filter.lazy_load_members():
-            members = set(ev.sender for ev in itertools.chain(
-                results["events_before"],
-                (results["event"],),
-                results["events_after"],
-            ))
-            filtered_types = [EventTypes.Member]
-            types = [(EventTypes.Member, member) for member in members]
+            state_filter = StateFilter.from_lazy_load_member_list(
+                ev.sender
+                for ev in itertools.chain(
+                    results["events_before"],
+                    (results["event"],),
+                    results["events_after"],
+                )
+            )
+        else:
+            state_filter = StateFilter.all()
 
         # XXX: why do we return the state as of the last event rather than the
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
 
         state = yield self.store.get_state_for_events(
-            [last_event_id], types, filtered_types=filtered_types,
+            [last_event_id], state_filter=state_filter,
         )
         results["state"] = list(state[last_event_id].values())
 

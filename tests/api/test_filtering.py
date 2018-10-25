@@ -60,7 +60,7 @@ class FilteringTestCase(unittest.TestCase):
         invalid_filters = [
             {"boom": {}},
             {"account_data": "Hello World"},
-            {"event_fields": ["\\foo"]},
+            {"event_fields": [r"\\foo"]},
             {"room": {"timeline": {"limit": 0}, "state": {"not_bars": ["*"]}}},
             {"event_format": "other"},
             {"room": {"not_rooms": ["#foo:pik-test"]}},
@@ -109,6 +109,16 @@ class FilteringTestCase(unittest.TestCase):
                 "event_format": "client",
                 "event_fields": ["type", "content", "sender"],
             },
+
+            # a single backslash should be permitted (though it is debatable whether
+            # it should be permitted before anything other than `.`, and what that
+            # actually means)
+            #
+            # (note that event_fields is implemented in
+            # synapse.events.utils.serialize_event, and so whether this actually works
+            # is tested elsewhere. We just want to check that it is allowed through the
+            # filter validation)
+            {"event_fields": [r"foo\.bar"]},
         ]
         for filter in valid_filters:
             try:

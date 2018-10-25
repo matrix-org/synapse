@@ -48,7 +48,7 @@ def main():
                 row.name: row.position
                 for row in replicate(server, {"streams": "-1"})["streams"].rows
             }
-        except requests.exceptions.ConnectionError as e:
+        except requests.exceptions.ConnectionError:
             time.sleep(0.1)
 
     while True:
