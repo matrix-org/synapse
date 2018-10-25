@@ -1012,8 +1012,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         # We need to work out which types we've fetched from the DB for the
         # member vs non-member caches. This should be as accurate as possible,
         # but can be an underestimate (e.g. when we have wild cards)
-        member_filter, non_member_filter = state_filter.get_member_split()
 
+        member_filter, non_member_filter = state_filter.get_member_split()
         if member_filter.is_full():
             # We fetched all member events
             member_types = None
