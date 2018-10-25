@@ -1,8 +1,16 @@
 sudo: false
 language: python
 
-# tell travis to cache ~/.cache/pip
-cache: pip
+cache:
+  directories:
+    # we only bother to cache the wheels; parts of the http cache get
+    # invalidated every build (because they get served with a max-age of 600
+    # seconds), which means that we end up re-uploading the whole cache for
+    # every build, which is time-consuming In any case, it's not obvious that
+    # downloading the cache from S3 would be much faster than downloading the
+    # originals from pypi.
+    #
+    - $HOME/.cache/pip/wheels
 
 # don't clone the whole repo history, one commit will do
 git:
