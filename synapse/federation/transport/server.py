@@ -560,7 +560,6 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, room_id):
         limit = int(content.get("limit", 10))
-        min_depth = int(content.get("min_depth", 0))
         earliest_events = content.get("earliest_events", [])
         latest_events = content.get("latest_events", [])
 
@@ -569,7 +568,6 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
             room_id=room_id,
             earliest_events=earliest_events,
             latest_events=latest_events,
-            min_depth=min_depth,
             limit=limit,
         )
 

@@ -1,0 +1,1 @@
+Fix issue where Python 3 users couldn't paginate /publicRooms
