@@ -55,7 +55,7 @@ class StateFilter(object):
     """A filter used when querying for state.
 
     Attributes:
-        types (dict[str, set[str]|None): Map from type to set of state keys (or
+        types (dict[str, set[str]|None]): Map from type to set of state keys (or
             None). This specifies which state_keys for the given type to fetch
             from the DB. If None then all events with that type are fetched. If
             the set is empty then no events with that type are fetched.
