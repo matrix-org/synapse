@@ -165,28 +165,7 @@ class RoomCreationHandler(BaseHandler):
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
 
-        # autogen room IDs and try to create it. We may clash, so just
-        # try a few times till one goes through, giving up eventually.
-        attempts = 0
-        room_id = None
-        while attempts < 5:
-            try:
-                random_string = stringutils.random_string(18)
-                gen_room_id = RoomID(
-                    random_string,
-                    self.hs.hostname,
-                )
-                yield self.store.store_room(
-                    room_id=gen_room_id.to_string(),
-                    room_creator_user_id=user_id,
-                    is_public=is_public
-                )
-                room_id = gen_room_id.to_string()
-                break
-            except StoreError:
-                attempts += 1
-        if not room_id:
-            raise StoreError(500, "Couldn't generate a room ID.")
+        room_id = yield self._generate_room_id(creator_id=user_id, is_public=is_public)
 
         if room_alias:
             directory_handler = self.hs.get_handlers().directory_handler
@@ -426,6 +405,28 @@ class RoomCreationHandler(BaseHandler):
                 state_key=state_key,
                 content=content,
             )
+
+    @defer.inlineCallbacks
+    def _generate_room_id(self, creator_id, is_public):
+        # autogen room IDs and try to create it. We may clash, so just
+        # try a few times till one goes through, giving up eventually.
+        attempts = 0
+        while attempts < 5:
+            try:
+                random_string = stringutils.random_string(18)
+                gen_room_id = RoomID(
+                    random_string,
+                    self.hs.hostname,
+                ).to_string()
+                yield self.store.store_room(
+                    room_id=gen_room_id,
+                    room_creator_user_id=creator_id,
+                    is_public=is_public,
+                )
+                defer.returnValue(gen_room_id)
+            except StoreError:
+                attempts += 1
+        raise StoreError(500, "Couldn't generate a room ID.")
 
 
 class RoomContextHandler(object):
