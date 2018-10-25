@@ -206,7 +206,9 @@ class StateFilter(object):
 
 
         Returns:
-            tuple[str, list]: The SQL string (may be empty) and arguments
+            tuple[str, list]: The SQL string (may be empty) and arguments. An
+            empty SQL string is returned when the filter matches everything
+            (i.e. is "full").
         """
 
         where_clause = ""
