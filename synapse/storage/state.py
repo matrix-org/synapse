@@ -112,7 +112,7 @@ class StateFilter(object):
         Hence, if we are doing a wildcard lookup, populate the cache fully so
         that we can do an efficient lookup next time.
 
-        Note that since we have two caches, one for members and one for
+        Note that since we have two caches, one for membership events and one for
         non-members, we can be a bit more clever than simply returning
         `StateFilter.all()` if `has_wildcards()` is True.
 
