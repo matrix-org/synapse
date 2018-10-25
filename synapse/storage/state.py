@@ -142,6 +142,11 @@ class StateFilter(object):
         other events, we can be a bit more clever than simply returning
         `StateFilter.all()` if `has_wildcards()` is True.
 
+        We return a StateFilter where:
+            1. the list of membership events to return is the same
+            2. if there is a wildcard that matches non-member events we
+               return all non-member events
+
         Returns:
             StateFilter
         """
@@ -159,26 +164,14 @@ class StateFilter(object):
         else:
             get_all_members = self.include_others
 
-        if self.include_others:
-            # If `include_others` is True then we want to fetch all
-            # non-member events.
-
-            if get_all_members:
-                return StateFilter.all()
-            else:
-                return StateFilter(
-                    types={EventTypes.Member: self.types[EventTypes.Member]},
-                    include_others=True
-                )
-
-        get_all_non_members = any(
+        has_non_member_wildcard = self.include_others or any(
             state_keys is None
             for t, state_keys in iteritems(self.types)
             if t != EventTypes.Member
         )
 
-        if not get_all_non_members:
-            # include_others must be False, so we can just return ourselves.
+        if not has_non_member_wildcard:
+            # If there are no non-member wild cards we can just return ourselves
             return self
 
         if get_all_members:
