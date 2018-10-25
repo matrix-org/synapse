@@ -191,6 +191,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     def upsert_monthly_active_user_txn(self, txn, user_id):
         """Updates or inserts monthly active user member
+
         Note that, after calling this method, it will generally be necessary
         to invalidate the caches on user_last_seen_monthly_active and
         get_monthly_active_count. We can't do that here, because we are running
