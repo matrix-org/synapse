@@ -204,7 +204,7 @@ class RoomCreationHandler(BaseHandler):
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override", {}),
+            power_level_content_override=config.get("power_level_content_override"),
             creator_join_profile=creator_join_profile,
         )
 
@@ -282,9 +282,9 @@ class RoomCreationHandler(BaseHandler):
             invite_list,
             initial_state,
             creation_content,
-            room_alias,
-            power_level_content_override,
-            creator_join_profile,
+            room_alias=None,
+            power_level_content_override=None,
+            creator_join_profile=None,
     ):
         def create(etype, content, **kwargs):
             e = {
@@ -364,7 +364,8 @@ class RoomCreationHandler(BaseHandler):
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            power_level_content.update(power_level_content_override)
+            if power_level_content_override:
+                power_level_content.update(power_level_content_override)
 
             yield send(
                 etype=EventTypes.PowerLevels,
