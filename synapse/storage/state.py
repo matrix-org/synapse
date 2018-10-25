@@ -86,6 +86,16 @@ class StateFilter(object):
 
     @staticmethod
     def from_types(types):
+        """Creates a filter that only fetches the given types
+
+        Args:
+            types (Iterable[tuple[str, str|None]]): A list of type and state
+                keys to fetch. A state_key of None fetches everything for
+                that type
+
+        Returns:
+            StateFilter
+        """
         type_dict = {}
         for typ, s in types:
             if typ in type_dict:
