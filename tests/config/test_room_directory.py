@@ -26,16 +26,16 @@ class RoomDirectoryConfigTestCase(unittest.TestCase):
         alias_creation_rules:
             - user_id: "*bob*"
               alias: "*"
-              action: "denied"
+              action: "deny"
             - user_id: "*"
               alias: "#unofficial_*"
-              action: "allowed"
+              action: "allow"
             - user_id: "@foo*:example.com"
               alias: "*"
-              action: "allowed"
+              action: "allow"
             - user_id: "@gah:example.com"
               alias: "#goo:example.com"
-              action: "allowed"
+              action: "allow"
         """)
 
         rd_config = RoomDirectoryConfig()

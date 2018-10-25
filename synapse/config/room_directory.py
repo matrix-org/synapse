@@ -35,13 +35,13 @@ class RoomDirectoryConfig(Config):
         # The format of this option is a list of rules that contain globs that
         # match against user_id and the new alias (fully qualified with server
         # name). The action in the first rule that matches is taken, which can
-        # currently either be "allowed" or "denied".
+        # currently either be "allow" or "deny".
         #
         # If no rules match the request is denied.
         alias_creation_rules:
             - user_id: "*"
               alias: "*"
-              action: allowed
+              action: allow
         """
 
     def is_alias_creation_allowed(self, user_id, alias):
@@ -56,7 +56,7 @@ class RoomDirectoryConfig(Config):
         """
         for rule in self._alias_creation_rules:
             if rule.matches(user_id, alias):
-                return rule.action == "allowed"
+                return rule.action == "allow"
 
         return False
 
@@ -67,12 +67,12 @@ class _AliasRule(object):
         user_id = rule["user_id"]
         alias = rule["alias"]
 
-        if action in ("allowed", "denied"):
+        if action in ("allow", "deny"):
             self.action = action
         else:
             raise ConfigError(
-                "alias_creation_rules rules can only have action of 'allowed'"
-                " or 'denied'"
+                "alias_creation_rules rules can only have action of 'allow'"
+                " or 'deny'"
             )
 
         try:

@@ -118,7 +118,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
             {
                 "user_id": "*",
                 "alias": "#unofficial_*",
-                "action": "allowed",
+                "action": "allow",
             }
         ]
 
