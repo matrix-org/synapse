@@ -817,11 +817,10 @@ class SyncHandler(object):
 
                         state_ids = yield self.store.get_state_ids_for_event(
                             batch.events[0].event_id,
-                            state_filter=StateFilter(
-                                types={
-                                    EventTypes.Member: members_to_fetch,
-                                },
-                                include_others=False,  # we only want members!
+                            # we only want members!
+                            state_filter=StateFilter.from_types(
+                                (EventTypes.Member, member)
+                                for member in members_to_fetch
                             ),
                         )
 

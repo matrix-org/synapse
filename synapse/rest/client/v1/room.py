@@ -410,7 +410,7 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
             room_id=room_id,
             user_id=requester.user.to_string(),
             at_token=at_token,
-            state_filter=StateFilter({EventTypes.Member: None}),
+            state_filter=StateFilter.from_types([(EventTypes.Member, None)]),
         )
 
         chunk = []
