@@ -113,7 +113,7 @@ class StateFilter(object):
         that we can do an efficient lookup next time.
 
         Note that since we have two caches, one for membership events and one for
-        non-members, we can be a bit more clever than simply returning
+        other events, we can be a bit more clever than simply returning
         `StateFilter.all()` if `has_wildcards()` is True.
 
         Returns:
