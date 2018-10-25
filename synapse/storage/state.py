@@ -213,6 +213,11 @@ class StateFilter(object):
         if self.is_full():
             return where_clause, where_args
 
+        if not self.include_others and not self.types:
+            # i.e. this is an empty filter, so we need to return a clause that
+            # will match nothing
+            return "1 = 2", []
+
         # First we build up a lost of clauses for each type/state_key combo
         clauses = []
         for etype, state_keys in iteritems(self.types):
