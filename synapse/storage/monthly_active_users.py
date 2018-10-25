@@ -184,18 +184,18 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn,
             user_id
         )
-        # Considered pushing cache invalidation down into txn method, but
-        # did not because txn is not a LoggingTransaction. This means I could not
-        # call txn.call_after(). Therefore cache is altered in background thread
-        # and calls from elsewhere to user_last_seen_monthly_active and
-        # get_monthly_active_count fail with ValueError in
-        #  synapse/util/caches/descriptors.py#check_thread
+
         if is_insert:
             self.user_last_seen_monthly_active.invalidate((user_id,))
             self.get_monthly_active_count.invalidate(())
 
     def upsert_monthly_active_user_txn(self, txn, user_id):
         """Updates or inserts monthly active user member
+        Note that, after calling this method, it will generally be necessary
+        to invalidate the caches on user_last_seen_monthly_active and
+        get_monthly_active_count. We can't do that here, because we are running
+        in a database thread rather than the main thread, and we can't call
+        txn.call_after because txn may not be a LoggingTransaction.
 
         Args:
             txn (cursor):
