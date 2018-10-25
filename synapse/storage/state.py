@@ -874,10 +874,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         missing_types = False
 
         if state_filter.has_wildcards():
-            # we mark the type as missing from the cache because
-            # when the cache was populated it might have been done with a
-            # restricted set of state_keys, so the wildcard will not work
-            # and the cache may be incomplete.
+            # We don't know if we fetched all the state keys for the types in
+            # the filter that are wildcards, so we have to assume that we may
+            # have missed some.
             missing_types = True
         else:
             # There aren't any wild cards, so `concrete_types()` returns the
