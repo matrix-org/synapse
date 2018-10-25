@@ -444,7 +444,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 from the database.
 
         Returns:
-            Deferred[Dict[tuple[str, str], str]]]: Map from type/state_key to
+            Deferred[dict[tuple[str, str], str]]: Map from type/state_key to
             event ID.
         """
 
