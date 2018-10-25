@@ -182,9 +182,9 @@ class StateFilter(object):
         For example:
 
             f = StateFilter.from_types([("m.room.create", "")])
-            f.make_sql_filter_clause()
-            f[0] == "(type = ? AND state_key = ?)"
-            f[1] == ['m.room.create', '']
+            clause, args = f.make_sql_filter_clause()
+            clause == "(type = ? AND state_key = ?)"
+            args == ['m.room.create', '']
 
 
         Returns:
