@@ -256,13 +256,10 @@ class PaginationHandler(object):
         if event_filter and event_filter.lazy_load_members():
             # TODO: remove redundant members
 
-            state_filter = StateFilter(
-                types={
-                    EventTypes.Member: set(
-                        event.sender  # FIXME: we also care about invite targets etc.
-                        for event in events
-                    ),
-                },
+            # FIXME: we also care about invite targets etc.
+            state_filter = StateFilter.from_types(
+                (EventTypes.Member, event.sender)
+                for event in events
             )
 
             state_ids = yield self.store.get_state_ids_for_event(
