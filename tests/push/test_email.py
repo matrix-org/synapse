@@ -22,10 +22,9 @@ from twisted.test.proto_helpers import AccumulatingProtocol
 from synapse.rest.client.v1 import admin, login, room
 
 from tests.server import FakeTransport
-from tests.unittest import INFO, HomeserverTestCase
+from tests.unittest import HomeserverTestCase
 
 
-@INFO
 class EmailPusherTests(HomeserverTestCase):
 
     servlets = [
@@ -105,9 +104,3 @@ class EmailPusherTests(HomeserverTestCase):
 
         # It then tries to send the email.
         self.assertEqual(len(self.reactor.tcpClients), 1)
-
-        mailer = self.reactor.tcpClients[0][2]
-
-        print(mailer.fromEmail)
-        print(mailer.toEmail)
-        print(mailer.file.read())
