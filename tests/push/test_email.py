@@ -17,11 +17,8 @@ import os
 
 import pkg_resources
 
-from twisted.test.proto_helpers import AccumulatingProtocol
-
 from synapse.rest.client.v1 import admin, login, room
 
-from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
 
 
