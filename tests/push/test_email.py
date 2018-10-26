@@ -21,9 +21,15 @@ from synapse.rest.client.v1 import admin, login, room
 
 from tests.unittest import HomeserverTestCase
 
+try:
+    from synapse.push.mailer import load_jinja2_templates
+except Exception:
+    load_jinja2_templates = None
+
 
 class EmailPusherTests(HomeserverTestCase):
 
+    skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         admin.register_servlets,
         room.register_servlets,
