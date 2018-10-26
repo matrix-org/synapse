@@ -136,10 +136,15 @@ class RoomCreationHandler(BaseHandler):
                 requester, tombstone_event, tombstone_context,
             )
 
-            # and finally, shut down the PLs in the old room, and update them in the new
-            # room.
             old_room_state = yield tombstone_context.get_current_state_ids(self.store)
 
+            # update any aliases
+            yield self._move_aliases_to_new_room(
+                requester, old_room_id, new_room_id, old_room_state,
+            )
+
+            # and finally, shut down the PLs in the old room, and update them in the new
+            # room.
             yield self._update_upgraded_room_pls(
                 requester, old_room_id, new_room_id, old_room_state,
             )
@@ -245,11 +250,6 @@ class RoomCreationHandler(BaseHandler):
         if not self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")
 
-        # XXX check alias is free
-        # canonical_alias = None
-
-        # XXX create association in directory handler
-
         creation_content = {
             "room_version": new_room_version,
             "predecessor": {
@@ -295,7 +295,112 @@ class RoomCreationHandler(BaseHandler):
 
         # XXX invites/joins
         # XXX 3pid invites
-        # XXX directory_handler.send_room_alias_update_event
+
+    @defer.inlineCallbacks
+    def _move_aliases_to_new_room(
+            self, requester, old_room_id, new_room_id, old_room_state,
+    ):
+        directory_handler = self.hs.get_handlers().directory_handler
+
+        aliases = yield self.store.get_aliases_for_room(old_room_id)
+
+        # check to see if we have a canonical alias.
+        canonical_alias = None
+        canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
+        if canonical_alias_event_id:
+            canonical_alias_event = yield self.store.get_event(canonical_alias_event_id)
+            if canonical_alias_event:
+                canonical_alias = canonical_alias_event.content.get("alias", "")
+
+        # first we try to remove the aliases from the old room (we suppress sending
+        # the room_aliases event until the end).
+        #
+        # Note that we'll only be able to remove aliases that (a) aren't owned by an AS,
+        # and (b) unless the user is a server admin, which the user created.
+        #
+        # This is probably correct - given we don't allow such aliases to be deleted
+        # normally, it would be odd to allow it in the case of doing a room upgrade -
+        # but it makes the upgrade less effective, and you have to wonder why a room
+        # admin can't remove aliases that point to that room anyway.
+        # (cf https://github.com/matrix-org/synapse/issues/2360)
+        #
+        removed_aliases = []
+        for alias_str in aliases:
+            alias = RoomAlias.from_string(alias_str)
+            try:
+                yield directory_handler.delete_association(
+                    requester, alias, send_event=False,
+                )
+            except SynapseError as e:
+                logger.warning(
+                    "Unable to remove alias %s from old room: %s",
+                    alias, e,
+                )
+            else:
+                removed_aliases.append(alias_str)
+
+        # if we didn't find any aliases, or couldn't remove anyway, we can skip the rest
+        # of this.
+        if not removed_aliases:
+            return
+
+        try:
+            # this can fail if, for some reason, our user doesn't have perms to send
+            # m.room.aliases events in the old room (note that we've already checked that
+            # they have perms to send a tombstone event, so that's not terribly likely).
+            #
+            # If that happens, it's regrettable, but we should carry on: it's the same
+            # as when you remove an alias from the directory normally - it just means that
+            # the aliases event gets out of sync with the directory
+            # (cf https://github.com/vector-im/riot-web/issues/2369)
+            yield directory_handler.send_room_alias_update_event(
+                requester, old_room_id,
+            )
+        except AuthError as e:
+            logger.warning(
+                "Failed to send updated alias event on old room: %s", e,
+            )
+
+        # we can now add any aliases we successfully removed to the new room.
+        for alias in removed_aliases:
+            try:
+                yield directory_handler.create_association(
+                    requester, RoomAlias.from_string(alias),
+                    new_room_id, servers=(self.hs.hostname, ),
+                    send_event=False,
+                )
+                logger.info("Moved alias %s to new room", alias)
+            except SynapseError as e:
+                # I'm not really expecting this to happen, but it could if the spam
+                # checking module decides it shouldn't, or similar.
+                logger.error(
+                    "Error adding alias %s to new room: %s",
+                    alias, e,
+                )
+
+        try:
+            if canonical_alias and (canonical_alias in removed_aliases):
+                yield self.event_creation_handler.create_and_send_nonmember_event(
+                    requester,
+                    {
+                        "type": EventTypes.CanonicalAlias,
+                        "state_key": "",
+                        "room_id": new_room_id,
+                        "sender": requester.user.to_string(),
+                        "content": {"alias": canonical_alias, },
+                    },
+                    ratelimit=False
+                )
+
+            yield directory_handler.send_room_alias_update_event(
+                requester, new_room_id,
+            )
+        except SynapseError as e:
+            # again I'm not really expecting this to fail, but if it does, I'd rather
+            # we returned the new room to the client at this point.
+            logger.error(
+                "Unable to send updated alias events in new room: %s", e,
+            )
 
     @defer.inlineCallbacks
     def create_room(self, requester, config, ratelimit=True,
