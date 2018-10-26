@@ -136,53 +136,91 @@ class RoomCreationHandler(BaseHandler):
                 requester, tombstone_event, tombstone_context,
             )
 
+            # and finally, shut down the PLs in the old room, and update them in the new
+            # room.
             old_room_state = yield tombstone_context.get_current_state_ids(self.store)
-            old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
 
-            if old_room_pl_event_id is None:
-                logger.warning(
-                    "Not supported: upgrading a room with no PL event. Not setting PLs "
-                    "in old room.",
+            yield self._update_upgraded_room_pls(
+                requester, old_room_id, new_room_id, old_room_state,
+            )
+
+            defer.returnValue(new_room_id)
+
+    @defer.inlineCallbacks
+    def _update_upgraded_room_pls(
+            self, requester, old_room_id, new_room_id, old_room_state,
+    ):
+        """Send updated power levels in both rooms after an upgrade
+
+        Args:
+            requester (synapse.types.Requester): the user requesting the upgrade
+            old_room_id (unicode): the id of the room to be replaced
+            new_room_id (unicode): the id of the replacement room
+            old_room_state (dict[tuple[str, str], str]): the state map for the old room
+
+        Returns:
+            Deferred
+        """
+        old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
+
+        if old_room_pl_event_id is None:
+            logger.warning(
+                "Not supported: upgrading a room with no PL event. Not setting PLs "
+                "in old room.",
+            )
+            return
+
+        old_room_pl_state = yield self.store.get_event(old_room_pl_event_id)
+
+        # we try to stop regular users from speaking by setting the PL required
+        # to send regular events and invites to 'Moderator' level. That's normally
+        # 50, but if the default PL in a room is 50 or more, then we set the
+        # required PL above that.
+
+        pl_content = dict(old_room_pl_state.content)
+        users_default = int(pl_content.get("users_default", 0))
+        restricted_level = max(users_default + 1, 50)
+
+        updated = False
+        for v in ("invite", "events_default"):
+            current = int(pl_content.get(v, 0))
+            if current < restricted_level:
+                logger.info(
+                    "Setting level for %s in %s to %i (was %i)",
+                    v, old_room_id, restricted_level, current,
                 )
+                pl_content[v] = restricted_level
+                updated = True
             else:
-                # we try to stop regular users from speaking by setting the PL required
-                # to send regular events and invites to 'Moderator' level. That's normally
-                # 50, but if the default PL in a room is 50 or more, then we set the
-                # required PL above that.
+                logger.info(
+                    "Not setting level for %s (already %i)",
+                    v, current,
+                )
 
-                old_room_pl_state = yield self.store.get_event(old_room_pl_event_id)
-                pl_content = dict(old_room_pl_state.content)
-                users_default = int(pl_content.get("users_default", 0))
-                restricted_level = max(users_default + 1, 50)
+        if updated:
+            try:
+                yield self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, {
+                        "type": EventTypes.PowerLevels,
+                        "state_key": '',
+                        "room_id": old_room_id,
+                        "sender": requester.user.to_string(),
+                        "content": pl_content,
+                    }, ratelimit=False,
+                )
+            except AuthError as e:
+                logger.warning("Unable to update PLs in old room: %s", e)
 
-                updated = False
-                for v in ("invite", "events_default"):
-                    current = int(pl_content.get(v, 0))
-                    if current < restricted_level:
-                        logger.debug(
-                            "Setting level for %s in %s to %i (was %i)",
-                            v, old_room_id, restricted_level, current,
-                        )
-                        pl_content[v] = restricted_level
-                        updated = True
-                    else:
-                        logger.debug(
-                            "Not setting level for %s (already %i)",
-                            v, current,
-                        )
-
-                if updated:
-                    yield self.event_creation_handler.create_and_send_nonmember_event(
-                        requester, {
-                            "type": EventTypes.PowerLevels,
-                            "state_key": '',
-                            "room_id": old_room_id,
-                            "sender": user_id,
-                            "content": pl_content,
-                        }, ratelimit=False,
-                    )
-
-        defer.returnValue(new_room_id)
+        logger.info("Setting correct PLs in new room")
+        yield self.event_creation_handler.create_and_send_nonmember_event(
+            requester, {
+                "type": EventTypes.PowerLevels,
+                "state_key": '',
+                "room_id": new_room_id,
+                "sender": requester.user.to_string(),
+                "content": old_room_pl_state.content,
+            }, ratelimit=False,
+        )
 
     @defer.inlineCallbacks
     def clone_exiting_room(
@@ -223,7 +261,6 @@ class RoomCreationHandler(BaseHandler):
         initial_state = dict()
 
         types_to_copy = (
-            (EventTypes.PowerLevels, ""),
             (EventTypes.JoinRules, ""),
             (EventTypes.Name, ""),
             (EventTypes.Topic, ""),
