@@ -211,7 +211,7 @@ password_config:
 server_notices:
   system_mxid_localpart: {{ SYNAPSE_NOTICE_LOCALPART }}
   system_mxid_display_name: "{{ SYNAPSE_NOTICE_NAME or 'Server Notice' }}"
-  system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
+  system_mxid_avatar_url: "{{ SYNAPSE_NOTICE_AVATAR }}"
   room_name: "{{ SYNAPSE_NOTICE_NAME or 'Server Notice' }}"
 {% endif %}
 

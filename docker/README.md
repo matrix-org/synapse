@@ -94,6 +94,7 @@ variables are available for configuration:
   server notice user (the user must be available)
 * ``SYNAPSE_NOTICE_NAME``, set this to the preferred displayname for the server
   notice user
+* ``SYNAPSE_NOTICE_AVATAR``, set this to the mxc:// URI of the notice user avatar.
 
 Shared secrets, that will be initialized to random values if not set:
 
