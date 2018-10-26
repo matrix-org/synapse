@@ -27,13 +27,13 @@ class RegisterTestCase(TestCase):
         post that MAC.
         """
 
-        def get(url):
+        def get(url, verify=None):
             r = Mock()
             r.status_code = 200
             r.json = lambda: {"nonce": "a"}
             return r
 
-        def post(url, json=None):
+        def post(url, json=None, verify=None):
             # Make sure we are sent the correct info
             self.assertEqual(json["username"], "user")
             self.assertEqual(json["password"], "pass")
@@ -75,7 +75,7 @@ class RegisterTestCase(TestCase):
         If the script fails to fetch a nonce, it throws an error and quits.
         """
 
-        def get(url):
+        def get(url, verify=None):
             r = Mock()
             r.status_code = 404
             r.reason = "Not Found"
@@ -113,13 +113,13 @@ class RegisterTestCase(TestCase):
         report an error and quit.
         """
 
-        def get(url):
+        def get(url, verify=None):
             r = Mock()
             r.status_code = 200
             r.json = lambda: {"nonce": "a"}
             return r
 
-        def post(url, json=None):
+        def post(url, json=None, verify=None):
             # Make sure we are sent the correct info
             self.assertEqual(json["username"], "user")
             self.assertEqual(json["password"], "pass")

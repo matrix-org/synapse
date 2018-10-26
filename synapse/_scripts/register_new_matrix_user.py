@@ -42,7 +42,7 @@ def request_registration(
     url = "%s/_matrix/client/r0/admin/register" % (server_location,)
 
     # Get the nonce
-    r = requests.get(url)
+    r = requests.get(url, verify=False)
 
     if r.status_code is not 200:
         _print("ERROR! Received %d %s" % (r.status_code, r.reason))
@@ -76,7 +76,7 @@ def request_registration(
     }
 
     _print("Sending registration request...")
-    r = requests.post(url, json=data)
+    r = requests.post(url, json=data, verify=False)
 
     if r.status_code is not 200:
         _print("ERROR! Received %d %s" % (r.status_code, r.reason))
