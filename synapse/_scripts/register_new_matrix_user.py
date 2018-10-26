@@ -20,6 +20,7 @@ import argparse
 import getpass
 import hashlib
 import hmac
+import logging
 import sys
 
 from six.moves import input
@@ -132,6 +133,9 @@ def register_new_user(user, password, server_location, shared_secret, admin):
 
 
 def main():
+
+    logging.captureWarnings(True)
+
     parser = argparse.ArgumentParser(
         description="Used to register new users with a given home server when"
         " registration has been disabled. The home server must be"
