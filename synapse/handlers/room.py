@@ -21,7 +21,7 @@ import math
 import string
 from collections import OrderedDict
 
-from six import string_types
+from six import iteritems, string_types
 
 from twisted.internet import defer
 
@@ -237,12 +237,10 @@ class RoomCreationHandler(BaseHandler):
         # map from event_id to BaseEvent
         old_room_state_events = yield self.store.get_events(old_room_state_ids.values())
 
-        for k in types_to_copy:
-            old_event_id = old_room_state_ids.get(k)
-            if old_event_id:
-                old_event = old_room_state_events.get(old_event_id)
-                if old_event:
-                    initial_state[k] = old_event.content
+        for k, old_event_id in iteritems(old_room_state_ids):
+            old_event = old_room_state_events.get(old_event_id)
+            if old_event:
+                initial_state[k] = old_event.content
 
         yield self._send_events_for_new_room(
             requester,
