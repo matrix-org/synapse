@@ -89,6 +89,11 @@ variables are available for configuration:
   uris to enable TURN for this homeserver.
 * ``SYNAPSE_TURN_SECRET``, set this to the TURN shared secret if required.
 * ``SYNAPSE_MAX_UPLOAD_SIZE``, set this variable to change the max upload size [default `10M`].
+* ``SYNAPSE_ENABLE_MANHOLE``, set this variable to enable the manhole interface.
+* ``SYNAPSE_NOTICE_LOCALPART``, set this if required to the localpart of the
+  server notice user (the user must be available)
+* ``SYNAPSE_NOTICE_NAME``, set this to the preferred displayname for the server
+  notice user
 
 Shared secrets, that will be initialized to random values if not set:
 

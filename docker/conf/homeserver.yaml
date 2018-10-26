@@ -44,6 +44,12 @@ listeners:
       - names: [federation]
         compress: false
 
+  {% if SYNAPSE_ENABLE_MANHOLE %}
+  - port: 9000
+    bind_addresses: ['::1', '127.0.0.1']
+    type: manhole
+  {% endif %}
+
 ## Database ##
 
 {% if POSTGRES_PASSWORD %}
@@ -200,6 +206,14 @@ perspectives:
 
 password_config:
    enabled: true
+
+{% if SYNAPSE_NOTICE_LOCALPART %}
+server_notices:
+  system_mxid_localpart: {{ SYNAPSE_NOTICE_LOCALPART }}
+  system_mxid_display_name: "{{ SYNAPSE_NOTICE_NAME or 'Server Notice' }}"
+  system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
+  room_name: "{{ SYNAPSE_NOTICE_NAME or 'Server Notice' }}"
+{% endif %}
 
 {% if SYNAPSE_SMTP_HOST %}
 email:
