@@ -31,6 +31,22 @@ logger = logging.getLogger(__name__)
 
 
 class RoomUpgradeRestServlet(RestServlet):
+    """Handler for room uprade requests.
+
+    Handles requests of the form:
+
+        POST /_matrix/client/r0/rooms/$roomid/upgrade HTTP/1.1
+        Content-Type: application/json
+
+        {
+            "new_version": "2",
+        }
+
+    Creates a new room and shuts down the old one. Returns the ID of the new room.
+
+    Args:
+        hs (synapse.server.HomeServer):
+    """
     PATTERNS = client_v2_patterns(
         # /rooms/$roomid/upgrade
         "/rooms/(?P<room_id>[^/]*)/upgrade$",
@@ -38,11 +54,6 @@ class RoomUpgradeRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        """
-
-        Args:
-            hs (synapse.server.HomeServer):
-        """
         super(RoomUpgradeRestServlet, self).__init__()
         self._hs = hs
         self._room_creation_handler = hs.get_room_creation_handler()

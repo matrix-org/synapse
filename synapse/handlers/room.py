@@ -136,19 +136,21 @@ class RoomCreationHandler(BaseHandler):
                 requester, tombstone_event, tombstone_context,
             )
 
-            # ... and restrict the PLs in the old room, if possible.
-            old_room_pl_state = yield self.state_handler.get_current_state(
-                old_room_id,
-                event_type=EventTypes.PowerLevels,
-                latest_event_ids=(tombstone_event.event_id, ),
-            )
+            old_room_state = yield tombstone_context.get_current_state_ids(self.store)
+            old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
 
-            if old_room_pl_state is None:
+            if old_room_pl_event_id is None:
                 logger.warning(
                     "Not supported: upgrading a room with no PL event. Not setting PLs "
                     "in old room.",
                 )
             else:
+                # we try to stop regular users from speaking by setting the PL required
+                # to send regular events and invites to 'Moderator' level. That's normally
+                # 50, but if the default PL in a room is 50 or more, then we set the
+                # required PL above that.
+
+                old_room_pl_state = yield self.store.get_event(old_room_pl_event_id)
                 pl_content = dict(old_room_pl_state.content)
                 users_default = int(pl_content.get("users_default", 0))
                 restricted_level = max(users_default + 1, 50)
