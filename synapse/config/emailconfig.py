@@ -19,18 +19,12 @@ from __future__ import print_function
 import email.utils
 import logging
 import os
-import sys
-import textwrap
 
-from ._base import Config
+import pkg_resources
+
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
-
-TEMPLATE_DIR_WARNING = """\
-WARNING: The email notifier is configured to look for templates in '%(template_dir)s',
-but no templates could be found there. We will fall back to using the example templates;
-to get rid of this warning, leave 'email.template_dir' unset.
-"""
 
 
 class EmailConfig(Config):
@@ -78,20 +72,22 @@ class EmailConfig(Config):
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
 
-            self.email_template_dir = email_config.get("template_dir")
-
-            # backwards-compatibility hack
-            if (
-                self.email_template_dir == "res/templates"
-                and not os.path.isfile(
-                    os.path.join(self.email_template_dir, self.email_notif_template_text)
+            template_dir = email_config.get("template_dir")
+            # we need an absolute path, because we change directory after starting (and
+            # we don't yet know what auxilliary templates like mail.css we will need).
+            # (Note that loading as package_resources with jinja.PackageLoader doesn't
+            # work for the same reason.)
+            if not template_dir:
+                template_dir = pkg_resources.resource_filename(
+                    'synapse', 'res/templates'
                 )
-            ):
-                t = TEMPLATE_DIR_WARNING % {
-                    "template_dir": self.email_template_dir,
-                }
-                print(textwrap.fill(t, width=80) + "\n", file=sys.stderr)
-                self.email_template_dir = None
+            template_dir = os.path.abspath(template_dir)
+
+            for f in self.email_notif_template_text, self.email_notif_template_html:
+                p = os.path.join(template_dir, f)
+                if not os.path.isfile(p):
+                    raise ConfigError("Unable to find email template file %s" % (p, ))
+            self.email_template_dir = template_dir
 
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True

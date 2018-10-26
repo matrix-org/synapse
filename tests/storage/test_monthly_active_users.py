@@ -52,7 +52,10 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         now = int(self.hs.get_clock().time_msec())
         self.store.user_add_threepid(user1, "email", user1_email, now, now)
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
-        self.store.initialise_reserved_users(threepids)
+
+        self.store.runInteraction(
+            "initialise", self.store._initialise_reserved_users, threepids
+        )
         self.pump()
 
         active_count = self.store.get_monthly_active_count()
@@ -199,7 +202,10 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
             {'medium': 'email', 'address': user2_email},
         ]
         self.hs.config.mau_limits_reserved_threepids = threepids
-        self.store.initialise_reserved_users(threepids)
+        self.store.runInteraction(
+            "initialise", self.store._initialise_reserved_users, threepids
+        )
+
         self.pump()
         count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), 0)

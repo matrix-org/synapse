@@ -35,6 +35,7 @@ from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
+from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
@@ -80,7 +81,7 @@ class MessageHandler(object):
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             room_state = yield self.store.get_state_for_events(
-                [membership_event_id], [key]
+                [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
 
@@ -88,7 +89,7 @@ class MessageHandler(object):
 
     @defer.inlineCallbacks
     def get_state_events(
-        self, user_id, room_id, types=None, filtered_types=None,
+        self, user_id, room_id, state_filter=StateFilter.all(),
         at_token=None, is_guest=False,
     ):
         """Retrieve all state events for a given room. If the user is
@@ -100,13 +101,8 @@ class MessageHandler(object):
         Args:
             user_id(str): The user requesting state events.
             room_id(str): The room ID to get all state events from.
-            types(list[(str, str|None)]|None): List of (type, state_key) tuples
-                which are used to filter the state fetched. If `state_key` is None,
-                all events are returned of the given type.
-                May be None, which matches any key.
-            filtered_types(list[str]|None): Only apply filtering via `types` to this
-                list of event types.  Other types of events are returned unfiltered.
-                If None, `types` filtering is applied to all events.
+            state_filter (StateFilter): The state filter used to fetch state
+                from the database.
             at_token(StreamToken|None): the stream token of the at which we are requesting
                 the stats. If the user is not allowed to view the state as of that
                 stream token, we raise a 403 SynapseError. If None, returns the current
@@ -139,7 +135,7 @@ class MessageHandler(object):
             event = last_events[0]
             if visible_events:
                 room_state = yield self.store.get_state_for_events(
-                    [event.event_id], types, filtered_types=filtered_types,
+                    [event.event_id], state_filter=state_filter,
                 )
                 room_state = room_state[event.event_id]
             else:
@@ -158,12 +154,12 @@ class MessageHandler(object):
 
             if membership == Membership.JOIN:
                 state_ids = yield self.store.get_filtered_current_state_ids(
-                    room_id, types, filtered_types=filtered_types,
+                    room_id, state_filter=state_filter,
                 )
                 room_state = yield self.store.get_events(state_ids.values())
             elif membership == Membership.LEAVE:
                 room_state = yield self.store.get_state_for_events(
-                    [membership_event_id], types, filtered_types=filtered_types,
+                    [membership_event_id], state_filter=state_filter,
                 )
                 room_state = room_state[membership_event_id]
 
@@ -779,7 +775,7 @@ class EventCreationHandler(object):
             event, context=context
         )
 
-        self.pusher_pool.on_new_notifications(
+        yield self.pusher_pool.on_new_notifications(
             event_stream_id, max_stream_id,
         )
 

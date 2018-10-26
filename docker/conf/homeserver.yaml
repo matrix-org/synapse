@@ -21,7 +21,7 @@ listeners:
   {% if not SYNAPSE_NO_TLS %}
   -
     port: 8448
-    bind_addresses: ['0.0.0.0']
+    bind_addresses: ['::']
     type: http
     tls: true
     x_forwarded: false
@@ -34,7 +34,7 @@ listeners:
 
   - port: 8008
     tls: false
-    bind_addresses: ['0.0.0.0']
+    bind_addresses: ['::']
     type: http
     x_forwarded: false
 

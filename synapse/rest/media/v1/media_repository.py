@@ -25,7 +25,7 @@ from six.moves.urllib import parse as urlparse
 
 import twisted.internet.error
 import twisted.web.http
-from twisted.internet import defer, threads
+from twisted.internet import defer
 from twisted.web.resource import Resource
 
 from synapse.api.errors import (
@@ -36,8 +36,8 @@ from synapse.api.errors import (
 )
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util import logcontext
 from synapse.util.async_helpers import Linearizer
-from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import is_ascii, random_string
 
@@ -492,10 +492,11 @@ class MediaRepository(object):
         ))
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+        t_byte_source = yield logcontext.defer_to_thread(
+            self.hs.get_reactor(),
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
-        ))
+        )
 
         if t_byte_source:
             try:
@@ -534,10 +535,11 @@ class MediaRepository(object):
         ))
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+        t_byte_source = yield logcontext.defer_to_thread(
+            self.hs.get_reactor(),
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
-        ))
+        )
 
         if t_byte_source:
             try:
@@ -620,15 +622,17 @@ class MediaRepository(object):
         for (t_width, t_height, t_type), t_method in iteritems(thumbnails):
             # Generate the thumbnail
             if t_method == "crop":
-                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                t_byte_source = yield logcontext.defer_to_thread(
+                    self.hs.get_reactor(),
                     thumbnailer.crop,
                     t_width, t_height, t_type,
-                ))
+                )
             elif t_method == "scale":
-                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                t_byte_source = yield logcontext.defer_to_thread(
+                    self.hs.get_reactor(),
                     thumbnailer.scale,
                     t_width, t_height, t_type,
-                ))
+                )
             else:
                 logger.error("Unrecognized method: %r", t_method)
                 continue

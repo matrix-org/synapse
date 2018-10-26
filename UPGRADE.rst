@@ -61,10 +61,6 @@ If you have email notifications enabled, you should ensure that
 have installed customised templates, or leave it unset to use the default
 templates.
 
-The configuration parser will try to detect the situation where
-``email.template_dir`` is incorrectly set to ``res/templates`` and do the right
-thing, but will warn about this.
-
 Upgrading to v0.27.3
 ====================
 
