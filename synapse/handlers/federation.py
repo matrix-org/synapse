@@ -53,7 +53,7 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
-from synapse.state import resolve_events_with_factory
+from synapse.state import StateResolutionStore, resolve_events_with_store
 from synapse.types import UserID, get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
@@ -384,24 +384,24 @@ class FederationHandler(BaseHandler):
                             for x in remote_state:
                                 event_map[x.event_id] = x
 
-                    # Resolve any conflicting state
-                    @defer.inlineCallbacks
-                    def fetch(ev_ids):
-                        fetched = yield self.store.get_events(
-                            ev_ids, get_prev_content=False, check_redacted=False,
-                        )
-                        # add any events we fetch here to the `event_map` so that we
-                        # can use them to build the state event list below.
-                        event_map.update(fetched)
-                        defer.returnValue(fetched)
-
                     room_version = yield self.store.get_room_version(room_id)
-                    state_map = yield resolve_events_with_factory(
-                        room_version, state_maps, event_map, fetch,
+                    state_map = yield resolve_events_with_store(
+                        room_version, state_maps, event_map,
+                        state_res_store=StateResolutionStore(self.store),
                     )
 
-                    # we need to give _process_received_pdu the actual state events
+                    # We need to give _process_received_pdu the actual state events
                     # rather than event ids, so generate that now.
+
+                    # First though we need to fetch all the events that are in
+                    # state_map, so we can build up the state below.
+                    evs = yield self.store.get_events(
+                        list(state_map.values()),
+                        get_prev_content=False,
+                        check_redacted=False,
+                    )
+                    event_map.update(evs)
+
                     state = [
                         event_map[e] for e in six.itervalues(state_map)
                     ]
@@ -2520,7 +2520,7 @@ class FederationHandler(BaseHandler):
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
-                    self._notify_persisted_event(event, max_stream_id)
+                    yield self._notify_persisted_event(event, max_stream_id)
 
     def _notify_persisted_event(self, event, max_stream_id):
         """Checks to see if notifier/pushers should be notified about the
@@ -2553,7 +2553,7 @@ class FederationHandler(BaseHandler):
             extra_users=extra_users
         )
 
-        self.pusher_pool.on_new_notifications(
+        return self.pusher_pool.on_new_notifications(
             event_stream_id, max_stream_id,
         )
 

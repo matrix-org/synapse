@@ -174,6 +174,12 @@ Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
+Slavi Pantaleev has created an Ansible playbook,
+which installs the offical Docker image of Matrix Synapse
+along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
+For more details, see
+https://github.com/spantaleev/matrix-docker-ansible-deploy
+
 Configuring Synapse
 -------------------
 
@@ -651,7 +657,8 @@ Using a reverse proxy with Synapse
 
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
-`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
+`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
+`Caddy <https://caddyserver.com/docs/proxy>`_ or
 `HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
@@ -682,7 +689,15 @@ so an example nginx configuration might look like::
       }
   }
 
-and an example apache configuration may look like::
+an example Caddy configuration might look like::
+
+    matrix.example.com {
+      proxy /_matrix http://localhost:8008 {
+        transparent
+      }
+    }
+
+and an example Apache configuration might look like::
 
     <VirtualHost *:443>
         SSLEngine on

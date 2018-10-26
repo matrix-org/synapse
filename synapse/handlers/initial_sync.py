@@ -156,7 +156,7 @@ class InitialSyncHandler(BaseHandler):
                     room_end_token = "s%d" % (event.stream_ordering,)
                     deferred_room_state = run_in_background(
                         self.store.get_state_for_events,
-                        [event.event_id], None,
+                        [event.event_id],
                     )
                     deferred_room_state.addCallback(
                         lambda states: states[event.event_id]
@@ -301,7 +301,7 @@ class InitialSyncHandler(BaseHandler):
     def _room_initial_sync_parted(self, user_id, room_id, pagin_config,
                                   membership, member_event_id, is_peeking):
         room_state = yield self.store.get_state_for_events(
-            [member_event_id], None
+            [member_event_id],
         )
 
         room_state = room_state[member_event_id]

@@ -99,7 +99,7 @@ class AuthRestServlet(RestServlet):
     cannot be handled in the normal flow (with requests to the same endpoint).
     Current use is for web fallback auth.
     """
-    PATTERNS = client_v2_patterns("/auth/(?P<stagetype>[\w\.]*)/fallback/web")
+    PATTERNS = client_v2_patterns(r"/auth/(?P<stagetype>[\w\.]*)/fallback/web")
 
     def __init__(self, hs):
         super(AuthRestServlet, self).__init__()

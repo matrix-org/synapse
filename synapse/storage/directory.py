@@ -90,7 +90,7 @@ class DirectoryWorkerStore(SQLBaseStore):
 class DirectoryStore(DirectoryWorkerStore):
     @defer.inlineCallbacks
     def create_room_alias_association(self, room_alias, room_id, servers, creator=None):
-        """ Creates an associatin between  a room alias and room_id/servers
+        """ Creates an association between a room alias and room_id/servers
 
         Args:
             room_alias (RoomAlias)

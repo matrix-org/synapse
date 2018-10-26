@@ -501,7 +501,8 @@ class Porter(object):
 
             try:
                 yield self.postgres_store.runInteraction("alter_table", alter_table)
-            except Exception as e:
+            except Exception:
+                # On Error Resume Next
                 pass
 
             yield self.postgres_store.runInteraction(

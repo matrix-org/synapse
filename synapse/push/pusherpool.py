@@ -20,24 +20,39 @@ from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push.pusher import PusherFactory
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
 
 class PusherPool:
+    """
+    The pusher pool. This is responsible for dispatching notifications of new events to
+    the http and email pushers.
+
+    It provides three methods which are designed to be called by the rest of the
+    application: `start`, `on_new_notifications`, and `on_new_receipts`: each of these
+    delegates to each of the relevant pushers.
+
+    Note that it is expected that each pusher will have its own 'processing' loop which
+    will send out the notifications in the background, rather than blocking until the
+    notifications are sent; accordingly Pusher.on_started, Pusher.on_new_notifications and
+    Pusher.on_new_receipts are not expected to return deferreds.
+    """
     def __init__(self, _hs):
         self.hs = _hs
         self.pusher_factory = PusherFactory(_hs)
-        self.start_pushers = _hs.config.start_pushers
+        self._should_start_pushers = _hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
         self.pushers = {}
 
-    @defer.inlineCallbacks
     def start(self):
-        pushers = yield self.store.get_all_pushers()
-        self._start_pushers(pushers)
+        """Starts the pushers off in a background process.
+        """
+        if not self._should_start_pushers:
+            logger.info("Not starting pushers because they are disabled in the config")
+            return
+        run_as_background_process("start_pushers", self._start_pushers)
 
     @defer.inlineCallbacks
     def add_pusher(self, user_id, access_token, kind, app_id,
@@ -86,7 +101,7 @@ class PusherPool:
             last_stream_ordering=last_stream_ordering,
             profile_tag=profile_tag,
         )
-        yield self._refresh_pusher(app_id, pushkey, user_id)
+        yield self.start_pusher_by_id(app_id, pushkey, user_id)
 
     @defer.inlineCallbacks
     def remove_pushers_by_app_id_and_pushkey_not_user(self, app_id, pushkey,
@@ -123,45 +138,23 @@ class PusherPool:
                     p['app_id'], p['pushkey'], p['user_name'],
                 )
 
-    def on_new_notifications(self, min_stream_id, max_stream_id):
-        run_as_background_process(
-            "on_new_notifications",
-            self._on_new_notifications, min_stream_id, max_stream_id,
-        )
-
     @defer.inlineCallbacks
-    def _on_new_notifications(self, min_stream_id, max_stream_id):
+    def on_new_notifications(self, min_stream_id, max_stream_id):
         try:
             users_affected = yield self.store.get_push_action_users_in_range(
                 min_stream_id, max_stream_id
             )
 
-            deferreds = []
-
             for u in users_affected:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
-                        deferreds.append(
-                            run_in_background(
-                                p.on_new_notifications,
-                                min_stream_id, max_stream_id,
-                            )
-                        )
+                        p.on_new_notifications(min_stream_id, max_stream_id)
 
-            yield make_deferred_yieldable(
-                defer.gatherResults(deferreds, consumeErrors=True),
-            )
         except Exception:
             logger.exception("Exception in pusher on_new_notifications")
 
-    def on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
-        run_as_background_process(
-            "on_new_receipts",
-            self._on_new_receipts, min_stream_id, max_stream_id, affected_room_ids,
-        )
-
     @defer.inlineCallbacks
-    def _on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
+    def on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
         try:
             # Need to subtract 1 from the minimum because the lower bound here
             # is not inclusive
@@ -171,26 +164,20 @@ class PusherPool:
             # This returns a tuple, user_id is at index 3
             users_affected = set([r[3] for r in updated_receipts])
 
-            deferreds = []
-
             for u in users_affected:
                 if u in self.pushers:
                     for p in self.pushers[u].values():
-                        deferreds.append(
-                            run_in_background(
-                                p.on_new_receipts,
-                                min_stream_id, max_stream_id,
-                            )
-                        )
+                        p.on_new_receipts(min_stream_id, max_stream_id)
 
-            yield make_deferred_yieldable(
-                defer.gatherResults(deferreds, consumeErrors=True),
-            )
         except Exception:
             logger.exception("Exception in pusher on_new_receipts")
 
     @defer.inlineCallbacks
-    def _refresh_pusher(self, app_id, pushkey, user_id):
+    def start_pusher_by_id(self, app_id, pushkey, user_id):
+        """Look up the details for the given pusher, and start it"""
+        if not self._should_start_pushers:
+            return
+
         resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(
             app_id, pushkey
         )
@@ -201,33 +188,49 @@ class PusherPool:
                 p = r
 
         if p:
+            self._start_pusher(p)
 
-            self._start_pushers([p])
+    @defer.inlineCallbacks
+    def _start_pushers(self):
+        """Start all the pushers
 
-    def _start_pushers(self, pushers):
-        if not self.start_pushers:
-            logger.info("Not starting pushers because they are disabled in the config")
-            return
+        Returns:
+            Deferred
+        """
+        pushers = yield self.store.get_all_pushers()
         logger.info("Starting %d pushers", len(pushers))
         for pusherdict in pushers:
-            try:
-                p = self.pusher_factory.create_pusher(pusherdict)
-            except Exception:
-                logger.exception("Couldn't start a pusher: caught Exception")
-                continue
-            if p:
-                appid_pushkey = "%s:%s" % (
-                    pusherdict['app_id'],
-                    pusherdict['pushkey'],
-                )
-                byuser = self.pushers.setdefault(pusherdict['user_name'], {})
-
-                if appid_pushkey in byuser:
-                    byuser[appid_pushkey].on_stop()
-                byuser[appid_pushkey] = p
-                run_in_background(p.on_started)
-
+            self._start_pusher(pusherdict)
         logger.info("Started pushers")
+
+    def _start_pusher(self, pusherdict):
+        """Start the given pusher
+
+        Args:
+            pusherdict (dict):
+
+        Returns:
+            None
+        """
+        try:
+            p = self.pusher_factory.create_pusher(pusherdict)
+        except Exception:
+            logger.exception("Couldn't start a pusher: caught Exception")
+            return
+
+        if not p:
+            return
+
+        appid_pushkey = "%s:%s" % (
+            pusherdict['app_id'],
+            pusherdict['pushkey'],
+        )
+        byuser = self.pushers.setdefault(pusherdict['user_name'], {})
+
+        if appid_pushkey in byuser:
+            byuser[appid_pushkey].on_stop()
+        byuser[appid_pushkey] = p
+        p.on_started()
 
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_id):
