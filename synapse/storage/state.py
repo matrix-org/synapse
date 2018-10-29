@@ -1266,9 +1266,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 current_search = next_to_search
                 next_to_search = set()
             else:
-                lst = list(next_to_search)
-                current_search = set(lst[:100])
-                next_to_search = set(lst[100:])
+                current_search = set(islice(next_to_search, 100))
+                next_to_search -= current_search
 
             # Check if state groups are referenced
             sql = """
