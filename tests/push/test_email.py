@@ -17,8 +17,9 @@ import os
 
 import pkg_resources
 
-from synapse.rest.client.v1 import admin, login, room
 from twisted.internet.defer import Deferred
+
+from synapse.rest.client.v1 import admin, login, room
 
 from tests.unittest import HomeserverTestCase
 
