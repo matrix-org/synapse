@@ -1272,14 +1272,13 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             # Check if state groups are referenced
             sql = """
-                SELECT state_group, count(*) FROM event_to_state_groups
+                SELECT DISTINCT state_group FROM event_to_state_groups
                 LEFT JOIN events_to_purge AS ep USING (event_id)
                 WHERE state_group IN (%s) AND ep.event_id IS NULL
-                GROUP BY state_group
             """ % (",".join("?" for _ in current_search),)
             txn.execute(sql, list(current_search))
 
-            referenced = set(sg for sg, cnt in txn if cnt > 0)
+            referenced = set(sg for sg, in txn)
             referenced_groups |= referenced
 
             # We don't continue iterating up the state group graphs for state
