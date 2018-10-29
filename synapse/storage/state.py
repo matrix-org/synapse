@@ -1293,10 +1293,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 retcols=("prev_state_group", "state_group",),
             )
 
-            next_to_search.update(row["state_group"] for row in rows)
+            prevs = set(row["state_group"] for row in rows)
             # We don't bother re-handling groups we've already seen
-            next_to_search -= state_groups_seen
-            state_groups_seen |= next_to_search
+            prevs -= state_groups_seen
+            next_to_search |= prevs
+            state_groups_seen |= prevs
 
             for row in rows:
                 # Note: Each state group can have at most one prev group
