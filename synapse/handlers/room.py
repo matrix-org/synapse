@@ -331,13 +331,12 @@ class RoomCreationHandler(BaseHandler):
                 yield directory_handler.delete_association(
                     requester, alias, send_event=False,
                 )
+                removed_aliases.append(alias_str)
             except SynapseError as e:
                 logger.warning(
                     "Unable to remove alias %s from old room: %s",
                     alias, e,
                 )
-            else:
-                removed_aliases.append(alias_str)
 
         # if we didn't find any aliases, or couldn't remove anyway, we can skip the rest
         # of this.
