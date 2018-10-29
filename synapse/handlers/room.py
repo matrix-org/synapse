@@ -265,7 +265,8 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.Name, ""),
             (EventTypes.Topic, ""),
             (EventTypes.RoomHistoryVisibility, ""),
-            (EventTypes.GuestAccess, "")
+            (EventTypes.GuestAccess, ""),
+            (EventTypes.RoomAvatar, ""),
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(
