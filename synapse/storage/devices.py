@@ -589,10 +589,14 @@ class DeviceStore(SQLBaseStore):
         combined list of changes to devices, and which destinations need to be
         poked. `destination` may be None if no destinations need to be poked.
         """
+        # We do a group by here as there can be a large number of duplicate
+        # entries, since we throw away device IDs.
         sql = """
-            SELECT stream_id, user_id, destination FROM device_lists_stream
+            SELECT MAX(stream_id) AS stream_id, user_id, destination
+            FROM device_lists_stream
             LEFT JOIN device_lists_outbound_pokes USING (stream_id, user_id, device_id)
             WHERE ? < stream_id AND stream_id <= ?
+            GROUP BY user_id, destination
         """
         return self._execute(
             "get_all_device_list_changes_for_remotes", None,
