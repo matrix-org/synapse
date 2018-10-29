@@ -146,7 +146,7 @@ class E2eRoomKeysHandler(object):
                 else:
                     raise
 
-            if version_info['version'] != version:
+            if str(version_info['version']) != version:
                 # Check that the version we're trying to upload actually exists
                 try:
                     version_info = yield self.store.get_e2e_room_keys_version_info(
