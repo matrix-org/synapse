@@ -51,6 +51,7 @@ class RegistrationHandler(BaseHandler):
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
+        self.http_client = hs.get_simple_http_client()
 
         self._next_generated_user_id = None
 
@@ -395,6 +396,43 @@ class RegistrationHandler(BaseHandler):
                     400, "This user ID is reserved by an application service.",
                     errcode=Codes.EXCLUSIVE
                 )
+
+    @defer.inlineCallbacks
+    def chain_register(self, localpart, auth_result, params):
+        """Invokes the current registration on another server, using
+        shared secret registration, passing in any auth_results from  
+        other registration UI auth flows (e.g. validated 3pids)
+        Useful for setting up shadow/backup accounts on a parallel deployment.
+        """
+
+        # TODO: retries
+
+        chained_hs = self.hs.config.chain_register.get("hs")
+
+        user = localpart.encode("utf-8")
+        mac = hmac.new(
+            key=self.hs.config.chain_register.get("hs_shared_secret").encode(),
+            msg=user,
+            digestmod=sha1,
+        ).hexdigest()
+
+        data = yield self.http_client.post_urlencoded_get_json(
+            "https://%s%s" % (
+                chained_hs, "/_matrix/client/r0/register"
+            ),
+            {
+                # XXX: auth_result is an unspecified extension for chained registration
+                'auth_result': auth_result,
+                'username': localpart,
+                'password': params.get("password"),
+                'bind_email': params.get("bind_email"),
+                'bind_msisdn': params.get("bind_msisdn"),
+                'device_id': params.get("device_id"),
+                'initial_device_display_name': params.get("initial_device_display_name"),
+                'inhibit_login': True,
+                'mac': mac,
+            }
+        )
 
     @defer.inlineCallbacks
     def _generate_user_id(self, reseed=False):

@@ -467,7 +467,6 @@ class RegisterRestServlet(RestServlet):
                 pass
 
             guest_access_token = params.get("guest_access_token", None)
-            new_password = params.get("password", None)
 
             # XXX: don't we need to validate these for length etc like we did on
             # the ones from the JSON body earlier on in the method?
@@ -477,11 +476,18 @@ class RegisterRestServlet(RestServlet):
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
-                password=new_password,
+                password=params.get("password", None),
                 guest_access_token=guest_access_token,
                 generate_token=False,
                 display_name=desired_display_name,
             )
+
+            if self.hs.config.chain_register:
+                yield self.registration_handler.chain_register(
+                    localpart=desired_username,
+                    auth_result=auth_result,
+                    params=params,
+                )
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
