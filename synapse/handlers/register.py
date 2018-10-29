@@ -254,9 +254,6 @@ class RegistrationHandler(BaseHandler):
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
-        # We used to generate default identicons here, but nowadays
-        # we want clients to generate their own as part of their branding
-        # rather than there being consistent matrix-wide ones, so we don't.
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
