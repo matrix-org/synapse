@@ -216,6 +216,13 @@ class HomeServer(object):
         """
         return self._reactor
 
+    def get_sendmail(self):
+        if hasattr(self, "_sendmail"):
+            return self._sendmail
+        else:
+            from twisted.mail.smtp import sendmail
+            return sendmail
+
     def get_ip_from_request(self, request):
         # X-Forwarded-For is handled by our custom request type.
         return request.getClientIP()

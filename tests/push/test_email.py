@@ -18,6 +18,7 @@ import os
 import pkg_resources
 
 from synapse.rest.client.v1 import admin, login, room
+from twisted.internet.defer import Deferred
 
 from tests.unittest import HomeserverTestCase
 
@@ -61,6 +62,17 @@ class EmailPusherTests(HomeserverTestCase):
         return hs
 
     def test_sends_email(self):
+
+        # List[Tuple[Deferred, args, kwargs]]
+        email_attempts = []
+
+        def sendmail(*args, **kwargs):
+            d = Deferred()
+            email_attempts.append((d, args, kwargs))
+            return d
+
+        self.hs._sendmail = sendmail
+
         # Register the user who gets notified
         user_id = self.register_user("user", "pass")
         access_token = self.login("user", "pass")
@@ -102,8 +114,36 @@ class EmailPusherTests(HomeserverTestCase):
         self.helper.send(room, body="Hi!", tok=other_access_token)
         self.helper.send(room, body="There!", tok=other_access_token)
 
-        # Advance time a bit, so the pusher will register
+        # Get the stream ordering before it gets sent
+        pushers = self.get_success(
+            self.hs.get_datastore().get_pushers_by(dict(user_name=user_id))
+        )
+        self.assertEqual(len(pushers), 1)
+        last_stream_ordering = pushers[0]["last_stream_ordering"]
+
+        # Advance time a bit, so the pusher will register something has happened
         self.pump(100)
 
-        # It then tries to send the email.
-        self.assertEqual(len(self.reactor.tcpClients), 1)
+        # It hasn't succeeded yet, so the stream ordering shouldn't have moved
+        pushers = self.get_success(
+            self.hs.get_datastore().get_pushers_by(dict(user_name=user_id))
+        )
+        self.assertEqual(len(pushers), 1)
+        self.assertEqual(last_stream_ordering, pushers[0]["last_stream_ordering"])
+
+        # One email was attempted to be sent
+        self.assertEqual(len(email_attempts), 1)
+
+        # Make the email succeed
+        email_attempts[0][0].callback(True)
+        self.pump()
+
+        # One email was attempted to be sent
+        self.assertEqual(len(email_attempts), 1)
+
+        # The stream ordering has increased
+        pushers = self.get_success(
+            self.hs.get_datastore().get_pushers_by(dict(user_name=user_id))
+        )
+        self.assertEqual(len(pushers), 1)
+        self.assertTrue(pushers[0]["last_stream_ordering"] > last_stream_ordering)

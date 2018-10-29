@@ -26,7 +26,6 @@ import bleach
 import jinja2
 
 from twisted.internet import defer
-from twisted.mail.smtp import sendmail
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
@@ -192,7 +191,7 @@ class Mailer(object):
 
         logger.info("Sending email push notification to %s" % email_address)
 
-        yield sendmail(
+        yield self.hs.get_sendmail()(
             self.hs.config.email_smtp_host,
             raw_from, raw_to, multipart_msg.as_string().encode('utf8'),
             reactor=self.hs.get_reactor(),
