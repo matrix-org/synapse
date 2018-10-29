@@ -1,1 +1,0 @@
-Fix bug which prevented email notifications from being sent unless an absolute path was given for `email_templates`.

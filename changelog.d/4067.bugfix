@@ -1,1 +1,0 @@
-Manhole now works again on Python 3, instead of failing with a "couldn't match all kex parts" when connecting.
