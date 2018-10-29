@@ -339,7 +339,7 @@ class UserDirectoryStore(SQLBaseStore):
         rows = yield self._execute("get_all_local_users", None, sql)
         defer.returnValue([name for name, in rows])
 
-    def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
+    def add_users_who_share_room(self, room_id, share_private, user_id_tuples_x):
         """Insert entries into the users_who_share_rooms table. The first
         user should be a local user.
 
@@ -350,9 +350,7 @@ class UserDirectoryStore(SQLBaseStore):
         """
         def _add_users_who_share_room_txn(txn):
             support_user = self.hs.config.support_user_id
-            for ut in user_id_tuples:
-                if support_user in ut:
-                    user_id_tuples.remove(ut)
+            user_id_tuples = filter(lambda x: support_user not in x, user_id_tuples_x)
 
             self._simple_insert_many_txn(
                 txn,

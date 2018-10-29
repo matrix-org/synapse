@@ -75,3 +75,42 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
             )
         finally:
             self.hs.config.user_directory_search_all_users = False
+
+    @defer.inlineCallbacks
+    def test_cannot_add_support_user_to_directory(self):
+        self.hs.config.user_directory_search_all_users = True
+        self.hs.config.support_user_id = "@support:test"
+        SUPPORT_USER = self.hs.config.support_user_id
+        yield self.store.add_profiles_to_user_dir(
+            "!room:id",
+            {SUPPORT_USER: ProfileInfo(None, "support")},
+        )
+        yield self.store.add_users_to_public_room("!room:id", [SUPPORT_USER])
+        yield self.store.add_users_who_share_room(
+            "!room:id", False, ((ALICE, SUPPORT_USER),)
+        )
+
+        r = yield self.store.search_user_dir(ALICE, "support", 10)
+        self.assertFalse(r["limited"])
+        self.assertEqual(0, len(r["results"]))
+
+        # add_users_who_share_room
+        # add_users_to_public_room
+        # add_profiles_to_user_dir
+        # update_user_in_user_dir
+        # update_profile_in_user_dir
+        # update_user_in_public_user_list
+
+        # yield self.store.add_profiles_to_user_dir(
+        #     "!room:id",
+        #     {SUPPORT_USER: ProfileInfo(None, "support")},
+        # )
+        # yield self.store.add_profiles_to_user_dir(SUPPORT_USER,
+        #
+        #
+        #
+        # yield self.store.add_users_to_public_room("!room:id", [SUPPORT_USER])
+        #
+        # yield self.store.add_users_who_share_room(
+        #     "!room:id", False, ((ALICE, SUPPORT_USER), (BOB, SUPPORT_USER))
+        # )
