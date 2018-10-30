@@ -23,6 +23,7 @@ import abc
 import logging
 
 from twisted.enterprise import adbapi
+from twisted.mail.smtp import sendmail
 from twisted.web.client import BrowserLikePolicyForHTTPS
 
 from synapse.api.auth import Auth
@@ -174,6 +175,7 @@ class HomeServer(object):
         'message_handler',
         'pagination_handler',
         'room_context_handler',
+        'sendmail',
     ]
 
     # This is overridden in derived application classes
@@ -268,6 +270,9 @@ class HomeServer(object):
 
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
+
+    def build_sendmail(self):
+        return sendmail
 
     def build_state_handler(self):
         return StateHandler(self)
