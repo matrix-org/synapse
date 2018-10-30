@@ -570,9 +570,9 @@ class EventCreationHandler(object):
 
         event = builder.build()
 
-        logger.info(
-            "Created %s in %s: %s",
-            event.type, event.room_id, event.event_id,
+        logger.debug(
+            "Created event %s",
+            event.event_id,
         )
 
         defer.returnValue(
