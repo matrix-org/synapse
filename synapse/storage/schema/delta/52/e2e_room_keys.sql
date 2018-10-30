@@ -24,7 +24,7 @@ CREATE TABLE e2e_room_keys_versions_new (
 );
 
 INSERT INTO e2e_room_keys_versions_new
-    SELECT user_id, version, algorithm, auth_data, deleted FROM e2e_room_keys_versions;
+    SELECT user_id, CAST(version as BIGINT), algorithm, auth_data, deleted FROM e2e_room_keys_versions;
 
 DROP TABLE e2e_room_keys_versions;
 ALTER TABLE e2e_room_keys_versions_new RENAME TO e2e_room_keys_versions;
@@ -45,7 +45,7 @@ CREATE TABLE e2e_room_keys_new (
 );
 
 INSERT INTO e2e_room_keys_new
-    SELECT user_id, room_id, session_id, version, first_message_index, forwarded_count, is_verified, session_data FROM e2e_room_keys;
+    SELECT user_id, room_id, session_id, CAST(version as BIGINT), first_message_index, forwarded_count, is_verified, session_data FROM e2e_room_keys;
 
 DROP TABLE e2e_room_keys;
 ALTER TABLE e2e_room_keys_new RENAME TO e2e_room_keys;
