@@ -23,8 +23,8 @@ import abc
 import logging
 
 from twisted.enterprise import adbapi
-from twisted.web.client import BrowserLikePolicyForHTTPS
 from twisted.mail.smtp import sendmail
+from twisted.web.client import BrowserLikePolicyForHTTPS
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
