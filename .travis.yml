@@ -23,6 +23,9 @@ branches:
     - develop
     - /^release-v/
 
+# When running the tox environments that call Twisted Trial, we can pass the -j
+# flag to run the tests concurrently. We set this to 2 for CPU bound tests
+# (SQLite) and 4 for I/O bound tests (PostgreSQL).
 matrix:
   fast_finish: true
   include:
@@ -33,10 +36,10 @@ matrix:
     env: TOX_ENV="pep8,check_isort"
 
   - python: 2.7
-    env: TOX_ENV=py27
+    env: TOX_ENV=py27 TRIAL_FLAGS="-j 2"
 
   - python: 2.7
-    env: TOX_ENV=py27-old
+    env: TOX_ENV=py27-old TRIAL_FLAGS="-j 2"
 
   - python: 2.7
     env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
@@ -44,10 +47,10 @@ matrix:
       - postgresql
 
   - python: 3.5
-    env: TOX_ENV=py35
+    env: TOX_ENV=py35 TRIAL_FLAGS="-j 2"
 
   - python: 3.6
-    env: TOX_ENV=py36
+    env: TOX_ENV=py36 TRIAL_FLAGS="-j 2"
 
   - python: 3.6
     env: TOX_ENV=py36-postgres TRIAL_FLAGS="-j 4"

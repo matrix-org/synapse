@@ -146,6 +146,13 @@ def DEBUG(target):
     return target
 
 
+def INFO(target):
+    """A decorator to set the .loglevel attribute to logging.INFO.
+    Can apply to either a TestCase or an individual test method."""
+    target.loglevel = logging.INFO
+    return target
+
+
 class HomeserverTestCase(TestCase):
     """
     A base TestCase that reduces boilerplate for HomeServer-using test cases.
@@ -373,5 +380,5 @@ class HomeserverTestCase(TestCase):
         self.render(request)
         self.assertEqual(channel.code, 200)
 
-        access_token = channel.json_body["access_token"].encode('ascii')
+        access_token = channel.json_body["access_token"]
         return access_token

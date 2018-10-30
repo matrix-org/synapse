@@ -26,7 +26,6 @@ import bleach
 import jinja2
 
 from twisted.internet import defer
-from twisted.mail.smtp import sendmail
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
@@ -85,6 +84,7 @@ class Mailer(object):
         self.notif_template_html = notif_template_html
         self.notif_template_text = notif_template_text
 
+        self.sendmail = self.hs.get_sendmail()
         self.store = self.hs.get_datastore()
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
@@ -191,11 +191,11 @@ class Mailer(object):
         multipart_msg.attach(html_part)
 
         logger.info("Sending email push notification to %s" % email_address)
-        # logger.debug(html_text)
 
-        yield sendmail(
+        yield self.sendmail(
             self.hs.config.email_smtp_host,
-            raw_from, raw_to, multipart_msg.as_string(),
+            raw_from, raw_to, multipart_msg.as_string().encode('utf8'),
+            reactor=self.hs.get_reactor(),
             port=self.hs.config.email_smtp_port,
             requireAuthentication=self.hs.config.email_smtp_user is not None,
             username=self.hs.config.email_smtp_user,
@@ -333,7 +333,7 @@ class Mailer(object):
                           notif_events, user_id, reason):
         if len(notifs_by_room) == 1:
             # Only one room has new stuff
-            room_id = notifs_by_room.keys()[0]
+            room_id = list(notifs_by_room.keys())[0]
 
             # If the room has some kind of name, use it, but we don't
             # want the generated-from-names one here otherwise we'll
