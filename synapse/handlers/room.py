@@ -104,6 +104,8 @@ class RoomCreationHandler(BaseHandler):
                 creator_id=user_id, is_public=r["is_public"],
             )
 
+            logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
+
             # we create and auth the tombstone event before properly creating the new
             # room, to check our user has perms in the old room.
             tombstone_event, tombstone_context = (
@@ -544,6 +546,7 @@ class RoomCreationHandler(BaseHandler):
             content=creation_content,
         )
 
+        logger.info("Sending %s in new room", EventTypes.Member)
         yield self.room_member_handler.update_membership(
             creator,
             creator.user,

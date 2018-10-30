@@ -427,6 +427,9 @@ class EventCreationHandler(object):
 
         if event.is_state():
             prev_state = yield self.deduplicate_state_event(event, context)
+            logger.info(
+                "Not bothering to persist duplicate state event %s", event.event_id,
+            )
             if prev_state is not None:
                 defer.returnValue(prev_state)
 
@@ -567,9 +570,9 @@ class EventCreationHandler(object):
 
         event = builder.build()
 
-        logger.debug(
-            "Created event %s",
-            event.event_id,
+        logger.info(
+            "Created %s in %s: %s",
+            event.type, event.room_id, event.event_id,
         )
 
         defer.returnValue(
