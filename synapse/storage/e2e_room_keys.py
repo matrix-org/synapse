@@ -118,6 +118,11 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             these room keys.
         """
 
+        try:
+            version = int(version)
+        except ValueError:
+            defer.returnValue({'rooms': {}})
+
         keyvalues = {
             "user_id": user_id,
             "version": version,
