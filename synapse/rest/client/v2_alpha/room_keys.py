@@ -209,9 +209,15 @@ class RoomKeysServlet(RestServlet):
         )
 
         if session_id:
-            room_keys = room_keys['rooms'][room_id]['sessions'][session_id]
+            if room_keys['rooms'] == {}:
+                raise SynapseError(404, "No room_keys found", Codes.NOT_FOUND)
+            else:
+                room_keys = room_keys['rooms'][room_id]['sessions'][session_id]
         elif room_id:
-            room_keys = room_keys['rooms'][room_id]
+            if room_keys['rooms'] == {}:
+                room_keys = {'sessions': {}}
+            else:
+                room_keys = room_keys['rooms'][room_id]
 
         defer.returnValue((200, room_keys))
 

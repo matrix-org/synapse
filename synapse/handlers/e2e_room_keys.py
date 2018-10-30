@@ -67,9 +67,6 @@ class E2eRoomKeysHandler(object):
                 user_id, version, room_id, session_id
             )
 
-            if results['rooms'] == {}:
-                raise SynapseError(404, "No room_keys found")
-
             defer.returnValue(results)
 
     @defer.inlineCallbacks
