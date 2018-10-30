@@ -63,6 +63,9 @@ class E2eRoomKeysHandler(object):
         # we deliberately take the lock to get keys so that changing the version
         # works atomically
         with (yield self._upload_linearizer.queue(user_id)):
+            # make sure the backup version exists
+            yield self.store.get_e2e_room_keys_version_info(user_id, version)
+
             results = yield self.store.get_e2e_room_keys(
                 user_id, version, room_id, session_id
             )
