@@ -236,6 +236,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 ),
             )
             result["auth_data"] = json.loads(result["auth_data"])
+            result["version"] = str(result["version"])
             return result
 
         return self.runInteraction(
