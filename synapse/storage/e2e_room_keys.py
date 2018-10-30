@@ -219,7 +219,12 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if version is None:
                 this_version = self._get_current_version(txn, user_id)
             else:
-                this_version = version
+                try:
+                    this_version = int(version)
+                except ValueError:
+                    # Our versions are all ints so if we can't convert it to an integer,
+                    # it isn't there.
+                    raise StoreError(404, "No row found")
 
             result = self._simple_select_one_txn(
                 txn,
