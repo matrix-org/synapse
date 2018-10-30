@@ -24,6 +24,7 @@ import logging
 
 from twisted.enterprise import adbapi
 from twisted.web.client import BrowserLikePolicyForHTTPS
+from twisted.mail.smtp import sendmail
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
@@ -174,6 +175,7 @@ class HomeServer(object):
         'message_handler',
         'pagination_handler',
         'room_context_handler',
+        'sendmail',
     ]
 
     # This is overridden in derived application classes
@@ -215,13 +217,6 @@ class HomeServer(object):
         Fetch the Twisted reactor in use by this HomeServer.
         """
         return self._reactor
-
-    def get_sendmail(self):
-        if hasattr(self, "_sendmail"):
-            return self._sendmail
-        else:
-            from twisted.mail.smtp import sendmail
-            return sendmail
 
     def get_ip_from_request(self, request):
         # X-Forwarded-For is handled by our custom request type.
@@ -275,6 +270,9 @@ class HomeServer(object):
 
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
+
+    def build_sendmail(self):
+        return sendmail
 
     def build_state_handler(self):
         return StateHandler(self)

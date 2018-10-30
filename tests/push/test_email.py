@@ -42,6 +42,14 @@ class EmailPusherTests(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
+        # List[Tuple[Deferred, args, kwargs]]
+        self.email_attempts = []
+
+        def sendmail(*args, **kwargs):
+            d = Deferred()
+            self.email_attempts.append((d, args, kwargs))
+            return d
+
         config = self.default_config()
         config.email_enable_notifs = True
         config.start_pushers = True
@@ -58,21 +66,11 @@ class EmailPusherTests(HomeserverTestCase):
         config.email_app_name = "Matrix"
         config.email_notif_from = "test@example.com"
 
-        hs = self.setup_test_homeserver(config=config)
+        hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
 
         return hs
 
     def test_sends_email(self):
-
-        # List[Tuple[Deferred, args, kwargs]]
-        email_attempts = []
-
-        def sendmail(*args, **kwargs):
-            d = Deferred()
-            email_attempts.append((d, args, kwargs))
-            return d
-
-        self.hs._sendmail = sendmail
 
         # Register the user who gets notified
         user_id = self.register_user("user", "pass")
@@ -133,14 +131,14 @@ class EmailPusherTests(HomeserverTestCase):
         self.assertEqual(last_stream_ordering, pushers[0]["last_stream_ordering"])
 
         # One email was attempted to be sent
-        self.assertEqual(len(email_attempts), 1)
+        self.assertEqual(len(self.email_attempts), 1)
 
         # Make the email succeed
-        email_attempts[0][0].callback(True)
+        self.email_attempts[0][0].callback(True)
         self.pump()
 
         # One email was attempted to be sent
-        self.assertEqual(len(email_attempts), 1)
+        self.assertEqual(len(self.email_attempts), 1)
 
         # The stream ordering has increased
         pushers = self.get_success(

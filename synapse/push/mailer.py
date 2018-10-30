@@ -84,6 +84,7 @@ class Mailer(object):
         self.notif_template_html = notif_template_html
         self.notif_template_text = notif_template_text
 
+        self.sendmail = self.hs.get_sendmail()
         self.store = self.hs.get_datastore()
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
@@ -191,7 +192,7 @@ class Mailer(object):
 
         logger.info("Sending email push notification to %s" % email_address)
 
-        yield self.hs.get_sendmail()(
+        yield self.sendmail(
             self.hs.config.email_smtp_host,
             raw_from, raw_to, multipart_msg.as_string().encode('utf8'),
             reactor=self.hs.get_reactor(),
