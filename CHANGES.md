@@ -1,3 +1,13 @@
+Synapse 0.33.8rc2 (2018-10-31)
+==============================
+
+Bugfixes
+--------
+
+- Searches that request profile info now no longer fail with a 500. Fixes 
+  a regression in 0.33.8rc1. ([\#4122](https://github.com/matrix-org/synapse/issues/4122))
+
+
 Synapse 0.33.8rc1 (2018-10-29)
 ==============================
 
