@@ -236,6 +236,13 @@ class SynchrotronTyping(object):
         return {"typing": self._latest_room_serial}
 
     def process_replication_rows(self, token, rows):
+        if self._latest_room_serial > token:
+            # The master has gone backwards. To prevent inconsistent data, just
+            # clear everything.
+            self._room_serials = {}
+            self._room_typing = {}
+
+        # Set the latest serial token to whatever the server gave us.
         self._latest_room_serial = token
 
         for row in rows:
