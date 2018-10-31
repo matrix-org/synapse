@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import ResourceLimitError
 from synapse.handlers.register import RegistrationHandler
-from synapse.types import UserID, create_requester
+from synapse.types import RoomAlias, UserID, create_requester
 
 from tests.utils import setup_test_homeserver
 
@@ -41,30 +41,27 @@ class RegistrationTestCase(unittest.TestCase):
         self.mock_captcha_client = Mock()
         self.hs = yield setup_test_homeserver(
             self.addCleanup,
-            handlers=None,
-            http_client=None,
             expire_access_token=True,
-            profile_handler=Mock(),
         )
         self.macaroon_generator = Mock(
             generate_access_token=Mock(return_value='secret')
         )
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
-        self.hs.handlers = RegistrationHandlers(self.hs)
         self.handler = self.hs.get_handlers().registration_handler
         self.store = self.hs.get_datastore()
         self.hs.config.max_mau_value = 50
         self.lots_of_users = 100
         self.small_number_of_users = 1
 
+        self.requester = create_requester("@requester:test")
+
     @defer.inlineCallbacks
     def test_user_is_created_and_logged_in_if_doesnt_exist(self):
-        local_part = "someone"
-        display_name = "someone"
-        user_id = "@someone:test"
-        requester = create_requester("@as:test")
+        frank = UserID.from_string("@frank:test")
+        user_id = frank.to_string()
+        requester = create_requester(user_id)
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name
+            requester, frank.localpart, "Frankie"
         )
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
@@ -78,12 +75,11 @@ class RegistrationTestCase(unittest.TestCase):
             token="jkv;g498752-43gj['eamb!-5",
             password_hash=None,
         )
-        local_part = "frank"
-        display_name = "Frank"
-        user_id = "@frank:test"
-        requester = create_requester("@as:test")
+        local_part = frank.localpart
+        user_id = frank.to_string()
+        requester = create_requester(user_id)
         result_user_id, result_token = yield self.handler.get_or_create_user(
-            requester, local_part, display_name
+            requester, local_part, None
         )
         self.assertEquals(result_user_id, user_id)
         self.assertEquals(result_token, 'secret')
@@ -92,7 +88,7 @@ class RegistrationTestCase(unittest.TestCase):
     def test_mau_limits_when_disabled(self):
         self.hs.config.limit_usage_by_mau = False
         # Ensure does not throw exception
-        yield self.handler.get_or_create_user("requester", 'a', "display_name")
+        yield self.handler.get_or_create_user(self.requester, 'a', "display_name")
 
     @defer.inlineCallbacks
     def test_get_or_create_user_mau_not_blocked(self):
@@ -101,7 +97,7 @@ class RegistrationTestCase(unittest.TestCase):
             return_value=defer.succeed(self.hs.config.max_mau_value - 1)
         )
         # Ensure does not throw exception
-        yield self.handler.get_or_create_user("@user:server", 'c', "User")
+        yield self.handler.get_or_create_user(self.requester, 'c', "User")
 
     @defer.inlineCallbacks
     def test_get_or_create_user_mau_blocked(self):
@@ -110,13 +106,13 @@ class RegistrationTestCase(unittest.TestCase):
             return_value=defer.succeed(self.lots_of_users)
         )
         with self.assertRaises(ResourceLimitError):
-            yield self.handler.get_or_create_user("requester", 'b', "display_name")
+            yield self.handler.get_or_create_user(self.requester, 'b', "display_name")
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         with self.assertRaises(ResourceLimitError):
-            yield self.handler.get_or_create_user("requester", 'b', "display_name")
+            yield self.handler.get_or_create_user(self.requester, 'b', "display_name")
 
     @defer.inlineCallbacks
     def test_register_mau_blocked(self):
@@ -147,3 +143,44 @@ class RegistrationTestCase(unittest.TestCase):
         )
         with self.assertRaises(ResourceLimitError):
             yield self.handler.register_saml2(localpart="local_part")
+
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_rooms(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+        res = yield self.handler.register(localpart='jeff')
+        rooms = yield self.store.get_rooms_for_user(res[0])
+
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = yield directory_handler.get_association(room_alias)
+
+        self.assertTrue(room_id['room_id'] in rooms)
+        self.assertEqual(len(rooms), 1)
+
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_rooms_with_no_rooms(self):
+        self.hs.config.auto_join_rooms = []
+        frank = UserID.from_string("@frank:test")
+        res = yield self.handler.register(frank.localpart)
+        self.assertEqual(res[0], frank.to_string())
+        rooms = yield self.store.get_rooms_for_user(res[0])
+        self.assertEqual(len(rooms), 0)
+
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_where_room_is_another_domain(self):
+        self.hs.config.auto_join_rooms = ["#room:another"]
+        frank = UserID.from_string("@frank:test")
+        res = yield self.handler.register(frank.localpart)
+        self.assertEqual(res[0], frank.to_string())
+        rooms = yield self.store.get_rooms_for_user(res[0])
+        self.assertEqual(len(rooms), 0)
+
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_where_auto_create_is_false(self):
+        self.hs.config.autocreate_auto_join_rooms = False
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+        res = yield self.handler.register(localpart='jeff')
+        rooms = yield self.store.get_rooms_for_user(res[0])
+        self.assertEqual(len(rooms), 0)

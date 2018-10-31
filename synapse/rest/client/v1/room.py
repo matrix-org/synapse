@@ -33,6 +33,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 
@@ -409,7 +410,7 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
             room_id=room_id,
             user_id=requester.user.to_string(),
             at_token=at_token,
-            types=[(EventTypes.Member, None)],
+            state_filter=StateFilter.from_types([(EventTypes.Member, None)]),
         )
 
         chunk = []

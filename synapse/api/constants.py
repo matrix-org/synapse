@@ -62,6 +62,7 @@ class LoginType(object):
 class EventTypes(object):
     Member = "m.room.member"
     Create = "m.room.create"
+    Tombstone = "m.room.tombstone"
     JoinRules = "m.room.join_rules"
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"

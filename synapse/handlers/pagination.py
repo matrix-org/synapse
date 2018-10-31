@@ -21,6 +21,7 @@ from twisted.python.failure import Failure
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.utils import serialize_event
+from synapse.storage.state import StateFilter
 from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.logcontext import run_in_background
@@ -255,16 +256,14 @@ class PaginationHandler(object):
         if event_filter and event_filter.lazy_load_members():
             # TODO: remove redundant members
 
-            types = [
-                (EventTypes.Member, state_key)
-                for state_key in set(
-                    event.sender  # FIXME: we also care about invite targets etc.
-                    for event in events
-                )
-            ]
+            # FIXME: we also care about invite targets etc.
+            state_filter = StateFilter.from_types(
+                (EventTypes.Member, event.sender)
+                for event in events
+            )
 
             state_ids = yield self.store.get_state_ids_for_event(
-                events[0].event_id, types=types,
+                events[0].event_id, state_filter=state_filter,
             )
 
             if state_ids:
