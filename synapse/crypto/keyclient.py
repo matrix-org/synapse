@@ -38,7 +38,7 @@ def fetch_server_key(server_name, tls_client_options_factory, key_id):
     """Fetch the keys for a remote server."""
 
     factory = SynapseKeyClientFactory()
-    factory.path = KEY_API_V2 % urllib.parse.quote(key_id)
+    factory.path = KEY_API_V2 % (urllib.parse.quote(key_id), )
     factory.host = server_name
     endpoint = matrix_federation_endpoint(
         reactor, server_name, tls_client_options_factory, timeout=30
