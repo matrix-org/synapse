@@ -161,8 +161,9 @@ class AuthRestServlet(RestServlet):
 
             html = TERMS_TEMPLATE % {
                 'session': session,
-                'terms_url': "%s/_matrix/consent" % (
+                'terms_url': "%s/_matrix/consent?v=%s" % (
                     self.hs.config.public_baseurl,
+                    self.hs.config.user_consent_version,
                 ),
                 'myurl': "%s/auth/%s/fallback/web" % (
                     CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS
@@ -241,8 +242,9 @@ class AuthRestServlet(RestServlet):
             else:
                 html = TERMS_TEMPLATE % {
                     'session': session,
-                    'terms_url': "%s/_matrix/consent" % (
+                    'terms_url': "%s/_matrix/consent?v=%s" % (
                         self.hs.config.public_baseurl,
+                        self.hs.config.user_consent_version,
                     ),
                     'myurl': "%s/auth/%s/fallback/web" % (
                         CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS

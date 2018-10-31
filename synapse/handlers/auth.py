@@ -473,7 +473,10 @@ class AuthHandler(BaseHandler):
                     "version": self.hs.config.user_consent_version,
                     "en": {
                         "name": "Privacy Policy",
-                        "url": "%s/_matrix/consent" % (self.hs.config.public_baseurl,),
+                        "url": "%s/_matrix/consent?v=%s" % (
+                            self.hs.config.public_baseurl,
+                            self.hs.config.user_consent_version,
+                        ),
                     },
                 },
             },
