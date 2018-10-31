@@ -47,6 +47,12 @@ class SlavedReceiptsStore(ReceiptsWorkerStore, BaseSlavedStore):
         result["receipts"] = self._receipts_id_gen.get_current_token()
         return result
 
+    def on_start_replication(self):
+        """
+        When we start replicating, wipe the receipt event cache.
+        """
+        self.get_last_receipt_event_id_for_user.invalidate_all()
+
     def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
         self._get_linearized_receipts_for_room.invalidate_many((room_id,))

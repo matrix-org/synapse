@@ -44,6 +44,13 @@ class BaseSlavedStore(SQLBaseStore):
 
         self.hs = hs
 
+    def on_start_replication(self):
+        """
+        We've begun replication.
+
+        Do nothing, override in subclasses.
+        """
+
     def stream_positions(self):
         pos = {}
         if self._cache_id_gen:

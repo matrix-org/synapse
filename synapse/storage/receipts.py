@@ -72,7 +72,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             desc="get_receipts_for_room",
         )
 
-    @cached(num_args=3)
+    @cached(num_args=3, max_entries=5000)
     def get_last_receipt_event_id_for_user(self, user_id, room_id, receipt_type):
         return self._simple_select_one_onecol(
             table="receipts_linearized",

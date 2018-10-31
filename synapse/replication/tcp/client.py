@@ -99,6 +99,7 @@ class ReplicationClientHandler(object):
         host = hs.config.worker_replication_host
         port = hs.config.worker_replication_port
         hs.get_reactor().connectTCP(host, port, factory)
+        self.store.on_start_replication()
 
     def on_rdata(self, stream_name, token, rows):
         """Called when we get new replication data. By default this just pokes
