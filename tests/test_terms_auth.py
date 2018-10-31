@@ -67,7 +67,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
                     "privacy_policy": {
                         "en": {
                             "name": "Privacy Policy",
-                            "url": "https://example.org/_matrix/consent",
+                            "url": "https://example.org/_matrix/consent?v=1.0",
                         },
                         "version": "1.0"
                     },
