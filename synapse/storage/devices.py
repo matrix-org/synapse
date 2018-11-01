@@ -239,7 +239,19 @@ class DeviceStore(SQLBaseStore):
 
     def update_remote_device_list_cache_entry(self, user_id, device_id, content,
                                               stream_id):
-        """Updates a single user's device in the cache.
+        """Updates a single device in the cache of a remote user's devicelist.
+
+        Note: assumes that we are the only thread that can be updating this user's
+        device list.
+
+        Args:
+            user_id (str): User to update device list for
+            device_id (str): ID of decivice being updated
+            content (dict): new data on this device
+            stream_id (int): the version of the device list
+
+        Returns:
+            Deferred[None]
         """
         return self.runInteraction(
             "update_remote_device_list_cache_entry",
@@ -272,7 +284,11 @@ class DeviceStore(SQLBaseStore):
                 },
                 values={
                     "content": json.dumps(content),
-                }
+                },
+
+                # we don't need to lock, because we assume we are the only thread
+                # updating this user's devices.
+                lock=False,
             )
 
         txn.call_after(self._get_cached_user_device.invalidate, (user_id, device_id,))
@@ -289,11 +305,26 @@ class DeviceStore(SQLBaseStore):
             },
             values={
                 "stream_id": stream_id,
-            }
+            },
+
+            # again, we can assume we are the only thread updating this user's
+            # extremity.
+            lock=False,
         )
 
     def update_remote_device_list_cache(self, user_id, devices, stream_id):
-        """Replace the cache of the remote user's devices.
+        """Replace the entire cache of the remote user's devices.
+
+        Note: assumes that we are the only thread that can be updating this user's
+        device list.
+
+        Args:
+            user_id (str): User to update device list for
+            devices (list[dict]): list of device objects supplied over federation
+            stream_id (int): the version of the device list
+
+        Returns:
+            Deferred[None]
         """
         return self.runInteraction(
             "update_remote_device_list_cache",
@@ -338,7 +369,11 @@ class DeviceStore(SQLBaseStore):
             },
             values={
                 "stream_id": stream_id,
-            }
+            },
+
+            # we don't need to lock, because we can assume we are the only thread
+            # updating this user's extremity.
+            lock=False,
         )
 
     def get_devices_by_remote(self, destination, from_stream_id):
