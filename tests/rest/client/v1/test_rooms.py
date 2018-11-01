@@ -23,7 +23,7 @@ from six.moves.urllib import parse as urlparse
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.rest.client.v1 import room
+from synapse.rest.client.v1 import admin, login, room
 
 from tests import unittest
 
@@ -799,3 +799,107 @@ class RoomMessageListTestCase(RoomBase):
         self.assertEquals(token, channel.json_body['start'])
         self.assertTrue("chunk" in channel.json_body)
         self.assertTrue("end" in channel.json_body)
+
+
+class RoomSearchTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+    user_id = True
+    hijack_auth = False
+
+    def prepare(self, reactor, clock, hs):
+
+        # Register the user who does the searching
+        self.user_id = self.register_user("user", "pass")
+        self.access_token = self.login("user", "pass")
+
+        # Register the user who sends the message
+        self.other_user_id = self.register_user("otheruser", "pass")
+        self.other_access_token = self.login("otheruser", "pass")
+
+        # Create a room
+        self.room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+
+        # Invite the other person
+        self.helper.invite(
+            room=self.room,
+            src=self.user_id,
+            tok=self.access_token,
+            targ=self.other_user_id,
+        )
+
+        # The other user joins
+        self.helper.join(
+            room=self.room, user=self.other_user_id, tok=self.other_access_token
+        )
+
+    def test_finds_message(self):
+        """
+        The search functionality will search for content in messages if asked to
+        do so.
+        """
+        # The other user sends some messages
+        self.helper.send(self.room, body="Hi!", tok=self.other_access_token)
+        self.helper.send(self.room, body="There!", tok=self.other_access_token)
+
+        request, channel = self.make_request(
+            "POST",
+            "/search?access_token=%s" % (self.access_token,),
+            {
+                "search_categories": {
+                    "room_events": {"keys": ["content.body"], "search_term": "Hi"}
+                }
+            },
+        )
+        self.render(request)
+
+        # Check we get the results we expect -- one search result, of the sent
+        # messages
+        self.assertEqual(channel.code, 200)
+        results = channel.json_body["search_categories"]["room_events"]
+        self.assertEqual(results["count"], 1)
+        self.assertEqual(results["results"][0]["result"]["content"]["body"], "Hi!")
+
+        # No context was requested, so we should get none.
+        self.assertEqual(results["results"][0]["context"], {})
+
+    def test_include_context(self):
+        """
+        When event_context includes include_profile, profile information will be
+        included in the search response.
+        """
+        # The other user sends some messages
+        self.helper.send(self.room, body="Hi!", tok=self.other_access_token)
+        self.helper.send(self.room, body="There!", tok=self.other_access_token)
+
+        request, channel = self.make_request(
+            "POST",
+            "/search?access_token=%s" % (self.access_token,),
+            {
+                "search_categories": {
+                    "room_events": {
+                        "keys": ["content.body"],
+                        "search_term": "Hi",
+                        "event_context": {"include_profile": True},
+                    }
+                }
+            },
+        )
+        self.render(request)
+
+        # Check we get the results we expect -- one search result, of the sent
+        # messages
+        self.assertEqual(channel.code, 200)
+        results = channel.json_body["search_categories"]["room_events"]
+        self.assertEqual(results["count"], 1)
+        self.assertEqual(results["results"][0]["result"]["content"]["body"], "Hi!")
+
+        # We should get context info, like the two users, and the display names.
+        context = results["results"][0]["context"]
+        self.assertEqual(len(context["profile_info"].keys()), 2)
+        self.assertEqual(
+            context["profile_info"][self.other_user_id]["displayname"], "otheruser"
+        )

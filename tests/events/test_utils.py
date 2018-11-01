@@ -156,7 +156,7 @@ class SerializeEventTestCase(unittest.TestCase):
                     room_id="!foo:bar",
                     content={"key.with.dots": {}},
                 ),
-                ["content.key\.with\.dots"],
+                [r"content.key\.with\.dots"],
             ),
             {"content": {"key.with.dots": {}}},
         )
@@ -172,7 +172,7 @@ class SerializeEventTestCase(unittest.TestCase):
                         "nested.dot.key": {"leaf.key": 42, "not_me_either": 1},
                     },
                 ),
-                ["content.nested\.dot\.key.leaf\.key"],
+                [r"content.nested\.dot\.key.leaf\.key"],
             ),
             {"content": {"nested.dot.key": {"leaf.key": 42}}},
         )
