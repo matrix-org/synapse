@@ -1,0 +1,1 @@
+Synapse will no longer fetch keys using the fallback deprecated v1 key exchange method and will now always use v2.
