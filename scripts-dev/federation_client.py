@@ -18,21 +18,21 @@
 from __future__ import print_function
 
 import argparse
+import base64
+import json
+import sys
 from urlparse import urlparse, urlunparse
 
 import nacl.signing
-import json
-import base64
 import requests
-import sys
-
-from requests.adapters import HTTPAdapter
 import srvlookup
 import yaml
+from requests.adapters import HTTPAdapter
 
 # uncomment the following to enable debug logging of http requests
-#from httplib import HTTPConnection
-#HTTPConnection.debuglevel = 1
+# from httplib import HTTPConnection
+# HTTPConnection.debuglevel = 1
+
 
 def encode_base64(input_bytes):
     """Encode bytes as a base64 string without any padding."""
@@ -58,15 +58,15 @@ def decode_base64(input_string):
 
 def encode_canonical_json(value):
     return json.dumps(
-         value,
-         # Encode code-points outside of ASCII as UTF-8 rather than \u escapes
-         ensure_ascii=False,
-         # Remove unecessary white space.
-         separators=(',',':'),
-         # Sort the keys of dictionaries.
-         sort_keys=True,
-         # Encode the resulting unicode as UTF-8 bytes.
-     ).encode("UTF-8")
+        value,
+        # Encode code-points outside of ASCII as UTF-8 rather than \u escapes
+        ensure_ascii=False,
+        # Remove unecessary white space.
+        separators=(',', ':'),
+        # Sort the keys of dictionaries.
+        sort_keys=True,
+        # Encode the resulting unicode as UTF-8 bytes.
+    ).encode("UTF-8")
 
 
 def sign_json(json_object, signing_key, signing_name):
@@ -87,6 +87,7 @@ def sign_json(json_object, signing_key, signing_name):
 
 
 NACL_ED25519 = "ed25519"
+
 
 def decode_signing_key_base64(algorithm, version, key_base64):
     """Decode a base64 encoded signing key
@@ -143,14 +144,12 @@ def request_json(method, origin_name, origin_key, destination, path, content):
     authorization_headers = []
 
     for key, sig in signed_json["signatures"][origin_name].items():
-        header = "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (
-            origin_name, key, sig,
-        )
+        header = "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (origin_name, key, sig)
         authorization_headers.append(bytes(header))
-        print ("Authorization: %s" % header, file=sys.stderr)
+        print("Authorization: %s" % header, file=sys.stderr)
 
     dest = "matrix://%s%s" % (destination, path)
-    print ("Requesting %s" % dest, file=sys.stderr)
+    print("Requesting %s" % dest, file=sys.stderr)
 
     s = requests.Session()
     s.mount("matrix://", MatrixConnectionAdapter())
@@ -158,10 +157,7 @@ def request_json(method, origin_name, origin_key, destination, path, content):
     result = s.request(
         method=method,
         url=dest,
-        headers={
-            "Host": destination,
-            "Authorization": authorization_headers[0]
-        },
+        headers={"Host": destination, "Authorization": authorization_headers[0]},
         verify=False,
         data=content,
     )
@@ -171,50 +167,50 @@ def request_json(method, origin_name, origin_key, destination, path, content):
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-            "Signs and sends a federation request to a matrix homeserver",
+        description="Signs and sends a federation request to a matrix homeserver"
     )
 
     parser.add_argument(
-        "-N", "--server-name",
+        "-N",
+        "--server-name",
         help="Name to give as the local homeserver. If unspecified, will be "
-             "read from the config file.",
+        "read from the config file.",
     )
 
     parser.add_argument(
-        "-k", "--signing-key-path",
+        "-k",
+        "--signing-key-path",
         help="Path to the file containing the private ed25519 key to sign the "
-             "request with.",
+        "request with.",
     )
 
     parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         default="homeserver.yaml",
         help="Path to server config file. Ignored if --server-name and "
-             "--signing-key-path are both given.",
+        "--signing-key-path are both given.",
     )
 
     parser.add_argument(
-        "-d", "--destination",
+        "-d",
+        "--destination",
         default="matrix.org",
         help="name of the remote homeserver. We will do SRV lookups and "
-             "connect appropriately.",
+        "connect appropriately.",
     )
 
     parser.add_argument(
-        "-X", "--method",
+        "-X",
+        "--method",
         help="HTTP method to use for the request. Defaults to GET if --data is"
-             "unspecified, POST if it is."
+        "unspecified, POST if it is.",
     )
 
-    parser.add_argument(
-        "--body",
-        help="Data to send as the body of the HTTP request"
-    )
+    parser.add_argument("--body", help="Data to send as the body of the HTTP request")
 
     parser.add_argument(
-        "path",
-        help="request path. We will add '/_matrix/federation/v1/' to this."
+        "path", help="request path. We will add '/_matrix/federation/v1/' to this."
     )
 
     args = parser.parse_args()
@@ -227,13 +223,15 @@ def main():
 
     result = request_json(
         args.method,
-        args.server_name, key, args.destination,
+        args.server_name,
+        key,
+        args.destination,
         "/_matrix/federation/v1/" + args.path,
         content=args.body,
     )
 
     json.dump(result, sys.stdout)
-    print ("")
+    print("")
 
 
 def read_args_from_config(args):
@@ -253,7 +251,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
             return s, 8448
 
         if ":" in s:
-            out = s.rsplit(":",1)
+            out = s.rsplit(":", 1)
             try:
                 port = int(out[1])
             except ValueError:
@@ -263,7 +261,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
         try:
             srv = srvlookup.lookup("matrix", "tcp", s)[0]
             return srv.host, srv.port
-        except:
+        except Exception:
             return s, 8448
 
     def get_connection(self, url, proxies=None):
@@ -272,10 +270,9 @@ class MatrixConnectionAdapter(HTTPAdapter):
         (host, port) = self.lookup(parsed.netloc)
         netloc = "%s:%d" % (host, port)
         print("Connecting to %s" % (netloc,), file=sys.stderr)
-        url = urlunparse((
-            "https", netloc, parsed.path, parsed.params, parsed.query,
-            parsed.fragment,
-        ))
+        url = urlunparse(
+            ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
+        )
         return super(MatrixConnectionAdapter, self).get_connection(url, proxies)
 
 

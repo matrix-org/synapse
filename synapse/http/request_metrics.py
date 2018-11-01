@@ -39,7 +39,8 @@ outgoing_responses_counter = Counter(
 )
 
 response_timer = Histogram(
-    "synapse_http_server_response_time_seconds", "sec",
+    "synapse_http_server_response_time_seconds",
+    "sec",
     ["method", "servlet", "tag", "code"],
 )
 
@@ -79,15 +80,11 @@ response_size = Counter(
 # than when the response was written.
 
 in_flight_requests_ru_utime = Counter(
-    "synapse_http_server_in_flight_requests_ru_utime_seconds",
-    "",
-    ["method", "servlet"],
+    "synapse_http_server_in_flight_requests_ru_utime_seconds", "", ["method", "servlet"]
 )
 
 in_flight_requests_ru_stime = Counter(
-    "synapse_http_server_in_flight_requests_ru_stime_seconds",
-    "",
-    ["method", "servlet"],
+    "synapse_http_server_in_flight_requests_ru_stime_seconds", "", ["method", "servlet"]
 )
 
 in_flight_requests_db_txn_count = Counter(
@@ -134,7 +131,7 @@ def _get_in_flight_counts():
     # type
     counts = {}
     for rm in reqs:
-        key = (rm.method, rm.name,)
+        key = (rm.method, rm.name)
         counts[key] = counts.get(key, 0) + 1
 
     return counts
@@ -175,7 +172,8 @@ class RequestMetrics(object):
             if context != self.start_context:
                 logger.warn(
                     "Context have unexpectedly changed %r, %r",
-                    context, self.start_context
+                    context,
+                    self.start_context,
                 )
                 return
 
@@ -192,10 +190,10 @@ class RequestMetrics(object):
         resource_usage = context.get_resource_usage()
 
         response_ru_utime.labels(self.method, self.name, tag).inc(
-            resource_usage.ru_utime,
+            resource_usage.ru_utime
         )
         response_ru_stime.labels(self.method, self.name, tag).inc(
-            resource_usage.ru_stime,
+            resource_usage.ru_stime
         )
         response_db_txn_count.labels(self.method, self.name, tag).inc(
             resource_usage.db_txn_count
@@ -222,8 +220,15 @@ class RequestMetrics(object):
         diff = new_stats - self._request_stats
         self._request_stats = new_stats
 
-        in_flight_requests_ru_utime.labels(self.method, self.name).inc(diff.ru_utime)
-        in_flight_requests_ru_stime.labels(self.method, self.name).inc(diff.ru_stime)
+        # max() is used since rapid use of ru_stime/ru_utime can end up with the
+        # count going backwards due to NTP, time smearing, fine-grained
+        # correction, or floating points. Who knows, really?
+        in_flight_requests_ru_utime.labels(self.method, self.name).inc(
+            max(diff.ru_utime, 0)
+        )
+        in_flight_requests_ru_stime.labels(self.method, self.name).inc(
+            max(diff.ru_stime, 0)
+        )
 
         in_flight_requests_db_txn_count.labels(self.method, self.name).inc(
             diff.db_txn_count

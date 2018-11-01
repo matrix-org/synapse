@@ -225,7 +225,7 @@ class TestMauLimit(unittest.TestCase):
 
     def do_sync_for_user(self, token):
         request, channel = make_request(
-            "GET", "/sync", access_token=token.encode('ascii')
+            "GET", "/sync", access_token=token
         )
         render(request, self.resource, self.reactor)
 

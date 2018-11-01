@@ -125,7 +125,9 @@ def make_request(method, path, content=b"", access_token=None, request=SynapseRe
     req.content = BytesIO(content)
 
     if access_token:
-        req.requestHeaders.addRawHeader(b"Authorization", b"Bearer " + access_token)
+        req.requestHeaders.addRawHeader(
+            b"Authorization", b"Bearer " + access_token.encode('ascii')
+        )
 
     if content:
         req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")

@@ -4,7 +4,6 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
-from synapse.handlers.auth import AuthHandler
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
@@ -13,17 +12,10 @@ from tests import unittest
 from tests.utils import setup_test_homeserver
 
 
-class AuthHandlers(object):
-    def __init__(self, hs):
-        self.auth_handler = AuthHandler(hs)
-
-
 class TestResourceLimitsServerNotices(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup, handlers=None)
-        self.hs.handlers = AuthHandlers(self.hs)
-        self.auth_handler = self.hs.handlers.auth_handler
+        self.hs = yield setup_test_homeserver(self.addCleanup)
         self.server_notices_sender = self.hs.get_server_notices_sender()
 
         # relying on [1] is far from ideal, but the only case where

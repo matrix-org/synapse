@@ -124,6 +124,7 @@ def default_config(name):
     config.user_consent_server_notice_content = None
     config.block_events_without_consent_error = None
     config.media_storage_providers = []
+    config.autocreate_auto_join_rooms = True
     config.auto_join_rooms = []
     config.limit_usage_by_mau = False
     config.hs_disabled = False
