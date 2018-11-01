@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import re
 
 import six
 from six import iteritems
@@ -44,6 +43,7 @@ from synapse.replication.http.federation import (
     ReplicationGetQueryRestServlet,
 )
 from synapse.types import get_domain_from_id
+from synapse.util import glob_to_regex
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logcontext import nested_logging_context
@@ -324,11 +324,6 @@ class FederationServer(FederationBase):
             defer.returnValue((404, ""))
 
     @defer.inlineCallbacks
-    @log_function
-    def on_pull_request(self, origin, versions):
-        raise NotImplementedError("Pull transactions not implemented")
-
-    @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
         received_queries_counter.labels(query_type).inc()
         resp = yield self.registry.on_query(query_type, args)
@@ -507,19 +502,19 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def on_get_missing_events(self, origin, room_id, earliest_events,
-                              latest_events, limit, min_depth):
+                              latest_events, limit):
         with (yield self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)
             yield self.check_server_matches_acl(origin_host, room_id)
 
             logger.info(
                 "on_get_missing_events: earliest_events: %r, latest_events: %r,"
-                " limit: %d, min_depth: %d",
-                earliest_events, latest_events, limit, min_depth
+                " limit: %d",
+                earliest_events, latest_events, limit,
             )
 
             missing_events = yield self.handler.on_get_missing_events(
-                origin, room_id, earliest_events, latest_events, limit, min_depth
+                origin, room_id, earliest_events, latest_events, limit,
             )
 
             if len(missing_events) < 5:
@@ -729,20 +724,8 @@ def _acl_entry_matches(server_name, acl_entry):
     if not isinstance(acl_entry, six.string_types):
         logger.warn("Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry))
         return False
-    regex = _glob_to_regex(acl_entry)
+    regex = glob_to_regex(acl_entry)
     return regex.match(server_name)
-
-
-def _glob_to_regex(glob):
-    res = ''
-    for c in glob:
-        if c == '*':
-            res = res + '.*'
-        elif c == '?':
-            res = res + '.'
-        else:
-            res = res + re.escape(c)
-    return re.compile(res + "\\Z", re.IGNORECASE)
 
 
 class FederationHandlerRegistry(object):
@@ -800,7 +783,7 @@ class FederationHandlerRegistry(object):
             yield handler(origin, content)
         except SynapseError as e:
             logger.info("Failed to handle edu %r: %r", edu_type, e)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to handle edu %r", edu_type)
 
     def on_query(self, query_type, args):

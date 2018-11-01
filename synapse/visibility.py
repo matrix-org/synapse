@@ -23,6 +23,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.utils import prune_event
+from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
     )
     event_id_to_state = yield store.get_state_for_events(
         frozenset(e.event_id for e in events),
-        types=types,
+        state_filter=StateFilter.from_types(types),
     )
 
     ignore_dict_content = yield store.get_global_account_data_by_type_for_user(
@@ -273,8 +274,8 @@ def filter_events_for_server(store, server_name, events):
     # need to check membership (as we know the server is in the room).
     event_to_state_ids = yield store.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
-        types=(
-            (EventTypes.RoomHistoryVisibility, ""),
+        state_filter=StateFilter.from_types(
+            types=((EventTypes.RoomHistoryVisibility, ""),),
         )
     )
 
@@ -314,9 +315,11 @@ def filter_events_for_server(store, server_name, events):
     # of the history vis and membership state at those events.
     event_to_state_ids = yield store.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
-        types=(
-            (EventTypes.RoomHistoryVisibility, ""),
-            (EventTypes.Member, None),
+        state_filter=StateFilter.from_types(
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, None),
+            ),
         )
     )
 

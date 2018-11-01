@@ -22,9 +22,8 @@ from prometheus_client import Counter
 from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
-from synapse.util.logcontext import LoggingContext
-from synapse.util.metrics import Measure
 
 from . import push_rule_evaluator, push_tools
 
@@ -61,7 +60,7 @@ class HttpPusher(object):
         self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
         self.failing_since = pusherdict['failing_since']
         self.timed_call = None
-        self.processing = False
+        self._is_processing = False
 
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
@@ -92,34 +91,27 @@ class HttpPusher(object):
         self.data_minus_url.update(self.data)
         del self.data_minus_url['url']
 
-    @defer.inlineCallbacks
     def on_started(self):
-        try:
-            yield self._process()
-        except Exception:
-            logger.exception("Error starting http pusher")
+        self._start_processing()
 
-    @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
         self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering or 0)
-        yield self._process()
+        self._start_processing()
 
-    @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id):
         # Note that the min here shouldn't be relied upon to be accurate.
 
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
-        with LoggingContext("push.on_new_receipts"):
-            with Measure(self.clock, "push.on_new_receipts"):
-                badge = yield push_tools.get_badge_count(
-                    self.hs.get_datastore(), self.user_id
-                )
-            yield self._send_badge(badge)
+        run_as_background_process("http_pusher.on_new_receipts", self._update_badge)
 
     @defer.inlineCallbacks
+    def _update_badge(self):
+        badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        yield self._send_badge(badge)
+
     def on_timer(self):
-        yield self._process()
+        self._start_processing()
 
     def on_stop(self):
         if self.timed_call:
@@ -129,27 +121,31 @@ class HttpPusher(object):
                 pass
             self.timed_call = None
 
-    @defer.inlineCallbacks
-    def _process(self):
-        if self.processing:
+    def _start_processing(self):
+        if self._is_processing:
             return
 
-        with LoggingContext("push._process"):
-            with Measure(self.clock, "push._process"):
+        run_as_background_process("httppush.process", self._process)
+
+    @defer.inlineCallbacks
+    def _process(self):
+        # we should never get here if we are already processing
+        assert not self._is_processing
+
+        try:
+            self._is_processing = True
+            # if the max ordering changes while we're running _unsafe_process,
+            # call it again, and so on until we've caught up.
+            while True:
+                starting_max_ordering = self.max_stream_ordering
                 try:
-                    self.processing = True
-                    # if the max ordering changes while we're running _unsafe_process,
-                    # call it again, and so on until we've caught up.
-                    while True:
-                        starting_max_ordering = self.max_stream_ordering
-                        try:
-                            yield self._unsafe_process()
-                        except Exception:
-                            logger.exception("Exception processing notifs")
-                        if self.max_stream_ordering == starting_max_ordering:
-                            break
-                finally:
-                    self.processing = False
+                    yield self._unsafe_process()
+                except Exception:
+                    logger.exception("Exception processing notifs")
+                if self.max_stream_ordering == starting_max_ordering:
+                    break
+        finally:
+            self._is_processing = False
 
     @defer.inlineCallbacks
     def _unsafe_process(self):

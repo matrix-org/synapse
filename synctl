@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +49,16 @@ def pid_running(pid):
 
 
 def write(message, colour=NORMAL, stream=sys.stdout):
-    if colour == NORMAL:
+    # Lets check if we're writing to a TTY before colouring
+    should_colour = False
+    try:
+        should_colour = stream.isatty()
+    except AttributeError:
+        # Just in case `isatty` isn't defined on everything. The python
+        # docs are incredibly vague.
+        pass
+
+    if not should_colour:
         stream.write(message + "\n")
     else:
         stream.write(colour + message + NORMAL + "\n")
@@ -66,8 +76,7 @@ def start(configfile):
 
     try:
         subprocess.check_call(args)
-        write("started synapse.app.homeserver(%r)" %
-              (configfile,), colour=GREEN)
+        write("started synapse.app.homeserver(%r)" % (configfile,), colour=GREEN)
     except subprocess.CalledProcessError as e:
         write(
             "error starting (exit code: %d); see above for logs" % e.returncode,
@@ -76,21 +85,15 @@ def start(configfile):
 
 
 def start_worker(app, configfile, worker_configfile):
-    args = [
-        "python", "-B",
-        "-m", app,
-        "-c", configfile,
-        "-c", worker_configfile
-    ]
+    args = [sys.executable, "-B", "-m", app, "-c", configfile, "-c", worker_configfile]
 
     try:
         subprocess.check_call(args)
         write("started %s(%r)" % (app, worker_configfile), colour=GREEN)
     except subprocess.CalledProcessError as e:
         write(
-            "error starting %s(%r) (exit code: %d); see above for logs" % (
-                app, worker_configfile, e.returncode,
-            ),
+            "error starting %s(%r) (exit code: %d); see above for logs"
+            % (app, worker_configfile, e.returncode),
             colour=RED,
         )
 
@@ -110,9 +113,9 @@ def stop(pidfile, app):
                 abort("Cannot stop %s: Unknown error" % (app,))
 
 
-Worker = collections.namedtuple("Worker", [
-    "app", "configfile", "pidfile", "cache_factor", "cache_factors",
-])
+Worker = collections.namedtuple(
+    "Worker", ["app", "configfile", "pidfile", "cache_factor", "cache_factors"]
+)
 
 
 def main():
@@ -131,24 +134,20 @@ def main():
         help="the homeserver config file, defaults to homeserver.yaml",
     )
     parser.add_argument(
-        "-w", "--worker",
-        metavar="WORKERCONFIG",
-        help="start or stop a single worker",
+        "-w", "--worker", metavar="WORKERCONFIG", help="start or stop a single worker"
     )
     parser.add_argument(
-        "-a", "--all-processes",
+        "-a",
+        "--all-processes",
         metavar="WORKERCONFIGDIR",
         help="start or stop all the workers in the given directory"
-             " and the main synapse process",
+        " and the main synapse process",
     )
 
     options = parser.parse_args()
 
     if options.worker and options.all_processes:
-        write(
-            'Cannot use "--worker" with "--all-processes"',
-            stream=sys.stderr
-        )
+        write('Cannot use "--worker" with "--all-processes"', stream=sys.stderr)
         sys.exit(1)
 
     configfile = options.configfile
@@ -157,9 +156,7 @@ def main():
         write(
             "No config file found\n"
             "To generate a config file, run '%s -c %s --generate-config"
-            " --server-name=<server name>'\n" % (
-                " ".join(SYNAPSE), options.configfile
-            ),
+            " --server-name=<server name>'\n" % (" ".join(SYNAPSE), options.configfile),
             stream=sys.stderr,
         )
         sys.exit(1)
@@ -184,8 +181,7 @@ def main():
         worker_configfile = options.worker
         if not os.path.exists(worker_configfile):
             write(
-                "No worker config found at %r" % (worker_configfile,),
-                stream=sys.stderr,
+                "No worker config found at %r" % (worker_configfile,), stream=sys.stderr
             )
             sys.exit(1)
         worker_configfiles.append(worker_configfile)
@@ -201,9 +197,9 @@ def main():
                 stream=sys.stderr,
             )
             sys.exit(1)
-        worker_configfiles.extend(sorted(glob.glob(
-            os.path.join(worker_configdir, "*.yaml")
-        )))
+        worker_configfiles.extend(
+            sorted(glob.glob(os.path.join(worker_configdir, "*.yaml")))
+        )
 
     workers = []
     for worker_configfile in worker_configfiles:
@@ -213,14 +209,12 @@ def main():
         if worker_app == "synapse.app.homeserver":
             # We need to special case all of this to pick up options that may
             # be set in the main config file or in this worker config file.
-            worker_pidfile = (
-                worker_config.get("pid_file")
-                or pidfile
+            worker_pidfile = worker_config.get("pid_file") or pidfile
+            worker_cache_factor = (
+                worker_config.get("synctl_cache_factor") or cache_factor
             )
-            worker_cache_factor = worker_config.get("synctl_cache_factor") or cache_factor
             worker_cache_factors = (
-                worker_config.get("synctl_cache_factors")
-                or cache_factors
+                worker_config.get("synctl_cache_factors") or cache_factors
             )
             daemonize = worker_config.get("daemonize") or config.get("daemonize")
             assert daemonize, "Main process must have daemonize set to true"
@@ -229,19 +223,27 @@ def main():
             for key in worker_config:
                 if key == "worker_app":  # But we allow worker_app
                     continue
-                assert not key.startswith("worker_"), \
-                    "Main process cannot use worker_* config"
+                assert not key.startswith(
+                    "worker_"
+                ), "Main process cannot use worker_* config"
         else:
             worker_pidfile = worker_config["worker_pid_file"]
             worker_daemonize = worker_config["worker_daemonize"]
             assert worker_daemonize, "In config %r: expected '%s' to be True" % (
-                worker_configfile, "worker_daemonize")
+                worker_configfile,
+                "worker_daemonize",
+            )
             worker_cache_factor = worker_config.get("synctl_cache_factor")
             worker_cache_factors = worker_config.get("synctl_cache_factors", {})
-        workers.append(Worker(
-            worker_app, worker_configfile, worker_pidfile, worker_cache_factor,
-            worker_cache_factors,
-        ))
+        workers.append(
+            Worker(
+                worker_app,
+                worker_configfile,
+                worker_pidfile,
+                worker_cache_factor,
+                worker_cache_factors,
+            )
+        )
 
     action = options.action
 
