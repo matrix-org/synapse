@@ -208,12 +208,21 @@ class RoomKeysServlet(RestServlet):
             user_id, version, room_id, session_id
         )
 
+        # Convert room_keys to the right format to return.
         if session_id:
+            # If the client requests a specific session, but that session was
+            # not backed up, then return an M_NOT_FOUND.
             if room_keys['rooms'] == {}:
                 raise NotFoundError("No room_keys found")
             else:
                 room_keys = room_keys['rooms'][room_id]['sessions'][session_id]
         elif room_id:
+            # If the client requests all sessions from a room, but no sessions
+            # are found, then return an empty result rather than an error, so
+            # that clients don't have to handle an error condition, and an
+            # empty result is valid.  (Similarly if the client requests all
+            # sessions from the backup, but in that case, room_keys is already
+            # in the right format, so we don't need to do anything about it.)
             if room_keys['rooms'] == {}:
                 room_keys = {'sessions': {}}
             else:
