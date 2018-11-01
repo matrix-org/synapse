@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
@@ -210,7 +210,7 @@ class RoomKeysServlet(RestServlet):
 
         if session_id:
             if room_keys['rooms'] == {}:
-                raise SynapseError(404, "No room_keys found", Codes.NOT_FOUND)
+                raise NotFoundError("No room_keys found")
             else:
                 room_keys = room_keys['rooms'][room_id]['sessions'][session_id]
         elif room_id:
