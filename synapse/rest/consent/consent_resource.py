@@ -141,7 +141,7 @@ class ConsentResource(Resource):
         username = parse_string(request, "u", required=False, default="")
         userhmac = None
         has_consented = False
-        public_version = username != ""
+        public_version = username == ""
         if not public_version:
             userhmac = parse_string(request, "h", required=True, encoding=None)
 
