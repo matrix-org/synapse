@@ -15,8 +15,6 @@
 
 import os
 
-import pkg_resources
-
 from synapse.api.urls import ConsentURIBuilder
 from synapse.rest.client.v1 import admin, login, room
 from synapse.rest.consent import consent_resource
@@ -84,7 +82,7 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Get the version from the body
-        version = channel.result["body"]
+        version = channel.result["body"].decode('ascii')
 
         # POST to the consent page, saying we've agreed
         request, channel = self.make_request(
