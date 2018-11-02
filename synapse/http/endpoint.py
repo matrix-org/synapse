@@ -108,7 +108,7 @@ def matrix_federation_endpoint(reactor, destination, tls_client_options_factory=
 
     Args:
         reactor: Twisted reactor.
-        destination (bytes): The name of the server to connect to.
+        destination (unicode): The name of the server to connect to.
         tls_client_options_factory
             (synapse.crypto.context_factory.ClientTLSOptionsFactory):
             Factory which generates TLS options for client connections.
@@ -126,10 +126,17 @@ def matrix_federation_endpoint(reactor, destination, tls_client_options_factory=
         transport_endpoint = HostnameEndpoint
         default_port = 8008
     else:
+        # the SNI string should be the same as the Host header, minus the port.
+        # as per https://github.com/matrix-org/synapse/issues/2525#issuecomment-336896777,
+        # the Host header and SNI should therefore be the server_name of the remote
+        # server.
+        tls_options = tls_client_options_factory.get_options(domain)
+
         def transport_endpoint(reactor, host, port, timeout):
             return wrapClientTLS(
-                tls_client_options_factory.get_options(host),
-                HostnameEndpoint(reactor, host, port, timeout=timeout))
+                tls_options,
+                HostnameEndpoint(reactor, host, port, timeout=timeout),
+            )
         default_port = 8448
 
     if port is None:

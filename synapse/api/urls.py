@@ -28,7 +28,6 @@ FEDERATION_PREFIX = "/_matrix/federation/v1"
 STATIC_PREFIX = "/_matrix/static"
 WEB_CLIENT_PREFIX = "/_matrix/client"
 CONTENT_REPO_PREFIX = "/_matrix/content"
-SERVER_KEY_PREFIX = "/_matrix/key/v1"
 SERVER_KEY_V2_PREFIX = "/_matrix/key/v2"
 MEDIA_PREFIX = "/_matrix/media/r0"
 LEGACY_MEDIA_PREFIX = "/_matrix/media/v1"
@@ -64,7 +63,7 @@ class ConsentURIBuilder(object):
         """
         mac = hmac.new(
             key=self._hmac_secret,
-            msg=user_id,
+            msg=user_id.encode('ascii'),
             digestmod=sha256,
         ).hexdigest()
         consent_uri = "%s_matrix/consent?%s" % (

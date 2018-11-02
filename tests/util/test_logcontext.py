@@ -159,6 +159,11 @@ class LoggingContextTestCase(unittest.TestCase):
             self.assertEqual(r, "bum")
             self._check_test_key("one")
 
+    def test_nested_logging_context(self):
+        with LoggingContext(request="foo"):
+            nested_context = logcontext.nested_logging_context(suffix="bar")
+            self.assertEqual(nested_context.request, "foo-bar")
+
 
 # a function which returns a deferred which has been "called", but
 # which had a function which returned another incomplete deferred on

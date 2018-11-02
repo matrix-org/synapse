@@ -362,14 +362,6 @@ class FederationSendServlet(BaseFederationServlet):
         defer.returnValue((code, response))
 
 
-class FederationPullServlet(BaseFederationServlet):
-    PATH = "/pull/"
-
-    # This is for when someone asks us for everything since version X
-    def on_GET(self, origin, content, query):
-        return self.handler.on_pull_request(query["origin"][0], query["v"])
-
-
 class FederationEventServlet(BaseFederationServlet):
     PATH = "/event/(?P<event_id>[^/]*)/"
 
@@ -560,7 +552,6 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, room_id):
         limit = int(content.get("limit", 10))
-        min_depth = int(content.get("min_depth", 0))
         earliest_events = content.get("earliest_events", [])
         latest_events = content.get("latest_events", [])
 
@@ -569,7 +560,6 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
             room_id=room_id,
             earliest_events=earliest_events,
             latest_events=latest_events,
-            min_depth=min_depth,
             limit=limit,
         )
 
@@ -1263,7 +1253,6 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
 
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
-    FederationPullServlet,
     FederationEventServlet,
     FederationStateServlet,
     FederationStateIdsServlet,

@@ -43,7 +43,7 @@ from twisted.web.http_headers import Headers
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import cancelled_to_request_timed_out_error, redact_uri
 from synapse.http.endpoint import SpiderEndpoint
-from synapse.util.async_helpers import add_timeout_to_deferred
+from synapse.util.async_helpers import timeout_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
 
@@ -99,7 +99,7 @@ class SimpleHttpClient(object):
             request_deferred = treq.request(
                 method, uri, agent=self.agent, data=data, headers=headers
             )
-            add_timeout_to_deferred(
+            request_deferred = timeout_deferred(
                 request_deferred, 60, self.hs.get_reactor(),
                 cancelled_to_request_timed_out_error,
             )

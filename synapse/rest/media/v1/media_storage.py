@@ -21,9 +21,10 @@ import sys
 
 import six
 
-from twisted.internet import defer, threads
+from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
+from synapse.util import logcontext
 from synapse.util.file_consumer import BackgroundFileConsumer
 from synapse.util.logcontext import make_deferred_yieldable
 
@@ -64,9 +65,10 @@ class MediaStorage(object):
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
             # Write to the main repository
-            yield make_deferred_yieldable(threads.deferToThread(
+            yield logcontext.defer_to_thread(
+                self.hs.get_reactor(),
                 _write_file_synchronously, source, f,
-            ))
+            )
             yield finish_cb()
 
         defer.returnValue(fname)

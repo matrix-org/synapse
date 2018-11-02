@@ -98,9 +98,9 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
     creation_event = auth_events.get((EventTypes.Create, ""), None)
 
     if not creation_event:
-        raise SynapseError(
+        raise AuthError(
             403,
-            "Room %r does not exist" % (event.room_id,)
+            "No create event in auth events",
         )
 
     creating_domain = get_domain_from_id(event.room_id)
@@ -155,10 +155,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
 
         if user_level < invite_level:
             raise AuthError(
-                403, (
-                    "You cannot issue a third party invite for %s." %
-                    (event.content.display_name,)
-                )
+                403, "You don't have permission to invite users",
             )
         else:
             logger.debug("Allowing! %s", event)
@@ -305,7 +302,7 @@ def _is_membership_change_allowed(event, auth_events):
 
             if user_level < invite_level:
                 raise AuthError(
-                    403, "You cannot invite user %s." % target_user_id
+                    403, "You don't have permission to invite users",
                 )
     elif Membership.JOIN == membership:
         # Joins are valid iff caller == target and they were:
@@ -693,7 +690,7 @@ def auth_types_for_event(event):
     auth_types = []
 
     auth_types.append((EventTypes.PowerLevels, "", ))
-    auth_types.append((EventTypes.Member, event.user_id, ))
+    auth_types.append((EventTypes.Member, event.sender, ))
     auth_types.append((EventTypes.Create, "", ))
 
     if event.type == EventTypes.Member:

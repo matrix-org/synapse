@@ -1,1 +1,0 @@
-Disable buffering and automatic retrying in treq requests to prevent timeouts.

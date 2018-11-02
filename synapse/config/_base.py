@@ -106,10 +106,7 @@ class Config(object):
     @classmethod
     def check_file(cls, file_path, config_name):
         if file_path is None:
-            raise ConfigError(
-                "Missing config for %s."
-                % (config_name,)
-            )
+            raise ConfigError("Missing config for %s." % (config_name,))
         try:
             os.stat(file_path)
         except OSError as e:
@@ -128,9 +125,7 @@ class Config(object):
             if e.errno != errno.EEXIST:
                 raise
         if not os.path.isdir(dir_path):
-            raise ConfigError(
-                "%s is not a directory" % (dir_path,)
-            )
+            raise ConfigError("%s is not a directory" % (dir_path,))
         return dir_path
 
     @classmethod
@@ -156,21 +151,20 @@ class Config(object):
         return results
 
     def generate_config(
-            self,
-            config_dir_path,
-            server_name,
-            is_generating_file,
-            report_stats=None,
+        self, config_dir_path, server_name, is_generating_file, report_stats=None
     ):
         default_config = "# vim:ft=yaml\n"
 
-        default_config += "\n\n".join(dedent(conf) for conf in self.invoke_all(
-            "default_config",
-            config_dir_path=config_dir_path,
-            server_name=server_name,
-            is_generating_file=is_generating_file,
-            report_stats=report_stats,
-        ))
+        default_config += "\n\n".join(
+            dedent(conf)
+            for conf in self.invoke_all(
+                "default_config",
+                config_dir_path=config_dir_path,
+                server_name=server_name,
+                is_generating_file=is_generating_file,
+                report_stats=report_stats,
+            )
+        )
 
         config = yaml.load(default_config)
 
@@ -178,23 +172,22 @@ class Config(object):
 
     @classmethod
     def load_config(cls, description, argv):
-        config_parser = argparse.ArgumentParser(
-            description=description,
-        )
+        config_parser = argparse.ArgumentParser(description=description)
         config_parser.add_argument(
-            "-c", "--config-path",
+            "-c",
+            "--config-path",
             action="append",
             metavar="CONFIG_FILE",
             help="Specify config file. Can be given multiple times and"
-                 " may specify directories containing *.yaml files."
+            " may specify directories containing *.yaml files.",
         )
 
         config_parser.add_argument(
             "--keys-directory",
             metavar="DIRECTORY",
             help="Where files such as certs and signing keys are stored when"
-                 " their location is given explicitly in the config."
-                 " Defaults to the directory containing the last config file",
+            " their location is given explicitly in the config."
+            " Defaults to the directory containing the last config file",
         )
 
         config_args = config_parser.parse_args(argv)
@@ -203,9 +196,7 @@ class Config(object):
 
         obj = cls()
         obj.read_config_files(
-            config_files,
-            keys_directory=config_args.keys_directory,
-            generate_keys=False,
+            config_files, keys_directory=config_args.keys_directory, generate_keys=False
         )
         return obj
 
@@ -213,38 +204,38 @@ class Config(object):
     def load_or_generate_config(cls, description, argv):
         config_parser = argparse.ArgumentParser(add_help=False)
         config_parser.add_argument(
-            "-c", "--config-path",
+            "-c",
+            "--config-path",
             action="append",
             metavar="CONFIG_FILE",
             help="Specify config file. Can be given multiple times and"
-                 " may specify directories containing *.yaml files."
+            " may specify directories containing *.yaml files.",
         )
         config_parser.add_argument(
             "--generate-config",
             action="store_true",
-            help="Generate a config file for the server name"
+            help="Generate a config file for the server name",
         )
         config_parser.add_argument(
             "--report-stats",
             action="store",
             help="Whether the generated config reports anonymized usage statistics",
-            choices=["yes", "no"]
+            choices=["yes", "no"],
         )
         config_parser.add_argument(
             "--generate-keys",
             action="store_true",
-            help="Generate any missing key files then exit"
+            help="Generate any missing key files then exit",
         )
         config_parser.add_argument(
             "--keys-directory",
             metavar="DIRECTORY",
             help="Used with 'generate-*' options to specify where files such as"
-                 " certs and signing keys should be stored in, unless explicitly"
-                 " specified in the config."
+            " certs and signing keys should be stored in, unless explicitly"
+            " specified in the config.",
         )
         config_parser.add_argument(
-            "-H", "--server-name",
-            help="The server name to generate a config file for"
+            "-H", "--server-name", help="The server name to generate a config file for"
         )
         config_args, remaining_args = config_parser.parse_known_args(argv)
 
@@ -257,8 +248,8 @@ class Config(object):
         if config_args.generate_config:
             if config_args.report_stats is None:
                 config_parser.error(
-                    "Please specify either --report-stats=yes or --report-stats=no\n\n" +
-                    MISSING_REPORT_STATS_SPIEL
+                    "Please specify either --report-stats=yes or --report-stats=no\n\n"
+                    + MISSING_REPORT_STATS_SPIEL
                 )
             if not config_files:
                 config_parser.error(
@@ -287,26 +278,32 @@ class Config(object):
                         config_dir_path=config_dir_path,
                         server_name=server_name,
                         report_stats=(config_args.report_stats == "yes"),
-                        is_generating_file=True
+                        is_generating_file=True,
                     )
                     obj.invoke_all("generate_files", config)
                     config_file.write(config_str)
-                print((
-                    "A config file has been generated in %r for server name"
-                    " %r with corresponding SSL keys and self-signed"
-                    " certificates. Please review this file and customise it"
-                    " to your needs."
-                ) % (config_path, server_name))
+                print(
+                    (
+                        "A config file has been generated in %r for server name"
+                        " %r with corresponding SSL keys and self-signed"
+                        " certificates. Please review this file and customise it"
+                        " to your needs."
+                    )
+                    % (config_path, server_name)
+                )
                 print(
                     "If this server name is incorrect, you will need to"
                     " regenerate the SSL certificates"
                 )
                 return
             else:
-                print((
-                    "Config file %r already exists. Generating any missing key"
-                    " files."
-                ) % (config_path,))
+                print(
+                    (
+                        "Config file %r already exists. Generating any missing key"
+                        " files."
+                    )
+                    % (config_path,)
+                )
                 generate_keys = True
 
         parser = argparse.ArgumentParser(
@@ -338,8 +335,7 @@ class Config(object):
 
         return obj
 
-    def read_config_files(self, config_files, keys_directory=None,
-                          generate_keys=False):
+    def read_config_files(self, config_files, keys_directory=None, generate_keys=False):
         if not keys_directory:
             keys_directory = os.path.dirname(config_files[-1])
 
@@ -364,8 +360,9 @@ class Config(object):
 
         if "report_stats" not in config:
             raise ConfigError(
-                MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS + "\n" +
-                MISSING_REPORT_STATS_SPIEL
+                MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS
+                + "\n"
+                + MISSING_REPORT_STATS_SPIEL
             )
 
         if generate_keys:
@@ -399,16 +396,16 @@ def find_config_files(search_paths):
                 for entry in os.listdir(config_path):
                     entry_path = os.path.join(config_path, entry)
                     if not os.path.isfile(entry_path):
-                        print (
-                            "Found subdirectory in config directory: %r. IGNORING."
-                        ) % (entry_path, )
+                        err = "Found subdirectory in config directory: %r. IGNORING."
+                        print(err % (entry_path,))
                         continue
 
                     if not entry.endswith(".yaml"):
-                        print (
-                            "Found file in config directory that does not"
-                            " end in '.yaml': %r. IGNORING."
-                        ) % (entry_path, )
+                        err = (
+                            "Found file in config directory that does not end in "
+                            "'.yaml': %r. IGNORING."
+                        )
+                        print(err % (entry_path,))
                         continue
 
                     files.append(entry_path)

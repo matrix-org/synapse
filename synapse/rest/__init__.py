@@ -46,6 +46,8 @@ from synapse.rest.client.v2_alpha import (
     receipts,
     register,
     report_event,
+    room_keys,
+    room_upgrade_rest_servlet,
     sendtodevice,
     sync,
     tags,
@@ -102,6 +104,7 @@ class ClientRestResource(JsonResource):
         auth.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
+        room_keys.register_servlets(hs, client_resource)
         keys.register_servlets(hs, client_resource)
         tokenrefresh.register_servlets(hs, client_resource)
         tags.register_servlets(hs, client_resource)
@@ -114,3 +117,4 @@ class ClientRestResource(JsonResource):
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
         groups.register_servlets(hs, client_resource)
+        room_upgrade_rest_servlet.register_servlets(hs, client_resource)

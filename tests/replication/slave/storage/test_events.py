@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from canonicaljson import encode_canonical_json
+
 from synapse.events import FrozenEvent, _EventInternalMetadata
 from synapse.events.snapshot import EventContext
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -26,7 +28,9 @@ ROOM_ID = "!room:blue"
 
 
 def dict_equals(self, other):
-    return self.__dict__ == other.__dict__
+    me = encode_canonical_json(self._event_dict)
+    them = encode_canonical_json(other._event_dict)
+    return me == them
 
 
 def patch__eq__(cls):

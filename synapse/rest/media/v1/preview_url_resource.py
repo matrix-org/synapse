@@ -79,7 +79,6 @@ class PreviewUrlResource(Resource):
             # don't spider URLs more often than once an hour
             expiry_ms=60 * 60 * 1000,
         )
-        self._cache.start()
 
         self._cleaner_loop = self.clock.looping_call(
             self._start_expire_url_cache_data, 10 * 1000,
@@ -597,10 +596,13 @@ def _iterate_over_text(tree, *tags_to_ignore):
     # to be returned.
     elements = iter([tree])
     while True:
-        el = next(elements)
+        el = next(elements, None)
+        if el is None:
+            return
+
         if isinstance(el, string_types):
             yield el
-        elif el is not None and el.tag not in tags_to_ignore:
+        elif el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately
             # return it if the text exists.
             if el.text:
@@ -672,7 +674,7 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
         # This splits the paragraph into words, but keeping the
         # (preceeding) whitespace intact so we can easily concat
         # words back together.
-        for match in re.finditer("\s*\S+", description):
+        for match in re.finditer(r"\s*\S+", description):
             word = match.group()
 
             # Keep adding words while the total length is less than

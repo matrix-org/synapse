@@ -52,6 +52,7 @@ class DownloadResource(Resource):
             b" script-src 'none';"
             b" plugin-types application/pdf;"
             b" style-src 'unsafe-inline';"
+            b" media-src 'self';"
             b" object-src 'self';"
         )
         server_name, media_id, name = parse_media_id(request)

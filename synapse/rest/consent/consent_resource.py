@@ -137,27 +137,31 @@ class ConsentResource(Resource):
             request (twisted.web.http.Request):
         """
 
-        version = parse_string(request, "v",
-                               default=self._default_consent_version)
-        username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True, encoding=None)
+        version = parse_string(request, "v", default=self._default_consent_version)
+        username = parse_string(request, "u", required=False, default="")
+        userhmac = None
+        has_consented = False
+        public_version = username == ""
+        if not public_version:
+            userhmac = parse_string(request, "h", required=True, encoding=None)
 
-        self._check_hash(username, userhmac)
+            self._check_hash(username, userhmac)
 
-        if username.startswith('@'):
-            qualified_user_id = username
-        else:
-            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+            if username.startswith('@'):
+                qualified_user_id = username
+            else:
+                qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
-        u = yield self.store.get_user_by_id(qualified_user_id)
-        if u is None:
-            raise NotFoundError("Unknown user")
+            u = yield self.store.get_user_by_id(qualified_user_id)
+            if u is None:
+                raise NotFoundError("Unknown user")
+            has_consented = u["consent_version"] == version
 
         try:
             self._render_template(
                 request, "%s.html" % (version,),
                 user=username, userhmac=userhmac, version=version,
-                has_consented=(u["consent_version"] == version),
+                has_consented=has_consented, public_version=public_version,
             )
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")
