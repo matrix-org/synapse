@@ -228,7 +228,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.pump()
         self.assertEqual(self.get_success(count), 0)
         self.store.upsert_monthly_active_user(
-            self.hs.config.support_user
+            self.hs.config.support_user_id
         )
         count = self.store.get_monthly_active_count()
         self.pump()

@@ -64,6 +64,7 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore, are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
 from synapse.storage.prepare_database import UpgradeDatabaseException, prepare_database
+from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
@@ -553,19 +554,25 @@ def run(hs):
         clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
-    if hs.config.autocreate_support_user:
-        localpart = hs.config.autocreate_support_user['localpart']
-        password = hs.config.autocreate_support_user['password']
-        user_id = UserID(localpart, hs.hostname).to_string()
-        # check not already created
-        support_user = yield hs.get_datastore().get_users_by_id_case_insensitive(user_id)
-        # if not create
-        if not support_user:
-            registration_handler = hs.get_handlers().registration_handler
-            (user_id, token) = yield registration_handler.register(
-                localpart=localpart,
-                password=password,
+    @defer.inlineCallbacks
+    def create_support_user():
+        if hs.config.support_user_id:
+            # check not already created
+            support_user = yield hs.get_datastore().get_users_by_id_case_insensitive(
+                hs.config.support_user_id
             )
+            # if not create
+            localpart = UserID.from_string(hs.config.support_user_id)
+            if not support_user:
+                registration_handler = hs.get_handlers().registration_handler
+                (user_id, token) = yield registration_handler.register(
+                    localpart=UserID.from_string(hs.config.support_user_id).localpart,
+                    password=hs.config.support_user_pass,
+                )
+    run_as_background_process(
+        "create_support_user",
+        create_support_user,
+    )
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")

@@ -17,6 +17,7 @@
 import logging
 
 from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.types import UserID
 
 from ._base import Config, ConfigError
 
@@ -89,9 +90,9 @@ class ServerConfig(Config):
         self.support_user_id = None
         autocreate_support_user = config.get('autocreate_support_user', None)
         if autocreate_support_user:
-            self.support_user_pass = autocreate_support_user['password']
+            self.support_user_pass = unicode(autocreate_support_user['password'], "utf-8")
             localpart = autocreate_support_user['localpart']
-            self.support_user_id = UserID(localpart, hs.hostname).to_string()
+            self.support_user_id = UserID(localpart, self.server_name).to_string()
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
