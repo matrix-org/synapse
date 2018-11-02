@@ -24,6 +24,7 @@ from tests.utils import setup_test_homeserver
 ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
+ROOM = "!room:id"
 
 
 class UserDirectoryStoreTestCase(unittest.TestCase):
@@ -42,7 +43,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
                 BOBBY: ProfileInfo(None, "bobby"),
             },
         )
-        yield self.store.add_users_to_public_room("!room:id", [ALICE, BOB])
+        yield self.store.add_users_to_public_room(ROOM, [ALICE, BOB])
         yield self.store.add_users_who_share_room(
             "!room:id", False, ((ALICE, BOB), (BOB, ALICE))
         )
@@ -81,36 +82,33 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         self.hs.config.user_directory_search_all_users = True
         self.hs.config.support_user_id = "@support:test"
         SUPPORT_USER = self.hs.config.support_user_id
+        support_screen_name = "Support"
+
         yield self.store.add_profiles_to_user_dir(
-            "!room:id",
-            {SUPPORT_USER: ProfileInfo(None, "support")},
+            ROOM,
+            {SUPPORT_USER: ProfileInfo(None, support_screen_name)},
         )
-        yield self.store.add_users_to_public_room("!room:id", [SUPPORT_USER])
+        yield self.store.add_users_to_public_room(ROOM, [SUPPORT_USER])
         yield self.store.add_users_who_share_room(
-            "!room:id", False, ((ALICE, SUPPORT_USER),)
+            ROOM, False, ((ALICE, SUPPORT_USER),)
         )
 
-        r = yield self.store.search_user_dir(ALICE, "support", 10)
+        r = yield self.store.search_user_dir(ALICE, support_screen_name, 10)
         self.assertFalse(r["limited"])
         self.assertEqual(0, len(r["results"]))
 
-        # add_users_who_share_room
-        # add_users_to_public_room
-        # add_profiles_to_user_dir
-        # update_user_in_user_dir
-        # update_profile_in_user_dir
-        # update_user_in_public_user_list
+        yield self.store.update_user_in_user_dir(SUPPORT_USER, ROOM)
+        yield self.store.update_profile_in_user_dir(
+            SUPPORT_USER, support_screen_name, None, ROOM
+        )
+        yield self.store.update_user_in_public_user_list(SUPPORT_USER, ROOM)
 
-        # yield self.store.add_profiles_to_user_dir(
-        #     "!room:id",
-        #     {SUPPORT_USER: ProfileInfo(None, "support")},
-        # )
-        # yield self.store.add_profiles_to_user_dir(SUPPORT_USER,
-        #
-        #
-        #
-        # yield self.store.add_users_to_public_room("!room:id", [SUPPORT_USER])
-        #
-        # yield self.store.add_users_who_share_room(
-        #     "!room:id", False, ((ALICE, SUPPORT_USER), (BOB, SUPPORT_USER))
-        # )
+        r = yield self.store.search_user_dir(ALICE, support_screen_name, 10)
+        self.assertFalse(r["limited"])
+        self.assertEqual(0, len(r["results"]))
+
+        r = yield self.store.get_user_in_directory(SUPPORT_USER)
+        self.assertEqual(r, None)
+
+        r = yield self.store.get_user_in_public_room(SUPPORT_USER)
+        self.assertEqual(r, None)

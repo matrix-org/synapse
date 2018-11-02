@@ -164,7 +164,7 @@ class UserDirectoryStore(SQLBaseStore):
 
     def update_profile_in_user_dir(self, user_id, display_name, avatar_url, room_id):
         def _update_profile_in_user_dir_txn(txn):
-            if user_is is self.hs.config.support_user_id:
+            if user_id is self.hs.config.support_user_id:
                 return
             new_entry = self._simple_upsert_txn(
                 txn,
@@ -229,7 +229,7 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def update_user_in_public_user_list(self, user_id, room_id):
-        if user_is is not self.hs.config.support_user_id:
+        if user_id is not self.hs.config.support_user_id:
             yield self._simple_update_one(
                 table="users_in_public_rooms",
                 keyvalues={"user_id": user_id},
