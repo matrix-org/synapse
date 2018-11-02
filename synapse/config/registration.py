@@ -60,6 +60,8 @@ class RegistrationConfig(Config):
         if not isinstance(self.replicate_user_profiles_to, list):
             self.replicate_user_profiles_to = [self.replicate_user_profiles_to, ]
 
+        self.shadow_server = config.get("shadow_server", None)
+
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
 
@@ -136,6 +138,13 @@ class RegistrationConfig(Config):
         # This is an experimental API currently implemented by sydent to support
         # cross-homeserver user directories.
         # replicate_user_profiles_to: example.com
+
+        # If specified, attempt to replay registrations, profile changes & 3pid
+        # bindings on the given target homeserver via the AS API. The HS is authed
+        # via a given AS token.
+        shadow-server:
+          hs: https://shadow.example.com
+          as-token: 12u394refgbdhivsia
 
         # If enabled, don't let users set their own display names/avatars
         # other than for the very first time (unless they are a server admin).

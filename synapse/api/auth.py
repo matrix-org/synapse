@@ -264,11 +264,12 @@ class Auth(object):
                 403,
                 "Application service cannot masquerade as this user."
             )
-        if not (yield self.store.get_user_by_id(user_id)):
-            raise AuthError(
-                403,
-                "Application service has not registered this user"
-            )
+        # Let ASes manipulate nonexistent users (e.g. to shadow-register them)
+        # if not (yield self.store.get_user_by_id(user_id)):
+        #     raise AuthError(
+        #         403,
+        #         "Application service has not registered this user"
+        #     )
         defer.returnValue((user_id, app_service))
 
     @defer.inlineCallbacks

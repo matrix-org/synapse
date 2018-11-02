@@ -34,6 +34,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.api.errors import AuthError
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -273,6 +274,19 @@ class RegisterRestServlet(RestServlet):
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
 
+        if 'access_token' in body:
+            requester = yield self.auth.get_user_by_req(request)
+            if not requester.app_service:
+                raise AuthError(
+                    403, "Only appservices can register clients with an access_token"
+                )
+
+            result = yield self._do_shadow_registration(
+                desired_username, desired_password, body
+            )
+            defer.returnValue((200, result))  # we throw for non 200 responses
+            return
+
         # == Normal User Registration == (everyone else)
         if not self.hs.config.enable_registration:
             raise SynapseError(403, "Registration has been disabled")
@@ -467,7 +481,6 @@ class RegisterRestServlet(RestServlet):
                 pass
 
             guest_access_token = params.get("guest_access_token", None)
-            new_password = params.get("password", None)
 
             # XXX: don't we need to validate these for length etc like we did on
             # the ones from the JSON body earlier on in the method?
@@ -477,11 +490,18 @@ class RegisterRestServlet(RestServlet):
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
-                password=new_password,
+                password=params.get("password", None),
                 guest_access_token=guest_access_token,
                 generate_token=False,
                 display_name=desired_display_name,
             )
+
+            if self.hs.config.shadow_server:
+                yield self.registration_handler.shadow_register(
+                    localpart=desired_username,
+                    auth_result=auth_result,
+                    params=params,
+                )
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
@@ -559,6 +579,34 @@ class RegisterRestServlet(RestServlet):
 
         result = yield self._create_registration_details(user_id, body)
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _do_shadow_registration(self, username, password, body):
+        auth_result = body.get('auth_result')
+
+        (user_id, _) = yield self.registration_handler.register(
+            localpart=username, password=password, generate_token=False,
+        )
+
+        return_dict = yield self._create_registration_details(
+            user_id, body
+        )
+
+        if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
+            threepid = auth_result[LoginType.EMAIL_IDENTITY]
+            yield self._register_email_threepid(
+                user_id, threepid, return_dict["access_token"],
+                body.get("bind_email")
+            )
+
+        if auth_result and LoginType.MSISDN in auth_result:
+            threepid = auth_result[LoginType.MSISDN]
+            yield self._register_msisdn_threepid(
+                user_id, threepid, return_dict["access_token"],
+                body.get("bind_msisdn")
+            )
+
+        defer.returnValue((200, return_dict))
 
     @defer.inlineCallbacks
     def _register_email_threepid(self, user_id, threepid, token, bind_email):
