@@ -226,7 +226,15 @@ class SynchrotronPresence(object):
 class SynchrotronTyping(object):
     def __init__(self, hs):
         self._latest_room_serial = 0
+        self._reset()
+
+    def _reset(self):
+        """
+        Reset the typing handler's data caches.
+        """
+        # map room IDs to serial numbers
         self._room_serials = {}
+        # map room IDs to sets of users currently typing
         self._room_typing = {}
 
     def stream_positions(self):

@@ -159,8 +159,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
 
         # Clear the typing information, so that it doesn't think everything is
         # in the future.
-        typing._room_serials = {}
-        typing._room_typing = {}
+        typing._reset()
 
         # Now it SHOULD fail as it never completes!
         request, channel = self.make_request("GET", "/sync?timeout=3000000&access_token=%s&since=%s" % (access_token, next_batch))
