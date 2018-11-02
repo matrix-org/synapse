@@ -64,6 +64,11 @@ class UserDirectoryStore(SQLBaseStore):
                 or publically joinable
             user_ids (list(str)): Users to add
         """
+
+        support_id = self.hs.config.support_user_id
+        if support_id in user_ids:
+            user_ids.remove(support_id)
+
         yield self._simple_insert_many(
             table="users_in_public_rooms",
             values=[
@@ -86,8 +91,7 @@ class UserDirectoryStore(SQLBaseStore):
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
-        # TODO Filter out support user
-
+        users_with_profile.pop(self.hs.config.support_user_id, None)
 
         if isinstance(self.database_engine, PostgresEngine):
             # We weight the loclpart most highly, then display name and finally
@@ -149,16 +153,19 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def update_user_in_user_dir(self, user_id, room_id):
-        yield self._simple_update_one(
-            table="user_directory",
-            keyvalues={"user_id": user_id},
-            updatevalues={"room_id": room_id},
-            desc="update_user_in_user_dir",
-        )
-        self.get_user_in_directory.invalidate((user_id,))
+        if user_id is not self.hs.config.support_user_id:
+            yield self._simple_update_one(
+                table="user_directory",
+                keyvalues={"user_id": user_id},
+                updatevalues={"room_id": room_id},
+                desc="update_user_in_user_dir",
+            )
+            self.get_user_in_directory.invalidate((user_id,))
 
     def update_profile_in_user_dir(self, user_id, display_name, avatar_url, room_id):
         def _update_profile_in_user_dir_txn(txn):
+            if user_is is self.hs.config.support_user_id:
+                return
             new_entry = self._simple_upsert_txn(
                 txn,
                 table="user_directory",
@@ -216,20 +223,20 @@ class UserDirectoryStore(SQLBaseStore):
                 raise Exception("Unrecognized database engine")
 
             txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
-
         return self.runInteraction(
             "update_profile_in_user_dir", _update_profile_in_user_dir_txn
         )
 
     @defer.inlineCallbacks
     def update_user_in_public_user_list(self, user_id, room_id):
-        yield self._simple_update_one(
-            table="users_in_public_rooms",
-            keyvalues={"user_id": user_id},
-            updatevalues={"room_id": room_id},
-            desc="update_user_in_public_user_list",
-        )
-        self.get_user_in_public_room.invalidate((user_id,))
+        if user_is is not self.hs.config.support_user_id:
+            yield self._simple_update_one(
+                table="users_in_public_rooms",
+                keyvalues={"user_id": user_id},
+                updatevalues={"room_id": room_id},
+                desc="update_user_in_public_user_list",
+            )
+            self.get_user_in_public_room.invalidate((user_id,))
 
     def remove_from_user_dir(self, user_id):
         def _remove_from_user_dir_txn(txn):
@@ -332,7 +339,7 @@ class UserDirectoryStore(SQLBaseStore):
         rows = yield self._execute("get_all_local_users", None, sql)
         defer.returnValue([name for name, in rows])
 
-    def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
+    def add_users_who_share_room(self, room_id, share_private, user_id_tuples_x):
         """Insert entries into the users_who_share_rooms table. The first
         user should be a local user.
 
@@ -342,6 +349,9 @@ class UserDirectoryStore(SQLBaseStore):
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
         def _add_users_who_share_room_txn(txn):
+            support_user = self.hs.config.support_user_id
+            user_id_tuples = filter(lambda x: support_user not in x, user_id_tuples_x)
+
             self._simple_insert_many_txn(
                 txn,
                 table="users_who_share_rooms",
@@ -378,6 +388,7 @@ class UserDirectoryStore(SQLBaseStore):
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
         def _update_users_who_share_room_txn(txn):
+
             sql = """
                 UPDATE users_who_share_rooms
                 SET room_id = ?, share_private = ?
