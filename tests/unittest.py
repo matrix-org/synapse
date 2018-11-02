@@ -258,7 +258,13 @@ class HomeserverTestCase(TestCase):
         """
 
     def make_request(
-        self, method, path, content=b"", access_token=None, request=SynapseRequest
+        self,
+        method,
+        path,
+        content=b"",
+        access_token=None,
+        request=SynapseRequest,
+        shorthand=True,
     ):
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -277,7 +283,7 @@ class HomeserverTestCase(TestCase):
         if isinstance(content, dict):
             content = json.dumps(content).encode('utf8')
 
-        return make_request(method, path, content, access_token, request)
+        return make_request(method, path, content, access_token, request, shorthand)
 
     def render(self, request):
         """
