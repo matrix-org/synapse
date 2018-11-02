@@ -53,6 +53,10 @@ def resolve_events_with_store(state_sets, event_map, state_res_store):
 
     logger.debug("Computing conflicted state")
 
+    # We use event_map as a cache, so if its None we need to initialize it
+    if event_map is None:
+        event_map = {}
+
     # First split up the un/conflicted state
     unconflicted_state, conflicted_state = _seperate(state_sets)
 
