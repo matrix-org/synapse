@@ -19,6 +19,7 @@ from synapse.rest.client.v1 import admin, login, room
 from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
+from tests.server import TimedOutException
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -74,12 +75,20 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
-        sync.register_servlets
+        sync.register_servlets,
     ]
     user_id = True
     hijack_auth = False
 
     def test_sync_backwards_typing(self):
+        """
+        If the typing serial goes backwards and the typing handler is then reset
+        (such as when the master restarts and sets the typing serial to 0), we
+        do not incorrectly return typing information that had a serial greater
+        than the now-reset serial.
+        """
+        typing_url = "/rooms/%s/typing/%s?access_token=%s"
+        sync_url = "/sync?timeout=3000000&access_token=%s&since=%s"
 
         # Register the user who gets notified
         user_id = self.register_user("user", "pass")
@@ -102,38 +111,44 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         self.helper.send(room, body="Hi!", tok=other_access_token)
         self.helper.send(room, body="There!", tok=other_access_token)
 
+        # Start typing.
         request, channel = self.make_request(
             "PUT",
-            "/rooms/%s/typing/%s?access_token=%s" % (room, other_user_id, other_access_token),
+            typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
         )
         self.render(request)
         self.assertEquals(200, channel.code)
 
-        request, channel = self.make_request("GET", "/sync?access_token=%s" % (access_token,))
+        request, channel = self.make_request(
+            "GET", "/sync?access_token=%s" % (access_token,)
+        )
         self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
+        # Stop typing.
         request, channel = self.make_request(
             "PUT",
-            "/rooms/%s/typing/%s?access_token=%s" % (room, other_user_id, other_access_token),
+            typing_url % (room, other_user_id, other_access_token),
             b'{"typing": false}',
         )
         self.render(request)
         self.assertEquals(200, channel.code)
 
-
+        # Start typing.
         request, channel = self.make_request(
             "PUT",
-            "/rooms/%s/typing/%s?access_token=%s" % (room, other_user_id, other_access_token),
+            typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
         )
         self.render(request)
         self.assertEquals(200, channel.code)
 
         # Should return immediately
-        request, channel = self.make_request("GET", "/sync?timeout=300000&access_token=%s&since=%s" % (access_token, next_batch))
+        request, channel = self.make_request(
+            "GET", sync_url % (access_token, next_batch)
+        )
         self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
@@ -146,13 +161,20 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         # invalidate the stream token.
         self.helper.send(room, body="There!", tok=other_access_token)
 
-        request, channel = self.make_request("GET", "/sync?timeout=3000000&access_token=%s&since=%s" % (access_token, next_batch))
+        request, channel = self.make_request(
+            "GET", sync_url % (access_token, next_batch)
+        )
         self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
-        # This should time out! But it does not, because our stream token is ahead.
-        request, channel = self.make_request("GET", "/sync?timeout=3000000&access_token=%s&since=%s" % (access_token, next_batch))
+        # This should time out! But it does not, because our stream token is
+        # ahead, and therefore it's saying the typing (that we've actually
+        # already seen) is new, since it's got a token above our new, now-reset
+        # stream token.
+        request, channel = self.make_request(
+            "GET", sync_url % (access_token, next_batch)
+        )
         self.render(request)
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
@@ -162,5 +184,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         typing._reset()
 
         # Now it SHOULD fail as it never completes!
-        request, channel = self.make_request("GET", "/sync?timeout=3000000&access_token=%s&since=%s" % (access_token, next_batch))
-        self.assertRaises(Exception, self.render, request)
+        request, channel = self.make_request(
+            "GET", sync_url % (access_token, next_batch)
+        )
+        self.assertRaises(TimedOutException, self.render, request)
