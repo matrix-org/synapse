@@ -112,7 +112,7 @@ class MessageAcceptTests(unittest.TestCase):
                 "origin_server_ts": 1,
                 "type": "m.room.message",
                 "origin": "test.serv",
-                "content": "hewwo?",
+                "content": {"body": "hewwo?"},
                 "auth_events": [],
                 "prev_events": [("two:test.serv", {}), (most_recent, {})],
             }

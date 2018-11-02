@@ -28,8 +28,8 @@ ROOM_ID = "!room:blue"
 
 
 def dict_equals(self, other):
-    me = encode_canonical_json(self._event_dict)
-    them = encode_canonical_json(other._event_dict)
+    me = encode_canonical_json(self.get_pdu_json())
+    them = encode_canonical_json(other.get_pdu_json())
     return me == them
 
 
