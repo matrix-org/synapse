@@ -1,0 +1,1 @@
+Fix table lock of device_lists_remote_cache which could freeze the application

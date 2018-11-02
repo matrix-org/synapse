@@ -21,7 +21,7 @@ import math
 import string
 from collections import OrderedDict
 
-from six import string_types
+from six import iteritems, string_types
 
 from twisted.internet import defer
 
@@ -32,10 +32,11 @@ from synapse.api.constants import (
     JoinRules,
     RoomCreationPreset,
 )
-from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
+from synapse.util.async_helpers import Linearizer
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -73,6 +74,334 @@ class RoomCreationHandler(BaseHandler):
 
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.room_member_handler = hs.get_room_member_handler()
+
+        # linearizer to stop two upgrades happening at once
+        self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
+
+    @defer.inlineCallbacks
+    def upgrade_room(self, requester, old_room_id, new_version):
+        """Replace a room with a new room with a different version
+
+        Args:
+            requester (synapse.types.Requester): the user requesting the upgrade
+            old_room_id (unicode): the id of the room to be replaced
+            new_version (unicode): the new room version to use
+
+        Returns:
+            Deferred[unicode]: the new room id
+        """
+        yield self.ratelimit(requester)
+
+        user_id = requester.user.to_string()
+
+        with (yield self._upgrade_linearizer.queue(old_room_id)):
+            # start by allocating a new room id
+            r = yield self.store.get_room(old_room_id)
+            if r is None:
+                raise NotFoundError("Unknown room id %s" % (old_room_id,))
+            new_room_id = yield self._generate_room_id(
+                creator_id=user_id, is_public=r["is_public"],
+            )
+
+            logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
+
+            # we create and auth the tombstone event before properly creating the new
+            # room, to check our user has perms in the old room.
+            tombstone_event, tombstone_context = (
+                yield self.event_creation_handler.create_event(
+                    requester, {
+                        "type": EventTypes.Tombstone,
+                        "state_key": "",
+                        "room_id": old_room_id,
+                        "sender": user_id,
+                        "content": {
+                            "body": "This room has been replaced",
+                            "replacement_room": new_room_id,
+                        }
+                    },
+                    token_id=requester.access_token_id,
+                )
+            )
+            yield self.auth.check_from_context(tombstone_event, tombstone_context)
+
+            yield self.clone_exiting_room(
+                requester,
+                old_room_id=old_room_id,
+                new_room_id=new_room_id,
+                new_room_version=new_version,
+                tombstone_event_id=tombstone_event.event_id,
+            )
+
+            # now send the tombstone
+            yield self.event_creation_handler.send_nonmember_event(
+                requester, tombstone_event, tombstone_context,
+            )
+
+            old_room_state = yield tombstone_context.get_current_state_ids(self.store)
+
+            # update any aliases
+            yield self._move_aliases_to_new_room(
+                requester, old_room_id, new_room_id, old_room_state,
+            )
+
+            # and finally, shut down the PLs in the old room, and update them in the new
+            # room.
+            yield self._update_upgraded_room_pls(
+                requester, old_room_id, new_room_id, old_room_state,
+            )
+
+            defer.returnValue(new_room_id)
+
+    @defer.inlineCallbacks
+    def _update_upgraded_room_pls(
+            self, requester, old_room_id, new_room_id, old_room_state,
+    ):
+        """Send updated power levels in both rooms after an upgrade
+
+        Args:
+            requester (synapse.types.Requester): the user requesting the upgrade
+            old_room_id (unicode): the id of the room to be replaced
+            new_room_id (unicode): the id of the replacement room
+            old_room_state (dict[tuple[str, str], str]): the state map for the old room
+
+        Returns:
+            Deferred
+        """
+        old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
+
+        if old_room_pl_event_id is None:
+            logger.warning(
+                "Not supported: upgrading a room with no PL event. Not setting PLs "
+                "in old room.",
+            )
+            return
+
+        old_room_pl_state = yield self.store.get_event(old_room_pl_event_id)
+
+        # we try to stop regular users from speaking by setting the PL required
+        # to send regular events and invites to 'Moderator' level. That's normally
+        # 50, but if the default PL in a room is 50 or more, then we set the
+        # required PL above that.
+
+        pl_content = dict(old_room_pl_state.content)
+        users_default = int(pl_content.get("users_default", 0))
+        restricted_level = max(users_default + 1, 50)
+
+        updated = False
+        for v in ("invite", "events_default"):
+            current = int(pl_content.get(v, 0))
+            if current < restricted_level:
+                logger.info(
+                    "Setting level for %s in %s to %i (was %i)",
+                    v, old_room_id, restricted_level, current,
+                )
+                pl_content[v] = restricted_level
+                updated = True
+            else:
+                logger.info(
+                    "Not setting level for %s (already %i)",
+                    v, current,
+                )
+
+        if updated:
+            try:
+                yield self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, {
+                        "type": EventTypes.PowerLevels,
+                        "state_key": '',
+                        "room_id": old_room_id,
+                        "sender": requester.user.to_string(),
+                        "content": pl_content,
+                    }, ratelimit=False,
+                )
+            except AuthError as e:
+                logger.warning("Unable to update PLs in old room: %s", e)
+
+        logger.info("Setting correct PLs in new room")
+        yield self.event_creation_handler.create_and_send_nonmember_event(
+            requester, {
+                "type": EventTypes.PowerLevels,
+                "state_key": '',
+                "room_id": new_room_id,
+                "sender": requester.user.to_string(),
+                "content": old_room_pl_state.content,
+            }, ratelimit=False,
+        )
+
+    @defer.inlineCallbacks
+    def clone_exiting_room(
+            self, requester, old_room_id, new_room_id, new_room_version,
+            tombstone_event_id,
+    ):
+        """Populate a new room based on an old room
+
+        Args:
+            requester (synapse.types.Requester): the user requesting the upgrade
+            old_room_id (unicode): the id of the room to be replaced
+            new_room_id (unicode): the id to give the new room (should already have been
+                created with _gemerate_room_id())
+            new_room_version (unicode): the new room version to use
+            tombstone_event_id (unicode|str): the ID of the tombstone event in the old
+                room.
+        Returns:
+            Deferred[None]
+        """
+        user_id = requester.user.to_string()
+
+        if not self.spam_checker.user_may_create_room(user_id):
+            raise SynapseError(403, "You are not permitted to create rooms")
+
+        creation_content = {
+            "room_version": new_room_version,
+            "predecessor": {
+                "room_id": old_room_id,
+                "event_id": tombstone_event_id,
+            }
+        }
+
+        initial_state = dict()
+
+        types_to_copy = (
+            (EventTypes.JoinRules, ""),
+            (EventTypes.Name, ""),
+            (EventTypes.Topic, ""),
+            (EventTypes.RoomHistoryVisibility, ""),
+            (EventTypes.GuestAccess, ""),
+            (EventTypes.RoomAvatar, ""),
+        )
+
+        old_room_state_ids = yield self.store.get_filtered_current_state_ids(
+            old_room_id, StateFilter.from_types(types_to_copy),
+        )
+        # map from event_id to BaseEvent
+        old_room_state_events = yield self.store.get_events(old_room_state_ids.values())
+
+        for k, old_event_id in iteritems(old_room_state_ids):
+            old_event = old_room_state_events.get(old_event_id)
+            if old_event:
+                initial_state[k] = old_event.content
+
+        yield self._send_events_for_new_room(
+            requester,
+            new_room_id,
+
+            # we expect to override all the presets with initial_state, so this is
+            # somewhat arbitrary.
+            preset_config=RoomCreationPreset.PRIVATE_CHAT,
+
+            invite_list=[],
+            initial_state=initial_state,
+            creation_content=creation_content,
+        )
+
+        # XXX invites/joins
+        # XXX 3pid invites
+
+    @defer.inlineCallbacks
+    def _move_aliases_to_new_room(
+            self, requester, old_room_id, new_room_id, old_room_state,
+    ):
+        directory_handler = self.hs.get_handlers().directory_handler
+
+        aliases = yield self.store.get_aliases_for_room(old_room_id)
+
+        # check to see if we have a canonical alias.
+        canonical_alias = None
+        canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
+        if canonical_alias_event_id:
+            canonical_alias_event = yield self.store.get_event(canonical_alias_event_id)
+            if canonical_alias_event:
+                canonical_alias = canonical_alias_event.content.get("alias", "")
+
+        # first we try to remove the aliases from the old room (we suppress sending
+        # the room_aliases event until the end).
+        #
+        # Note that we'll only be able to remove aliases that (a) aren't owned by an AS,
+        # and (b) unless the user is a server admin, which the user created.
+        #
+        # This is probably correct - given we don't allow such aliases to be deleted
+        # normally, it would be odd to allow it in the case of doing a room upgrade -
+        # but it makes the upgrade less effective, and you have to wonder why a room
+        # admin can't remove aliases that point to that room anyway.
+        # (cf https://github.com/matrix-org/synapse/issues/2360)
+        #
+        removed_aliases = []
+        for alias_str in aliases:
+            alias = RoomAlias.from_string(alias_str)
+            try:
+                yield directory_handler.delete_association(
+                    requester, alias, send_event=False,
+                )
+                removed_aliases.append(alias_str)
+            except SynapseError as e:
+                logger.warning(
+                    "Unable to remove alias %s from old room: %s",
+                    alias, e,
+                )
+
+        # if we didn't find any aliases, or couldn't remove anyway, we can skip the rest
+        # of this.
+        if not removed_aliases:
+            return
+
+        try:
+            # this can fail if, for some reason, our user doesn't have perms to send
+            # m.room.aliases events in the old room (note that we've already checked that
+            # they have perms to send a tombstone event, so that's not terribly likely).
+            #
+            # If that happens, it's regrettable, but we should carry on: it's the same
+            # as when you remove an alias from the directory normally - it just means that
+            # the aliases event gets out of sync with the directory
+            # (cf https://github.com/vector-im/riot-web/issues/2369)
+            yield directory_handler.send_room_alias_update_event(
+                requester, old_room_id,
+            )
+        except AuthError as e:
+            logger.warning(
+                "Failed to send updated alias event on old room: %s", e,
+            )
+
+        # we can now add any aliases we successfully removed to the new room.
+        for alias in removed_aliases:
+            try:
+                yield directory_handler.create_association(
+                    requester, RoomAlias.from_string(alias),
+                    new_room_id, servers=(self.hs.hostname, ),
+                    send_event=False,
+                )
+                logger.info("Moved alias %s to new room", alias)
+            except SynapseError as e:
+                # I'm not really expecting this to happen, but it could if the spam
+                # checking module decides it shouldn't, or similar.
+                logger.error(
+                    "Error adding alias %s to new room: %s",
+                    alias, e,
+                )
+
+        try:
+            if canonical_alias and (canonical_alias in removed_aliases):
+                yield self.event_creation_handler.create_and_send_nonmember_event(
+                    requester,
+                    {
+                        "type": EventTypes.CanonicalAlias,
+                        "state_key": "",
+                        "room_id": new_room_id,
+                        "sender": requester.user.to_string(),
+                        "content": {"alias": canonical_alias, },
+                    },
+                    ratelimit=False
+                )
+
+            yield directory_handler.send_room_alias_update_event(
+                requester, new_room_id,
+            )
+        except SynapseError as e:
+            # again I'm not really expecting this to fail, but if it does, I'd rather
+            # we returned the new room to the client at this point.
+            logger.error(
+                "Unable to send updated alias events in new room: %s", e,
+            )
 
     @defer.inlineCallbacks
     def create_room(self, requester, config, ratelimit=True,
@@ -165,28 +494,7 @@ class RoomCreationHandler(BaseHandler):
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
 
-        # autogen room IDs and try to create it. We may clash, so just
-        # try a few times till one goes through, giving up eventually.
-        attempts = 0
-        room_id = None
-        while attempts < 5:
-            try:
-                random_string = stringutils.random_string(18)
-                gen_room_id = RoomID(
-                    random_string,
-                    self.hs.hostname,
-                )
-                yield self.store.store_room(
-                    room_id=gen_room_id.to_string(),
-                    room_creator_user_id=user_id,
-                    is_public=is_public
-                )
-                room_id = gen_room_id.to_string()
-                break
-            except StoreError:
-                attempts += 1
-        if not room_id:
-            raise StoreError(500, "Couldn't generate a room ID.")
+        room_id = yield self._generate_room_id(creator_id=user_id, is_public=is_public)
 
         if room_alias:
             directory_handler = self.hs.get_handlers().directory_handler
@@ -216,18 +524,15 @@ class RoomCreationHandler(BaseHandler):
         # override any attempt to set room versions via the creation_content
         creation_content["room_version"] = room_version
 
-        room_member_handler = self.hs.get_room_member_handler()
-
         yield self._send_events_for_new_room(
             requester,
             room_id,
-            room_member_handler,
             preset_config=preset_config,
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
             room_alias=room_alias,
-            power_level_content_override=config.get("power_level_content_override", {}),
+            power_level_content_override=config.get("power_level_content_override"),
             creator_join_profile=creator_join_profile,
         )
 
@@ -263,7 +568,7 @@ class RoomCreationHandler(BaseHandler):
             if is_direct:
                 content["is_direct"] = is_direct
 
-            yield room_member_handler.update_membership(
+            yield self.room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
                 room_id,
@@ -301,14 +606,13 @@ class RoomCreationHandler(BaseHandler):
             self,
             creator,  # A Requester object.
             room_id,
-            room_member_handler,
             preset_config,
             invite_list,
             initial_state,
             creation_content,
-            room_alias,
-            power_level_content_override,
-            creator_join_profile,
+            room_alias=None,
+            power_level_content_override=None,
+            creator_join_profile=None,
     ):
         def create(etype, content, **kwargs):
             e = {
@@ -324,6 +628,7 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
+            logger.info("Sending %s in new room", etype)
             yield self.event_creation_handler.create_and_send_nonmember_event(
                 creator,
                 event,
@@ -346,7 +651,8 @@ class RoomCreationHandler(BaseHandler):
             content=creation_content,
         )
 
-        yield room_member_handler.update_membership(
+        logger.info("Sending %s in new room", EventTypes.Member)
+        yield self.room_member_handler.update_membership(
             creator,
             creator.user,
             room_id,
@@ -388,7 +694,8 @@ class RoomCreationHandler(BaseHandler):
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            power_level_content.update(power_level_content_override)
+            if power_level_content_override:
+                power_level_content.update(power_level_content_override)
 
             yield send(
                 etype=EventTypes.PowerLevels,
@@ -426,6 +733,30 @@ class RoomCreationHandler(BaseHandler):
                 state_key=state_key,
                 content=content,
             )
+
+    @defer.inlineCallbacks
+    def _generate_room_id(self, creator_id, is_public):
+        # autogen room IDs and try to create it. We may clash, so just
+        # try a few times till one goes through, giving up eventually.
+        attempts = 0
+        while attempts < 5:
+            try:
+                random_string = stringutils.random_string(18)
+                gen_room_id = RoomID(
+                    random_string,
+                    self.hs.hostname,
+                ).to_string()
+                if isinstance(gen_room_id, bytes):
+                    gen_room_id = gen_room_id.decode('utf-8')
+                yield self.store.store_room(
+                    room_id=gen_room_id,
+                    room_creator_user_id=creator_id,
+                    is_public=is_public,
+                )
+                defer.returnValue(gen_room_id)
+            except StoreError:
+                attempts += 1
+        raise StoreError(500, "Couldn't generate a room ID.")
 
 
 class RoomContextHandler(object):

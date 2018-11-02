@@ -21,6 +21,12 @@ from synapse.util import Clock
 from tests.utils import setup_test_homeserver as _sth
 
 
+class TimedOutException(Exception):
+    """
+    A web query timed out.
+    """
+
+
 @attr.s
 class FakeChannel(object):
     """
@@ -125,7 +131,9 @@ def make_request(method, path, content=b"", access_token=None, request=SynapseRe
     req.content = BytesIO(content)
 
     if access_token:
-        req.requestHeaders.addRawHeader(b"Authorization", b"Bearer " + access_token)
+        req.requestHeaders.addRawHeader(
+            b"Authorization", b"Bearer " + access_token.encode('ascii')
+        )
 
     if content:
         req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
@@ -151,7 +159,7 @@ def wait_until_result(clock, request, timeout=100):
         x += 1
 
         if x > timeout:
-            raise Exception("Timed out waiting for request to finish.")
+            raise TimedOutException("Timed out waiting for request to finish.")
 
         clock.advance(0.1)
 

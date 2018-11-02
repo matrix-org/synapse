@@ -85,7 +85,10 @@ class EmailPusher(object):
             self.timed_call = None
 
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
-        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
+        if self.max_stream_ordering:
+            self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
+        else:
+            self.max_stream_ordering = max_stream_ordering
         self._start_processing()
 
     def on_new_receipts(self, min_stream_id, max_stream_id):

@@ -51,6 +51,7 @@ class LoginType(object):
     EMAIL_IDENTITY = u"m.login.email.identity"
     MSISDN = u"m.login.msisdn"
     RECAPTCHA = u"m.login.recaptcha"
+    TERMS = u"m.login.terms"
     DUMMY = u"m.login.dummy"
 
     # Only for C/S API v1
@@ -61,6 +62,7 @@ class LoginType(object):
 class EventTypes(object):
     Member = "m.room.member"
     Create = "m.room.create"
+    Tombstone = "m.room.tombstone"
     JoinRules = "m.room.join_rules"
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"
@@ -101,6 +103,7 @@ class ThirdPartyEntityKind(object):
 class RoomVersions(object):
     V1 = "1"
     VDH_TEST = "vdh-test-version"
+    STATE_V2_TEST = "state-v2-test"
 
 
 # the version we will give rooms which are created on this server
@@ -108,7 +111,11 @@ DEFAULT_ROOM_VERSION = RoomVersions.V1
 
 # vdh-test-version is a placeholder to get room versioning support working and tested
 # until we have a working v2.
-KNOWN_ROOM_VERSIONS = {RoomVersions.V1, RoomVersions.VDH_TEST}
+KNOWN_ROOM_VERSIONS = {
+    RoomVersions.V1,
+    RoomVersions.VDH_TEST,
+    RoomVersions.STATE_V2_TEST,
+}
 
 ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"

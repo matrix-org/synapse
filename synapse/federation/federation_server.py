@@ -324,11 +324,6 @@ class FederationServer(FederationBase):
             defer.returnValue((404, ""))
 
     @defer.inlineCallbacks
-    @log_function
-    def on_pull_request(self, origin, versions):
-        raise NotImplementedError("Pull transactions not implemented")
-
-    @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
         received_queries_counter.labels(query_type).inc()
         resp = yield self.registry.on_query(query_type, args)
