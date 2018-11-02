@@ -23,7 +23,7 @@ from tests import unittest
 from tests.server import render
 
 
-class RoomSearchTestCase(unittest.HomeserverTestCase):
+class ConsentResourceTestCase(unittest.HomeserverTestCase):
     servlets = [
         admin.register_servlets,
         room.register_servlets,
