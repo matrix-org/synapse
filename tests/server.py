@@ -21,6 +21,12 @@ from synapse.util import Clock
 from tests.utils import setup_test_homeserver as _sth
 
 
+class TimedOutException(Exception):
+    """
+    A web query timed out.
+    """
+
+
 @attr.s
 class FakeChannel(object):
     """
@@ -153,7 +159,7 @@ def wait_until_result(clock, request, timeout=100):
         x += 1
 
         if x > timeout:
-            raise Exception("Timed out waiting for request to finish.")
+            raise TimedOutException("Timed out waiting for request to finish.")
 
         clock.advance(0.1)
 
