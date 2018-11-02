@@ -1,0 +1,1 @@
+The default logging config will now set an explicit log file encoding of UTF-8.
