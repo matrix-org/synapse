@@ -219,3 +219,23 @@ email:
    notif_for_new_users: True
    riot_base_url: "https://{{ SYNAPSE_SERVER_NAME }}"
 {% endif %}
+{% if SYNAPSE_LDAP_HOST %}
+password_providers:
+  - module: "ldap_auth_provider.LdapAuthProvider"
+    config:
+      enabled: true
+      uri: "{{ SYNAPSE_LDAP_HOST }}"
+      start_tls: {{ SYNAPSE_LDAP_STARTTLS or false }}
+      base: "{{ SYNAPSE_LDAP_BASE }}"
+      attributes:
+        uid: "{{ SYNAPSE_LDAP_ATTR_UID or "cn" }}"
+        mail: "{{ SYNAPSE_LDAP_ATTR_MAIL or "email" }}"
+        name: "{{ SYNAPSE_LDAP_ATTR_NAME or "givenName" }}"
+      {% if SYNAPSE_LDAP_BIND_DN %}
+      bind_dn: "{{ SYNAPSE_LDAP_BIND_DN }}"
+      bind_password: "{{ SYNAPSE_LDAP_BIND_PASSWORD }}"
+      {% endif %}
+      {% if SYNAPSE_LDAP_FILTER %}
+      filter: "{{ SYNAPSE_LDAP_FILTER }}"
+      {% endif %}
+{% endif %}

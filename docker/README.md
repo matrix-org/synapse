@@ -111,6 +111,20 @@ Mail server specific values (will not send emails if not set):
 * ``SYNAPSE_SMTP_USER``, username for authenticating against the mail server if any.
 * ``SYNAPSE_SMTP_PASSWORD``, password for authenticating against the mail server if any.
 
+LDAP server specific values (will use ldap for authentication if set):
+
+* ``SYNAPSE_LDAP_HOST``, URI of the ldap server. If you set this var, you need to set all other
+``SYNAPSE_LDAP`` vars that are not marked as optional.
+* ``SYNAPSE_LDAP_STARTTLS``, whether to use starttls for connecting to the ldap server.
+* ``SYNAPSE_LDAP_BASE``, the search base.
+* ``SYNAPSE_LDAP_ATTR_UID``, the attribute to use for the localpart, defaults to cn.
+* ``SYNAPSE_LDAP_ATTR_MAIL``, the attribute to use for the users mail address, defaults to email.
+* ``SYNAPSE_LDAP_ATTR_NAME``, the attribute to use for the users name, defaults to givenName.
+* ``SYNAPSE_LDAP_BIND_DN``, the bind dn, optional.
+* ``SYNAPSE_LDAP_BIND_PASSWORD``, the bind password, optional.
+* ``SYNAPSE_LDAP_FILTER``, the search filter, optional.
+
+
 ## Build
 
 Build the docker image with the `docker build` command from the root of the synapse repository.
