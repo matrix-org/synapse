@@ -438,7 +438,7 @@ class RegistrationHandler(BaseHandler):
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
-        yield self.http_client.post_urlencoded_get_json(
+        yield self.http_client.post_json_get_json(
             "%s%s" % (
                 shadow_hs_url, "/_matrix/client/r0/register"
             ),

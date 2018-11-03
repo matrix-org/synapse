@@ -157,8 +157,9 @@ class SimpleHttpClient(object):
             data=query_bytes
         )
 
+        body = yield make_deferred_yieldable(treq.json_content(response))
+
         if 200 <= response.code < 300:
-            body = yield make_deferred_yieldable(treq.json_content(response))
             defer.returnValue(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
