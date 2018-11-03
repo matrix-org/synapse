@@ -406,8 +406,8 @@ class RegistrationHandler(BaseHandler):
         """
 
         # TODO: retries
-        shadow_hs = self.hs.config.shadow_register.get("hs")
-        as_token = self.hs.config.shadow_register.get("as_token")
+        shadow_hs = self.hs.config.shadow_server.get("hs")
+        as_token = self.hs.config.shadow_server.get("as_token")
 
         yield self.http_client.post_urlencoded_get_json(
             "https://%s%s" % (
