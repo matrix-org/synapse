@@ -238,7 +238,6 @@ class Auth(object):
                 errcode=Codes.MISSING_TOKEN
             )
 
-    @defer.inlineCallbacks
     def _get_appservice_user_id(self, request):
         app_service = self.store.get_app_service_by_token(
             self.get_access_token_from_request(
@@ -246,19 +245,19 @@ class Auth(object):
             )
         )
         if app_service is None:
-            defer.returnValue((None, None))
+            return(None, None)
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(self.hs.get_ip_from_request(request))
             if ip_address not in app_service.ip_range_whitelist:
-                defer.returnValue((None, None))
+                return(None, None)
 
         if b"user_id" not in request.args:
-            defer.returnValue((app_service.sender, app_service))
+            return(app_service.sender, app_service)
 
         user_id = request.args[b"user_id"][0].decode('utf8')
         if app_service.sender == user_id:
-            defer.returnValue((app_service.sender, app_service))
+            return(app_service.sender, app_service)
 
         if not app_service.is_interested_in_user(user_id):
             raise AuthError(
@@ -271,7 +270,7 @@ class Auth(object):
         #         403,
         #         "Application service has not registered this user"
         #     )
-        defer.returnValue((user_id, app_service))
+        return(user_id, app_service)
 
     @defer.inlineCallbacks
     def get_user_by_access_token(self, token, rights="access"):
