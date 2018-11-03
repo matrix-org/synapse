@@ -146,9 +146,9 @@ class RegistrationConfig(Config):
         # If specified, attempt to replay registrations, profile changes & 3pid
         # bindings on the given target homeserver via the AS API. The HS is authed
         # via a given AS token.
-        shadow-server:
-          hs: https://shadow.example.com
-          as-token: 12u394refgbdhivsia
+        # shadow-server:
+        #     hs: https://shadow.example.com
+        #     as-token: 12u394refgbdhivsia
 
         # If enabled, don't let users set their own display names/avatars
         # other than for the very first time (unless they are a server admin).
