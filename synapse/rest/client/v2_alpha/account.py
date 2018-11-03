@@ -363,7 +363,10 @@ class ThreepidRestServlet(RestServlet):
                     logger.warn("Couldn't add 3pid: invalid response from ID server")
                     raise SynapseError(500, "Invalid response from ID Server")
         else:
-            # XXX: ASes pass in a validated threepid directly to bypass the IS
+            # XXX: ASes pass in a validated threepid directly to bypass the IS.
+            # This makes the API entirely change shape when we have an AS token;
+            # it really should be an entirely separate API - perhaps
+            # /account/3pid/replicate or something.
             threepid = body.get('threepid')
 
         yield self.auth_handler.add_threepid(
