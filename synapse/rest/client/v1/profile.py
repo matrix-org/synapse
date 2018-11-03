@@ -75,7 +75,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         as_token = self.hs.config.shadow_server.get("as_token")
         body['access_token'] = as_token
 
-        yield self.http_client.post_urlencoded_get_json(
+        yield self.http_client.post_json_get_json(
             "%s%s" % (
                 shadow_hs_url, ("/_matrix/client/r0/profile/%s/displayname" % user_id)
             ),
@@ -135,7 +135,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         as_token = self.hs.config.shadow_server.get("as_token")
         body['access_token'] = as_token
 
-        yield self.http_client.post_urlencoded_get_json(
+        yield self.http_client.post_json_get_json(
             "%s%s" % (
                 shadow_hs_url, ("/_matrix/client/r0/profile/%s/avatar_url" % user_id)
             ),
