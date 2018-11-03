@@ -35,7 +35,6 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.api.errors import AuthError
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -230,7 +229,7 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
 
-        desired_display_name = None
+        desired_display_name = body.get('display_name')
 
         appservice = None
         if self.auth.has_access_token(request):
@@ -255,7 +254,8 @@ class RegisterRestServlet(RestServlet):
 
             if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
-                    desired_username, access_token, body
+                    desired_username, desired_password, desired_display_name,
+                    access_token, body
                 )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
@@ -274,19 +274,6 @@ class RegisterRestServlet(RestServlet):
             # FIXME: Should we really be determining if this is shared secret
             # auth based purely on the 'mac' key?
             result = yield self._do_shared_secret_registration(
-                desired_username, desired_password, body
-            )
-            defer.returnValue((200, result))  # we throw for non 200 responses
-            return
-
-        if 'access_token' in body:
-            requester = yield self.auth.get_user_by_req(request)
-            if not requester.app_service:
-                raise AuthError(
-                    403, "Only appservices can register clients with an access_token"
-                )
-
-            result = yield self._do_shadow_registration(
                 desired_username, desired_password, body
             )
             defer.returnValue((200, result))  # we throw for non 200 responses
@@ -515,6 +502,7 @@ class RegisterRestServlet(RestServlet):
             if self.hs.config.shadow_server:
                 yield self.registration_handler.shadow_register(
                     localpart=desired_username,
+                    display_name=desired_display_name,
                     auth_result=auth_result,
                     params=params,
                 )
@@ -552,11 +540,33 @@ class RegisterRestServlet(RestServlet):
         return 200, {}
 
     @defer.inlineCallbacks
-    def _do_appservice_registration(self, username, as_token, body):
+    def _do_appservice_registration(
+        self, username, password, display_name, as_token, body
+    ):
+
+        # FIXME: appservice_register() is horribly duplicated with register()
+        # and they should probably just be combined together with a config flag.
         user_id = yield self.registration_handler.appservice_register(
-            username, as_token
+            username, as_token, password, display_name
         )
-        defer.returnValue((yield self._create_registration_details(user_id, body)))
+        result = yield self._create_registration_details(user_id, body)
+
+        auth_result = body.get('auth_result')
+        if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
+            threepid = auth_result[LoginType.EMAIL_IDENTITY]
+            yield self._register_email_threepid(
+                user_id, threepid, result["access_token"],
+                body.get("bind_email")
+            )
+
+        if auth_result and LoginType.MSISDN in auth_result:
+            threepid = auth_result[LoginType.MSISDN]
+            yield self._register_msisdn_threepid(
+                user_id, threepid, result["access_token"],
+                body.get("bind_msisdn")
+            )
+
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def _do_shared_secret_registration(self, username, password, body):
@@ -595,34 +605,6 @@ class RegisterRestServlet(RestServlet):
 
         result = yield self._create_registration_details(user_id, body)
         defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def _do_shadow_registration(self, username, password, body):
-        auth_result = body.get('auth_result')
-
-        (user_id, _) = yield self.registration_handler.register(
-            localpart=username, password=password, generate_token=False,
-        )
-
-        return_dict = yield self._create_registration_details(
-            user_id, body
-        )
-
-        if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
-            threepid = auth_result[LoginType.EMAIL_IDENTITY]
-            yield self._register_email_threepid(
-                user_id, threepid, return_dict["access_token"],
-                body.get("bind_email")
-            )
-
-        if auth_result and LoginType.MSISDN in auth_result:
-            threepid = auth_result[LoginType.MSISDN]
-            yield self._register_msisdn_threepid(
-                user_id, threepid, return_dict["access_token"],
-                body.get("bind_msisdn")
-            )
-
-        defer.returnValue((200, return_dict))
 
     @defer.inlineCallbacks
     def _register_email_threepid(self, user_id, threepid, token, bind_email):
