@@ -103,9 +103,6 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        if self.hs.config.shadow_server:
-            self.shadow_displayname(user_id, content)
-
         defer.returnValue((200, ret))
 
     @defer.inlineCallbacks
