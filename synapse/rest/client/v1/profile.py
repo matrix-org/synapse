@@ -71,13 +71,13 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def shadow_displayname(self, user_id, body):
         # TODO: retries
-        shadow_hs = self.hs.config.shadow_server.get("hs")
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
         body['access_token'] = as_token
 
         yield self.http_client.post_urlencoded_get_json(
-            "https://%s%s" % (
-                shadow_hs, ("/_matrix/client/r0/profile/%s/displayname" % user_id)
+            "%s%s" % (
+                shadow_hs_url, ("/_matrix/client/r0/profile/%s/displayname" % user_id)
             ),
             body
         )
@@ -134,13 +134,13 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
     @defer.inlineCallbacks
     def shadow_avatar_url(self, user_id, body):
         # TODO: retries
-        shadow_hs = self.hs.config.shadow_server.get("hs")
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
         body['access_token'] = as_token
 
         yield self.http_client.post_urlencoded_get_json(
-            "https://%s%s" % (
-                shadow_hs, ("/_matrix/client/r0/profile/%s/avatar_url" % user_id)
+            "%s%s" % (
+                shadow_hs_url, ("/_matrix/client/r0/profile/%s/avatar_url" % user_id)
             ),
             body
         )

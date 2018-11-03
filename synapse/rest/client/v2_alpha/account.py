@@ -189,13 +189,13 @@ class PasswordRestServlet(RestServlet):
     @defer.inlineCallbacks
     def shadow_password(self, body):
         # TODO: retries
-        shadow_hs = self.hs.config.shadow_server.get("hs")
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
         body['access_token'] = as_token
 
         yield self.http_client.post_urlencoded_get_json(
-            "https://%s%s" % (
-                shadow_hs, "/_matrix/client/r0/account/password"
+            "%s%s" % (
+                shadow_hs_url, "/_matrix/client/r0/account/password"
             ),
             body
         )
@@ -401,13 +401,13 @@ class ThreepidRestServlet(RestServlet):
     @defer.inlineCallbacks
     def shadow_3pid(self, body):
         # TODO: retries
-        shadow_hs = self.hs.config.shadow_server.get("hs")
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
         body['access_token'] = as_token
 
         yield self.http_client.post_urlencoded_get_json(
-            "https://%s%s" % (
-                shadow_hs, "/_matrix/client/r0/account/3pid"
+            "%s%s" % (
+                shadow_hs_url, "/_matrix/client/r0/account/3pid"
             ),
             body
         )
@@ -460,13 +460,13 @@ class ThreepidDeleteRestServlet(RestServlet):
     @defer.inlineCallbacks
     def shadow_3pid_delete(self, body):
         # TODO: retries
-        shadow_hs = self.hs.config.shadow_server.get("hs")
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
         body['access_token'] = as_token
 
         yield self.http_client.post_urlencoded_get_json(
-            "https://%s%s" % (
-                shadow_hs, "/_matrix/client/r0/account/3pid/delete"
+            "%s%s" % (
+                shadow_hs_url, "/_matrix/client/r0/account/3pid/delete"
             ),
             body
         )

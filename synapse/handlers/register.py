@@ -435,12 +435,12 @@ class RegistrationHandler(BaseHandler):
         """
 
         # TODO: retries
-        shadow_hs = self.hs.config.shadow_server.get("hs")
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
         yield self.http_client.post_urlencoded_get_json(
-            "https://%s%s" % (
-                shadow_hs, "/_matrix/client/r0/register"
+            "%s%s" % (
+                shadow_hs_url, "/_matrix/client/r0/register"
             ),
             {
                 # XXX: auth_result is an unspecified extension for shadow registration
