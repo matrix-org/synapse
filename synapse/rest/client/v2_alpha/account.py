@@ -191,11 +191,10 @@ class PasswordRestServlet(RestServlet):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
-        body['access_token'] = as_token
 
         yield self.http_client.post_json_get_json(
-            "%s%s" % (
-                shadow_hs_url, "/_matrix/client/r0/account/password"
+            "%s/_matrix/client/r0/account/password?access_token=%s" % (
+                shadow_hs_url, as_token
             ),
             body
         )
@@ -403,11 +402,10 @@ class ThreepidRestServlet(RestServlet):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
-        body['access_token'] = as_token
 
         yield self.http_client.post_json_get_json(
-            "%s%s" % (
-                shadow_hs_url, "/_matrix/client/r0/account/3pid"
+            "%s/_matrix/client/r0/account/3pid?access_token=%s" % (
+                shadow_hs_url, as_token
             ),
             body
         )
@@ -462,11 +460,10 @@ class ThreepidDeleteRestServlet(RestServlet):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
-        body['access_token'] = as_token
 
         yield self.http_client.post_json_get_json(
-            "%s%s" % (
-                shadow_hs_url, "/_matrix/client/r0/account/3pid/delete"
+            "%s/_matrix/client/r0/account/3pid/delete?access_token=%s" % (
+                shadow_hs_url, as_token
             ),
             body
         )

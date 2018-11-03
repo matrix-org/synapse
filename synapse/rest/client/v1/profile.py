@@ -73,11 +73,10 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
-        body['access_token'] = as_token
 
         yield self.http_client.post_json_get_json(
-            "%s%s" % (
-                shadow_hs_url, ("/_matrix/client/r0/profile/%s/displayname" % user_id)
+            "%s/_matrix/client/r0/profile/%s/displayname?access_token=%s" % (
+                shadow_hs_url, user_id, as_token
             ),
             body
         )
@@ -133,11 +132,10 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         # TODO: retries
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
-        body['access_token'] = as_token
 
         yield self.http_client.post_json_get_json(
-            "%s%s" % (
-                shadow_hs_url, ("/_matrix/client/r0/profile/%s/avatar_url" % user_id)
+            "%s/_matrix/client/r0/profile/%s/avatar_url?access_token=%s" % (
+                shadow_hs_url, user_id, as_token
             ),
             body
         )
