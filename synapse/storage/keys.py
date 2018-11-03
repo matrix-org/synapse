@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview
 if six.PY2:
-    db_binary_type = buffer
+    db_binary_type = six.moves.builtins.buffer
 else:
     db_binary_type = memoryview
 
@@ -134,6 +134,7 @@ class KeyStore(SQLBaseStore):
         """
         key_id = "%s:%s" % (verify_key.alg, verify_key.version)
 
+        # XXX fix this to not need a lock (#3819)
         def _txn(txn):
             self._simple_upsert_txn(
                 txn,

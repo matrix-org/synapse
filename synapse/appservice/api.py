@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import urllib
+
+from six.moves import urllib
 
 from prometheus_client import Counter
 
@@ -98,7 +99,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def query_user(self, service, user_id):
         if service.url is None:
             defer.returnValue(False)
-        uri = service.url + ("/users/%s" % urllib.quote(user_id))
+        uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         response = None
         try:
             response = yield self.get_json(uri, {
@@ -119,7 +120,7 @@ class ApplicationServiceApi(SimpleHttpClient):
     def query_alias(self, service, alias):
         if service.url is None:
             defer.returnValue(False)
-        uri = service.url + ("/rooms/%s" % urllib.quote(alias))
+        uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         response = None
         try:
             response = yield self.get_json(uri, {
@@ -153,7 +154,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             service.url,
             APP_SERVICE_PREFIX,
             kind,
-            urllib.quote(protocol)
+            urllib.parse.quote(protocol)
         )
         try:
             response = yield self.get_json(uri, fields)
@@ -188,7 +189,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
-                urllib.quote(protocol)
+                urllib.parse.quote(protocol)
             )
             try:
                 info = yield self.get_json(uri, {})
@@ -228,7 +229,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         txn_id = str(txn_id)
 
         uri = service.url + ("/transactions/%s" %
-                             urllib.quote(txn_id))
+                             urllib.parse.quote(txn_id))
         try:
             yield self.put_json(
                 uri=uri,

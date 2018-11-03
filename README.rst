@@ -81,7 +81,7 @@ Thanks for using Matrix!
 Synapse Installation
 ====================
 
-Synapse is the reference python/twisted Matrix homeserver implementation.
+Synapse is the reference Python/Twisted Matrix homeserver implementation.
 
 System requirements:
 
@@ -91,12 +91,13 @@ System requirements:
 
 Installing from source
 ----------------------
+
 (Prebuilt packages are available for some platforms - see `Platform-Specific
 Instructions`_.)
 
-Synapse is written in python but some of the libraries it uses are written in
-C. So before we can install synapse itself we need a working C compiler and the
-header files for python C extensions.
+Synapse is written in Python but some of the libraries it uses are written in
+C. So before we can install Synapse itself we need a working C compiler and the
+header files for Python C extensions.
 
 Installing prerequisites on Ubuntu or Debian::
 
@@ -143,21 +144,27 @@ Installing prerequisites on OpenBSD::
     doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
                  libxslt
 
-To install the synapse homeserver run::
+To install the Synapse homeserver run::
 
     virtualenv -p python2.7 ~/.synapse
     source ~/.synapse/bin/activate
     pip install --upgrade pip
     pip install --upgrade setuptools
-    pip install https://github.com/matrix-org/synapse/tarball/master
+    pip install matrix-synapse
 
-This installs synapse, along with the libraries it uses, into a virtual
+This installs Synapse, along with the libraries it uses, into a virtual
 environment under ``~/.synapse``.  Feel free to pick a different directory
 if you prefer.
 
+This Synapse installation can then be later upgraded by using pip again with the
+update flag::
+
+    source ~/.synapse/bin/activate
+    pip install -U matrix-synapse
+
 In case of problems, please see the _`Troubleshooting` section below.
 
-There is an offical synapse image available at 
+There is an offical synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with
 the docker-compose file available at `contrib/docker <contrib/docker>`_. Further information on
 this including configuration options is available in the README on
@@ -167,12 +174,13 @@ Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
-Also, Martin Giess has created an auto-deployment process with vagrant/ansible,
-tested with VirtualBox/AWS/DigitalOcean - see 
-https://github.com/EMnify/matrix-synapse-auto-deploy
-for details.
+Slavi Pantaleev has created an Ansible playbook,
+which installs the offical Docker image of Matrix Synapse
+along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
+For more details, see
+https://github.com/spantaleev/matrix-docker-ansible-deploy
 
-Configuring synapse
+Configuring Synapse
 -------------------
 
 Before you can start Synapse, you will need to generate a configuration
@@ -253,26 +261,6 @@ Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
 a TURN server.  See `<docs/turn-howto.rst>`_ for details.
-
-IPv6
-----
-
-As of Synapse 0.19 we finally support IPv6, many thanks to @kyrias and @glyph
-for providing PR #1696.
-
-However, for federation to work on hosts with IPv6 DNS servers you **must**
-be running Twisted 17.1.0 or later - see https://github.com/matrix-org/synapse/issues/1002
-for details.  We can't make Synapse depend on Twisted 17.1 by default
-yet as it will break most older distributions (see https://github.com/matrix-org/synapse/pull/1909)
-so if you are using operating system dependencies you'll have to install your
-own Twisted 17.1 package via pip or backports etc.
-
-If you're running in a virtualenv then pip should have installed the newest
-Twisted automatically, but if your virtualenv is old you will need to manually
-upgrade to a newer Twisted dependency via:
-
-    pip install Twisted>=17.1.0
-
 
 Running Synapse
 ===============
@@ -449,8 +437,7 @@ settings require a slightly more difficult installation process.
    using the ``.`` command, rather than ``bash``'s ``source``.
 5) Optionally, use ``pip`` to install ``lxml``, which Synapse needs to parse
    webpages for their titles.
-6) Use ``pip`` to install this repository: ``pip install
-   https://github.com/matrix-org/synapse/tarball/master``
+6) Use ``pip`` to install this repository: ``pip install matrix-synapse``
 7) Optionally, change ``_synapse``'s shell to ``/bin/false`` to reduce the
    chance of a compromised Synapse server being used to take over your box.
 
@@ -464,37 +451,13 @@ https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-
 
 Windows Install
 ---------------
-Synapse can be installed on Cygwin. It requires the following Cygwin packages:
 
-- gcc
-- git
-- libffi-devel
-- openssl (and openssl-devel, python-openssl)
-- python
-- python-setuptools
-
-The content repository requires additional packages and will be unable to process
-uploads without them:
-
-- libjpeg8
-- libjpeg8-devel
-- zlib
-
-If you choose to install Synapse without these packages, you will need to reinstall
-``pillow`` for changes to be applied, e.g. ``pip uninstall pillow`` ``pip install
-pillow --user``
-
-Troubleshooting:
-
-- You may need to upgrade ``setuptools`` to get this to work correctly:
-  ``pip install setuptools --upgrade``.
-- You may encounter errors indicating that ``ffi.h`` is missing, even with
-  ``libffi-devel`` installed. If you do, copy the ``.h`` files:
-  ``cp /usr/lib/libffi-3.0.13/include/*.h /usr/include``
-- You may need to install libsodium from source in order to install PyNacl. If
-  you do, you may need to create a symlink to ``libsodium.a`` so ``ld`` can find
-  it: ``ln -s /usr/local/lib/libsodium.a /usr/lib/libsodium.a``
-
+If you wish to run or develop Synapse on Windows, the Windows Subsystem For
+Linux provides a Linux environment on Windows 10 which is capable of using the
+Debian, Fedora, or source installation methods. More information about WSL can
+be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 for
+Windows 10 and https://docs.microsoft.com/en-us/windows/wsl/install-on-server
+for Windows Server.
 
 Troubleshooting
 ===============
@@ -502,7 +465,7 @@ Troubleshooting
 Troubleshooting Installation
 ----------------------------
 
-Synapse requires pip 1.7 or later, so if your OS provides too old a version you
+Synapse requires pip 8 or later, so if your OS provides too old a version you
 may need to manually upgrade it::
 
     sudo pip install --upgrade pip
@@ -536,28 +499,6 @@ happens, you will have to individually install the dependencies which are
 failing, e.g.::
 
     pip install twisted
-
-On OS X, if you encounter clang: error: unknown argument: '-mno-fused-madd' you
-will need to export CFLAGS=-Qunused-arguments.
-
-Troubleshooting Running
------------------------
-
-If synapse fails with ``missing "sodium.h"`` crypto errors, you may need
-to manually upgrade PyNaCL, as synapse uses NaCl (https://nacl.cr.yp.to/) for
-encryption and digital signatures.
-Unfortunately PyNACL currently has a few issues
-(https://github.com/pyca/pynacl/issues/53) and
-(https://github.com/pyca/pynacl/issues/79) that mean it may not install
-correctly, causing all tests to fail with errors about missing "sodium.h". To
-fix try re-installing from PyPI or directly from
-(https://github.com/pyca/pynacl)::
-
-    # Install from PyPI
-    pip install --user --upgrade --force pynacl
-
-    # Install from github
-    pip install --user https://github.com/pyca/pynacl/tarball/master
 
 Running out of File Handles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -716,7 +657,8 @@ Using a reverse proxy with Synapse
 
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
-`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
+`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
+`Caddy <https://caddyserver.com/docs/proxy>`_ or
 `HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
@@ -746,6 +688,26 @@ so an example nginx configuration might look like::
           proxy_set_header X-Forwarded-For $remote_addr;
       }
   }
+
+an example Caddy configuration might look like::
+
+    matrix.example.com {
+      proxy /_matrix http://localhost:8008 {
+        transparent
+      }
+    }
+
+and an example Apache configuration might look like::
+
+    <VirtualHost *:443>
+        SSLEngine on
+        ServerName matrix.example.com;
+
+        <Location /_matrix>
+            ProxyPass http://127.0.0.1:8008/_matrix nocanon
+            ProxyPassReverse http://127.0.0.1:8008/_matrix
+        </Location>
+    </VirtualHost>
 
 You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
 for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
@@ -901,7 +863,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python2.7 env
     source env/bin/activate
-    python synapse/python_dependencies.py | xargs pip install
+    python -m synapse.python_dependencies | xargs pip install
     pip install lxml mock
 
 This will run a process of downloading and installing all the needed
@@ -956,5 +918,13 @@ variable.  The default is 0.5, which can be decreased to reduce RAM usage
 in memory constrained enviroments, or increased if performance starts to
 degrade.
 
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall amount, and especially in terms of giving back RAM
+to the OS. To use it, the library must simply be put in the LD_PRELOAD
+environment variable when launching Synapse. On Debian, this can be done
+by installing the ``libjemalloc1`` package and adding this line to
+``/etc/default/matrix-synapse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 .. _`key_management`: https://matrix.org/docs/spec/server_server/unstable.html#retrieving-server-keys

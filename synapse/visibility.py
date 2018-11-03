@@ -23,6 +23,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.utils import prune_event
+from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
     )
     event_id_to_state = yield store.get_state_for_events(
         frozenset(e.event_id for e in events),
-        types=types,
+        state_filter=StateFilter.from_types(types),
     )
 
     ignore_dict_content = yield store.get_global_account_data_by_type_for_user(
@@ -219,7 +220,7 @@ def filter_events_for_server(store, server_name, events):
     # Whatever else we do, we need to check for senders which have requested
     # erasure of their data.
     erased_senders = yield store.are_users_erased(
-        e.sender for e in events,
+        (e.sender for e in events),
     )
 
     def redact_disallowed(event, state):
@@ -273,8 +274,8 @@ def filter_events_for_server(store, server_name, events):
     # need to check membership (as we know the server is in the room).
     event_to_state_ids = yield store.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
-        types=(
-            (EventTypes.RoomHistoryVisibility, ""),
+        state_filter=StateFilter.from_types(
+            types=((EventTypes.RoomHistoryVisibility, ""),),
         )
     )
 
@@ -314,9 +315,11 @@ def filter_events_for_server(store, server_name, events):
     # of the history vis and membership state at those events.
     event_to_state_ids = yield store.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
-        types=(
-            (EventTypes.RoomHistoryVisibility, ""),
-            (EventTypes.Member, None),
+        state_filter=StateFilter.from_types(
+            types=(
+                (EventTypes.RoomHistoryVisibility, ""),
+                (EventTypes.Member, None),
+            ),
         )
     )
 
@@ -324,14 +327,13 @@ def filter_events_for_server(store, server_name, events):
     # server's domain.
     #
     # event_to_state_ids contains lots of duplicates, so it turns out to be
-    # cheaper to build a complete set of unique
-    # ((type, state_key), event_id) tuples, and then filter out the ones we
-    # don't want.
+    # cheaper to build a complete event_id => (type, state_key) dict, and then
+    # filter out the ones we don't want
     #
-    state_key_to_event_id_set = {
-        e
+    event_id_to_state_key = {
+        event_id: key
         for key_to_eid in itervalues(event_to_state_ids)
-        for e in key_to_eid.items()
+        for key, event_id in iteritems(key_to_eid)
     }
 
     def include(typ, state_key):
@@ -346,7 +348,7 @@ def filter_events_for_server(store, server_name, events):
 
     event_map = yield store.get_events([
         e_id
-        for key, e_id in state_key_to_event_id_set
+        for e_id, key in iteritems(event_id_to_state_key)
         if include(key[0], key[1])
     ])
 

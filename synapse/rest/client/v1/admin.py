@@ -101,7 +101,7 @@ class UserRegisterServlet(ClientV1RestServlet):
 
         nonce = self.hs.get_secrets().token_hex(64)
         self.nonces[nonce] = int(self.reactor.seconds())
-        return (200, {"nonce": nonce.encode('ascii')})
+        return (200, {"nonce": nonce})
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -164,7 +164,7 @@ class UserRegisterServlet(ClientV1RestServlet):
             key=self.hs.config.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
-        want_mac.update(nonce)
+        want_mac.update(nonce.encode('utf8'))
         want_mac.update(b"\x00")
         want_mac.update(username)
         want_mac.update(b"\x00")
@@ -173,7 +173,10 @@ class UserRegisterServlet(ClientV1RestServlet):
         want_mac.update(b"admin" if admin else b"notadmin")
         want_mac = want_mac.hexdigest()
 
-        if not hmac.compare_digest(want_mac, got_mac.encode('ascii')):
+        if not hmac.compare_digest(
+                want_mac.encode('ascii'),
+                got_mac.encode('ascii')
+        ):
             raise SynapseError(403, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication

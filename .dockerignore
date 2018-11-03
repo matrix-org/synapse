@@ -3,6 +3,5 @@ Dockerfile
 .gitignore
 demo/etc
 tox.ini
-synctl
 .git/*
 .tox/*

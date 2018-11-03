@@ -46,6 +46,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "consent_version": None,
                 "consent_server_notice_sent": None,
                 "appservice_id": None,
+                "creation_ts": 1000,
             },
             (yield self.store.get_user_by_id(self.user_id)),
         )

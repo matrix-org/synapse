@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import re
 
 import six
 from six import iteritems
@@ -44,8 +43,10 @@ from synapse.replication.http.federation import (
     ReplicationGetQueryRestServlet,
 )
 from synapse.types import get_domain_from_id
+from synapse.util import glob_to_regex
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.logcontext import nested_logging_context
 from synapse.util.logutils import log_function
 
 # when processing incoming transactions, we try to handle multiple rooms in
@@ -99,7 +100,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
-    def on_incoming_transaction(self, transaction_data):
+    def on_incoming_transaction(self, origin, transaction_data):
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
         request_time = self._clock.time_msec()
@@ -108,34 +109,33 @@ class FederationServer(FederationBase):
 
         if not transaction.transaction_id:
             raise Exception("Transaction missing transaction_id")
-        if not transaction.origin:
-            raise Exception("Transaction missing origin")
 
         logger.debug("[%s] Got transaction", transaction.transaction_id)
 
         # use a linearizer to ensure that we don't process the same transaction
         # multiple times in parallel.
         with (yield self._transaction_linearizer.queue(
-                (transaction.origin, transaction.transaction_id),
+                (origin, transaction.transaction_id),
         )):
             result = yield self._handle_incoming_transaction(
-                transaction, request_time,
+                origin, transaction, request_time,
             )
 
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _handle_incoming_transaction(self, transaction, request_time):
+    def _handle_incoming_transaction(self, origin, transaction, request_time):
         """ Process an incoming transaction and return the HTTP response
 
         Args:
+            origin (unicode): the server making the request
             transaction (Transaction): incoming transaction
             request_time (int): timestamp that the HTTP request arrived at
 
         Returns:
             Deferred[(int, object)]: http response code and body
         """
-        response = yield self.transaction_actions.have_responded(transaction)
+        response = yield self.transaction_actions.have_responded(origin, transaction)
 
         if response:
             logger.debug(
@@ -149,7 +149,7 @@ class FederationServer(FederationBase):
 
         received_pdus_counter.inc(len(transaction.pdus))
 
-        origin_host, _ = parse_server_name(transaction.origin)
+        origin_host, _ = parse_server_name(origin)
 
         pdus_by_room = {}
 
@@ -188,21 +188,22 @@ class FederationServer(FederationBase):
 
             for pdu in pdus_by_room[room_id]:
                 event_id = pdu.event_id
-                try:
-                    yield self._handle_received_pdu(
-                        transaction.origin, pdu
-                    )
-                    pdu_results[event_id] = {}
-                except FederationError as e:
-                    logger.warn("Error handling PDU %s: %s", event_id, e)
-                    pdu_results[event_id] = {"error": str(e)}
-                except Exception as e:
-                    f = failure.Failure()
-                    pdu_results[event_id] = {"error": str(e)}
-                    logger.error(
-                        "Failed to handle PDU %s: %s",
-                        event_id, f.getTraceback().rstrip(),
-                    )
+                with nested_logging_context(event_id):
+                    try:
+                        yield self._handle_received_pdu(
+                            origin, pdu
+                        )
+                        pdu_results[event_id] = {}
+                    except FederationError as e:
+                        logger.warn("Error handling PDU %s: %s", event_id, e)
+                        pdu_results[event_id] = {"error": str(e)}
+                    except Exception as e:
+                        f = failure.Failure()
+                        pdu_results[event_id] = {"error": str(e)}
+                        logger.error(
+                            "Failed to handle PDU %s: %s",
+                            event_id, f.getTraceback().rstrip(),
+                        )
 
         yield concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(),
@@ -212,7 +213,7 @@ class FederationServer(FederationBase):
         if hasattr(transaction, "edus"):
             for edu in (Edu(**x) for x in transaction.edus):
                 yield self.received_edu(
-                    transaction.origin,
+                    origin,
                     edu.edu_type,
                     edu.content
                 )
@@ -224,6 +225,7 @@ class FederationServer(FederationBase):
         logger.debug("Returning: %s", str(response))
 
         yield self.transaction_actions.set_response(
+            origin,
             transaction,
             200, response
         )
@@ -505,19 +507,19 @@ class FederationServer(FederationBase):
     @defer.inlineCallbacks
     @log_function
     def on_get_missing_events(self, origin, room_id, earliest_events,
-                              latest_events, limit, min_depth):
+                              latest_events, limit):
         with (yield self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)
             yield self.check_server_matches_acl(origin_host, room_id)
 
             logger.info(
                 "on_get_missing_events: earliest_events: %r, latest_events: %r,"
-                " limit: %d, min_depth: %d",
-                earliest_events, latest_events, limit, min_depth
+                " limit: %d",
+                earliest_events, latest_events, limit,
             )
 
             missing_events = yield self.handler.on_get_missing_events(
-                origin, room_id, earliest_events, latest_events, limit, min_depth
+                origin, room_id, earliest_events, latest_events, limit,
             )
 
             if len(missing_events) < 5:
@@ -618,7 +620,7 @@ class FederationServer(FederationBase):
             )
 
         yield self.handler.on_receive_pdu(
-            origin, pdu, get_missing=True, sent_to_us_directly=True,
+            origin, pdu, sent_to_us_directly=True,
         )
 
     def __str__(self):
@@ -727,20 +729,8 @@ def _acl_entry_matches(server_name, acl_entry):
     if not isinstance(acl_entry, six.string_types):
         logger.warn("Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry))
         return False
-    regex = _glob_to_regex(acl_entry)
+    regex = glob_to_regex(acl_entry)
     return regex.match(server_name)
-
-
-def _glob_to_regex(glob):
-    res = ''
-    for c in glob:
-        if c == '*':
-            res = res + '.*'
-        elif c == '?':
-            res = res + '.'
-        else:
-            res = res + re.escape(c)
-    return re.compile(res + "\\Z", re.IGNORECASE)
 
 
 class FederationHandlerRegistry(object):
@@ -798,7 +788,7 @@ class FederationHandlerRegistry(object):
             yield handler(origin, content)
         except SynapseError as e:
             logger.info("Failed to handle edu %r: %r", edu_type, e)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to handle edu %r", edu_type)
 
     def on_query(self, query_type, args):
@@ -838,9 +828,9 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
             )
 
         return self._send_edu(
-                edu_type=edu_type,
-                origin=origin,
-                content=content,
+            edu_type=edu_type,
+            origin=origin,
+            content=content,
         )
 
     def on_query(self, query_type, args):
@@ -851,6 +841,6 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
             return handler(args)
 
         return self._get_query_client(
-                query_type=query_type,
-                args=args,
+            query_type=query_type,
+            args=args,
         )

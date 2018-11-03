@@ -65,7 +65,6 @@ class ExpiringCacheTestCase(unittest.TestCase):
     def test_time_eviction(self):
         clock = MockClock()
         cache = ExpiringCache("test", clock, expiry_ms=1000)
-        cache.start()
 
         cache["key"] = 1
         clock.advance_time(0.5)

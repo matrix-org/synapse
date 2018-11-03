@@ -21,7 +21,7 @@ listeners:
   {% if not SYNAPSE_NO_TLS %}
   -
     port: 8448
-    bind_addresses: ['0.0.0.0']
+    bind_addresses: ['::']
     type: http
     tls: true
     x_forwarded: false
@@ -34,7 +34,7 @@ listeners:
 
   - port: 8008
     tls: false
-    bind_addresses: ['0.0.0.0']
+    bind_addresses: ['::']
     type: http
     x_forwarded: false
 
@@ -85,7 +85,7 @@ federation_rc_concurrent: 3
 
 media_store_path: "/data/media"
 uploads_path: "/data/uploads"
-max_upload_size: "10M"
+max_upload_size: "{{ SYNAPSE_MAX_UPLOAD_SIZE or "10M" }}"
 max_image_pixels: "32M"
 dynamic_thumbnails: false
 
@@ -211,7 +211,9 @@ email:
    require_transport_security: False
    notif_from: "{{ SYNAPSE_SMTP_FROM or "hostmaster@" + SYNAPSE_SERVER_NAME }}"
    app_name: Matrix
-   template_dir: res/templates
+   # if template_dir is unset, uses the example templates that are part of
+   # the Synapse distribution.
+   #template_dir: res/templates
    notif_template_html: notif_mail.html
    notif_template_text: notif_mail.txt
    notif_for_new_users: True

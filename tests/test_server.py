@@ -1,14 +1,35 @@
+# Copyright 2018 New Vector Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import logging
 import re
 
+from six import StringIO
+
 from twisted.internet.defer import Deferred
-from twisted.test.proto_helpers import MemoryReactorClock
+from twisted.python.failure import Failure
+from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
+from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
+from synapse.http.site import SynapseSite, logger
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, render, setup_test_homeserver
+from tests.server import FakeTransport, make_request, render, setup_test_homeserver
 
 
 class JsonResourceTests(unittest.TestCase):
@@ -121,3 +142,52 @@ class JsonResourceTests(unittest.TestCase):
         self.assertEqual(channel.result["code"], b'400')
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
+
+
+class SiteTestCase(unittest.HomeserverTestCase):
+    def test_lose_connection(self):
+        """
+        We log the URI correctly redacted when we lose the connection.
+        """
+
+        class HangingResource(Resource):
+            """
+            A Resource that strategically hangs, as if it were processing an
+            answer.
+            """
+
+            def render(self, request):
+                return NOT_DONE_YET
+
+        # Set up a logging handler that we can inspect afterwards
+        output = StringIO()
+        handler = logging.StreamHandler(output)
+        logger.addHandler(handler)
+        old_level = logger.level
+        logger.setLevel(10)
+        self.addCleanup(logger.setLevel, old_level)
+        self.addCleanup(logger.removeHandler, handler)
+
+        # Make a resource and a Site, the resource will hang and allow us to
+        # time out the request while it's 'processing'
+        base_resource = Resource()
+        base_resource.putChild(b'', HangingResource())
+        site = SynapseSite("test", "site_tag", {}, base_resource, "1.0")
+
+        server = site.buildProtocol(None)
+        client = AccumulatingProtocol()
+        client.makeConnection(FakeTransport(server, self.reactor))
+        server.makeConnection(FakeTransport(client, self.reactor))
+
+        # Send a request with an access token that will get redacted
+        server.dataReceived(b"GET /?access_token=bar HTTP/1.0\r\n\r\n")
+        self.pump()
+
+        # Lose the connection
+        e = Failure(Exception("Failed123"))
+        server.connectionLost(e)
+        handler.flush()
+
+        # Our access token is redacted and the failure reason is logged.
+        self.assertIn("/?access_token=<redacted>", output.getvalue())
+        self.assertIn("Failed123", output.getvalue())

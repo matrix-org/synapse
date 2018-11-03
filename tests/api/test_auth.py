@@ -457,8 +457,8 @@ class AuthTestCase(unittest.TestCase):
 
         with self.assertRaises(ResourceLimitError) as e:
             yield self.auth.check_auth_blocking()
-        self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
+        self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.exception.code, 403)
 
         # Ensure does not throw an error
@@ -468,11 +468,37 @@ class AuthTestCase(unittest.TestCase):
         yield self.auth.check_auth_blocking()
 
     @defer.inlineCallbacks
+    def test_reserved_threepid(self):
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.config.max_mau_value = 1
+        self.store.get_monthly_active_count = lambda: defer.succeed(2)
+        threepid = {'medium': 'email', 'address': 'reserved@server.com'}
+        unknown_threepid = {'medium': 'email', 'address': 'unreserved@server.com'}
+        self.hs.config.mau_limits_reserved_threepids = [threepid]
+
+        yield self.store.register(user_id='user1', token="123", password_hash=None)
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking()
+
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking(threepid=unknown_threepid)
+
+        yield self.auth.check_auth_blocking(threepid=threepid)
+
+    @defer.inlineCallbacks
     def test_hs_disabled(self):
         self.hs.config.hs_disabled = True
         self.hs.config.hs_disabled_message = "Reason for being disabled"
         with self.assertRaises(ResourceLimitError) as e:
             yield self.auth.check_auth_blocking()
-        self.assertEquals(e.exception.admin_uri, self.hs.config.admin_uri)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEED)
+        self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
+        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.exception.code, 403)
+
+    @defer.inlineCallbacks
+    def test_server_notices_mxid_special_cased(self):
+        self.hs.config.hs_disabled = True
+        user = "@user:server"
+        self.hs.config.server_notices_mxid = user
+        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        yield self.auth.check_auth_blocking(user)

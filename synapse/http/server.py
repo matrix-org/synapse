@@ -84,10 +84,21 @@ def wrap_json_request_handler(h):
             logger.info(
                 "%s SynapseError: %s - %s", request, code, e.msg
             )
-            respond_with_json(
-                request, code, e.error_dict(), send_cors=True,
-                pretty_print=_request_user_agent_is_curl(request),
-            )
+
+            # Only respond with an error response if we haven't already started
+            # writing, otherwise lets just kill the connection
+            if request.startedWriting:
+                if request.transport:
+                    try:
+                        request.transport.abortConnection()
+                    except Exception:
+                        # abortConnection throws if the connection is already closed
+                        pass
+            else:
+                respond_with_json(
+                    request, code, e.error_dict(), send_cors=True,
+                    pretty_print=_request_user_agent_is_curl(request),
+                )
 
         except Exception:
             # failure.Failure() fishes the original Failure out
@@ -100,16 +111,26 @@ def wrap_json_request_handler(h):
                 request,
                 f.getTraceback().rstrip(),
             )
-            respond_with_json(
-                request,
-                500,
-                {
-                    "error": "Internal server error",
-                    "errcode": Codes.UNKNOWN,
-                },
-                send_cors=True,
-                pretty_print=_request_user_agent_is_curl(request),
-            )
+            # Only respond with an error response if we haven't already started
+            # writing, otherwise lets just kill the connection
+            if request.startedWriting:
+                if request.transport:
+                    try:
+                        request.transport.abortConnection()
+                    except Exception:
+                        # abortConnection throws if the connection is already closed
+                        pass
+            else:
+                respond_with_json(
+                    request,
+                    500,
+                    {
+                        "error": "Internal server error",
+                        "errcode": Codes.UNKNOWN,
+                    },
+                    send_cors=True,
+                    pretty_print=_request_user_agent_is_curl(request),
+                )
 
     return wrap_async_request_handler(wrapped_request_handler)
 

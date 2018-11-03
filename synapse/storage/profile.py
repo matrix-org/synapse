@@ -123,8 +123,6 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_from_remote_profile_cache",
         )
 
-
-class ProfileStore(ProfileWorkerStore):
     def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
         return self._simple_upsert(
             table="profiles",
@@ -165,6 +163,8 @@ class ProfileStore(ProfileWorkerStore):
             lock=False  # we can do this because user_id has a unique index
         )
 
+
+class ProfileStore(ProfileWorkerStore):
     def add_remote_profile_cache(self, user_id, displayname, avatar_url):
         """Ensure we are caching the remote user's profiles.
 

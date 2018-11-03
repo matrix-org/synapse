@@ -26,6 +26,11 @@ from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 
 class RegistrationWorkerStore(SQLBaseStore):
+    def __init__(self, db_conn, hs):
+        super(RegistrationWorkerStore, self).__init__(db_conn, hs)
+
+        self.config = hs.config
+
     @cached()
     def get_user_by_id(self, user_id):
         return self._simple_select_one(
@@ -36,11 +41,32 @@ class RegistrationWorkerStore(SQLBaseStore):
             retcols=[
                 "name", "password_hash", "is_guest",
                 "consent_version", "consent_server_notice_sent",
-                "appservice_id",
+                "appservice_id", "creation_ts",
             ],
             allow_none=True,
             desc="get_user_by_id",
         )
+
+    @defer.inlineCallbacks
+    def is_trial_user(self, user_id):
+        """Checks if user is in the "trial" period, i.e. within the first
+        N days of registration defined by `mau_trial_days` config
+
+        Args:
+            user_id (str)
+
+        Returns:
+            Deferred[bool]
+        """
+
+        info = yield self.get_user_by_id(user_id)
+        if not info:
+            defer.returnValue(False)
+
+        now = self.clock.time_msec()
+        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
+        defer.returnValue(is_trial)
 
     @cached()
     def get_user_by_access_token(self, token):
@@ -436,17 +462,44 @@ class RegistrationStore(RegistrationWorkerStore,
 
     @defer.inlineCallbacks
     def get_user_id_by_threepid(self, medium, address):
-        ret = yield self._simple_select_one(
+        """Returns user id from threepid
+
+        Args:
+            medium (str): threepid medium e.g. email
+            address (str): threepid address e.g. me@example.com
+
+        Returns:
+            Deferred[str|None]: user id or None if no user id/threepid mapping exists
+        """
+        user_id = yield self.runInteraction(
+            "get_user_id_by_threepid", self.get_user_id_by_threepid_txn,
+            medium, address
+        )
+        defer.returnValue(user_id)
+
+    def get_user_id_by_threepid_txn(self, txn, medium, address):
+        """Returns user id from threepid
+
+        Args:
+            txn (cursor):
+            medium (str): threepid medium e.g. email
+            address (str): threepid address e.g. me@example.com
+
+        Returns:
+            str|None: user id or None if no user id/threepid mapping exists
+        """
+        ret = self._simple_select_one_txn(
+            txn,
             "user_threepids",
             {
                 "medium": medium,
                 "address": address
             },
-            ['user_id'], True, 'get_user_id_by_threepid'
+            ['user_id'], True
         )
         if ret:
-            defer.returnValue(ret['user_id'])
-        defer.returnValue(None)
+            return ret['user_id']
+        return None
 
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
@@ -529,7 +582,7 @@ class RegistrationStore(RegistrationWorkerStore,
         def _find_next_generated_user_id(txn):
             txn.execute("SELECT name FROM users")
 
-            regex = re.compile("^@(\d+):")
+            regex = re.compile(r"^@(\d+):")
 
             found = set()
 

@@ -344,6 +344,7 @@ class RoomMemberHandler(object):
         latest_event_ids = (
             event_id for (event_id, _, _) in prev_events_and_hashes
         )
+
         current_state_ids = yield self.state_handler.get_current_state_ids(
             room_id, latest_event_ids=latest_event_ids,
         )
@@ -581,6 +582,11 @@ class RoomMemberHandler(object):
 
         room_id = mapping["room_id"]
         servers = mapping["servers"]
+
+        # put the server which owns the alias at the front of the server list.
+        if room_alias.domain in servers:
+            servers.remove(room_alias.domain)
+        servers.insert(0, room_alias.domain)
 
         defer.returnValue((RoomID.from_string(room_id), servers))
 

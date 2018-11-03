@@ -38,12 +38,12 @@ def cancelled_to_request_timed_out_error(value, timeout):
     return value
 
 
-ACCESS_TOKEN_RE = re.compile(br'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
+ACCESS_TOKEN_RE = re.compile(r'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
 
 
 def redact_uri(uri):
     """Strips access tokens from the uri replaces with <redacted>"""
     return ACCESS_TOKEN_RE.sub(
-        br'\1<redacted>\3',
+        r'\1<redacted>\3',
         uri
     )

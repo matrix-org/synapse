@@ -17,4 +17,14 @@
 """ This is a reference implementation of a Matrix home server.
 """
 
-__version__ = "0.33.3"
+try:
+    from twisted.internet import protocol
+    from twisted.internet.protocol import Factory
+    from twisted.names.dns import DNSDatagramProtocol
+    protocol.Factory.noisy = False
+    Factory.noisy = False
+    DNSDatagramProtocol.noisy = False
+except ImportError:
+    pass
+
+__version__ = "0.33.8"

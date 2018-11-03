@@ -31,5 +31,5 @@ $TOX_BIN/pip install 'setuptools>=18.5'
 $TOX_BIN/pip install 'pip>=10'
 
 { python synapse/python_dependencies.py
-  echo lxml psycopg2
+  echo lxml
 } | xargs $TOX_BIN/pip install

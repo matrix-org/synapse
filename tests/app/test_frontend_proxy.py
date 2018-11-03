@@ -47,7 +47,7 @@ class FrontendProxyTests(HomeserverTestCase):
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
         self.resource = (
-            site.resource.children["_matrix"].children["client"].children["r0"]
+            site.resource.children[b"_matrix"].children[b"client"].children[b"r0"]
         )
 
         request, channel = self.make_request("PUT", "presence/a/status")
@@ -77,7 +77,7 @@ class FrontendProxyTests(HomeserverTestCase):
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
         self.resource = (
-            site.resource.children["_matrix"].children["client"].children["r0"]
+            site.resource.children[b"_matrix"].children[b"client"].children[b"r0"]
         )
 
         request, channel = self.make_request("PUT", "presence/a/status")

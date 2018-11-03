@@ -28,6 +28,7 @@ import synapse
 import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
+from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -77,7 +78,9 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
         if not (yield check_3pid_allowed(self.hs, "email", body['email'])):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Your email domain is not authorized to register on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
@@ -117,7 +120,9 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         if not (yield check_3pid_allowed(self.hs, "msisdn", msisdn)):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Phone numbers are not authorized to register on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
@@ -383,7 +388,9 @@ class RegisterRestServlet(RestServlet):
 
                     if not (yield check_3pid_allowed(self.hs, medium, address)):
                         raise SynapseError(
-                            403, "Third party identifier is not allowed",
+                            403,
+                            "Third party identifiers (email/phone numbers)" +
+                            " are not authorized on this server",
                             Codes.THREEPID_DENIED,
                         )
 
@@ -488,13 +495,22 @@ class RegisterRestServlet(RestServlet):
             if desired_username is not None:
                 desired_username = desired_username.lower()
 
+            threepid = None
+            if auth_result:
+                threepid = auth_result.get(LoginType.EMAIL_IDENTITY)
+
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
                 password=params.get("password", None),
                 guest_access_token=guest_access_token,
                 generate_token=False,
                 display_name=desired_display_name,
+                threepid=threepid,
             )
+            # Necessary due to auth checks prior to the threepid being
+            # written to the db
+            if is_threepid_reserved(self.hs.config, threepid):
+                yield self.store.upsert_monthly_active_user(registered_user_id)
 
             if self.hs.config.shadow_server:
                 yield self.registration_handler.shadow_register(
