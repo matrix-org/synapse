@@ -28,6 +28,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(ProfileDisplaynameRestServlet, self).__init__(hs)
         self.profile_handler = hs.get_profile_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -59,10 +60,27 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         yield self.profile_handler.set_displayname(
             user, requester, new_name, is_admin)
 
+        if self.hs.config.shadow_server:
+            self.shadow_displayname(user_id, content)
+
         defer.returnValue((200, {}))
 
     def on_OPTIONS(self, request, user_id):
         return (200, {})
+
+    @defer.inlineCallbacks
+    def shadow_displayname(self, user_id, body):
+        # TODO: retries
+        shadow_hs = self.hs.config.shadow_server.get("hs")
+        as_token = self.hs.config.shadow_server.get("as_token")
+        body['access_token'] = as_token
+
+        yield self.http_client.post_urlencoded_get_json(
+            "https://%s%s" % (
+                shadow_hs, ("/_matrix/client/r0/profile/%s/displayname" % user_id)
+            ),
+            body
+        )
 
 
 class ProfileAvatarURLRestServlet(ClientV1RestServlet):
@@ -71,6 +89,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(ProfileAvatarURLRestServlet, self).__init__(hs)
         self.profile_handler = hs.get_profile_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -83,6 +102,9 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         ret = {}
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
+
+        if self.hs.config.shadow_server:
+            self.shadow_displayname(user_id, content)
 
         defer.returnValue((200, ret))
 
@@ -101,10 +123,27 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         yield self.profile_handler.set_avatar_url(
             user, requester, new_name, is_admin)
 
+        if self.hs.config.shadow_server:
+            self.shadow_avatar_url(user_id, content)
+
         defer.returnValue((200, {}))
 
     def on_OPTIONS(self, request, user_id):
         return (200, {})
+
+    @defer.inlineCallbacks
+    def shadow_avatar_url(self, user_id, body):
+        # TODO: retries
+        shadow_hs = self.hs.config.shadow_server.get("hs")
+        as_token = self.hs.config.shadow_server.get("as_token")
+        body['access_token'] = as_token
+
+        yield self.http_client.post_urlencoded_get_json(
+            "https://%s%s" % (
+                shadow_hs, ("/_matrix/client/r0/profile/%s/avatar_url" % user_id)
+            ),
+            body
+        )
 
 
 class ProfileRestServlet(ClientV1RestServlet):
