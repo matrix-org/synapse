@@ -113,6 +113,7 @@ class PasswordRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.datastore = self.hs.get_datastore()
         self._set_password_handler = hs.get_set_password_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -409,6 +410,7 @@ class ThreepidDeleteRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
