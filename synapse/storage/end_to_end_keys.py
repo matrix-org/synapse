@@ -14,13 +14,13 @@
 # limitations under the License.
 from six import iteritems
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, db_to_json
 
 
 class EndToEndKeyStore(SQLBaseStore):
@@ -90,7 +90,7 @@ class EndToEndKeyStore(SQLBaseStore):
 
         for user_id, device_keys in iteritems(results):
             for device_id, device_info in iteritems(device_keys):
-                device_info["keys"] = json.loads(device_info.pop("key_json"))
+                device_info["keys"] = db_to_json(device_info.pop("key_json"))
 
         defer.returnValue(results)
 

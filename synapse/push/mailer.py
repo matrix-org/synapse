@@ -17,9 +17,10 @@ import email.mime.multipart
 import email.utils
 import logging
 import time
-import urllib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+from six.moves import urllib
 
 import bleach
 import jinja2
@@ -440,7 +441,7 @@ class Mailer(object):
 
     def make_room_link(self, room_id):
         if self.hs.config.email_riot_base_url:
-            base_url = self.hs.config.email_riot_base_url
+            base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             base_url = "https://vector.im/beta/#/room"
@@ -474,7 +475,7 @@ class Mailer(object):
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
             self.hs.config.public_baseurl,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
         )
 
 
@@ -525,8 +526,7 @@ def load_jinja2_templates(config):
     Returns:
         (notif_template_html, notif_template_text)
     """
-    logger.info("loading jinja2")
-
+    logger.info("loading email templates from '%s'", config.email_template_dir)
     loader = jinja2.FileSystemLoader(config.email_template_dir)
     env = jinja2.Environment(loader=loader)
     env.filters["format_ts"] = format_ts_filter
@@ -561,7 +561,7 @@ def _create_mxc_to_http_filter(config):
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             config.public_baseurl,
             serverAndMediaId,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
             fragment or "",
         )
 

@@ -30,6 +30,7 @@ from .appservice import ApplicationServiceStore, ApplicationServiceTransactionSt
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .directory import DirectoryStore
+from .e2e_room_keys import EndToEndRoomKeyStore
 from .end_to_end_keys import EndToEndKeyStore
 from .engines import PostgresEngine
 from .event_federation import EventFederationStore
@@ -77,6 +78,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 ApplicationServiceTransactionStore,
                 ReceiptsStore,
                 EndToEndKeyStore,
+                EndToEndRoomKeyStore,
                 SearchStore,
                 TagsStore,
                 AccountDataStore,

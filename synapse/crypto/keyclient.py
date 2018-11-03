@@ -18,7 +18,9 @@ import logging
 from canonicaljson import json
 
 from twisted.internet import defer, reactor
+from twisted.internet.error import ConnectError
 from twisted.internet.protocol import Factory
+from twisted.names.error import DomainError
 from twisted.web.http import HTTPClient
 
 from synapse.http.endpoint import matrix_federation_endpoint
@@ -47,12 +49,14 @@ def fetch_server_key(server_name, tls_client_options_factory, path=KEY_API_V1):
                 server_response, server_certificate = yield protocol.remote_key
                 defer.returnValue((server_response, server_certificate))
         except SynapseKeyClientError as e:
-            logger.exception("Error getting key for %r" % (server_name,))
-            if e.status.startswith("4"):
+            logger.warn("Error getting key for %r: %s", server_name, e)
+            if e.status.startswith(b"4"):
                 # Don't retry for 4xx responses.
                 raise IOError("Cannot get key for %r" % server_name)
-        except Exception as e:
-            logger.exception(e)
+        except (ConnectError, DomainError) as e:
+            logger.warn("Error getting key for %r: %s", server_name, e)
+        except Exception:
+            logger.exception("Error getting key for %r", server_name)
     raise IOError("Cannot get key for %r" % server_name)
 
 
@@ -77,6 +81,12 @@ class SynapseKeyClientProtocol(HTTPClient):
     def connectionMade(self):
         self._peer = self.transport.getPeer()
         logger.debug("Connected to %s", self._peer)
+
+        if not isinstance(self.path, bytes):
+            self.path = self.path.encode('ascii')
+
+        if not isinstance(self.host, bytes):
+            self.host = self.host.encode('ascii')
 
         self.sendCommand(b"GET", self.path)
         if self.host:

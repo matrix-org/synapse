@@ -88,5 +88,5 @@ class LocalKey(Resource):
         )
 
     def getChild(self, name, request):
-        if name == '':
+        if name == b'':
             return self

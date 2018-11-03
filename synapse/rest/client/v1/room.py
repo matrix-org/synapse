@@ -33,6 +33,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 
@@ -207,7 +208,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
             "sender": requester.user.to_string(),
         }
 
-        if 'ts' in request.args and requester.app_service:
+        if b'ts' in request.args and requester.app_service:
             event_dict['origin_server_ts'] = parse_integer(request, "ts", 0)
 
         event = yield self.event_creation_hander.create_and_send_nonmember_event(
@@ -255,7 +256,9 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             try:
-                remote_room_hosts = request.args["server_name"]
+                remote_room_hosts = [
+                    x.decode('ascii') for x in request.args[b"server_name"]
+                ]
             except Exception:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
@@ -407,7 +410,7 @@ class RoomMemberListRestServlet(ClientV1RestServlet):
             room_id=room_id,
             user_id=requester.user.to_string(),
             at_token=at_token,
-            types=[(EventTypes.Member, None)],
+            state_filter=StateFilter.from_types([(EventTypes.Member, None)]),
         )
 
         chunk = []
@@ -461,10 +464,10 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         pagination_config = PaginationConfig.from_request(
             request, default_limit=10,
         )
-        as_client_event = "raw" not in request.args
-        filter_bytes = parse_string(request, "filter")
+        as_client_event = b"raw" not in request.args
+        filter_bytes = parse_string(request, b"filter", encoding=None)
         if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes).decode("UTF-8")
+            filter_json = urlparse.unquote(filter_bytes.decode("UTF-8"))
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
@@ -531,7 +534,7 @@ class RoomEventServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         event = yield self.event_handler.get_event(requester.user, room_id, event_id)
 
         time_now = self.clock.time_msec()
@@ -560,7 +563,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
         # picking the API shape for symmetry with /messages
         filter_bytes = parse_string(request, "filter")
         if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes).decode("UTF-8")
+            filter_json = urlparse.unquote(filter_bytes)
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None

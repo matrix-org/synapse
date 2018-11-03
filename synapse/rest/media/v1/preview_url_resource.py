@@ -79,7 +79,6 @@ class PreviewUrlResource(Resource):
             # don't spider URLs more often than once an hour
             expiry_ms=60 * 60 * 1000,
         )
-        self._cache.start()
 
         self._cleaner_loop = self.clock.looping_call(
             self._start_expire_url_cache_data, 10 * 1000,
@@ -261,7 +260,7 @@ class PreviewUrlResource(Resource):
 
         logger.debug("Calculated OG for %s as %s" % (url, og))
 
-        jsonog = json.dumps(og)
+        jsonog = json.dumps(og).encode('utf8')
 
         # store OG in history-aware DB cache
         yield self.store.store_url_cache(
@@ -301,20 +300,20 @@ class PreviewUrlResource(Resource):
                 logger.warn("Error downloading %s: %r", url, e)
                 raise SynapseError(
                     500, "Failed to download content: %s" % (
-                        traceback.format_exception_only(sys.exc_type, e),
+                        traceback.format_exception_only(sys.exc_info()[0], e),
                     ),
                     Codes.UNKNOWN,
                 )
             yield finish()
 
         try:
-            if "Content-Type" in headers:
-                media_type = headers["Content-Type"][0]
+            if b"Content-Type" in headers:
+                media_type = headers[b"Content-Type"][0].decode('ascii')
             else:
                 media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
 
-            content_disposition = headers.get("Content-Disposition", None)
+            content_disposition = headers.get(b"Content-Disposition", None)
             if content_disposition:
                 _, params = cgi.parse_header(content_disposition[0],)
                 download_name = None
@@ -597,10 +596,13 @@ def _iterate_over_text(tree, *tags_to_ignore):
     # to be returned.
     elements = iter([tree])
     while True:
-        el = next(elements)
+        el = next(elements, None)
+        if el is None:
+            return
+
         if isinstance(el, string_types):
             yield el
-        elif el is not None and el.tag not in tags_to_ignore:
+        elif el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately
             # return it if the text exists.
             if el.text:
@@ -672,7 +674,7 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
         # This splits the paragraph into words, but keeping the
         # (preceeding) whitespace intact so we can easily concat
         # words back together.
-        for match in re.finditer("\s*\S+", description):
+        for match in re.finditer(r"\s*\S+", description):
             word = match.group()
 
             # Keep adding words while the total length is less than

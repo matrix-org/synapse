@@ -16,8 +16,9 @@
 
 import hashlib
 import logging
-import urllib
 from collections import namedtuple
+
+from six.moves import urllib
 
 from signedjson.key import (
     decode_verify_key_bytes,
@@ -40,6 +41,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyclient import fetch_server_key
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.logcontext import (
+    LoggingContext,
     PreserveLoggingContext,
     preserve_fn,
     run_in_background,
@@ -216,23 +218,34 @@ class Keyring(object):
             servers have completed. Follows the synapse rules of logcontext
             preservation.
         """
+        loop_count = 1
         while True:
             wait_on = [
-                self.key_downloads[server_name]
+                (server_name, self.key_downloads[server_name])
                 for server_name in server_names
                 if server_name in self.key_downloads
             ]
-            if wait_on:
-                with PreserveLoggingContext():
-                    yield defer.DeferredList(wait_on)
-            else:
+            if not wait_on:
                 break
+            logger.info(
+                "Waiting for existing lookups for %s to complete [loop %i]",
+                [w[0] for w in wait_on], loop_count,
+            )
+            with PreserveLoggingContext():
+                yield defer.DeferredList((w[1] for w in wait_on))
+
+            loop_count += 1
+
+        ctx = LoggingContext.current_context()
 
         def rm(r, server_name_):
-            self.key_downloads.pop(server_name_, None)
+            with PreserveLoggingContext(ctx):
+                logger.debug("Releasing key lookup lock on %s", server_name_)
+                self.key_downloads.pop(server_name_, None)
             return r
 
         for server_name, deferred in server_to_deferred.items():
+            logger.debug("Got key lookup lock on %s", server_name)
             self.key_downloads[server_name] = deferred
             deferred.addBoth(rm, server_name)
 
@@ -432,7 +445,7 @@ class Keyring(object):
         # an incoming request.
         query_response = yield self.client.post_json(
             destination=perspective_name,
-            path=b"/_matrix/key/v2/query",
+            path="/_matrix/key/v2/query",
             data={
                 u"server_keys": {
                     server_name: {
@@ -513,8 +526,8 @@ class Keyring(object):
 
             (response, tls_certificate) = yield fetch_server_key(
                 server_name, self.hs.tls_client_options_factory,
-                path=(b"/_matrix/key/v2/server/%s" % (
-                    urllib.quote(requested_key_id),
+                path=("/_matrix/key/v2/server/%s" % (
+                    urllib.parse.quote(requested_key_id),
                 )).encode("ascii"),
             )
 

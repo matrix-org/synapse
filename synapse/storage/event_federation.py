@@ -376,33 +376,25 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
 
     @defer.inlineCallbacks
     def get_missing_events(self, room_id, earliest_events, latest_events,
-                           limit, min_depth):
+                           limit):
         ids = yield self.runInteraction(
             "get_missing_events",
             self._get_missing_events,
-            room_id, earliest_events, latest_events, limit, min_depth
+            room_id, earliest_events, latest_events, limit,
         )
-
         events = yield self._get_events(ids)
-
-        events = sorted(
-            [ev for ev in events if ev.depth >= min_depth],
-            key=lambda e: e.depth,
-        )
-
-        defer.returnValue(events[:limit])
+        defer.returnValue(events)
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events,
-                            limit, min_depth):
+                            limit):
 
-        earliest_events = set(earliest_events)
-        front = set(latest_events) - earliest_events
-
-        event_results = set()
+        seen_events = set(earliest_events)
+        front = set(latest_events) - seen_events
+        event_results = []
 
         query = (
             "SELECT prev_event_id FROM event_edges "
-            "WHERE event_id = ? AND is_state = ? "
+            "WHERE room_id = ? AND event_id = ? AND is_state = ? "
             "LIMIT ?"
         )
 
@@ -411,18 +403,20 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
             for event_id in front:
                 txn.execute(
                     query,
-                    (event_id, False, limit - len(event_results))
+                    (room_id, event_id, False, limit - len(event_results))
                 )
 
-                for e_id, in txn:
-                    new_front.add(e_id)
+                new_results = set(t[0] for t in txn) - seen_events
 
-            new_front -= earliest_events
-            new_front -= event_results
+                new_front |= new_results
+                seen_events |= new_results
+                event_results.extend(new_results)
 
             front = new_front
-            event_results |= new_front
 
+        # we built the list working backwards from latest_events; we now need to
+        # reverse it so that the events are approximately chronological.
+        event_results.reverse()
         return event_results
 
 
