@@ -152,7 +152,7 @@ class ProfileWorkerStore(SQLBaseStore):
             "active": int(active),
             "batch": batchnum,
         }
-        if not active and hide:
+        if not active and not hide:
             values["avatar_url"] = None
             values["displayname"] = None
         return self._simple_upsert(
