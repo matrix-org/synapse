@@ -47,6 +47,11 @@ class AccountDataServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
+        if account_data_type == "im.vector.hide_profile":
+            user = UserID.from_string(user_id)
+            hide_profile = body.get('hide_profile')
+            yield self._profile_handler.set_active(user, hide_profile, True)
+
         max_id = yield self.store.add_account_data_for_user(
             user_id, account_data_type, body
         )
