@@ -130,7 +130,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
             shadow_user = UserID(
                 user.localpart, self.hs.config.shadow_server.get("hs")
             )
-            self.shadow_avatar_url(user_id, content)
+            self.shadow_avatar_url(shadow_user.to_string(), content)
 
         defer.returnValue((200, {}))
 
@@ -145,7 +145,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
         yield self.http_client.put_json(
             "%s/_matrix/client/r0/profile/%s/avatar_url?access_token=%s&user_id=%s" % (
-                shadow_hs_url, shadow_user.to_string(), as_token, user_id
+                shadow_hs_url, user_id, as_token, user_id
             ),
             body
         )
