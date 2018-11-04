@@ -14,12 +14,16 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
+import logging
+
 from twisted.internet import defer
 
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import UserID
 
 from .base import ClientV1RestServlet, client_path_patterns
+
+logger = logging.getLogger(__name__)
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
@@ -61,7 +65,10 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
             user, requester, new_name, is_admin)
 
         if self.hs.config.shadow_server:
-            self.shadow_displayname(user_id, content)
+            shadow_user = UserID(
+                user.localpart, self.hs.config.shadow_server.get("hs")
+            )
+            self.shadow_displayname(shadow_user.to_string(), content)
 
         defer.returnValue((200, {}))
 
@@ -74,9 +81,9 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
-        yield self.http_client.post_json_get_json(
-            "%s/_matrix/client/r0/profile/%s/displayname?access_token=%s" % (
-                shadow_hs_url, user_id, as_token
+        yield self.http_client.put_json(
+            "%s/_matrix/client/r0/profile/%s/displayname?access_token=%s&user_id=%s" % (
+                shadow_hs_url, user_id, as_token, user_id
             ),
             body
         )
@@ -120,6 +127,9 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
             user, requester, new_name, is_admin)
 
         if self.hs.config.shadow_server:
+            shadow_user = UserID(
+                user.localpart, self.hs.config.shadow_server.get("hs")
+            )
             self.shadow_avatar_url(user_id, content)
 
         defer.returnValue((200, {}))
@@ -133,9 +143,9 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
         as_token = self.hs.config.shadow_server.get("as_token")
 
-        yield self.http_client.post_json_get_json(
-            "%s/_matrix/client/r0/profile/%s/avatar_url?access_token=%s" % (
-                shadow_hs_url, user_id, as_token
+        yield self.http_client.put_json(
+            "%s/_matrix/client/r0/profile/%s/avatar_url?access_token=%s&user_id=%s" % (
+                shadow_hs_url, shadow_user.to_string(), as_token, user_id
             ),
             body
         )

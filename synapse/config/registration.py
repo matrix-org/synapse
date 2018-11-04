@@ -148,6 +148,7 @@ class RegistrationConfig(Config):
         # via a given AS token.
         # shadow_server:
         #     hs_url: https://shadow.example.com
+        #     hs: shadow.example.com
         #     as_token: 12u394refgbdhivsia
 
         # If enabled, don't let users set their own display names/avatars

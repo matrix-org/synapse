@@ -189,6 +189,7 @@ class Auth(object):
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
             user_id, app_service = yield self._get_appservice_user_id(request)
+
             if user_id:
                 request.authenticated_entity = user_id
                 defer.returnValue(
@@ -244,6 +245,7 @@ class Auth(object):
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
         )
+
         if app_service is None:
             return(None, None)
 
@@ -514,24 +516,9 @@ class Auth(object):
         defer.returnValue(user_info)
 
     def get_appservice_by_req(self, request):
-        try:
-            token = self.get_access_token_from_request(
-                request, self.TOKEN_NOT_FOUND_HTTP_STATUS
-            )
-            service = self.store.get_app_service_by_token(token)
-            if not service:
-                logger.warn("Unrecognised appservice access token.")
-                raise AuthError(
-                    self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                    "Unrecognised access token.",
-                    errcode=Codes.UNKNOWN_TOKEN
-                )
-            request.authenticated_entity = service.sender
-            return defer.succeed(service)
-        except KeyError:
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Missing access token."
-            )
+        (user_id, appservice) = self._get_appservice_user_id(request)
+        request.authenticated_entity = service.sender
+        return appservice
 
     def is_server_admin(self, user):
         """ Check if the given user is a local server admin.
