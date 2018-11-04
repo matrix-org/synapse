@@ -516,9 +516,9 @@ class Auth(object):
         defer.returnValue(user_info)
 
     def get_appservice_by_req(self, request):
-        (user_id, appservice) = self._get_appservice_user_id(request)
-        request.authenticated_entity = service.sender
-        return appservice
+        (user_id, app_service) = self._get_appservice_user_id(request)
+        request.authenticated_entity = app_service.sender
+        return app_service
 
     def is_server_admin(self, user):
         """ Check if the given user is a local server admin.
