@@ -100,6 +100,15 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
 
-        # Now we've consented!
-        user_data = self.get_success(store.get_user_by_id(user_id))
-        self.assertEqual(user_data["consent_version"], "1")
+        # Fetch the consent page, to get the consent version -- it should have
+        # changed
+        request, channel = self.make_request(
+            "GET", consent_uri, access_token=access_token, shorthand=False
+        )
+        render(request, resource, self.reactor)
+        self.assertEqual(channel.code, 200)
+
+        # Get the version from the body, and check that it's the version we
+        # agreed to
+        version = channel.result["body"].decode('ascii')
+        self.assertEqual(version, "1")
