@@ -200,7 +200,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         # history_visibility event.
         room_state = []
 
-        history_visibility_evt = FrozenEvent(
+        history_visibility_evt = FrozenEvent.from_v1(
             {
                 "event_id": "$history_vis",
                 "type": "m.room.history_visibility",
@@ -215,7 +215,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         for i in range(0, 100000):
             user = "@resident_user_%i:test.com" % (i,)
-            evt = FrozenEvent(
+            evt = FrozenEvent.from_v1(
                 {
                     "event_id": "$res_event_%i" % (i,),
                     "type": "m.room.member",
@@ -231,7 +231,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         events_to_filter = []
         for i in range(0, 10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
-            evt = FrozenEvent(
+            evt = FrozenEvent.from_v1(
                 {
                     "event_id": "$evt%i" % (i,),
                     "type": "m.room.member",

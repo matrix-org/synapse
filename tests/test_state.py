@@ -64,7 +64,7 @@ def create_event(
 
     d.update(kwargs)
 
-    event = FrozenEvent(d)
+    event = FrozenEvent.from_v1(d)
 
     return event
 

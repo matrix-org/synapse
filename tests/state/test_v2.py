@@ -86,7 +86,7 @@ class FakeEvent(object):
         if self.state_key is not None:
             event_dict["state_key"] = self.state_key
 
-        return FrozenEvent(event_dict)
+        return FrozenEvent.from_v1(event_dict)
 
 
 # All graphs start with this set of events

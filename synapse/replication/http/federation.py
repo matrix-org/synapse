@@ -96,7 +96,9 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 event_dict = event_payload["event"]
                 internal_metadata = event_payload["internal_metadata"]
                 rejected_reason = event_payload["rejected_reason"]
-                event = FrozenEvent(event_dict, internal_metadata, rejected_reason)
+                event = FrozenEvent.from_v1(
+                    event_dict, internal_metadata, rejected_reason,
+                )
 
                 context = yield EventContext.deserialize(
                     self.store, event_payload["context"],

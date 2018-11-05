@@ -92,7 +92,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             event_dict = content["event"]
             internal_metadata = content["internal_metadata"]
             rejected_reason = content["rejected_reason"]
-            event = FrozenEvent(event_dict, internal_metadata, rejected_reason)
+            event = FrozenEvent.from_v1(
+                event_dict, internal_metadata, rejected_reason,
+            )
 
             requester = Requester.deserialize(self.store, content["requester"])
             context = yield EventContext.deserialize(self.store, content["context"])

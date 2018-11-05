@@ -86,7 +86,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         msg_dict["content"] = {}
         msg_dict["unsigned"]["redacted_by"] = redaction.event_id
         msg_dict["unsigned"]["redacted_because"] = redaction
-        redacted = FrozenEvent(msg_dict, msg.internal_metadata.get_dict())
+        redacted = FrozenEvent.from_v1(msg_dict, msg.internal_metadata.get_dict())
         self.check("get_event", [msg.event_id], redacted)
 
     def test_backfilled_redactions(self):
@@ -106,7 +106,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         msg_dict["content"] = {}
         msg_dict["unsigned"]["redacted_by"] = redaction.event_id
         msg_dict["unsigned"]["redacted_because"] = redaction
-        redacted = FrozenEvent(msg_dict, msg.internal_metadata.get_dict())
+        redacted = FrozenEvent.from_v1(msg_dict, msg.internal_metadata.get_dict())
         self.check("get_event", [msg.event_id], redacted)
 
     def test_invites(self):
@@ -223,7 +223,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         if redacts is not None:
             event_dict["redacts"] = redacts
 
-        event = FrozenEvent(event_dict, internal_metadata_dict=internal)
+        event = FrozenEvent.from_v1(event_dict, internal_metadata_dict=internal)
 
         self.event_id += 1
 

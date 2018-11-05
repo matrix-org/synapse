@@ -34,7 +34,7 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return FrozenEvent.from_v1(kwargs)
 
 
 class FilteringTestCase(unittest.TestCase):

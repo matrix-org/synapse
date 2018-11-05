@@ -25,7 +25,7 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return FrozenEvent.from_v1(kwargs)
 
 
 class PruneEventTestCase(unittest.TestCase):
@@ -33,7 +33,7 @@ class PruneEventTestCase(unittest.TestCase):
     `matchdict` when it is redacted. """
 
     def run_test(self, evdict, matchdict):
-        self.assertEquals(prune_event(FrozenEvent(evdict)).get_dict(), matchdict)
+        self.assertEquals(prune_event(FrozenEvent.from_v1(evdict)).get_dict(), matchdict)
 
     def test_minimal(self):
         self.run_test(

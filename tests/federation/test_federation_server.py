@@ -43,7 +43,7 @@ class ServerACLsTestCase(unittest.TestCase):
 
 
 def _create_acl_event(content):
-    return FrozenEvent(
+    return FrozenEvent.from_v1(
         {
             "room_id": "!a:b",
             "event_id": "$a:b",

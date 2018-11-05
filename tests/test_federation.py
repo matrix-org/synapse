@@ -41,7 +41,7 @@ class MessageAcceptTests(unittest.TestCase):
             )
         )[0]
 
-        join_event = FrozenEvent(
+        join_event = FrozenEvent.from_v1(
             {
                 "room_id": self.room_id,
                 "sender": "@baduser:test.serv",
@@ -103,7 +103,7 @@ class MessageAcceptTests(unittest.TestCase):
         )[0]
 
         # Now lie about an event
-        lying_event = FrozenEvent(
+        lying_event = FrozenEvent.from_v1(
             {
                 "room_id": self.room_id,
                 "sender": "@baduser:test.serv",

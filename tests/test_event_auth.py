@@ -84,7 +84,7 @@ TEST_ROOM_ID = "!test:room"
 
 
 def _create_event(user_id):
-    return FrozenEvent(
+    return FrozenEvent.from_v1(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -96,7 +96,7 @@ def _create_event(user_id):
 
 
 def _join_event(user_id):
-    return FrozenEvent(
+    return FrozenEvent.from_v1(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -109,7 +109,7 @@ def _join_event(user_id):
 
 
 def _power_levels_event(sender, content):
-    return FrozenEvent(
+    return FrozenEvent.from_v1(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -122,7 +122,7 @@ def _power_levels_event(sender, content):
 
 
 def _random_state_event(sender):
-    return FrozenEvent(
+    return FrozenEvent.from_v1(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),

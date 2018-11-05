@@ -33,9 +33,7 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     name, expected_hash = compute_content_hash(event, hash_algorithm)
     logger.debug("Expecting hash: %s", encode_base64(expected_hash))
 
-    # some malformed events lack a 'hashes'. Protect against it being missing
-    # or a weird type by basically treating it the same as an unhashed event.
-    hashes = event.get("hashes")
+    hashes = event.hashes
     if not isinstance(hashes, dict):
         raise SynapseError(400, "Malformed 'hashes'", Codes.UNAUTHORIZED)
 

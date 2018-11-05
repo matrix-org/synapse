@@ -180,8 +180,6 @@ class EventsWorkerStore(SQLBaseStore):
                 else:
                     event = entry.event
 
-                events.append(event)
-
                 if get_prev_content:
                     if "replaces_state" in event.unsigned:
                         prev = yield self.get_event(
@@ -190,9 +188,11 @@ class EventsWorkerStore(SQLBaseStore):
                             allow_none=True,
                         )
                         if prev:
-                            event.unsigned = dict(event.unsigned)
+                            event = event.copy()
                             event.unsigned["prev_content"] = prev.content
                             event.unsigned["prev_sender"] = prev.sender
+
+                events.append(event)
 
         defer.returnValue(events)
 
@@ -405,7 +405,7 @@ class EventsWorkerStore(SQLBaseStore):
                     desc="_get_event_from_row_rejected_reason",
                 )
 
-            original_ev = FrozenEvent(
+            original_ev = FrozenEvent.from_v1(
                 d,
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,

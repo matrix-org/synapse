@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-import copy
 import itertools
 import logging
 import random
@@ -663,7 +662,7 @@ class FederationClient(FederationBase):
             # NB: We *need* to copy to ensure that we don't have multiple
             # references being passed on, as that causes... issues.
             signed_state = [
-                copy.copy(valid_pdus_map[p.event_id])
+                valid_pdus_map[p.event_id].copy()
                 for p in state
                 if p.event_id in valid_pdus_map
             ]
@@ -673,11 +672,6 @@ class FederationClient(FederationBase):
                 for p in auth_chain
                 if p.event_id in valid_pdus_map
             ]
-
-            # NB: We *need* to copy to ensure that we don't have multiple
-            # references being passed on, as that causes... issues.
-            for s in signed_state:
-                s.internal_metadata = copy.deepcopy(s.internal_metadata)
 
             check_authchain_validity(signed_auth)
 

@@ -325,7 +325,7 @@ def event_from_pdu_json(pdu_json, outlier=False):
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
-    event = FrozenEvent(
+    event = FrozenEvent.from_v1(
         pdu_json
     )
 
