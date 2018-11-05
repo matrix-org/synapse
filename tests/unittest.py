@@ -276,6 +276,8 @@ class HomeserverTestCase(TestCase):
             escaped UTF-8 & spaces and such).
             content (bytes or dict): The body of the request. JSON-encoded, if
             a dict.
+            shorthand: Whether to try and be helpful and prefix the given URL
+            with the usual REST API path, if it doesn't contain it.
 
         Returns:
             A synapse.http.site.SynapseRequest.

@@ -110,6 +110,18 @@ def make_request(
     """
     Make a web request using the given method and path, feed it the
     content, and return the Request and the Channel underneath.
+
+    Args:
+        method (bytes/unicode): The HTTP request method ("verb").
+        path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
+        escaped UTF-8 & spaces and such).
+        content (bytes or dict): The body of the request. JSON-encoded, if
+        a dict.
+        shorthand: Whether to try and be helpful and prefix the given URL
+        with the usual REST API path, if it doesn't contain it.
+
+    Returns:
+        A synapse.http.site.SynapseRequest.
     """
     if not isinstance(method, bytes):
         method = method.encode('ascii')
