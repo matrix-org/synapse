@@ -227,7 +227,7 @@ class ConsentResource(Resource):
             key=self._hmac_secret,
             msg=userid.encode('utf-8'),
             digestmod=sha256,
-        ).hexdigest()
+        ).hexdigest().encode('ascii')
 
         if not compare_digest(want_mac, userhmac):
             raise SynapseError(http_client.FORBIDDEN, "HMAC incorrect")
