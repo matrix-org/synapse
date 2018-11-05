@@ -46,9 +46,9 @@ DEFAULT_CONFIG = """\
 # process, similar to how captcha works. Users will be required to accept the
 # policy before their account is created.
 #
-# 'policy_name' is the name of the policy users will see when registering for
-# an account. Defaults to "Privacy Policy" and requires require_at_registration
-# to be enabled.
+# 'policy_name' is the display name of the policy users will see when registering
+# for an account. Has no effect unless `require_at_registration` is enabled.
+# Defaults to "Privacy Policy".
 #
 # user_consent:
 #   template_dir: res/templates/privacy
