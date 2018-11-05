@@ -52,7 +52,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         config.user_consent_template_dir = os.path.abspath(temp_consent_path)
 
         with open(os.path.join(temp_consent_path, "en/1.html"), 'w') as f:
-            f.write("{{version}}")
+            f.write("{{version}},{{has_consented}}")
 
         with open(os.path.join(temp_consent_path, "en/success.html"), 'w') as f:
             f.write("yay!")
@@ -72,10 +72,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user("user", "pass")
         access_token = self.login("user", "pass")
 
-        # They haven't consented, so they'll have a consent version of None
-        user_data = self.get_success(store.get_user_by_id(user_id))
-        self.assertIs(user_data["consent_version"], None)
-
         # Fetch the consent page, to get the consent version
         consent_uri = (
             uri_builder.build_user_consent_uri(user_id).replace("_matrix/", "")
@@ -87,8 +83,9 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         render(request, resource, self.reactor)
         self.assertEqual(channel.code, 200)
 
-        # Get the version from the body
-        version = channel.result["body"].decode('ascii')
+        # Get the version from the body, and whether we've consented
+        version, consented = channel.result["body"].decode('ascii').split(",")
+        self.assertEqual(consented, "False")
 
         # POST to the consent page, saying we've agreed
         request, channel = self.make_request(
@@ -109,6 +106,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Get the version from the body, and check that it's the version we
-        # agreed to
-        version = channel.result["body"].decode('ascii')
+        # agreed to, and that we've consented to it.
+        version, consented = channel.result["body"].decode('ascii').split(",")
+        self.assertEqual(consented, "True")
         self.assertEqual(version, "1")
