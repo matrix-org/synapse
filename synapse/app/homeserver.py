@@ -562,7 +562,6 @@ def run(hs):
                 hs.config.support_user_id
             )
             # if not create
-            localpart = UserID.from_string(hs.config.support_user_id)
             if not support_user:
                 registration_handler = hs.get_handlers().registration_handler
                 (user_id, token) = yield registration_handler.register(
