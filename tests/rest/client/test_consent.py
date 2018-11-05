@@ -65,7 +65,6 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         A user can use the consent form to accept the terms.
         """
         uri_builder = ConsentURIBuilder(self.hs.config)
-        store = self.hs.get_datastore()
         resource = consent_resource.ConsentResource(self.hs)
 
         # Register a user
