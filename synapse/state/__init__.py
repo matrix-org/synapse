@@ -261,7 +261,7 @@ class StateHandler(object):
         logger.debug("calling resolve_state_groups from compute_event_context")
 
         entry = yield self.resolve_state_groups_for_events(
-            event.room_id, [e for e, _ in event.prev_events],
+            event.room_id, event.prev_event_ids(),
         )
 
         prev_state_ids = entry.state

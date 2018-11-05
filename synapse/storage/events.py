@@ -416,7 +416,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                             )
                             if len_1:
                                 all_single_prev_not_state = all(
-                                    len(event.prev_events) == 1
+                                    len(event.prev_event_ids()) == 1
                                     and not event.is_state()
                                     for event, ctx in ev_ctx_rm
                                 )
@@ -440,7 +440,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                                 # guess this by looking at the prev_events and checking
                                 # if they match the current forward extremities.
                                 for ev, _ in ev_ctx_rm:
-                                    prev_event_ids = set(e for e, _ in ev.prev_events)
+                                    prev_event_ids = set(ev.prev_event_ids())
                                     if latest_event_ids == prev_event_ids:
                                         state_delta_reuse_delta_counter.inc()
                                         break
@@ -551,7 +551,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
         result.difference_update(
             e_id
             for event in new_events
-            for e_id, _ in event.prev_events
+            for e_id in event.prev_event_ids()
         )
 
         # Finally, remove any events which are prev_events of any existing events.
@@ -869,7 +869,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                     "auth_id": auth_id,
                 }
                 for event, _ in events_and_contexts
-                for auth_id, _ in event.auth_events
+                for auth_id in event.auth_event_ids()
                 if event.is_state()
             ],
         )
