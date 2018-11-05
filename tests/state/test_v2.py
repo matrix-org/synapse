@@ -753,7 +753,7 @@ class TestStateResolutionStore(object):
             result.add(event_id)
 
             event = self.event_map[event_id]
-            for aid, _ in event.auth_events:
+            for aid in event.auth_event_ids():
                 stack.append(aid)
 
         return list(result)

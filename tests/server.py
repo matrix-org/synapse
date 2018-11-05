@@ -104,10 +104,24 @@ class FakeSite:
         return FakeLogger()
 
 
-def make_request(method, path, content=b"", access_token=None, request=SynapseRequest):
+def make_request(
+    method, path, content=b"", access_token=None, request=SynapseRequest, shorthand=True
+):
     """
     Make a web request using the given method and path, feed it the
     content, and return the Request and the Channel underneath.
+
+    Args:
+        method (bytes/unicode): The HTTP request method ("verb").
+        path (bytes/unicode): The HTTP path, suitably URL encoded (e.g.
+        escaped UTF-8 & spaces and such).
+        content (bytes or dict): The body of the request. JSON-encoded, if
+        a dict.
+        shorthand: Whether to try and be helpful and prefix the given URL
+        with the usual REST API path, if it doesn't contain it.
+
+    Returns:
+        A synapse.http.site.SynapseRequest.
     """
     if not isinstance(method, bytes):
         method = method.encode('ascii')
@@ -115,8 +129,8 @@ def make_request(method, path, content=b"", access_token=None, request=SynapseRe
     if not isinstance(path, bytes):
         path = path.encode('ascii')
 
-    # Decorate it to be the full path
-    if not path.startswith(b"/_matrix"):
+    # Decorate it to be the full path, if we're using shorthand
+    if shorthand and not path.startswith(b"/_matrix"):
         path = b"/_matrix/client/r0/" + path
         path = path.replace(b"//", b"/")
 
