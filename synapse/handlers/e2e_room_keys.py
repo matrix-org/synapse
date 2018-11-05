@@ -55,6 +55,8 @@ class E2eRoomKeysHandler(object):
             room_id(string): room ID to get keys for, for None to get keys for all rooms
             session_id(string): session ID to get keys for, for None to get keys for all
                 sessions
+        Raises:
+            NotFoundError: if the backup version does not exist
         Returns:
             A deferred list of dicts giving the session_data and message metadata for
             these room keys.
