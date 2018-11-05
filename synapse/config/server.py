@@ -13,8 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
+from builtins import str
 
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.types import UserID
@@ -90,7 +90,7 @@ class ServerConfig(Config):
         self.support_user_id = None
         autocreate_support_user = config.get('autocreate_support_user', None)
         if autocreate_support_user:
-            self.support_user_pass = unicode(autocreate_support_user['password'], "utf-8")
+            self.support_user_pass = str(autocreate_support_user['password'])
             localpart = autocreate_support_user['localpart']
             self.support_user_id = UserID(localpart, self.server_name).to_string()
 
