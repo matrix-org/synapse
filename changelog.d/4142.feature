@@ -1,1 +1,1 @@
-Add configuration options for enabling consent at registration and changing the policy name.
+Include flags to optionally add `m.login.terms` to the registration flow when consent tracking is enabled.
