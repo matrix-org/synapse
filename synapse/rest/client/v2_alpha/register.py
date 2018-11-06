@@ -359,6 +359,13 @@ class RegisterRestServlet(RestServlet):
                     [LoginType.MSISDN, LoginType.EMAIL_IDENTITY]
                 ])
 
+        # Append m.login.terms to all flows if we're requiring consent
+        if self.hs.config.user_consent_at_registration:
+            new_flows = []
+            for flow in flows:
+                flow.append(LoginType.TERMS)
+            flows.extend(new_flows)
+
         auth_result, params, session_id = yield self.auth_handler.check_auth(
             flows, body, self.hs.get_ip_from_request(request)
         )
@@ -443,6 +450,12 @@ class RegisterRestServlet(RestServlet):
             yield self._register_msisdn_threepid(
                 registered_user_id, threepid, return_dict["access_token"],
                 params.get("bind_msisdn")
+            )
+
+        if auth_result and LoginType.TERMS in auth_result:
+            logger.info("%s has consented to the privacy policy" % registered_user_id)
+            yield self.store.user_set_consent_version(
+                registered_user_id, self.hs.config.user_consent_version,
             )
 
         defer.returnValue((200, return_dict))

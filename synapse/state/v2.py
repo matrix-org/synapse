@@ -53,6 +53,10 @@ def resolve_events_with_store(state_sets, event_map, state_res_store):
 
     logger.debug("Computing conflicted state")
 
+    # We use event_map as a cache, so if its None we need to initialize it
+    if event_map is None:
+        event_map = {}
+
     # First split up the un/conflicted state
     unconflicted_state, conflicted_state = _seperate(state_sets)
 
@@ -155,7 +159,7 @@ def _get_power_level_for_sender(event_id, event_map, state_res_store):
     event = yield _get_event(event_id, event_map, state_res_store)
 
     pl = None
-    for aid, _ in event.auth_events:
+    for aid in event.auth_event_ids():
         aev = yield _get_event(aid, event_map, state_res_store)
         if (aev.type, aev.state_key) == (EventTypes.PowerLevels, ""):
             pl = aev
@@ -163,7 +167,7 @@ def _get_power_level_for_sender(event_id, event_map, state_res_store):
 
     if pl is None:
         # Couldn't find power level. Check if they're the creator of the room
-        for aid, _ in event.auth_events:
+        for aid in event.auth_event_ids():
             aev = yield _get_event(aid, event_map, state_res_store)
             if (aev.type, aev.state_key) == (EventTypes.Create, ""):
                 if aev.content.get("creator") == event.sender:
@@ -295,7 +299,7 @@ def _add_event_and_auth_chain_to_graph(graph, event_id, event_map,
         graph.setdefault(eid, set())
 
         event = yield _get_event(eid, event_map, state_res_store)
-        for aid, _ in event.auth_events:
+        for aid in event.auth_event_ids():
             if aid in auth_diff:
                 if aid not in graph:
                     state.append(aid)
@@ -365,7 +369,7 @@ def _iterative_auth_checks(event_ids, base_state, event_map, state_res_store):
         event = event_map[event_id]
 
         auth_events = {}
-        for aid, _ in event.auth_events:
+        for aid in event.auth_event_ids():
             ev = yield _get_event(aid, event_map, state_res_store)
 
             if ev.rejected_reason is None:
@@ -413,9 +417,9 @@ def _mainline_sort(event_ids, resolved_power_event_id, event_map,
     while pl:
         mainline.append(pl)
         pl_ev = yield _get_event(pl, event_map, state_res_store)
-        auth_events = pl_ev.auth_events
+        auth_events = pl_ev.auth_event_ids()
         pl = None
-        for aid, _ in auth_events:
+        for aid in auth_events:
             ev = yield _get_event(aid, event_map, state_res_store)
             if (ev.type, ev.state_key) == (EventTypes.PowerLevels, ""):
                 pl = aid
@@ -460,10 +464,10 @@ def _get_mainline_depth_for_event(event, mainline_map, event_map, state_res_stor
         if depth is not None:
             defer.returnValue(depth)
 
-        auth_events = event.auth_events
+        auth_events = event.auth_event_ids()
         event = None
 
-        for aid, _ in auth_events:
+        for aid in auth_events:
             aev = yield _get_event(aid, event_map, state_res_store)
             if (aev.type, aev.state_key) == (EventTypes.PowerLevels, ""):
                 event = aev

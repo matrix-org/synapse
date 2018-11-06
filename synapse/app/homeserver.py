@@ -37,7 +37,6 @@ from synapse.api.urls import (
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_PREFIX,
-    SERVER_KEY_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
     WEB_CLIENT_PREFIX,
@@ -59,7 +58,6 @@ from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, check_requirem
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
-from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
@@ -236,10 +234,7 @@ class SynapseHomeServer(HomeServer):
                 )
 
         if name in ["keys", "federation"]:
-            resources.update({
-                SERVER_KEY_PREFIX: LocalKey(self),
-                SERVER_KEY_V2_PREFIX: KeyApiV2Resource(self),
-            })
+            resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
             resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)

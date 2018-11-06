@@ -138,9 +138,30 @@ class DirectoryHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def delete_association(self, requester, room_alias):
-        # association deletion for human users
+    def delete_association(self, requester, room_alias, send_event=True):
+        """Remove an alias from the directory
 
+        (this is only meant for human users; AS users should call
+        delete_appservice_association)
+
+        Args:
+            requester (Requester):
+            room_alias (RoomAlias):
+            send_event (bool): Whether to send an updated m.room.aliases event.
+                Note that, if we delete the canonical alias, we will always attempt
+                to send an m.room.canonical_alias event
+
+        Returns:
+            Deferred[unicode]: room id that the alias used to point to
+
+        Raises:
+            NotFoundError: if the alias doesn't exist
+
+            AuthError: if the user doesn't have perms to delete the alias (ie, the user
+                is neither the creator of the alias, nor a server admin.
+
+            SynapseError: if the alias belongs to an AS
+        """
         user_id = requester.user.to_string()
 
         try:
@@ -168,10 +189,11 @@ class DirectoryHandler(BaseHandler):
         room_id = yield self._delete_association(room_alias)
 
         try:
-            yield self.send_room_alias_update_event(
-                requester,
-                room_id
-            )
+            if send_event:
+                yield self.send_room_alias_update_event(
+                    requester,
+                    room_id
+                )
 
             yield self._update_canonical_alias(
                 requester,

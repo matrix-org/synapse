@@ -15,6 +15,8 @@
 
 import logging
 
+from six.moves import urllib
+
 from canonicaljson import json
 
 from twisted.internet import defer, reactor
@@ -28,15 +30,15 @@ from synapse.util import logcontext
 
 logger = logging.getLogger(__name__)
 
-KEY_API_V1 = b"/_matrix/key/v1/"
+KEY_API_V2 = "/_matrix/key/v2/server/%s"
 
 
 @defer.inlineCallbacks
-def fetch_server_key(server_name, tls_client_options_factory, path=KEY_API_V1):
+def fetch_server_key(server_name, tls_client_options_factory, key_id):
     """Fetch the keys for a remote server."""
 
     factory = SynapseKeyClientFactory()
-    factory.path = path
+    factory.path = KEY_API_V2 % (urllib.parse.quote(key_id), )
     factory.host = server_name
     endpoint = matrix_federation_endpoint(
         reactor, server_name, tls_client_options_factory, timeout=30
