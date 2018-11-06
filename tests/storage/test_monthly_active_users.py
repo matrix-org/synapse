@@ -29,7 +29,6 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         hs.config.limit_usage_by_mau = True
         hs.config.max_mau_value = 50
         hs.config.support_user_id = "@support:test"
-        hs.config.support_user_pass = "password"
         # Advance the clock a bit
         reactor.advance(FORTY_DAYS)
 

@@ -554,25 +554,6 @@ def run(hs):
         clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
-    @defer.inlineCallbacks
-    def create_support_user():
-        if hs.config.support_user_id:
-            # check not already created
-            support_user = yield hs.get_datastore().get_users_by_id_case_insensitive(
-                hs.config.support_user_id
-            )
-            # if not create
-            if not support_user:
-                registration_handler = hs.get_handlers().registration_handler
-                (user_id, token) = yield registration_handler.register(
-                    localpart=UserID.from_string(hs.config.support_user_id).localpart,
-                    password=hs.config.support_user_pass,
-                )
-    run_as_background_process(
-        "create_support_user",
-        create_support_user,
-    )
-
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
         clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000)
