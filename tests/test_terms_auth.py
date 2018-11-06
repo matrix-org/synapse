@@ -41,7 +41,8 @@ class TermsTestCase(unittest.HomeserverTestCase):
         hs.config.enable_registration_captcha = False
 
     def test_ui_auth(self):
-        self.hs.config.block_events_without_consent_error = True
+        self.hs.config.user_consent_at_registration = True
+        self.hs.config.user_consent_policy_name = "My Cool Privacy Policy"
         self.hs.config.public_baseurl = "https://example.org"
         self.hs.config.user_consent_version = "1.0"
 
@@ -65,7 +66,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
                 "policies": {
                     "privacy_policy": {
                         "en": {
-                            "name": "Privacy Policy",
+                            "name": "My Cool Privacy Policy",
                             "url": "https://example.org/_matrix/consent?v=1.0",
                         },
                         "version": "1.0"
