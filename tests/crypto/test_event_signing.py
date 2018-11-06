@@ -18,7 +18,7 @@ import nacl.signing
 from unpaddedbase64 import decode_base64
 
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.events.builder import EventBuilder
+from synapse.events.builder import EventBuilderV1
 
 from tests import unittest
 
@@ -40,7 +40,7 @@ class EventSigningTestCase(unittest.TestCase):
         self.signing_key.version = KEY_VER
 
     def test_sign_minimal(self):
-        builder = EventBuilder(
+        builder = EventBuilderV1(
             {
                 'event_id': "$0:domain",
                 'origin': "domain",
@@ -71,7 +71,7 @@ class EventSigningTestCase(unittest.TestCase):
         )
 
     def test_sign_message(self):
-        builder = EventBuilder(
+        builder = EventBuilderV1(
             {
                 'content': {'body': "Here is the message content"},
                 'event_id': "$0:domain",

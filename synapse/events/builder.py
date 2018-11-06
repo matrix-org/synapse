@@ -48,7 +48,7 @@ def _event_dict_property(key):
     )
 
 
-class EventBuilder(object):
+class EventBuilderV1(object):
     def __init__(self, event_dict, signatures={}, unsigned={},
                  internal_metadata_dict={}, rejected_reason=None):
         self.signatures = signatures
@@ -157,4 +157,4 @@ class EventBuilderFactory(object):
 
         key_values["signatures"] = {}
 
-        return EventBuilder(key_values)
+        return EventBuilderV1(key_values)

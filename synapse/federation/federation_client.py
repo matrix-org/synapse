@@ -570,7 +570,7 @@ class FederationClient(FederationBase):
             if "prev_state" not in pdu_dict:
                 pdu_dict["prev_state"] = []
 
-            ev = builder.EventBuilder(pdu_dict)
+            ev = builder.EventBuilderV1(pdu_dict)
 
             defer.returnValue(
                 (destination, ev)

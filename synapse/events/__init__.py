@@ -220,15 +220,6 @@ class FrozenEvent(object):
             self._state_key,
         )
 
-    @staticmethod
-    def from_event(event):
-        e = FrozenEvent.from_v1(
-            event.get_pdu_json(),
-            internal_metadata_dict=event.internal_metadata.get_dict(),
-        )
-
-        return e
-
     # FIXME: We probably want to get rid of the below functions
 
     def get(self, key, default=None):
