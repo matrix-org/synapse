@@ -21,7 +21,7 @@ from frozendict import frozendict
 
 from synapse.api.constants import EventTypes
 
-from . import EventBase, FrozenEvent
+from . import FrozenEvent
 
 # Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
 # (?<!stuff) matches if the current position in the string is not preceded
@@ -245,7 +245,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
         dict
     """
     # FIXME(erikj): To handle the case of presence events and the like
-    if not isinstance(e, EventBase) and not isinstance(e, FrozenEvent):
+    if not isinstance(e, FrozenEvent):
         return e
 
     time_now_ms = int(time_now_ms)

@@ -20,7 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
-from synapse.events import EventBase
+from synapse.events import FrozenEvent
 from synapse.events.utils import serialize_event
 from synapse.types import UserID
 from synapse.util.logutils import log_function
@@ -89,7 +89,7 @@ class EventStreamHandler(BaseHandler):
             # joined room, we need to send down presence for those users.
             to_add = []
             for event in events:
-                if not isinstance(event, EventBase):
+                if not isinstance(event, FrozenEvent):
                     continue
                 if event.type == EventTypes.Member:
                     if event.membership != Membership.JOIN:

@@ -31,7 +31,6 @@ import synapse.metrics
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 # these are only included to make the type annotations work
-from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateResolutionStore

@@ -23,7 +23,6 @@ from twisted.internet import defer
 
 from synapse.api.errors import NotFoundError
 # these are only included to make the type annotations work
-from synapse.events import EventBase  # noqa: F401
 from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event

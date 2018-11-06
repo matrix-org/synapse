@@ -13,32 +13,117 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-
 from synapse.types import EventID
 from synapse.util.stringutils import random_string
 
-from . import EventBase, FrozenEvent, _event_dict_property
+from . import FrozenEvent, _EventInternalMetadata
 
 
-class EventBuilder(EventBase):
-    def __init__(self, key_values={}, internal_metadata_dict={}):
-        signatures = copy.deepcopy(key_values.pop("signatures", {}))
-        unsigned = copy.deepcopy(key_values.pop("unsigned", {}))
+def _event_dict_property(key):
+    # We want to be able to use hasattr with the event dict properties.
+    # However, (on python3) hasattr expects AttributeError to be raised. Hence,
+    # we need to transform the KeyError into an AttributeError
+    def getter(self):
+        try:
+            return self._event_dict[key]
+        except KeyError:
+            raise AttributeError(key)
 
-        super(EventBuilder, self).__init__(
-            key_values,
-            signatures=signatures,
-            unsigned=unsigned,
-            internal_metadata_dict=internal_metadata_dict,
+    def setter(self, v):
+        try:
+            self._event_dict[key] = v
+        except KeyError:
+            raise AttributeError(key)
+
+    def delete(self):
+        try:
+            del self._event_dict[key]
+        except KeyError:
+            raise AttributeError(key)
+
+    return property(
+        getter,
+        setter,
+        delete,
+    )
+
+
+class EventBuilder(object):
+    def __init__(self, event_dict, signatures={}, unsigned={},
+                 internal_metadata_dict={}, rejected_reason=None):
+        self.signatures = signatures
+        self.unsigned = unsigned
+        self.rejected_reason = rejected_reason
+
+        self._event_dict = event_dict
+
+        self.internal_metadata = _EventInternalMetadata(
+            internal_metadata_dict
         )
 
+    auth_events = _event_dict_property("auth_events")
+    depth = _event_dict_property("depth")
+    content = _event_dict_property("content")
     event_id = _event_dict_property("event_id")
+    hashes = _event_dict_property("hashes")
+    origin = _event_dict_property("origin")
+    origin_server_ts = _event_dict_property("origin_server_ts")
+    prev_events = _event_dict_property("prev_events")
+    prev_state = _event_dict_property("prev_state")
+    redacts = _event_dict_property("redacts")
+    room_id = _event_dict_property("room_id")
+    sender = _event_dict_property("sender")
     state_key = _event_dict_property("state_key")
     type = _event_dict_property("type")
+    user_id = _event_dict_property("sender")
+
+    @property
+    def membership(self):
+        return self.content["membership"]
+
+    def is_state(self):
+        return hasattr(self, "state_key") and self.state_key is not None
+
+    def get_dict(self):
+        d = dict(self._event_dict)
+        d.update({
+            "signatures": self.signatures,
+            "unsigned": dict(self.unsigned),
+        })
+
+        return d
+
+    def get_pdu_json(self, time_now=None):
+        pdu_json = self.get_dict()
+
+        if time_now is not None and "age_ts" in pdu_json["unsigned"]:
+            age = time_now - pdu_json["unsigned"]["age_ts"]
+            pdu_json.setdefault("unsigned", {})["age"] = int(age)
+            del pdu_json["unsigned"]["age_ts"]
+
+        # This may be a frozen event
+        pdu_json["unsigned"].pop("redacted_because", None)
+
+        return pdu_json
 
     def build(self):
-        return FrozenEvent.from_event(self)
+        # Make sure it matches
+        return FrozenEvent.from_v1(
+            event_dict=self.get_dict(),
+            internal_metadata_dict=self.internal_metadata.get_dict(),
+        )
+
+    def auth_event_ids(self):
+        if self.auth_events:
+            return [e for e, _ in self.auth_events]
+        else:
+            return []
+
+    def prev_event_ids(self):
+        if self.prev_events:
+            return [e for e, _ in self.prev_events]
+        else:
+            return []
 
 
 class EventBuilderFactory(object):
@@ -72,4 +157,4 @@ class EventBuilderFactory(object):
 
         key_values["signatures"] = {}
 
-        return EventBuilder(key_values=key_values,)
+        return EventBuilder(key_values)
