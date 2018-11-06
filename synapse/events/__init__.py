@@ -58,7 +58,7 @@ class _EventInternalMetadata(object):
         return getattr(self, "send_on_behalf_of", None)
 
 
-@attr.s(slots=True, frozen=True, cmp=False)
+@attr.s(slots=True, frozen=True, cmp=False, hash=None)
 class FrozenEvent(object):
     """A full event, which can't be mutated. Abstracts away differences
     between different event format versions.
