@@ -46,7 +46,7 @@ class E2eKeysHandler(object):
         )
 
     @defer.inlineCallbacks
-    def query_devices(self, query_body, timeout):
+    def query_devices(self, req_user_id, query_body, timeout):
         """ Handle a device key query from a client
 
         {
@@ -62,7 +62,18 @@ class E2eKeysHandler(object):
                         ...
                     }
                 }
-            }
+            },
+            "attestations": [
+               "user_id": "<user_id>",
+               "device_id": "<device_id>",
+               "keys": {
+                  "ed25519": "<key_base64>"
+               },
+               "state": "<verified or revoked>",
+               "signatures": {
+                  "<algorithm>:<device_id>": "<signature_base64>"
+               }
+            ]
         }
         """
         device_keys_query = query_body.get("device_keys", {})
@@ -82,11 +93,13 @@ class E2eKeysHandler(object):
         # First get local devices.
         failures = {}
         results = {}
+        attestations = []
         if local_query:
             local_result = yield self.query_local_devices(local_query)
             for user_id, keys in local_result.items():
                 if user_id in local_query:
                     results[user_id] = keys
+            attestations = yield self.query_local_attestations(req_user_id, local_query)
 
         # Now attempt to get any remote devices from our local cache.
         remote_queries_not_in_cache = {}
@@ -145,6 +158,7 @@ class E2eKeysHandler(object):
 
         defer.returnValue({
             "device_keys": results, "failures": failures,
+            "attestations": attestations
         })
 
     @defer.inlineCallbacks
@@ -192,6 +206,29 @@ class E2eKeysHandler(object):
                 result_dict[user_id][device_id] = r
 
         defer.returnValue(result_dict)
+
+    @defer.inlineCallbacks
+    def query_local_attestations(self, req_user_id, query):
+        local_query = []
+
+        for user_id, device_ids in query.items():
+            # we use UserID.from_string to catch invalid user ids
+            if not self.is_mine(UserID.from_string(user_id)):
+                logger.warning("Request for keys for non-local user %s",
+                               user_id)
+                raise SynapseError(400, "Not a user here")
+
+            if not device_ids:
+                local_query.append((user_id, None))
+            else:
+                for device_id in device_ids:
+                    local_query.append((user_id, device_id))
+
+        results = yield self.store.get_e2e_attestations(req_user_id, local_query)
+
+        # FIXME: combine signatures of the same payload
+
+        defer.returnValue(results)
 
     @defer.inlineCallbacks
     def on_federation_query_client_keys(self, query_body):
@@ -286,6 +323,12 @@ class E2eKeysHandler(object):
                 user_id, device_id, time_now, one_time_keys,
             )
 
+        attestations = keys.get("attestations", None)
+        if attestations:
+            yield self._upload_attestations_from_user(
+                user_id, attestations,
+            )
+
         # the device should have been registered already, but it may have been
         # deleted due to a race with a DELETE request. Or we may be using an
         # old access_token without an associated device_id. Either way, we
@@ -296,6 +339,42 @@ class E2eKeysHandler(object):
         result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
 
         defer.returnValue({"one_time_key_counts": result})
+
+    @defer.inlineCallbacks
+    def _upload_attestations_from_user(self, user_id, attestations):
+        if not isinstance(attestations, list):
+            raise SynapseError(
+                400,
+                "Attestations is not an array."
+            )
+
+        # only include attestations made by the user
+        attestations = [
+            {
+                "user_id": x["user_id"],
+                "device_id": x["device_id"],
+                "keys": x["keys"],
+                "state": x["state"],
+                "signatures": {
+                    user_id: x["signatures"][user_id]
+                }
+            }
+            for x in attestations if user_id in x["signatures"]]
+
+        yield self.store.add_e2e_attestations(
+            attestations
+        )
+
+        # notify about attestations
+        attested_users = {}
+        for attestation in attestations:
+            user_id = attestation["user_id"]
+            if user_id not in attested_users:
+                attested_users[user_id] = []
+            attested_users[user_id].append(attestation["device_id"])
+        # FIXME: only notify the calling user about the attestations
+        for user_id, devices in attested_users.iteritems():
+            yield self.device_handler.notify_device_update(user_id, devices)
 
     @defer.inlineCallbacks
     def _upload_one_time_keys_for_user(self, user_id, device_id, time_now,

@@ -14,7 +14,7 @@
 # limitations under the License.
 from six import iteritems
 
-from canonicaljson import encode_canonical_json
+from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
 
@@ -285,3 +285,55 @@ class EndToEndKeyStore(SQLBaseStore):
         return self.runInteraction(
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )
+
+    def add_e2e_attestations(self, attestations):
+        def add_e2e_attestations_txn(txn):
+            self._simple_insert_many_txn(
+                txn, table="e2e_attestations",
+                values=[
+                    {
+                        "user_id": x["user_id"],
+                        "device_id": x["device_id"],
+                        "from_user_id": from_user_id,
+                        "attestation": json.dumps(x),
+                    }
+                    for x in attestations
+                    for from_user_id in x["signatures"].iterkeys()
+                ],
+            )
+        return self.runInteraction(
+            "add_e2e_attestations", add_e2e_attestations_txn
+        )
+
+    @defer.inlineCallbacks
+    def get_e2e_attestations(self, from_user_id, query_list):
+        def get_e2e_attestations_txn(txn):
+            query_clauses = []
+            query_params = []
+
+            for (user_id, device_id) in query_list:
+                query_clause = "(from_user_id = ? OR from_user_id = ?) AND user_id = ?"
+                query_params.append(from_user_id)
+                query_params.append(user_id)
+                query_params.append(user_id)
+
+                if device_id is not None:
+                    query_clause += " AND device_id = ?"
+                    query_params.append(device_id)
+
+                query_clauses.append(query_clause)
+
+            sql = (
+                "SELECT attestation "
+                "  FROM e2e_attestations "
+                " WHERE %s"
+            ) % (
+                " OR ".join("(" + q + ")" for q in query_clauses)
+            )
+
+            txn.execute(sql, query_params)
+            return [json.loads(row[0]) for row in txn]
+        results = yield self.runInteraction(
+            "get_e2e_attestations", get_e2e_attestations_txn
+        )
+        defer.returnValue(results)

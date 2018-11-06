@@ -54,6 +54,19 @@ class KeyUploadServlet(RestServlet):
       "one_time_keys": {
         "<algorithm>:<key_id>": "<key_base64>"
       },
+      "attestations": [
+        {
+          "user_id": "<user_id>",
+          "device_id": "<device_id>",
+          "keys": {
+            "ed25519": "<key_base64>"
+          },
+          "state": "<verified or revoked>",
+          "signatures": {
+            "<user_id>": {
+              "<algorithm>:<device_id>": "<signature_base64>"
+        } } }
+      ]
     }
     """
     PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
@@ -127,7 +140,19 @@ class KeyQueryServlet(RestServlet):
               // Must be signed by this server.
               "<server_name>": {
                 "<algorithm>:<key_id>": "<signature_base64>"
-    } } } } } }
+      } } } } },
+      "attestations": [
+        "user_id": "<user_id>",
+        "device_id": "<device_id>",
+        "keys": {
+          "ed25519": "<key_base64>"
+        },
+        "state": "<verified or revoked>",
+        "signatures": {
+          "<algorithm>:<device_id>": "<signature_base64>"
+        }
+      ]
+    }
     """
 
     PATTERNS = client_v2_patterns("/keys/query$")
@@ -143,10 +168,11 @@ class KeyQueryServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        user_id = requester.user.to_string()
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        result = yield self.e2e_keys_handler.query_devices(body, timeout)
+        result = yield self.e2e_keys_handler.query_devices(user_id, body, timeout)
         defer.returnValue((200, result))
 
 
