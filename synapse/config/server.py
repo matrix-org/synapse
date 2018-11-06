@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from builtins import str
 
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.types import UserID
