@@ -60,6 +60,26 @@ class _EventInternalMetadata(object):
 
 @attr.s(slots=True, frozen=True, cmp=False)
 class FrozenEvent(object):
+    """A full event, which can't be mutated. Abstracts away differences
+    between different event format versions.
+
+    Attributes:
+        event_id (str)
+        room_id (str)
+        sender (str)
+        type (str)
+        state_key (str): If a state event, the state_key
+        depth (int)
+        redacts (str|None)
+        origin_server_ts (int)
+        content (dict)
+        signatures (dict)
+        hashes (dict)
+        unsigned (dict)
+        rejected_reason (str|None)
+        internal_metadata (_EventInternalMetadata)
+    """
+
     event_id = attr.ib()
     room_id = attr.ib()
     sender = attr.ib()
@@ -74,14 +94,29 @@ class FrozenEvent(object):
     unsigned = attr.ib()
     rejected_reason = attr.ib()
     internal_metadata = attr.ib()
-    event_format_version = attr.ib()
 
-    _auth_event_ids = attr.ib()
-    _prev_event_ids = attr.ib()
+    _auth_event_ids = attr.ib()  # tuple[str]: list of auth event IDs
+    _prev_event_ids = attr.ib()  # tuple[str]: list of prev event IDs
+    # str: the serialized event json, minus "unsigned" and "signatures" keys
     _json = attr.ib()
 
     @staticmethod
-    def from_v1(event_dict, internal_metadata_dict={}, rejected_reason=None):
+    def from_v1(event_dict, internal_metadata_dict={}, rejected_reason=None,
+                event_json=None):
+        """Creates a FrozenEvent from a v1 event
+
+        Args:
+            event_dict (dict)
+            internal_metadata_dict (dict)
+            rejected_reason (str|None): If set the event was rejected for the
+                given reason.
+            event_json (str|None): If set the json string `event_dict` was
+                parse from. If not given then it will be calculated by
+                serializing `event_dict`
+
+        Returns:
+            FrozenEvent
+        """
         event_dict = dict(event_dict)  # We copy this as we're going to remove stuff
 
         # A lot of this is optional because the tests don't actually define them
@@ -117,7 +152,8 @@ class FrozenEvent(object):
 
         unsigned = dict(event_dict.pop("unsigned", {}))
 
-        _json = json.dumps(event_dict)
+        if not event_json:
+            event_json = json.dumps(event_dict)
 
         rejected_reason = rejected_reason
         internal_metadata = _EventInternalMetadata(
@@ -139,10 +175,9 @@ class FrozenEvent(object):
             auth_event_ids=_auth_event_ids,
             prev_event_ids=_prev_event_ids,
             unsigned=unsigned,
-            json=_json,
+            json=event_json,
             rejected_reason=rejected_reason,
             internal_metadata=internal_metadata,
-            event_format_version=1,
         )
 
     def copy(self):
@@ -166,7 +201,6 @@ class FrozenEvent(object):
             internal_metadata=_EventInternalMetadata(
                 self.internal_metadata.get_dict(),
             ),
-            event_format_version=self.event_format_version,
         )
 
     @property

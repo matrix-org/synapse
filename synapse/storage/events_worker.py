@@ -408,6 +408,7 @@ class EventsWorkerStore(SQLBaseStore):
                 d,
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
+                event_json=js,
             )
 
             redacted_event = None
