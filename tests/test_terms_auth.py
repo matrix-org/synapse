@@ -23,7 +23,6 @@ from synapse.rest.client.v2_alpha.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request
 
 
 class TermsTestCase(unittest.HomeserverTestCase):
@@ -92,7 +91,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
 
         self.registration_handler.check_username = Mock(return_value=True)
 
-        request, channel = make_request(b"POST", self.url, request_data)
+        request, channel = self.make_request(b"POST", self.url, request_data)
         self.render(request)
 
         # We don't bother checking that the response is correct - we'll leave that to
@@ -110,7 +109,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
                 },
             }
         )
-        request, channel = make_request(b"POST", self.url, request_data)
+        request, channel = self.make_request(b"POST", self.url, request_data)
         self.render(request)
 
         # We're interested in getting a response that looks like a successful
