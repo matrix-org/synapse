@@ -400,9 +400,19 @@ class MediaRepository(object):
 
         time_now_ms = self.clock.time_msec()
 
-        content_disposition = headers.get(b"Content-Disposition", None)
+        content_disposition = headers.get(b"Content-Disposition", b'')
+
+        # Decode the Content-Disposition header (cgi.parse_header requires
+        # unicode on Python 3, not bytes) the best we can.
+        try:
+            content_disposition = content_disposition[0].decode('utf8')
+        except UnicodeDecodeError:
+            # Wasn't valid UTF-8, therefore not valid ASCII. Give up on figuring
+            # out what the mess they've sent is.
+            content_disposition = None
+
         if content_disposition:
-            _, params = cgi.parse_header(content_disposition[0].decode('ascii'),)
+            _, params = cgi.parse_header(content_disposition)
             upload_name = None
 
             # First check if there is a valid UTF-8 filename
@@ -421,7 +431,7 @@ class MediaRepository(object):
                 if PY3:
                     upload_name = urlparse.unquote(upload_name)
                 else:
-                    upload_name = urlparse.unquote(upload_name.encode('ascii'))
+                    upload_name = urlparse.unquote(upload_name.encode('utf8'))
                 try:
                     if isinstance(upload_name, bytes):
                         upload_name = upload_name.decode("utf-8")
