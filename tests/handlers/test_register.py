@@ -43,10 +43,7 @@ class RegistrationTestCase(unittest.TestCase):
             self.addCleanup,
             expire_access_token=True,
         )
-        self.macaroon_generator = Mock(
-            generate_access_token=Mock(return_value='secret')
-        )
-        self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
+
         self.handler = self.hs.get_handlers().registration_handler
         self.store = self.hs.get_datastore()
         self.hs.config.max_mau_value = 50
@@ -64,7 +61,7 @@ class RegistrationTestCase(unittest.TestCase):
             requester, frank.localpart, "Frankie"
         )
         self.assertEquals(result_user_id, user_id)
-        self.assertEquals(result_token, 'secret')
+        self.assertTrue(result_token is not None)
 
     @defer.inlineCallbacks
     def test_if_user_exists(self):
@@ -82,7 +79,8 @@ class RegistrationTestCase(unittest.TestCase):
             requester, local_part, None
         )
         self.assertEquals(result_user_id, user_id)
-        self.assertEquals(result_token, 'secret')
+        print("result token is %s" % result_token)
+        self.assertTrue(result_token is not None)
 
     @defer.inlineCallbacks
     def test_mau_limits_when_disabled(self):
@@ -184,3 +182,22 @@ class RegistrationTestCase(unittest.TestCase):
         res = yield self.handler.register(localpart='jeff')
         rooms = yield self.store.get_rooms_for_user(res[0])
         self.assertEqual(len(rooms), 0)
+
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_rooms_when_support_user_exists(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+        self.hs.config.support_user_id = "@support:test"
+        res_support = yield self.handler.register(localpart='support')
+        rooms = yield self.store.get_rooms_for_user(res_support[0])
+        self.assertTrue(len(rooms) == 0)
+
+        res = yield self.handler.register(localpart='jeff')
+
+        rooms = yield self.store.get_rooms_for_user(res[0])
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = yield directory_handler.get_association(room_alias)
+
+        self.assertTrue(room_id['room_id'] in rooms)
+        self.assertEqual(len(rooms), 1)
