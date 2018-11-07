@@ -57,6 +57,8 @@ class FakeChannel(object):
         self.result["headers"] = headers
 
     def write(self, content):
+        assert isinstance(content, bytes), "Should be bytes! " + repr(content)
+
         if "body" not in self.result:
             self.result["body"] = b""
 
