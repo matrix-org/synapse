@@ -339,18 +339,20 @@ class UserDirectoryStore(SQLBaseStore):
         rows = yield self._execute("get_all_local_users", None, sql)
         defer.returnValue([name for name, in rows])
 
-    def add_users_who_share_room(self, room_id, share_private, user_id_tuples_x):
+    def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
         """Insert entries into the users_who_share_rooms table. The first
         user should be a local user.
 
         Args:
             room_id (str)
             share_private (bool): Is the room private
-            user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
+            user_id_tuples_uf([(str, str)]): iterable of 2-tuple of user IDs.
         """
-        def _add_users_who_share_room_txn(txn):
+        def _add_users_who_share_room_txn(txn, user_id_tuples):
             support_user = self.hs.config.support_user_id
-            user_id_tuples = filter(lambda x: support_user not in x, user_id_tuples_x)
+
+            if support_user is not None:
+                user_id_tuples = [u for u in user_id_tuples if support_user not in u]
 
             self._simple_insert_many_txn(
                 txn,
@@ -375,7 +377,7 @@ class UserDirectoryStore(SQLBaseStore):
                     (user_id, other_user_id),
                 )
         return self.runInteraction(
-            "add_users_who_share_room", _add_users_who_share_room_txn
+            "add_users_who_share_room", _add_users_who_share_room_txn, user_id_tuples
         )
 
     def update_users_who_share_room(self, room_id, share_private, user_id_sets):

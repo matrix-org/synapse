@@ -97,6 +97,11 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         self.assertFalse(r["limited"])
         self.assertEqual(0, len(r["results"]))
 
+        # Check that enabled support user does not prevent all users being added
+        r = yield self.store.search_user_dir(ALICE, ALICE, 10)
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+
         yield self.store.update_user_in_user_dir(SUPPORT_USER, ROOM)
         yield self.store.update_profile_in_user_dir(
             SUPPORT_USER, support_screen_name, None, ROOM
