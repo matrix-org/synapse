@@ -247,7 +247,7 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             allow_guest=True,
         )
 
-        time.sleep(80)
+        time.sleep(240)
 
         try:
             content = parse_json_object_from_request(request)
