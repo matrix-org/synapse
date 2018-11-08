@@ -223,7 +223,7 @@ class RegistrationHandler(BaseHandler):
 
         # try to create the room if we're the first real user on the server. Note
         # that an auto generated support user is not a real user and never be
-        # the user to create the room 
+        # the user to create the room
         should_auto_create_rooms = False
         if (self.hs.config.autocreate_auto_join_rooms and
                 self.hs.config.support_user_id != user_id):
