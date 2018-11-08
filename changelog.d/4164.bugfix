@@ -1,0 +1,1 @@
+Fix noop checks when updating device keys, reducing spurious device list update notifications.

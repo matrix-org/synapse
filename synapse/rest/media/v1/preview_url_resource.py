@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import cgi
 import datetime
 import errno
@@ -24,6 +25,7 @@ import shutil
 import sys
 import traceback
 
+import six
 from six import string_types
 from six.moves import urllib_parse as urlparse
 
@@ -79,7 +81,6 @@ class PreviewUrlResource(Resource):
             # don't spider URLs more often than once an hour
             expiry_ms=60 * 60 * 1000,
         )
-        self._cache.start()
 
         self._cleaner_loop = self.clock.looping_call(
             self._start_expire_url_cache_data, 10 * 1000,
@@ -99,7 +100,7 @@ class PreviewUrlResource(Resource):
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = yield self.auth.get_user_by_req(request)
         url = parse_string(request, "url")
-        if "ts" in request.args:
+        if b"ts" in request.args:
             ts = parse_integer(request, "ts")
         else:
             ts = self.clock.time_msec()
@@ -181,7 +182,12 @@ class PreviewUrlResource(Resource):
             cache_result["expires_ts"] > ts and
             cache_result["response_code"] / 100 == 2
         ):
-            defer.returnValue(cache_result["og"])
+            # It may be stored as text in the database, not as bytes (such as
+            # PostgreSQL). If so, encode it back before handing it on.
+            og = cache_result["og"]
+            if isinstance(og, six.text_type):
+                og = og.encode('utf8')
+            defer.returnValue(og)
             return
 
         media_info = yield self._download_url(url, user)
@@ -214,14 +220,17 @@ class PreviewUrlResource(Resource):
         elif _is_html(media_info['media_type']):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
 
-            file = open(media_info['filename'])
-            body = file.read()
-            file.close()
+            with open(media_info['filename'], 'rb') as file:
+                body = file.read()
 
             # clobber the encoding from the content-type, or default to utf-8
             # XXX: this overrides any <meta/> or XML charset headers in the body
             # which may pose problems, but so far seems to work okay.
-            match = re.match(r'.*; *charset=(.*?)(;|$)', media_info['media_type'], re.I)
+            match = re.match(
+                r'.*; *charset="?(.*?)"?(;|$)',
+                media_info['media_type'],
+                re.I
+            )
             encoding = match.group(1) if match else "utf-8"
 
             og = decode_and_calc_og(body, media_info['uri'], encoding)
@@ -597,10 +606,13 @@ def _iterate_over_text(tree, *tags_to_ignore):
     # to be returned.
     elements = iter([tree])
     while True:
-        el = next(elements)
+        el = next(elements, None)
+        if el is None:
+            return
+
         if isinstance(el, string_types):
             yield el
-        elif el is not None and el.tag not in tags_to_ignore:
+        elif el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately
             # return it if the text exists.
             if el.text:
@@ -672,7 +684,7 @@ def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
         # This splits the paragraph into words, but keeping the
         # (preceeding) whitespace intact so we can easily concat
         # words back together.
-        for match in re.finditer("\s*\S+", description):
+        for match in re.finditer(r"\s*\S+", description):
             word = match.group()
 
             # Keep adding words while the total length is less than

@@ -17,10 +17,12 @@ import cgi
 import logging
 import random
 import sys
+from io import BytesIO
 
 from six import PY3, string_types
 from six.moves import urllib
 
+import attr
 import treq
 from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
@@ -28,8 +30,9 @@ from signedjson.sign import sign_json
 
 from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
+from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, HTTPConnectionPool
+from twisted.web.client import Agent, FileBodyProducer, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
@@ -41,13 +44,11 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.endpoint import matrix_federation_endpoint
-from synapse.util import logcontext
-from synapse.util.async_helpers import timeout_no_seriously
+from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
-outbound_logger = logging.getLogger("synapse.http.outbound")
 
 outgoing_requests_counter = Counter("synapse_http_matrixfederationclient_requests",
                                     "", ["method"])
@@ -78,6 +79,99 @@ class MatrixFederationEndpointFactory(object):
         )
 
 
+_next_id = 1
+
+
+@attr.s
+class MatrixFederationRequest(object):
+    method = attr.ib()
+    """HTTP method
+    :type: str
+    """
+
+    path = attr.ib()
+    """HTTP path
+    :type: str
+    """
+
+    destination = attr.ib()
+    """The remote server to send the HTTP request to.
+    :type: str"""
+
+    json = attr.ib(default=None)
+    """JSON to send in the body.
+    :type: dict|None
+    """
+
+    json_callback = attr.ib(default=None)
+    """A callback to generate the JSON.
+    :type: func|None
+    """
+
+    query = attr.ib(default=None)
+    """Query arguments.
+    :type: dict|None
+    """
+
+    txn_id = attr.ib(default=None)
+    """Unique ID for this request (for logging)
+    :type: str|None
+    """
+
+    def __attrs_post_init__(self):
+        global _next_id
+        self.txn_id = "%s-O-%s" % (self.method, _next_id)
+        _next_id = (_next_id + 1) % (MAXINT - 1)
+
+    def get_json(self):
+        if self.json_callback:
+            return self.json_callback()
+        return self.json
+
+
+@defer.inlineCallbacks
+def _handle_json_response(reactor, timeout_sec, request, response):
+    """
+    Reads the JSON body of a response, with a timeout
+
+    Args:
+        reactor (IReactor): twisted reactor, for the timeout
+        timeout_sec (float): number of seconds to wait for response to complete
+        request (MatrixFederationRequest): the request that triggered the response
+        response (IResponse): response to the request
+
+    Returns:
+        dict: parsed JSON response
+    """
+    try:
+        check_content_type_is_json(response.headers)
+
+        d = treq.json_content(response)
+        d = timeout_deferred(
+            d,
+            timeout=timeout_sec,
+            reactor=reactor,
+        )
+
+        body = yield make_deferred_yieldable(d)
+    except Exception as e:
+        logger.warn(
+            "{%s} [%s] Error reading response: %s",
+            request.txn_id,
+            request.destination,
+            e,
+        )
+        raise
+    logger.info(
+        "{%s} [%s] Completed: %d %s",
+        request.txn_id,
+        request.destination,
+        response.code,
+        response.phrase.decode('ascii', errors='replace'),
+    )
+    defer.returnValue(body)
+
+
 class MatrixFederationHttpClient(object):
     """HTTP client used to talk to other homeservers over the federation
     protocol. Send client certificates and signs requests.
@@ -101,41 +195,42 @@ class MatrixFederationHttpClient(object):
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
-        self.version_string = hs.version_string.encode('ascii')
-        self._next_id = 1
+        self.version_string_bytes = hs.version_string.encode('ascii')
         self.default_timeout = 60
 
-    def _create_url(self, destination, path_bytes, param_bytes, query_bytes):
-        return urllib.parse.urlunparse(
-            (b"matrix", destination, path_bytes, param_bytes, query_bytes, b"")
-        )
+        def schedule(x):
+            reactor.callLater(_EPSILON, x)
+
+        self._cooperator = Cooperator(scheduler=schedule)
 
     @defer.inlineCallbacks
-    def _request(self, destination, method, path,
-                 json=None, json_callback=None,
-                 param_bytes=b"",
-                 query=None, retry_on_dns_fail=True,
-                 timeout=None, long_retries=False,
-                 ignore_backoff=False,
-                 backoff_on_404=False):
+    def _send_request(
+        self,
+        request,
+        retry_on_dns_fail=True,
+        timeout=None,
+        long_retries=False,
+        ignore_backoff=False,
+        backoff_on_404=False
+    ):
         """
-        Creates and sends a request to the given server.
+        Sends a request to the given server.
 
         Args:
-            destination (str): The remote server to send the HTTP request to.
-            method (str): HTTP method
-            path (str): The HTTP path
-            json (dict or None): JSON to send in the body.
-            json_callback (func or None): A callback to generate the JSON.
-            query (dict or None): Query arguments.
+            request (MatrixFederationRequest): details of request to be sent
+
+            timeout (int|None): number of milliseconds to wait for the response headers
+                (including connecting to the server). 60s by default.
+
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
+
             backoff_on_404 (bool): Back off if we get a 404
 
         Returns:
             Deferred: resolves with the http response object on success.
 
-            Fails with ``HTTPRequestException``: if we get an HTTP response
+            Fails with ``HttpResponseException``: if we get an HTTP response
                 code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -154,38 +249,32 @@ class MatrixFederationHttpClient(object):
 
         if (
             self.hs.config.federation_domain_whitelist is not None and
-            destination not in self.hs.config.federation_domain_whitelist
+            request.destination not in self.hs.config.federation_domain_whitelist
         ):
-            raise FederationDeniedError(destination)
+            raise FederationDeniedError(request.destination)
 
         limiter = yield synapse.util.retryutils.get_retry_limiter(
-            destination,
+            request.destination,
             self.clock,
             self._store,
             backoff_on_404=backoff_on_404,
             ignore_backoff=ignore_backoff,
         )
 
-        headers_dict = {}
-        path_bytes = path.encode("ascii")
-        if query:
-            query_bytes = encode_query_args(query)
+        method_bytes = request.method.encode("ascii")
+        destination_bytes = request.destination.encode("ascii")
+        path_bytes = request.path.encode("ascii")
+        if request.query:
+            query_bytes = encode_query_args(request.query)
         else:
             query_bytes = b""
 
         headers_dict = {
-            "User-Agent": [self.version_string],
-            "Host": [destination],
+            b"User-Agent": [self.version_string_bytes],
+            b"Host": [destination_bytes],
         }
 
         with limiter:
-            url = self._create_url(
-                destination.encode("ascii"), path_bytes, param_bytes, query_bytes
-            ).decode('ascii')
-
-            txn_id = "%s-O-%s" % (method, self._next_id)
-            self._next_id = (self._next_id + 1) % (MAXINT - 1)
-
             # XXX: Would be much nicer to retry only at the transaction-layer
             # (once we have reliable transactions in place)
             if long_retries:
@@ -193,49 +282,56 @@ class MatrixFederationHttpClient(object):
             else:
                 retries_left = MAX_SHORT_RETRIES
 
-            http_url = urllib.parse.urlunparse(
-                (b"", b"", path_bytes, param_bytes, query_bytes, b"")
-            ).decode('ascii')
+            url_bytes = urllib.parse.urlunparse((
+                b"matrix", destination_bytes,
+                path_bytes, None, query_bytes, b"",
+            ))
+            url_str = url_bytes.decode('ascii')
 
-            log_result = None
+            url_to_sign_bytes = urllib.parse.urlunparse((
+                b"", b"",
+                path_bytes, None, query_bytes, b"",
+            ))
+
             while True:
                 try:
-                    if json_callback:
-                        json = json_callback()
-
+                    json = request.get_json()
                     if json:
-                        data = encode_canonical_json(json)
-                        headers_dict["Content-Type"] = ["application/json"]
+                        headers_dict[b"Content-Type"] = [b"application/json"]
                         self.sign_request(
-                            destination, method, http_url, headers_dict, json
+                            destination_bytes, method_bytes, url_to_sign_bytes,
+                            headers_dict, json,
+                        )
+                        data = encode_canonical_json(json)
+                        producer = FileBodyProducer(
+                            BytesIO(data),
+                            cooperator=self._cooperator,
                         )
                     else:
-                        data = None
-                        self.sign_request(destination, method, http_url, headers_dict)
+                        producer = None
+                        self.sign_request(
+                            destination_bytes, method_bytes, url_to_sign_bytes,
+                            headers_dict,
+                        )
 
-                    outbound_logger.info(
+                    logger.info(
                         "{%s} [%s] Sending request: %s %s",
-                        txn_id, destination, method, url
+                        request.txn_id, request.destination, request.method,
+                        url_str,
                     )
 
-                    request_deferred = treq.request(
-                        method,
-                        url,
+                    # we don't want all the fancy cookie and redirect handling that
+                    # treq.request gives: just use the raw Agent.
+                    request_deferred = self.agent.request(
+                        method_bytes,
+                        url_bytes,
                         headers=Headers(headers_dict),
-                        data=data,
-                        agent=self.agent,
-                        reactor=self.hs.get_reactor(),
-                        unbuffered=True
+                        bodyProducer=producer,
                     )
-                    request_deferred.addTimeout(_sec_timeout, self.hs.get_reactor())
 
-                    # Sometimes the timeout above doesn't work, so lets hack yet
-                    # another layer of timeouts in in the vain hope that at some
-                    # point the world made sense and this really really really
-                    # should work.
-                    request_deferred = timeout_no_seriously(
+                    request_deferred = timeout_deferred(
                         request_deferred,
-                        timeout=_sec_timeout * 2,
+                        timeout=_sec_timeout,
                         reactor=self.hs.get_reactor(),
                     )
 
@@ -244,30 +340,19 @@ class MatrixFederationHttpClient(object):
                             request_deferred,
                         )
 
-                    log_result = "%d %s" % (response.code, response.phrase,)
                     break
                 except Exception as e:
-                    if not retry_on_dns_fail and isinstance(e, DNSLookupError):
-                        logger.warn(
-                            "DNS Lookup failed to %s with %s",
-                            destination,
-                            e
-                        )
-                        log_result = "DNS Lookup failed to %s with %s" % (
-                            destination, e
-                        )
-                        raise
-
                     logger.warn(
-                        "{%s} Sending request failed to %s: %s %s: %s",
-                        txn_id,
-                        destination,
-                        method,
-                        url,
+                        "{%s} [%s] Request failed: %s %s: %s",
+                        request.txn_id,
+                        request.destination,
+                        request.method,
+                        url_str,
                         _flatten_response_never_received(e),
                     )
 
-                    log_result = _flatten_response_never_received(e)
+                    if not retry_on_dns_fail and isinstance(e, DNSLookupError):
+                        raise
 
                     if retries_left and not timeout:
                         if long_retries:
@@ -280,33 +365,37 @@ class MatrixFederationHttpClient(object):
                             delay *= random.uniform(0.8, 1.4)
 
                         logger.debug(
-                            "{%s} Waiting %s before sending to %s...",
-                            txn_id,
+                            "{%s} [%s] Waiting %ss before re-sending...",
+                            request.txn_id,
+                            request.destination,
                             delay,
-                            destination
                         )
 
                         yield self.clock.sleep(delay)
                         retries_left -= 1
                     else:
                         raise
-                finally:
-                    outbound_logger.info(
-                        "{%s} [%s] Result: %s",
-                        txn_id,
-                        destination,
-                        log_result,
-                    )
+
+            logger.info(
+                "{%s} [%s] Got response headers: %d %s",
+                request.txn_id,
+                request.destination,
+                response.code,
+                response.phrase.decode('ascii', errors='replace'),
+            )
 
             if 200 <= response.code < 300:
                 pass
             else:
                 # :'(
                 # Update transactions table?
-                with logcontext.PreserveLoggingContext():
-                    d = treq.content(response)
-                    d.addTimeout(_sec_timeout, self.hs.get_reactor())
-                    body = yield make_deferred_yieldable(d)
+                d = treq.content(response)
+                d = timeout_deferred(
+                    d,
+                    timeout=_sec_timeout,
+                    reactor=self.hs.get_reactor(),
+                )
+                body = yield make_deferred_yieldable(d)
                 raise HttpResponseException(
                     response.code, response.phrase, body
                 )
@@ -323,8 +412,9 @@ class MatrixFederationHttpClient(object):
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
             url_bytes (bytes): The URI path of the request
-            headers_dict (dict): Dictionary of request headers to append to
-            content (bytes): The body of the request
+            headers_dict (dict[bytes, list[bytes]]): Dictionary of request headers to
+                append to
+            content (object): The body of the request
             destination_is (bytes): As 'destination', but if the destination is an
                 identity server
 
@@ -390,7 +480,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -400,29 +490,26 @@ class MatrixFederationHttpClient(object):
             is not on our federation whitelist
         """
 
-        if not json_data_callback:
-            json_data_callback = lambda: data
-
-        response = yield self._request(
-            destination,
-            "PUT",
-            path,
-            json_callback=json_data_callback,
+        request = MatrixFederationRequest(
+            method="PUT",
+            destination=destination,
+            path=path,
             query=args,
+            json_callback=json_data_callback,
+            json=data,
+        )
+
+        response = yield self._send_request(
+            request,
             long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
             backoff_on_404=backoff_on_404,
         )
 
-        if 200 <= response.code < 300:
-            # We need to update the transactions table to say it was sent?
-            check_content_type_is_json(response.headers)
-
-        with logcontext.PreserveLoggingContext():
-            d = treq.json_content(response)
-            d.addTimeout(self.default_timeout, self.hs.get_reactor())
-            body = yield make_deferred_yieldable(d)
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
+        )
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -447,7 +534,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -456,31 +543,30 @@ class MatrixFederationHttpClient(object):
             Fails with ``FederationDeniedError`` if this destination
             is not on our federation whitelist
         """
-        response = yield self._request(
-            destination,
-            "POST",
-            path,
+
+        request = MatrixFederationRequest(
+            method="POST",
+            destination=destination,
+            path=path,
             query=args,
             json=data,
+        )
+
+        response = yield self._send_request(
+            request,
             long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
         )
 
-        if 200 <= response.code < 300:
-            # We need to update the transactions table to say it was sent?
-            check_content_type_is_json(response.headers)
+        if timeout:
+            _sec_timeout = timeout / 1000
+        else:
+            _sec_timeout = self.default_timeout
 
-        with logcontext.PreserveLoggingContext():
-            d = treq.json_content(response)
-            if timeout:
-                _sec_timeout = timeout / 1000
-            else:
-                _sec_timeout = self.default_timeout
-
-            d.addTimeout(_sec_timeout, self.hs.get_reactor())
-            body = yield make_deferred_yieldable(d)
-
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), _sec_timeout, request, response,
+        )
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -503,7 +589,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -516,25 +602,23 @@ class MatrixFederationHttpClient(object):
 
         logger.debug("Query bytes: %s Retry DNS: %s", args, retry_on_dns_fail)
 
-        response = yield self._request(
-            destination,
-            "GET",
-            path,
+        request = MatrixFederationRequest(
+            method="GET",
+            destination=destination,
+            path=path,
             query=args,
+        )
+
+        response = yield self._send_request(
+            request,
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
         )
 
-        if 200 <= response.code < 300:
-            # We need to update the transactions table to say it was sent?
-            check_content_type_is_json(response.headers)
-
-        with logcontext.PreserveLoggingContext():
-            d = treq.json_content(response)
-            d.addTimeout(self.default_timeout, self.hs.get_reactor())
-            body = yield make_deferred_yieldable(d)
-
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
+        )
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -556,7 +640,7 @@ class MatrixFederationHttpClient(object):
             Deferred: Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response
+            Fails with ``HttpResponseException`` if we get an HTTP response
             code >= 300.
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -565,25 +649,23 @@ class MatrixFederationHttpClient(object):
             Fails with ``FederationDeniedError`` if this destination
             is not on our federation whitelist
         """
-        response = yield self._request(
-            destination,
-            "DELETE",
-            path,
+        request = MatrixFederationRequest(
+            method="DELETE",
+            destination=destination,
+            path=path,
             query=args,
+        )
+
+        response = yield self._send_request(
+            request,
             long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
         )
 
-        if 200 <= response.code < 300:
-            # We need to update the transactions table to say it was sent?
-            check_content_type_is_json(response.headers)
-
-        with logcontext.PreserveLoggingContext():
-            d = treq.json_content(response)
-            d.addTimeout(self.default_timeout, self.hs.get_reactor())
-            body = yield make_deferred_yieldable(d)
-
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
+        )
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -602,7 +684,7 @@ class MatrixFederationHttpClient(object):
             Deferred: resolves with an (int,dict) tuple of the file length and
             a dict of the response headers.
 
-            Fails with ``HTTPRequestException`` if we get an HTTP response code
+            Fails with ``HttpResponseException`` if we get an HTTP response code
             >= 300
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
@@ -611,11 +693,15 @@ class MatrixFederationHttpClient(object):
             Fails with ``FederationDeniedError`` if this destination
             is not on our federation whitelist
         """
-        response = yield self._request(
-            destination,
-            "GET",
-            path,
+        request = MatrixFederationRequest(
+            method="GET",
+            destination=destination,
+            path=path,
             query=args,
+        )
+
+        response = yield self._send_request(
+            request,
             retry_on_dns_fail=retry_on_dns_fail,
             ignore_backoff=ignore_backoff,
         )
@@ -623,14 +709,25 @@ class MatrixFederationHttpClient(object):
         headers = dict(response.headers.getAllRawHeaders())
 
         try:
-            with logcontext.PreserveLoggingContext():
-                d = _readBodyToFile(response, output_stream, max_size)
-                d.addTimeout(self.default_timeout, self.hs.get_reactor())
-                length = yield make_deferred_yieldable(d)
-        except Exception:
-            logger.exception("Failed to download body")
+            d = _readBodyToFile(response, output_stream, max_size)
+            d.addTimeout(self.default_timeout, self.hs.get_reactor())
+            length = yield make_deferred_yieldable(d)
+        except Exception as e:
+            logger.warn(
+                "{%s} [%s] Error reading response: %s",
+                request.txn_id,
+                request.destination,
+                e,
+            )
             raise
-
+        logger.info(
+            "{%s} [%s] Completed: %d %s [%d bytes]",
+            request.txn_id,
+            request.destination,
+            response.code,
+            response.phrase.decode('ascii', errors='replace'),
+            length,
+        )
         defer.returnValue((length, headers))
 
 

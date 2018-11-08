@@ -59,6 +59,7 @@ class Codes(object):
     RESOURCE_LIMIT_EXCEEDED = "M_RESOURCE_LIMIT_EXCEEDED"
     UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
+    WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
 
 
 class CodeMessageException(RuntimeError):
@@ -310,6 +311,20 @@ class LimitExceededError(SynapseError):
             self.errcode,
             retry_after_ms=self.retry_after_ms,
         )
+
+
+class RoomKeysVersionError(SynapseError):
+    """A client has tried to upload to a non-current version of the room_keys store
+    """
+    def __init__(self, current_version):
+        """
+        Args:
+            current_version (str): the current version of the store they should have used
+        """
+        super(RoomKeysVersionError, self).__init__(
+            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
+        )
+        self.current_version = current_version
 
 
 class IncompatibleRoomVersionError(SynapseError):

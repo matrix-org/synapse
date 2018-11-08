@@ -18,9 +18,14 @@ from mock import Mock
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.web.client import ResponseNeverReceived
+from twisted.web.http import HTTPChannel
 
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
+from synapse.http.matrixfederationclient import (
+    MatrixFederationHttpClient,
+    MatrixFederationRequest,
+)
 
+from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
 
 
@@ -40,7 +45,7 @@ class FederationClientTests(HomeserverTestCase):
         """
         If the DNS raising returns an error, it will bubble up.
         """
-        d = self.cl._request("testserv2:8008", "GET", "foo/bar", timeout=10000)
+        d = self.cl.get_json("testserv2:8008", "foo/bar", timeout=10000)
         self.pump()
 
         f = self.failureResultOf(d)
@@ -49,9 +54,9 @@ class FederationClientTests(HomeserverTestCase):
     def test_client_never_connect(self):
         """
         If the HTTP request is not connected and is timed out, it'll give a
-        ConnectingCancelledError.
+        ConnectingCancelledError or TimeoutError.
         """
-        d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
+        d = self.cl.get_json("testserv:8008", "foo/bar", timeout=10000)
 
         self.pump()
 
@@ -71,14 +76,14 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, ConnectingCancelledError)
+        self.assertIsInstance(f.value, (ConnectingCancelledError, TimeoutError))
 
     def test_client_connect_no_response(self):
         """
         If the HTTP request is connected, but gets no response before being
         timed out, it'll give a ResponseNeverReceived.
         """
-        d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
+        d = self.cl.get_json("testserv:8008", "foo/bar", timeout=10000)
 
         self.pump()
 
@@ -108,7 +113,12 @@ class FederationClientTests(HomeserverTestCase):
         """
         Once the client gets the headers, _request returns successfully.
         """
-        d = self.cl._request("testserv:8008", "GET", "foo/bar", timeout=10000)
+        request = MatrixFederationRequest(
+            method="GET",
+            destination="testserv:8008",
+            path="foo/bar",
+        )
+        d = self.cl._send_request(request, timeout=10000)
 
         self.pump()
 
@@ -155,3 +165,26 @@ class FederationClientTests(HomeserverTestCase):
         f = self.failureResultOf(d)
 
         self.assertIsInstance(f.value, TimeoutError)
+
+    def test_client_sends_body(self):
+        self.cl.post_json(
+            "testserv:8008", "foo/bar", timeout=10000,
+            data={"a": "b"}
+        )
+
+        self.pump()
+
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        client = clients[0][2].buildProtocol(None)
+        server = HTTPChannel()
+
+        client.makeConnection(FakeTransport(server, self.reactor))
+        server.makeConnection(FakeTransport(client, self.reactor))
+
+        self.pump(0.1)
+
+        self.assertEqual(len(server.requests), 1)
+        request = server.requests[0]
+        content = request.content.read()
+        self.assertEqual(content, b'{"a":"b"}')

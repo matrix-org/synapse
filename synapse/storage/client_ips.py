@@ -119,21 +119,25 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         for entry in iteritems(to_update):
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
-            self._simple_upsert_txn(
-                txn,
-                table="user_ips",
-                keyvalues={
-                    "user_id": user_id,
-                    "access_token": access_token,
-                    "ip": ip,
-                    "user_agent": user_agent,
-                    "device_id": device_id,
-                },
-                values={
-                    "last_seen": last_seen,
-                },
-                lock=False,
-            )
+            try:
+                self._simple_upsert_txn(
+                    txn,
+                    table="user_ips",
+                    keyvalues={
+                        "user_id": user_id,
+                        "access_token": access_token,
+                        "ip": ip,
+                        "user_agent": user_agent,
+                        "device_id": device_id,
+                    },
+                    values={
+                        "last_seen": last_seen,
+                    },
+                    lock=False,
+                )
+            except Exception as e:
+                # Failed to upsert, log and continue
+                logger.error("Failed to insert client IP %r: %r", entry, e)
 
     @defer.inlineCallbacks
     def get_last_client_ip_by_device(self, user_id, device_id):

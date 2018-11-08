@@ -23,6 +23,7 @@ import abc
 import logging
 
 from twisted.enterprise import adbapi
+from twisted.mail.smtp import sendmail
 from twisted.web.client import BrowserLikePolicyForHTTPS
 
 from synapse.api.auth import Auth
@@ -51,6 +52,7 @@ from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
+from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
@@ -130,6 +132,7 @@ class HomeServer(object):
         'auth_handler',
         'device_handler',
         'e2e_keys_handler',
+        'e2e_room_keys_handler',
         'event_handler',
         'event_stream_handler',
         'initial_sync_handler',
@@ -172,6 +175,7 @@ class HomeServer(object):
         'message_handler',
         'pagination_handler',
         'room_context_handler',
+        'sendmail',
     ]
 
     # This is overridden in derived application classes
@@ -205,6 +209,7 @@ class HomeServer(object):
         logger.info("Setting up.")
         with self.get_db_conn() as conn:
             self.datastore = self.DATASTORE_CLASS(conn, self)
+            conn.commit()
         logger.info("Finished setting up.")
 
     def get_reactor(self):
@@ -266,6 +271,9 @@ class HomeServer(object):
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
 
+    def build_sendmail(self):
+        return sendmail
+
     def build_state_handler(self):
         return StateHandler(self)
 
@@ -298,6 +306,9 @@ class HomeServer(object):
 
     def build_e2e_keys_handler(self):
         return E2eKeysHandler(self)
+
+    def build_e2e_room_keys_handler(self):
+        return E2eRoomKeysHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)
