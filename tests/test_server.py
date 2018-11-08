@@ -57,7 +57,9 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")], _callback
         )
 
-        request, channel = make_request(b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83")
+        request, channel = make_request(
+            self.reactor, b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83"
+        )
         render(request, res, self.reactor)
 
         self.assertEqual(request.args, {b'a': [u"\N{SNOWMAN}".encode('utf8')]})
@@ -75,7 +77,7 @@ class JsonResourceTests(unittest.TestCase):
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foo")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'500')
@@ -98,7 +100,7 @@ class JsonResourceTests(unittest.TestCase):
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foo")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'500')
@@ -115,7 +117,7 @@ class JsonResourceTests(unittest.TestCase):
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foo")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'403')
@@ -136,7 +138,7 @@ class JsonResourceTests(unittest.TestCase):
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foobar")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foobar")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'400')

@@ -34,6 +34,7 @@ class FakeChannel(object):
     wire).
     """
 
+    _reactor = attr.ib()
     result = attr.ib(default=attr.Factory(dict))
     _producer = None
 
@@ -56,6 +57,8 @@ class FakeChannel(object):
         self.result["headers"] = headers
 
     def write(self, content):
+        assert isinstance(content, bytes), "Should be bytes! " + repr(content)
+
         if "body" not in self.result:
             self.result["body"] = b""
 
@@ -63,6 +66,15 @@ class FakeChannel(object):
 
     def registerProducer(self, producer, streaming):
         self._producer = producer
+        self.producerStreaming = streaming
+
+        def _produce():
+            if self._producer:
+                self._producer.resumeProducing()
+                self._reactor.callLater(0.1, _produce)
+
+        if not streaming:
+            self._reactor.callLater(0.0, _produce)
 
     def unregisterProducer(self):
         if self._producer is None:
@@ -105,7 +117,13 @@ class FakeSite:
 
 
 def make_request(
-    method, path, content=b"", access_token=None, request=SynapseRequest, shorthand=True
+    reactor,
+    method,
+    path,
+    content=b"",
+    access_token=None,
+    request=SynapseRequest,
+    shorthand=True,
 ):
     """
     Make a web request using the given method and path, feed it the
@@ -138,7 +156,7 @@ def make_request(
         content = content.encode('utf8')
 
     site = FakeSite()
-    channel = FakeChannel()
+    channel = FakeChannel(reactor)
 
     req = request(site, channel)
     req.process = lambda: b""

@@ -189,11 +189,11 @@ class HomeserverTestCase(TestCase):
         for servlet in self.servlets:
             servlet(self.hs, self.resource)
 
+        from tests.rest.client.v1.utils import RestHelper
+
+        self.helper = RestHelper(self.hs, self.resource, getattr(self, "user_id", None))
+
         if hasattr(self, "user_id"):
-            from tests.rest.client.v1.utils import RestHelper
-
-            self.helper = RestHelper(self.hs, self.resource, self.user_id)
-
             if self.hijack_auth:
 
                 def get_user_by_access_token(token=None, allow_guest=False):
@@ -285,7 +285,9 @@ class HomeserverTestCase(TestCase):
         if isinstance(content, dict):
             content = json.dumps(content).encode('utf8')
 
-        return make_request(method, path, content, access_token, request, shorthand)
+        return make_request(
+            self.reactor, method, path, content, access_token, request, shorthand
+        )
 
     def render(self, request):
         """
