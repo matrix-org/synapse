@@ -43,7 +43,6 @@ class RegistrationTestCase(unittest.TestCase):
             self.addCleanup,
             expire_access_token=True,
         )
-
         self.handler = self.hs.get_handlers().registration_handler
         self.store = self.hs.get_datastore()
         self.hs.config.max_mau_value = 50
@@ -79,7 +78,6 @@ class RegistrationTestCase(unittest.TestCase):
             requester, local_part, None
         )
         self.assertEquals(result_user_id, user_id)
-        print("result token is %s" % result_token)
         self.assertTrue(result_token is not None)
 
     @defer.inlineCallbacks

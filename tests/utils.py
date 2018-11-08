@@ -134,12 +134,9 @@ def default_config(name):
     config.mau_trial_days = 0
     config.mau_limits_reserved_threepids = []
     config.admin_contact = None
-    config.autocreate_support_user = None
     config.support_user_id = None
-    config.support_user_pass = None
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
-
     config.use_frozen_dicts = False
 
     # we need a sane default_room_version, otherwise attempts to create rooms will

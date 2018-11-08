@@ -207,7 +207,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             existing one was updated.
         """
         # Support user never to be included in MAU stats
-        if user_id is self.hs.config.support_user_id:
+        if user_id == self.hs.config.support_user_id:
             return
         # Am consciously deciding to lock the table on the basis that is ought
         # never be a big table and alternative approaches (batching multiple

@@ -346,7 +346,7 @@ class UserDirectoryStore(SQLBaseStore):
         Args:
             room_id (str)
             share_private (bool): Is the room private
-            user_id_tuples_uf([(str, str)]): iterable of 2-tuple of user IDs.
+            user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
         def _add_users_who_share_room_txn(txn, user_id_tuples):
             support_user = self.hs.config.support_user_id

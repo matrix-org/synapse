@@ -222,14 +222,15 @@ class RegistrationHandler(BaseHandler):
         fake_requester = create_requester(user_id)
 
         # try to create the room if we're the first real user on the server. Note
-        # there maybe a support user present that should autojoin rooms
+        # that an auto generated support user is not a real user and never be
+        # the user to create the room 
         should_auto_create_rooms = False
         if (self.hs.config.autocreate_auto_join_rooms and
                 self.hs.config.support_user_id != user_id):
             count = yield self.store.count_all_users()
             if self.hs.config.support_user_id is None:
                 should_auto_create_rooms = count == 1
-            elif self.hs.config.support_user_id != user_id:
+            else:
                 # assume that support user has been created first
                 should_auto_create_rooms = count == 2
 
