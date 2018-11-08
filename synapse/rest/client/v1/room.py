@@ -16,6 +16,7 @@
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
+import time
 
 from six.moves.urllib import parse as urlparse
 
@@ -245,6 +246,8 @@ class JoinRoomAliasServlet(ClientV1RestServlet):
             request,
             allow_guest=True,
         )
+
+        time.sleep(80)
 
         try:
             content = parse_json_object_from_request(request)
