@@ -160,7 +160,9 @@ class ConsentResource(Resource):
         try:
             self._render_template(
                 request, "%s.html" % (version,),
-                user=username, userhmac=userhmac, version=version,
+                user=username,
+                userhmac=userhmac.decode('ascii'),
+                version=version,
                 has_consented=has_consented, public_version=public_version,
             )
         except TemplateNotFound:
