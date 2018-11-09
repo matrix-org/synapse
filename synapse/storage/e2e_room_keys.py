@@ -217,7 +217,8 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         Raises:
             StoreError: with code 404 if there are no e2e_room_keys_versions present
         Returns:
-            A deferred dict giving the info metadata for this backup version, with fields including:
+            A deferred dict giving the info metadata for this backup version, with
+            fields including:
                 version(str)
                 algorithm(str)
                 auth_data(object): opaque dict supplied by the client
