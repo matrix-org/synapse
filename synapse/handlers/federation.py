@@ -202,27 +202,22 @@ class FederationHandler(BaseHandler):
             self.room_queues[room_id].append((pdu, origin))
             return
 
-        # If we're no longer in the room just ditch the event entirely. This
-        # is probably an old server that has come back and thinks we're still
-        # in the room (or we've been rejoined to the room by a state reset).
+        # If we're not in the room just ditch the event entirely. This is
+        # probably an old server that has come back and thinks we're still in
+        # the room (or we've been rejoined to the room by a state reset).
         #
-        # If we were never in the room then maybe our database got vaped and
-        # we should check if we *are* in fact in the room. If we are then we
-        # can magically rejoin the room.
+        # Note that if we were never in the room then we would have already
+        # dropped the event, since we wouldn't know the room version.
         is_in_room = yield self.auth.check_host_in_room(
             room_id,
             self.server_name
         )
         if not is_in_room:
-            was_in_room = yield self.store.was_host_joined(
-                pdu.room_id, self.server_name,
+            logger.info(
+                "[%s %s] Ignoring PDU from %s as we're not in the room",
+                room_id, event_id, origin,
             )
-            if was_in_room:
-                logger.info(
-                    "[%s %s] Ignoring PDU from %s as we've left the room",
-                    room_id, event_id, origin,
-                )
-                defer.returnValue(None)
+            defer.returnValue(None)
 
         state = None
         auth_chain = []
