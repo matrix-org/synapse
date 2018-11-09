@@ -22,3 +22,12 @@ CREATE TABLE e2e_attestations (
 );
 
 CREATE INDEX e2e_attestations_idx ON e2e_attestations(user_id, from_user_id, device_id);
+
+-- stream of attestation updates
+CREATE TABLE attestations_stream (
+    stream_id BIGINT NOT NULL,
+    from_user_id TEXT NOT NULL,
+    user_id TEXT NOT NULL
+);
+
+CREATE INDEX attestations_stream_idx ON attestations_stream(stream_id, from_user_id);

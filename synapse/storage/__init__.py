@@ -185,6 +185,9 @@ class DataStore(RoomMemberStore, RoomStore,
         self._device_list_stream_cache = StreamChangeCache(
             "DeviceListStreamChangeCache", device_list_max,
         )
+        self._attestation_stream_cache = StreamChangeCache(
+            "AttestationStreamChangeCache", device_list_max,
+        )
         self._device_list_federation_stream_cache = StreamChangeCache(
             "DeviceListFederationStreamChangeCache", device_list_max,
         )

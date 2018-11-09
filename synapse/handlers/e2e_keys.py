@@ -372,9 +372,17 @@ class E2eKeysHandler(object):
             if user_id not in attested_users:
                 attested_users[user_id] = []
             attested_users[user_id].append(attestation["device_id"])
-        # FIXME: only notify the calling user about the attestations
         for user_id, devices in attested_users.iteritems():
-            yield self.device_handler.notify_device_update(user_id, devices)
+            if req_user_id == user_id:
+                # when making an attestation on your own device, notify
+                # everyone who shares a room with you.  This is the same as the
+                # users that are notified when your device list changes, so we
+                # use the same stream.
+                yield self.device_handler.notify_device_update(user_id, devices)
+            else:
+                # when making an attestation on someone else's device, notify
+                # only your own devices.
+                yield self.device_handler.notify_attestation_update(req_user_id, user_id)
 
     @defer.inlineCallbacks
     def _upload_one_time_keys_for_user(self, user_id, device_id, time_now,

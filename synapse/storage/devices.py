@@ -570,19 +570,42 @@ class DeviceStore(SQLBaseStore):
         txn.execute(sql, (destination, stream_id,))
 
     @defer.inlineCallbacks
-    def get_user_whose_devices_changed(self, from_key):
+    def get_user_whose_devices_changed(self, user_id, from_key):
         """Get set of users whose devices have changed since `from_key`.
         """
         from_key = int(from_key)
         changed = self._device_list_stream_cache.get_all_entities_changed(from_key)
         if changed is not None:
-            defer.returnValue(set(changed))
+            changed_set = set(changed)
+            if self._attestation_stream_cache.has_entity_changed(user_id, from_key):
+                # the user's attestations have changed, so fetch the new users
+                # that have been attested
+                sql = """
+                    SELECT DISTINCT user_id FROM attestations_stream
+                     WHERE from_user_id = ? AND stream_id > ?
+                """
+                rows = yield self._execute(
+                    "get_user_whose_devices_were_attested", None, sql, user_id, from_key
+                )
+                changed_set.update(row[0] for row in rows)
+            defer.returnValue(changed_set)
 
+        # get device updates
         sql = """
             SELECT DISTINCT user_id FROM device_lists_stream WHERE stream_id > ?
         """
         rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
-        defer.returnValue(set(row[0] for row in rows))
+        changed_set = set(row[0] for row in rows)
+        # get attestations that the user has made
+        sql = """
+            SELECT DISTINCT user_id FROM attestations_stream
+             WHERE from_user_id = ? AND stream_id > ?
+        """
+        rows = yield self._execute(
+            "get_user_whose_devices_were_attested", None, sql, user_id, from_key
+        )
+        changed_set.update(row[0] for row in rows)
+        defer.returnValue(changed_set)
 
     def get_all_device_list_changes_for_remotes(self, from_key, to_key):
         """Return a list of `(stream_id, user_id, destination)` which is the
@@ -662,6 +685,33 @@ class DeviceStore(SQLBaseStore):
                 for destination in hosts
                 for device_id in device_ids
             ]
+        )
+
+    @defer.inlineCallbacks
+    def add_attestation_change_to_streams(self, from_user_id, user_id):
+        """Persist that a user's attestations have been updated.
+        """
+
+        with self._device_list_id_gen.get_next() as stream_id:
+            yield self.runInteraction(
+                "add_attestation_change_to_streams", self._add_attestation_change_txn,
+                from_user_id, user_id, stream_id,
+            )
+        defer.returnValue(stream_id)
+
+    def _add_attestation_change_txn(self, txn, from_user_id, user_id, stream_id):
+        txn.call_after(
+            self._attestation_stream_cache.entity_has_changed,
+            from_user_id, stream_id,
+        )
+        self._simple_insert_txn(
+            txn,
+            "attestations_stream",
+            values={
+                "stream_id": stream_id,
+                "from_user_id": from_user_id,
+                "user_id": user_id,
+            },
         )
 
     def get_device_stream_token(self):

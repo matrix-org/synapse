@@ -283,6 +283,20 @@ class DeviceHandler(BaseHandler):
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
 
+    @measure_func("notify_attestation_update")
+    @defer.inlineCallbacks
+    def notify_attestation_update(self, from_user_id, user_id):
+        """Notify a user that they have made new attestations.
+        """
+
+        position = yield self.store.add_attestation_change_to_streams(
+            from_user_id, user_id
+        )
+
+        yield self.notifier.on_new_event(
+            "device_list_key", position, users=[from_user_id],
+        )
+
     @measure_func("device.get_user_ids_changed")
     @defer.inlineCallbacks
     def get_user_ids_changed(self, user_id, from_token):
@@ -299,7 +313,8 @@ class DeviceHandler(BaseHandler):
 
         # First we check if any devices have changed
         changed = yield self.store.get_user_whose_devices_changed(
-            from_token.device_list_key
+            user_id,
+            from_token.device_list_key,
         )
 
         # Then work out if any users have since joined

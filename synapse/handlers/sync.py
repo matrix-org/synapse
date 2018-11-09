@@ -955,6 +955,7 @@ class SyncHandler(object):
 
         device_lists = yield self._generate_sync_entry_for_device_list(
             sync_result_builder,
+            user_id,
             newly_joined_rooms=newly_joined_rooms,
             newly_joined_users=newly_joined_users,
             newly_left_rooms=newly_left_rooms,
@@ -1031,7 +1032,7 @@ class SyncHandler(object):
 
     @measure_func("_generate_sync_entry_for_device_list")
     @defer.inlineCallbacks
-    def _generate_sync_entry_for_device_list(self, sync_result_builder,
+    def _generate_sync_entry_for_device_list(self, sync_result_builder, user_id,
                                              newly_joined_rooms, newly_joined_users,
                                              newly_left_rooms, newly_left_users):
         user_id = sync_result_builder.sync_config.user.to_string()
@@ -1039,7 +1040,8 @@ class SyncHandler(object):
 
         if since_token and since_token.device_list_key:
             changed = yield self.store.get_user_whose_devices_changed(
-                since_token.device_list_key
+                user_id,
+                since_token.device_list_key,
             )
 
             # TODO: Be more clever than this, i.e. remove users who we already
