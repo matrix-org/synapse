@@ -162,7 +162,7 @@ class FederationServer(FederationBase):
                 p["age_ts"] = request_time - int(p["age"])
                 del p["age"]
 
-            # We try and pull out an event ID so that if latter checks fail we
+            # We try and pull out an event ID so that if later checks fail we
             # can log something sensible. We don't mandate an event ID here in
             # case future event formats get rid of the key.
             possible_event_id = p.get("event_id", "<Unknown>")
