@@ -341,7 +341,7 @@ class E2eKeysHandler(object):
         defer.returnValue({"one_time_key_counts": result})
 
     @defer.inlineCallbacks
-    def _upload_attestations_from_user(self, user_id, attestations):
+    def _upload_attestations_from_user(self, req_user_id, attestations):
         if not isinstance(attestations, list):
             raise SynapseError(
                 400,
@@ -356,10 +356,10 @@ class E2eKeysHandler(object):
                 "keys": x["keys"],
                 "state": x["state"],
                 "signatures": {
-                    user_id: x["signatures"][user_id]
+                    req_user_id: x["signatures"][req_user_id]
                 }
             }
-            for x in attestations if user_id in x["signatures"]]
+            for x in attestations if req_user_id in x["signatures"]]
 
         yield self.store.add_e2e_attestations(
             attestations
