@@ -34,7 +34,6 @@ from synapse.api.errors import (
     NotFoundError,
     SynapseError,
 )
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util import logcontext
 from synapse.util.async_helpers import Linearizer
@@ -62,7 +61,7 @@ class MediaRepository(object):
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.client = MatrixFederationHttpClient(hs)
+        self.client = hs.get_http_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
