@@ -159,6 +159,24 @@ class EventBase(object):
     def keys(self):
         return six.iterkeys(self._event_dict)
 
+    def prev_event_ids(self):
+        """Returns the list of prev event IDs. The order matches the order
+        specified in the event, though there is no meaning to it.
+
+        Returns:
+            list[str]: The list of event IDs of this event's prev_events
+        """
+        return [e for e, _ in self.prev_events]
+
+    def auth_event_ids(self):
+        """Returns the list of auth event IDs. The order matches the order
+        specified in the event, though there is no meaning to it.
+
+        Returns:
+            list[str]: The list of event IDs of this event's auth_events
+        """
+        return [e for e, _ in self.auth_events]
+
 
 class FrozenEvent(EventBase):
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):

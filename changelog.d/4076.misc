@@ -1,1 +1,0 @@
-Correctly manage logcontexts during startup to fix some "Unexpected logging context" warnings

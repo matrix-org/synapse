@@ -1,3 +1,66 @@
+Synapse 0.33.8 (2018-11-01)
+===========================
+
+No significant changes.
+
+
+Synapse 0.33.8rc2 (2018-10-31)
+==============================
+
+Bugfixes
+--------
+
+- Searches that request profile info now no longer fail with a 500. Fixes 
+  a regression in 0.33.8rc1. ([\#4122](https://github.com/matrix-org/synapse/issues/4122))
+
+
+Synapse 0.33.8rc1 (2018-10-29)
+==============================
+
+Features
+--------
+
+- Servers with auto-join rooms will now automatically create those rooms when the first user registers ([\#3975](https://github.com/matrix-org/synapse/issues/3975))
+- Add config option to control alias creation ([\#4051](https://github.com/matrix-org/synapse/issues/4051))
+- The register_new_matrix_user script is now ported to Python 3. ([\#4085](https://github.com/matrix-org/synapse/issues/4085))
+- Configure Docker image to listen on both ipv4 and ipv6. ([\#4089](https://github.com/matrix-org/synapse/issues/4089))
+
+
+Bugfixes
+--------
+
+- Fix HTTP error response codes for federated group requests. ([\#3969](https://github.com/matrix-org/synapse/issues/3969))
+- Fix issue where Python 3 users couldn't paginate /publicRooms ([\#4046](https://github.com/matrix-org/synapse/issues/4046))
+- Fix URL previewing to work in Python 3.7 ([\#4050](https://github.com/matrix-org/synapse/issues/4050))
+- synctl will use the right python executable to run worker processes ([\#4057](https://github.com/matrix-org/synapse/issues/4057))
+- Manhole now works again on Python 3, instead of failing with a "couldn't match all kex parts" when connecting. ([\#4060](https://github.com/matrix-org/synapse/issues/4060), [\#4067](https://github.com/matrix-org/synapse/issues/4067))
+- Fix some metrics being racy and causing exceptions when polled by Prometheus. ([\#4061](https://github.com/matrix-org/synapse/issues/4061))
+- Fix bug which prevented email notifications from being sent unless an absolute path was given for `email_templates`. ([\#4068](https://github.com/matrix-org/synapse/issues/4068))
+- Correctly account for cpu usage by background threads ([\#4074](https://github.com/matrix-org/synapse/issues/4074))
+- Fix race condition where config defined reserved users were not being added to
+  the monthly active user list prior to the homeserver reactor firing up ([\#4081](https://github.com/matrix-org/synapse/issues/4081))
+- Fix bug which prevented backslashes being used in event field filters ([\#4083](https://github.com/matrix-org/synapse/issues/4083))
+
+
+Internal Changes
+----------------
+
+- Add information about the [matrix-docker-ansible-deploy](https://github.com/spantaleev/matrix-docker-ansible-deploy) playbook ([\#3698](https://github.com/matrix-org/synapse/issues/3698))
+- Add initial implementation of new state resolution algorithm ([\#3786](https://github.com/matrix-org/synapse/issues/3786))
+- Reduce database load when fetching state groups ([\#4011](https://github.com/matrix-org/synapse/issues/4011))
+- Various cleanups in the federation client code ([\#4031](https://github.com/matrix-org/synapse/issues/4031))
+- Run the CircleCI builds in docker containers ([\#4041](https://github.com/matrix-org/synapse/issues/4041))
+- Only colourise synctl output when attached to tty ([\#4049](https://github.com/matrix-org/synapse/issues/4049))
+- Refactor room alias creation code ([\#4063](https://github.com/matrix-org/synapse/issues/4063))
+- Make the Python scripts in the top-level scripts folders meet pep8 and pass flake8. ([\#4068](https://github.com/matrix-org/synapse/issues/4068))
+- The README now contains example for the Caddy web server. Contributed by steamp0rt. ([\#4072](https://github.com/matrix-org/synapse/issues/4072))
+- Add psutil as an explicit dependency ([\#4073](https://github.com/matrix-org/synapse/issues/4073))
+- Clean up threading and logcontexts in pushers ([\#4075](https://github.com/matrix-org/synapse/issues/4075))
+- Correctly manage logcontexts during startup to fix some "Unexpected logging context" warnings ([\#4076](https://github.com/matrix-org/synapse/issues/4076))
+- Give some more things logcontexts ([\#4077](https://github.com/matrix-org/synapse/issues/4077))
+- Clean up some bits of code which were flagged by the linter ([\#4082](https://github.com/matrix-org/synapse/issues/4082))
+
+
 Synapse 0.33.7 (2018-10-18)
 ===========================
 

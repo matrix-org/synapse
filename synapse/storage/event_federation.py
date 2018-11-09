@@ -477,7 +477,7 @@ class EventFederationStore(EventFederationWorkerStore):
                     "is_state": False,
                 }
                 for ev in events
-                for e_id, _ in ev.prev_events
+                for e_id in ev.prev_event_ids()
             ],
         )
 
@@ -510,7 +510,7 @@ class EventFederationStore(EventFederationWorkerStore):
 
         txn.executemany(query, [
             (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
-            for ev in events for e_id, _ in ev.prev_events
+            for ev in events for e_id in ev.prev_event_ids()
             if not ev.internal_metadata.is_outlier()
         ])
 

@@ -1,2 +1,0 @@
-Fix race condition where config defined reserved users were not being added to
-the monthly active user list prior to the homeserver reactor firing up

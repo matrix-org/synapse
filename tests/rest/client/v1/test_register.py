@@ -45,11 +45,11 @@ class CreateUserServletTestCase(unittest.TestCase):
         )
 
         handlers = Mock(registration_handler=self.registration_handler)
-        self.clock = MemoryReactorClock()
-        self.hs_clock = Clock(self.clock)
+        self.reactor = MemoryReactorClock()
+        self.hs_clock = Clock(self.reactor)
 
         self.hs = self.hs = setup_test_homeserver(
-            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.clock
+            self.addCleanup, http_client=None, clock=self.hs_clock, reactor=self.reactor
         )
         self.hs.get_datastore = Mock(return_value=self.datastore)
         self.hs.get_handlers = Mock(return_value=handlers)
@@ -76,8 +76,8 @@ class CreateUserServletTestCase(unittest.TestCase):
             return_value=(user_id, token)
         )
 
-        request, channel = make_request(b"POST", url, request_data)
-        render(request, res, self.clock)
+        request, channel = make_request(self.reactor, b"POST", url, request_data)
+        render(request, res, self.reactor)
 
         self.assertEquals(channel.result["code"], b"200")
 
