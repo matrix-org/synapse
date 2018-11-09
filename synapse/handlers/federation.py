@@ -552,86 +552,54 @@ class FederationHandler(BaseHandler):
             room_id, event_id, event,
         )
 
-        # FIXME (erikj): Awful hack to make the case where we are not currently
-        # in the room work
-        # If state and auth_chain are None, then we don't need to do this check
-        # as we already know we have enough state in the DB to handle this
-        # event.
-        if state and auth_chain and not event.internal_metadata.is_outlier():
-            is_in_room = yield self.auth.check_host_in_room(
-                room_id,
-                self.server_name
-            )
-        else:
-            is_in_room = True
+        event_ids = set()
+        if state:
+            event_ids |= {e.event_id for e in state}
+        if auth_chain:
+            event_ids |= {e.event_id for e in auth_chain}
 
-        if not is_in_room:
+        seen_ids = yield self.store.have_seen_events(event_ids)
+
+        if state and auth_chain is not None:
+            # If we have any state or auth_chain given to us by the replication
+            # layer, then we should handle them (if we haven't before.)
+
+            event_infos = []
+
+            for e in itertools.chain(auth_chain, state):
+                if e.event_id in seen_ids:
+                    continue
+                e.internal_metadata.outlier = True
+                auth_ids = e.auth_event_ids()
+                auth = {
+                    (e.type, e.state_key): e for e in auth_chain
+                    if e.event_id in auth_ids or e.type == EventTypes.Create
+                }
+                event_infos.append({
+                    "event": e,
+                    "auth_events": auth,
+                })
+                seen_ids.add(e.event_id)
+
             logger.info(
-                "[%s %s] Got event for room we're not in",
-                room_id, event_id,
+                "[%s %s] persisting newly-received auth/state events %s",
+                room_id, event_id, [e["event"].event_id for e in event_infos]
             )
+            yield self._handle_new_events(origin, event_infos)
 
-            try:
-                yield self._persist_auth_tree(
-                    origin, auth_chain, state, event
-                )
-            except AuthError as e:
-                raise FederationError(
-                    "ERROR",
-                    e.code,
-                    e.msg,
-                    affected=event_id,
-                )
-
-        else:
-            event_ids = set()
-            if state:
-                event_ids |= {e.event_id for e in state}
-            if auth_chain:
-                event_ids |= {e.event_id for e in auth_chain}
-
-            seen_ids = yield self.store.have_seen_events(event_ids)
-
-            if state and auth_chain is not None:
-                # If we have any state or auth_chain given to us by the replication
-                # layer, then we should handle them (if we haven't before.)
-
-                event_infos = []
-
-                for e in itertools.chain(auth_chain, state):
-                    if e.event_id in seen_ids:
-                        continue
-                    e.internal_metadata.outlier = True
-                    auth_ids = e.auth_event_ids()
-                    auth = {
-                        (e.type, e.state_key): e for e in auth_chain
-                        if e.event_id in auth_ids or e.type == EventTypes.Create
-                    }
-                    event_infos.append({
-                        "event": e,
-                        "auth_events": auth,
-                    })
-                    seen_ids.add(e.event_id)
-
-                logger.info(
-                    "[%s %s] persisting newly-received auth/state events %s",
-                    room_id, event_id, [e["event"].event_id for e in event_infos]
-                )
-                yield self._handle_new_events(origin, event_infos)
-
-            try:
-                context = yield self._handle_new_event(
-                    origin,
-                    event,
-                    state=state,
-                )
-            except AuthError as e:
-                raise FederationError(
-                    "ERROR",
-                    e.code,
-                    e.msg,
-                    affected=event.event_id,
-                )
+        try:
+            context = yield self._handle_new_event(
+                origin,
+                event,
+                state=state,
+            )
+        except AuthError as e:
+            raise FederationError(
+                "ERROR",
+                e.code,
+                e.msg,
+                affected=event.event_id,
+            )
 
         room = yield self.store.get_room(room_id)
 
