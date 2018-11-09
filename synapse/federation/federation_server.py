@@ -182,7 +182,7 @@ class FederationServer(FederationBase):
                 # PDU into an event.
                 yield self.store.get_room_version(room_id)
             except NotFoundError:
-                logger.info("Ignoring PUD for unknown room_id: %s", room_id)
+                logger.info("Ignoring PDU for unknown room_id: %s", room_id)
                 continue
 
             event = event_from_pdu_json(p)
