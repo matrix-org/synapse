@@ -14,14 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cgi
 import errno
 import logging
 import os
 import shutil
 
-from six import PY3, iteritems
-from six.moves.urllib import parse as urlparse
+from six import iteritems
 
 import twisted.internet.error
 import twisted.web.http
@@ -38,9 +36,14 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util import logcontext
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
-from synapse.util.stringutils import is_ascii, random_string
+from synapse.util.stringutils import random_string
 
-from ._base import FileInfo, respond_404, respond_with_responder
+from ._base import (
+    FileInfo,
+    get_filename_from_headers,
+    respond_404,
+    respond_with_responder,
+)
 from .config_resource import MediaConfigResource
 from .download_resource import DownloadResource
 from .filepath import MediaFilePaths
@@ -396,48 +399,8 @@ class MediaRepository(object):
             yield finish()
 
         media_type = headers[b"Content-Type"][0].decode('ascii')
-
+        upload_name = get_filename_from_headers(headers)
         time_now_ms = self.clock.time_msec()
-
-        content_disposition = headers.get(b"Content-Disposition", [b''])
-
-        # Decode the Content-Disposition header (cgi.parse_header requires
-        # unicode on Python 3, not bytes) the best we can.
-        try:
-            content_disposition = content_disposition[0].decode('utf8')
-        except UnicodeDecodeError:
-            # Wasn't valid UTF-8, therefore not valid ASCII. Give up on figuring
-            # out what the mess they've sent is.
-            content_disposition = None
-
-        if content_disposition:
-            _, params = cgi.parse_header(content_disposition)
-            upload_name = None
-
-            # First check if there is a valid UTF-8 filename
-            upload_name_utf8 = params.get("filename*", None)
-            if upload_name_utf8:
-                if upload_name_utf8.lower().startswith("utf-8''"):
-                    upload_name = upload_name_utf8[7:]
-
-            # If there isn't check for an ascii name.
-            if not upload_name:
-                upload_name_ascii = params.get("filename", None)
-                if upload_name_ascii and is_ascii(upload_name_ascii):
-                    upload_name = upload_name_ascii
-
-            if upload_name:
-                if PY3:
-                    upload_name = urlparse.unquote(upload_name)
-                else:
-                    upload_name = urlparse.unquote(upload_name.encode('utf8'))
-                try:
-                    if isinstance(upload_name, bytes):
-                        upload_name = upload_name.decode("utf-8")
-                except UnicodeDecodeError:
-                    upload_name = None
-        else:
-            upload_name = None
 
         logger.info("Stored remote media in file %r", fname)
 

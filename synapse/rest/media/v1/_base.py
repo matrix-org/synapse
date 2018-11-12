@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cgi
 import logging
 import os
 
+from six import PY3
 from six.moves import urllib
 
 from twisted.internet import defer
@@ -197,3 +199,64 @@ class FileInfo(object):
         self.thumbnail_height = thumbnail_height
         self.thumbnail_method = thumbnail_method
         self.thumbnail_type = thumbnail_type
+
+
+def get_filename_from_headers(headers):
+    """
+    Get the filename of the downloaded file by inspecting the
+    Content-Disposition HTTP header.
+
+    Args:
+        headers (twisted.web.http_headers.Headers): The HTTP
+        request headers.
+
+    Returns:
+        A Unicode string of the filename, or None.
+    """
+    content_disposition = headers.get(b"Content-Disposition", [b''])
+
+    # Decode the Content-Disposition header (cgi.parse_header requires
+    # unicode on Python 3, not bytes) the best we can.
+    try:
+        content_disposition = content_disposition[0].decode('utf8')
+    except UnicodeDecodeError:
+        # Wasn't valid UTF-8, therefore not valid ASCII. Give up on figuring
+        # out what the mess they've sent is.
+        content_disposition = None
+
+    if not content_disposition:
+        return None
+
+    _, params = cgi.parse_header(content_disposition)
+    upload_name = None
+
+    # First check if there is a valid UTF-8 filename
+    upload_name_utf8 = params.get("filename*", None)
+    if upload_name_utf8:
+        if upload_name_utf8.lower().startswith("utf-8''"):
+            upload_name = upload_name_utf8[7:]
+
+    # If there isn't check for an ascii name.
+    if not upload_name:
+        upload_name_ascii = params.get("filename", None)
+        if upload_name_ascii and is_ascii(upload_name_ascii):
+            upload_name = upload_name_ascii
+
+    if not upload_name:
+        # We couldn't find a valid filename in the headers.
+        return None
+
+    # Unquote the string
+    if PY3:
+        upload_name = urllib.parse.unquote(upload_name)
+    else:
+        # Needs to be bytes on Python 2
+        upload_name = urllib.parse.unquote(upload_name.encode('utf8'))
+
+    try:
+        if isinstance(upload_name, bytes):
+            upload_name = upload_name.decode("utf-8")
+    except UnicodeDecodeError:
+        upload_name = None
+
+    return upload_name
