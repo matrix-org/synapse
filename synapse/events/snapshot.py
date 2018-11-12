@@ -74,6 +74,7 @@ class EventContext(object):
         "delta_ids",
         "prev_state_events",
         "app_service",
+        "thread_id",
         "_current_state_ids",
         "_prev_state_ids",
         "_prev_state_id",
@@ -89,8 +90,9 @@ class EventContext(object):
 
     @staticmethod
     def with_state(state_group, current_state_ids, prev_state_ids,
-                   prev_group=None, delta_ids=None):
+                   thread_id, prev_group=None, delta_ids=None):
         context = EventContext()
+        context.thread_id = thread_id
 
         # The current state including the current event
         context._current_state_ids = current_state_ids
@@ -141,7 +143,8 @@ class EventContext(object):
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
             "prev_state_events": self.prev_state_events,
-            "app_service_id": self.app_service.id if self.app_service else None
+            "app_service_id": self.app_service.id if self.app_service else None,
+            "thread_id": self.thread_id,
         })
 
     @staticmethod
@@ -157,6 +160,8 @@ class EventContext(object):
             EventContext
         """
         context = EventContext()
+
+        context.thread_id = input["thread_input"]
 
         # We use the state_group and prev_state_id stuff to pull the
         # current_state_ids out of the DB and construct prev_state_ids.

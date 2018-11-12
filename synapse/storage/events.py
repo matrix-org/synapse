@@ -1282,8 +1282,9 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                         "url" in event.content
                         and isinstance(event.content["url"], text_type)
                     ),
+                    "thread_id": ctx.thread_id,
                 }
-                for event, _ in events_and_contexts
+                for event, ctx in events_and_contexts
             ],
         )
 

@@ -352,7 +352,7 @@ class EventsWorkerStore(SQLBaseStore):
                 run_in_background(
                     self._get_event_from_row,
                     row["internal_metadata"], row["json"], row["redacts"],
-                    rejected_reason=row["rejects"],
+                    rejected_reason=row["rejects"], thread_id=row["thread_id"],
                 )
                 for row in rows
             ],
@@ -378,8 +378,10 @@ class EventsWorkerStore(SQLBaseStore):
                 " e.internal_metadata,"
                 " e.json,"
                 " r.redacts as redacts,"
-                " rej.event_id as rejects "
+                " rej.event_id as rejects, "
+                " ev.thread_id as thread_id"
                 " FROM event_json as e"
+                " INNER JOIN events as ev USING (event_id)"
                 " LEFT JOIN rejections as rej USING (event_id)"
                 " LEFT JOIN redactions as r ON e.event_id = r.redacts"
                 " WHERE e.event_id IN (%s)"
@@ -392,10 +394,11 @@ class EventsWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_event_from_row(self, internal_metadata, js, redacted,
-                            rejected_reason=None):
+                            thread_id, rejected_reason=None):
         with Measure(self._clock, "_get_event_from_row"):
             d = json.loads(js)
             internal_metadata = json.loads(internal_metadata)
+            internal_metadata["thread_id"] = thread_id
 
             if rejected_reason:
                 rejected_reason = yield self._simple_select_one_onecol(
@@ -410,6 +413,8 @@ class EventsWorkerStore(SQLBaseStore):
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
             )
+
+            original_ev.unsigned["thread_id"] = thread_id
 
             redacted_event = None
             if redacted:

@@ -18,6 +18,7 @@
 
 import itertools
 import logging
+import random
 
 import six
 from six import iteritems, itervalues
@@ -135,7 +136,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def on_receive_pdu(
-            self, origin, pdu, sent_to_us_directly=False,
+            self, origin, pdu, sent_to_us_directly=False, thread_id=None,
     ):
         """ Process a PDU received via a federation /send/ transaction, or
         via backfill of missing prev_events
@@ -222,6 +223,10 @@ class FederationHandler(BaseHandler):
         state = None
         auth_chain = []
 
+        if thread_id is None:
+            # FIXME: Pick something better?
+            thread_id = random.randint(0, 999999999)
+
         # Get missing pdus if necessary.
         if not pdu.internal_metadata.is_outlier():
             # We only backfill backwards to the min depth.
@@ -259,7 +264,8 @@ class FederationHandler(BaseHandler):
                         )
 
                         yield self._get_missing_events_for_pdu(
-                            origin, pdu, prevs, min_depth
+                            origin, pdu, prevs, min_depth,
+                            thread_id=thread_id,
                         )
 
                         # Update the set of things we've seen after trying to
@@ -414,15 +420,24 @@ class FederationHandler(BaseHandler):
                         affected=event_id,
                     )
 
+        now = self.clock.time_msec()
+        if now - pdu.origin_server_ts > 2 * 60 * 1000:
+            pass
+        else:
+            thread_id = 0
+
+        logger.info("Thread ID %r", thread_id)
+
         yield self._process_received_pdu(
             origin,
             pdu,
             state=state,
             auth_chain=auth_chain,
+            thread_id=thread_id,
         )
 
     @defer.inlineCallbacks
-    def _get_missing_events_for_pdu(self, origin, pdu, prevs, min_depth):
+    def _get_missing_events_for_pdu(self, origin, pdu, prevs, min_depth, thread_id):
         """
         Args:
             origin (str): Origin of the pdu. Will be called to get the missing events
@@ -529,6 +544,7 @@ class FederationHandler(BaseHandler):
                         origin,
                         ev,
                         sent_to_us_directly=False,
+                        thread_id=thread_id,
                     )
                 except FederationError as e:
                     if e.code == 403:
@@ -540,7 +556,7 @@ class FederationHandler(BaseHandler):
                         raise
 
     @defer.inlineCallbacks
-    def _process_received_pdu(self, origin, event, state, auth_chain):
+    def _process_received_pdu(self, origin, event, state, auth_chain, thread_id):
         """ Called when we have a new pdu. We need to do auth checks and put it
         through the StateHandler.
         """
@@ -592,6 +608,7 @@ class FederationHandler(BaseHandler):
                 origin,
                 event,
                 state=state,
+                thread_id=thread_id,
             )
         except AuthError as e:
             raise FederationError(
@@ -1557,11 +1574,12 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _handle_new_event(self, origin, event, state=None, auth_events=None,
-                          backfilled=False):
+                          backfilled=False, thread_id=0):
         context = yield self._prep_event(
             origin, event,
             state=state,
             auth_events=auth_events,
+            thread_id=thread_id,
         )
 
         # reraise does not allow inlineCallbacks to preserve the stacktrace, so we
@@ -1720,7 +1738,7 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _prep_event(self, origin, event, state=None, auth_events=None):
+    def _prep_event(self, origin, event, state=None, auth_events=None, thread_id=0):
         """
 
         Args:
@@ -1733,7 +1751,7 @@ class FederationHandler(BaseHandler):
             Deferred, which resolves to synapse.events.snapshot.EventContext
         """
         context = yield self.state_handler.compute_event_context(
-            event, old_state=state,
+            event, old_state=state, thread_id=thread_id,
         )
 
         if not auth_events:

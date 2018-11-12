@@ -178,7 +178,7 @@ class StateHandler(object):
         defer.returnValue(joined_hosts)
 
     @defer.inlineCallbacks
-    def compute_event_context(self, event, old_state=None):
+    def compute_event_context(self, event, old_state=None, thread_id=0):
         """Build an EventContext structure for the event.
 
         This works out what the current state should be for the event, and
@@ -215,6 +215,7 @@ class StateHandler(object):
             # We don't store state for outliers, so we don't generate a state
             # group for it.
             context = EventContext.with_state(
+                thread_id=0,  # outlier, don't care
                 state_group=None,
                 current_state_ids=current_state_ids,
                 prev_state_ids=prev_state_ids,
@@ -251,6 +252,7 @@ class StateHandler(object):
             )
 
             context = EventContext.with_state(
+                thread_id=thread_id,
                 state_group=state_group,
                 current_state_ids=current_state_ids,
                 prev_state_ids=prev_state_ids,
@@ -319,6 +321,7 @@ class StateHandler(object):
             state_group = entry.state_group
 
         context = EventContext.with_state(
+            thread_id=thread_id,
             state_group=state_group,
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
