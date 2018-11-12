@@ -211,7 +211,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         correctly decode it as the UTF-8 string, and use filename* in the
         response.
         """
-        filename = parse.quote(u"\u2603").encode('ascii')
+        filename = parse.quote(u"\u2603".encode('utf8')).encode('ascii')
         channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
 
         headers = channel.headers
@@ -226,7 +226,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         If the filename is `filename=<utf8 escaped>` then Synapse will correctly
         decode it as the UTF-8 string, but use filename* for responses.
         """
-        filename = parse.quote(u"\u2603").encode('ascii')
+        filename = parse.quote(u"\u2603".encode('utf8')).encode('ascii')
         channel = self._req(b"inline; filename=" + filename + b".png")
 
         headers = channel.headers
