@@ -57,6 +57,14 @@ matrix:
     services:
       - postgresql
 
+  - python: "pypy3.5"
+    env: TOX_ENV=pypy
+
+  - python: "pypy3.5"
+    env: TOX_ENV=pypy-postgres TRIAL_FLAGS="-j 4"
+    services:
+      - postgresql
+
   - # we only need to check for the newsfragment if it's a PR build
     if: type = pull_request
     python: 3.6
