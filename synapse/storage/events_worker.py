@@ -398,7 +398,6 @@ class EventsWorkerStore(SQLBaseStore):
         with Measure(self._clock, "_get_event_from_row"):
             d = json.loads(js)
             internal_metadata = json.loads(internal_metadata)
-            internal_metadata["thread_id"] = thread_id
 
             if rejected_reason:
                 rejected_reason = yield self._simple_select_one_onecol(
@@ -413,8 +412,6 @@ class EventsWorkerStore(SQLBaseStore):
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
             )
-
-            original_ev.unsigned["thread_id"] = thread_id
 
             redacted_event = None
             if redacted:

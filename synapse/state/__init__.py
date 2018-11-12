@@ -194,6 +194,8 @@ class StateHandler(object):
             synapse.events.snapshot.EventContext:
         """
 
+        event.internal_metadata.thread_id = thread_id
+
         if event.internal_metadata.is_outlier():
             # If this is an outlier, then we know it shouldn't have any current
             # state. Certainly store.get_current_state won't return any, and
