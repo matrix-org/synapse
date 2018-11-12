@@ -21,6 +21,7 @@
 # Imports required for the default HomeServer() implementation
 import abc
 import logging
+import platform
 
 from twisted.enterprise import adbapi
 from twisted.mail.smtp import sendmail
@@ -366,6 +367,9 @@ class HomeServer(object):
 
     def build_db_pool(self):
         name = self.db_config["name"]
+
+        if (name == "psycopg2" and platform.python_implementation() == "PyPy"):
+            name = "psycopg2cffi"
 
         return adbapi.ConnectionPool(
             name,
