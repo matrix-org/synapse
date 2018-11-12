@@ -186,7 +186,11 @@ class SearchStore(BackgroundUpdateStore):
                 # have an event_search_fts_idx; unfortunately postgres 9.4
                 # doesn't support CREATE INDEX IF EXISTS so we just catch the
                 # exception and ignore it.
-                import psycopg2
+                import platform
+                if platform.python_implementation() == "PyPy":
+                    import psycopg2cffi as psycopg2
+                else:
+                    import psycopg2
                 try:
                     c.execute(
                         "CREATE INDEX CONCURRENTLY event_search_fts_idx"
