@@ -24,6 +24,8 @@ from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
+from synapse.api.constants import UserTypes
+
 
 class RegistrationWorkerStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
@@ -449,6 +451,18 @@ class RegistrationStore(RegistrationWorkerStore,
         )
 
         defer.returnValue(res if res else False)
+
+    @cachedInlineCallbacks()
+    def is_support_user(self, user_id):
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="user_type",
+            allow_none=True,
+            desc="is_support_user",
+        )
+
+        defer.returnValue(res if res == UserTypes.SUPPORT else False)
 
     @defer.inlineCallbacks
     def user_add_threepid(self, user_id, medium, address, validated_at, added_at):

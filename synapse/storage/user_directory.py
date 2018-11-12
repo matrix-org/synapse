@@ -16,7 +16,7 @@
 import logging
 import re
 
-from six import iteritems
+from six import iteritems, iterkeys
 
 from twisted.internet import defer
 
@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryStore(SQLBaseStore):
+    def __init__(self, dbconn, hs):
+        super(UserDirectoryStore, self).__init__(dbconn, hs)
+        self.store = hs.get_datastore()
+
     @cachedInlineCallbacks(cache_context=True)
     def is_room_world_readable_or_publicly_joinable(self, room_id, cache_context):
         """Check if the room is either world_readable or publically joinable
@@ -64,10 +68,9 @@ class UserDirectoryStore(SQLBaseStore):
                 or publically joinable
             user_ids (list(str)): Users to add
         """
-
-        support_id = self.hs.config.support_user_id
-        if support_id in user_ids:
-            user_ids.remove(support_id)
+        for u in user_ids:
+            if self.store.is_support_user(u):
+                user_ids.remove(u)
 
         yield self._simple_insert_many(
             table="users_in_public_rooms",
@@ -91,7 +94,13 @@ class UserDirectoryStore(SQLBaseStore):
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
-        users_with_profile.pop(self.hs.config.support_user_id, None)
+        # remove users of type UserType.SUPPORT
+        user_ids_to_pop = []
+        for user_id in iterkeys(users_with_profile):
+            if self.store.is_support_user(user_id):
+                user_ids_to_pop.append(user_id)
+        for u in user_ids_to_pop:
+            users_with_profile.pop(u, None)
 
         if isinstance(self.database_engine, PostgresEngine):
             # We weight the loclpart most highly, then display name and finally
@@ -153,7 +162,8 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def update_user_in_user_dir(self, user_id, room_id):
-        if user_id != self.hs.config.support_user_id:
+
+        if not self.store.is_support_user(user_id):
             yield self._simple_update_one(
                 table="user_directory",
                 keyvalues={"user_id": user_id},
@@ -164,7 +174,7 @@ class UserDirectoryStore(SQLBaseStore):
 
     def update_profile_in_user_dir(self, user_id, display_name, avatar_url, room_id):
         def _update_profile_in_user_dir_txn(txn):
-            if user_id == self.hs.config.support_user_id:
+            if self.store.is_support_user(user_id):
                 return
             new_entry = self._simple_upsert_txn(
                 txn,
@@ -229,7 +239,7 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def update_user_in_public_user_list(self, user_id, room_id):
-        if user_id != self.hs.config.support_user_id:
+        if not self.store.is_support_user(user_id):
             yield self._simple_update_one(
                 table="users_in_public_rooms",
                 keyvalues={"user_id": user_id},
@@ -352,7 +362,8 @@ class UserDirectoryStore(SQLBaseStore):
             support_user = self.hs.config.support_user_id
 
             if support_user is not None:
-                user_id_tuples = [u for u in user_id_tuples if support_user not in u]
+                user_id_tuples = [u for u in user_id_tuples
+                                  if not self.store.is_support_user(u)]
 
             self._simple_insert_many_txn(
                 txn,

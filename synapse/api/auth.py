@@ -791,9 +791,10 @@ class Auth(object):
             threepid should never be set at the same time.
         """
 
-        # Never fail an auth check for the server notices users
+        # Never fail an auth check for the server notices users or support user
         # This can be a problem where event creation is prohibited due to blocking
-        if user_id == self.hs.config.server_notices_mxid:
+        if (user_id == self.hs.config.server_notices_mxid or
+                user_id == self.hs.config.support_user_id):
             return
 
         if self.hs.config.hs_disabled:

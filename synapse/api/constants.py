@@ -105,7 +105,6 @@ class RoomVersions(object):
     VDH_TEST = "vdh-test-version"
     STATE_V2_TEST = "state-v2-test"
 
-
 # the version we will give rooms which are created on this server
 DEFAULT_ROOM_VERSION = RoomVersions.V1
 
@@ -119,3 +118,9 @@ KNOWN_ROOM_VERSIONS = {
 
 ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
+
+
+# Allows for user type specific behaviour, if we'd had a crystal ball would
+# probably have included admin and guest, normal users are type None
+class UserTypes(object):
+    SUPPORT = "support"
