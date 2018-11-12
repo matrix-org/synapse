@@ -15,28 +15,22 @@
 
 
 import os
+import shutil
+import tempfile
+from binascii import unhexlify
 
 from mock import Mock
+from six.moves.urllib import parse
 
+from twisted.internet import defer, reactor
 from twisted.internet.defer import Deferred
 
 from synapse.config.repository import MediaStorageProviderConfig
-from synapse.util.module_loader import load_module
-
-from tests import unittest
-
-import os
-import shutil
-import tempfile
-
-from mock import Mock
-
-from twisted.internet import defer, reactor
-
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
+from synapse.util.module_loader import load_module
 
 from tests import unittest
 
@@ -105,7 +99,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         self.fetches = []
 
-        def get_file(url, output_stream, max_size):
+        def get_file(destination, path, output_stream, args=None, max_size=None):
             """
             Returns tuple[int,dict,str,int] of file length, response headers,
             absolute URI, and response code.
@@ -118,7 +112,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
             d = Deferred()
             d.addCallback(write_to)
-            self.fetches.append((d, url))
+            self.fetches.append((d, destination, path, args))
             return d
 
         client = Mock()
@@ -129,6 +123,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config.media_store_path = self.storage_path
+        config.thumbnail_requirements = {}
+        config.max_image_pixels = 2000000
 
         provider_config = {
             "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
@@ -151,37 +147,42 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
 
         self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b'download_resource']
+        self.download_resource = self.media_repo.children[b'download']
 
-    def test_get_remote_media(self):
+        # smol png
+        self.end_content = unhexlify(
+            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+            b"0000001f15c4890000000a49444154789c63000100000500010d"
+            b"0a2db40000000049454e44ae426082"
+        )
+
+    def _req(self, content_disposition):
 
         request, channel = self.make_request(
-            "GET", "download/example.com/12345", shorthand=False
+            "GET", "example.com/12345", shorthand=False
         )
         request.render(self.download_resource)
         self.pump()
 
-        # We've made one fetch
+        # We've made one fetch, to example.com, using the media URL, and asking
+        # the other server not to do a remote fetch
         self.assertEqual(len(self.fetches), 1)
-
-        end_content = (
-            b'<html><head>'
-            b'<meta property="og:title" content="~matrix~" />'
-            b'<meta property="og:description" content="hi" />'
-            b'</head></html>'
+        self.assertEqual(self.fetches[0][1], "example.com")
+        self.assertEqual(
+            self.fetches[0][2], "/_matrix/media/v1/download/example.com/12345"
         )
+        self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
 
         self.fetches[0][0].callback(
             (
-                end_content,
+                self.end_content,
                 (
-                    len(end_content),
+                    len(self.end_content),
                     {
-                        b"Content-Length": [b"%d" % (len(end_content))],
-                        b"Content-Type": [b'text/html; charset="utf8"'],
+                        b"Content-Length": [b"%d" % (len(self.end_content))],
+                        b"Content-Type": [b'image/png'],
+                        b"Content-Disposition": [content_disposition],
                     },
-                    "https://example.com",
-                    200,
                 ),
             )
         )
@@ -189,44 +190,48 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(channel.code, 200)
 
-        print(request)
+        return channel
+
+    def test_disposition_filename_ascii(self):
+        """
+        If the filename is filename=<ascii> then Synapse will decode it as an
+        ASCII string, and use filename= in the response.
+        """
+        channel = self._req(b"inline; filename=out.png")
+
+        headers = channel.headers
+        self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
         self.assertEqual(
-            channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+            headers.getRawHeaders(b"Content-Disposition"), [b"inline; filename=out.png"]
         )
 
-        # Check the cache returns the correct response
-        request, channel = self.make_request(
-            "GET", "url_preview?url=matrix.org", shorthand=False
-        )
-        request.render(self.preview_url)
-        self.pump()
+    def test_disposition_filenamestar_utf8escaped(self):
+        """
+        If the filename is filename=*utf8''<utf8 escaped> then Synapse will
+        correctly decode it as the UTF-8 string, and use filename* in the
+        response.
+        """
+        filename = parse.quote(u"\u2603").encode('ascii')
+        channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
 
-        # Only one fetch, still, since we'll lean on the cache
-        self.assertEqual(len(self.fetches), 1)
-
-        # Check the cache response has the same content
-        self.assertEqual(channel.code, 200)
+        headers = channel.headers
+        self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
         self.assertEqual(
-            channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+            headers.getRawHeaders(b"Content-Disposition"),
+            [b"inline; filename*=utf-8''" + filename + b".png"],
         )
 
-        # Clear the in-memory cache
-        self.assertIn("matrix.org", self.preview_url._cache)
-        self.preview_url._cache.pop("matrix.org")
-        self.assertNotIn("matrix.org", self.preview_url._cache)
+    def test_disposition_filename_utf8escaped(self):
+        """
+        If the filename is `filename=<utf8 escaped>` then Synapse will correctly
+        decode it as the UTF-8 string, but use filename* for responses.
+        """
+        filename = parse.quote(u"\u2603").encode('ascii')
+        channel = self._req(b"inline; filename=" + filename + b".png")
 
-        # Check the database cache returns the correct response
-        request, channel = self.make_request(
-            "GET", "url_preview?url=matrix.org", shorthand=False
-        )
-        request.render(self.preview_url)
-        self.pump()
-
-        # Only one fetch, still, since we'll lean on the cache
-        self.assertEqual(len(self.fetches), 1)
-
-        # Check the cache response has the same content
-        self.assertEqual(channel.code, 200)
+        headers = channel.headers
+        self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
         self.assertEqual(
-            channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+            headers.getRawHeaders(b"Content-Disposition"),
+            [b"inline; filename*=utf-8''" + filename + b".png"],
         )

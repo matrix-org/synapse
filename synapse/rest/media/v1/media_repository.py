@@ -399,7 +399,7 @@ class MediaRepository(object):
 
         time_now_ms = self.clock.time_msec()
 
-        content_disposition = headers.get(b"Content-Disposition", b'')
+        content_disposition = headers.get(b"Content-Disposition", [b''])
 
         # Decode the Content-Disposition header (cgi.parse_header requires
         # unicode on Python 3, not bytes) the best we can.
