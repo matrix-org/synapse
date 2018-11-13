@@ -785,7 +785,7 @@ class UserDirectoryStore(SQLBaseStore):
             desc="is_support_user",
         )
 
-        defer.returnValue(res if res == UserTypes.SUPPORT else False)
+        defer.returnValue(True if res == UserTypes.SUPPORT else False)
 
 
 def _parse_query_sqlite(search_term):
