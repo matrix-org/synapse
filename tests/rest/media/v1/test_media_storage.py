@@ -173,18 +173,15 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
 
+        headers = {
+            b"Content-Length": [b"%d" % (len(self.end_content))],
+            b"Content-Type": [b'image/png'],
+        }
+        if content_disposition:
+            headers[b"Content-Disposition"] = [content_disposition]
+
         self.fetches[0][0].callback(
-            (
-                self.end_content,
-                (
-                    len(self.end_content),
-                    {
-                        b"Content-Length": [b"%d" % (len(self.end_content))],
-                        b"Content-Type": [b'image/png'],
-                        b"Content-Disposition": [content_disposition],
-                    },
-                ),
-            )
+            (self.end_content, (len(self.end_content), headers))
         )
 
         self.pump()
@@ -221,17 +218,13 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             [b"inline; filename*=utf-8''" + filename + b".png"],
         )
 
-    def test_disposition_filename_utf8escaped(self):
+    def test_disposition_none(self):
         """
-        If the filename is `filename=<utf8 escaped>` then Synapse will correctly
-        decode it as the UTF-8 string, but use filename* for responses.
+        If there is no filename, one isn't passed on in the Content-Disposition
+        of the request.
         """
-        filename = parse.quote(u"\u2603".encode('utf8')).encode('ascii')
-        channel = self._req(b"inline; filename=" + filename + b".png")
+        channel = self._req(None)
 
         headers = channel.headers
         self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
-        self.assertEqual(
-            headers.getRawHeaders(b"Content-Disposition"),
-            [b"inline; filename*=utf-8''" + filename + b".png"],
-        )
+        self.assertEqual(headers.getRawHeaders(b"Content-Disposition"), None)
