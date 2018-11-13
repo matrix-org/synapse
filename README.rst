@@ -128,10 +128,12 @@ Installing prerequisites on Raspbian::
 
     sudo apt-get install build-essential python2.7-dev libffi-dev \
                          python-pip python-setuptools sqlite3 \
-                         libssl-dev python-virtualenv libjpeg-dev
+                         libssl-dev python-virtualenv libjpeg-dev \
+                         python-dev libpq-dev
     sudo pip install --upgrade pip
     sudo pip install --upgrade ndg-httpsclient
     sudo pip install --upgrade virtualenv
+    sudo pip install psycopg2
 
 Installing prerequisites on openSUSE::
 
