@@ -252,7 +252,11 @@ def setup_test_homeserver(
         else:
             # We need to do cleanup on PostgreSQL
             def cleanup():
-                import psycopg2
+                import platform
+                if platform.python_implementation() == "PyPy":
+                    import psycopg2cffi as psycopg2
+                else:
+                    import psycopg2
 
                 # Close all the db pools
                 hs.get_db_pool().close()
