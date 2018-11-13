@@ -471,6 +471,11 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
             event_filter = Filter(json.loads(filter_json))
         else:
             event_filter = None
+
+        logger.info("filter_bytes: %s", filter_bytes)
+        logger.info("Event filter: %s", event_filter)
+        if event_filter:
+            logger.info("Event filter: %s", event_filter.thread_id)
         msgs = yield self.pagination_handler.get_messages(
             room_id=room_id,
             requester=requester,

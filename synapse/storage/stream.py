@@ -149,7 +149,13 @@ def filter_to_clause(event_filter):
         clauses.append("contains_url = ?")
         args.append(event_filter.contains_url)
 
-    return " AND ".join(clauses), args
+    if event_filter.thread_id is not None:
+        clauses.append("thread_id = ?")
+        args.append(event_filter.thread_id)
+
+    filter = " AND ".join(clauses), args
+
+    return filter
 
 
 class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
@@ -741,6 +747,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         filter_clause, filter_args = filter_to_clause(event_filter)
 
+        logger.info("event_filter: %s", event_filter)
+        if event_filter is not None:
+            logger.info("event_filter: %s", event_filter.thread_id)
+        logger.info("Paginating with filter: %s", filter_clause)
+
         if filter_clause:
             bounds += " AND " + filter_clause
             args.extend(filter_args)
@@ -808,7 +819,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         rows, token = yield self.runInteraction(
             "paginate_room_events", self._paginate_room_events_txn,
-            room_id, from_key, to_key, direction, limit, event_filter,
+            room_id, from_key, to_key, direction, limit,
+            event_filter=event_filter,
         )
 
         events = yield self._get_events(

@@ -120,6 +120,9 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "include_redundant_members": {
             "type": "boolean"
         },
+        "thread_id": {
+            "type": "number",
+        }
     }
 }
 
@@ -330,6 +333,8 @@ class Filter(object):
         self.not_senders = self.filter_json.get("not_senders", [])
 
         self.contains_url = self.filter_json.get("contains_url", None)
+
+        self.thread_id = self.filter_json.get("thread_id", None)
 
     def filters_all_types(self):
         return "*" in self.not_types
