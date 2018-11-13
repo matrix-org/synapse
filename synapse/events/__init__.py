@@ -44,6 +44,9 @@ class _EventInternalMetadata(object):
     def is_invite_from_remote(self):
         return getattr(self, "invite_from_remote", False)
 
+    def is_internal_event(self):
+        return getattr(self, "internal_event", False)
+
     def get_send_on_behalf_of(self):
         """Whether this server should send the event on behalf of another server.
         This is used by the federation "send_join" API to forward the initial join

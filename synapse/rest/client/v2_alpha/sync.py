@@ -32,7 +32,6 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
-from synapse.util.stringutils import random_string
 
 from ._base import client_v2_patterns, set_timeline_upper_limit
 
@@ -387,22 +386,10 @@ class SyncRestServlet(RestServlet):
 
         if exclude_threaded:
             serialized_timeline = []
-            seen_threads = set()
             for e in reversed(timeline_events):
                 thread_id = e.internal_metadata.thread_id
                 if thread_id != 0:
-                    if thread_id not in seen_threads:
-                        serialized_timeline.append({
-                            "type": "org.matrix.new_thread",
-                            "content": {
-                                "thread_id": thread_id,
-                                "latest_event": e.event_id,
-                            },
-                            "event_id": random_string(24),
-                            "origin_server_ts": e.origin_server_ts,
-                            "sender": "@server",
-                        })
-                    seen_threads.add(thread_id)
+                    pass
                 else:
                     serialized_timeline.append(serialize(e))
 

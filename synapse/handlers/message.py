@@ -588,6 +588,7 @@ class EventCreationHandler(object):
         context,
         ratelimit=True,
         extra_users=[],
+        do_auth=True,
     ):
         """Processes a new event. This includes checking auth, persisting it,
         notifying users, sending to remote servers, etc.
@@ -604,7 +605,8 @@ class EventCreationHandler(object):
         """
 
         try:
-            yield self.auth.check_from_context(event, context)
+            if do_auth:
+                yield self.auth.check_from_context(event, context)
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err

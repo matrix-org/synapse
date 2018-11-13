@@ -55,13 +55,14 @@ from synapse.replication.http.federation import (
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import StateResolutionStore, resolve_events_with_store
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import UserID, create_requester, get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room
 from synapse.util.frozenutils import unfreeze
 from synapse.util.logutils import log_function
 from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_server
 
 from ._base import BaseHandler
@@ -223,9 +224,11 @@ class FederationHandler(BaseHandler):
         state = None
         auth_chain = []
 
+        new_thread = False
         if thread_id is None:
             # FIXME: Pick something better?
             thread_id = random.randint(0, 999999999)
+            new_thread = True
 
         # Get missing pdus if necessary.
         if not pdu.internal_metadata.is_outlier():
@@ -425,6 +428,7 @@ class FederationHandler(BaseHandler):
             pass
         else:
             thread_id = 0
+            new_thread = False
 
         logger.info("Thread ID %r", thread_id)
 
@@ -435,6 +439,32 @@ class FederationHandler(BaseHandler):
             auth_chain=auth_chain,
             thread_id=thread_id,
         )
+
+        if new_thread:
+            builder = self.event_builder_factory.new({
+                "type": "org.matrix.new_thread",
+                "content": {
+                    "thread_id": thread_id,
+                    "latest_event": pdu.event_id,
+                },
+                "event_id": random_string(24),
+                "origin_server_ts": self.clock.time_msec(),
+                "sender": "@server:server",
+                "room_id": pdu.room_id,
+            })
+
+            event, context = yield self.event_creation_handler.create_new_client_event(
+                builder=builder,
+            )
+            event.internal_metadata.internal_event = True
+            yield self.event_creation_handler.handle_new_client_event(
+                create_requester(UserID("server", "server")),
+                event,
+                context,
+                ratelimit=True,
+                extra_users=[],
+                do_auth=False,
+            )
 
     @defer.inlineCallbacks
     def _get_missing_events_for_pdu(self, origin, pdu, prevs, min_depth, thread_id):

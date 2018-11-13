@@ -175,6 +175,9 @@ class TransactionQueue(object):
                     if not is_mine and send_on_behalf_of is None:
                         return
 
+                    if event.internal_metadata.is_internal_event():
+                        return
+
                     try:
                         # Get the state from before the event.
                         # We need to make sure that this is the state from before
