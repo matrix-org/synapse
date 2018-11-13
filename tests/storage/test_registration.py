@@ -99,6 +99,26 @@ class RegistrationStoreTestCase(unittest.TestCase):
         user = yield self.store.get_user_by_access_token(self.tokens[0])
         self.assertIsNone(user, "access token was not deleted without device_id")
 
+    @defer.inlineCallbacks
+    def test_is_support_user(self):
+        TEST_USER = "@test:test"
+        SUPPORT_USER = "@support:test"
+
+        res = yield self.store.is_support_user(None)
+        self.assertFalse(res)
+        yield self.datastore.register(user_id=TEST_USER, token="123", password_hash=None)
+        res = yield self.store.is_support_user(TEST_USER)
+        self.assertFalse(res)
+
+        self.datastore.register(
+            user_id=SUPPORT_USER,
+            token="456",
+            password_hash=None,
+            user_type=UserTypes.SUPPORT
+        )
+        res = yield self.store.is_support_user(SUPPORT_USER)
+        self.assertTrue(res)
+
 
 class TokenGenerator:
     def __init__(self):

@@ -125,9 +125,11 @@ class UserDirectoryHandler(object):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        yield self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url, None,
-        )
+        is_support = yield self.store.is_support_user(user_id)
+        if not is_support:
+            yield self.store.update_profile_in_user_dir(
+                user_id, profile.display_name, profile.avatar_url, None,
+            )
 
     @defer.inlineCallbacks
     def handle_user_deactivated(self, user_id):
@@ -323,18 +325,14 @@ class UserDirectoryHandler(object):
                     room_id, prev_event_id, event_id, typ,
                 )
             elif typ == EventTypes.Member:
+
                 change = yield self._get_key_change(
                     prev_event_id, event_id,
                     key_name="membership",
                     public_value=Membership.JOIN,
                 )
 
-                if change is None:
-                    # Handle any profile changes
-                    yield self._handle_profile_change(
-                        state_key, room_id, prev_event_id, event_id,
-                    )
-                    continue
+
 
                 if not change:
                     # Need to check if the server left the room entirely, if so
@@ -349,12 +347,23 @@ class UserDirectoryHandler(object):
                         # need to remove those users or not
                         user_ids = yield self.store.get_users_in_dir_due_to_room(room_id)
                         for user_id in user_ids:
-                            yield self._handle_remove_user(room_id, user_id)
+                            is_support = yield self.store.is_support_user(state_key)
+                            if not is_support:
+                                yield self._handle_remove_user(room_id, user_id)
                         return
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                if change:  # The user joined
+                is_support = yield self.store.is_support_user(state_key)
+
+                if change is None and not is_support:
+                    # Handle any profile changes
+                    yield self._handle_profile_change(
+                        state_key, room_id, prev_event_id, event_id,
+                    )
+                    continue
+
+                if change and not is_support:  # The user joined
                     event = yield self.store.get_event(event_id, allow_none=True)
                     profile = ProfileInfo(
                         avatar_url=event.content.get("avatar_url"),

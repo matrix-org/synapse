@@ -454,6 +454,18 @@ class RegistrationStore(RegistrationWorkerStore,
 
         defer.returnValue(res if res else False)
 
+    @cachedInlineCallbacks()
+    def is_support_user(self, user_id):
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="user_type",
+            allow_none=True,
+            desc="is_support_user",
+        )
+
+        defer.returnValue(True if res == UserTypes.SUPPORT else False)
+
     @defer.inlineCallbacks
     def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
         yield self._simple_upsert("user_threepids", {
