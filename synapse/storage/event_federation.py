@@ -34,6 +34,24 @@ logger = logging.getLogger(__name__)
 
 class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
                                  SQLBaseStore):
+
+    def get_threads_for_backfill_event(self, event_id):
+        def _get_thread_for_backfill_event_txn(txn):
+            sql = """
+                SELECT thread_id
+                FROM event_edges
+                INNER JOIN events USING (event_id)
+                WHERE prev_event_id = ?
+            """
+
+            txn.execute(sql, (event_id,))
+            return [thread_id for thread_id, in txn]
+
+        return self.runInteraction(
+            "get_thread_for_backfill_event",
+            _get_thread_for_backfill_event_txn,
+        )
+
     def get_auth_chain(self, event_ids, include_given=False):
         """Get auth events for given event_ids. The events *must* be state events.
 

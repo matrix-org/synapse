@@ -28,7 +28,6 @@ from synapse.events.utils import (
     format_event_raw,
     serialize_event,
 )
-from synapse.events import FrozenEvent
 from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
@@ -246,7 +245,8 @@ class SyncRestServlet(RestServlet):
         }
 
     @staticmethod
-    def encode_joined(rooms, time_now, token_id, event_fields, event_formatter, exclude_threaded):
+    def encode_joined(rooms, time_now, token_id, event_fields, event_formatter,
+                      exclude_threaded):
         """
         Encode the joined rooms in a sync result
 
