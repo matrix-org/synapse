@@ -20,7 +20,7 @@ from six import iteritems, iterkeys
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventTypes, JoinRules, UserTypes
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -69,7 +69,8 @@ class UserDirectoryStore(SQLBaseStore):
             user_ids (list(str)): Users to add
         """
         for u in user_ids:
-            if self.store.is_support_user(u):
+            is_support = yield self.store.is_support_user(u)
+            if is_support:
                 user_ids.remove(u)
 
         yield self._simple_insert_many(
@@ -86,6 +87,7 @@ class UserDirectoryStore(SQLBaseStore):
         for user_id in user_ids:
             self.get_user_in_public_room.invalidate((user_id,))
 
+    @defer.inlineCallbacks
     def add_profiles_to_user_dir(self, room_id, users_with_profile):
         """Add profiles to the user directory
 
@@ -94,10 +96,10 @@ class UserDirectoryStore(SQLBaseStore):
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
-        # remove users of type UserType.SUPPORT
         user_ids_to_pop = []
         for user_id in iterkeys(users_with_profile):
-            if self.store.is_support_user(user_id):
+            is_support = yield self.store.is_support_user(user_id)
+            if is_support:
                 user_ids_to_pop.append(user_id)
         for u in user_ids_to_pop:
             users_with_profile.pop(u, None)
@@ -156,14 +158,14 @@ class UserDirectoryStore(SQLBaseStore):
                     self.get_user_in_directory.invalidate, (user_id,)
                 )
 
-        return self.runInteraction(
+        self.runInteraction(
             "add_profiles_to_user_dir", _add_profiles_to_user_dir_txn
         )
 
     @defer.inlineCallbacks
     def update_user_in_user_dir(self, user_id, room_id):
-
-        if not self.store.is_support_user(user_id):
+        is_support = yield self.store.is_support_user(user_id)
+        if not is_support:
             yield self._simple_update_one(
                 table="user_directory",
                 keyvalues={"user_id": user_id},
@@ -174,8 +176,10 @@ class UserDirectoryStore(SQLBaseStore):
 
     def update_profile_in_user_dir(self, user_id, display_name, avatar_url, room_id):
         def _update_profile_in_user_dir_txn(txn):
-            if self.store.is_support_user(user_id):
+            is_support = yield self.store.is_support_user(user_id)
+            if is_support:
                 return
+
             new_entry = self._simple_upsert_txn(
                 txn,
                 table="user_directory",
@@ -239,7 +243,8 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def update_user_in_public_user_list(self, user_id, room_id):
-        if not self.store.is_support_user(user_id):
+        is_support = yield self.store.is_support_user(user_id)
+        if not is_support:
             yield self._simple_update_one(
                 table="users_in_public_rooms",
                 keyvalues={"user_id": user_id},
@@ -349,6 +354,7 @@ class UserDirectoryStore(SQLBaseStore):
         rows = yield self._execute("get_all_local_users", None, sql)
         defer.returnValue([name for name, in rows])
 
+    @defer.inlineCallbacks
     def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
         """Insert entries into the users_who_share_rooms table. The first
         user should be a local user.
@@ -358,12 +364,19 @@ class UserDirectoryStore(SQLBaseStore):
             share_private (bool): Is the room private
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
-        def _add_users_who_share_room_txn(txn, user_id_tuples):
-            support_user = self.hs.config.support_user_id
+        # user_id_tuples =
+        #   [u for u in user_id_tuples if not self.store.is_support_user(u)]
+        user_id_tuples_filtered = []
+        for ut in user_id_tuples:
+            safe = True
+            for u in ut:
+                is_support = yield self.store.is_support_user(u)
+                if is_support:
+                    safe = False
+            if safe:
+                user_id_tuples_filtered.append(ut)
 
-            if support_user is not None:
-                user_id_tuples = [u for u in user_id_tuples
-                                  if not self.store.is_support_user(u)]
+        def _add_users_who_share_room_txn(txn, user_id_tuples_filtered):
 
             self._simple_insert_many_txn(
                 txn,
@@ -375,10 +388,10 @@ class UserDirectoryStore(SQLBaseStore):
                         "room_id": room_id,
                         "share_private": share_private,
                     }
-                    for user_id, other_user_id in user_id_tuples
+                    for user_id, other_user_id in user_id_tuples_filtered
                 ],
             )
-            for user_id, other_user_id in user_id_tuples:
+            for user_id, other_user_id in user_id_tuples_filtered:
                 txn.call_after(
                     self.get_users_who_share_room_from_dir.invalidate,
                     (user_id,),
@@ -387,8 +400,10 @@ class UserDirectoryStore(SQLBaseStore):
                     self.get_if_users_share_a_room.invalidate,
                     (user_id, other_user_id),
                 )
-        return self.runInteraction(
-            "add_users_who_share_room", _add_users_who_share_room_txn, user_id_tuples
+        self.runInteraction(
+            "add_users_who_share_room",
+            _add_users_who_share_room_txn,
+            user_id_tuples_filtered,
         )
 
     def update_users_who_share_room(self, room_id, share_private, user_id_sets):
@@ -759,6 +774,18 @@ class UserDirectoryStore(SQLBaseStore):
             "limited": limited,
             "results": results,
         })
+
+    @cachedInlineCallbacks()
+    def is_support_user(self, user_id):
+        res = yield self._simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="user_type",
+            allow_none=True,
+            desc="is_support_user",
+        )
+
+        defer.returnValue(res if res == UserTypes.SUPPORT else False)
 
 
 def _parse_query_sqlite(search_term):

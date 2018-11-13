@@ -105,6 +105,7 @@ class RoomVersions(object):
     VDH_TEST = "vdh-test-version"
     STATE_V2_TEST = "state-v2-test"
 
+
 # the version we will give rooms which are created on this server
 DEFAULT_ROOM_VERSION = RoomVersions.V1
 

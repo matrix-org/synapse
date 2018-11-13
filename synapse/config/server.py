@@ -16,7 +16,6 @@
 import logging
 
 from synapse.http.endpoint import parse_and_validate_server_name
-from synapse.types import UserID
 
 from ._base import Config, ConfigError
 
@@ -85,10 +84,6 @@ class ServerConfig(Config):
         self.mau_trial_days = config.get(
             "mau_trial_days", 0,
         )
-        self.support_user_id = None
-        support_user = config.get('support_user', None)
-        if support_user:
-            self.support_user_id = UserID(support_user, self.server_name).to_string()
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)

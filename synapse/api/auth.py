@@ -793,8 +793,8 @@ class Auth(object):
 
         # Never fail an auth check for the server notices users or support user
         # This can be a problem where event creation is prohibited due to blocking
-        if (user_id == self.hs.config.server_notices_mxid or
-                user_id == self.hs.config.support_user_id):
+        is_support = yield self.store.is_support_user(user_id)
+        if user_id == self.hs.config.server_notices_mxid or is_support:
             return
 
         if self.hs.config.hs_disabled:

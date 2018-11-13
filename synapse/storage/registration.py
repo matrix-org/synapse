@@ -24,8 +24,6 @@ from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
-from synapse.api.constants import UserTypes
-
 
 class RegistrationWorkerStore(SQLBaseStore):
     def __init__(self, db_conn, hs):
@@ -169,7 +167,7 @@ class RegistrationStore(RegistrationWorkerStore,
 
     def register(self, user_id, token=None, password_hash=None,
                  was_guest=False, make_guest=False, appservice_id=None,
-                 create_profile_with_localpart=None, admin=False):
+                 create_profile_with_localpart=None, admin=False, user_type=None):
         """Attempts to register an account.
 
         Args:
@@ -198,7 +196,8 @@ class RegistrationStore(RegistrationWorkerStore,
             make_guest,
             appservice_id,
             create_profile_with_localpart,
-            admin
+            admin,
+            user_type
         )
 
     def _register(
@@ -212,6 +211,7 @@ class RegistrationStore(RegistrationWorkerStore,
         appservice_id,
         create_profile_with_localpart,
         admin,
+        user_type,
     ):
         now = int(self.clock.time())
 
@@ -246,6 +246,7 @@ class RegistrationStore(RegistrationWorkerStore,
                         "is_guest": 1 if make_guest else 0,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
+                        "user_type": user_type
                     }
                 )
             else:
@@ -259,6 +260,7 @@ class RegistrationStore(RegistrationWorkerStore,
                         "is_guest": 1 if make_guest else 0,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
+                        "user_type": user_type,
                     }
                 )
         except self.database_engine.module.IntegrityError:
@@ -451,18 +453,6 @@ class RegistrationStore(RegistrationWorkerStore,
         )
 
         defer.returnValue(res if res else False)
-
-    @cachedInlineCallbacks()
-    def is_support_user(self, user_id):
-        res = yield self._simple_select_one_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="user_type",
-            allow_none=True,
-            desc="is_support_user",
-        )
-
-        defer.returnValue(res if res == UserTypes.SUPPORT else False)
 
     @defer.inlineCallbacks
     def user_add_threepid(self, user_id, medium, address, validated_at, added_at):

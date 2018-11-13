@@ -16,6 +16,8 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.api.constants import UserTypes
+
 from tests.unittest import HomeserverTestCase
 
 FORTY_DAYS = 40 * 24 * 60 * 60
@@ -28,7 +30,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store = hs.get_datastore()
         hs.config.limit_usage_by_mau = True
         hs.config.max_mau_value = 50
-        hs.config.support_user_id = "@support:test"
+
         # Advance the clock a bit
         reactor.advance(FORTY_DAYS)
 
@@ -226,9 +228,15 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         count = self.store.get_monthly_active_count()
         self.pump()
         self.assertEqual(self.get_success(count), 0)
-        self.store.upsert_monthly_active_user(
-            self.hs.config.support_user_id
+        support_user_id = '@support:test'
+        self.store.register(
+            user_id=support_user_id,
+            token="123",
+            password_hash=None,
+            user_type=UserTypes.SUPPORT
         )
+
+        self.store.upsert_monthly_active_user(support_user_id)
         count = self.store.get_monthly_active_count()
         self.pump()
         self.assertEqual(self.get_success(count), 0)

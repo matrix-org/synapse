@@ -15,6 +15,7 @@
 
 from twisted.internet import defer
 
+from synapse.api.constants import UserTypes
 from synapse.storage import UserDirectoryStore
 from synapse.storage.roommember import ProfileInfo
 
@@ -31,6 +32,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.datastore = self.hs.get_datastore()
         self.store = UserDirectoryStore(self.hs.get_db_conn(), self.hs)
 
         # alice and bob are both in !room_id. bobby is not but shares
@@ -80,20 +82,23 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_cannot_add_support_user_to_directory(self):
         self.hs.config.user_directory_search_all_users = True
-        self.hs.config.support_user_id = "@support:test"
-        SUPPORT_USER = self.hs.config.support_user_id
-        support_screen_name = "Support"
+        SUPPORT_USER = "@support:test"
+        SUPPOER_USER_SCREEN_NAME = "Support"
+
+        yield self.datastore.register(user_id=SUPPORT_USER, token="123",
+                                      password_hash=None, user_type=UserTypes.SUPPORT)
+        yield self.datastore.register(user_id=ALICE, token="456", password_hash=None)
 
         yield self.store.add_profiles_to_user_dir(
             ROOM,
-            {SUPPORT_USER: ProfileInfo(None, support_screen_name)},
+            {SUPPORT_USER: ProfileInfo(None, SUPPOER_USER_SCREEN_NAME)},
         )
         yield self.store.add_users_to_public_room(ROOM, [SUPPORT_USER])
         yield self.store.add_users_who_share_room(
             ROOM, False, ((ALICE, SUPPORT_USER),)
         )
 
-        r = yield self.store.search_user_dir(ALICE, support_screen_name, 10)
+        r = yield self.store.search_user_dir(ALICE, SUPPOER_USER_SCREEN_NAME, 10)
         self.assertFalse(r["limited"])
         self.assertEqual(0, len(r["results"]))
 
@@ -104,11 +109,11 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
 
         yield self.store.update_user_in_user_dir(SUPPORT_USER, ROOM)
         yield self.store.update_profile_in_user_dir(
-            SUPPORT_USER, support_screen_name, None, ROOM
+            SUPPORT_USER, SUPPOER_USER_SCREEN_NAME, None, ROOM
         )
         yield self.store.update_user_in_public_user_list(SUPPORT_USER, ROOM)
 
-        r = yield self.store.search_user_dir(ALICE, support_screen_name, 10)
+        r = yield self.store.search_user_dir(ALICE, SUPPOER_USER_SCREEN_NAME, 10)
         self.assertFalse(r["limited"])
         self.assertEqual(0, len(r["results"]))
 
@@ -117,3 +122,23 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
 
         r = yield self.store.get_user_in_public_room(SUPPORT_USER)
         self.assertEqual(r, None)
+
+    @defer.inlineCallbacks
+    def test_is_support_user(self):
+        TEST_USER = "@test:test"
+        SUPPORT_USER = "@support:test"
+
+        res = yield self.store.is_support_user(None)
+        self.assertFalse(res)
+        yield self.datastore.register(user_id=TEST_USER, token="123", password_hash=None)
+        res = yield self.store.is_support_user(TEST_USER)
+        self.assertFalse(res)
+
+        self.datastore.register(
+            user_id=SUPPORT_USER,
+            token="456",
+            password_hash=None,
+            user_type=UserTypes.SUPPORT
+        )
+        res = yield self.store.is_support_user(SUPPORT_USER)
+        self.assertTrue(res)

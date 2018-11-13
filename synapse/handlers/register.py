@@ -225,15 +225,17 @@ class RegistrationHandler(BaseHandler):
         # that an auto generated support user is not a real user and never be
         # the user to create the room
         should_auto_create_rooms = False
-        if (self.hs.config.autocreate_auto_join_rooms and
-                self.hs.config.support_user_id != user_id):
+        is_support = yield self.store.is_support_user(user_id)
+        # There is an edge case where the first user is the support user, then
+        # the room is never created, though this seems unlikely and
+        # recoverable from given the support user being involved in the first
+        # place.
+        print ("is_support is %r" % is_support)
+        if (self.hs.config.autocreate_auto_join_rooms and not is_support):
             count = yield self.store.count_all_users()
-            if self.hs.config.support_user_id is None:
-                should_auto_create_rooms = count == 1
-            else:
-                # assume that support user has been created first
-                should_auto_create_rooms = count == 2
-
+            print ("count %d" % count)
+            should_auto_create_rooms = count == 1
+        print "should_auto_create_rooms is %r" % should_auto_create_rooms
         for r in self.hs.config.auto_join_rooms:
             try:
                 if should_auto_create_rooms:
