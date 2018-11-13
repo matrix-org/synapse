@@ -336,6 +336,7 @@ class SyncRestServlet(RestServlet):
                 room, time_now, token_id, joined=False,
                 only_fields=event_fields,
                 event_formatter=event_formatter,
+                exclude_threaded=False,
             )
 
         return joined
