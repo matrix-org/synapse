@@ -1,0 +1,1 @@
+Use psycopg2cffi consistently if running on PyPy
