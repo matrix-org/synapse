@@ -230,12 +230,11 @@ class RegistrationHandler(BaseHandler):
         # the room is never created, though this seems unlikely and
         # recoverable from given the support user being involved in the first
         # place.
-        print ("is_support is %r" % is_support)
+
         if (self.hs.config.autocreate_auto_join_rooms and not is_support):
             count = yield self.store.count_all_users()
-            print ("count %d" % count)
             should_auto_create_rooms = count == 1
-        print "should_auto_create_rooms is %r" % should_auto_create_rooms
+
         for r in self.hs.config.auto_join_rooms:
             try:
                 if should_auto_create_rooms:
