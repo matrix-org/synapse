@@ -332,8 +332,6 @@ class UserDirectoryHandler(object):
                     public_value=Membership.JOIN,
                 )
 
-
-
                 if not change:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room

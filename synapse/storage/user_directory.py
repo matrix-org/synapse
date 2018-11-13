@@ -16,11 +16,11 @@
 import logging
 import re
 
-from six import iteritems, iterkeys
+from six import iteritems
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules, UserTypes
+from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -31,9 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryStore(SQLBaseStore):
-    def __init__(self, dbconn, hs):
-        super(UserDirectoryStore, self).__init__(dbconn, hs)
-        self.store = hs.get_datastore()
 
     @cachedInlineCallbacks(cache_context=True)
     def is_room_world_readable_or_publicly_joinable(self, room_id, cache_context):
@@ -68,7 +65,6 @@ class UserDirectoryStore(SQLBaseStore):
                 or publically joinable
             user_ids (list(str)): Users to add
         """
-
         yield self._simple_insert_many(
             table="users_in_public_rooms",
             values=[
@@ -83,7 +79,6 @@ class UserDirectoryStore(SQLBaseStore):
         for user_id in user_ids:
             self.get_user_in_public_room.invalidate((user_id,))
 
-
     def add_profiles_to_user_dir(self, room_id, users_with_profile):
         """Add profiles to the user directory
 
@@ -92,7 +87,6 @@ class UserDirectoryStore(SQLBaseStore):
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
-
         if isinstance(self.database_engine, PostgresEngine):
             # We weight the loclpart most highly, then display name and finally
             # server name

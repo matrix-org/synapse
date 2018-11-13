@@ -16,9 +16,10 @@
 
 from twisted.internet import defer
 
+from synapse.api.constants import UserTypes
+
 from tests import unittest
 from tests.utils import setup_test_homeserver
-from synapse.api.constants import UserTypes
 
 
 class RegistrationStoreTestCase(unittest.TestCase):

@@ -15,8 +15,6 @@
 
 from twisted.internet import defer
 
-from synapse.api.constants import UserTypes
-from synapse.storage import UserDirectoryStore
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
@@ -33,7 +31,6 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.hs = yield setup_test_homeserver(self.addCleanup)
         self.store = self.hs.get_datastore()
-        # self.store = UserDirectoryStore(self.hs.get_db_conn(), self.hs)
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.
