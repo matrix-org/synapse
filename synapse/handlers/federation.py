@@ -69,6 +69,8 @@ from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
+pdu_logger = logging.getLogger("synapse.federation.pdu_destination_logger")
+
 
 def shortstr(iterable, maxitems=5):
     """If iterable has maxitems or fewer, return the stringification of a list
@@ -178,7 +180,16 @@ class FederationHandler(BaseHandler):
         )
         if already_seen:
             logger.debug("[%s %s]: Already seen pdu", room_id, event_id)
+            pdu_logger.info(
+                "Received already seen event %s in room %s from %s",
+                pdu.event_id, pdu.room_id, origin,
+            )
             return
+
+        pdu_logger.info(
+            "Received unseen event %s in room %s from %s",
+            pdu.event_id, pdu.room_id, origin,
+        )
 
         # do some initial sanity-checking of the event. In particular, make
         # sure it doesn't have hundreds of prev_events or auth_events, which

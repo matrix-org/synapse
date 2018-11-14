@@ -42,6 +42,8 @@ from .units import Edu, Transaction
 
 logger = logging.getLogger(__name__)
 
+pdu_logger = logging.getLogger("synapse.federation.pdu_destination_logger")
+
 sent_pdus_destination_dist_count = Counter(
     "synapse_federation_client_sent_pdu_destinations:count", ""
 )
@@ -169,13 +171,9 @@ class TransactionQueue(object):
 
                 @defer.inlineCallbacks
                 def handle_event(event):
-                    # Only send events for this server.
-                    send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
-                    is_mine = self.is_mine_id(event.event_id)
-                    if not is_mine and send_on_behalf_of is None:
-                        return
-
-                    if event.internal_metadata.is_internal_event():
+                    should_relay = yield self._should_relay(event)
+                    logger.info("Should relay event %s: %s", event.event_id, should_relay)
+                    if not should_relay:
                         return
 
                     try:
@@ -197,15 +195,9 @@ class TransactionQueue(object):
 
                     destinations = set(destinations)
 
-                    if send_on_behalf_of is not None:
-                        # If we are sending the event on behalf of another server
-                        # then it already has the event and there is no reason to
-                        # send the event to it.
-                        destinations.discard(send_on_behalf_of)
-
                     logger.debug("Sending %s to %r", event, destinations)
 
-                    self._send_pdu(event, destinations)
+                    yield self._send_pdu(event, destinations)
 
                 @defer.inlineCallbacks
                 def handle_room_events(events):
@@ -251,6 +243,7 @@ class TransactionQueue(object):
         finally:
             self._is_processing = False
 
+    @defer.inlineCallbacks
     def _send_pdu(self, pdu, destinations):
         # We loop through all destinations to see whether we already have
         # a transaction in progress. If we do, stick it in the pending_pdus
@@ -261,7 +254,17 @@ class TransactionQueue(object):
 
         destinations = set(destinations)
         destinations.discard(self.server_name)
+
+        destinations = yield self._compute_relay_destinations(
+            pdu, joined_hosts=destinations,
+        )
+
         logger.debug("Sending to: %s", str(destinations))
+
+        pdu_logger.info(
+            "Relaying PDU %s in %s to %s",
+            pdu.event_id, pdu.room_id, destinations,
+        )
 
         if not destinations:
             return
@@ -269,12 +272,44 @@ class TransactionQueue(object):
         sent_pdus_destination_dist_total.inc(len(destinations))
         sent_pdus_destination_dist_count.inc()
 
+        # XXX: Should we decide where to route here.
+
         for destination in destinations:
             self.pending_pdus_by_dest.setdefault(destination, []).append(
                 (pdu, order)
             )
 
             self._attempt_new_transaction(destination)
+
+    def _compute_relay_destinations(self, pdu, joined_hosts):
+        """Compute where we should send an event. Returning an empty set stops
+        PDU from being sent anywhere.
+        """
+        # XXX: Hook for routing shenanigans
+        send_on_behalf_of = pdu.internal_metadata.get_send_on_behalf_of()
+        if send_on_behalf_of is not None:
+            # If we are sending the event on behalf of another server
+            # then it already has the event and there is no reason to
+            # send the event to it.
+            joined_hosts.discard(send_on_behalf_of)
+
+        return joined_hosts
+
+    def _should_relay(self, event):
+        """Whether we should consider relaying this event.
+        """
+
+        # XXX: Hook for routing shenanigans
+
+        send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
+        is_mine = self.is_mine_id(event.event_id)
+        if not is_mine and send_on_behalf_of is None:
+            return False
+
+        if event.internal_metadata.is_internal_event():
+            return False
+
+        return True
 
     @logcontext.preserve_fn  # the caller should not yield on this
     @defer.inlineCallbacks
@@ -657,18 +692,35 @@ class TransactionQueue(object):
         logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
 
         if code == 200:
-            for e_id, r in response.get("pdus", {}).items():
-                if "error" in r:
-                    logger.warn(
-                        "TX [%s] {%s} Remote returned error for %s: %s",
-                        destination, txn_id, e_id, r,
-                    )
+            pdu_results = response.get("pdus", {})
+            for p in pdus:
+                yield self._pdu_send_result(
+                    destination, txn_id, p,
+                    response=pdu_results.get(p.event_id, {})
+                )
         else:
             for p in pdus:
-                logger.warn(
-                    "TX [%s] {%s} Failed to send event %s",
-                    destination, txn_id, p.event_id,
-                )
+                yield self._pdu_send_txn_failed(destination, txn_id, p)
             success = False
 
         defer.returnValue(success)
+
+    def _pdu_send_result(self, destination, txn_id, pdu, response):
+        """Gets called after sending the event in a transaction, with the
+        result for the event from the remote server.
+        """
+        # XXX: Hook for routing shenanigans
+        if "error" in response:
+            logger.warn(
+                "TX [%s] {%s} Remote returned error for %s: %s",
+                destination, txn_id, pdu.event_id, response,
+            )
+
+    def _pdu_send_txn_failed(self, destination, txn_id, pdu):
+        """Gets called when sending a transaction failed (after retries)
+        """
+        # XXX: Hook for routing shenanigans
+        logger.warn(
+            "TX [%s] {%s} Failed to send event %s",
+            destination, txn_id, pdu.event_id,
+        )
