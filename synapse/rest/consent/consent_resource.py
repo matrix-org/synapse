@@ -142,7 +142,7 @@ class ConsentResource(Resource):
         userhmac = None
         has_consented = False
         public_version = username == ""
-        if not public_version or not self.hs.config.user_consent_at_registration:
+        if not public_version:
             userhmac_bytes = parse_string(request, "h", required=True, encoding=None)
 
             self._check_hash(username, userhmac_bytes)
