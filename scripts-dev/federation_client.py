@@ -154,10 +154,15 @@ def request_json(method, origin_name, origin_key, destination, path, content):
     s = requests.Session()
     s.mount("matrix://", MatrixConnectionAdapter())
 
+    headers = {"Host": destination, "Authorization": authorization_headers[0]}
+
+    if method == "POST":
+        headers["Content-Type"] = "application/json"
+
     result = s.request(
         method=method,
         url=dest,
-        headers={"Host": destination, "Authorization": authorization_headers[0]},
+        headers=headers,
         verify=False,
         data=content,
     )
@@ -203,7 +208,7 @@ def main():
     parser.add_argument(
         "-X",
         "--method",
-        help="HTTP method to use for the request. Defaults to GET if --data is"
+        help="HTTP method to use for the request. Defaults to GET if --body is"
         "unspecified, POST if it is.",
     )
 

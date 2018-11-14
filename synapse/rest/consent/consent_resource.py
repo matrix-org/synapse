@@ -143,9 +143,9 @@ class ConsentResource(Resource):
         has_consented = False
         public_version = username == ""
         if not public_version:
-            userhmac = parse_string(request, "h", required=True, encoding=None)
+            userhmac_bytes = parse_string(request, "h", required=True, encoding=None)
 
-            self._check_hash(username, userhmac)
+            self._check_hash(username, userhmac_bytes)
 
             if username.startswith('@'):
                 qualified_user_id = username
@@ -155,13 +155,18 @@ class ConsentResource(Resource):
             u = yield self.store.get_user_by_id(qualified_user_id)
             if u is None:
                 raise NotFoundError("Unknown user")
+
             has_consented = u["consent_version"] == version
+            userhmac = userhmac_bytes.decode("ascii")
 
         try:
             self._render_template(
                 request, "%s.html" % (version,),
-                user=username, userhmac=userhmac, version=version,
-                has_consented=has_consented, public_version=public_version,
+                user=username,
+                userhmac=userhmac,
+                version=version,
+                has_consented=has_consented,
+                public_version=public_version,
             )
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")

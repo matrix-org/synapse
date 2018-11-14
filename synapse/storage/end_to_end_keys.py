@@ -40,7 +40,10 @@ class EndToEndKeyStore(SQLBaseStore):
                 allow_none=True,
             )
 
-            new_key_json = encode_canonical_json(device_keys)
+            # In py3 we need old_key_json to match new_key_json type. The DB
+            # returns unicode while encode_canonical_json returns bytes.
+            new_key_json = encode_canonical_json(device_keys).decode("utf-8")
+
             if old_key_json == new_key_json:
                 return False
 

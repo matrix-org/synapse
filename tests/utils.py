@@ -123,6 +123,8 @@ def default_config(name):
     config.user_directory_search_all_users = False
     config.user_consent_server_notice_content = None
     config.block_events_without_consent_error = None
+    config.user_consent_at_registration = False
+    config.user_consent_policy_name = "Privacy Policy"
     config.media_storage_providers = []
     config.autocreate_auto_join_rooms = True
     config.auto_join_rooms = []

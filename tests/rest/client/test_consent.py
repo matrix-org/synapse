@@ -60,6 +60,13 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(config=config)
         return hs
 
+    def test_render_public_consent(self):
+        """You can observe the terms form without specifying a user"""
+        resource = consent_resource.ConsentResource(self.hs)
+        request, channel = self.make_request("GET", "/consent?v=1", shorthand=False)
+        render(request, resource, self.reactor)
+        self.assertEqual(channel.code, 200)
+
     def test_accept_consent(self):
         """
         A user can use the consent form to accept the terms.
