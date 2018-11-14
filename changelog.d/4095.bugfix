@@ -1,1 +1,0 @@
-Fix exceptions when using the email mailer on Python 3.

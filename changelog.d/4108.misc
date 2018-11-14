@@ -1,1 +1,0 @@
-The "Received rdata" log messages on workers is now logged at DEBUG, not INFO.
