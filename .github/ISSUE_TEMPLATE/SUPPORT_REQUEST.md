@@ -1,5 +1,5 @@
 ---
-name: Support Request
+name: Support request
 about: I need support for Synapse
 
 ---
