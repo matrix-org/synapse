@@ -184,6 +184,8 @@ class RegistrationStore(RegistrationWorkerStore,
             appservice_id (str): The ID of the appservice registering the user.
             create_profile_with_localpart (str): Optionally create a profile for
                 the given localpart.
+            admin (boolean): is an admin user?
+            user_type (synapse.api.constants import UserTypes): type of user
         Raises:
             StoreError if the user_id could not be registered.
         """

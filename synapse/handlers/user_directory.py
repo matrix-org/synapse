@@ -327,7 +327,6 @@ class UserDirectoryHandler(object):
                     room_id, prev_event_id, event_id, typ,
                 )
             elif typ == EventTypes.Member:
-
                 change = yield self._get_key_change(
                     prev_event_id, event_id,
                     key_name="membership",
