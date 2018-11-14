@@ -1,19 +1,19 @@
-Support in Synapse for tracking agreement to server terms and conditions
-========================================================================
+Support in Synapse for tracking confirmation to have read the terms and conditions
+==================================================================================
 
-Synapse 0.30 introduces support for tracking whether users have agreed to the
+Synapse 0.30 introduces support for tracking whether users have read the
 terms and conditions set by the administrator of a server - and blocking access
 to the server until they have.
 
 There are several parts to this functionality; each requires some specific
 configuration in `homeserver.yaml` to be enabled.
 
-Note that various parts of the configuation and this document refer to the
-"privacy policy": agreement with a privacy policy is one particular use of this
-feature, but of course adminstrators can specify other terms and conditions
+Note that various parts of the configuration and this document refer to the
+"privacy policy": confirming the privacy policy is one particular use of this
+feature, but of course administrators can specify other terms and conditions
 unrelated to "privacy" per se.
 
-Collecting policy agreement from a user
+Collecting policy read confirmation from a user
 ---------------------------------------
 
 Synapse can be configured to serve the user a simple policy form with an
@@ -33,7 +33,7 @@ internationalisation support is intended for the future.
 
 The template for the policy itself should be versioned and named according to
 the version: for example `1.0.html`. The version of the policy which the user
-has agreed to is stored in the database.
+has confirmed to is stored in the database.
 
 Once the templates are in place, make the following changes to `homeserver.yaml`:
 
@@ -97,16 +97,18 @@ construct URIs where users can give their consent.
 
 2. In your consent templates, make use of the `public_version` variable to
    see if an unauthenticated user is viewing the page. This is typically
-   wrapped around the form that would be used to actually agree to the document:
+   wrapped around the form that would be used to actually collect the 
+   confirmation to have read the document:
 
    ```
    {% if not public_version %}
      <!-- The variables used here are only provided when the 'u' param is given to the homeserver -->
      <form method="post" action="consent">
+       I have read the Privacy Policy<br>
        <input type="hidden" name="v" value="{{version}}"/>
        <input type="hidden" name="u" value="{{user}}"/>
        <input type="hidden" name="h" value="{{userhmac}}"/>
-       <input type="submit" value="Sure thing!"/>
+       <input type="submit" value="Confirm"/>
      </form>
    {% endif %}
    ```
@@ -143,12 +145,12 @@ Therefore, the `h` parameter is not required in this scenario. To enable this
 behaviour, set `require_at_registration` to `true` in your `user_consent` config.
 
 
-Sending users a server notice asking them to agree to the policy
+Sending users a server notice asking them to confirm to have read the policy
 ----------------------------------------------------------------
 
 It is possible to configure Synapse to send a [server
-notice](server_notices.md) to anybody who has not yet agreed to the current
-version of the policy. To do so:
+notice](server_notices.md) to anybody who has not yet confirmed to have read the
+current version of the policy. To do so:
 
  * ensure that the consent resource is configured, as in the previous section
 
@@ -173,12 +175,12 @@ version of the policy. To do so:
    `consent_uri` in the server notice.)
 
 
-Blocking users from using the server until they agree to the policy
+Blocking users from using the server until they confirm to have read the policy
 -------------------------------------------------------------------
 
 Synapse can be configured to block any attempts to join rooms or send messages
-until the user has given their agreement to the policy. (Joining the server
-notices room is exempted from this).
+until the user has given their confirmation to have read the policy. (Joining
+the server notices room is exempted from this).
 
 To enable this, add `block_events_error` under `user_consent`. For example:
 

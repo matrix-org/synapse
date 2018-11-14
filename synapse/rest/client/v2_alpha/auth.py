@@ -80,11 +80,12 @@ TERMS_TEMPLATE = """
 <form id="registrationForm" method="post" action="%(myurl)s">
     <div>
         <p>
-            Please click the button below if you agree to the
-            <a href="%(terms_url)s">privacy policy of this homeserver.</a>
+            Please click the button below to confirm, that you have read the
+            <a href="%(terms_url)s" target="_blank">privacy policy of this
+            homeserver.</a>
         </p>
         <input type="hidden" name="session" value="%(session)s" />
-        <input type="submit" value="Agree" />
+        <input type="submit" value="Confirm" />
     </div>
 </form>
 </body>
