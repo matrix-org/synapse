@@ -747,11 +747,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         filter_clause, filter_args = filter_to_clause(event_filter)
 
-        logger.info("event_filter: %s", event_filter)
-        if event_filter is not None:
-            logger.info("event_filter: %s", event_filter.thread_id)
-        logger.info("Paginating with filter: %s", filter_clause)
-
         if filter_clause:
             bounds += " AND " + filter_clause
             args.extend(filter_args)
