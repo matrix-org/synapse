@@ -137,8 +137,10 @@ class UserDirectoryHandler(object):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        yield self.store.remove_from_user_dir(user_id)
-        yield self.store.remove_from_user_in_public_room(user_id)
+        is_support = yield self.store.is_support_user(user_id)
+        if not is_support:
+            yield self.store.remove_from_user_dir(user_id)
+            yield self.store.remove_from_user_in_public_room(user_id)
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
@@ -353,24 +355,24 @@ class UserDirectoryHandler(object):
                         logger.debug("Server is still in room: %r", room_id)
 
                 is_support = yield self.store.is_support_user(state_key)
+                if not is_support:
+                    if change is None:
+                        # Handle any profile changes
+                        yield self._handle_profile_change(
+                            state_key, room_id, prev_event_id, event_id,
+                        )
+                        continue
 
-                if change is None and not is_support:
-                    # Handle any profile changes
-                    yield self._handle_profile_change(
-                        state_key, room_id, prev_event_id, event_id,
-                    )
-                    continue
+                    if change:  # The user joined
+                        event = yield self.store.get_event(event_id, allow_none=True)
+                        profile = ProfileInfo(
+                            avatar_url=event.content.get("avatar_url"),
+                            display_name=event.content.get("displayname"),
+                        )
 
-                if change and not is_support:  # The user joined
-                    event = yield self.store.get_event(event_id, allow_none=True)
-                    profile = ProfileInfo(
-                        avatar_url=event.content.get("avatar_url"),
-                        display_name=event.content.get("displayname"),
-                    )
-
-                    yield self._handle_new_user(room_id, state_key, profile)
-                else:  # The user left
-                    yield self._handle_remove_user(room_id, state_key)
+                        yield self._handle_new_user(room_id, state_key, profile)
+                    else:  # The user left
+                        yield self._handle_remove_user(room_id, state_key)
             else:
                 logger.debug("Ignoring irrelevant type: %r", typ)
 
