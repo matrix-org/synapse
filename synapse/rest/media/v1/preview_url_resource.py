@@ -54,7 +54,7 @@ from ._base import FileInfo
 logger = logging.getLogger(__name__)
 
 _charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=re.I)
-_content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I | re.ASCII)
+_content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 
 class PreviewUrlResource(Resource):
