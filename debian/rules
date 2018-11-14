@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+#
+# Build Debian package using https://github.com/spotify/dh-virtualenv
+#
+# The below targets create a clean copy of the workdir via
+# using "sdist", else "pip" goes haywire when installing from
+# sourcedir ".", because that includes the debian build stage,
+# and a recursive explosion ensues when symlinks are followed.
+#
+# It also ensures your MANIFEST is complete and at least covers
+# all files needed for a release build.
+
+# Increase trace logging, see debhelper(7) (uncomment to enable)
+#DH_VERBOSE=1
+
+export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
+SNAKE=/usr/bin/python3
+EXTRA_REQUIREMENTS=--preinstall "setuptools>=17.1" --preinstall "pip>=7" --preinstall "wheel" --preinstall "no-manylinux1" --preinstall "lxml"
+DH_VENV_ARGS=--with python-virtualenv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) #-v
+PACKAGE=$(shell dh_listpackages)
+VERSION=$(shell $(SNAKE) setup.py --version)
+SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
+
+clean:
+	test ! -d dist || rm -rf dist
+	test ! -d $(SDIST_DIR) || rm -rf $(SDIST_DIR)
+	dh $@ $(DH_VENV_ARGS)
+
+build-arch:
+	$(SNAKE) setup.py sdist --formats tar
+	mkdir -p $(SDIST_DIR)
+	tar -x -C $(SDIST_DIR) --strip-components=1 --exclude '*.egg-info' -f dist/*.tar
+	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
+
+%:
+	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)

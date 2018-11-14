@@ -1,0 +1,13 @@
+{
+    "_template": "https://github.com/Springerle/dh-virtualenv-mold.git",
+    "distro": "bionic",
+    "email": "synapse@matrix.org",
+    "full_name": "Synapse Developers",
+    "package": "matrix-synapse",
+    "repo_name": "debian",
+    "short_description": "A Python package and its dependencies packaged up as DEB in an isolated virtualenv.",
+    "snake": "/usr/bin/python3",
+    "url": "https://github.com/matrix-org/synapse",
+    "version": "0.33.8",
+    "year": "2018"
+}

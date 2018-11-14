@@ -1,0 +1,8 @@
+matrix-synapse.*.debhelper
+matrix-synapse.substvars
+matrix-synapse/
+matrix-synapse-*/
+files
+debhelper-build-stamp
+source/
+.debhelper

@@ -1,0 +1,20 @@
+Source: matrix-synapse
+Section: contrib/python
+Priority: extra
+Maintainer: Synapse Developers <synapse@matrix.org>
+Build-Depends: debhelper (>= 9), python3, python3-dev, libffi-dev, libssl-dev, libjpeg-dev, libxslt1-dev, dh-virtualenv (>= 0.10), tar
+Standards-Version: 3.9.5
+Homepage: https://github.com/matrix-org/synapse
+
+Package: matrix-synapse
+Architecture: any
+Pre-Depends: dpkg (>= 1.16.1), python3, ${misc:Pre-Depends}
+Depends: ${python:Depends}, ${misc:Depends}, sqlite3, libpq, libffi, libjpeg, libxslt1, libssl
+Description: A Python package and its dependencies packaged up as DEB in an isolated virtualenv.
+    .
+    This is a distribution of "matrix-synapse" as a self-contained
+    Python virtualenv wrapped into a Debian package ("omnibus" package,
+    all passengers on board). The packaged virtualenv is kept in sync with
+    the host's interpreter automatically.
+    .
+    See https://github.com/spotify/dh-virtualenv for more details.

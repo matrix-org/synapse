@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# "matrix-synapse" postinst script
+#
+set -e
+
+#DEBHELPER#
+
+# Add your own code here, note that some "dh_venv_*" env vars are available,
+# at least these ones:
+#
+#   dh_venv_package         Name of the Debian package
+#   dh_venv_install_dir     Root directory for the installed virtualenv
+
+exit 0

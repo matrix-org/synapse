@@ -1,0 +1,5 @@
+matrix-synapse (0.33.8) bionic; urgency=low
+
+  * matrix-synapse: Initial debian packaging
+
+ -- Synapse Developers <synapse@matrix.org> Day, 01 Jan 2014 12:34:56 +0000
