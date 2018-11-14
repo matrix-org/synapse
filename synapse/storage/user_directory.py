@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryStore(SQLBaseStore):
-
     @cachedInlineCallbacks(cache_context=True)
     def is_room_world_readable_or_publicly_joinable(self, room_id, cache_context):
         """Check if the room is either world_readable or publically joinable
@@ -157,7 +156,6 @@ class UserDirectoryStore(SQLBaseStore):
 
     def update_profile_in_user_dir(self, user_id, display_name, avatar_url, room_id):
         def _update_profile_in_user_dir_txn(txn):
-
             new_entry = self._simple_upsert_txn(
                 txn,
                 table="user_directory",
@@ -215,6 +213,7 @@ class UserDirectoryStore(SQLBaseStore):
                 raise Exception("Unrecognized database engine")
 
             txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
+
         return self.runInteraction(
             "update_profile_in_user_dir", _update_profile_in_user_dir_txn
         )
@@ -339,9 +338,7 @@ class UserDirectoryStore(SQLBaseStore):
             share_private (bool): Is the room private
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
-
-        def _add_users_who_share_room_txn(txn, user_id_tuples):
-
+        def _add_users_who_share_room_txn(txn):
             self._simple_insert_many_txn(
                 txn,
                 table="users_who_share_rooms",
@@ -365,9 +362,7 @@ class UserDirectoryStore(SQLBaseStore):
                     (user_id, other_user_id),
                 )
         return self.runInteraction(
-            "add_users_who_share_room",
-            _add_users_who_share_room_txn,
-            user_id_tuples,
+            "add_users_who_share_room", _add_users_who_share_room_txn
         )
 
     def update_users_who_share_room(self, room_id, share_private, user_id_sets):
@@ -380,7 +375,6 @@ class UserDirectoryStore(SQLBaseStore):
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
         def _update_users_who_share_room_txn(txn):
-
             sql = """
                 UPDATE users_who_share_rooms
                 SET room_id = ?, share_private = ?
