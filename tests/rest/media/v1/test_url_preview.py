@@ -162,3 +162,80 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
+
+    def test_non_ascii_preview_httpequiv(self):
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=matrix.org", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        # We've made one fetch
+        self.assertEqual(len(self.fetches), 1)
+
+        end_content = (
+            b'<html><head>'
+            b'<meta http-equiv="Content-Type" content="text/html; charset=windows-1251"/>'
+            b'<meta property="og:title" content="\xe4\xea\xe0" />'
+            b'<meta property="og:description" content="hi" />'
+            b'</head></html>'
+        )
+
+        self.fetches[0][0].callback(
+            (
+                end_content,
+                (
+                    len(end_content),
+                    {
+                        b"Content-Length": [b"%d" % (len(end_content))],
+                        # This charset=utf-8 should be ignored, because the
+                        # document has a meta tag overriding it.
+                        b"Content-Type": [b'text/html; charset="utf8"'],
+                    },
+                    "https://example.com",
+                    200,
+                ),
+            )
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
+
+    def test_non_ascii_preview_content_type(self):
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=matrix.org", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        # We've made one fetch
+        self.assertEqual(len(self.fetches), 1)
+
+        end_content = (
+            b'<html><head>'
+            b'<meta property="og:title" content="\xe4\xea\xe0" />'
+            b'<meta property="og:description" content="hi" />'
+            b'</head></html>'
+        )
+
+        self.fetches[0][0].callback(
+            (
+                end_content,
+                (
+                    len(end_content),
+                    {
+                        b"Content-Length": [b"%d" % (len(end_content))],
+                        b"Content-Type": [b'text/html; charset="windows-1251"'],
+                    },
+                    "https://example.com",
+                    200,
+                ),
+            )
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
