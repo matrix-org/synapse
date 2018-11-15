@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cgi
 import datetime
 import errno
 import fnmatch
@@ -44,10 +43,11 @@ from synapse.http.server import (
 )
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
-from synapse.util.stringutils import is_ascii, random_string
+from synapse.util.stringutils import random_string
 
 from ._base import FileInfo
 
@@ -336,31 +336,7 @@ class PreviewUrlResource(Resource):
                 media_type = "application/octet-stream"
             time_now_ms = self.clock.time_msec()
 
-            content_disposition = headers.get(b"Content-Disposition", None)
-            if content_disposition:
-                _, params = cgi.parse_header(content_disposition[0],)
-                download_name = None
-
-                # First check if there is a valid UTF-8 filename
-                download_name_utf8 = params.get("filename*", None)
-                if download_name_utf8:
-                    if download_name_utf8.lower().startswith("utf-8''"):
-                        download_name = download_name_utf8[7:]
-
-                # If there isn't check for an ascii name.
-                if not download_name:
-                    download_name_ascii = params.get("filename", None)
-                    if download_name_ascii and is_ascii(download_name_ascii):
-                        download_name = download_name_ascii
-
-                if download_name:
-                    download_name = urlparse.unquote(download_name)
-                    try:
-                        download_name = download_name.decode("utf-8")
-                    except UnicodeDecodeError:
-                        download_name = None
-            else:
-                download_name = None
+            download_name = get_filename_from_headers(headers)
 
             yield self.store.store_local_media(
                 media_id=file_id,
