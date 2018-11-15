@@ -298,7 +298,7 @@ class EndToEndKeyStore(SQLBaseStore):
                         "attestation": json.dumps(x),
                     }
                     for x in attestations
-                    for from_user_id in x["signatures"].iterkeys()
+                    for from_user_id in x["signatures"].keys()
                 ],
             )
         return self.runInteraction(

@@ -372,7 +372,7 @@ class E2eKeysHandler(object):
             if user_id not in attested_users:
                 attested_users[user_id] = []
             attested_users[user_id].append(attestation["device_id"])
-        for user_id, devices in attested_users.iteritems():
+        for user_id, devices in attested_users.items():
             if req_user_id == user_id:
                 # when making an attestation on your own device, notify
                 # everyone who shares a room with you.  This is the same as the
