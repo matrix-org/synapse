@@ -45,6 +45,21 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         self.assertDictContainsSubset({"keys": json, "device_display_name": None}, dev)
 
     @defer.inlineCallbacks
+    def test_reupload_key(self):
+        now = 1470174257070
+        json = {"key": "value"}
+
+        yield self.store.store_device("user", "device", None)
+
+        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        self.assertTrue(changed)
+
+        # If we try to upload the same key then we should be told nothing
+        # changed
+        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        self.assertFalse(changed)
+
+    @defer.inlineCallbacks
     def test_get_key_with_device_name(self):
         now = 1470174257070
         json = {"key": "value"}
