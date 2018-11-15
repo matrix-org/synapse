@@ -66,8 +66,9 @@ class KeyringTestCase(unittest.TestCase):
     def assert_sentinel_context(self):
         if LoggingContext.current_context() != LoggingContext.sentinel:
             self.fail(
-                "Expected sentinel context but got %s",
-                LoggingContext.current_context(),
+                "Expected sentinel context but got %s" % (
+                    LoggingContext.current_context(),
+                )
             )
 
     def check_context(self, _, expected):
