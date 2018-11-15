@@ -53,6 +53,9 @@ from ._base import FileInfo
 
 logger = logging.getLogger(__name__)
 
+_charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=re.I)
+_content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
+
 
 class PreviewUrlResource(Resource):
     isLeaf = True
@@ -223,15 +226,25 @@ class PreviewUrlResource(Resource):
             with open(media_info['filename'], 'rb') as file:
                 body = file.read()
 
-            # clobber the encoding from the content-type, or default to utf-8
-            # XXX: this overrides any <meta/> or XML charset headers in the body
-            # which may pose problems, but so far seems to work okay.
-            match = re.match(
-                r'.*; *charset="?(.*?)"?(;|$)',
-                media_info['media_type'],
-                re.I
-            )
-            encoding = match.group(1) if match else "utf-8"
+            encoding = None
+
+            # Let's try and figure out if it has an encoding set in a meta tag.
+            # Limit it to the first 1kb, since it ought to be in the meta tags
+            # at the top.
+            match = _charset_match.search(body[:1000])
+
+            # If we find a match, it should take precedence over the
+            # Content-Type header, so set it here.
+            if match:
+                encoding = match.group(1).decode('ascii')
+
+            # If we don't find a match, we'll look at the HTTP Content-Type, and
+            # if that doesn't exist, we'll fall back to UTF-8.
+            if not encoding:
+                match = _content_type_match.match(
+                    media_info['media_type']
+                )
+                encoding = match.group(1) if match else "utf-8"
 
             og = decode_and_calc_og(body, media_info['uri'], encoding)
 
