@@ -1,1 +1,1 @@
-Add better diagnostics to flakey keyring test
+Clean up some problems with leaky logcontexts in the tests
