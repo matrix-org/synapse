@@ -14,6 +14,8 @@ from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactorClock
+from twisted.web.http import unquote
+from twisted.web.http_headers import Headers
 
 from synapse.http.site import SynapseRequest
 from synapse.util import Clock
@@ -49,6 +51,15 @@ class FakeChannel(object):
         if not self.result:
             raise Exception("No result yet.")
         return int(self.result["code"])
+
+    @property
+    def headers(self):
+        if not self.result:
+            raise Exception("No result yet.")
+        h = Headers()
+        for i in self.result["headers"]:
+            h.addRawHeader(*i)
+        return h
 
     def writeHeaders(self, version, code, reason, headers):
         self.result["version"] = version
@@ -152,6 +163,9 @@ def make_request(
         path = b"/_matrix/client/r0/" + path
         path = path.replace(b"//", b"/")
 
+    if not path.startswith(b"/"):
+        path = b"/" + path
+
     if isinstance(content, text_type):
         content = content.encode('utf8')
 
@@ -161,6 +175,7 @@ def make_request(
     req = request(site, channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
+    req.postpath = list(map(unquote, path[1:].split(b'/')))
 
     if access_token:
         req.requestHeaders.addRawHeader(
