@@ -218,15 +218,17 @@ def get_filename_from_headers(headers):
     if not content_disposition[0]:
         return
 
+    # dict of unicode: bytes, corresponding to the key value sections of the
+    # Content-Disposition header.
     params = {}
     parts = content_disposition[0].split(b";")
     for i in parts:
         # Split into key-value pairs, if able
+        # We don't care about things like `inline`, so throw it out
         if b"=" not in i:
             continue
 
         key, value = i.strip().split(b"=")
-        # Store it with a decoded key and unencoded value
         params[key.decode('ascii')] = value
 
     upload_name = None
@@ -236,11 +238,12 @@ def get_filename_from_headers(headers):
     if upload_name_utf8:
         if upload_name_utf8.lower().startswith(b"utf-8''"):
             upload_name_utf8 = upload_name_utf8[7:]
+            # We have a filename*= section. This MUST be ASCII, and any UTF-8
+            # bytes are %-quoted.
             if PY3:
                 try:
-                    # We have a filename*= section. This MUST be ASCII, and any
-                    # UTF-8 bytes are quoted. Once it is decoded, we can then
-                    # unquote it strictly.
+                    # Once it is decoded, we can then unquote the %-encoded
+                    # parts strictly into a unicode string.
                     upload_name = urllib.parse.unquote(
                         upload_name_utf8.decode('ascii'), errors="strict"
                     )
@@ -248,8 +251,8 @@ def get_filename_from_headers(headers):
                     # Incorrect UTF-8.
                     pass
             else:
-                # On Python 2, we can unquote it directly, and then decode it
-                # strictly.
+                # On Python 2, we first unquote the %-encoded parts and then
+                # decode it strictly using UTF-8.
                 try:
                     upload_name = urllib.parse.unquote(upload_name_utf8).decode('utf8')
                 except UnicodeDecodeError:
@@ -259,8 +262,8 @@ def get_filename_from_headers(headers):
     if not upload_name:
         upload_name_ascii = params.get("filename", None)
         if upload_name_ascii and is_ascii(upload_name_ascii):
-            # Make sure there's no percent-escaped bytes. If there is, reject it
-            # as non-valid ASCII.
+            # Make sure there's no %-quoted bytes. If there is, reject it as
+            # non-valid ASCII.
             if b"%" not in upload_name_ascii:
                 upload_name = upload_name_ascii.decode('ascii')
 
