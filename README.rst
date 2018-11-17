@@ -142,7 +142,7 @@ Installing prerequisites on openSUSE::
 Installing prerequisites on OpenBSD::
 
     doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
-                 libxslt
+                 libxslt jpeg
 
 To install the Synapse homeserver run::
 
