@@ -15,8 +15,8 @@
 
 
 from twisted.internet.defer import succeed
-from synapse.api.constants import LoginType
 
+from synapse.api.constants import LoginType
 from synapse.rest.client.v1 import admin
 from synapse.rest.client.v2_alpha import auth, register
 
