@@ -61,3 +61,11 @@ the following:
     }
 
 The status will be one of ``active``, ``complete``, or ``failed``.
+
+Reclaim disk space (Postgres)
+-----------------------------
+
+To reclaim the disk space and return it to the operating system, you need to run
+`VACUUM FULL;` on the database.
+
+https://www.postgresql.org/docs/current/sql-vacuum.html
