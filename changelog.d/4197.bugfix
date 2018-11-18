@@ -1,0 +1,1 @@
+Fallback auth now accepts the session parameter on Python 3.
