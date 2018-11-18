@@ -38,7 +38,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         AuthError if the checks fail
 
     Returns:
-         if the auth checks pass.
+        if the auth checks pass.
     """
     if do_size_check:
         _check_size_limits(event)

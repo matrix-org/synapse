@@ -6,6 +6,7 @@ import sys
 import subprocess
 import glob
 import codecs
+import time
 
 # Utility functions
 convert = lambda src, dst, environ: open(dst, "w").write(jinja2.Template(open(src).read()).render(**environ))
@@ -31,6 +32,10 @@ def generate_secrets(environ, secrets):
 # Prepare the configuration
 mode = sys.argv[1] if len(sys.argv) > 1 else None
 environ = os.environ.copy()
+
+for e in environ:
+    print("%s:%s" % (e, environ[e]))
+
 ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
 args = ["python", "-m", "synapse.app.homeserver"]
 
@@ -64,4 +69,8 @@ else:
         args += ["--config-path", "/compiled/homeserver.yaml"]
     # Generate missing keys and start synapse
     subprocess.check_output(args + ["--generate-keys"])
-    os.execv("/sbin/su-exec", ["su-exec", ownership] + args)
+
+    os.system("(sleep 5; /usr/local/bin/register_new_matrix_user -u matthew -p isildur -c /compiled/homeserver.yaml -a) &");
+
+    os.execv("/usr/local/bin/python", args)
+

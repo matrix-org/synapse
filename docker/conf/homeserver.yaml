@@ -55,7 +55,7 @@ database:
     database: "{{ POSTGRES_DB or "synapse" }}"
     host: "{{ POSTGRES_HOST or "db" }}"
     port: "{{ POSTGRES_PORT or "5432" }}"
-    cp_min: 5
+    cp_min: 1
     cp_max: 10
 {% else %}
 database:

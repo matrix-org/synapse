@@ -86,7 +86,7 @@ class TypingHandler(object):
         self._room_typing = {}
 
     def _handle_timeouts(self):
-        logger.info("Checking for typing timeouts")
+        #logger.info("Checking for typing timeouts")
 
         now = self.clock.time_msec()
 
