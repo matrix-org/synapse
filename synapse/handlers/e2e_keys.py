@@ -62,18 +62,7 @@ class E2eKeysHandler(object):
                         ...
                     }
                 }
-            },
-            "attestations": [
-               "user_id": "<user_id>",
-               "device_id": "<device_id>",
-               "keys": {
-                  "ed25519": "<key_base64>"
-               },
-               "state": "<verified or revoked>",
-               "signatures": {
-                  "<algorithm>:<device_id>": "<signature_base64>"
-               }
-            ]
+            }
         }
         """
         device_keys_query = query_body.get("device_keys", {})
@@ -93,13 +82,11 @@ class E2eKeysHandler(object):
         # First get local devices.
         failures = {}
         results = {}
-        attestations = []
         if local_query:
-            local_result = yield self.query_local_devices(local_query)
+            local_result = yield self.query_local_devices(local_query, req_user_id)
             for user_id, keys in local_result.items():
                 if user_id in local_query:
                     results[user_id] = keys
-            attestations = yield self.query_local_attestations(req_user_id, local_query)
 
         # Now attempt to get any remote devices from our local cache.
         remote_queries_not_in_cache = {}
@@ -121,11 +108,14 @@ class E2eKeysHandler(object):
                 for device_id, device in iteritems(devices):
                     keys = device.get("keys", None)
                     device_display_name = device.get("device_display_name", None)
+                    attestations = device.get("attestations", None)
                     if keys:
                         result = dict(keys)
                         unsigned = result.setdefault("unsigned", {})
                         if device_display_name:
                             unsigned["device_display_name"] = device_display_name
+                        if attestations:
+                            unsigned["attestations"] = attestations
                         user_devices[device_id] = result
 
             for user_id in user_ids_not_in_cache:
@@ -158,16 +148,16 @@ class E2eKeysHandler(object):
 
         defer.returnValue({
             "device_keys": results, "failures": failures,
-            "attestations": attestations
         })
 
     @defer.inlineCallbacks
-    def query_local_devices(self, query):
+    def query_local_devices(self, query, req_user_id=None):
         """Get E2E device keys for local users
 
         Args:
             query (dict[string, list[string]|None): map from user_id to a list
                  of devices to query (None for all devices)
+            req_user_id: the user requesting the devices
 
         Returns:
             defer.Deferred: (resolves to dict[string, dict[string, dict]]):
@@ -192,7 +182,9 @@ class E2eKeysHandler(object):
             # make sure that each queried user appears in the result dict
             result_dict[user_id] = {}
 
-        results = yield self.store.get_e2e_device_keys(local_query)
+        results = yield self.store.get_e2e_device_keys(
+            local_query, req_user_id=req_user_id,
+        )
 
         # Build the result structure, un-jsonify the results, and add the
         # "unsigned" section
@@ -201,34 +193,14 @@ class E2eKeysHandler(object):
                 r = dict(device_info["keys"])
                 r["unsigned"] = {}
                 display_name = device_info["device_display_name"]
+                attestations = device_info.get("attestations", None)
                 if display_name is not None:
                     r["unsigned"]["device_display_name"] = display_name
+                if attestations is not None:
+                    r["unsigned"]["attestations"] = attestations
                 result_dict[user_id][device_id] = r
 
         defer.returnValue(result_dict)
-
-    @defer.inlineCallbacks
-    def query_local_attestations(self, req_user_id, query):
-        local_query = []
-
-        for user_id, device_ids in query.items():
-            # we use UserID.from_string to catch invalid user ids
-            if not self.is_mine(UserID.from_string(user_id)):
-                logger.warning("Request for keys for non-local user %s",
-                               user_id)
-                raise SynapseError(400, "Not a user here")
-
-            if not device_ids:
-                local_query.append((user_id, None))
-            else:
-                for device_id in device_ids:
-                    local_query.append((user_id, device_id))
-
-        results = yield self.store.get_e2e_attestations(req_user_id, local_query)
-
-        # FIXME: combine signatures of the same payload
-
-        defer.returnValue(results)
 
     @defer.inlineCallbacks
     def on_federation_query_client_keys(self, query_body):
