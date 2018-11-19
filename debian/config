@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+. /usr/share/debconf/confmodule
+
+db_input high matrix-synapse/server-name || true
+db_input high matrix-synapse/report-stats || true
+db_go

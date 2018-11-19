@@ -10,7 +10,7 @@ FROM ${distro} AS dpkg-build
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-        build-essential debhelper devscripts equivs dh-virtualenv libpq-dev sqlite3 python3-dev libffi-dev libjpeg-dev libxslt1-dev python3-setuptools libssl-dev\
+        build-essential debhelper devscripts equivs dh-virtualenv libpq-dev sqlite3 python3-dev libffi-dev libjpeg-dev libxslt1-dev python3-setuptools libssl-dev lsb-release\
     && apt-get clean && rm -rf "/var/lib/apt/lists"/*
 WORKDIR /build
 ENTRYPOINT ['/build/build_debian.sh']

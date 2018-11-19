@@ -15,11 +15,13 @@
 
 export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
 SNAKE=/usr/bin/python3
+DEB_BUILD_OPTIONS=noddebs
 EXTRA_REQUIREMENTS=--preinstall "setuptools>=17.1" --preinstall "pip>=7" --preinstall "wheel" --preinstall "no-manylinux1" --preinstall "lxml"
 DH_VENV_ARGS=--with python-virtualenv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) #-v
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell $(SNAKE) setup.py --version)
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
+RELEASE_VERSION=$(VERSION)~$(shell lsb_release -c -s)
 
 clean:
 	test ! -d dist || rm -rf dist
@@ -31,6 +33,10 @@ build-arch:
 	mkdir -p $(SDIST_DIR)
 	tar -x -C $(SDIST_DIR) --strip-components=1 --exclude '*.egg-info' -f dist/*.tar
 	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
+
+
+override_dh_gencontrol:
+	dh_gencontrol -- -v$(RELEASE_VERSION)
 
 %:
 	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
