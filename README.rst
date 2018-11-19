@@ -128,7 +128,7 @@ Installing prerequisites on Raspbian::
 
     sudo apt-get install build-essential python2.7-dev libffi-dev \
                          python-pip python-setuptools sqlite3 \
-                         libssl-dev python-virtualenv libjpeg-dev
+                         libssl-dev python-virtualenv libjpeg-dev libpq-dev
     sudo pip install --upgrade pip
     sudo pip install --upgrade ndg-httpsclient
     sudo pip install --upgrade virtualenv
