@@ -1,17 +1,9 @@
-# Build dh-virtualenv's Debian package within a container for any platform
-#
-#   docker build --tag dh-venv-builder --build-arg distro=debian:9 .
-#   docker build --tag dh-venv-builder --build-arg distro=ubuntu:bionic .
-#
-#   mkdir -p dist && docker run --rm dh-venv-builder tar -C /dpkg -c . | tar -C dist -xv
-
 ARG distro="debian:stable"
 FROM ${distro} AS dpkg-build
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-        build-essential debhelper devscripts equivs dh-virtualenv libpq-dev sqlite3 python3-dev libffi-dev libjpeg-dev libxslt1-dev python3-setuptools libssl-dev lsb-release\
-    && apt-get clean && rm -rf "/var/lib/apt/lists"/*
+        build-essential debhelper devscripts equivs dh-virtualenv libpq-dev sqlite3 python3-dev libffi-dev libjpeg-dev zlib1g-dev libxslt1-dev python3-setuptools libssl-dev lsb-release
 WORKDIR /build
-ENTRYPOINT ['/build/build_debian.sh']
+ENTRYPOINT ["bash","/build/build_debian.sh"]
 
