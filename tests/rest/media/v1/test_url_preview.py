@@ -20,6 +20,7 @@ from mock import Mock
 from twisted.internet.defer import Deferred
 
 from synapse.config.repository import MediaStorageProviderConfig
+from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.module_loader import load_module
 
 from tests import unittest
@@ -77,7 +78,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             d = Deferred()
             d.addCallback(write_to)
             self.fetches.append((d, url))
-            return d
+            return make_deferred_yieldable(d)
 
         client = Mock()
         client.get_file = get_file
