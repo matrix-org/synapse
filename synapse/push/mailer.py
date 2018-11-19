@@ -36,6 +36,7 @@ from synapse.push.presentable_names import (
 )
 from synapse.types import UserID
 from synapse.util.async_helpers import concurrently_execute
+from synapse.util.logcontext import make_deferred_yieldable
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
@@ -192,7 +193,7 @@ class Mailer(object):
 
         logger.info("Sending email push notification to %s" % email_address)
 
-        yield self.sendmail(
+        yield make_deferred_yieldable(self.sendmail(
             self.hs.config.email_smtp_host,
             raw_from, raw_to, multipart_msg.as_string().encode('utf8'),
             reactor=self.hs.get_reactor(),
@@ -201,7 +202,7 @@ class Mailer(object):
             username=self.hs.config.email_smtp_user,
             password=self.hs.config.email_smtp_pass,
             requireTransportSecurity=self.hs.config.require_transport_security
-        )
+        ))
 
     @defer.inlineCallbacks
     def get_room_vars(self, room_id, user_id, notifs, notif_events, room_state_ids):
