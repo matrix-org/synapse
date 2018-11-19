@@ -1,1 +1,1 @@
-Clean up some problems with leaky logcontexts in the tests
+Add some diagnostics to the tests to detect logcontext problems
