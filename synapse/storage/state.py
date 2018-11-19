@@ -1257,6 +1257,7 @@ class StateStore(StateGroupWorkerStore, BackgroundUpdateStore):
     STATE_GROUP_DEDUPLICATION_UPDATE_NAME = "state_group_state_deduplication"
     STATE_GROUP_INDEX_UPDATE_NAME = "state_group_state_type_index"
     CURRENT_STATE_INDEX_UPDATE_NAME = "current_state_members_idx"
+    EVENT_STATE_GROUP_INDEX_UPDATE_NAME = "event_to_state_groups_sg_index"
 
     def __init__(self, db_conn, hs):
         super(StateStore, self).__init__(db_conn, hs)
@@ -1274,6 +1275,12 @@ class StateStore(StateGroupWorkerStore, BackgroundUpdateStore):
             table="current_state_events",
             columns=["state_key"],
             where_clause="type='m.room.member'",
+        )
+        self.register_background_index_update(
+            self.EVENT_STATE_GROUP_INDEX_UPDATE_NAME,
+            index_name="event_to_state_groups_sg_index",
+            table="event_to_state_groups",
+            columns=["state_group"],
         )
 
     def _store_event_state_mappings_txn(self, txn, events_and_contexts):

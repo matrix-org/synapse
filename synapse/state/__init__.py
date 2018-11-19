@@ -261,7 +261,7 @@ class StateHandler(object):
         logger.debug("calling resolve_state_groups from compute_event_context")
 
         entry = yield self.resolve_state_groups_for_events(
-            event.room_id, [e for e, _ in event.prev_events],
+            event.room_id, event.prev_event_ids(),
         )
 
         prev_state_ids = entry.state
@@ -607,7 +607,7 @@ def resolve_events_with_store(room_version, state_sets, event_map, state_res_sto
         return v1.resolve_events_with_store(
             state_sets, event_map, state_res_store.get_events,
         )
-    elif room_version == RoomVersions.VDH_TEST:
+    elif room_version in (RoomVersions.VDH_TEST, RoomVersions.STATE_V2_TEST):
         return v2.resolve_events_with_store(
             state_sets, event_map, state_res_store,
         )

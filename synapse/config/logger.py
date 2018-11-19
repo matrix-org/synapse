@@ -50,6 +50,7 @@ handlers:
         maxBytes: 104857600
         backupCount: 10
         filters: [context]
+        encoding: utf8
     console:
         class: logging.StreamHandler
         formatter: precise

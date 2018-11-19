@@ -202,27 +202,22 @@ class FederationHandler(BaseHandler):
             self.room_queues[room_id].append((pdu, origin))
             return
 
-        # If we're no longer in the room just ditch the event entirely. This
-        # is probably an old server that has come back and thinks we're still
-        # in the room (or we've been rejoined to the room by a state reset).
+        # If we're not in the room just ditch the event entirely. This is
+        # probably an old server that has come back and thinks we're still in
+        # the room (or we've been rejoined to the room by a state reset).
         #
-        # If we were never in the room then maybe our database got vaped and
-        # we should check if we *are* in fact in the room. If we are then we
-        # can magically rejoin the room.
+        # Note that if we were never in the room then we would have already
+        # dropped the event, since we wouldn't know the room version.
         is_in_room = yield self.auth.check_host_in_room(
             room_id,
             self.server_name
         )
         if not is_in_room:
-            was_in_room = yield self.store.was_host_joined(
-                pdu.room_id, self.server_name,
+            logger.info(
+                "[%s %s] Ignoring PDU from %s as we're not in the room",
+                room_id, event_id, origin,
             )
-            if was_in_room:
-                logger.info(
-                    "[%s %s] Ignoring PDU from %s as we've left the room",
-                    room_id, event_id, origin,
-                )
-                defer.returnValue(None)
+            defer.returnValue(None)
 
         state = None
         auth_chain = []
@@ -239,7 +234,7 @@ class FederationHandler(BaseHandler):
                 room_id, event_id, min_depth,
             )
 
-            prevs = {e_id for e_id, _ in pdu.prev_events}
+            prevs = set(pdu.prev_event_ids())
             seen = yield self.store.have_seen_events(prevs)
 
             if min_depth and pdu.depth < min_depth:
@@ -557,86 +552,54 @@ class FederationHandler(BaseHandler):
             room_id, event_id, event,
         )
 
-        # FIXME (erikj): Awful hack to make the case where we are not currently
-        # in the room work
-        # If state and auth_chain are None, then we don't need to do this check
-        # as we already know we have enough state in the DB to handle this
-        # event.
-        if state and auth_chain and not event.internal_metadata.is_outlier():
-            is_in_room = yield self.auth.check_host_in_room(
-                room_id,
-                self.server_name
-            )
-        else:
-            is_in_room = True
+        event_ids = set()
+        if state:
+            event_ids |= {e.event_id for e in state}
+        if auth_chain:
+            event_ids |= {e.event_id for e in auth_chain}
 
-        if not is_in_room:
+        seen_ids = yield self.store.have_seen_events(event_ids)
+
+        if state and auth_chain is not None:
+            # If we have any state or auth_chain given to us by the replication
+            # layer, then we should handle them (if we haven't before.)
+
+            event_infos = []
+
+            for e in itertools.chain(auth_chain, state):
+                if e.event_id in seen_ids:
+                    continue
+                e.internal_metadata.outlier = True
+                auth_ids = e.auth_event_ids()
+                auth = {
+                    (e.type, e.state_key): e for e in auth_chain
+                    if e.event_id in auth_ids or e.type == EventTypes.Create
+                }
+                event_infos.append({
+                    "event": e,
+                    "auth_events": auth,
+                })
+                seen_ids.add(e.event_id)
+
             logger.info(
-                "[%s %s] Got event for room we're not in",
-                room_id, event_id,
+                "[%s %s] persisting newly-received auth/state events %s",
+                room_id, event_id, [e["event"].event_id for e in event_infos]
             )
+            yield self._handle_new_events(origin, event_infos)
 
-            try:
-                yield self._persist_auth_tree(
-                    origin, auth_chain, state, event
-                )
-            except AuthError as e:
-                raise FederationError(
-                    "ERROR",
-                    e.code,
-                    e.msg,
-                    affected=event_id,
-                )
-
-        else:
-            event_ids = set()
-            if state:
-                event_ids |= {e.event_id for e in state}
-            if auth_chain:
-                event_ids |= {e.event_id for e in auth_chain}
-
-            seen_ids = yield self.store.have_seen_events(event_ids)
-
-            if state and auth_chain is not None:
-                # If we have any state or auth_chain given to us by the replication
-                # layer, then we should handle them (if we haven't before.)
-
-                event_infos = []
-
-                for e in itertools.chain(auth_chain, state):
-                    if e.event_id in seen_ids:
-                        continue
-                    e.internal_metadata.outlier = True
-                    auth_ids = [e_id for e_id, _ in e.auth_events]
-                    auth = {
-                        (e.type, e.state_key): e for e in auth_chain
-                        if e.event_id in auth_ids or e.type == EventTypes.Create
-                    }
-                    event_infos.append({
-                        "event": e,
-                        "auth_events": auth,
-                    })
-                    seen_ids.add(e.event_id)
-
-                logger.info(
-                    "[%s %s] persisting newly-received auth/state events %s",
-                    room_id, event_id, [e["event"].event_id for e in event_infos]
-                )
-                yield self._handle_new_events(origin, event_infos)
-
-            try:
-                context = yield self._handle_new_event(
-                    origin,
-                    event,
-                    state=state,
-                )
-            except AuthError as e:
-                raise FederationError(
-                    "ERROR",
-                    e.code,
-                    e.msg,
-                    affected=event.event_id,
-                )
+        try:
+            context = yield self._handle_new_event(
+                origin,
+                event,
+                state=state,
+            )
+        except AuthError as e:
+            raise FederationError(
+                "ERROR",
+                e.code,
+                e.msg,
+                affected=event.event_id,
+            )
 
         room = yield self.store.get_room(room_id)
 
@@ -726,7 +689,7 @@ class FederationHandler(BaseHandler):
         edges = [
             ev.event_id
             for ev in events
-            if set(e_id for e_id, _ in ev.prev_events) - event_ids
+            if set(ev.prev_event_ids()) - event_ids
         ]
 
         logger.info(
@@ -753,7 +716,7 @@ class FederationHandler(BaseHandler):
         required_auth = set(
             a_id
             for event in events + list(state_events.values()) + list(auth_events.values())
-            for a_id, _ in event.auth_events
+            for a_id in event.auth_event_ids()
         )
         auth_events.update({
             e_id: event_map[e_id] for e_id in required_auth if e_id in event_map
@@ -769,7 +732,7 @@ class FederationHandler(BaseHandler):
             auth_events.update(ret_events)
 
             required_auth.update(
-                a_id for event in ret_events.values() for a_id, _ in event.auth_events
+                a_id for event in ret_events.values() for a_id in event.auth_event_ids()
             )
             missing_auth = required_auth - set(auth_events)
 
@@ -796,7 +759,7 @@ class FederationHandler(BaseHandler):
                 required_auth.update(
                     a_id
                     for event in results if event
-                    for a_id, _ in event.auth_events
+                    for a_id in event.auth_event_ids()
                 )
                 missing_auth = required_auth - set(auth_events)
 
@@ -816,7 +779,7 @@ class FederationHandler(BaseHandler):
                 "auth_events": {
                     (auth_events[a_id].type, auth_events[a_id].state_key):
                     auth_events[a_id]
-                    for a_id, _ in a.auth_events
+                    for a_id in a.auth_event_ids()
                     if a_id in auth_events
                 }
             })
@@ -828,7 +791,7 @@ class FederationHandler(BaseHandler):
                 "auth_events": {
                     (auth_events[a_id].type, auth_events[a_id].state_key):
                     auth_events[a_id]
-                    for a_id, _ in event_map[e_id].auth_events
+                    for a_id in event_map[e_id].auth_event_ids()
                     if a_id in auth_events
                 }
             })
@@ -1041,17 +1004,17 @@ class FederationHandler(BaseHandler):
         Raises:
             SynapseError if the event does not pass muster
         """
-        if len(ev.prev_events) > 20:
+        if len(ev.prev_event_ids()) > 20:
             logger.warn("Rejecting event %s which has %i prev_events",
-                        ev.event_id, len(ev.prev_events))
+                        ev.event_id, len(ev.prev_event_ids()))
             raise SynapseError(
                 http_client.BAD_REQUEST,
                 "Too many prev_events",
             )
 
-        if len(ev.auth_events) > 10:
+        if len(ev.auth_event_ids()) > 10:
             logger.warn("Rejecting event %s which has %i auth_events",
-                        ev.event_id, len(ev.auth_events))
+                        ev.event_id, len(ev.auth_event_ids()))
             raise SynapseError(
                 http_client.BAD_REQUEST,
                 "Too many auth_events",
@@ -1076,7 +1039,7 @@ class FederationHandler(BaseHandler):
     def on_event_auth(self, event_id):
         event = yield self.store.get_event(event_id)
         auth = yield self.store.get_auth_chain(
-            [auth_id for auth_id, _ in event.auth_events],
+            [auth_id for auth_id in event.auth_event_ids()],
             include_given=True
         )
         defer.returnValue([e for e in auth])
@@ -1698,7 +1661,7 @@ class FederationHandler(BaseHandler):
 
         missing_auth_events = set()
         for e in itertools.chain(auth_events, state, [event]):
-            for e_id, _ in e.auth_events:
+            for e_id in e.auth_event_ids():
                 if e_id not in event_map:
                     missing_auth_events.add(e_id)
 
@@ -1717,7 +1680,7 @@ class FederationHandler(BaseHandler):
         for e in itertools.chain(auth_events, state, [event]):
             auth_for_e = {
                 (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
-                for e_id, _ in e.auth_events
+                for e_id in e.auth_event_ids()
                 if e_id in event_map
             }
             if create_event:
@@ -1785,10 +1748,10 @@ class FederationHandler(BaseHandler):
 
         # This is a hack to fix some old rooms where the initial join event
         # didn't reference the create event in its auth events.
-        if event.type == EventTypes.Member and not event.auth_events:
-            if len(event.prev_events) == 1 and event.depth < 5:
+        if event.type == EventTypes.Member and not event.auth_event_ids():
+            if len(event.prev_event_ids()) == 1 and event.depth < 5:
                 c = yield self.store.get_event(
-                    event.prev_events[0][0],
+                    event.prev_event_ids()[0],
                     allow_none=True,
                 )
                 if c and c.type == EventTypes.Create:
@@ -1835,7 +1798,7 @@ class FederationHandler(BaseHandler):
 
         # Now get the current auth_chain for the event.
         local_auth_chain = yield self.store.get_auth_chain(
-            [auth_id for auth_id, _ in event.auth_events],
+            [auth_id for auth_id in event.auth_event_ids()],
             include_given=True
         )
 
@@ -1891,7 +1854,7 @@ class FederationHandler(BaseHandler):
         """
         # Check if we have all the auth events.
         current_state = set(e.event_id for e in auth_events.values())
-        event_auth_events = set(e_id for e_id, _ in event.auth_events)
+        event_auth_events = set(event.auth_event_ids())
 
         if event.is_state():
             event_key = (event.type, event.state_key)
@@ -1935,7 +1898,7 @@ class FederationHandler(BaseHandler):
                         continue
 
                     try:
-                        auth_ids = [e_id for e_id, _ in e.auth_events]
+                        auth_ids = e.auth_event_ids()
                         auth = {
                             (e.type, e.state_key): e for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
@@ -1956,7 +1919,7 @@ class FederationHandler(BaseHandler):
                         pass
 
                 have_events = yield self.store.get_seen_events_with_rejections(
-                    [e_id for e_id, _ in event.auth_events]
+                    event.auth_event_ids()
                 )
                 seen_events = set(have_events.keys())
             except Exception:
@@ -2058,7 +2021,7 @@ class FederationHandler(BaseHandler):
                             continue
 
                         try:
-                            auth_ids = [e_id for e_id, _ in ev.auth_events]
+                            auth_ids = ev.auth_event_ids()
                             auth = {
                                 (e.type, e.state_key): e
                                 for e in result["auth_chain"]
@@ -2250,7 +2213,7 @@ class FederationHandler(BaseHandler):
         missing_remote_ids = [e.event_id for e in missing_remotes]
         base_remote_rejected = list(missing_remotes)
         for e in missing_remotes:
-            for e_id, _ in e.auth_events:
+            for e_id in e.auth_event_ids():
                 if e_id in missing_remote_ids:
                     try:
                         base_remote_rejected.remove(e)

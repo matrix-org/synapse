@@ -59,6 +59,7 @@ class AuthHandler(BaseHandler):
             LoginType.EMAIL_IDENTITY: self._check_email_identity,
             LoginType.MSISDN: self._check_msisdn,
             LoginType.DUMMY: self._check_dummy_auth,
+            LoginType.TERMS: self._check_terms_auth,
         }
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
@@ -431,6 +432,9 @@ class AuthHandler(BaseHandler):
     def _check_dummy_auth(self, authdict, _):
         return defer.succeed(True)
 
+    def _check_terms_auth(self, authdict, _):
+        return defer.succeed(True)
+
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict):
         if 'threepid_creds' not in authdict:
@@ -462,6 +466,22 @@ class AuthHandler(BaseHandler):
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
 
+    def _get_params_terms(self):
+        return {
+            "policies": {
+                "privacy_policy": {
+                    "version": self.hs.config.user_consent_version,
+                    "en": {
+                        "name": self.hs.config.user_consent_policy_name,
+                        "url": "%s/_matrix/consent?v=%s" % (
+                            self.hs.config.public_baseurl,
+                            self.hs.config.user_consent_version,
+                        ),
+                    },
+                },
+            },
+        }
+
     def _auth_dict_for_flows(self, flows, session):
         public_flows = []
         for f in flows:
@@ -469,6 +489,7 @@ class AuthHandler(BaseHandler):
 
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
+            LoginType.TERMS: self._get_params_terms,
         }
 
         params = {}

@@ -51,7 +51,6 @@ REQUIREMENTS = {
     "daemonize>=2.3.1": ["daemonize"],
     "bcrypt>=3.1.0": ["bcrypt>=3.1.0"],
     "pillow>=3.1.2": ["PIL"],
-    "pydenticon>=0.2": ["pydenticon"],
     "sortedcontainers>=1.4.4": ["sortedcontainers"],
     "psutil>=2.0.0": ["psutil>=2.0.0"],
     "pysaml2>=3.0.0": ["saml2"],

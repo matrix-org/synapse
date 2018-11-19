@@ -45,7 +45,6 @@ from ._base import FileInfo, respond_404, respond_with_responder
 from .config_resource import MediaConfigResource
 from .download_resource import DownloadResource
 from .filepath import MediaFilePaths
-from .identicon_resource import IdenticonResource
 from .media_storage import MediaStorage
 from .preview_url_resource import PreviewUrlResource
 from .storage_provider import StorageProviderWrapper
@@ -769,7 +768,6 @@ class MediaRepositoryResource(Resource):
         self.putChild(b"thumbnail", ThumbnailResource(
             hs, media_repo, media_repo.media_storage,
         ))
-        self.putChild(b"identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
             self.putChild(b"preview_url", PreviewUrlResource(
                 hs, media_repo, media_repo.media_storage,

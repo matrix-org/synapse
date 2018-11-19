@@ -200,11 +200,11 @@ def _is_membership_change_allowed(event, auth_events):
     membership = event.content["membership"]
 
     # Check if this is the room creator joining:
-    if len(event.prev_events) == 1 and Membership.JOIN == membership:
+    if len(event.prev_event_ids()) == 1 and Membership.JOIN == membership:
         # Get room creation event:
         key = (EventTypes.Create, "", )
         create = auth_events.get(key)
-        if create and event.prev_events[0][0] == create.event_id:
+        if create and event.prev_event_ids()[0] == create.event_id:
             if create.content["creator"] == event.state_key:
                 return
 
