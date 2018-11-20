@@ -36,7 +36,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # Do not add more reserved users than the total allowable number
         self._new_transaction(
             dbconn, "initialise_mau_threepids", [], [],
-            self._initialise_reserved_users, 
+            self._initialise_reserved_users,
             hs.config.mau_limits_reserved_threepids[:self.hs.config.max_mau_value],
         )
 
