@@ -93,10 +93,12 @@ class RegistrationConfig(Config):
 
         # The list of identity servers trusted to verify third party
         # identifiers by this server.
+        #
+        # Also defines the ID server which will be called when an account is
+        # deactivated (one will be picked arbitrarily).
         trusted_third_party_id_servers:
             - matrix.org
             - vector.im
-            - riot.im
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
