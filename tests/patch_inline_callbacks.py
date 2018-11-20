@@ -14,13 +14,11 @@
 # limitations under the License.
 
 import functools
-import logging
+import sys
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
-
-logger = logging.getLogger(__name__)
 
 
 def do_patch():
@@ -39,14 +37,26 @@ def do_patch():
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
             start_context = LoggingContext.current_context()
-            res = orig(*args, **kwargs)
+
+            try:
+                res = orig(*args, **kwargs)
+            except Exception:
+                if LoggingContext.current_context() != start_context:
+                    err = "%s changed context from %s to %s on exception" % (
+                        f, start_context, LoggingContext.current_context()
+                    )
+                    print(err, file=sys.stderr)
+                    raise Exception(err)
+                raise
 
             if not isinstance(res, Deferred) or res.called:
                 if LoggingContext.current_context() != start_context:
                     err = "%s changed context from %s to %s" % (
                         f, start_context, LoggingContext.current_context()
                     )
-                    logger.error(err)
+                    # print the error to stderr because otherwise all we
+                    # see in travis-ci is the 500 error
+                    print(err, file=sys.stderr)
                     raise Exception(err)
                 return res
 
@@ -57,7 +67,7 @@ def do_patch():
                 ) % (
                     f, LoggingContext.current_context(), start_context,
                 )
-                logger.error(err)
+                print(err, file=sys.stderr)
                 raise Exception(err)
 
             def check_ctx(r):
@@ -66,7 +76,7 @@ def do_patch():
                         "Failure" if isinstance(r, Failure) else "Success",
                         f, start_context, LoggingContext.current_context(),
                     )
-                    logger.error(err)
+                    print(err, file=sys.stderr)
                     raise Exception(err)
                 return r
 
