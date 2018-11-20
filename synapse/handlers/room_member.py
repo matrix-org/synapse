@@ -29,7 +29,7 @@ import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.types import RoomID, UserID
+from synapse.types import RoomID, UserID, RoomAlias
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
@@ -416,6 +416,7 @@ class RoomMemberHandler(object):
                 ret = yield self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
+                self._send_merged_user_invites(requester, room_id)
                 defer.returnValue(ret)
 
         elif effective_membership_state == Membership.LEAVE:
@@ -450,7 +451,33 @@ class RoomMemberHandler(object):
             prev_events_and_hashes=prev_events_and_hashes,
             content=content,
         )
+        self._send_merged_user_invites(requester, room_id)
         defer.returnValue(res)
+
+    @defer.inlineCallbacks
+    def _send_merged_user_invites(self, requester, room_id):
+        profile_alias = "#_profile_" + requester.user.localpart + ":" + self.hs.hostname
+        profile_alias = RoomAlias.from_string(profile_alias)
+        profile_room_id, remote_room_hosts = yield self.lookup_room_alias(profile_alias)
+        if profile_room_id:
+            linked_accounts = yield self.state_handler.get_current_state(
+                room_id=profile_room_id.to_string(),
+                event_type="m.linked_accounts",
+                state_key="",
+            )
+            if not linked_accounts or not linked_accounts.content['all_children']:
+                return
+            for child_id in linked_accounts.content['all_children']:
+                child = UserID.from_string(child_id)
+                if self.hs.is_mine(child) or child_id == requester.user.to_string():
+                    # TODO: Handle auto-invite for local users (not a priority)
+                    continue
+                self.update_membership(
+                    requester=requester,
+                    target=child,
+                    room_id=room_id,
+                    action="invite",
+                )
 
     @defer.inlineCallbacks
     def send_membership_event(

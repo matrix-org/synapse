@@ -54,7 +54,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import StateResolutionStore, resolve_events_with_store
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import UserID, get_domain_from_id, create_requester
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room
@@ -1300,7 +1300,36 @@ class FederationHandler(BaseHandler):
         context = yield self.state_handler.compute_event_context(event)
         yield self.persist_events_and_notify([(event, context)])
 
+        sender = UserID.from_string(event.sender)
+        target = UserID.from_string(event.state_key)
+        if (sender.localpart == target.localpart):
+            logcontext.run_in_background(
+                self._auto_accept_invite,
+                sender, target, event.room_id,
+            )
+
         defer.returnValue(event)
+
+    @defer.inlineCallbacks
+    def _auto_accept_invite(self, sender, target, room_id):
+        joined = False
+        for attempt in range(0, 10):
+            try:
+                yield self.hs.get_room_member_handler().update_membership(
+                    requester=create_requester(target.to_string()),
+                    target=target,
+                    room_id=room_id,
+                    action="join",
+                )
+                joined = True
+                break
+            except Exception:
+                # We're going to retry, but we should log the error
+                logger.exception("Error auto-accepting invite on attempt %d" % attempt)
+                yield self.hs.get_clock().sleep(1)
+        if not joined:
+            logger.error("Giving up on trying to auto-accept invite: too many attempts")
+
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
