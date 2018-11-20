@@ -190,23 +190,33 @@ def make_request(
     return req, channel
 
 
-def wait_until_result(clock, request, timeout=100):
+def wait_until_result(clock, request):
     """
     Wait until the request is finished.
     """
+    # this function used to give up if the request hadn't completed within 100
+    # iterations. However, this led to problems with log contexts.
+    #
+    # The problem is that because we (a) give up waiting for the result of the
+    # request, and (b) throw away the HomeServer instance (and hence the Notifier,
+    # which would otherwise keep references to requests it is supposed to be
+    # waking up), we can end up with orphaned chains of incomplete Deferreds
+    # which no longer have any references to them and so get garbage-collected.
+    #
+    # It further turns out that one of the many unpleasant effects of the way we
+    # do logcontexts is that if a deferred chain gets garbage-collected before
+    # it completes, we can end up leaking log-contexts (see log_contexts.rst
+    # for more details).
+    #
+    # In short, a timeout here makes things explode down the line.
+
     clock.run()
-    x = 0
 
     while not request.finished:
 
         # If there's a producer, tell it to resume producing so we get content
         if request._channel._producer:
             request._channel._producer.resumeProducing()
-
-        x += 1
-
-        if x > timeout:
-            raise TimedOutException("Timed out waiting for request to finish.")
 
         clock.advance(0.1)
 

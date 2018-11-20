@@ -19,7 +19,6 @@ from synapse.rest.client.v1 import admin, login, room
 from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
-from tests.server import TimedOutException
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -88,7 +87,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         than the now-reset serial.
         """
         typing_url = "/rooms/%s/typing/%s?access_token=%s"
-        sync_url = "/sync?timeout=3000000&access_token=%s&since=%s"
+        sync_url = "/sync?timeout=3000&access_token=%s&since=%s"
 
         # Register the user who gets notified
         user_id = self.register_user("user", "pass")
@@ -177,14 +176,24 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(200, channel.code)
+        self.assertEqual(
+            len(channel.json_body["rooms"]["join"][room]["ephemeral"]["events"]), 1,
+        )
         next_batch = channel.json_body["next_batch"]
 
         # Clear the typing information, so that it doesn't think everything is
         # in the future.
         typing._reset()
 
-        # Now it SHOULD fail as it never completes!
+        # Now we should get a null response back.
         request, channel = self.make_request(
             "GET", sync_url % (access_token, next_batch)
         )
-        self.assertRaises(TimedOutException, self.render, request)
+        self.render(request)
+        self.assertEquals(200, channel.code)
+
+        # rooms list should be empty
+        self.assertEqual(channel.json_body["rooms"]["join"], {})
+
+        # sync token should be the same as before
+        self.assertEqual(channel.json_body["next_batch"], next_batch)
