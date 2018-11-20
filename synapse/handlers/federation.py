@@ -225,12 +225,6 @@ class FederationHandler(BaseHandler):
         state = None
         auth_chain = []
 
-        new_thread = False
-        if thread_id is None:
-            # FIXME: Pick something better?
-            thread_id = random.randint(0, 999999999)
-            new_thread = True
-
         # Get missing pdus if necessary.
         if not pdu.internal_metadata.is_outlier():
             # We only backfill backwards to the min depth.
@@ -423,13 +417,6 @@ class FederationHandler(BaseHandler):
                         "We can't get valid state history.",
                         affected=event_id,
                     )
-
-        now = self.clock.time_msec()
-        if now - pdu.origin_server_ts > 1 * 60 * 1000:
-            pass
-        else:
-            thread_id = 0
-            new_thread = False
 
         logger.info("Thread ID %r", thread_id)
 
