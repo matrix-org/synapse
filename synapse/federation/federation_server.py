@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 
 import six
 from six import iteritems
@@ -71,6 +72,7 @@ class FederationServer(FederationBase):
 
         self.auth = hs.get_auth()
         self.handler = hs.get_handlers().federation_handler
+        self.clock = hs.get_clock()
 
         self._server_linearizer = Linearizer("fed_server")
         self._transaction_linearizer = Linearizer("fed_txn_handler")
@@ -208,12 +210,25 @@ class FederationServer(FederationBase):
                     pdu_results[event_id] = e.error_dict()
                 return
 
+            thread_id = random.randint(0, 999999999)
+            pdu_to_thread = {}
+            first_in_thread = True
+            for pdu in reversed(pdus_by_room[room_id]):
+                now = self.clock.time_msec()
+                if now - pdu.origin_server_ts > 1 * 60 * 1000:
+                    pdu_to_thread[pdu.event_id] = (thread_id, first_in_thread)
+                    first_in_thread = False
+                else:
+                    pdu_to_thread[pdu.event_id] = (0, False)
+
             for pdu in pdus_by_room[room_id]:
                 event_id = pdu.event_id
                 with nested_logging_context(event_id):
+                    thread_id, new_thread = pdu_to_thread[pdu.event_id]
                     try:
                         yield self._handle_received_pdu(
-                            origin, pdu
+                            origin, pdu, thread_id=thread_id,
+                            new_thread=new_thread
                         )
                         pdu_results[event_id] = {}
                     except FederationError as e:
@@ -571,7 +586,7 @@ class FederationServer(FederationBase):
         )
 
     @defer.inlineCallbacks
-    def _handle_received_pdu(self, origin, pdu):
+    def _handle_received_pdu(self, origin, pdu, thread_id, new_thread):
         """ Process a PDU received in a federation /send/ transaction.
 
         If the event is invalid, then this method throws a FederationError.
@@ -638,6 +653,7 @@ class FederationServer(FederationBase):
 
         yield self.handler.on_receive_pdu(
             origin, pdu, sent_to_us_directly=True,
+            thread_id=thread_id, new_thread=new_thread,
         )
 
     def __str__(self):
