@@ -424,7 +424,7 @@ class FederationHandler(BaseHandler):
                     )
 
         now = self.clock.time_msec()
-        if now - pdu.origin_server_ts > 2 * 60 * 1000:
+        if now - pdu.origin_server_ts > 1 * 60 * 1000:
             pass
         else:
             thread_id = 0
