@@ -154,7 +154,6 @@ trusted_third_party_id_servers:
     - matrix.org
     - vector.im
 
-
 ## Metrics ###
 
 {% if SYNAPSE_REPORT_STATS.lower() == "yes" %}
