@@ -96,7 +96,6 @@ class RegistrationConfig(Config):
         trusted_third_party_id_servers:
             - matrix.org
             - vector.im
-            - riot.im
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
