@@ -1,0 +1,1 @@
+Fix an issue where public consent URLs had two slashes.

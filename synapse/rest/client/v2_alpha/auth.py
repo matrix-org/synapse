@@ -21,7 +21,7 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
 from synapse.http.server import finish_request
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_string
 
 from ._base import client_v2_patterns
 
@@ -131,16 +131,12 @@ class AuthRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_handlers().registration_handler
 
-    @defer.inlineCallbacks
     def on_GET(self, request, stagetype):
-        yield
+        session = parse_string(request, "session")
+        if not session:
+            raise SynapseError(400, "No session supplied")
+
         if stagetype == LoginType.RECAPTCHA:
-            if ('session' not in request.args or
-                    len(request.args['session']) == 0):
-                raise SynapseError(400, "No session supplied")
-
-            session = request.args["session"][0]
-
             html = RECAPTCHA_TEMPLATE % {
                 'session': session,
                 'myurl': "%s/auth/%s/fallback/web" % (
@@ -155,13 +151,11 @@ class AuthRestServlet(RestServlet):
 
             request.write(html_bytes)
             finish_request(request)
-            defer.returnValue(None)
+            return None
         elif stagetype == LoginType.TERMS:
-            session = request.args['session'][0]
-
             html = TERMS_TEMPLATE % {
                 'session': session,
-                'terms_url': "%s/_matrix/consent?v=%s" % (
+                'terms_url': "%s_matrix/consent?v=%s" % (
                     self.hs.config.public_baseurl,
                     self.hs.config.user_consent_version,
                 ),
@@ -176,25 +170,25 @@ class AuthRestServlet(RestServlet):
 
             request.write(html_bytes)
             finish_request(request)
-            defer.returnValue(None)
+            return None
         else:
             raise SynapseError(404, "Unknown auth stage type")
 
     @defer.inlineCallbacks
     def on_POST(self, request, stagetype):
-        yield
-        if stagetype == LoginType.RECAPTCHA:
-            if ('g-recaptcha-response' not in request.args or
-                    len(request.args['g-recaptcha-response'])) == 0:
-                raise SynapseError(400, "No captcha response supplied")
-            if ('session' not in request.args or
-                    len(request.args['session'])) == 0:
-                raise SynapseError(400, "No session supplied")
 
-            session = request.args['session'][0]
+        session = parse_string(request, "session")
+        if not session:
+            raise SynapseError(400, "No session supplied")
+
+        if stagetype == LoginType.RECAPTCHA:
+            response = parse_string(request, "g-recaptcha-response")
+
+            if not response:
+                raise SynapseError(400, "No captcha response supplied")
 
             authdict = {
-                'response': request.args['g-recaptcha-response'][0],
+                'response': response,
                 'session': session,
             }
 
@@ -242,7 +236,7 @@ class AuthRestServlet(RestServlet):
             else:
                 html = TERMS_TEMPLATE % {
                     'session': session,
-                    'terms_url': "%s/_matrix/consent?v=%s" % (
+                    'terms_url': "%s_matrix/consent?v=%s" % (
                         self.hs.config.public_baseurl,
                         self.hs.config.user_consent_version,
                     ),

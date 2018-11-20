@@ -220,3 +220,28 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
         count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), len(threepids))
+
+    def test_track_monthly_users_without_cap(self):
+        self.hs.config.limit_usage_by_mau = False
+        self.hs.config.mau_stats_only = True
+        self.hs.config.max_mau_value = 1  # should not matter
+
+        count = self.store.get_monthly_active_count()
+        self.assertEqual(0, self.get_success(count))
+
+        self.store.upsert_monthly_active_user("@user1:server")
+        self.store.upsert_monthly_active_user("@user2:server")
+        self.pump()
+
+        count = self.store.get_monthly_active_count()
+        self.assertEqual(2, self.get_success(count))
+
+    def test_no_users_when_not_tracking(self):
+        self.hs.config.limit_usage_by_mau = False
+        self.hs.config.mau_stats_only = False
+        self.store.upsert_monthly_active_user = Mock()
+
+        self.store.populate_monthly_active_users("@user:sever")
+        self.pump()
+
+        self.store.upsert_monthly_active_user.assert_not_called()
