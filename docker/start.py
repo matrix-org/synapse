@@ -70,7 +70,7 @@ else:
     # Generate missing keys and start synapse
     subprocess.check_output(args + ["--generate-keys"])
 
-    os.system("(sleep 5; /usr/local/bin/register_new_matrix_user -u matthew -p isildur -c /compiled/homeserver.yaml -a) &");
+    os.system("(sleep 10; /usr/local/bin/register_new_matrix_user -u matthew -p secret -c /compiled/homeserver.yaml -a) &");
 
     os.execv("/usr/local/bin/python", args)
 
