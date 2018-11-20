@@ -1,5 +1,5 @@
 matrix-synapse.*.debhelper
-matrix-synapse.*.debhelper.log
+matrix-synapse.debhelper.log
 matrix-synapse.substvars
 matrix-synapse/
 matrix-synapse-*/
