@@ -210,7 +210,7 @@ class FederationServer(FederationBase):
                     pdu_results[event_id] = e.error_dict()
                 return
 
-            thread_id = random.randint(0, 999999999)
+            thread_id = random.randint(1, 999999999)
             pdu_to_thread = {}
             first_in_thread = True
             for pdu in reversed(pdus_by_room[room_id]):
@@ -225,6 +225,7 @@ class FederationServer(FederationBase):
                 event_id = pdu.event_id
                 with nested_logging_context(event_id):
                     thread_id, new_thread = pdu_to_thread[pdu.event_id]
+                    logger.info("Assigning thread %d to %s", thread_id, pdu.event_id)
                     try:
                         yield self._handle_received_pdu(
                             origin, pdu, thread_id=thread_id,

@@ -551,6 +551,21 @@ class FederationHandler(BaseHandler):
         # tell clients about them in order.
         missing_events.sort(key=lambda x: x.depth)
 
+        pdu_to_thread = {}
+        if not thread_id:
+            thread_id = random.randint(1, 999999999)
+            first_in_thread = True
+            for pdu in reversed(missing_events):
+                now = self.clock.time_msec()
+                if now - pdu.origin_server_ts > 1 * 60 * 1000:
+                    pdu_to_thread[pdu.event_id] = (thread_id, first_in_thread)
+                    first_in_thread = False
+                else:
+                    pdu_to_thread[pdu.event_id] = (0, False)
+        else:
+            for pdu in reversed(missing_events):
+                pdu_to_thread[pdu.event_id] = (thread_id, False)
+
         for ev in missing_events:
             logger.info(
                 "[%s %s] Handling received prev_event %s",
@@ -562,7 +577,8 @@ class FederationHandler(BaseHandler):
                         origin,
                         ev,
                         sent_to_us_directly=False,
-                        thread_id=thread_id,
+                        thread_id=pdu_to_thread[ev.event_id][0],
+                        new_thread=pdu_to_thread[ev.event_id][1],
                     )
                 except FederationError as e:
                     if e.code == 403:
