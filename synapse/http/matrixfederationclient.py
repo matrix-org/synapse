@@ -196,7 +196,7 @@ class MatrixFederationHttpClient(object):
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
         self.version_string_bytes = hs.version_string.encode('ascii')
-        self.default_timeout = 60
+        self.default_timeout = 30
 
         def schedule(x):
             reactor.callLater(_EPSILON, x)
@@ -253,13 +253,13 @@ class MatrixFederationHttpClient(object):
         ):
             raise FederationDeniedError(request.destination)
 
-        limiter = yield synapse.util.retryutils.get_retry_limiter(
-            request.destination,
-            self.clock,
-            self._store,
-            backoff_on_404=backoff_on_404,
-            ignore_backoff=ignore_backoff,
-        )
+        # limiter = yield synapse.util.retryutils.get_retry_limiter(
+        #     request.destination,
+        #     self.clock,
+        #     self._store,
+        #     backoff_on_404=backoff_on_404,
+        #     ignore_backoff=ignore_backoff,
+        # )
 
         method_bytes = request.method.encode("ascii")
         destination_bytes = request.destination.encode("ascii")
@@ -274,7 +274,8 @@ class MatrixFederationHttpClient(object):
             b"Host": [destination_bytes],
         }
 
-        with limiter:
+        # with limiter:
+        if True:
             # XXX: Would be much nicer to retry only at the transaction-layer
             # (once we have reliable transactions in place)
             if long_retries:

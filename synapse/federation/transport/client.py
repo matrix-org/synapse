@@ -174,7 +174,8 @@ class TransportLayerClient(object):
             path=path,
             data=json_data,
             json_data_callback=json_data_callback,
-            long_retries=True,
+            long_retries=False,
+            timeout=10000,
             backoff_on_404=True,  # If we get a 404 the other side has gone
         )
 

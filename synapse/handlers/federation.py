@@ -140,6 +140,7 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_receive_pdu(
             self, origin, pdu, sent_to_us_directly=False, thread_id=None,
+            new_thread=False,
     ):
         """ Process a PDU received via a federation /send/ transaction, or
         via backfill of missing prev_events
@@ -234,12 +235,6 @@ class FederationHandler(BaseHandler):
 
         state = None
         auth_chain = []
-
-        new_thread = False
-        if thread_id is None:
-            # FIXME: Pick something better?
-            thread_id = random.randint(0, 999999999)
-            new_thread = True
 
         # Get missing pdus if necessary.
         if not pdu.internal_metadata.is_outlier():
@@ -434,13 +429,6 @@ class FederationHandler(BaseHandler):
                         affected=event_id,
                     )
 
-        now = self.clock.time_msec()
-        if now - pdu.origin_server_ts > 2 * 60 * 1000:
-            pass
-        else:
-            thread_id = 0
-            new_thread = False
-
         logger.info("Thread ID %r", thread_id)
 
         yield self._process_received_pdu(
@@ -472,7 +460,7 @@ class FederationHandler(BaseHandler):
                 create_requester(UserID("server", "server")),
                 event,
                 context,
-                ratelimit=True,
+                ratelimit=False,
                 extra_users=[],
                 do_auth=False,
             )
@@ -574,6 +562,21 @@ class FederationHandler(BaseHandler):
         # tell clients about them in order.
         missing_events.sort(key=lambda x: x.depth)
 
+        pdu_to_thread = {}
+        if not thread_id:
+            thread_id = random.randint(1, 999999999)
+            first_in_thread = True
+            for pdu in reversed(missing_events):
+                now = self.clock.time_msec()
+                if now - pdu.origin_server_ts > 1 * 60 * 1000:
+                    pdu_to_thread[pdu.event_id] = (thread_id, first_in_thread)
+                    first_in_thread = False
+                else:
+                    pdu_to_thread[pdu.event_id] = (0, False)
+        else:
+            for pdu in reversed(missing_events):
+                pdu_to_thread[pdu.event_id] = (thread_id, False)
+
         for ev in missing_events:
             logger.info(
                 "[%s %s] Handling received prev_event %s",
@@ -585,7 +588,8 @@ class FederationHandler(BaseHandler):
                         origin,
                         ev,
                         sent_to_us_directly=False,
-                        thread_id=thread_id,
+                        thread_id=pdu_to_thread[ev.event_id][0],
+                        new_thread=pdu_to_thread[ev.event_id][1],
                     )
                 except FederationError as e:
                     if e.code == 403:
