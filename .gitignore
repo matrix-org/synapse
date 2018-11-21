@@ -57,3 +57,4 @@ env/
 
 .vscode/
 .ropeproject/
+.coverage.*

@@ -29,6 +29,7 @@ from twisted.internet import defer, protocol, reactor, ssl
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.web._newclient import ResponseDone
 from twisted.web.client import (
+    URI,
     Agent,
     BrowserLikeRedirectAgent,
     ContentDecoderAgent,
@@ -59,10 +60,20 @@ class SimpleHttpClient(object):
     A simple, no-frills HTTP client with methods that wrap up common ways of
     using HTTP in Matrix
     """
-    def __init__(self, hs):
+
+    def __init__(self, hs, treq_args=None, whitelist=None, blacklist=None, _treq=None):
+
+        if not _treq:
+            self._treq = treq
+        else:
+            self._treq = _treq
+
         self.hs = hs
 
         pool = HTTPConnectionPool(reactor)
+        self._extra_treq_args = treq_args
+        self.whitelist = whitelist
+        self.blacklist = blacklist
 
         # the pusher makes lots of concurrent SSL connections to sygnal, and
         # tends to do so in batches, so we need to allow the pool to keep lots
@@ -81,6 +92,7 @@ class SimpleHttpClient(object):
         )
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
+        self.reactor = hs.get_reactor()
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
@@ -88,6 +100,22 @@ class SimpleHttpClient(object):
 
     @defer.inlineCallbacks
     def request(self, method, uri, data=b'', headers=None):
+
+        # Check our IP whitelists/blacklists before making the request.
+        if self.blacklist:
+            split_uri = URI.fromBytes(uri.encode('utf8'))
+            address = yield self.reactor.resolve(split_uri.host)
+
+            from netaddr import IPAddress
+
+            ip_address = IPAddress(address)
+
+            if ip_address in self.blacklist:
+                if self.whitelist is None or ip_address not in self.whitelist:
+                    raise ConnectError(
+                        "Refusing to spider blacklisted IP address %s" % address
+                    )
+
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.labels(method).inc()
@@ -96,8 +124,13 @@ class SimpleHttpClient(object):
         logger.info("Sending request %s %s", method, redact_uri(uri))
 
         try:
-            request_deferred = treq.request(
-                method, uri, agent=self.agent, data=data, headers=headers
+            request_deferred = self._treq.request(
+                method,
+                uri,
+                agent=self.agent,
+                data=data,
+                headers=headers,
+                **self._extra_treq_args
             )
             request_deferred = timeout_deferred(
                 request_deferred, 60, self.hs.get_reactor(),

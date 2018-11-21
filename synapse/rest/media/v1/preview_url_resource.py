@@ -35,7 +35,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.client import SpiderHttpClient
+from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     respond_with_json,
     respond_with_json_bytes,
@@ -69,7 +69,12 @@ class PreviewUrlResource(Resource):
         self.max_spider_size = hs.config.max_spider_size
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
-        self.client = SpiderHttpClient(hs)
+        self.client = SimpleHttpClient(
+            hs,
+            treq_args={"browser_like_redirects": True},
+            whitelist=hs.config.url_preview_ip_range_whitelist,
+            blacklist=hs.config.url_preview_ip_range_blacklist,
+        )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage

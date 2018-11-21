@@ -18,6 +18,7 @@ import os
 from mock import Mock
 
 from twisted.internet.defer import Deferred
+from twisted.web.http_headers import Headers
 
 from synapse.config.repository import MediaStorageProviderConfig
 from synapse.util.logcontext import make_deferred_yieldable
@@ -39,6 +40,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         config = self.default_config()
         config.url_preview_enabled = True
         config.max_spider_size = 9999999
+        config.url_preview_ip_range_blacklist = None
         config.url_preview_url_blacklist = []
         config.media_store_path = self.storage_path
 
@@ -85,6 +87,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.media_repo = hs.get_media_repository_resource()
         preview_url = self.media_repo.children[b'preview_url']
+        self._old_client = preview_url.client
         preview_url.client = client
         self.preview_url = preview_url
 
@@ -240,3 +243,48 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
+
+    def test_ipaddr(self):
+        """
+        IP addresses can be previewed directly.
+        """
+        # We don't want a fully mocked out client, just a mocked out Treq
+        treq = Mock()
+        d = Deferred()
+        treq.request = Mock(return_value=d)
+        self.preview_url.client = self._old_client
+        self.preview_url.client._treq = treq
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://8.8.8.8", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        self.assertEqual(treq.request.call_count, 1)
+
+        end_content = (
+            b'<html><head>'
+            b'<meta property="og:title" content="~matrix~" />'
+            b'<meta property="og:description" content="hi" />'
+            b'</head></html>'
+        )
+
+        # Assemble a mocked out response
+        def deliver(to):
+            to.dataReceived(end_content)
+            to.connectionLost(Mock())
+
+        res = Mock()
+        res.code = 200
+        res.headers = Headers({b"Content-Type": [b"text/html"]})
+        res.deliverBody = deliver
+
+        # Deliver the mocked out response
+        d.callback(res)
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+        )
