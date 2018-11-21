@@ -22,11 +22,11 @@ from six.moves import urllib
 import treq
 from canonicaljson import encode_canonical_json, json
 from prometheus_client import Counter
-from twisted.internet.error import ConnectError
 
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, protocol, reactor, ssl
+from twisted.internet.error import ConnectError
 from twisted.web._newclient import ResponseDone
 from twisted.web.client import (
     URI,
