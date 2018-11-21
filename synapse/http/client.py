@@ -60,7 +60,7 @@ class SimpleHttpClient(object):
     using HTTP in Matrix
     """
 
-    def __init__(self, hs, treq_args={}}, whitelist=None, blacklist=None, _treq=treq):
+    def __init__(self, hs, treq_args={}, whitelist=None, blacklist=None, _treq=treq):
         self.hs = hs
 
         pool = HTTPConnectionPool(reactor)
