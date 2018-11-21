@@ -60,16 +60,11 @@ class SimpleHttpClient(object):
     using HTTP in Matrix
     """
 
-    def __init__(self, hs, treq_args=None, whitelist=None, blacklist=None, _treq=None):
-
-        if not _treq:
-            self._treq = treq
-        else:
-            self._treq = _treq
-
+    def __init__(self, hs, treq_args={}}, whitelist=None, blacklist=None, _treq=treq):
         self.hs = hs
 
         pool = HTTPConnectionPool(reactor)
+        self._treq = _treq
         self._extra_treq_args = treq_args
         self.whitelist = whitelist
         self.blacklist = blacklist
@@ -493,57 +488,6 @@ class CaptchaServerHttpClient(SimpleHttpClient):
         except PartialDownloadError as e:
             # twisted dislikes google's response, no content length.
             defer.returnValue(e.response)
-
-
-class SpiderEndpointFactory(object):
-    def __init__(self, hs):
-        self.blacklist = hs.config.url_preview_ip_range_blacklist
-        self.whitelist = hs.config.url_preview_ip_range_whitelist
-        self.policyForHTTPS = hs.get_http_client_context_factory()
-
-    def endpointForURI(self, uri):
-        logger.info("Getting endpoint for %s", uri.toBytes())
-
-        if uri.scheme == b"http":
-            endpoint_factory = HostnameEndpoint
-        elif uri.scheme == b"https":
-            tlsCreator = self.policyForHTTPS.creatorForNetloc(uri.host, uri.port)
-
-            def endpoint_factory(reactor, host, port, **kw):
-                return wrapClientTLS(
-                    tlsCreator,
-                    HostnameEndpoint(reactor, host, port, **kw))
-        else:
-            logger.warn("Can't get endpoint for unrecognised scheme %s", uri.scheme)
-            return None
-        return SpiderEndpoint(
-            reactor, uri.host, uri.port, self.blacklist, self.whitelist,
-            endpoint=endpoint_factory, endpoint_kw_args=dict(timeout=15),
-        )
-
-
-class SpiderHttpClient(SimpleHttpClient):
-    """
-    Separate HTTP client for spidering arbitrary URLs.
-    Special in that it follows retries and has a UA that looks
-    like a browser.
-
-    used by the preview_url endpoint in the content repo.
-    """
-    def __init__(self, hs):
-        SimpleHttpClient.__init__(self, hs)
-        # clobber the base class's agent and UA:
-        self.agent = ContentDecoderAgent(
-            BrowserLikeRedirectAgent(
-                Agent.usingEndpointFactory(
-                    reactor,
-                    SpiderEndpointFactory(hs)
-                )
-            ), [(b'gzip', GzipDecoder)]
-        )
-        # We could look like Chrome:
-        # self.user_agent = ("Mozilla/5.0 (%s) (KHTML, like Gecko)
-        #                   Chrome Safari" % hs.version_string)
 
 
 def encode_urlencode_args(args):
