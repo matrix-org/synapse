@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -322,6 +323,11 @@ class EndToEndKeyStore(SQLBaseStore):
         query_params = []
 
         for (user_id, device_id) in query_list:
+            # Users can only see attestations made by themselves about the
+            # target user's devices, or by the target user about their own
+            # devices.  If the requesting user is not specified, select only
+            # the publicly visible attestations, that is, attestations made by
+            # the target user's own devices.
             if from_user_id:
                 query_clause = "(from_user_id = ? OR from_user_id = ?)"
                 query_params.append(from_user_id)
