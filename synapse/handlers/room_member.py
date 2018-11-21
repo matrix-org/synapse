@@ -30,6 +30,7 @@ import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.types import RoomID, UserID, RoomAlias
+from synapse.util import logcontext
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
@@ -416,7 +417,10 @@ class RoomMemberHandler(object):
                 ret = yield self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
-                self._send_merged_user_invites(requester, room_id)
+                logcontext.run_in_background(
+                    self._send_merged_user_invites,
+                    requester, room_id,
+                )
                 defer.returnValue(ret)
 
         elif effective_membership_state == Membership.LEAVE:
@@ -451,7 +455,10 @@ class RoomMemberHandler(object):
             prev_events_and_hashes=prev_events_and_hashes,
             content=content,
         )
-        self._send_merged_user_invites(requester, room_id)
+        logcontext.run_in_background(
+            self._send_merged_user_invites,
+            requester, room_id,
+        )
         defer.returnValue(res)
 
     @defer.inlineCallbacks
