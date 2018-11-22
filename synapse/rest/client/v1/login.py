@@ -18,10 +18,6 @@ import xml.etree.ElementTree as ET
 
 from six.moves import urllib
 
-from canonicaljson import json
-from saml2 import BINDING_HTTP_POST, config
-from saml2.client import Saml2Client
-
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
@@ -81,7 +77,6 @@ def login_id_thirdparty_from_phone(identifier):
 
 class LoginRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/login$")
-    SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
@@ -89,8 +84,6 @@ class LoginRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
-        self.idp_redirect_url = hs.config.saml2_idp_redirect_url
-        self.saml2_enabled = hs.config.saml2_enabled
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm
@@ -103,8 +96,6 @@ class LoginRestServlet(ClientV1RestServlet):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-        if self.saml2_enabled:
-            flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
             flows.append({"type": LoginRestServlet.SSO_TYPE})
 
@@ -134,18 +125,8 @@ class LoginRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         login_submission = parse_json_object_from_request(request)
         try:
-            if self.saml2_enabled and (login_submission["type"] ==
-                                       LoginRestServlet.SAML2_TYPE):
-                relay_state = ""
-                if "relay_state" in login_submission:
-                    relay_state = "&RelayState=" + urllib.parse.quote(
-                                  login_submission["relay_state"])
-                result = {
-                    "uri": "%s%s" % (self.idp_redirect_url, relay_state)
-                }
-                defer.returnValue((200, result))
-            elif self.jwt_enabled and (login_submission["type"] ==
-                                       LoginRestServlet.JWT_TYPE):
+            if self.jwt_enabled and (login_submission["type"] ==
+                                     LoginRestServlet.JWT_TYPE):
                 result = yield self.do_jwt_login(login_submission)
                 defer.returnValue(result)
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
@@ -345,50 +326,6 @@ class LoginRestServlet(ClientV1RestServlet):
         )
 
 
-class SAML2RestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/saml2", releases=())
-
-    def __init__(self, hs):
-        super(SAML2RestServlet, self).__init__(hs)
-        self.sp_config = hs.config.saml2_config_path
-        self.handlers = hs.get_handlers()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        saml2_auth = None
-        try:
-            conf = config.SPConfig()
-            conf.load_file(self.sp_config)
-            SP = Saml2Client(conf)
-            saml2_auth = SP.parse_authn_request_response(
-                request.args['SAMLResponse'][0], BINDING_HTTP_POST)
-        except Exception as e:        # Not authenticated
-            logger.exception(e)
-        if saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
-            username = saml2_auth.name_id.text
-            handler = self.handlers.registration_handler
-            (user_id, token) = yield handler.register_saml2(username)
-            # Forward to the RelayState callback along with ava
-            if 'RelayState' in request.args:
-                request.redirect(urllib.parse.unquote(
-                                 request.args['RelayState'][0]) +
-                                 '?status=authenticated&access_token=' +
-                                 token + '&user_id=' + user_id + '&ava=' +
-                                 urllib.quote(json.dumps(saml2_auth.ava)))
-                finish_request(request)
-                defer.returnValue(None)
-            defer.returnValue((200, {"status": "authenticated",
-                                     "user_id": user_id, "token": token,
-                                     "ava": saml2_auth.ava}))
-        elif 'RelayState' in request.args:
-            request.redirect(urllib.parse.unquote(
-                             request.args['RelayState'][0]) +
-                             '?status=not_authenticated')
-            finish_request(request)
-            defer.returnValue(None)
-        defer.returnValue((200, {"status": "not_authenticated"}))
-
-
 class CasRedirectServlet(RestServlet):
     PATTERNS = client_path_patterns("/login/(cas|sso)/redirect")
 
@@ -517,8 +454,6 @@ class CasTicketServlet(ClientV1RestServlet):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    if hs.config.saml2_enabled:
-        SAML2RestServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)
