@@ -455,10 +455,11 @@ class RoomMemberHandler(object):
             prev_events_and_hashes=prev_events_and_hashes,
             content=content,
         )
-        logcontext.run_in_background(
-            self._send_merged_user_invites,
-            requester, room_id,
-        )
+        if effective_membership_state == Membership.JOIN:
+            logcontext.run_in_background(
+                self._send_merged_user_invites,
+                requester, room_id,
+            )
         defer.returnValue(res)
 
     @defer.inlineCallbacks
@@ -479,12 +480,15 @@ class RoomMemberHandler(object):
                 if self.hs.is_mine(child) or child_id == requester.user.to_string():
                     # TODO: Handle auto-invite for local users (not a priority)
                     continue
-                self.update_membership(
-                    requester=requester,
-                    target=child,
-                    room_id=room_id,
-                    action="invite",
-                )
+                try:
+                    yield self.update_membership(
+                        requester=requester,
+                        target=child,
+                        room_id=room_id,
+                        action="invite",
+                    )
+                except Exception:
+                    logger.exception("Failed to invite %s to %s" % (child_id, room_id))
 
     @defer.inlineCallbacks
     def send_membership_event(

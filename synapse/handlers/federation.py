@@ -110,6 +110,7 @@ class FederationHandler(BaseHandler):
 
         self.hs = hs
 
+        self.clock = hs.get_clock()
         self.store = hs.get_datastore()  # type: synapse.storage.DataStore
         self.federation_client = hs.get_federation_client()
         self.federation_sender = hs.get_federation_sender()
@@ -1435,7 +1436,7 @@ class FederationHandler(BaseHandler):
             except Exception:
                 # We're going to retry, but we should log the error
                 logger.exception("Error auto-accepting invite on attempt %d" % attempt)
-                yield self.hs.get_clock().sleep(1)
+                yield self.clock.sleep(1)
         if not joined:
             logger.error("Giving up on trying to auto-accept invite: too many attempts")
 
