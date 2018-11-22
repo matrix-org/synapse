@@ -17,7 +17,9 @@ import os
 
 from mock import Mock
 
-from twisted.internet.defer import Deferred
+from netaddr import IPSet
+
+from twisted.internet.defer import Deferred, succeed
 from twisted.web.http_headers import Headers
 
 from synapse.config.repository import MediaStorageProviderConfig
@@ -40,7 +42,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         config = self.default_config()
         config.url_preview_enabled = True
         config.max_spider_size = 9999999
-        config.url_preview_ip_range_blacklist = None
+        config.url_preview_ip_range_blacklist = IPSet(("192.168.1.1", "1.0.0.0/8"))
+        config.url_preview_ip_range_whitelist = IPSet(("1.1.1.1",))
         config.url_preview_url_blacklist = []
         config.media_store_path = self.storage_path
 
@@ -244,16 +247,33 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
 
+    def make_response(self, body, headers):
+
+        # Assemble a mocked out response
+        def deliver(to):
+            to.dataReceived(body)
+            to.connectionLost(Mock())
+
+        res = Mock()
+        res.code = 200
+        res.headers = Headers(headers)
+        res.deliverBody = deliver
+
+        return res
+
     def test_ipaddr(self):
         """
         IP addresses can be previewed directly.
         """
-        # We don't want a fully mocked out client, just a mocked out Treq
+        # Mock out Treq to one we control
         treq = Mock()
         d = Deferred()
         treq.request = Mock(return_value=d)
         self.preview_url.client = self._old_client
         self.preview_url.client._treq = treq
+
+        # Hardcode the URL resolving to the IP we want
+        self.reactor.resolve = lambda x: succeed("8.8.8.8")
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://8.8.8.8", shorthand=False
@@ -270,21 +290,43 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b'</head></html>'
         )
 
-        # Assemble a mocked out response
-        def deliver(to):
-            to.dataReceived(end_content)
-            to.connectionLost(Mock())
-
-        res = Mock()
-        res.code = 200
-        res.headers = Headers({b"Content-Type": [b"text/html"]})
-        res.deliverBody = deliver
-
-        # Deliver the mocked out response
+        # Build and deliver the mocked out response.
+        res = self.make_response(end_content, {b"Content-Type": [b"text/html"]})
         d.callback(res)
 
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+        )
+
+    def test_blacklisted_ip_range(self):
+        """
+        Blacklisted IP addresses are not spidered.
+        """
+        # Mock out Treq to one we control
+        treq = Mock()
+        d = Deferred()
+        treq.request = Mock(return_value=d)
+        self.preview_url.client = self._old_client
+        self.preview_url.client._treq = treq
+
+        # Hardcode the URL resolving to the IP we want
+        self.reactor.resolve = lambda x: succeed("192.168.1.1")
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://192.168.1.1", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        # Treq is NOT called, because it will be blacklisted
+        self.assertEqual(treq.request.call_count, 0)
+        self.assertEqual(channel.code, 403)
+        self.assertEqual(
+            channel.json_body,
+            {
+                'errcode': 'M_UNKNOWN',
+                'error': 'IP address blocked by IP blacklist entry',
+            },
         )

@@ -98,13 +98,13 @@ class SimpleHttpClient(object):
             address = yield self.reactor.resolve(split_uri.host)
 
             from netaddr import IPAddress
-
             ip_address = IPAddress(address)
 
             if ip_address in self.blacklist:
                 if self.whitelist is None or ip_address not in self.whitelist:
-                    raise ConnectError(
-                        "Refusing to spider blacklisted IP address %s" % address
+                    raise SynapseError(
+                        403, "IP address blocked by IP blacklist entry",
+                        Codes.UNKNOWN
                     )
 
         # A small wrapper around self.agent.request() so we can easily attach
