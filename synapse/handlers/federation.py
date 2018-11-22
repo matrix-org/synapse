@@ -50,6 +50,7 @@ from synapse.crypto.event_signing import (
 )
 from synapse.events import FrozenEvent
 from synapse.events.validator import EventValidator
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
@@ -1413,7 +1414,8 @@ class FederationHandler(BaseHandler):
         sender = UserID.from_string(event.sender)
         target = UserID.from_string(event.state_key)
         if (sender.localpart == target.localpart):
-            logcontext.run_in_background(
+            run_as_background_process(
+                "_auto_accept_invite",
                 self._auto_accept_invite,
                 sender, target, event.room_id,
             )
