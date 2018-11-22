@@ -257,7 +257,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                 module.run_create(cur, database_engine)
                 if not is_empty:
                     module.run_upgrade(cur, database_engine, config=config)
-            elif ext == ".pyc":
+            elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
                 # installers. Silently skip it

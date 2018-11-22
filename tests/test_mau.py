@@ -171,6 +171,24 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.assertEqual(e.code, 403)
         self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
+    def test_tracked_but_not_limited(self):
+        self.hs.config.max_mau_value = 1  # should not matter
+        self.hs.config.limit_usage_by_mau = False
+        self.hs.config.mau_stats_only = True
+
+        # Simply being able to create 2 users indicates that the
+        # limit was not reached.
+        token1 = self.create_user("kermit1")
+        self.do_sync_for_user(token1)
+        token2 = self.create_user("kermit2")
+        self.do_sync_for_user(token2)
+
+        # We do want to verify that the number of tracked users
+        # matches what we want though
+        count = self.store.get_monthly_active_count()
+        self.reactor.advance(100)
+        self.assertEqual(2, self.successResultOf(count))
+
     def create_user(self, localpart):
         request_data = json.dumps(
             {

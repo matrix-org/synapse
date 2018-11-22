@@ -535,7 +535,7 @@ def run(hs):
         current_mau_count = 0
         reserved_count = 0
         store = hs.get_datastore()
-        if hs.config.limit_usage_by_mau:
+        if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
             current_mau_count = yield store.get_monthly_active_count()
             reserved_count = yield store.get_registered_reserved_users_count()
         current_mau_gauge.set(float(current_mau_count))
