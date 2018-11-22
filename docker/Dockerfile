@@ -69,7 +69,8 @@ RUN apt-get update && apt-get install -y \
     mtr-tiny \
     inetutils-ping \
     less \
-    lsof
+    lsof \
+    supervisor
 
 # for topologiser
 RUN pip install flask
@@ -77,14 +78,17 @@ RUN pip install flask
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
+COPY ./docker/proxy/proxy /proxy
+COPY ./docker/proxy/maps /maps
+COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 VOLUME ["/data"]
 
-EXPOSE 8008/tcp 8448/tcp 3000/tcp
+EXPOSE 8008/tcp 8448/tcp 3000/tcp 5683/udp
 
 ENV LD_PRELOAD=/usr/local/lib/libksm_preload.so
 
 # default is 32768 (8 4KB pages)
 ENV KSMP_MERGE_THRESHOLD=16384
 
-ENTRYPOINT ["/start.py"]
+ENTRYPOINT ["/usr/bin/supervisord"]

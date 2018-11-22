@@ -1,0 +1,518 @@
+[
+	{
+		"path": "/_matrix/client/r0/profile/{userId}/displayname",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/profile/{userId}/displayname",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/join",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/kick",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/send/{eventType}/{txnId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/admin/whois/{userId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/receipt/{receiptType}/{eventId}",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/versions",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/media/r0/config",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/media/r0/download/{serverName}/{mediaId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/invite ",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/join/{roomIdOrAlias}",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/presence/list/{userId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/presence/list/{userId}",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/pushrules/{scope}/{kind}/{ruleId}",
+		"method": "delete"
+	},
+	{
+		"path": "/_matrix/client/r0/pushrules/{scope}/{kind}/{ruleId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/pushrules/{scope}/{kind}/{ruleId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/state/{eventType}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/state/{eventType}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/account/whoami",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/devices",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/keys/claim",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/login",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/login",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/pushrules/{scope}/{kind}/{ruleId}/actions",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/register/available",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/filter",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/user_directory/search",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/account/3pid",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/account/3pid",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/publicRooms",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/publicRooms",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/register",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/ban",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/typing/{userId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/search",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/account/password",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/initialSync",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/logout/all",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/account/deactivate",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/forget",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/redact/{eventId}/{txnId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/unban",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/keys/query",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/account_data/{type}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}",
+		"method": "delete"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/rooms/{roomId}/tags/{tag}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/media/r0/upload",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/events",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/context/{eventId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/invite",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/messages",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/account/3pid/delete",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/createRoom",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/profile/{userId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/pushrules/{scope}/{kind}/{ruleId}/enabled",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/leave",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/members",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/sendToDevice/{eventType}/{txnId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/voip/turnServer",
+		"method": "get"
+	},
+	{
+		"path": "/.well-known/matrix/client",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/directory/list/appservice/{networkId}/{roomId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/keys/upload",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/pushrules/",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/initialSync",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/openid/request_token",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/rooms/{roomId}/tags",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/media/r0/download/{serverName}/{mediaId}/{fileName}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/delete_devices",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/events/{eventId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/profile/{userId}/avatar_url",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/profile/{userId}/avatar_url",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/pushers/set",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/event/{eventId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/report/{eventId}",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/media/r0/preview_url",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/directory/room/{roomAlias}",
+		"method": "delete"
+	},
+	{
+		"path": "/_matrix/client/r0/directory/room/{roomAlias}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/directory/room/{roomAlias}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/sync",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/read_markers",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/logout",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/client/r0/notifications",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/joined_members",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/filter/{filterId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/user/{userId}/rooms/{roomId}/account_data/{type}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/joined_rooms",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/keys/changes",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/presence/{userId}/status",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/presence/{userId}/status",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/client/r0/pushers",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/state",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/media/r0/thumbnail/{serverName}/{mediaId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/devices/{deviceId}",
+		"method": "delete"
+	},
+	{
+		"path": "/_matrix/client/r0/devices/{deviceId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/client/r0/devices/{deviceId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/federation/v1/backfill/{roomId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/get_missing_events/{roomId}",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/federation/v1/event_auth/{roomId}/{eventId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/query_auth/{roomId}/{eventId}",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/federation/v1/state/{roomId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/state_ids/{roomId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/event/{eventId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/invite/{roomId}/{eventId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/federation/v1/make_join/{roomId}/{userId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/send_join/{roomId}/{eventId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/federation/v1/query/{serverName}/{keyId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/query",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/federation/v1/server/{keyId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/make_leave/{roomId}/{userId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/send_leave/{roomId}/{eventId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/federation/v1/openid/userinfo",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/publicRooms",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/query/directory",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/query/profile",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/query/{queryType}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/query_auth/{roomId}/{eventId}",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/federation/v1/state/{roomId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/state_ids/{roomId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/event/{eventId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/event_auth/{roomId}/{eventId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/exchange_third_party_invite/{roomId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/federation/v1/3pid/onbind",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/federation/v1/send/{txnId}",
+		"method": "put"
+	},
+	{
+		"path": "/_matrix/federation/v1/user/devices/{userId}",
+		"method": "get"
+	},
+	{
+		"path": "/_matrix/federation/v1/user/keys/claim",
+		"method": "post"
+	},
+	{
+		"path": "/_matrix/federation/v1/user/keys/query",
+		"method": "post"
+	}
+]
