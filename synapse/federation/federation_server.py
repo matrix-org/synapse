@@ -226,11 +226,11 @@ class FederationServer(FederationBase):
                     thread_id, new_thread = pdu_to_thread[pdu.event_id]
                     logger.info("Assigning thread %d to %s", thread_id, pdu.event_id)
                     try:
-                        yield self._handle_received_pdu(
+                        ret = yield self._handle_received_pdu(
                             origin, pdu, thread_id=thread_id,
                             new_thread=new_thread
                         )
-                        pdu_results[event_id] = {}
+                        pdu_results[event_id] = ret
                     except FederationError as e:
                         logger.warn("Error handling PDU %s: %s", event_id, e)
                         pdu_results[event_id] = {"error": str(e)}
@@ -259,7 +259,7 @@ class FederationServer(FederationBase):
             "pdus": pdu_results,
         }
 
-        logger.debug("Returning: %s", str(response))
+        logger.info("Returning: %s", str(response))
 
         yield self.transaction_actions.set_response(
             origin,
@@ -627,10 +627,28 @@ class FederationServer(FederationBase):
                 affected=pdu.event_id,
             )
 
+        destinations = pdu.unsigned.get("destinations", {})
+
+        costs = yield self.store.get_destination_healths(list(destinations))
+
+        logger.info("Destinations: %s", destinations)
+        logger.info("Costs: %s", costs)
+
+        dont_relay = set()
+        for dest, their_cost in destinations.items():
+            our_cost = costs.get(dest)
+            if our_cost and their_cost and their_cost < our_cost:
+                dont_relay.add(dest)
+
+        if destinations:
+            pdu.unsigned["destinations"] = {d: c for d, c in destinations.items() if d not in dont_relay}
+
         yield self.handler.on_receive_pdu(
             origin, pdu, sent_to_us_directly=True,
             thread_id=thread_id, new_thread=new_thread,
         )
+
+        defer.returnValue({"did_not_relay": list(dont_relay)})
 
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name

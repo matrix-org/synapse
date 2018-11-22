@@ -120,10 +120,10 @@ class Authenticator(object):
         ):
             raise FederationDeniedError(origin)
 
-        if not json_request["signatures"]:
-            raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED,
-            )
+        # if not json_request["signatures"]:
+        #     raise NoAuthenticationError(
+        #         401, "Missing Authorization headers", Codes.UNAUTHORIZED,
+        #     )
 
         # yield self.keyring.verify_json_for_server(origin, json_request)
 

@@ -23,6 +23,7 @@ from twisted.internet import defer
 
 import synapse.metrics
 from synapse.api.errors import FederationDeniedError, HttpResponseException
+from synapse.events import FrozenEvent
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 from synapse.metrics import (
     LaterGauge,
@@ -692,6 +693,10 @@ class TransactionQueue(object):
         logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
 
         if code == 200:
+            logger.info(
+                "TX [%s] {%s} got response json %s",
+                destination, txn_id, response
+            )
             pdu_results = response.get("pdus", {})
             for p in pdus:
                 yield self._pdu_send_result(
@@ -705,6 +710,7 @@ class TransactionQueue(object):
 
         defer.returnValue(success)
 
+    @defer.inlineCallbacks
     def _pdu_send_result(self, destination, txn_id, pdu, response):
         """Gets called after sending the event in a transaction, with the
         result for the event from the remote server.
@@ -715,7 +721,35 @@ class TransactionQueue(object):
                 "TX [%s] {%s} Remote returned error for %s: %s",
                 destination, txn_id, pdu.event_id, response,
             )
+            pdu_logger.info(
+                "SendErrorPDU",
+                extra={
+                    "event_id": pdu.event_id, "room_id": pdu.room_id,
+                    "destination": destination,
+                    "server": self.server_name,
+                },
+            )
 
+            new_destinations = set(pdu.unsigned.get("destinations", []))
+            new_destinations.discard(destination)
+            yield self._send_pdu(pdu, list(new_destinations))
+        elif "did_not_relay" in response and response["did_not_relay"]:
+            new_destinations = set(response["did_not_relay"])
+            new_destinations.discard(destination)
+
+            pdu_logger.info(
+                "DidNotRelayPDU",
+                extra={
+                    "event_id": pdu.event_id, "room_id": pdu.room_id,
+                    "destination": destination,
+                    "new_destinations": json.dumps(list(new_destinations)),
+                    "server": self.server_name,
+                },
+            )
+
+            yield self._send_pdu(pdu, list(new_destinations))
+
+    @defer.inlineCallbacks
     def _pdu_send_txn_failed(self, destination, txn_id, pdu):
         """Gets called when sending a transaction failed (after retries)
         """
@@ -724,3 +758,16 @@ class TransactionQueue(object):
             "TX [%s] {%s} Failed to send event %s",
             destination, txn_id, pdu.event_id,
         )
+
+        pdu_logger.info(
+            "SendFailPDU",
+            extra={
+                "event_id": pdu.event_id, "room_id": pdu.room_id,
+                "destination": destination,
+                "server": self.server_name,
+            },
+        )
+
+        new_destinations = set(pdu.unsigned.get("destinations", []))
+        new_destinations.discard(destination)
+        yield self._send_pdu(pdu, list(new_destinations))
