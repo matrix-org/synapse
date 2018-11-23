@@ -78,8 +78,8 @@ RUN pip install flask
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
-COPY ./docker/proxy/proxy /proxy
-COPY ./docker/proxy/maps /maps
+COPY ./docker/proxy/proxy /proxy/proxy
+COPY ./docker/proxy/maps /proxy/maps
 COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 VOLUME ["/data"]
