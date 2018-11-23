@@ -54,7 +54,7 @@ var show_login = function() {
     $("#loading").hide();
 
     if (matrixLogin.serverAcceptsPassword) {
-        $("#password_form").show();
+        $("#password_flow").show();
     }
 
     if (matrixLogin.serverAcceptsCas) {
@@ -67,7 +67,7 @@ var show_login = function() {
 };
 
 var show_spinner = function() {
-    $("#password_form").hide();
+    $("#password_flow").hide();
     $("#cas_flow").hide();
     $("#no_login_types").hide();
     $("#loading").show();
