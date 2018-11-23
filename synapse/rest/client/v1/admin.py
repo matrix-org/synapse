@@ -32,6 +32,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.types import UserID, create_requester
+from synapse.util.stringutils import random_string
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -740,6 +741,91 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class ServerHealth(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/server_health")
+
+    def __init__(self, hs):
+        super(ServerHealth, self).__init__(hs)
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.store = hs.get_datastore()
+        self.builder_factory = hs.get_event_builder_factory()
+        self.clock = hs.get_clock()
+
+    def on_GET(self, request):
+        return self.do_update()
+
+    def on_POST(self, request):
+        return self.do_update()
+
+    @defer.inlineCallbacks
+    def do_update(self):
+        hosts = yield self.store.get_all_destination_healths()
+
+        up_servers = set(h for h, c in hosts.items() if c is not None)
+        down_servers = set(h for h, c in hosts.items() if c is None)
+
+        rooms_to_hosts = yield self.store.get_all_hosts_and_room()
+
+        requester = create_requester(UserID("server", "server")),
+
+        state = yield self.store.get_destination_states()
+
+        new_up = set()
+        new_down = set()
+
+        for host in up_servers:
+            if state.get(host, True):
+                continue
+            new_up.add(host)
+
+            yield self.store.store_destination_state(host, True)
+
+        for host in down_servers:
+            if not state.get(host, True):
+                continue
+            new_down.add(host)
+
+            yield self.store.store_destination_state(host, False)
+
+        for room_id, hosts in rooms_to_hosts.items():
+            for host in hosts:
+                if host in new_up:
+                    new_state = "connected"
+                elif host in new_down:
+                    new_state = "disconnected"
+                else:
+                    continue
+
+                logger.info("Marking %s as %r", host, new_state)
+
+                builder = self.builder_factory.new({
+                    "type": "org.matrix.server_presence",
+                    "content": {
+                        "state": new_state,
+                    },
+                    "state_key": host,
+                    "event_id": random_string(24),
+                    "origin_server_ts": self.clock.time_msec(),
+                    "sender": "@server:server",
+                    "room_id": room_id,
+                })
+
+                event, context = yield self.event_creation_handler.create_new_client_event(
+                    builder=builder,
+                )
+                event.internal_metadata.internal_event = True
+                yield self.event_creation_handler.handle_new_client_event(
+                    requester,
+                    event,
+                    context,
+                    ratelimit=False,
+                    extra_users=[],
+                    do_auth=False,
+                )
+
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
@@ -754,3 +840,4 @@ def register_servlets(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
+    ServerHealth(hs).register(http_server)

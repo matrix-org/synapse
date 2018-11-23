@@ -406,11 +406,6 @@ class RegistrationStore(RegistrationWorkerStore,
             )
             tokens_and_devices = [(r[0], r[1], r[2]) for r in txn]
 
-            for token, _, _ in tokens_and_devices:
-                self._invalidate_cache_and_stream(
-                    txn, self.get_user_by_access_token, (token,)
-                )
-
             txn.execute(
                 "DELETE FROM access_tokens WHERE %s" % where_clause,
                 values
@@ -430,10 +425,6 @@ class RegistrationStore(RegistrationWorkerStore,
                 keyvalues={
                     "token": access_token
                 },
-            )
-
-            self._invalidate_cache_and_stream(
-                txn, self.get_user_by_access_token, (access_token,)
             )
 
         return self.runInteraction("delete_access_token", f)

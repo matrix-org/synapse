@@ -88,6 +88,23 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return [to_ascii(r[0]) for r in txn]
         return self.runInteraction("get_users_in_room", f)
 
+    def get_all_hosts_and_room(self):
+        def f(txn):
+            sql = """
+                SELECT DISTINCT room_id, regexp_replace(state_key, '^[^:]*:', '') AS host
+                FROM current_state_events
+                INNER JOIN room_memberships USING (event_id, room_id)
+                WHERE
+                    type = 'm.room.member' AND membership = 'join'
+            """
+
+            txn.execute(sql)
+            results = {}
+            for r in txn:
+                results.setdefault(to_ascii(r[0]), set()).add(to_ascii(r[1]))
+            return results
+        return self.runInteraction("get_users_in_room", f)
+
     @cached(max_entries=100000)
     def get_room_summary(self, room_id):
         """ Get the details of a room roughly suitable for use by the room

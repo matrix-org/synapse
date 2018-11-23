@@ -103,6 +103,9 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
             "No create event in auth events",
         )
 
+    if event.type == "org.matrix.server_presence":
+        return
+
     creating_domain = get_domain_from_id(event.room_id)
     originating_domain = get_domain_from_id(event.sender)
     if creating_domain != originating_domain:

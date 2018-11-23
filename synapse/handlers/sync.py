@@ -35,6 +35,7 @@ from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logcontext import LoggingContext
 from synapse.util.metrics import Measure, measure_func
+from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
@@ -211,6 +212,7 @@ class SyncHandler(object):
         self.response_cache = ResponseCache(hs, "sync")
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
+        self.builder_factory = hs.get_event_builder_factory()
 
         # ExpiringCache((User, Device)) -> LruCache(state_key => event_id)
         self.lazy_loaded_members_cache = ExpiringCache(
@@ -709,7 +711,6 @@ class SyncHandler(object):
         # TODO(mjark) Check for new redactions in the state events.
 
         with Measure(self.clock, "compute_state_delta"):
-
             members_to_fetch = None
 
             lazy_load_members = sync_config.filter_collection.lazy_load_members()
@@ -857,6 +858,28 @@ class SyncHandler(object):
         state = {}
         if state_ids:
             state = yield self.store.get_events(list(state_ids.values()))
+
+        hosts_in_room = yield self.store.get_hosts_in_room(room_id)
+        destination_states = yield self.store.get_destination_states()
+
+        for host in hosts_in_room:
+            if host not in destination_states:
+                continue
+
+            if ("org.matrix.server_presence", host) in timeline_state:
+                continue
+
+            state[("org.matrix.server_presence", host)] = self.builder_factory.new({
+                "type": "org.matrix.server_presence",
+                "content": {
+                    "state": "connected" if destination_states[host] else "disconnected",
+                },
+                "state_key": host,
+                "event_id": random_string(24),
+                "origin_server_ts": self.clock.time_msec(),
+                "sender": "@server:server",
+                "room_id": room_id,
+            })
 
         defer.returnValue({
             (e.type, e.state_key): e
