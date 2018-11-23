@@ -17,9 +17,10 @@
             <img src="spinner.gif" />
         </div>
 
-        <div id="cas_flow" class="login_flow" style="display:none">
-            CAS Authentication:
-            <form onsubmit="gotoCas(); return false;">
+        <div id="sso_flow" class="login_flow" style="display:none">
+            Single-sign on:
+            <form id="sso_form" action="/_matrix/client/r0/login/sso/redirect" method="get">
+                <input id="sso_redirect_url" type="hidden" name="redirectUrl" value=""/>
                 <input type="submit" value="Log in"/>
             </form>
         </div>
