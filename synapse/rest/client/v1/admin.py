@@ -810,8 +810,10 @@ class ServerHealth(ClientV1RestServlet):
                     "room_id": room_id,
                 })
 
-                event, context = yield self.event_creation_handler.create_new_client_event(
-                    builder=builder,
+                event, context = yield (
+                    self.event_creation_handler.create_new_client_event(
+                        builder=builder,
+                    )
                 )
                 event.internal_metadata.internal_event = True
                 yield self.event_creation_handler.handle_new_client_event(

@@ -641,7 +641,9 @@ class FederationServer(FederationBase):
                 dont_relay.add(dest)
 
         if destinations:
-            pdu.unsigned["destinations"] = {d: c for d, c in destinations.items() if d not in dont_relay}
+            pdu.unsigned["destinations"] = {
+                d: c for d, c in destinations.items() if d not in dont_relay
+            }
 
         yield self.handler.on_receive_pdu(
             origin, pdu, sent_to_us_directly=True,
