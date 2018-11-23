@@ -150,7 +150,6 @@ class RegistrationTestCase(unittest.TestCase):
         self.hs.config.auto_join_rooms = [room_alias_str]
         res = yield self.handler.register(localpart='jeff')
         rooms = yield self.store.get_rooms_for_user(res[0])
-
         directory_handler = self.hs.get_handlers().directory_handler
         room_alias = RoomAlias.from_string(room_alias_str)
         room_id = yield directory_handler.get_association(room_alias)
@@ -182,5 +181,16 @@ class RegistrationTestCase(unittest.TestCase):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
         res = yield self.handler.register(localpart='jeff')
+        rooms = yield self.store.get_rooms_for_user(res[0])
+        self.assertEqual(len(rooms), 0)
+
+    @defer.inlineCallbacks
+    def test_auto_create_auto_join_where_no_consent(self):
+        self.hs.config.user_consent_at_registration = True
+        self.hs.config.block_events_without_consent_error = "Error"
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+        res = yield self.handler.register(localpart='jeff')
+        yield self.handler.post_consent_actions(res[0])
         rooms = yield self.store.get_rooms_for_user(res[0])
         self.assertEqual(len(rooms), 0)

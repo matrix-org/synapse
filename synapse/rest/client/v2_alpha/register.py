@@ -457,6 +457,7 @@ class RegisterRestServlet(RestServlet):
             yield self.store.user_set_consent_version(
                 registered_user_id, self.hs.config.user_consent_version,
             )
+            yield self.registration_handler.post_consent_actions(registered_user_id)
 
         defer.returnValue((200, return_dict))
 
