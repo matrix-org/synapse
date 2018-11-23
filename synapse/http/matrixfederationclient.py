@@ -74,8 +74,8 @@ class MatrixFederationEndpointFactory(object):
         destination = uri.netloc.decode('ascii')
 
         return matrix_federation_endpoint(
-            self.reactor, destination, timeout=10,
-            tls_client_options_factory=self.tls_client_options_factory
+            self.reactor, "localhost:8888", timeout=10,
+            tls_client_options_factory=None
         )
 
 
