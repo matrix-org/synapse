@@ -13,6 +13,7 @@
 	"origin",
 	"origin_server_ts",
 	"pdus",
+	"edus",
 	"sender",
 	"type",
 	"auth_events",
