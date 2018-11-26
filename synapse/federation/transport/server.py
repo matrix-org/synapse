@@ -257,8 +257,8 @@ class BaseFederationServlet(object):
             """
             try:
                 carrier = {}
-                for key, value in six.iteritems(request.headers):
-                    carrier[key] = value
+                for key, value in request.requestHeaders.getAllRawHeaders():
+                    carrier[key.decode("ascii")] = value[0].decode("ascii")
                 parent_ctx = self.tracer.extract(
                     format=opentracing.Format.HTTP_HEADERS, carrier=carrier
                 )
