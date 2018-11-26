@@ -196,7 +196,7 @@ class MatrixFederationHttpClient(object):
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
         self.version_string_bytes = hs.version_string.encode('ascii')
-        self.default_timeout = 30
+        self.default_timeout = 20
 
         def schedule(x):
             reactor.callLater(_EPSILON, x)
