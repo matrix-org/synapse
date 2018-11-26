@@ -140,6 +140,8 @@ class TransactionQueue(object):
 
         self._processing_pending_presence = False
 
+        self.tracer = hs.get_tracer()
+
     def notify_new_events(self, current_id):
         """This gets called when we have some new events we might want to
         send out to other servers.
@@ -526,26 +528,30 @@ class TransactionQueue(object):
 
                 # END CRITICAL SECTION
 
-                success = yield self._send_new_transaction(
-                    destination, pending_pdus, pending_edus,
-                )
-                if success:
-                    sent_transactions_counter.inc()
-                    # Remove the acknowledged device messages from the database
-                    # Only bother if we actually sent some device messages
-                    if device_message_edus:
-                        yield self.store.delete_device_msgs_for_remote(
-                            destination, device_stream_id
-                        )
-                        logger.info("Marking as sent %r %r", destination, dev_list_id)
-                        yield self.store.mark_as_sent_devices_by_remote(
-                            destination, dev_list_id
-                        )
+                with self.tracer.start_span('_send_new_transaction') as span:
+                    span.set_tag("destination", destination)
 
-                    self.last_device_stream_id_by_dest[destination] = device_stream_id
-                    self.last_device_list_stream_id_by_dest[destination] = dev_list_id
-                else:
-                    break
+                    success = yield self._send_new_transaction(
+                        destination, pending_pdus, pending_edus, span,
+                    )
+                    span.set_tag("success", success)
+                    if success:
+                        sent_transactions_counter.inc()
+                        # Remove the acknowledged device messages from the database
+                        # Only bother if we actually sent some device messages
+                        if device_message_edus:
+                            yield self.store.delete_device_msgs_for_remote(
+                                destination, device_stream_id
+                            )
+                            logger.info("Marking as sent %r %r", destination, dev_list_id)
+                            yield self.store.mark_as_sent_devices_by_remote(
+                                destination, dev_list_id
+                            )
+
+                        self.last_device_stream_id_by_dest[destination] = device_stream_id
+                        self.last_device_list_stream_id_by_dest[destination] = dev_list_id
+                    else:
+                        break
         except NotRetryingDestination as e:
             logger.debug(
                 "TX [%s] not ready for retry yet (next retry at %s) - "
@@ -604,7 +610,7 @@ class TransactionQueue(object):
 
     @measure_func("_send_new_transaction")
     @defer.inlineCallbacks
-    def _send_new_transaction(self, destination, pending_pdus, pending_edus):
+    def _send_new_transaction(self, destination, pending_pdus, pending_edus, span):
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[1])
@@ -616,6 +622,8 @@ class TransactionQueue(object):
         logger.debug("TX [%s] _attempt_new_transaction", destination)
 
         txn_id = str(self._next_txn_id)
+
+        span.set_tag("txn-id", txn_id)
 
         logger.debug(
             "TX [%s] {%s} Attempting new transaction"
@@ -667,7 +675,7 @@ class TransactionQueue(object):
 
         try:
             response = yield self.transport_layer.send_transaction(
-                transaction, json_data_cb
+                transaction, json_data_cb, span,
             )
             code = 200
         except HttpResponseException as e:
@@ -685,6 +693,8 @@ class TransactionQueue(object):
             "TX [%s] {%s} got %d response",
             destination, txn_id, code
         )
+
+        span.set_tag("http.status_code", code)
 
         yield self.transaction_actions.delivered(
             transaction, code, response

@@ -136,7 +136,7 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_transaction(self, transaction, json_data_callback=None):
+    def send_transaction(self, transaction, json_data_callback=None, span=None):
         """ Sends the given Transaction to its destination
 
         Args:
@@ -176,6 +176,7 @@ class TransportLayerClient(object):
             json_data_callback=json_data_callback,
             long_retries=False,
             backoff_on_404=True,  # If we get a 404 the other side has gone
+            span=span,
         )
 
         defer.returnValue(response)

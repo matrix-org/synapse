@@ -73,7 +73,7 @@ log_config: "/compiled/log.config"
 
 ## Ratelimiting ##
 
-rc_messages_per_second: 0.2
+rc_messages_per_second: 50
 rc_message_burst_count: 10.0
 federation_rc_window_size: 1000
 federation_rc_sleep_limit: 10

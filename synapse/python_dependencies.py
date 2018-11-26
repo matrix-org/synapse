@@ -66,6 +66,9 @@ REQUIREMENTS = {
     # we use attr.s(slots), which arrived in 16.0.0
     "attrs>=16.0.0": ["attr>=16.0.0"],
     "netaddr>=0.7.18": ["netaddr"],
+
+    "jaeger_client": ["jaeger_client"],
+    "opentracing": ["opentracing"],
 }
 
 CONDITIONAL_REQUIREMENTS = {

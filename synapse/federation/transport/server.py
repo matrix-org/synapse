@@ -17,6 +17,9 @@
 import functools
 import logging
 import re
+import opentracing
+
+import six
 
 from twisted.internet import defer
 
@@ -227,10 +230,11 @@ class BaseFederationServlet(object):
     """
     REQUIRE_AUTH = True
 
-    def __init__(self, handler, authenticator, ratelimiter, server_name):
+    def __init__(self, handler, authenticator, ratelimiter, server_name, hs):
         self.handler = handler
         self.authenticator = authenticator
         self.ratelimiter = ratelimiter
+        self.tracer = hs.get_tracer()
 
     def _wrap(self, func):
         authenticator = self.authenticator
@@ -251,32 +255,58 @@ class BaseFederationServlet(object):
                 Deferred[(int, object)|None]: (response code, response object) as returned
                     by the callback method. None if the request has already been handled.
             """
-            content = None
-            if request.method in [b"PUT", b"POST"]:
-                # TODO: Handle other method types? other content types?
-                content = parse_json_object_from_request(request)
-
             try:
-                origin = yield authenticator.authenticate_request(request, content)
-            except NoAuthenticationError:
-                origin = None
-                if self.REQUIRE_AUTH:
-                    logger.warn("authenticate_request failed: missing authentication")
-                    raise
-            except Exception as e:
-                logger.warn("authenticate_request failed: %s", e)
-                raise
+                carrier = {}
+                for key, value in six.iteritems(request.headers):
+                    carrier[key] = value
+                parent_ctx = self.tracer.extract(
+                    format=opentracing.Format.HTTP_HEADERS, carrier=carrier
+                )
+            except Exception:
+                logger.exception("trace extract failed")
+                parent_ctx = None
 
-            if origin:
-                with ratelimiter.ratelimit(origin) as d:
-                    yield d
+            tags_dict = {
+                "http.method": request.method.decode('ascii'),
+                "http.url": request.uri.decode('ascii'),
+            }
+
+            span = self.tracer.start_span(
+                operation_name="federation-server",
+                child_of=parent_ctx,
+                tags=tags_dict,
+            )
+
+            with span:
+                content = None
+                if request.method in [b"PUT", b"POST"]:
+                    # TODO: Handle other method types? other content types?
+                    content = parse_json_object_from_request(request)
+
+                try:
+                    origin = yield authenticator.authenticate_request(request, content)
+                except NoAuthenticationError:
+                    origin = None
+                    if self.REQUIRE_AUTH:
+                        logger.warn("authenticate_request failed: missing authentication")
+                        raise
+                except Exception as e:
+                    logger.warn("authenticate_request failed: %s", e)
+                    raise
+
+                if origin:
+                    span.set_tag("origin", origin)
+                    with ratelimiter.ratelimit(origin) as d:
+                        yield d
+                        response = yield func(
+                            origin, content, request.args, *args, **kwargs
+                        )
+                else:
                     response = yield func(
                         origin, content, request.args, *args, **kwargs
                     )
-            else:
-                response = yield func(
-                    origin, content, request.args, *args, **kwargs
-                )
+
+                span.set_tag("http.status_code", response[0])
 
             defer.returnValue(response)
 
@@ -1322,6 +1352,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,
+            hs=hs,
         ).register(resource)
 
     for servletclass in ROOM_LIST_CLASSES:
@@ -1330,6 +1361,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,
+            hs=hs,
         ).register(resource)
 
     for servletclass in GROUP_SERVER_SERVLET_CLASSES:
@@ -1338,6 +1370,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,
+            hs=hs,
         ).register(resource)
 
     for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
@@ -1346,6 +1379,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,
+            hs=hs,
         ).register(resource)
 
     for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
@@ -1354,4 +1388,5 @@ def register_servlets(hs, resource, authenticator, ratelimiter):
             authenticator=authenticator,
             ratelimiter=ratelimiter,
             server_name=hs.hostname,
+            hs=hs,
         ).register(resource)

@@ -19,7 +19,9 @@ import random
 import sys
 from io import BytesIO
 
-from six import PY3, string_types
+import opentracing
+
+from six import PY3, string_types, iteritems
 from six.moves import urllib
 
 import attr
@@ -203,6 +205,8 @@ class MatrixFederationHttpClient(object):
 
         self._cooperator = Cooperator(scheduler=schedule)
 
+        self.tracer = hs.get_tracer()
+
     @defer.inlineCallbacks
     def _send_request(
         self,
@@ -211,7 +215,8 @@ class MatrixFederationHttpClient(object):
         timeout=None,
         long_retries=False,
         ignore_backoff=False,
-        backoff_on_404=False
+        backoff_on_404=False,
+        span=None,
     ):
         """
         Sends a request to the given server.
@@ -321,25 +326,44 @@ class MatrixFederationHttpClient(object):
                         url_str,
                     )
 
-                    # we don't want all the fancy cookie and redirect handling that
-                    # treq.request gives: just use the raw Agent.
-                    request_deferred = self.agent.request(
-                        method_bytes,
-                        url_bytes,
-                        headers=Headers(headers_dict),
-                        bodyProducer=producer,
-                    )
-
-                    request_deferred = timeout_deferred(
-                        request_deferred,
-                        timeout=_sec_timeout,
-                        reactor=self.hs.get_reactor(),
-                    )
-
-                    with Measure(self.clock, "outbound_request"):
-                        response = yield make_deferred_yieldable(
-                            request_deferred,
+                    with self.tracer.start_span('request', child_of=span) as child_span:
+                        carrier = {}
+                        opentracing.tracer.inject(
+                            span_context=child_span.context,
+                            format=opentracing.Format.HTTP_HEADERS,
+                            carrier=carrier,
                         )
+                        for key, value in iteritems(carrier):
+                            headers_dict[key.encode("ascii")] = [value.encode("ascii")]
+
+                        # we don't want all the fancy cookie and redirect handling that
+                        # treq.request gives: just use the raw Agent.
+                        request_deferred = self.agent.request(
+                            method_bytes,
+                            url_bytes,
+                            headers=Headers(headers_dict),
+                            bodyProducer=producer,
+                        )
+
+                        request_deferred = timeout_deferred(
+                            request_deferred,
+                            timeout=_sec_timeout,
+                            reactor=self.hs.get_reactor(),
+                        )
+
+                        child_span.set_tag("http.method", request.method)
+                        child_span.set_tag("http.url", url_str)
+
+                        try:
+                            with Measure(self.clock, "outbound_request"):
+                                response = yield make_deferred_yieldable(
+                                    request_deferred,
+                                )
+                        except Exception as e:
+                            child_span.set_tag("error", str(e))
+                            raise
+
+                        child_span.set_tag("http.status_code", response.code)
 
                     break
                 except Exception as e:
@@ -455,7 +479,8 @@ class MatrixFederationHttpClient(object):
                  json_data_callback=None,
                  long_retries=False, timeout=None,
                  ignore_backoff=False,
-                 backoff_on_404=False):
+                 backoff_on_404=False,
+                 span=None):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -506,6 +531,7 @@ class MatrixFederationHttpClient(object):
             timeout=timeout,
             ignore_backoff=ignore_backoff,
             backoff_on_404=backoff_on_404,
+            span=span,
         )
 
         body = yield _handle_json_response(

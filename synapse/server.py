@@ -21,6 +21,9 @@
 # Imports required for the default HomeServer() implementation
 import abc
 import logging
+import os
+
+from jaeger_client import Config
 
 from twisted.enterprise import adbapi
 from twisted.mail.smtp import sendmail
@@ -176,6 +179,7 @@ class HomeServer(object):
         'pagination_handler',
         'room_context_handler',
         'sendmail',
+        'tracer',
     ]
 
     # This is overridden in derived application classes
@@ -471,6 +475,39 @@ class HomeServer(object):
 
     def build_room_context_handler(self):
         return RoomContextHandler(self)
+
+    def build_tracer(self):
+        # TODO: Make optional
+        jaeger_host = os.environ.get("SYNAPSE_JAEGER_HOST", None)
+        if jaeger_host:
+            config_dict = {
+                'sampler': {
+                    'type': 'const',
+                    'param': 1,
+                },
+                'logging': True,
+                'local_agent': {
+                    'reporting_host': '172.18.0.1',
+                },
+            }
+        else:
+            config_dict = {
+                'sampler': {
+                    'type': 'const',
+                    'param': 0,
+                },
+                'logging': True,
+            }
+
+        config = Config(
+            config=config_dict,
+            service_name="synapse-" + self.config.server_name,
+            validate=True,
+        )
+        # this call also sets opentracing.tracer
+        tracer = config.initialize_tracer()
+
+        return tracer
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
