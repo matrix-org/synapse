@@ -830,6 +830,30 @@ class JoinedRoomsRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {"joined_rooms": list(room_ids)}))
 
 
+class TimestampLookupRestServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/timestamp_to_event$")
+
+    def __init__(self, hs):
+        super(TimestampLookupRestServlet, self).__init__(hs)
+        self.store = hs.get_datastore()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id):
+        requester = yield self.auth.get_user_by_req(request)
+        yield self.auth.check_joined_room(room_id, requester.user.to_string())
+
+        timestamp = parse_integer(request, "ts")
+        thread_id = parse_integer(request, "thread_id", 0)
+
+        event_id = yield self.store.get_event_for_timestamp(
+            room_id, thread_id, timestamp,
+        )
+
+        defer.returnValue((200, {
+            "event_id": event_id,
+        }))
+
+
 def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """Registers a transaction-based path.
 
@@ -879,6 +903,7 @@ def register_servlets(hs, http_server):
     JoinedRoomsRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
+    TimestampLookupRestServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):
