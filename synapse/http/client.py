@@ -26,7 +26,6 @@ from prometheus_client import Counter
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, protocol, reactor, ssl
-from twisted.internet.error import ConnectError
 from twisted.web._newclient import ResponseDone
 from twisted.web.client import (
     URI,

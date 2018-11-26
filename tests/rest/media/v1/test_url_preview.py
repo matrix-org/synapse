@@ -362,7 +362,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             },
         )
 
-
     def test_blacklisted_ip_range_whitelisted_ip(self):
         """
         Blacklisted but then subsequently whitelisted IP addresses can be

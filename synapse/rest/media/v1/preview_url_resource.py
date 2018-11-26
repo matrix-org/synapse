@@ -323,7 +323,7 @@ class PreviewUrlResource(Resource):
                 length, headers, uri, code = yield self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
-            except SynapseError as e:
+            except SynapseError:
                 # Pass SynapseErrors through directly.
                 raise
             except Exception as e:
