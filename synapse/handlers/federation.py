@@ -1155,6 +1155,7 @@ class FederationHandler(BaseHandler):
         have finished processing the join.
         """
         logger.debug("Joining %s to %s", joinee, room_id)
+        logger.info("Target hosts %s", target_hosts)
 
         origin, event = yield self._make_and_verify_event(
             target_hosts,

@@ -486,6 +486,22 @@ class FederationClient(FederationBase):
 
             RuntimeError if no servers were reachable.
         """
+        healths = yield self.store.get_destination_healths(destinations)
+
+        with_healths = []
+        without_healths = []
+        for d in destinations:
+            if healths.get(d):
+                with_healths.append(d)
+            else:
+                without_healths.append(d)
+
+        with_healths.sort(key=lambda d: healths[d])
+
+        destinations = with_healths + without_healths
+
+        logger.info("Trying destinations: %r", destinations)
+
         for destination in destinations:
             if destination == self.server_name:
                 continue

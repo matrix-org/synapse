@@ -265,9 +265,8 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND
             )
 
-        users = yield self.state.get_current_user_in_room(room_id)
-        extra_servers = set(get_domain_from_id(u) for u in users)
-        servers = set(extra_servers) | set(servers)
+        hosts = yield self.state.get_current_hosts_in_room(room_id)
+        servers = set(hosts) | set(servers)
 
         # If this server is in the list of servers, return it first.
         if self.server_name in servers:
@@ -277,6 +276,8 @@ class DirectoryHandler(BaseHandler):
             )
         else:
             servers = list(servers)
+
+        logger.info("Returning servers %s", servers)
 
         defer.returnValue({
             "room_id": room_id,
@@ -292,14 +293,14 @@ class DirectoryHandler(BaseHandler):
                 400, "Room Alias is not hosted on this Home Server"
             )
 
-        result = yield self.get_association_from_room_alias(
+        result = yield self.get_association(
             room_alias
         )
 
         if result is not None:
             defer.returnValue({
-                "room_id": result.room_id,
-                "servers": result.servers,
+                "room_id": result["room_id"],
+                "servers": result["servers"],
             })
         else:
             raise SynapseError(
