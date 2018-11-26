@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -140,19 +141,23 @@ class KeyQueryServlet(RestServlet):
               // Must be signed by this server.
               "<server_name>": {
                 "<algorithm>:<key_id>": "<signature_base64>"
-      } } } } },
-      "attestations": [
-        "user_id": "<user_id>",
-        "device_id": "<device_id>",
-        "keys": {
-          "ed25519": "<key_base64>"
-        },
-        "state": "<verified or revoked>",
-        "signatures": {
-          "<algorithm>:<device_id>": "<signature_base64>"
-        }
-      ]
-    }
+            },
+            "unsigned": {
+              "device_display_name": "<device_name>"
+              "attestations": [ // attestations on this device
+                {
+                  "user_id": "<user_id>",
+                  "device_id": "<device_id>",
+                  "keys": {
+                    "<algorithm>:<key_id>": "<key_base64>"
+                  },
+                  "state": "<verified or revoked>",
+                  "signatures": {
+                    "<user_id>": { // user_id of the user making the attestation
+                      "<algorithm>:<device_id>": "<signature_base64>"
+                } } }
+              ]
+    } } } } } }
     """
 
     PATTERNS = client_v2_patterns("/keys/query$")
