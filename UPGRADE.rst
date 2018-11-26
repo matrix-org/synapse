@@ -48,6 +48,15 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v0.34.0
+====================
+
+This release removes the ``riot.im`` from the default list of trusted identity servers.
+
+If ``riot.im`` is in your homeserver's list of ``trusted_third_party_id_servers``,
+you should remove it. It was added in case a hypothetical future identity server was
+put there. If you don't remove it, users may be unable to deactivate their accounts.
+
 Upgrading to v0.33.7
 ====================
 
