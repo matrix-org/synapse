@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import gc
 import hashlib
 import hmac
 import logging
@@ -31,7 +31,7 @@ from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
-from synapse.util.logcontext import LoggingContextFilter
+from synapse.util.logcontext import LoggingContext, LoggingContextFilter
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
 from tests.utils import default_config
@@ -114,6 +114,17 @@ class TestCase(unittest.TestCase):
 
             logging.getLogger().setLevel(level)
             return orig()
+
+        @around(self)
+        def tearDown(orig):
+            ret = orig()
+
+            # force a GC to workaround problems with deferreds leaking logcontexts when
+            # they are GCed (see the logcontext docs)
+            gc.collect()
+            LoggingContext.set_current_context(LoggingContext.sentinel)
+
+            return ret
 
     def assertObjectHasAttributes(self, attrs, obj):
         """Asserts that the given object has each of the attributes given, and
