@@ -300,7 +300,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
 
-    def test_blacklisted_ip_range(self):
+    def test_blacklisted_ip_specific(self):
         """
         Blacklisted IP addresses are not spidered.
         """
@@ -329,4 +329,77 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 'errcode': 'M_UNKNOWN',
                 'error': 'IP address blocked by IP blacklist entry',
             },
+        )
+
+    def test_blacklisted_ip_range(self):
+        """
+        Blacklisted IP ranges are not spidered.
+        """
+        # Mock out Treq to one we control
+        treq = Mock()
+        d = Deferred()
+        treq.request = Mock(return_value=d)
+        self.preview_url.client = self._old_client
+        self.preview_url.client._treq = treq
+
+        # Hardcode the URL resolving to the IP we want
+        self.reactor.resolve = lambda x: succeed("1.1.1.2")
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://1.1.1.2", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        # Treq is NOT called, because it will be blacklisted
+        self.assertEqual(treq.request.call_count, 0)
+        self.assertEqual(channel.code, 403)
+        self.assertEqual(
+            channel.json_body,
+            {
+                'errcode': 'M_UNKNOWN',
+                'error': 'IP address blocked by IP blacklist entry',
+            },
+        )
+
+
+    def test_blacklisted_ip_range_whitelisted_ip(self):
+        """
+        Blacklisted but then subsequently whitelisted IP addresses can be
+        spidered.
+        """
+        # Mock out Treq to one we control
+        treq = Mock()
+        d = Deferred()
+        treq.request = Mock(return_value=d)
+        self.preview_url.client = self._old_client
+        self.preview_url.client._treq = treq
+
+        # Hardcode the URL resolving to the IP we want. This is an IP that is
+        # caught by a blacklist range, but is then subsequently whitelisted.
+        self.reactor.resolve = lambda x: succeed("1.1.1.1")
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://1.1.1.1", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        self.assertEqual(treq.request.call_count, 1)
+
+        end_content = (
+            b'<html><head>'
+            b'<meta property="og:title" content="~matrix~" />'
+            b'<meta property="og:description" content="hi" />'
+            b'</head></html>'
+        )
+
+        # Build and deliver the mocked out response.
+        res = self.make_response(end_content, {b"Content-Type": [b"text/html"]})
+        d.callback(res)
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
