@@ -13,4 +13,11 @@
  * limitations under the License.
  */
 
-CREATE INDEX event_room_thread_ts ON events (room_id, thread_id, origin_server_ts);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS thread_id BIGINT NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS events_room_idx ON events (room_id, thread_id);
+
+-- CREATE SEQUENCE thread_id_seq;
+
+
+CREATE INDEX IF NOT EXISTS event_room_thread_ts ON events (room_id, thread_id, origin_server_ts);

@@ -828,6 +828,27 @@ class ServerHealth(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
+class ForceThreadServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/force_thread")
+
+    def __init__(self, hs):
+        super(ForceThreadServlet, self).__init__(hs)
+        self.federation_handler = hs.get_handlers().federation_handler
+        self.clock = hs.get_clock()
+
+    def on_GET(self, request):
+        return self.do_force_thread()
+
+    def on_POST(self, request):
+        return self.do_force_thread()
+
+    @defer.inlineCallbacks
+    def do_force_thread(self):
+        yield self.clock.sleep(0)
+        self.federation_handler.force_thread_ts = self.clock.time_msec()
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
@@ -843,3 +864,4 @@ def register_servlets(hs, http_server):
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     ServerHealth(hs).register(http_server)
+    ForceThreadServlet(hs).register(http_server)

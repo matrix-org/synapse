@@ -213,8 +213,7 @@ class FederationServer(FederationBase):
             pdu_to_thread = {}
             first_in_thread = True
             for pdu in reversed(pdus_by_room[room_id]):
-                now = self.clock.time_msec()
-                if now - pdu.origin_server_ts > 1 * 60 * 1000:
+                if self.handler.should_start_thread(pdu):
                     pdu_to_thread[pdu.event_id] = (thread_id, first_in_thread)
                     first_in_thread = False
                 else:

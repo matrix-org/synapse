@@ -137,6 +137,10 @@ class FederationHandler(BaseHandler):
         self.room_queues = {}
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
+        # Always start a new thread for events that have an origin_server_ts
+        # from before this
+        self.force_thread_ts = 0
+
     @defer.inlineCallbacks
     def on_receive_pdu(
             self, origin, pdu, sent_to_us_directly=False, thread_id=None,
@@ -567,8 +571,7 @@ class FederationHandler(BaseHandler):
             thread_id = random.randint(1, 999999999)
             first_in_thread = True
             for pdu in reversed(missing_events):
-                now = self.clock.time_msec()
-                if now - pdu.origin_server_ts > 1 * 60 * 1000:
+                if self.should_start_thread(pdu):
                     pdu_to_thread[pdu.event_id] = (thread_id, first_in_thread)
                     first_in_thread = False
                 else:
@@ -2641,3 +2644,10 @@ class FederationHandler(BaseHandler):
             )
         else:
             return user_joined_room(self.distributor, user, room_id)
+
+    def should_start_thread(self, event):
+        now = self.clock.time_msec()
+        forced = event.origin_server_ts <= self.force_thread_ts
+        old = now - event.origin_server_ts > 1 * 60 * 1000
+
+        return forced or old
