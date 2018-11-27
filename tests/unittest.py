@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import gc
 import hashlib
 import hmac
 import logging
@@ -126,12 +126,11 @@ class TestCase(unittest.TestCase):
         @around(self)
         def tearDown(orig):
             ret = orig()
-            if LoggingContext.current_context() is not LoggingContext.sentinel:
-                self.fail(
-                    "Test exited with non-sentinel logging context %s" % (
-                        LoggingContext.current_context(),
-                    )
-                )
+            # force a GC to workaround problems with deferreds leaking logcontexts when
+            # they are GCed (see the logcontext docs)
+            gc.collect()
+            LoggingContext.set_current_context(LoggingContext.sentinel)
+
             return ret
 
     def assertObjectHasAttributes(self, attrs, obj):
