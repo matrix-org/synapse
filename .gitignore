@@ -19,6 +19,7 @@ homeserver*.log
 homeserver*.log.*
 homeserver*.pid
 homeserver*.yaml
+!debian/homeserver.yaml
 
 *.signing.key
 *.tls.crt
