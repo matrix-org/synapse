@@ -564,7 +564,7 @@ class TransactionQueue(object):
         except FederationDeniedError as e:
             logger.info(e)
         except Exception as e:
-            logger.warn(
+            logger.exception(
                 "TX [%s] Failed to send transaction: %s",
                 destination,
                 e,
@@ -619,6 +619,7 @@ class TransactionQueue(object):
 
         success = True
 
+        logger.debug("TX [%s] _attempt_new_transaction", destination)
         logger.debug("TX [%s] _attempt_new_transaction", destination)
 
         txn_id = str(self._next_txn_id)

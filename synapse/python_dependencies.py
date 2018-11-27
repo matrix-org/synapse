@@ -68,7 +68,7 @@ REQUIREMENTS = {
     "netaddr>=0.7.18": ["netaddr"],
 
     "jaeger_client": ["jaeger_client"],
-    "opentracing": ["opentracing"],
+    "opentracing<2,>=1.2.2": ["opentracing"],
 }
 
 CONDITIONAL_REQUIREMENTS = {
