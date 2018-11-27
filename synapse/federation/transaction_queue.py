@@ -625,6 +625,10 @@ class TransactionQueue(object):
         txn_id = str(self._next_txn_id)
 
         span.set_tag("txn-id", txn_id)
+        span.log_kv({
+            "pdus": len(pdus),
+            "edus": len(edus),
+        })
 
         logger.debug(
             "TX [%s] {%s} Attempting new transaction"
@@ -694,8 +698,6 @@ class TransactionQueue(object):
             "TX [%s] {%s} got %d response",
             destination, txn_id, code
         )
-
-        span.set_tag("http.status_code", code)
 
         yield self.transaction_actions.delivered(
             transaction, code, response

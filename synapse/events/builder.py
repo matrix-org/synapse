@@ -52,7 +52,7 @@ class EventBuilderFactory(object):
         i = str(self.event_id_count)
         self.event_id_count += 1
 
-        local_part = str(int(self.clock.time())) + i + random_string(5)
+        local_part = random_string(3) + str(i)
 
         e_id = EventID(local_part, self.hostname)
 

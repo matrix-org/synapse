@@ -20,6 +20,7 @@ import sys
 from io import BytesIO
 
 import opentracing
+from opentracing.ext import tags
 
 from six import PY3, string_types, iteritems
 from six.moves import urllib
@@ -351,8 +352,12 @@ class MatrixFederationHttpClient(object):
                             reactor=self.hs.get_reactor(),
                         )
 
-                        child_span.set_tag("http.method", request.method)
-                        child_span.set_tag("http.url", url_str)
+                        child_span.set_tag(tags.HTTP_METHOD, request.method)
+                        child_span.set_tag(tags.HTTP_URL, url_str)
+                        child_span.set_tag(
+                            tags.SPAN_KIND,
+                            tags.SPAN_KIND_RPC_CLIENT,
+                        )
 
                         try:
                             with Measure(self.clock, "outbound_request"):
@@ -363,7 +368,7 @@ class MatrixFederationHttpClient(object):
                             child_span.set_tag("error", str(e))
                             raise
 
-                        child_span.set_tag("http.status_code", response.code)
+                        child_span.set_tag(tags.HTTP_STATUS_CODE, response.code)
 
                     break
                 except Exception as e:

@@ -132,6 +132,8 @@ def _mangle_pdu(pdu_json):
     pdu_json["auth_events"] = list(_strip_hashes(pdu_json["auth_events"]))
     pdu_json["prev_events"] = list(_strip_hashes(pdu_json["prev_events"]))
 
+    logger.info("Mangled PDU: %s", pdu_json)
+
     return pdu_json
 
 

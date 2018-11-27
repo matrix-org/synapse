@@ -18,6 +18,7 @@ import functools
 import logging
 import re
 import opentracing
+from opentracing.ext import tags
 
 import six
 
@@ -267,8 +268,9 @@ class BaseFederationServlet(object):
                 parent_ctx = None
 
             tags_dict = {
-                "http.method": request.method.decode('ascii'),
-                "http.url": request.uri.decode('ascii'),
+                tags.HTTP_METHOD: request.method.decode('ascii'),
+                tags.HTTP_URL: request.uri.decode('ascii'),
+                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
             }
 
             span = self.tracer.start_span(
@@ -306,7 +308,7 @@ class BaseFederationServlet(object):
                         origin, content, request.args, *args, **kwargs
                     )
 
-                span.set_tag("http.status_code", response[0])
+                span.set_tag(tags.HTTP_STATUS_CODE, response[0])
 
             defer.returnValue(response)
 
