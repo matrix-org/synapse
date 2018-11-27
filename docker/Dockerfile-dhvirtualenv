@@ -5,5 +5,5 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
         build-essential debhelper devscripts equivs dh-virtualenv libpq-dev sqlite3 python3-dev libffi-dev libjpeg-dev zlib1g-dev libxslt1-dev python3-setuptools libssl-dev lsb-release
 WORKDIR /build
-ENTRYPOINT ["bash","/build/build_debian.sh"]
+ENTRYPOINT ["dpkg-buildpackage", "-us", "-uc", "-b"]
 

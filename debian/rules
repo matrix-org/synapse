@@ -38,5 +38,8 @@ build-arch:
 override_dh_gencontrol:
 	dh_gencontrol -- -v$(RELEASE_VERSION)
 
+override_dh_builddeb:
+	dh_builddeb --destdir=/debs
+
 %:
 	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
