@@ -46,7 +46,7 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
 
-    if do_sig_check:
+    if False and do_sig_check:  # Disable all sig checks for meshsim
         sender_domain = get_domain_from_id(event.sender)
         event_id_domain = get_domain_from_id(event.event_id)
 

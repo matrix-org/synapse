@@ -117,6 +117,26 @@ class Transaction(JsonEncodedObject):
                 "Require 'transaction_id' to construct a Transaction"
             )
 
-        kwargs["pdus"] = [p.get_pdu_json() for p in pdus]
+        kwargs["pdus"] = [
+            _mangle_pdu(p.get_pdu_json())
+            for p in pdus
+        ]
 
         return Transaction(**kwargs)
+
+
+def _mangle_pdu(pdu_json):
+    pdu_json.pop("hashes", None)
+    pdu_json.pop("signatures", None)
+
+    pdu_json["auth_events"] = list(_strip_hashes(pdu_json["auth_events"]))
+    pdu_json["prev_events"] = list(_strip_hashes(pdu_json["prev_events"]))
+
+    return pdu_json
+
+
+def _strip_hashes(iterable):
+    return (
+        (e, {})
+        for e, hashes in iterable
+    )
