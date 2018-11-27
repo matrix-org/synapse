@@ -326,6 +326,17 @@ def event_from_pdu_json(pdu_json, outlier=False):
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
+    dtab = pdu_json.get("unsigned", {}).pop("dtab", None)
+
+    if dtab:
+        pdu_json.setdefault("unsigned", {})["destinations"] = {
+            dest: cost
+            for cost, destinations in dtab
+            for dest in destinations
+        }
+
+    logger.info("Unmangled event to: %s", pdu_json)
+
     event = FrozenEvent(
         pdu_json
     )

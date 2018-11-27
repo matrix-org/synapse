@@ -385,7 +385,8 @@ class MatrixFederationHttpClient(object):
                                     request_deferred,
                                 )
                         except Exception as e:
-                            child_span.set_tag("error", str(e))
+                            child_span.set_tag("error", True)
+                            child_span.log_kv({"error": e})
                             raise
 
                         child_span.set_tag(tags.HTTP_STATUS_CODE, response.code)

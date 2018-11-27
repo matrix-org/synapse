@@ -17,11 +17,15 @@
 server protocol.
 """
 
+import itertools
 import logging
 
 from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
+
+
+BUCKETS = [0, 50, 100, 200, 350, 500, 750, 1000, 2000, 5000, 10000, 100000]
 
 
 class Edu(JsonEncodedObject):
@@ -122,6 +126,20 @@ def _mangle_pdu(pdu_json):
     pdu_json["auth_events"] = list(_strip_hashes(pdu_json["auth_events"]))
     pdu_json["prev_events"] = list(_strip_hashes(pdu_json["prev_events"]))
 
+    destinations = pdu_json["unsigned"].pop("destinations", None)
+    if destinations:
+        new_destinations = {}
+        for dest, cost in destinations.items():
+            for first, second in pairwise(BUCKETS):
+                if first <= cost <= second:
+                    b = first if cost - first < second - cost else second
+                    new_destinations.setdefault(b, []).append(dest)
+                    break
+            else:
+                new_destinations.setdefault(b[-1], []).append(dest)
+
+        pdu_json["unsigned"]["dtab"] = list(new_destinations.items())
+
     logger.info("Mangled PDU: %s", pdu_json)
 
     return pdu_json
@@ -132,3 +150,10 @@ def _strip_hashes(iterable):
         (e, {})
         for e, hashes in iterable
     )
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, b)

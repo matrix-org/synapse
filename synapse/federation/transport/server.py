@@ -20,8 +20,6 @@ import re
 import opentracing
 from opentracing.ext import tags
 
-import six
-
 from twisted.internet import defer
 
 import synapse
@@ -296,17 +294,22 @@ class BaseFederationServlet(object):
                     logger.warn("authenticate_request failed: %s", e)
                     raise
 
-                if origin:
-                    span.set_tag("origin", origin)
-                    with ratelimiter.ratelimit(origin) as d:
-                        yield d
+                try:
+                    if origin:
+                        span.set_tag("origin", origin)
+                        with ratelimiter.ratelimit(origin) as d:
+                            yield d
+                            response = yield func(
+                                origin, content, request.args, *args, **kwargs
+                            )
+                    else:
                         response = yield func(
                             origin, content, request.args, *args, **kwargs
                         )
-                else:
-                    response = yield func(
-                        origin, content, request.args, *args, **kwargs
-                    )
+                except Exception as e:
+                    span.set_tag("error", True)
+                    span.log_kv({"error": e})
+                    raise
 
                 span.set_tag(tags.HTTP_STATUS_CODE, response[0])
 

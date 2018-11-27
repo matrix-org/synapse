@@ -86,7 +86,7 @@ class TypingHandler(object):
         self._room_typing = {}
 
     def _handle_timeouts(self):
-        #logger.info("Checking for typing timeouts")
+        # logger.info("Checking for typing timeouts")
 
         now = self.clock.time_msec()
 
@@ -231,6 +231,7 @@ class TypingHandler(object):
             for domain in set(get_domain_from_id(u) for u in users):
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
+                    return
                     self.federation.send_edu(
                         destination=domain,
                         edu_type="m.typing",

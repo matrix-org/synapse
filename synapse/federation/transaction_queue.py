@@ -587,8 +587,10 @@ class TransactionQueue(object):
                     pdu_span_references.append(opentracing.follows_from(span.context))
 
                 # END CRITICAL SECTION
-
-                with self.tracer.start_span('_send_new_transaction', references=pdu_span_references) as span:
+                span = self.tracer.start_span(
+                    '_send_new_transaction', references=pdu_span_references,
+                )
+                with span:
                     span.set_tag("destination", destination)
 
                     success = yield self._send_new_transaction(
@@ -629,7 +631,7 @@ class TransactionQueue(object):
                 destination,
                 e,
             )
-            for p, _ in pending_pdus:
+            for p, _, _ in pending_pdus:
                 logger.info("Failed to send event %s to %s", p.event_id,
                             destination)
         finally:
@@ -672,7 +674,8 @@ class TransactionQueue(object):
 
     @measure_func("_send_new_transaction")
     @defer.inlineCallbacks
-    def _send_new_transaction(self, destination, pending_pdus, pending_edus, span, pdu_spans):
+    def _send_new_transaction(self, destination, pending_pdus, pending_edus,
+                              span, pdu_spans):
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[1])
@@ -749,6 +752,9 @@ class TransactionQueue(object):
             code = e.code
             response = e.response
 
+            span.set_tag("error", True)
+            span.log_kv({"error": e})
+
             if e.code in (401, 404, 429) or 500 <= e.code:
                 logger.info(
                     "TX [%s] {%s} got %d response",
@@ -796,6 +802,7 @@ class TransactionQueue(object):
         """
         # XXX: Hook for routing shenanigans
         if "error" in response:
+            span.set_tag("error", True)
             span.log_kv({
                 "error.kind": "pdu",
                 "response.error": response["error"],
@@ -847,6 +854,7 @@ class TransactionQueue(object):
             destination, txn_id, pdu.event_id,
         )
 
+        span.set_tag("error", True)
         span.log_kv({
             "error.kind": "transaction",
         })

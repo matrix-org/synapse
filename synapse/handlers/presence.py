@@ -347,7 +347,7 @@ class PresenceHandler(object):
         """Checks the presence of users that have timed out and updates as
         appropriate.
         """
-        #logger.info("Handling presence timeouts")
+        # logger.info("Handling presence timeouts")
         now = self.clock.time_msec()
 
         try:
@@ -626,6 +626,7 @@ class PresenceHandler(object):
         Args:
             states (list(UserPresenceState))
         """
+        return
         self.federation.send_presence(states)
 
     @defer.inlineCallbacks
@@ -816,6 +817,7 @@ class PresenceHandler(object):
         if self.is_mine(observed_user):
             yield self.invite_presence(observed_user, observer_user)
         else:
+            return
             yield self.federation.send_edu(
                 destination=observed_user.domain,
                 edu_type="m.presence_invite",
@@ -836,6 +838,7 @@ class PresenceHandler(object):
         if self.is_mine(observer_user):
             yield self.accept_presence(observed_user, observer_user)
         else:
+            return
             self.federation.send_edu(
                 destination=observer_user.domain,
                 edu_type="m.presence_accept",

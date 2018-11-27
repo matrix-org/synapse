@@ -402,6 +402,12 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                                 # No change in extremities, so no change in state
                                 continue
 
+                            logger.info(
+                                "Forward extremities for %s: %s -> %s",
+                                room_id, latest_event_ids, new_latest_event_ids,
+                            )
+                            logger.info("Events: %s", [e.event_id for e, _ in ev_ctx_rm])
+
                             # there should always be at least one forward extremity.
                             # (except during the initial persistence of the send_join
                             # results, in which case there will be no existing
