@@ -102,8 +102,16 @@ class TestCase(unittest.TestCase):
             # traceback when a unit test exits leaving things on the reactor.
             twisted.internet.base.DelayedCall.debug = True
 
-            old_level = logging.getLogger().level
+            # if we're not starting in the sentinel logcontext, then to be honest
+            # all future bets are off.
+            if LoggingContext.current_context() is not LoggingContext.sentinel:
+                self.fail(
+                    "Test starting with non-sentinel logging context %s" % (
+                        LoggingContext.current_context(),
+                    )
+                )
 
+            old_level = logging.getLogger().level
             if old_level != level:
 
                 @around(self)
@@ -118,7 +126,6 @@ class TestCase(unittest.TestCase):
         @around(self)
         def tearDown(orig):
             ret = orig()
-
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
             gc.collect()
