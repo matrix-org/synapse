@@ -1,1 +1,0 @@
-Fix `synapse_replication_tcp_protocol_*_commands` metric label to be full command name, rather than just the first character
