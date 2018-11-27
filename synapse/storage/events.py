@@ -590,6 +590,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                 prev_event_id IN (%s)
                 AND NOT events.outlier
                 AND rejections.event_id IS NULL
+                AND NOT events.internal_event
             """ % (
                 ",".join("?" for _ in batch),
             )
@@ -1290,6 +1291,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                         and isinstance(event.content["url"], text_type)
                     ),
                     "thread_id": ctx.thread_id,
+                    "internal_event": event.internal_metadata.is_internal_event(),
                 }
                 for event, ctx in events_and_contexts
             ],

@@ -48,6 +48,7 @@ from synapse.crypto.event_signing import (
     add_hashes_and_signatures,
     compute_event_signature,
 )
+from synapse.events import FrozenEvent
 from synapse.events.validator import EventValidator
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
@@ -111,6 +112,7 @@ class FederationHandler(BaseHandler):
 
         self.store = hs.get_datastore()  # type: synapse.storage.DataStore
         self.federation_client = hs.get_federation_client()
+        self.federation_sender = hs.get_federation_sender()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
@@ -435,6 +437,10 @@ class FederationHandler(BaseHandler):
 
         logger.info("Thread ID %r", thread_id)
 
+        # Remove destinations field before persisting
+        event_copy = FrozenEvent.from_event(pdu)
+        pdu.unsigned.pop("destinations", None)
+
         yield self._process_received_pdu(
             origin,
             pdu,
@@ -442,6 +448,9 @@ class FederationHandler(BaseHandler):
             auth_chain=auth_chain,
             thread_id=thread_id,
         )
+
+        if sent_to_us_directly:
+            yield self.federation_sender.received_new_event(origin, event_copy)
 
         if new_thread:
             builder = self.event_builder_factory.new({

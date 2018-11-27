@@ -177,7 +177,7 @@ class TransactionQueue(object):
 
                 @defer.inlineCallbacks
                 def handle_event(event):
-                    should_relay = yield self._should_relay(event)
+                    should_relay = yield self._should_relay(event, False)
                     logger.info("Should relay event %s: %s", event.event_id, should_relay)
                     if not should_relay:
                         return
@@ -248,6 +248,20 @@ class TransactionQueue(object):
 
         finally:
             self._is_processing = False
+
+    @defer.inlineCallbacks
+    def received_new_event(self, origin, event):
+        should_relay = yield self._should_relay(event, True)
+        logger.info("Should relay event %s: %s", event.event_id, should_relay)
+        if not should_relay:
+            return
+
+        destinations = event.unsigned.get("destinations")
+        destinations = set(destinations)
+
+        logger.debug("Sending %s to %r", event, destinations)
+
+        yield self._send_pdu(event, destinations)
 
     @defer.inlineCallbacks
     def _send_pdu(self, pdu, destinations, span=None):
@@ -352,12 +366,18 @@ class TransactionQueue(object):
 
         return joined_hosts
 
-    def _should_relay(self, event):
+    def _should_relay(self, event, from_federation):
         """Whether we should consider relaying this event.
         """
 
         # XXX: Hook for routing shenanigans
 
+<<<<<<< HEAD
+=======
+        if from_federation and event.unsigned.get("destinations"):
+            return True
+
+>>>>>>> efdec3252... Only relay 'live' events
         send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
         is_mine = self.is_mine_id(event.event_id)
         if not is_mine and send_on_behalf_of is None:

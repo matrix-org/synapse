@@ -79,16 +79,16 @@ class FederationBase(object):
                     allow_none=True,
                 )
 
-            if not res and pdu.origin != origin:
-                try:
-                    res = yield self.get_pdu(
-                        destinations=[pdu.origin],
-                        event_id=pdu.event_id,
-                        outlier=outlier,
-                        timeout=10000,
-                    )
-                except SynapseError:
-                    pass
+            # if not res and pdu.origin != origin:
+            #     try:
+            #         res = yield self.get_pdu(
+            #             destinations=[pdu.origin],
+            #             event_id=pdu.event_id,
+            #             outlier=outlier,
+            #             timeout=10000,
+            #         )
+            #     except SynapseError:
+            #         pass
 
             if not res:
                 logger.warn(
