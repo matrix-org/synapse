@@ -43,7 +43,7 @@ class UserDirectoryTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_handle_local_profile_change_with_support_user(self):
         support_user_id = "@support:test"
-        self.store.register(
+        yield self.store.register(
             user_id=support_user_id,
             token="123",
             password_hash=None,
