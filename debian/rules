@@ -18,7 +18,7 @@ export CFLAGS=-march=x86-64
 SNAKE=/usr/bin/python3
 DEB_BUILD_OPTIONS=noddebs
 EXTRA_REQUIREMENTS=--preinstall "setuptools>=17.1" --preinstall "pip>=7" --preinstall "wheel" --preinstall "no-manylinux1" --preinstall "lxml"
-DH_VENV_ARGS=--with python-virtualenv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) --extra-pip-arg="--no-cache-dir" --extra-pip-arg="--no-binary=lxml"
+DH_VENV_ARGS=--with python-virtualenv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) --extra-pip-arg="--no-cache-dir" --extra-pip-arg="--compile" --extra-pip-arg="--no-binary=lxml"
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell $(SNAKE) setup.py --version)
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
@@ -39,7 +39,7 @@ override_dh_gencontrol:
 	dh_gencontrol -- -v$(RELEASE_VERSION)
 
 override_dh_builddeb:
-	dh_builddeb --destdir=/debs
+	dh_builddeb -- -z9
 
 %:
 	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)

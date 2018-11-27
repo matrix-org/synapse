@@ -4,6 +4,6 @@ RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
         build-essential debhelper devscripts equivs dh-virtualenv libpq-dev sqlite3 python3-dev libffi-dev libjpeg-dev zlib1g-dev libxslt1-dev python3-setuptools libssl-dev lsb-release
-WORKDIR /build
-ENTRYPOINT ["dpkg-buildpackage", "-us", "-uc", "-b"]
+WORKDIR /synapse/build
+ENTRYPOINT ["bash","/synapse/build/debian/build_debian.sh"]
 

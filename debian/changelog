@@ -1,5 +1,5 @@
-matrix-synapse (0.33.9) bionic; urgency=low
+matrix-synapse (0.33.9) stretch; urgency=medium
 
-  * matrix-synapse: Initial debian packaging
+  * New upstream version 0.33.9
 
- -- Synapse Developers <synapse@matrix.org> Tue, 27 Nov 2018 12:34:56 +0000
+ -- Amber <amber@matrix.org>  Tue, 27 Nov 2018 14:33:26 +0000
