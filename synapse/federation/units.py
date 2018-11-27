@@ -77,14 +77,13 @@ class Transaction(JsonEncodedObject):
 
     internal_keys = [
         "transaction_id",
-        "destination",
-    ]
-
-    required_keys = [
-        "transaction_id",
         "origin",
         "destination",
         "origin_server_ts",
+        "previous_ids",
+    ]
+
+    required_keys = [
         "pdus",
     ]
 
@@ -108,15 +107,6 @@ class Transaction(JsonEncodedObject):
         """ Used to create a new transaction. Will auto fill out
         transaction_id and origin_server_ts keys.
         """
-        if "origin_server_ts" not in kwargs:
-            raise KeyError(
-                "Require 'origin_server_ts' to construct a Transaction"
-            )
-        if "transaction_id" not in kwargs:
-            raise KeyError(
-                "Require 'transaction_id' to construct a Transaction"
-            )
-
         kwargs["pdus"] = [
             _mangle_pdu(p.get_pdu_json())
             for p in pdus
