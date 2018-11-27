@@ -45,27 +45,29 @@ class SearchStore(BackgroundUpdateStore):
 
     def __init__(self, db_conn, hs):
         super(SearchStore, self).__init__(db_conn, hs)
-        self.register_background_update_handler(
-            self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
-        )
-        self.register_background_update_handler(
-            self.EVENT_SEARCH_ORDER_UPDATE_NAME,
-            self._background_reindex_search_order
-        )
 
-        # we used to have a background update to turn the GIN index into a
-        # GIST one; we no longer do that (obviously) because we actually want
-        # a GIN index. However, it's possible that some people might still have
-        # the background update queued, so we register a handler to clear the
-        # background update.
-        self.register_noop_background_update(
-            self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME,
-        )
+        if hs.config.enable_search:
+            self.register_background_update_handler(
+                self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
+            )
+            self.register_background_update_handler(
+                self.EVENT_SEARCH_ORDER_UPDATE_NAME,
+                self._background_reindex_search_order
+            )
 
-        self.register_background_update_handler(
-            self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME,
-            self._background_reindex_gin_search
-        )
+            # we used to have a background update to turn the GIN index into a
+            # GIST one; we no longer do that (obviously) because we actually want
+            # a GIN index. However, it's possible that some people might still have
+            # the background update queued, so we register a handler to clear the
+            # background update.
+            self.register_noop_background_update(
+                self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME,
+            )
+
+            self.register_background_update_handler(
+                self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME,
+                self._background_reindex_gin_search
+            )
 
     @defer.inlineCallbacks
     def _background_reindex_search(self, progress, batch_size):
@@ -316,6 +318,8 @@ class SearchStore(BackgroundUpdateStore):
             entries (iterable[SearchEntry]):
                 entries to be added to the table
         """
+        if not self.hs.config.enable_search:
+            return
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
                 "INSERT INTO event_search"
