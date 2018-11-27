@@ -266,4 +266,3 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.pump()
 
         self.store.upsert_monthly_active_user.assert_not_called()
-
