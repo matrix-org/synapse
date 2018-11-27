@@ -18,6 +18,7 @@ import logging
 import random
 import sys
 from io import BytesIO
+import os
 
 from six import PY3, string_types
 from six.moves import urllib
@@ -55,6 +56,7 @@ outgoing_requests_counter = Counter("synapse_http_matrixfederationclient_request
 incoming_responses_counter = Counter("synapse_http_matrixfederationclient_responses",
                                      "", ["method", "code"])
 
+USE_PROXY = "SYNAPSE_USE_PROXY" in os.environ
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
@@ -63,6 +65,18 @@ if PY3:
     MAXINT = sys.maxsize
 else:
     MAXINT = sys.maxint
+
+
+class ProxyMatrixFederationEndpointFactory(object):
+    def __init__(self, hs):
+        self.reactor = hs.get_reactor()
+        self.tls_client_options_factory = hs.tls_client_options_factory
+
+    def endpointForURI(self, uri):
+        return matrix_federation_endpoint(
+            self.reactor, "localhost:8888", timeout=10,
+            tls_client_options_factory=None
+        )
 
 
 class MatrixFederationEndpointFactory(object):
@@ -74,8 +88,8 @@ class MatrixFederationEndpointFactory(object):
         destination = uri.netloc.decode('ascii')
 
         return matrix_federation_endpoint(
-            self.reactor, "localhost:8888", timeout=10,
-            tls_client_options_factory=None
+            self.reactor, destination, timeout=10,
+            tls_client_options_factory=self.tls_client_options_factory
         )
 
 
@@ -190,9 +204,15 @@ class MatrixFederationHttpClient(object):
         pool.retryAutomatically = False
         pool.maxPersistentPerHost = 5
         pool.cachedConnectionTimeout = 2 * 60
-        self.agent = Agent.usingEndpointFactory(
-            reactor, MatrixFederationEndpointFactory(hs), pool=pool
-        )
+
+        if USE_PROXY:
+            self.agent = Agent.usingEndpointFactory(
+                reactor, ProxyMatrixFederationEndpointFactory(hs), pool=pool
+            )
+        else:
+            self.agent = Agent.usingEndpointFactory(
+                reactor, MatrixFederationEndpointFactory(hs), pool=pool
+            )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
         self.version_string_bytes = hs.version_string.encode('ascii')
