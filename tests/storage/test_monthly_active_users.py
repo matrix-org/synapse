@@ -224,7 +224,6 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), len(threepids))
 
-
     def test_support_user_not_add_to_mau_limits(self):
         count = self.store.get_monthly_active_count()
         self.pump()
