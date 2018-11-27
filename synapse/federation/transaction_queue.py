@@ -250,7 +250,7 @@ class TransactionQueue(object):
             self._is_processing = False
 
     @defer.inlineCallbacks
-    def received_new_event(self, origin, event):
+    def received_new_event(self, origin, event, span):
         should_relay = yield self._should_relay(event, True)
         logger.info("Should relay event %s: %s", event.event_id, should_relay)
         if not should_relay:
@@ -261,7 +261,7 @@ class TransactionQueue(object):
 
         logger.debug("Sending %s to %r", event, destinations)
 
-        yield self._send_pdu(event, destinations)
+        yield self._send_pdu(event, destinations, span)
 
     @defer.inlineCallbacks
     def _send_pdu(self, pdu, destinations, span=None):
@@ -539,6 +539,12 @@ class TransactionQueue(object):
 
             pending_pdus = []
             while True:
+                txn_id = str(self._next_txn_id)
+                self._next_txn_id += 1
+
+                for s in pdu_spans.values():
+                    s.set_tag("txn-id", txn_id)
+
                 device_message_edus, device_stream_id, dev_list_id = (
                     yield self._get_new_device_messages(destination)
                 )
@@ -602,9 +608,10 @@ class TransactionQueue(object):
                     return
 
                 pdu_span_references = []
-                for pdu, _, span in pending_pdus:
-                    pdu_spans[pdu.event_id] = span
-                    pdu_span_references.append(opentracing.follows_from(span.context))
+                for pdu, _, p_span in pending_pdus:
+                    pdu_spans[pdu.event_id] = p_span
+                    p_span.set_tag("txn-id", txn_id)
+                    pdu_span_references.append(opentracing.follows_from(p_span.context))
 
                 # END CRITICAL SECTION
                 span = self.tracer.start_span(
@@ -612,11 +619,39 @@ class TransactionQueue(object):
                 )
                 with span:
                     span.set_tag("destination", destination)
+                    span.set_tag("txn-id", txn_id)
 
-                    success = yield self._send_new_transaction(
-                        destination, pending_pdus, pending_edus, span, pdu_spans,
-                    )
+                    try:
+                        success = yield self._send_new_transaction(
+                            destination, pending_pdus, pending_edus, span,
+                            pdu_spans, txn_id,
+                        )
+                    except Exception as e:
+                        success = False
+                        span.set_tag("error", True)
+                        span.log_kv({"error": e})
+
+                        for s in pdu_spans.values():
+                            s.set_tag("error", True)
+                            s.log_kv({"transaction_error": e})
+
+                        raise
+                    finally:
+                        if not success:
+                            for p, _, _ in pending_pdus:
+                                yield self._pdu_send_txn_failed(
+                                    destination, txn_id, p,
+                                    span=pdu_spans[p.event_id],
+                                )
+
+                        # We want to be *very* sure we del5ete this after we stop
+                        # processing
+                        self.pending_transactions.pop(destination, None)
+                        for s in pdu_spans.values():
+                            s.finish()
+
                     span.set_tag("success", success)
+
                     if success:
                         sent_transactions_counter.inc()
                         # Remove the acknowledged device messages from the database
@@ -625,7 +660,9 @@ class TransactionQueue(object):
                             yield self.store.delete_device_msgs_for_remote(
                                 destination, device_stream_id
                             )
-                            logger.info("Marking as sent %r %r", destination, dev_list_id)
+                            logger.info(
+                                "Marking as sent %r %r", destination, dev_list_id,
+                            )
                             yield self.store.mark_as_sent_devices_by_remote(
                                 destination, dev_list_id
                             )
@@ -654,11 +691,6 @@ class TransactionQueue(object):
             for p, _, _ in pending_pdus:
                 logger.info("Failed to send event %s to %s", p.event_id,
                             destination)
-        finally:
-            # We want to be *very* sure we delete this after we stop processing
-            self.pending_transactions.pop(destination, None)
-            for span in pdu_spans.values():
-                span.finish()
 
     @defer.inlineCallbacks
     def _get_new_device_messages(self, destination):
@@ -695,7 +727,7 @@ class TransactionQueue(object):
     @measure_func("_send_new_transaction")
     @defer.inlineCallbacks
     def _send_new_transaction(self, destination, pending_pdus, pending_edus,
-                              span, pdu_spans):
+                              span, pdu_spans, txn_id):
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[1])
@@ -707,9 +739,6 @@ class TransactionQueue(object):
         logger.debug("TX [%s] _attempt_new_transaction", destination)
         logger.debug("TX [%s] _attempt_new_transaction", destination)
 
-        txn_id = str(self._next_txn_id)
-
-        span.set_tag("txn-id", txn_id)
         span.log_kv({
             "pdus": len(pdus),
             "edus": len(edus),
@@ -733,8 +762,6 @@ class TransactionQueue(object):
             pdus=pdus,
             edus=edus,
         )
-
-        self._next_txn_id += 1
 
         yield self.transaction_actions.prepare_to_send(transaction)
 
@@ -806,11 +833,6 @@ class TransactionQueue(object):
                     span=pdu_spans[p.event_id],
                 )
         else:
-            for p in pdus:
-                yield self._pdu_send_txn_failed(
-                    destination, txn_id, p,
-                    span=pdu_spans[p.event_id],
-                )
             success = False
 
         defer.returnValue(success)

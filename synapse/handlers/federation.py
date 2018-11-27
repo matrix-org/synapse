@@ -146,7 +146,7 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def on_receive_pdu(
             self, origin, pdu, sent_to_us_directly=False, thread_id=None,
-            new_thread=False,
+            new_thread=False, span=None,
     ):
         """ Process a PDU received via a federation /send/ transaction, or
         via backfill of missing prev_events
@@ -450,7 +450,7 @@ class FederationHandler(BaseHandler):
         )
 
         if sent_to_us_directly:
-            yield self.federation_sender.received_new_event(origin, event_copy)
+            yield self.federation_sender.received_new_event(origin, event_copy, span)
 
         if new_thread:
             builder = self.event_builder_factory.new({

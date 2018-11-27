@@ -84,6 +84,8 @@ class FederationServer(FederationBase):
         # come in waves.
         self._state_resp_cache = ResponseCache(hs, "state_resp", timeout_ms=30000)
 
+        self.tracer = hs.get_tracer()
+
     @defer.inlineCallbacks
     @log_function
     def on_backfill_request(self, origin, room_id, versions, limit):
@@ -101,7 +103,7 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
-    def on_incoming_transaction(self, origin, transaction_data):
+    def on_incoming_transaction(self, origin, transaction_data, span):
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
         request_time = self._clock.time_msec()
@@ -119,13 +121,13 @@ class FederationServer(FederationBase):
                 (origin, transaction.transaction_id),
         )):
             result = yield self._handle_incoming_transaction(
-                origin, transaction, request_time,
+                origin, transaction, request_time, span,
             )
 
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _handle_incoming_transaction(self, origin, transaction, request_time):
+    def _handle_incoming_transaction(self, origin, transaction, request_time, span):
         """ Process an incoming transaction and return the HTTP response
 
         Args:
@@ -224,22 +226,33 @@ class FederationServer(FederationBase):
                 with nested_logging_context(event_id):
                     thread_id, new_thread = pdu_to_thread[pdu.event_id]
                     logger.info("Assigning thread %d to %s", thread_id, pdu.event_id)
-                    try:
-                        ret = yield self._handle_received_pdu(
-                            origin, pdu, thread_id=thread_id,
-                            new_thread=new_thread
-                        )
-                        pdu_results[event_id] = ret
-                    except FederationError as e:
-                        logger.warn("Error handling PDU %s: %s", event_id, e)
-                        pdu_results[event_id] = {"error": str(e)}
-                    except Exception as e:
-                        f = failure.Failure()
-                        pdu_results[event_id] = {"error": str(e)}
-                        logger.error(
-                            "Failed to handle PDU %s: %s",
-                            event_id, f.getTraceback().rstrip(),
-                        )
+                    child_span = self.tracer.start_span('handle_pdu', child_of=span)
+                    with child_span:
+                        child_span.set_tag("event_id", event_id)
+                        try:
+                            ret = yield self._handle_received_pdu(
+                                origin, pdu, thread_id=thread_id,
+                                new_thread=new_thread,
+                                span=child_span,
+                            )
+                            if ret:
+                                pdu_results[event_id] = ret
+                        except FederationError as e:
+                            logger.warn("Error handling PDU %s: %s", event_id, e)
+                            pdu_results[event_id] = {"error": str(e)}
+                            child_span.set_tag("error", True)
+                            child_span.log_kv({"error", e})
+                        except Exception as e:
+                            f = failure.Failure()
+                            pdu_results[event_id] = {"error": str(e)}
+                            logger.error(
+                                "Failed to handle PDU %s: %s",
+                                event_id, f.getTraceback().rstrip(),
+                            )
+                            child_span.set_tag("error", True)
+                            child_span.log_kv({"error", e})
+
+                        child_span.log_kv({"pdu_result": pdu_results.get(event_id)})
 
         yield concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(),
@@ -594,7 +607,7 @@ class FederationServer(FederationBase):
         )
 
     @defer.inlineCallbacks
-    def _handle_received_pdu(self, origin, pdu, thread_id, new_thread):
+    def _handle_received_pdu(self, origin, pdu, thread_id, new_thread, span):
         """ Process a PDU received in a federation /send/ transaction.
 
         If the event is invalid, then this method throws a FederationError.
@@ -656,6 +669,7 @@ class FederationServer(FederationBase):
         yield self.handler.on_receive_pdu(
             origin, pdu, sent_to_us_directly=True,
             thread_id=thread_id, new_thread=new_thread,
+            span=span,
         )
 
         defer.returnValue({"did_not_relay": list(dont_relay)})

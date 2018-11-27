@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import functools
+import inspect
 import logging
 import re
 import opentracing
@@ -239,6 +240,12 @@ class BaseFederationServlet(object):
         authenticator = self.authenticator
         ratelimiter = self.ratelimiter
 
+        arg_spec = inspect.signature(func)
+        all_args = arg_spec.parameters
+
+        include_span = "request_span" in all_args
+        logger.info("include_span: %s for %s", include_span, self)
+
         @defer.inlineCallbacks
         @functools.wraps(func)
         def new_func(request, *args, **kwargs):
@@ -294,6 +301,9 @@ class BaseFederationServlet(object):
                     logger.warn("authenticate_request failed: %s", e)
                     raise
 
+                if include_span:
+                    kwargs["request_span"] = span
+
                 try:
                     if origin:
                         span.set_tag("origin", origin)
@@ -342,7 +352,7 @@ class FederationSendServlet(BaseFederationServlet):
 
     # This is when someone is trying to send us a bunch of data.
     @defer.inlineCallbacks
-    def on_PUT(self, origin, content, query, transaction_id):
+    def on_PUT(self, origin, content, query, transaction_id, request_span):
         """ Called on PUT /send/<transaction_id>/
 
         Args:
@@ -388,7 +398,7 @@ class FederationSendServlet(BaseFederationServlet):
 
         try:
             code, response = yield self.handler.on_incoming_transaction(
-                origin, transaction_data,
+                origin, transaction_data, request_span,
             )
         except Exception:
             logger.exception("on_incoming_transaction failed")
