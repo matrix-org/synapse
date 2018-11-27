@@ -70,7 +70,8 @@ RUN apt-get update && apt-get install -y \
     inetutils-ping \
     less \
     lsof \
-    supervisor
+    supervisor \
+    netcat
 
 # for topologiser
 RUN pip install flask
