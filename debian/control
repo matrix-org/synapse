@@ -8,8 +8,8 @@ Homepage: https://github.com/matrix-org/synapse
 
 Package: matrix-synapse
 Architecture: any
-Pre-Depends: dpkg (>= 1.16.1), python3, ${misc:Pre-Depends}
-Depends: ${python:Depends}, ${misc:Depends}, adduser, sqlite3, libpq5, libffi6, libjpeg-turbo8, libxslt1.1, openssl
+Pre-Depends: dpkg (>= 1.16.1)
+Depends: python3, python3-distutils, adduser, sqlite3, libpq5, libffi6, libjpeg-turbo8, libxslt1.1, openssl
 Description: A Python package and its dependencies packaged up as DEB in an isolated virtualenv.
     .
     This is a distribution of "matrix-synapse" as a self-contained

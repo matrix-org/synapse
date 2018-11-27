@@ -14,6 +14,7 @@
 #DH_VERBOSE=1
 
 export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
+export CFLAGS=-march=x86-64
 SNAKE=/usr/bin/python3
 DEB_BUILD_OPTIONS=noddebs
 EXTRA_REQUIREMENTS=--preinstall "setuptools>=17.1" --preinstall "pip>=7" --preinstall "wheel" --preinstall "no-manylinux1" --preinstall "lxml"
