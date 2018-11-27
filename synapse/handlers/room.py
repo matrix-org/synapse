@@ -79,6 +79,8 @@ class RoomCreationHandler(BaseHandler):
         # linearizer to stop two upgrades happening at once
         self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
 
+        self._next_room_id = 0
+
     @defer.inlineCallbacks
     def upgrade_room(self, requester, old_room_id, new_version):
         """Replace a room with a new room with a different version
@@ -741,7 +743,9 @@ class RoomCreationHandler(BaseHandler):
         attempts = 0
         while attempts < 5:
             try:
-                random_string = stringutils.random_string(18)
+                i = self._next_room_id
+                self._next_room_id += 1
+                random_string = stringutils.random_string(3) + str(i)
                 gen_room_id = RoomID(
                     random_string,
                     self.hs.hostname,
