@@ -70,7 +70,7 @@ else:
     # Generate missing keys and start synapse
     subprocess.check_output(args + ["--generate-keys"])
 
-    # we register our test users in start_hs.sh now to avoid having to wait for HS launch
+    # we register our test users in add_accounts.sh now to avoid having to wait for HS launch
     #os.system("(sleep 10; /usr/local/bin/register_new_matrix_user -u matthew -p secret -c /compiled/homeserver.yaml -a) &");
 
     os.execv("/usr/local/bin/python", args)
