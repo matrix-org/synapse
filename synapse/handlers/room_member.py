@@ -464,31 +464,34 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _send_merged_user_invites(self, requester, room_id):
-        profile_alias = "#_profile_" + requester.user.localpart + ":" + self.hs.hostname
-        profile_alias = RoomAlias.from_string(profile_alias)
-        profile_room_id, remote_room_hosts = yield self.lookup_room_alias(profile_alias)
-        if profile_room_id:
-            linked_accounts = yield self.state_handler.get_current_state(
-                room_id=profile_room_id.to_string(),
-                event_type="m.linked_accounts",
-                state_key="",
-            )
-            if not linked_accounts or not linked_accounts.content['all_children']:
-                return
-            for child_id in linked_accounts.content['all_children']:
-                child = UserID.from_string(child_id)
-                if self.hs.is_mine(child) or child_id == requester.user.to_string():
-                    # TODO: Handle auto-invite for local users (not a priority)
-                    continue
-                try:
-                    yield self.update_membership(
-                        requester=requester,
-                        target=child,
-                        room_id=room_id,
-                        action="invite",
-                    )
-                except Exception:
-                    logger.exception("Failed to invite %s to %s" % (child_id, room_id))
+        try:
+            profile_alias = "#_profile_" + requester.user.localpart + ":" + self.hs.hostname
+            profile_alias = RoomAlias.from_string(profile_alias)
+            profile_room_id, remote_room_hosts = yield self.lookup_room_alias(profile_alias)
+            if profile_room_id:
+                linked_accounts = yield self.state_handler.get_current_state(
+                    room_id=profile_room_id.to_string(),
+                    event_type="m.linked_accounts",
+                    state_key="",
+                )
+                if not linked_accounts or not linked_accounts.content['all_children']:
+                    return
+                for child_id in linked_accounts.content['all_children']:
+                    child = UserID.from_string(child_id)
+                    if self.hs.is_mine(child) or child_id == requester.user.to_string():
+                        # TODO: Handle auto-invite for local users (not a priority)
+                        continue
+                    try:
+                        yield self.update_membership(
+                            requester=requester,
+                            target=child,
+                            room_id=room_id,
+                            action="invite",
+                        )
+                    except Exception:
+                        logger.exception("Failed to invite %s to %s" % (child_id, room_id))
+        except Exception:
+            logger.exception("Failed to send invites to children of %s in %s" % (requester.user.to_string(), room_id))
 
     @defer.inlineCallbacks
     def send_membership_event(
