@@ -1442,7 +1442,6 @@ class FederationHandler(BaseHandler):
         if not joined:
             logger.error("Giving up on trying to auto-accept invite: too many attempts")
 
-
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
         origin, event = yield self._make_and_verify_event(

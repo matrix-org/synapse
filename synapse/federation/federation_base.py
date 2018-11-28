@@ -26,7 +26,7 @@ from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
-from synapse.types import get_domain_from_id
+from synapse.types import get_domain_from_id, EventID
 from synapse.util import logcontext, unwrapFirstError
 
 logger = logging.getLogger(__name__)
@@ -325,6 +325,14 @@ def event_from_pdu_json(pdu_json, outlier=False):
         raise SynapseError(400, "Depth too small", Codes.BAD_JSON)
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
+
+    event_id = pdu_json["event_id"]
+    if event_id[0] != "$":
+        pdu_json["event_id"] = EventID(
+            event_id,
+            get_domain_from_id(pdu_json["sender"]),
+        ).to_string()
+        event_id = pdu_json["event_id"]
 
     dtab = pdu_json.get("unsigned", {}).pop("dtab", None)
 
