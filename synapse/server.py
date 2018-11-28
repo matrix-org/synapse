@@ -487,7 +487,7 @@ class HomeServer(object):
                 },
                 'logging': True,
                 'local_agent': {
-                    'reporting_host': '172.18.0.1',
+                    'reporting_host': jaeger_host,
                 },
             }
         else:
