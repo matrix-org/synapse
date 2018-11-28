@@ -1,0 +1,2 @@
+Fix an issue where error {"errcode":"M_UNKNOWN","error":"No known servers"} 
+when joining by invite to empty room
