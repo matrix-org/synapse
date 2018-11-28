@@ -278,6 +278,7 @@ class DeviceHandler(BaseHandler):
             "device_list_key", position, rooms=room_ids,
         )
 
+        return
         if hosts:
             logger.info("Sending device list update notif to: %r", hosts)
             for host in hosts:
