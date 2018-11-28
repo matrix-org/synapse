@@ -194,6 +194,7 @@ class RegistrationTestCase(unittest.TestCase):
         with self.assertRaises(SynapseError):
             yield directory_handler.get_association(room_alias)
 
+    @defer.inlineCallbacks
     def test_auto_create_auto_join_where_no_consent(self):
         self.hs.config.user_consent_at_registration = True
         self.hs.config.block_events_without_consent_error = "Error"
