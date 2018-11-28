@@ -194,8 +194,11 @@ class _WrappedConnection(object):
             # In Twisted >18.4; the TLS connection will be None if it has closed
             # which will make abortConnection() throw. Check that the TLS connection
             # is not None before trying to close it.
-            if self.transport.getHandle() is not None:
-                self.transport.abortConnection()
+            try:
+                if self.transport.getHandle() is not None:
+                    self.transport.abortConnection()
+            except:
+                logger.warning("Failed to abort connection")
 
     def request(self, request):
         self.last_request = time.time()
