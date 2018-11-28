@@ -318,7 +318,7 @@ def event_from_pdu_json(pdu_json, outlier=False):
 
     depth = pdu_json['depth']
     if not isinstance(depth, six.integer_types):
-        raise SynapseError(400, "Depth %r not an intger" % (depth, ),
+        raise SynapseError(400, "Depth %r not an integer" % (depth, ),
                            Codes.BAD_JSON)
 
     if depth < 0:
@@ -334,6 +334,21 @@ def event_from_pdu_json(pdu_json, outlier=False):
             for cost, destinations in dtab
             for dest in destinations
         }
+
+    if "auth_events" in pdu_json:
+        pdu_json["auth_events"] = [
+            (e, {}) if isinstance(e, six.string_types) else e
+            for e in pdu_json["auth_events"]
+        ]
+
+    if "prev_events" in pdu_json:
+        pdu_json["prev_events"] = [
+            (e, {}) if isinstance(e, six.string_types) else e
+            for e in pdu_json["prev_events"]
+        ]
+
+    if "origin" not in pdu_json:
+        pdu_json["origin"] = get_domain_from_id(pdu_json["sender"])
 
     logger.info("Unmangled event to: %s", pdu_json)
 
