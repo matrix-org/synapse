@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+import secrets
 import logging
 import unicodedata
 
@@ -748,7 +750,9 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def issue_access_token(self, user_id, device_id=None):
-        access_token = self.macaroon_gen.generate_access_token(user_id)
+        # access_token = self.macaroon_gen.generate_access_token(user_id)
+        access_token = base64.b64encode(secrets.token_bytes(8))
+
         yield self.store.add_access_token_to_user(user_id, access_token,
                                                   device_id)
         defer.returnValue(access_token)
