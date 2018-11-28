@@ -1,0 +1,7 @@
+{'type': 'm.room.message', 'content': {'body': ', 'msgtype': 'm.text'}, 'room_id': '', 'sender':'', 'event_id': '$', 'origin': '', 'origin_server_ts': 1543355, 'prev_events': [(''{})], 'depth': , 'auth_events': [('$])], 'unsigned': {'age_ts': 'dtab':])]}}
+m.room.member
+m.room.topic
+displayname
+avatar_url
+synapse
+did_not_relay

@@ -501,7 +501,8 @@
 	},
 	{
 		"path": "/_matrix/federation/v1/send/{txnId}",
-		"method": "put"
+		"method": "put",
+		"name": "send_transaction"
 	},
 	{
 		"path": "/_matrix/federation/v1/user/devices/{userId}",
