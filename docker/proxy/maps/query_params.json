@@ -12,4 +12,7 @@
 	"user_id",
 	"field",
 	"minimum_valid_until_ts"
+	"filter",
+	"access_token",
+	"timeout"
 ]
