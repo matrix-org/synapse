@@ -225,10 +225,11 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.assertEquals(self.get_success(count), len(threepids))
 
     def test_support_user_not_add_to_mau_limits(self):
+        support_user_id = "@support:test"
         count = self.store.get_monthly_active_count()
         self.pump()
         self.assertEqual(self.get_success(count), 0)
-        support_user_id = '@support:test'
+
         self.store.register(
             user_id=support_user_id,
             token="123",
