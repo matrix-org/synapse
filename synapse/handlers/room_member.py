@@ -888,7 +888,8 @@ class RoomMemberHandler(object):
             if not event:
                 continue
 
-            if event.membership == Membership.JOIN or event.membership == Membership.INVITE:
+            if (event.membership == Membership.JOIN
+                    or event.membership == Membership.INVITE):
                 defer.returnValue(True)
 
         defer.returnValue(False)
