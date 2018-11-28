@@ -19,6 +19,7 @@ server protocol.
 
 import logging
 
+from synapse.types import get_localpart_from_id
 from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,8 @@ def _mangle_pdu(pdu_json):
 
     pdu_json["auth_events"] = list(_strip_hashes(pdu_json["auth_events"]))
     pdu_json["prev_events"] = list(_strip_hashes(pdu_json["prev_events"]))
+
+    pdu_json["event_id"] = get_localpart_from_id(pdu_json["event_id"])
 
     logger.info("Mangled PDU: %s", pdu_json)
 

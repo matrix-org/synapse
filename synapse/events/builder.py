@@ -14,9 +14,9 @@
 # limitations under the License.
 
 import copy
+import string
 
 from synapse.types import EventID
-from synapse.util.stringutils import random_string
 
 from . import EventBase, FrozenEvent, _event_dict_property
 
@@ -49,10 +49,10 @@ class EventBuilderFactory(object):
         self.event_id_count = 0
 
     def create_event_id(self):
-        i = str(self.event_id_count)
+        i = self.event_id_count
         self.event_id_count += 1
 
-        local_part = random_string(3) + str(i)
+        local_part = _encode_id(i)
 
         e_id = EventID(local_part, self.hostname)
 
@@ -73,3 +73,19 @@ class EventBuilderFactory(object):
         key_values["signatures"] = {}
 
         return EventBuilder(key_values=key_values,)
+
+
+def _numberToBase(n, b):
+    if n == 0:
+        return [0]
+    digits = []
+    while n:
+        digits.append(int(n % b))
+        n //= b
+    return digits[::-1]
+
+
+def _encode_id(i):
+    digits = string.digits + string.ascii_letters
+    val_slice = _numberToBase(i, len(digits))
+    return "".join(digits[x] for x in val_slice)
