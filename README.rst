@@ -142,7 +142,7 @@ Installing prerequisites on openSUSE::
 Installing prerequisites on OpenBSD::
 
     doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
-                 libxslt
+                 libxslt jpeg
 
 To install the Synapse homeserver run::
 
@@ -729,9 +729,10 @@ port:
 
   .. __: `key_management`_
 
-* Synapse does not currently support SNI on the federation protocol
-  (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_), which
-  means that using name-based virtual hosting is unreliable.
+* Until v0.33.3, Synapse did not support SNI on the federation port
+  (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_). This bug
+  is now fixed, but means that federating with older servers can be unreliable 
+  when using name-based virtual hosting.
 
 Furthermore, a number of the normal reasons for using a reverse-proxy do not
 apply:

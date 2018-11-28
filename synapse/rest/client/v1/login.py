@@ -27,7 +27,7 @@ from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.http.server import finish_request
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
 
@@ -83,6 +83,7 @@ class LoginRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/login$")
     SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
+    SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "m.login.jwt"
 
@@ -105,6 +106,10 @@ class LoginRestServlet(ClientV1RestServlet):
         if self.saml2_enabled:
             flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
+
+            # we advertise CAS for backwards compat, though MSC1721 renamed it
+            # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
             # While its valid for us to advertise this login type generally,
@@ -384,11 +389,11 @@ class SAML2RestServlet(ClientV1RestServlet):
         defer.returnValue((200, {"status": "not_authenticated"}))
 
 
-class CasRedirectServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/cas/redirect", releases=())
+class CasRedirectServlet(RestServlet):
+    PATTERNS = client_path_patterns("/login/(cas|sso)/redirect")
 
     def __init__(self, hs):
-        super(CasRedirectServlet, self).__init__(hs)
+        super(CasRedirectServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url.encode('ascii')
         self.cas_service_url = hs.config.cas_service_url.encode('ascii')
 
