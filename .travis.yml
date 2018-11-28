@@ -36,24 +36,24 @@ matrix:
     env: TOX_ENV="pep8,check_isort"
 
   - python: 2.7
-    env: TOX_ENV=py27 TRIAL_FLAGS="-j 2"
+    env: TOX_ENV=py27,codecov TRIAL_FLAGS="-j 2"
 
   - python: 2.7
     env: TOX_ENV=py27-old TRIAL_FLAGS="-j 2"
 
   - python: 2.7
-    env: TOX_ENV=py27-postgres TRIAL_FLAGS="-j 4"
+    env: TOX_ENV=py27-postgres,codecov TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
   - python: 3.5
-    env: TOX_ENV=py35 TRIAL_FLAGS="-j 2"
+    env: TOX_ENV=py35,codecov TRIAL_FLAGS="-j 2"
 
   - python: 3.6
-    env: TOX_ENV=py36 TRIAL_FLAGS="-j 2"
+    env: TOX_ENV=py36,codecov TRIAL_FLAGS="-j 2"
 
   - python: 3.6
-    env: TOX_ENV=py36-postgres TRIAL_FLAGS="-j 4"
+    env: TOX_ENV=py36-postgres,codecov TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
