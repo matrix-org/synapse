@@ -17,6 +17,7 @@ import logging
 import random
 import json
 import opentracing
+import string
 
 from six import itervalues
 
@@ -135,7 +136,7 @@ class TransactionQueue(object):
         self.last_device_list_stream_id_by_dest = {}
 
         # HACK to get unique tx id
-        self._next_txn_id = int(self.clock.time_msec())
+        self._next_txn_id = 1
 
         self._order = 1
 
@@ -486,7 +487,7 @@ class TransactionQueue(object):
 
             pending_pdus = []
             while True:
-                txn_id = str(self._next_txn_id)
+                txn_id = _encode_id(self._next_txn_id)
                 self._next_txn_id += 1
 
                 for s in pdu_spans.values():
@@ -860,3 +861,19 @@ class TransactionQueue(object):
         new_destinations = set(pdu.unsigned.get("destinations", []))
         new_destinations.discard(destination)
         yield self._send_pdu(pdu, list(new_destinations), span)
+
+
+def _numberToBase(n, b):
+    if n == 0:
+        return [0]
+    digits = []
+    while n:
+        digits.append(int(n % b))
+        n //= b
+    return digits[::-1]
+
+
+def _encode_id(i):
+    digits = string.digits + string.ascii_letters
+    val_slice = _numberToBase(i, len(digits))
+    return "".join(digits[x] for x in val_slice)
