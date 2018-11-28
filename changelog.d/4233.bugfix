@@ -1,0 +1,1 @@
+Fix synapse_admin_mau:current metric is not updating when config.mau_stats_only is True
