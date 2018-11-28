@@ -24,5 +24,12 @@
 	"event_id",
 	"room_id",
 	"state_key",
-	"content"
+	"content",
+	"edu_type",
+	"sha256",
+	"typing",
+	"user_id",
+	"m.read",
+	"data",
+	"event_ids"
 ]

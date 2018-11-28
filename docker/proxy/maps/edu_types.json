@@ -1,0 +1,8 @@
+[
+	"m.presence_invite",
+	"m.presence_accept",
+	"m.presence_deny",
+	"m.presence",
+	"m.typing",
+	"m.receipt"
+]
