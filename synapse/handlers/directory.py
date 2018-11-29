@@ -259,10 +259,8 @@ class DirectoryHandler(BaseHandler):
                 servers = result["servers"]
 
         if not room_id:
-            raise SynapseError(
-                404,
+            raise NotFoundError(
                 "Room alias %s not found" % (room_alias.to_string(),),
-                Codes.NOT_FOUND
             )
 
         hosts = yield self.state.get_current_hosts_in_room(room_id)
@@ -303,10 +301,8 @@ class DirectoryHandler(BaseHandler):
                 "servers": result["servers"],
             })
         else:
-            raise SynapseError(
-                404,
+            raise NotFoundError(
                 "Room alias %r not found" % (room_alias.to_string(),),
-                Codes.NOT_FOUND
             )
 
     @defer.inlineCallbacks
