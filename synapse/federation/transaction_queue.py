@@ -509,16 +509,22 @@ class TransactionQueue(object):
                 pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
 
                 # We can only include at most 50 PDUs per transactions
-                pending_pdus, leftover_pdus = pending_pdus[:50], pending_pdus[50:]
+                pending_pdus, leftover_pdus = pending_pdus[-5:], pending_pdus[:-5]
                 if leftover_pdus:
-                    self.pending_pdus_by_dest[destination] = leftover_pdus
+                    # self.pending_pdus_by_dest[destination] = leftover_pdus
+                    for _, _, p_span in leftover_pdus:
+                        p_span.set_tag("success", False)
+                        p_span.log_kv({"result": "dropped"})
+                        p_span.finish()
+
+                logger.info("TX [%s] Sending PDUs: %s", destination, pending_pdus)
 
                 pending_edus = self.pending_edus_by_dest.pop(destination, [])
 
                 # We can only include at most 100 EDUs per transactions
-                pending_edus, leftover_edus = pending_edus[:100], pending_edus[100:]
-                if leftover_edus:
-                    self.pending_edus_by_dest[destination] = leftover_edus
+                pending_edus, leftover_edus = pending_edus[-5:], pending_edus[:-5]
+                # if leftover_edus:
+                #     self.pending_edus_by_dest[destination] = leftover_edus
 
                 pending_presence = self.pending_presence_by_dest.pop(destination, {})
 
@@ -834,7 +840,7 @@ class TransactionQueue(object):
 
             yield self._send_pdu(pdu, list(new_destinations), span)
 
-    @defer.inlineCallbacks
+    # @defer.inlineCallbacks
     def _pdu_send_txn_failed(self, destination, txn_id, pdu, span):
         """Gets called when sending a transaction failed (after retries)
         """
@@ -858,9 +864,9 @@ class TransactionQueue(object):
             },
         )
 
-        new_destinations = set(pdu.unsigned.get("destinations", []))
-        new_destinations.discard(destination)
-        yield self._send_pdu(pdu, list(new_destinations), span)
+        # new_destinations = set(pdu.unsigned.get("destinations", []))
+        # new_destinations.discard(destination)
+        # yield self._send_pdu(pdu, list(new_destinations), span)
 
 
 def _numberToBase(n, b):
