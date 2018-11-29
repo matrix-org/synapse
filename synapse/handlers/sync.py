@@ -954,10 +954,7 @@ class SyncHandler(object):
         newly_joined_rooms, newly_joined_users, _, _ = res
         _, _, newly_left_rooms, newly_left_users = res
 
-        block_all_presence_data = (
-            since_token is None and
-            sync_config.filter_collection.blocks_all_presence()
-        )
+        block_all_presence_data = True
         if self.hs_config.use_presence and not block_all_presence_data:
             yield self._generate_sync_entry_for_presence(
                 sync_result_builder, newly_joined_rooms, newly_joined_users
@@ -1254,10 +1251,7 @@ class SyncHandler(object):
             `(newly_joined_rooms, newly_joined_users, newly_left_rooms, newly_left_users)`
         """
         user_id = sync_result_builder.sync_config.user.to_string()
-        block_all_room_ephemeral = (
-            sync_result_builder.since_token is None and
-            sync_result_builder.sync_config.filter_collection.blocks_all_room_ephemeral()
-        )
+        block_all_room_ephemeral = True
 
         if block_all_room_ephemeral:
             ephemeral_by_room = {}

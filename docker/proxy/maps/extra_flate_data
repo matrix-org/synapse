@@ -21,6 +21,7 @@ groom_idn!
 cXJGX%
 dtypenm.room.message
 dtypemm.room.member
+events
 :synapse0
 :synapse1
 :synapse2
@@ -29,6 +30,23 @@ dtypemm.room.member
 :synapse5
 :synapse7
 :synapse8
+&exclude_threaded=true
+chunk
+start
+end
+thread_id
+=%7B%22thread_id%22%3A0%7D&2=20&dir=b&from=
+transaction_id
+m.room.room_version
+m.room.power_levels
+m.room.join_rule
+m.room.guest_access
+user_id
+dtypenm.room.aliases
+dtypevm.room.canonical_aliasfsender
+device_id
+home_server
+access_token
 
 "dpdus\x81\xaadtypenm.room.messageedepth"
 "gcontent\xa2dbody"
@@ -36,3 +54,25 @@ dtypemm.room.member
 "porigin_server_ts\x1b\x00\x00\x01gZ\xe3\xfd\x1c"
 "\x11*\xd1\x02\x06\xd1\x14"
 "\xa1dpdus\xa0"
+"\xa8erooms\xa3djoin\xa0eleave\xa0finvite\xa0fgroups\xa3djoin\xa0eleave\xa0finvite\xa0hpresence\xa1fevents\x80ito_device\xa1fevents\x80jnext_batchts58_10_0_1_1_1_1_3_1laccount_data\xa1fevents\x80ldevice_lists\xa2dleft\x80gchanged\x80x\x1adevice_one_time_keys_count\xa1qsigned_curve25519\x182"
+"\xa8erooms\xa3djoin\xa1n!DQQ0:synapse0\xa6estate\xa1fevents\x80gsummary\xa0htimeline\xa3fevents\x81\xa6dtypenm.room.messagefsender"
+"`Zy\x1eglimited\xf4jprev_batchss16_3_0_1_1_1_1_3_1iephemeral\xa1fevents\x80laccount_data\xa1fevents\x80tunread_notifications\xa0eleave"
+"ephemeral\xa1fevents\x80laccount_data\xa1fevents\x81\xa2dtypelm.fully_readgcontent\xa1hevent_idk"
+"chunk\x8a\xaacage\x0cdtypemm.room.memberfsenderqgcontent\xa3javatar_url\xf6jmembershipdjoinkdisplayname\xf6groom_id"
+"gcontent\xa1rhistory_visibilityfsharedgroom_id"
+"dtypex\x19m.room.history_visibility"
+"gcontent\xa1ijoin_rulefpublicgroom_idn"
+"dtypesm.room.power_levelsfsenderq"
+"gcontent\xa9cban\x182dkick\x182eusers\xa1q"
+"\x18dfevents\xa5km.room.name\x182mm.room.avatar\x182sm.room.power_levels\x18dvm.room.canonical_alias\x182x\x19m.room.history_visibility\x18dfinvite\x00fredact\x182mstate_default\x182musers_default\x00nevents_default\x00groom_idn"
+"gcontent\xa2gcreatorqlroom_versiona1groom_idn"
+"\xa1eflows\x81\xa1dtypepm.login.password"
+"\xa2eerroroNo backup foundgerrcodekM_NOT_FOUND"
+"xa1kdevice_keys\xa5dkeys\xa2red25519:J"
+"jalgorithms\x82x\x1cm.olm.v1.curve25519-aes-sha2tm.megolm.v1.aes-sha2jsignatures\xa1"
+"\xa2fdevice\xa0fglobal\xa5droom\x80fsender\x80gcontent\x81\xa5gactions\x83fnotify\xa2evaluegdefaultiset_tweakesound\xa1iset_tweakihighlightgdefault\xf5genabled\xf5gpatternggrule_idx\x1a.m.rule.contains_user_namehoverride\x86\xa5gactions\x81kdont_notifygdefault\xf5genabled\xf4grule_idn.m.rule.masterjconditions\x80\xa5gactions\x81kdont_notifygdefault\xf5genabled\xf5grule_idx\x18.m.rule.suppress_noticesjconditions\x81\xa3ckeyocontent.msgtypedkindkevent_matchgpatternhm.notice\xa5gactions\x83fnotify\xa2evaluegdefaultiset_tweakesound\xa2evalue\xf4iset_tweakihighlightgdefault\xf5genabled\xf5grule_idu.m.rule.invite_for_mejconditions\x83\xa3ckeydtypedkindkevent_matchgpatternmm.room.member\xa3ckeyrcontent.membershipdkindkevent_matchgpatternfinvite\xa3ckeyistate_keydkindkevent_matchgpatternq\xa5gactions\x81kdont_notifygdefault\xf5genabled\xf5grule_idt.m.rule.member_eventjconditions\x81\xa3ckeydtypedkindkevent_matchgpatternmm.room.member\xa5gactions\x83fnotify\xa2evaluegdefaultiset_tweakesound\xa1iset_tweakihighlightgdefault\xf5genabled\xf5grule_idx\x1d.m.rule.contains_display_namejconditions\x81\xa1dkinducontains_display_name\xa5gactions\x82fnotify\xa2evalue\xf5iset_tweakihighlightgdefault\xf5genabled\xf5grule_idq.m.rule.roomnotifjconditions\x82\xa3ckeylcontent.bodydkindkevent_matchgpatterne@room\xa2ckeydroomdkindx\x1esender_notification_permissioniunderride\x85\xa5gactions\x83fnotify\xa2evaluedringiset_tweakesound\xa2evalue\xf4iset_tweakihighlightgdefault\xf5genabled\xf5grule_idl.m.rule.calljconditions\x81\xa3ckeydtypedkindkevent_matchgpatternmm.call.invite\xa5gactions\x83fnotify\xa2evaluegdefaultiset_tweakesound\xa2evalue\xf4iset_tweakihighlightgdefault\xf5genabled\xf5grule_idw.m.rule.room_one_to_onejconditions\x82\xa2bisa2dkindqroom_member_count\xa3ckeydtypedkindkevent_matchgpatternnm.room.message\xa5gactions\x83fnotify\xa2evaluegdefaultiset_tweakesound\xa2evalue\xf4iset_tweakihighlightgdefault\xf5genabled\xf5grule_idx!.m.rule.encrypted_room_one_to_onejconditions\x82\xa2bisa2dkindqroom_member_count\xa3ckeydtypedkindkevent_matchgpatternpm.room.encrypted\xa5gactions\x82fnotify\xa2evalue\xf4iset_tweakihighlightgdefault\xf5genabled\xf5grule_ido.m.rule.messagejconditions\x81\xa3ckeydtypedkindkevent_matchgpatternnm.room.message\xa5gactions\x82fnotify\xa2evalue\xf4iset_tweakihighlightgdefault\xf5genabled\xf5grule_idq.m.rule.encryptedjconditions\x81\xa3ckeydtypedkindkevent_matchgpatternpm.room.encrypted"
+"\xa1droom\xa1htimeline\xa1elimit\x14"
+"\xa8erooms\xa3djoin\xa1n!eYB0:synapse0\xa6estate\xa1fevents\x80gsummary\xa0htimeline\xa3fevents\x8e\xa7dtypemm.room.createfsenderq"
+"\xa1mone_time_keys\xa5x\x18signed_curve25519:"
+"\xa1sone_time_key_counts\xa1qsigned_curve25519\x05"
+"\xa4jexpires_in\xfb@\xac \x00\x00\x00\x00\x00jtoken_typefBearerlaccess_tokenxrmatrix_server_namehsynapse"
