@@ -197,7 +197,7 @@ class _WrappedConnection(object):
             try:
                 if self.transport.getHandle() is not None:
                     self.transport.abortConnection()
-            except:
+            except Exception:
                 logger.warning("Failed to abort connection")
 
     def request(self, request):
