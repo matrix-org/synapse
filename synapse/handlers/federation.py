@@ -304,20 +304,20 @@ class FederationHandler(BaseHandler):
                 # but there is an interaction with min_depth that I'm not really
                 # following.
 
-                if sent_to_us_directly:
-                    logger.warn(
-                        "[%s %s] Rejecting: failed to fetch %d prev events: %s",
-                        room_id, event_id, len(prevs - seen), shortstr(prevs - seen)
-                    )
-                    raise FederationError(
-                        "ERROR",
-                        403,
-                        (
-                            "Your server isn't divulging details about prev_events "
-                            "referenced in this event."
-                        ),
-                        affected=pdu.event_id,
-                    )
+                # if sent_to_us_directly:
+                #     logger.warn(
+                #         "[%s %s] Rejecting: failed to fetch %d prev events: %s",
+                #         room_id, event_id, len(prevs - seen), shortstr(prevs - seen)
+                #     )
+                #     raise FederationError(
+                #         "ERROR",
+                #         403,
+                #         (
+                #             "Your server isn't divulging details about prev_events "
+                #             "referenced in this event."
+                #         ),
+                #         affected=pdu.event_id,
+                #     )
 
                 # Calculate the state after each of the previous events, and
                 # resolve them to find the correct state at the current event.
@@ -506,9 +506,9 @@ class FederationHandler(BaseHandler):
             room_id,
             earliest_events_ids=list(latest),
             latest_events=[pdu],
-            limit=10,
+            limit=5,
             min_depth=min_depth,
-            timeout=60000,
+            timeout=15000,
         )
 
         logger.info(

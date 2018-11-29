@@ -36,7 +36,7 @@ from synapse.api.errors import (
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
-from synapse.federation.units import Edu, Transaction
+from synapse.federation.units import Edu, Transaction, _mangle_pdu
 from synapse.http.endpoint import parse_server_name
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
@@ -48,6 +48,7 @@ from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logcontext import nested_logging_context
 from synapse.util.logutils import log_function
+
 
 # when processing incoming transactions, we try to handle multiple rooms in
 # parallel, up to this limit.
@@ -338,8 +339,8 @@ class FederationServer(FederationBase):
                 )
 
         defer.returnValue({
-            "pdus": [pdu.get_pdu_json() for pdu in pdus],
-            "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
+            "pdus": [_mangle_pdu(pdu.get_pdu_json()) for pdu in pdus],
+            "auth_chain": [_mangle_pdu(pdu.get_pdu_json()) for pdu in auth_chain],
         })
 
     @defer.inlineCallbacks
@@ -384,7 +385,7 @@ class FederationServer(FederationBase):
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
         time_now = self._clock.time_msec()
-        defer.returnValue((200, {"event": ret_pdu.get_pdu_json(time_now)}))
+        defer.returnValue((200, {"event": _mangle_pdu(ret_pdu.get_pdu_json(time_now))}))
 
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):
@@ -398,9 +399,9 @@ class FederationServer(FederationBase):
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
         defer.returnValue((200, {
-            "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
+            "state": [_mangle_pdu(p.get_pdu_json(time_now)) for p in res_pdus["state"]],
             "auth_chain": [
-                p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]
+                _mangle_pdu(p.get_pdu_json(time_now)) for p in res_pdus["auth_chain"]
             ],
         }))
 
@@ -433,7 +434,7 @@ class FederationServer(FederationBase):
             time_now = self._clock.time_msec()
             auth_pdus = yield self.handler.on_event_auth(event_id)
             res = {
-                "auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus],
+                "auth_chain": [_mangle_pdu(a.get_pdu_json(time_now)) for a in auth_pdus],
             }
         defer.returnValue((200, res))
 
@@ -482,7 +483,7 @@ class FederationServer(FederationBase):
             time_now = self._clock.time_msec()
             send_content = {
                 "auth_chain": [
-                    e.get_pdu_json(time_now)
+                    _mangle_pdu(e.get_pdu_json(time_now))
                     for e in ret["auth_chain"]
                 ],
                 "rejects": ret.get("rejects", []),
@@ -558,7 +559,7 @@ class FederationServer(FederationBase):
             time_now = self._clock.time_msec()
 
         defer.returnValue({
-            "events": [ev.get_pdu_json(time_now) for ev in missing_events],
+            "events": [_mangle_pdu(ev.get_pdu_json(time_now)) for ev in missing_events],
         })
 
     @log_function
