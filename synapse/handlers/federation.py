@@ -55,7 +55,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import StateResolutionStore, resolve_events_with_store
-from synapse.types import UserID, get_domain_from_id, create_requester
+from synapse.types import UserID, create_requester, get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room
@@ -1332,7 +1332,6 @@ class FederationHandler(BaseHandler):
                 yield self.clock.sleep(1)
         if not joined:
             logger.error("Giving up on trying to auto-accept invite: too many attempts")
-
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
