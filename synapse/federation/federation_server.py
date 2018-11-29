@@ -672,7 +672,10 @@ class FederationServer(FederationBase):
             span=span,
         )
 
-        defer.returnValue({"did_not_relay": list(dont_relay)})
+        ret = {}
+        if dont_relay:
+            ret = {"did_not_relay": list(dont_relay)}
+        defer.returnValue(ret)
 
     def __str__(self):
         return "<ReplicationLayer(%s)>" % self.server_name
