@@ -1,5 +1,14 @@
 [
 	{
+		"path": "/_matrix/federation/v1/send/{txnId}",
+		"method": "put",
+		"name": "send_transaction"
+	},
+	{
+		"path": "/_matrix/client/r0/rooms/{roomId}/send/{eventType}/{txnId}",
+		"method": "put"
+	},
+	{
 		"path": "/_matrix/client/r0/profile/{userId}/displayname",
 		"method": "get"
 	},
@@ -14,10 +23,6 @@
 	{
 		"path": "/_matrix/client/r0/rooms/{roomId}/kick",
 		"method": "post"
-	},
-	{
-		"path": "/_matrix/client/r0/rooms/{roomId}/send/{eventType}/{txnId}",
-		"method": "put"
 	},
 	{
 		"path": "/_matrix/client/r0/admin/whois/{userId}",
@@ -498,11 +503,6 @@
 	{
 		"path": "/_matrix/federation/v1/3pid/onbind",
 		"method": "put"
-	},
-	{
-		"path": "/_matrix/federation/v1/send/{txnId}",
-		"method": "put",
-		"name": "send_transaction"
 	},
 	{
 		"path": "/_matrix/federation/v1/user/devices/{userId}",
