@@ -57,6 +57,16 @@ class SimpleHttpClient(object):
     """
 
     def __init__(self, hs, treq_args={}, whitelist=None, blacklist=None, _treq=treq):
+        """
+        Args:
+            hs (synapse.server.HomeServer)
+            treq_args (dict): Extra keyword arguments to be given to treq.request.
+            blacklist (netaddr.IPSet): The IP addresses that are blacklisted that
+                we may not request.
+            whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
+               request if it were otherwise caught in a blacklist.
+            _treq (treq): Treq implementation, can be overridden for testing.
+        """
         self.hs = hs
 
         pool = HTTPConnectionPool(reactor)
