@@ -1,0 +1,1 @@
+Fix exception caused by non-ascii event IDs
