@@ -94,16 +94,22 @@ class SimpleHttpClient(object):
         # Check our IP whitelists/blacklists before making the request.
         if self.blacklist:
             split_uri = URI.fromBytes(uri.encode('utf8'))
-            address = yield self.reactor.resolve(split_uri.host)
+            address = yield make_deferred_yieldable(
+                self.reactor.resolve(split_uri.host)
+            )
 
             from netaddr import IPAddress
+
             ip_address = IPAddress(address)
 
             if ip_address in self.blacklist:
                 if self.whitelist is None or ip_address not in self.whitelist:
+                    logger.info(
+                        "Blocked accessing %s because of blacklisted IP %s"
+                        % (split_uri.host.decode('utf8'), ip_address)
+                    )
                     raise SynapseError(
-                        403, "IP address blocked by IP blacklist entry",
-                        Codes.UNKNOWN
+                        403, "IP address blocked by IP blacklist entry", Codes.UNKNOWN
                     )
 
         # A small wrapper around self.agent.request() so we can easily attach
