@@ -90,7 +90,16 @@ class SimpleHttpClient(object):
 
     @defer.inlineCallbacks
     def request(self, method, uri, data=b'', headers=None):
+        """
+        Args:
+            method (str): HTTP method to use.
+            uri (str): URI to query.
+            data (bytes): Data to send in the request body, if applicable.
+            headers (t.w.http_headers.Headers): Request headers.
 
+        Raises:
+            SynapseError: If the IP is blacklisted.
+        """
         # Check our IP whitelists/blacklists before making the request.
         if self.blacklist:
             split_uri = URI.fromBytes(uri.encode('utf8'))
