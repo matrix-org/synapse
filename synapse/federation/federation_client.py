@@ -39,6 +39,7 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.retryutils import NotRetryingDestination
+from synapse.federation.units import _mangle_pdu
 
 logger = logging.getLogger(__name__)
 
@@ -712,7 +713,7 @@ class FederationClient(FederationBase):
                 destination=destination,
                 room_id=room_id,
                 event_id=event_id,
-                content=pdu.get_pdu_json(time_now),
+                content=_mangle_pdu(pdu.get_pdu_json(time_now)),
             )
         except HttpResponseException as e:
             if e.code == 403:
