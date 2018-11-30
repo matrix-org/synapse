@@ -324,7 +324,10 @@ class PreviewUrlResource(Resource):
                     url, output_stream=f, max_size=self.max_spider_size,
                 )
             except SynapseError:
-                # Pass SynapseErrors through directly.
+                # Pass SynapseErrors through directly, so that the servlet
+                # handler will return a SynapseError to the client instead of
+                # blank data or a 500. Currently, this is only if the IP we are
+                # trying to fetch from is blacklisted.
                 raise
             except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
