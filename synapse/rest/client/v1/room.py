@@ -838,10 +838,9 @@ class TimestampLookupRestServlet(ClientV1RestServlet):
         yield self.auth.check_joined_room(room_id, requester.user.to_string())
 
         timestamp = parse_integer(request, "ts")
-        thread_id = parse_integer(request, "thread_id", 0)
 
         event_id = yield self.store.get_event_for_timestamp(
-            room_id, thread_id, timestamp,
+            room_id, timestamp,
         )
 
         defer.returnValue((200, {
