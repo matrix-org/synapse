@@ -213,6 +213,15 @@ class MatrixFederationHttpClient(object):
             self.agent = Agent.usingEndpointFactory(
                 reactor, MatrixFederationEndpointFactory(hs), pool=pool
             )
+
+        file_pool = HTTPConnectionPool(reactor)
+        file_pool.retryAutomatically = False
+        file_pool.maxPersistentPerHost = 5
+        file_pool.cachedConnectionTimeout = 10
+
+        self.file_agent = Agent.usingEndpointFactory(
+            reactor, MatrixFederationEndpointFactory(hs), pool=file_pool
+        )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
         self.version_string_bytes = hs.version_string.encode('ascii')
@@ -231,7 +240,8 @@ class MatrixFederationHttpClient(object):
         timeout=None,
         long_retries=False,
         ignore_backoff=False,
-        backoff_on_404=False
+        backoff_on_404=False,
+        agent=None,
     ):
         """
         Sends a request to the given server.
@@ -724,6 +734,7 @@ class MatrixFederationHttpClient(object):
             request,
             retry_on_dns_fail=retry_on_dns_fail,
             ignore_backoff=ignore_backoff,
+            agent=self.file_agent,
         )
 
         headers = dict(response.headers.getAllRawHeaders())
