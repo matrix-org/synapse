@@ -555,7 +555,7 @@ class EventsWorkerStore(SQLBaseStore):
             else:
                 event_id_after, ts_after = None, None
 
-            if event_id_before and event_id_before:
+            if event_id_before and event_id_after:
                 # Return the closest one
                 if (timestamp - ts_before) < (ts_after - timestamp):
                     return event_id_before
