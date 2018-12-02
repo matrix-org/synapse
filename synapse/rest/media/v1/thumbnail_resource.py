@@ -263,8 +263,8 @@ class ThumbnailResource(Resource):
 
     def _select_thumbnail(self, desired_width, desired_height, desired_method,
                           desired_type, thumbnail_infos):
-        d_w = desired_width
-        d_h = desired_height
+        d_w = 0 if desired_width is None else desired_width
+        d_h = 0 if desired_height is None else desired_height
 
         if desired_method.lower() == "crop":
             info_list = []
