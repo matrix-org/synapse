@@ -66,6 +66,7 @@ REQUIREMENTS = {
     # we use attr.s(slots), which arrived in 16.0.0
     "attrs>=16.0.0": ["attr>=16.0.0"],
     "netaddr>=0.7.18": ["netaddr"],
+    "cbor2>=4.1.1": ["cbor2"],
 }
 
 CONDITIONAL_REQUIREMENTS = {

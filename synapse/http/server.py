@@ -22,6 +22,7 @@ from six import PY3
 from six.moves import http_client, urllib
 
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+import cbor2.encoder as cborenc
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -402,7 +403,6 @@ class RootRedirect(resource.Resource):
             return self  # select ourselves as the child to render
         return resource.Resource.getChild(self, name, request)
 
-
 def respond_with_json(request, code, json_object, send_cors=False,
                       response_code_message=None, pretty_print=False,
                       canonical_json=True):
@@ -415,6 +415,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
             request)
         return
 
+    encoding = "application/json"
     if pretty_print:
         json_bytes = encode_pretty_printed_json(json_object) + b"\n"
     else:
@@ -422,17 +423,51 @@ def respond_with_json(request, code, json_object, send_cors=False,
             # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = json.dumps(json_object).encode("utf-8")
+            # Check what encoding the client prefers.
+            encoding = select_content_type(request)
+            logger.debug(
+                "Selected encoding %s.",
+                encoding)
+            if encoding == "application/cbor":
+                json_bytes = cborenc.dumps(json_object)
+            else: # Default to json
+                logger.warn(
+                    "Unknown encoding %s, responding with application/json.",
+                    encoding)
+                encoding = "application/json"
+                json_bytes = json.dumps(json_object).encode("utf-8")
 
     return respond_with_json_bytes(
         request, code, json_bytes,
         send_cors=send_cors,
         response_code_message=response_code_message,
+        encoding=encoding
     )
 
+def select_content_type(request):
+    accepts = request.getHeader(b"Accept")
+    if accepts is None:
+        return "application/json"
+    mimetypes = accepts.decode().split(",")
+    mimetypes = [mt.strip().lower().split("q=")for mt in mimetypes]
+    mimetype = "application/json"
+    currentQuality = 0
+    for mt in mimetypes:
+        try:
+            quality = 1 if len(mt) == 1 else float("1.0")
+        except ValueError:
+            # Bad float value, just set it to 1
+            quality = 1
+        # 1 is the highest it can be
+        if quality == 1:
+            return mt[0]
+        if currentQuality < quality:
+            quality = currentQuality
+            mimetype = mt
+    return mimetype
 
 def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
-                            response_code_message=None):
+                            response_code_message=None, encoding="application/json"):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -445,7 +480,7 @@ def respond_with_json_bytes(request, code, json_bytes, send_cors=False,
         twisted.web.server.NOT_DONE_YET"""
 
     request.setResponseCode(code, message=response_code_message)
-    request.setHeader(b"Content-Type", b"application/json")
+    request.setHeader(b"Content-Type", encoding.encode("utf-8"))
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
