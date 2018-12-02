@@ -22,7 +22,7 @@ from six import PY3
 from six.moves import http_client, urllib
 
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
-import cbor2.encoder as cborenc
+import cbor2 as cbor
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -429,7 +429,7 @@ def respond_with_json(request, code, json_object, send_cors=False,
                 "Selected encoding %s.",
                 encoding)
             if encoding == "application/cbor":
-                json_bytes = cborenc.dumps(json_object)
+                json_bytes = cbor.dumps(json_object)
             else: # Default to json
                 logger.warn(
                     "Unknown encoding %s, responding with application/json.",

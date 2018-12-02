@@ -18,6 +18,7 @@
 import logging
 
 from canonicaljson import json
+from cbor2 as cbor
 
 from synapse.api.errors import Codes, SynapseError
 
@@ -197,6 +198,17 @@ def parse_json_value_from_request(request, allow_empty_body=False):
 
     if not content_bytes and allow_empty_body:
         return None
+
+    contentType = request.getHeader(b"Content-Type")
+
+
+    if contentType == b"application/cbor":
+        try:
+            return cbor.loads(content_bytes)
+        except Exception as e:
+            logger.warn("Unable to parse CBOR: %s", e)
+            # XXX: errcode here is technically wrong.
+            raise SynapseError(400, "Content not CBOR.", errcode=Codes.NOT_JSON)
 
     # Decode to Unicode so that simplejson will return Unicode strings on
     # Python 2
