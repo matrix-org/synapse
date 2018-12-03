@@ -42,7 +42,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request):
-        spec = _rule_spec_from_path(request.postpath.decode('utf8'))
+        spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
@@ -103,7 +103,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request):
-        spec = _rule_spec_from_path(request.postpath)
+        spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
