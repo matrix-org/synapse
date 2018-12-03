@@ -134,7 +134,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         rules = format_push_rules_for_user(requester.user, rules)
 
-        path = request.postpath[1:].decode('utf8')
+        path = [x.decode('utf8') for x in request.postpath][1:]
 
         if path == []:
             # we're a reference impl: pedantry is our job.
