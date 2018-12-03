@@ -18,7 +18,7 @@
 import logging
 
 from canonicaljson import json
-from cbor2 as cbor
+import cbor2 as cbor
 
 from synapse.api.errors import Codes, SynapseError
 

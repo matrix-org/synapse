@@ -449,7 +449,7 @@ def select_content_type(request):
     if accepts is None:
         return "application/json"
     mimetypes = accepts.decode().split(",")
-    mimetypes = [mt.strip().lower().split("q=")for mt in mimetypes]
+    mimetypes = [mt.strip().lower().split(";q=")for mt in mimetypes]
     mimetype = "application/json"
     currentQuality = 0
     for mt in mimetypes:
