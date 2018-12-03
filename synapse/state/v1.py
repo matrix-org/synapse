@@ -298,6 +298,8 @@ def _resolve_normal_events(events, auth_events):
 
 def _ordered_events(events):
     def key_func(e):
-        return -int(e.depth), hashlib.sha1(e.event_id.encode('ascii')).hexdigest()
+        # we have to use utf-8 rather than ascii here because it turns out we allow
+        # people to send us events with non-ascii event IDs :/
+        return -int(e.depth), hashlib.sha1(e.event_id.encode('utf-8')).hexdigest()
 
     return sorted(events, key=key_func)
