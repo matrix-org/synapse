@@ -209,7 +209,7 @@ def _rule_spec_from_path(path):
     if len(path) == 0 or len(path[0]) == 0:
         raise UnrecognizedRequestError()
 
-    rule_id = path[0].decode('ascii')
+    rule_id = path[0].decode('utf8')
 
     spec = {
         'scope': scope,
