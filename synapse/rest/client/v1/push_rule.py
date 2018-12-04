@@ -190,13 +190,14 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
 def _rule_spec_from_path(path):
     """Turn a sequence of path components into a rule spec
-    
+
     Args:
         path (sequence[unicode]): the URL path components.
-        
+
     Returns:
-        dict: rule spec dict, containing scope/template/rule_id entries, and possibly attr.
-        
+        dict: rule spec dict, containing scope/template/rule_id entries, 
+            and possibly attr.
+
     Raises:
         UnrecognizedRequestError if the path components cannot be parsed.
     """
