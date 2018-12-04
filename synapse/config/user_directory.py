@@ -23,10 +23,14 @@ class UserDirectoryConfig(Config):
 
     def read_config(self, config):
         self.user_directory_search_all_users = False
+        self.user_directory_enabled = True
         user_directory_config = config.get("user_directory", None)
         if user_directory_config:
             self.user_directory_search_all_users = (
                 user_directory_config.get("search_all_users", False)
+            )
+            self.user_directory_enabled = (
+                user_directory_config.get("enabled", True)
             )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
@@ -39,6 +43,12 @@ class UserDirectoryConfig(Config):
         # UPDATE user_directory_stream_pos SET stream_id = NULL;
         # on your database to tell it to rebuild the user_directory search indexes.
         #
+        # 'enabled' when false will disable the user directory entirely. Users will not
+        # be indexed and users will receive errors when searching for users (often done
+        # while finding people to invite to a room) when the directory is disabled. This
+        # defaults to enabled.
+        #
         #user_directory:
+        #   enabled: true
         #   search_all_users: false
         """

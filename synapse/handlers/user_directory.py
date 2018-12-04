@@ -20,6 +20,7 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import get_localpart_from_id
@@ -58,6 +59,7 @@ class UserDirectoryHandler(object):
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.update_user_directory
         self.search_all_users = hs.config.user_directory_search_all_users
+        self.enabled = hs.config.user_directory_enabled
 
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
@@ -73,7 +75,7 @@ class UserDirectoryHandler(object):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if self.update_user_directory:
+        if self.update_user_directory and self.enabled:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
@@ -97,12 +99,14 @@ class UserDirectoryHandler(object):
                     ]
                 }
         """
+        if not self.enabled:
+            raise SynapseError(400, "User directory is disabled on this homeserver")
         return self.store.search_user_dir(user_id, search_term, limit)
 
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
-        if not self.update_user_directory:
+        if not self.update_user_directory or not self.enabled:
             return
 
         if self._is_processing:
@@ -123,6 +127,8 @@ class UserDirectoryHandler(object):
         """Called to update index of our local user profiles when they change
         irrespective of any rooms the user may be in.
         """
+        if not self.enabled:
+            defer.returnValue(None)
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
         yield self.store.update_profile_in_user_dir(
@@ -133,6 +139,8 @@ class UserDirectoryHandler(object):
     def handle_user_deactivated(self, user_id):
         """Called when a user ID is deactivated
         """
+        if not self.enabled:
+            defer.returnValue(None)
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
         yield self.store.remove_from_user_dir(user_id)
