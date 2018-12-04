@@ -125,50 +125,6 @@ class ServerConfig(Config):
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
-        bind_port = config.get("bind_port")
-        if bind_port:
-            self.listeners = []
-            bind_host = config.get("bind_host", "")
-            gzip_responses = config.get("gzip_responses", True)
-
-            names = ["client", "webclient"] if self.web_client else ["client"]
-
-            self.listeners.append({
-                "port": bind_port,
-                "bind_addresses": [bind_host],
-                "tls": True,
-                "type": "http",
-                "resources": [
-                    {
-                        "names": names,
-                        "compress": gzip_responses,
-                    },
-                    {
-                        "names": ["federation"],
-                        "compress": False,
-                    }
-                ]
-            })
-
-            unsecure_port = config.get("unsecure_port", bind_port - 400)
-            if unsecure_port:
-                self.listeners.append({
-                    "port": unsecure_port,
-                    "bind_addresses": [bind_host],
-                    "tls": False,
-                    "type": "http",
-                    "resources": [
-                        {
-                            "names": names,
-                            "compress": gzip_responses,
-                        },
-                        {
-                            "names": ["federation"],
-                            "compress": False,
-                        }
-                    ]
-                })
-
         manhole = config.get("manhole")
         if manhole:
             self.listeners.append({

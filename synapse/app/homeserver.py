@@ -124,6 +124,9 @@ class SynapseHomeServer(HomeServer):
         resources = {}
         for res in listener_config["resources"]:
             for name in res["names"]:
+                if not config.web_client and name == "webclient":
+                    continue
+
                 resources.update(self._configure_named_resource(
                     name, res.get("compress", False),
                 ))
