@@ -195,7 +195,7 @@ def _rule_spec_from_path(path):
         path (sequence[unicode]): the URL path components.
 
     Returns:
-        dict: rule spec dict, containing scope/template/rule_id entries, 
+        dict: rule spec dict, containing scope/template/rule_id entries,
             and possibly attr.
 
     Raises:
