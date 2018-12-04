@@ -333,7 +333,7 @@ content served to web browsers a matrix API from being able to attack webapps ho
 on the same domain.  This is particularly true of sharing a matrix webclient and
 server on the same domain.
 
-See https://github.com/vector-im/vector-web/issues/1977 and
+See https://github.com/vector-im/riot-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
 
@@ -828,7 +828,7 @@ Password reset
 ==============
 
 If a user has registered an email address to their account using an identity
-server, they can request a password-reset token via clients such as Vector.
+server, they can request a password-reset token via clients such as Riot.
 
 A manual password reset can be done via direct database access as follows.
 
