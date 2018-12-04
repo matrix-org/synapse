@@ -103,7 +103,7 @@ def exception_to_unicode(e):
     elif len(e.args) > 1:
         return six.text_type(repr(e.args))
 
-    msg = e.args
+    msg = e.args[0]
     if isinstance(msg, bytes):
         return msg.decode('utf-8', errors='replace')
     else:
