@@ -46,7 +46,7 @@ class SearchStore(BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
         super(SearchStore, self).__init__(db_conn, hs)
 
-        if hs.config.enable_search:
+        if not hs.config.enable_search:
             return
 
         self.register_background_update_handler(
