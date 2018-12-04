@@ -157,10 +157,10 @@ class ServerConfig(Config):
     def default_config(self, server_name, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
-            unsecure_port = bind_port - 400
+            insecure_port = bind_port - 400
         else:
             bind_port = 8448
-            unsecure_port = 8008
+            insecure_port = 8008
 
         pid_file = self.abspath("homeserver.pid")
         return """\
@@ -289,9 +289,9 @@ class ServerConfig(Config):
             #     module: my_module.CustomRequestHandler
             #     config: {}
 
-          # Unsecure HTTP listener,
+          # Insecure HTTP listener,
           # For when matrix traffic passes through loadbalancer that unwraps TLS.
-          - port: %(unsecure_port)s
+          - port: %(insecure_port)s
             tls: false
             bind_addresses: ['::', '0.0.0.0']
             type: http
