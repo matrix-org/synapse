@@ -119,7 +119,6 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "device_lists_stream", "stream_id",
         )
 
-        self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
