@@ -3,7 +3,7 @@ Synapse 0.34.0rc1 (2018-12-04)
 
 Synapse 0.34 is the first release to fully support Python 3. We recommend
 upgrading to Python 3, but make sure to read the
-[UPGRADE.rst#upgrading-to-v0340](upgrade notes) when doing so.
+[https://github.com/matrix-org/synapse/blob/release-v0.34.0/UPGRADE.rst#upgrading-to-v0340](upgrade notes) when doing so.
 
 Features
 --------
