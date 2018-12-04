@@ -850,9 +850,9 @@ class SQLBaseStore(object):
         rowcount = cls._simple_update_txn(txn, table, keyvalues, updatevalues)
 
         if rowcount == 0:
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if rowcount > 1:
-            raise StoreError(500, "More than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
     @staticmethod
     def _simple_select_one_txn(txn, table, keyvalues, retcols,
@@ -869,9 +869,9 @@ class SQLBaseStore(object):
         if not row:
             if allow_none:
                 return None
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if txn.rowcount > 1:
-            raise StoreError(500, "More than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
         return dict(zip(retcols, row))
 
@@ -903,9 +903,9 @@ class SQLBaseStore(object):
 
         txn.execute(sql, list(keyvalues.values()))
         if txn.rowcount == 0:
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if txn.rowcount > 1:
-            raise StoreError(500, "more than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
     def _simple_delete(self, table, keyvalues, desc):
         return self.runInteraction(
