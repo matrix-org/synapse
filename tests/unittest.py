@@ -34,7 +34,9 @@ from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContext, LoggingContextFilter
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
-from tests.utils import default_config
+from tests.utils import default_config, setupdb
+
+setupdb()
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
