@@ -217,7 +217,19 @@ class RegistrationHandler(BaseHandler):
                     user_id = None
                     token = None
                     attempts += 1
+        if not self.hs.config.user_consent_at_registration:
+            yield self._auto_join_rooms(user_id)
 
+        defer.returnValue((user_id, token))
+
+    @defer.inlineCallbacks
+    def _auto_join_rooms(self, user_id):
+        """Automatically joins users to auto join rooms - creating the room in the first place
+        if the user is the first to be created.
+
+        Args:
+            user_id(str): The user to join
+        """
         # auto-join the user to any rooms we're supposed to dump them into
         fake_requester = create_requester(user_id)
 
@@ -226,7 +238,6 @@ class RegistrationHandler(BaseHandler):
         if self.hs.config.autocreate_auto_join_rooms:
             count = yield self.store.count_all_users()
             should_auto_create_rooms = count == 1
-
         for r in self.hs.config.auto_join_rooms:
             try:
                 if should_auto_create_rooms:
@@ -256,7 +267,15 @@ class RegistrationHandler(BaseHandler):
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
-        defer.returnValue((user_id, token))
+    @defer.inlineCallbacks
+    def post_consent_actions(self, user_id):
+        """A series of registration actions that can only be carried out once consent
+        has been granted
+
+        Args:
+            user_id (str): The user to join
+        """
+        yield self._auto_join_rooms(user_id)
 
     @defer.inlineCallbacks
     def appservice_register(self, user_localpart, as_token):

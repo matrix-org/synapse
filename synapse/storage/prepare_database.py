@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 52
+SCHEMA_VERSION = 53
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -257,7 +257,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
                 module.run_create(cur, database_engine)
                 if not is_empty:
                     module.run_upgrade(cur, database_engine, config=config)
-            elif ext == ".pyc":
+            elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
                 # installers. Silently skip it

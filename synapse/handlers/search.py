@@ -50,6 +50,9 @@ class SearchHandler(BaseHandler):
             dict to be returned to the client with results of search
         """
 
+        if not self.hs.config.enable_search:
+            raise SynapseError(400, "Search is disabled on this homeserver")
+
         batch_group = None
         batch_group_key = None
         batch_token = None
