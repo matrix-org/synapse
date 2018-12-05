@@ -14,11 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
+import calendar
 import logging
 import time
-
-from dateutil import tz
 
 from synapse.api.constants import PresenceState
 from synapse.storage.devices import DeviceStore
@@ -357,10 +355,11 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         Returns millisecond unixtime for start of UTC day.
         """
-        now = datetime.datetime.utcnow()
-        today_start = datetime.datetime(now.year, now.month,
-                                        now.day, tzinfo=tz.tzutc())
-        return int(time.mktime(today_start.timetuple())) * 1000
+        now = time.gmtime()
+        today_start = calendar.timegm((
+            now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0,
+        ))
+        return today_start * 1000
 
     def generate_user_daily_visits(self):
         """
