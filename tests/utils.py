@@ -139,6 +139,7 @@ def default_config(name):
     config.admin_contact = None
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
+    config.saml2_enabled = False
 
     config.use_frozen_dicts = False
 

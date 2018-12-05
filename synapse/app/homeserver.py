@@ -199,6 +199,10 @@ class SynapseHomeServer(HomeServer):
                 "/.well-known/matrix/client": WellKnownResource(self),
             })
 
+            if self.get_config().saml2_enabled:
+                from synapse.rest.saml2 import SAML2Resource
+                resources["/_matrix/saml2"] = SAML2Resource(self)
+
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
             consent_resource = ConsentResource(self)
