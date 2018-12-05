@@ -22,6 +22,10 @@ import attr
 
 from twisted.web._newclient import ResponseDone
 from twisted.internet.defer import Deferred, succeed
+from twisted.internet._resolver import HostResolution
+from twisted.internet.address import IPv4Address
+from twisted.internet.defer import Deferred
+from twisted.internet.error import DNSLookupError
 from twisted.web.http_headers import Headers
 from twisted.web.client import Response
 from twisted.python.failure import Failure
@@ -109,6 +113,32 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Load in the Agent we want
         self.preview_url.client._make_agent(Agent())
 
+        self.lookups = {}
+
+        class Resolver(object):
+            def resolveHostName(
+                _self,
+                resolutionReceiver,
+                hostName,
+                portNumber=0,
+                addressTypes=None,
+                transportSemantics='TCP',
+            ):
+
+                resolution = HostResolution(hostName)
+                resolutionReceiver.resolutionBegan(resolution)
+                if hostName not in self.lookups:
+                    raise DNSLookupError("OH NO")
+
+                for i in self.lookups[hostName]:
+                    resolutionReceiver.addressResolved(
+                        i[0]('TCP', i[1], portNumber)
+                    )
+                resolutionReceiver.resolutionComplete()
+                return resolutionReceiver
+
+        self.reactor.nameResolver = Resolver()
+
     def test_cache_returns_correct_type(self):
 
         calls = [0]
@@ -126,6 +156,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             return succeed(resp)
 
         self._on_request = _on_request
+
+    def test_cache_returns_correct_type(self):
 
         request, channel = self.make_request(
             "GET", "url_preview?url=matrix.org", shorthand=False
@@ -259,7 +291,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self._on_request = _on_request
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://8.8.8.8", shorthand=False
+            "GET", "url_preview?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -287,7 +319,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self._on_request = _on_request
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://192.168.1.1", shorthand=False
+            "GET", "url_preview?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -319,7 +351,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self._on_request = _on_request
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://1.1.1.2", shorthand=False
+            "GET", "url_preview?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
@@ -352,11 +384,46 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self._on_request = _on_request
 
         request, channel = self.make_request(
-            "GET", "url_preview?url=http://1.1.1.1", shorthand=False
+            "GET", "url_preview?url=http://example.com", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+        )
+
+    def test_blacklisted_ip_with_external_ip(self):
+        """
+        If a hostname resolves a blacklisted IP, even if there's a
+        non-blacklisted one, it will be rejected.
+        """
+        def _on_request(method, uri, headers=None, bodyProducer=None):
+
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(self.end_content))],
+                    b"Content-Type": [b'text/html'],
+                }
+            )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, self.end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
+
+        # Hardcode the URL resolving to the IP we want.
+        self.lookups[u"example.com"] = ["1.1.1.2", "8.8.8.8"]
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://example.com", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+        self.assertEqual(channel.code, 403)
+        self.assertEqual(
+            channel.json_body,
+            {
+                'errcode': 'M_UNKNOWN',
+                'error': 'IP address blocked by IP blacklist entry',
+            },
         )
