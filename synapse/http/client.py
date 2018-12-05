@@ -262,9 +262,6 @@ class SimpleHttpClient(object):
             )
             defer.returnValue(response)
         except Exception as e:
-            print(e)
-            import traceback
-            traceback.print_exc()
             incoming_responses_counter.labels(method, "ERR").inc()
             logger.info(
                 "Error sending request to  %s %s: %s %s",
