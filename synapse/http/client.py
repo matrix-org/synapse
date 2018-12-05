@@ -112,7 +112,7 @@ class IPBlacklistingResolver(object):
 
 
 class BlacklistingAgentWrapper(Agent):
-    def __init__(self, agent, reactor, *args, whitelist=None, blacklist=None, **kwargs):
+    def __init__(self, agent, reactor, whitelist=None, blacklist=None):
         self._agent = agent
         self._whitelist = whitelist
         self._blacklist = blacklist
