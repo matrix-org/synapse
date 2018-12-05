@@ -89,6 +89,7 @@ class ConsentResource(Resource):
 
         self.hs = hs
         self.store = hs.get_datastore()
+        self.registration_handler = hs.get_handlers().registration_handler
 
         # this is required by the request_handler wrapper
         self.clock = hs.get_clock()
@@ -199,6 +200,7 @@ class ConsentResource(Resource):
             if e.code != 404:
                 raise
             raise NotFoundError("Unknown user")
+        yield self.registration_handler.post_consent_actions(qualified_user_id)
 
         try:
             self._render_template(request, "success.html")

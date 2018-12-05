@@ -62,6 +62,11 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # whether to enable search. If disabled, new entries will not be inserted
+        # into the search tables and they will not be indexed. Users will receive
+        # errors when attempting to search for messages.
+        self.enable_search = config.get("enable_search", True)
+
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
         # Whether we should block invites sent to users on this server
@@ -384,7 +389,12 @@ class ServerConfig(Config):
           # mau_limit_reserved_threepids:
           # - medium: 'email'
           #   address: 'reserved_user@example.com'
-
+          #
+          # Room searching
+          #
+          # If disabled, new messages will not be indexed for searching and users
+          # will receive errors when searching for messages. Defaults to enabled.
+          # enable_search: true
         """ % locals()
 
     def read_arguments(self, args):
