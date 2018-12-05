@@ -46,6 +46,8 @@ class WellKnownTests(unittest.HomeserverTestCase):
         )
 
     def test_well_known_no_public_baseurl(self):
+        self.hs.config.public_baseurl = None
+
         request, channel = self.make_request(
             "GET",
             "/.well-known/matrix/client",
