@@ -23,7 +23,11 @@ import treq
 from canonicaljson import encode_canonical_json, json
 from prometheus_client import Counter
 
+from netaddr import IPAddress
+
+from hyperlink import URL
 from OpenSSL import SSL
+from twisted.python.failure import Failure
 from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, protocol, reactor, ssl
 from twisted.web._newclient import ResponseDone
@@ -43,11 +47,94 @@ from synapse.util.async_helpers import timeout_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
 
+from twisted.internet.address import IPv4Address, IPv6Address
+
 logger = logging.getLogger(__name__)
 
 outgoing_requests_counter = Counter("synapse_http_client_requests", "", ["method"])
 incoming_responses_counter = Counter("synapse_http_client_responses", "",
                                      ["method", "code"])
+
+def check_against_blacklist(ip_address, whitelist, blacklist):
+    if ip_address in blacklist:
+        if whitelist is None or ip_address not in whitelist:
+            return True
+    return False
+
+
+class IPBlacklistingResolver(object):
+    def __init__(self, reactor, whitelist, blacklist):
+        self._reactor = reactor
+        self._whitelist = whitelist
+        self._blacklist = blacklist
+
+    def resolveHostName(recv, hostname, portNumber=0):
+
+        r = recv()
+        d = Deferred()
+
+        @provider(IResolutionReceiver)
+        class EndpointReceiver(object):
+            @staticmethod
+            def resolutionBegan(resolutionInProgress):
+                pass
+            @staticmethod
+            def addressResolved(address):
+                print(repr(address))
+                ip_address = IPAddress(address.host)
+
+                if check_against_blacklist(ip_address, self.whitelist, self._blacklist):
+                    logger.info(
+                        "Dropped %s from DNS resolution to %s"
+                        % (ip_address, hostname)
+                    )
+                    raise SynapseError(403, "IP address blocked by IP blacklist entry")
+
+                addresses.append(address)
+            @staticmethod
+            def resolutionComplete():
+                d.callback(addresses)
+
+        self._reactor.nameResolver.resolveHostName(
+            EndpointReceiver, hostname, portNumber=portNumber
+        )
+
+        def _callback(addrs):
+            r.resolutionBegan(None)
+            for i in addrs:
+                r.addressResolved(i)
+            r.resolutionComplete()
+
+        d.addCallback(_callback)
+
+        return r
+
+
+class BlacklistingAgentWrapper(Agent):
+
+    def __init__(self, agent, reactor, *args, whitelist=None, blacklist=None, **kwargs):
+        self._agent = agent
+        self._whitelist = whitelist
+        self._blacklist = blacklist
+
+        # Put in our own blacklisting resolver.
+        agent._nameResolver = IPBlacklistingResolver(reactor, whitelist, blacklist)
+
+    def request(self, method, uri, headers=None, bodyProducer=None):
+        h = URL.from_text(uri.decode('ascii'))
+
+        try:
+            ip_address = IPAddress(h.host)
+
+            if check_against_blacklist(ip_address, self._whitelist, self._blacklist):
+                logger.info("Blocking access to %s because of blacklist" % (ip_address,))
+                e = SynapseError(403, "IP address blocked by IP blacklist entry")
+                return defer.fail(Failure(e))
+        except:
+            # Not an IP
+            pass
+
+        return self._agent.request(method, uri, headers=headers, bodyProducer=bodyProducer)
 
 
 class SimpleHttpClient(object):
@@ -56,7 +143,7 @@ class SimpleHttpClient(object):
     using HTTP in Matrix
     """
 
-    def __init__(self, hs, treq_args={}, whitelist=None, blacklist=None, _treq=treq):
+    def __init__(self, hs, treq_args={}, whitelist=None, blacklist=None):
         """
         Args:
             hs (synapse.server.HomeServer)
@@ -65,31 +152,13 @@ class SimpleHttpClient(object):
                 we may not request.
             whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
-            _treq (treq): Treq implementation, can be overridden for testing.
         """
         self.hs = hs
 
-        pool = HTTPConnectionPool(reactor)
-        self._treq = _treq
+        self._whitelist = whitelist
+        self._blacklist = blacklist
         self._extra_treq_args = treq_args
-        self.whitelist = whitelist
-        self.blacklist = blacklist
 
-        # the pusher makes lots of concurrent SSL connections to sygnal, and
-        # tends to do so in batches, so we need to allow the pool to keep lots
-        # of idle connections around.
-        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
-        pool.cachedConnectionTimeout = 2 * 60
-
-        # The default context factory in Twisted 14.0.0 (which we require) is
-        # BrowserLikePolicyForHTTPS which will do regular cert validation
-        # 'like a browser'
-        self.agent = Agent(
-            reactor,
-            connectTimeout=15,
-            contextFactory=hs.get_http_client_context_factory(),
-            pool=pool,
-        )
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
         self.reactor = hs.get_reactor()
@@ -97,6 +166,38 @@ class SimpleHttpClient(object):
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix,)
 
         self.user_agent = self.user_agent.encode('ascii')
+        self._make_agent()
+
+    def _make_agent(self, _agent=False):
+
+        if _agent:
+            self.agent = _agent
+        else:
+            # the pusher makes lots of concurrent SSL connections to sygnal, and
+            # tends to do so in batches, so we need to allow the pool to keep
+            # lots of idle connections around.
+            pool = HTTPConnectionPool(self.reactor)
+            pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
+            pool.cachedConnectionTimeout = 2 * 60
+
+            # The default context factory in Twisted 14.0.0 (which we require) is
+            # BrowserLikePolicyForHTTPS which will do regular cert validation
+            # 'like a browser'
+            self.agent = Agent(
+                reactor,
+                connectTimeout=15,
+                contextFactory=self.hs.get_http_client_context_factory(),
+                pool=pool,
+            )
+
+        # If we have an IP blacklist, use the blacklisting Agent wrapper.
+        if self._blacklist:
+            self.agent = BlacklistingAgentWrapper(
+                self.agent,
+                reactor,
+                whitelist=self._whitelist,
+                blacklist=self._blacklist,
+            )
 
     @defer.inlineCallbacks
     def request(self, method, uri, data=b'', headers=None):
@@ -110,27 +211,6 @@ class SimpleHttpClient(object):
         Raises:
             SynapseError: If the IP is blacklisted.
         """
-        # Check our IP whitelists/blacklists before making the request.
-        if self.blacklist:
-            split_uri = URI.fromBytes(uri.encode('utf8'))
-            address = yield make_deferred_yieldable(
-                self.reactor.resolve(split_uri.host)
-            )
-
-            from netaddr import IPAddress
-
-            ip_address = IPAddress(address)
-
-            if ip_address in self.blacklist:
-                if self.whitelist is None or ip_address not in self.whitelist:
-                    logger.info(
-                        "Blocked accessing %s because of blacklisted IP %s"
-                        % (split_uri.host.decode('utf8'), ip_address)
-                    )
-                    raise SynapseError(
-                        403, "IP address blocked by IP blacklist entry", Codes.UNKNOWN
-                    )
-
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
         outgoing_requests_counter.labels(method).inc()
@@ -139,7 +219,7 @@ class SimpleHttpClient(object):
         logger.info("Sending request %s %s", method, redact_uri(uri))
 
         try:
-            request_deferred = self._treq.request(
+            request_deferred = treq.request(
                 method,
                 uri,
                 agent=self.agent,
@@ -397,7 +477,7 @@ class SimpleHttpClient(object):
         resp_headers = dict(response.headers.getAllRawHeaders())
 
         if (b'Content-Length' in resp_headers and
-                int(resp_headers[b'Content-Length']) > max_size):
+                int(resp_headers[b'Content-Length'][0]) > max_size):
             logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
                 502,

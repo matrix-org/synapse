@@ -18,9 +18,13 @@ import os
 from mock import Mock
 
 from netaddr import IPSet
+import attr
 
+from twisted.web._newclient import ResponseDone
 from twisted.internet.defer import Deferred, succeed
 from twisted.web.http_headers import Headers
+from twisted.web.client import Response
+from twisted.python.failure import Failure
 
 from synapse.config.repository import MediaStorageProviderConfig
 from synapse.util.logcontext import make_deferred_yieldable
@@ -29,10 +33,38 @@ from synapse.util.module_loader import load_module
 from tests import unittest
 
 
+@attr.s
+class FakeResponse(object):
+    version = attr.ib()
+    code = attr.ib()
+    phrase = attr.ib()
+    headers = attr.ib()
+    body = attr.ib()
+    absoluteURI = attr.ib()
+
+    @property
+    def request(self):
+        @attr.s
+        class FakeTransport(object):
+            absoluteURI = self.absoluteURI
+
+        return FakeTransport()
+
+    def deliverBody(self, protocol):
+        protocol.dataReceived(self.body)
+        protocol.connectionLost(Failure(ResponseDone()))
+
+
 class URLPreviewTests(unittest.HomeserverTestCase):
 
     hijack_auth = True
     user_id = "@test:user"
+    end_content = (
+        b'<html><head>'
+        b'<meta property="og:title" content="~matrix~" />'
+        b'<meta property="og:description" content="hi" />'
+        b'</head></html>'
+    )
 
     def make_homeserver(self, reactor, clock):
 
@@ -67,71 +99,45 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
 
-        self.fetches = []
-
-        def get_file(url, output_stream, max_size):
-            """
-            Returns tuple[int,dict,str,int] of file length, response headers,
-            absolute URI, and response code.
-            """
-
-            def write_to(r):
-                data, response = r
-                output_stream.write(data)
-                return response
-
-            d = Deferred()
-            d.addCallback(write_to)
-            self.fetches.append((d, url))
-            return make_deferred_yieldable(d)
-
-        client = Mock()
-        client.get_file = get_file
-
         self.media_repo = hs.get_media_repository_resource()
-        preview_url = self.media_repo.children[b'preview_url']
-        self._old_client = preview_url.client
-        preview_url.client = client
-        self.preview_url = preview_url
+        self.preview_url = self.media_repo.children[b'preview_url']
+
+        class Agent(object):
+            def request(_self, *args, **kwargs):
+                return self._on_request(*args, **kwargs)
+
+        # Load in the Agent we want
+        self.preview_url.client._make_agent(Agent())
 
     def test_cache_returns_correct_type(self):
+
+        calls = [0]
+
+        def _on_request(method, uri, headers=None, bodyProducer=None):
+
+            calls[0] += 1
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(self.end_content))],
+                    b"Content-Type": [b'text/html; charset="utf8"'],
+                }
+            )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, self.end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
 
         request, channel = self.make_request(
             "GET", "url_preview?url=matrix.org", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
-
-        # We've made one fetch
-        self.assertEqual(len(self.fetches), 1)
-
-        end_content = (
-            b'<html><head>'
-            b'<meta property="og:title" content="~matrix~" />'
-            b'<meta property="og:description" content="hi" />'
-            b'</head></html>'
-        )
-
-        self.fetches[0][0].callback(
-            (
-                end_content,
-                (
-                    len(end_content),
-                    {
-                        b"Content-Length": [b"%d" % (len(end_content))],
-                        b"Content-Type": [b'text/html; charset="utf8"'],
-                    },
-                    "https://example.com",
-                    200,
-                ),
-            )
-        )
-
-        self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
         )
+
+        self.assertEqual(calls[0], 1)
 
         # Check the cache returns the correct response
         request, channel = self.make_request(
@@ -141,7 +147,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.pump()
 
         # Only one fetch, still, since we'll lean on the cache
-        self.assertEqual(len(self.fetches), 1)
+        self.assertEqual(calls[0], 1)
 
         # Check the cache response has the same content
         self.assertEqual(channel.code, 200)
@@ -162,7 +168,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.pump()
 
         # Only one fetch, still, since we'll lean on the cache
-        self.assertEqual(len(self.fetches), 1)
+        self.assertEqual(calls[0], 1)
 
         # Check the cache response has the same content
         self.assertEqual(channel.code, 200)
@@ -172,15 +178,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def test_non_ascii_preview_httpequiv(self):
 
-        request, channel = self.make_request(
-            "GET", "url_preview?url=matrix.org", shorthand=False
-        )
-        request.render(self.preview_url)
-        self.pump()
-
-        # We've made one fetch
-        self.assertEqual(len(self.fetches), 1)
-
         end_content = (
             b'<html><head>'
             b'<meta http-equiv="Content-Type" content="text/html; charset=windows-1251"/>'
@@ -189,37 +186,31 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b'</head></html>'
         )
 
-        self.fetches[0][0].callback(
-            (
-                end_content,
-                (
-                    len(end_content),
-                    {
-                        b"Content-Length": [b"%d" % (len(end_content))],
-                        # This charset=utf-8 should be ignored, because the
-                        # document has a meta tag overriding it.
-                        b"Content-Type": [b'text/html; charset="utf8"'],
-                    },
-                    "https://example.com",
-                    200,
-                ),
+        def _on_request(method, uri, headers=None, bodyProducer=None):
+
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(end_content))],
+                    # This charset=utf-8 should be ignored, because the
+                    # document has a meta tag overriding it.
+                    b"Content-Type": [b'text/html; charset="utf8"'],
+                }
             )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=matrix.org", shorthand=False
         )
+        request.render(self.preview_url)
 
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
 
     def test_non_ascii_preview_content_type(self):
-
-        request, channel = self.make_request(
-            "GET", "url_preview?url=matrix.org", shorthand=False
-        )
-        request.render(self.preview_url)
-        self.pump()
-
-        # We've made one fetch
-        self.assertEqual(len(self.fetches), 1)
 
         end_content = (
             b'<html><head>'
@@ -228,72 +219,49 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b'</head></html>'
         )
 
-        self.fetches[0][0].callback(
-            (
-                end_content,
-                (
-                    len(end_content),
-                    {
-                        b"Content-Length": [b"%d" % (len(end_content))],
-                        b"Content-Type": [b'text/html; charset="windows-1251"'],
-                    },
-                    "https://example.com",
-                    200,
-                ),
-            )
-        )
+        def _on_request(method, uri, headers=None, bodyProducer=None):
 
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(end_content))],
+                    b"Content-Type": [b'text/html; charset="windows-1251"'],
+                }
+            )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=matrix.org", shorthand=False
+        )
+        request.render(self.preview_url)
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
-
-    def make_response(self, body, headers):
-
-        # Assemble a mocked out response
-        def deliver(to):
-            to.dataReceived(body)
-            to.connectionLost(Mock())
-
-        res = Mock()
-        res.code = 200
-        res.headers = Headers(headers)
-        res.deliverBody = deliver
-
-        return res
 
     def test_ipaddr(self):
         """
         IP addresses can be previewed directly.
         """
-        # Mock out Treq to one we control
-        treq = Mock()
-        d = Deferred()
-        treq.request = Mock(return_value=d)
-        self.preview_url.client = self._old_client
-        self.preview_url.client._treq = treq
 
-        # Hardcode the URL resolving to the IP we want
-        self.reactor.resolve = lambda x: succeed("8.8.8.8")
+        def _on_request(method, uri, headers=None, bodyProducer=None):
+
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(self.end_content))],
+                    b"Content-Type": [b'text/html'],
+                }
+            )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, self.end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://8.8.8.8", shorthand=False
         )
         request.render(self.preview_url)
-        self.pump()
-
-        self.assertEqual(treq.request.call_count, 1)
-
-        end_content = (
-            b'<html><head>'
-            b'<meta property="og:title" content="~matrix~" />'
-            b'<meta property="og:description" content="hi" />'
-            b'</head></html>'
-        )
-
-        # Build and deliver the mocked out response.
-        res = self.make_response(end_content, {b"Content-Type": [b"text/html"]})
-        d.callback(res)
-
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(
@@ -304,24 +272,25 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         Blacklisted IP addresses are not spidered.
         """
-        # Mock out Treq to one we control
-        treq = Mock()
-        d = Deferred()
-        treq.request = Mock(return_value=d)
-        self.preview_url.client = self._old_client
-        self.preview_url.client._treq = treq
 
-        # Hardcode the URL resolving to the IP we want
-        self.reactor.resolve = lambda x: succeed("192.168.1.1")
+        def _on_request(method, uri, headers=None, bodyProducer=None):
+
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(self.end_content))],
+                    b"Content-Type": [b'text/html'],
+                }
+            )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, self.end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://192.168.1.1", shorthand=False
         )
         request.render(self.preview_url)
         self.pump()
-
-        # Treq is NOT called, because it will be blacklisted
-        self.assertEqual(treq.request.call_count, 0)
         self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
@@ -335,15 +304,19 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         Blacklisted IP ranges are not spidered.
         """
-        # Mock out Treq to one we control
-        treq = Mock()
-        d = Deferred()
-        treq.request = Mock(return_value=d)
-        self.preview_url.client = self._old_client
-        self.preview_url.client._treq = treq
 
-        # Hardcode the URL resolving to the IP we want
-        self.reactor.resolve = lambda x: succeed("1.1.1.2")
+        def _on_request(method, uri, headers=None, bodyProducer=None):
+
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(self.end_content))],
+                    b"Content-Type": [b'text/html'],
+                }
+            )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, self.end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://1.1.1.2", shorthand=False
@@ -351,8 +324,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        # Treq is NOT called, because it will be blacklisted
-        self.assertEqual(treq.request.call_count, 0)
         self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
@@ -367,36 +338,23 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         Blacklisted but then subsequently whitelisted IP addresses can be
         spidered.
         """
-        # Mock out Treq to one we control
-        treq = Mock()
-        d = Deferred()
-        treq.request = Mock(return_value=d)
-        self.preview_url.client = self._old_client
-        self.preview_url.client._treq = treq
+        def _on_request(method, uri, headers=None, bodyProducer=None):
 
-        # Hardcode the URL resolving to the IP we want. This is an IP that is
-        # caught by a blacklist range, but is then subsequently whitelisted.
-        self.reactor.resolve = lambda x: succeed("1.1.1.1")
+            h = Headers(
+                {
+                    b"Content-Length": [b"%d" % (len(self.end_content))],
+                    b"Content-Type": [b'text/html'],
+                }
+            )
+            resp = FakeResponse(b"1.1", 200, b"OK", h, self.end_content, uri)
+            return succeed(resp)
+
+        self._on_request = _on_request
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://1.1.1.1", shorthand=False
         )
         request.render(self.preview_url)
-        self.pump()
-
-        self.assertEqual(treq.request.call_count, 1)
-
-        end_content = (
-            b'<html><head>'
-            b'<meta property="og:title" content="~matrix~" />'
-            b'<meta property="og:description" content="hi" />'
-            b'</head></html>'
-        )
-
-        # Build and deliver the mocked out response.
-        res = self.make_response(end_content, {b"Content-Type": [b"text/html"]})
-        d.callback(res)
-
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(
