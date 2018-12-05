@@ -24,6 +24,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events.utils import serialize_event
+from synapse.storage.state import StateFilter
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -48,6 +49,9 @@ class SearchHandler(BaseHandler):
         Returns:
             dict to be returned to the client with results of search
         """
+
+        if not self.hs.config.enable_search:
+            raise SynapseError(400, "Search is disabled on this homeserver")
 
         batch_group = None
         batch_group_key = None
@@ -324,9 +328,12 @@ class SearchHandler(BaseHandler):
                     else:
                         last_event_id = event.event_id
 
+                    state_filter = StateFilter.from_types(
+                        [(EventTypes.Member, sender) for sender in senders]
+                    )
+
                     state = yield self.store.get_state_for_event(
-                        last_event_id,
-                        types=[(EventTypes.Member, sender) for sender in senders]
+                        last_event_id, state_filter
                     )
 
                     res["profile_info"] = {

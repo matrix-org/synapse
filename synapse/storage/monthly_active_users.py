@@ -33,19 +33,30 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self._clock = hs.get_clock()
         self.hs = hs
         self.reserved_users = ()
+        # Do not add more reserved users than the total allowable number
+        self._new_transaction(
+            dbconn, "initialise_mau_threepids", [], [],
+            self._initialise_reserved_users,
+            hs.config.mau_limits_reserved_threepids[:self.hs.config.max_mau_value],
+        )
 
-    @defer.inlineCallbacks
-    def initialise_reserved_users(self, threepids):
-        store = self.hs.get_datastore()
+    def _initialise_reserved_users(self, txn, threepids):
+        """Ensures that reserved threepids are accounted for in the MAU table, should
+        be called on start up.
+
+        Args:
+            txn (cursor):
+            threepids (list[dict]): List of threepid dicts to reserve
+        """
         reserved_user_list = []
 
-        # Do not add more reserved users than the total allowable number
-        for tp in threepids[:self.hs.config.max_mau_value]:
-            user_id = yield store.get_user_id_by_threepid(
+        for tp in threepids:
+            user_id = self.get_user_id_by_threepid_txn(
+                txn,
                 tp["medium"], tp["address"]
             )
             if user_id:
-                yield self.upsert_monthly_active_user(user_id)
+                self.upsert_monthly_active_user_txn(txn, user_id)
                 reserved_user_list.append(user_id)
             else:
                 logger.warning(
@@ -55,8 +66,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def reap_monthly_active_users(self):
-        """
-        Cleans out monthly active user table to ensure that no stale
+        """Cleans out monthly active user table to ensure that no stale
         entries exist.
 
         Returns:
@@ -87,37 +97,38 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
             txn.execute(sql, query_args)
 
-            # If MAU user count still exceeds the MAU threshold, then delete on
-            # a least recently active basis.
-            # Note it is not possible to write this query using OFFSET due to
-            # incompatibilities in how sqlite and postgres support the feature.
-            # sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be present
-            # While Postgres does not require 'LIMIT', but also does not support
-            # negative LIMIT values. So there is no way to write it that both can
-            # support
-            safe_guard = self.hs.config.max_mau_value - len(self.reserved_users)
-            # Must be greater than zero for postgres
-            safe_guard = safe_guard if safe_guard > 0 else 0
-            query_args = [safe_guard]
+            if self.hs.config.limit_usage_by_mau:
+                # If MAU user count still exceeds the MAU threshold, then delete on
+                # a least recently active basis.
+                # Note it is not possible to write this query using OFFSET due to
+                # incompatibilities in how sqlite and postgres support the feature.
+                # sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be present
+                # While Postgres does not require 'LIMIT', but also does not support
+                # negative LIMIT values. So there is no way to write it that both can
+                # support
+                safe_guard = self.hs.config.max_mau_value - len(self.reserved_users)
+                # Must be greater than zero for postgres
+                safe_guard = safe_guard if safe_guard > 0 else 0
+                query_args = [safe_guard]
 
-            base_sql = """
-                DELETE FROM monthly_active_users
-                WHERE user_id NOT IN (
-                    SELECT user_id FROM monthly_active_users
-                    ORDER BY timestamp DESC
-                    LIMIT ?
+                base_sql = """
+                    DELETE FROM monthly_active_users
+                    WHERE user_id NOT IN (
+                        SELECT user_id FROM monthly_active_users
+                        ORDER BY timestamp DESC
+                        LIMIT ?
+                        )
+                    """
+                # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
+                # when len(reserved_users) == 0. Works fine on sqlite.
+                if len(self.reserved_users) > 0:
+                    query_args.extend(self.reserved_users)
+                    sql = base_sql + """ AND user_id NOT IN ({})""".format(
+                        ','.join(questionmarks)
                     )
-                """
-            # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
-            # when len(reserved_users) == 0. Works fine on sqlite.
-            if len(self.reserved_users) > 0:
-                query_args.extend(self.reserved_users)
-                sql = base_sql + """ AND user_id NOT IN ({})""".format(
-                    ','.join(questionmarks)
-                )
-            else:
-                sql = base_sql
-            txn.execute(sql, query_args)
+                else:
+                    sql = base_sql
+                txn.execute(sql, query_args)
 
         yield self.runInteraction("reap_monthly_active_users", _reap_users)
         # It seems poor to invalidate the whole cache, Postgres supports
@@ -165,19 +176,44 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
+        """Updates or inserts the user into the monthly active user table, which
+        is used to track the current MAU usage of the server
+
+        Args:
+            user_id (str): user to add/update
         """
-            Updates or inserts monthly active user member
-            Arguments:
-                user_id (str): user to add/update
-            Deferred[bool]: True if a new entry was created, False if an
-                existing one was updated.
+        is_insert = yield self.runInteraction(
+            "upsert_monthly_active_user", self.upsert_monthly_active_user_txn,
+            user_id
+        )
+
+        if is_insert:
+            self.user_last_seen_monthly_active.invalidate((user_id,))
+            self.get_monthly_active_count.invalidate(())
+
+    def upsert_monthly_active_user_txn(self, txn, user_id):
+        """Updates or inserts monthly active user member
+
+        Note that, after calling this method, it will generally be necessary
+        to invalidate the caches on user_last_seen_monthly_active and
+        get_monthly_active_count. We can't do that here, because we are running
+        in a database thread rather than the main thread, and we can't call
+        txn.call_after because txn may not be a LoggingTransaction.
+
+        Args:
+            txn (cursor):
+            user_id (str): user to add/update
+
+        Returns:
+            bool: True if a new entry was created, False if an
+            existing one was updated.
         """
         # Am consciously deciding to lock the table on the basis that is ought
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
         # See https://github.com/matrix-org/synapse/issues/3854 for more
-        is_insert = yield self._simple_upsert(
-            desc="upsert_monthly_active_user",
+        is_insert = self._simple_upsert_txn(
+            txn,
             table="monthly_active_users",
             keyvalues={
                 "user_id": user_id,
@@ -186,9 +222,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 "timestamp": int(self._clock.time_msec()),
             },
         )
-        if is_insert:
-            self.user_last_seen_monthly_active.invalidate((user_id,))
-            self.get_monthly_active_count.invalidate(())
+
+        return is_insert
 
     @cached(num_args=1)
     def user_last_seen_monthly_active(self, user_id):
@@ -219,8 +254,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Args:
             user_id(str): the user_id to query
         """
-
-        if self.hs.config.limit_usage_by_mau:
+        if self.hs.config.limit_usage_by_mau or self.hs.config.mau_stats_only:
             # Trial users and guests should not be included as part of MAU group
             is_guest = yield self.is_guest(user_id)
             if is_guest:
@@ -238,8 +272,14 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # but only update if we have not previously seen the user for
             # LAST_SEEN_GRANULARITY ms
             if last_seen_timestamp is None:
-                count = yield self.get_monthly_active_count()
-                if count < self.hs.config.max_mau_value:
+                # In the case where mau_stats_only is True and limit_usage_by_mau is
+                # False, there is no point in checking get_monthly_active_count - it
+                # adds no value and will break the logic if max_mau_value is exceeded.
+                if not self.hs.config.limit_usage_by_mau:
                     yield self.upsert_monthly_active_user(user_id)
+                else:
+                    count = yield self.get_monthly_active_count()
+                    if count < self.hs.config.max_mau_value:
+                        yield self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 yield self.upsert_monthly_active_user(user_id)

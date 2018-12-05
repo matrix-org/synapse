@@ -183,9 +183,7 @@ class TransactionQueue(object):
                         # banned then it won't receive the event because it won't
                         # be in the room after the ban.
                         destinations = yield self.state.get_current_hosts_in_room(
-                            event.room_id, latest_event_ids=[
-                                prev_id for prev_id, _ in event.prev_events
-                            ],
+                            event.room_id, latest_event_ids=event.prev_event_ids(),
                         )
                     except Exception:
                         logger.exception(
@@ -633,14 +631,6 @@ class TransactionQueue(object):
                 transaction, json_data_cb
             )
             code = 200
-
-            if response:
-                for e_id, r in response.get("pdus", {}).items():
-                    if "error" in r:
-                        logger.warn(
-                            "Transaction returned error for %s: %s",
-                            e_id, r,
-                        )
         except HttpResponseException as e:
             code = e.code
             response = e.response
@@ -657,19 +647,24 @@ class TransactionQueue(object):
             destination, txn_id, code
         )
 
-        logger.debug("TX [%s] Sent transaction", destination)
-        logger.debug("TX [%s] Marking as delivered...", destination)
-
         yield self.transaction_actions.delivered(
             transaction, code, response
         )
 
-        logger.debug("TX [%s] Marked as delivered", destination)
+        logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
 
-        if code != 200:
+        if code == 200:
+            for e_id, r in response.get("pdus", {}).items():
+                if "error" in r:
+                    logger.warn(
+                        "TX [%s] {%s} Remote returned error for %s: %s",
+                        destination, txn_id, e_id, r,
+                    )
+        else:
             for p in pdus:
-                logger.info(
-                    "Failed to send event %s to %s", p.event_id, destination
+                logger.warn(
+                    "TX [%s] {%s} Failed to send event %s",
+                    destination, txn_id, p.event_id,
                 )
             success = False
 

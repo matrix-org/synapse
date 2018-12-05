@@ -118,6 +118,11 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             these room keys.
         """
 
+        try:
+            version = int(version)
+        except ValueError:
+            defer.returnValue({'rooms': {}})
+
         keyvalues = {
             "user_id": user_id,
             "version": version,
@@ -212,14 +217,23 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         Raises:
             StoreError: with code 404 if there are no e2e_room_keys_versions present
         Returns:
-            A deferred dict giving the info metadata for this backup version
+            A deferred dict giving the info metadata for this backup version, with
+            fields including:
+                version(str)
+                algorithm(str)
+                auth_data(object): opaque dict supplied by the client
         """
 
         def _get_e2e_room_keys_version_info_txn(txn):
             if version is None:
                 this_version = self._get_current_version(txn, user_id)
             else:
-                this_version = version
+                try:
+                    this_version = int(version)
+                except ValueError:
+                    # Our versions are all ints so if we can't convert it to an integer,
+                    # it isn't there.
+                    raise StoreError(404, "No row found")
 
             result = self._simple_select_one_txn(
                 txn,
@@ -236,6 +250,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 ),
             )
             result["auth_data"] = json.loads(result["auth_data"])
+            result["version"] = str(result["version"])
             return result
 
         return self.runInteraction(

@@ -31,7 +31,7 @@ POWER_KEY = (EventTypes.PowerLevels, "")
 
 
 @defer.inlineCallbacks
-def resolve_events_with_factory(state_sets, event_map, state_map_factory):
+def resolve_events_with_store(state_sets, event_map, state_map_factory):
     """
     Args:
         state_sets(list): List of dicts of (type, state_key) -> event_id,
@@ -298,6 +298,8 @@ def _resolve_normal_events(events, auth_events):
 
 def _ordered_events(events):
     def key_func(e):
-        return -int(e.depth), hashlib.sha1(e.event_id.encode('ascii')).hexdigest()
+        # we have to use utf-8 rather than ascii here because it turns out we allow
+        # people to send us events with non-ascii event IDs :/
+        return -int(e.depth), hashlib.sha1(e.event_id.encode('utf-8')).hexdigest()
 
     return sorted(events, key=key_func)

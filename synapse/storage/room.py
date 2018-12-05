@@ -47,7 +47,7 @@ class RoomWorkerStore(SQLBaseStore):
         Args:
             room_id (str): The ID of the room to retrieve.
         Returns:
-            A namedtuple containing the room information, or an empty list.
+            A dict containing the room information, or None if the room is unknown.
         """
         return self._simple_select_one(
             table="rooms",

@@ -217,19 +217,65 @@ class RegistrationHandler(BaseHandler):
                     user_id = None
                     token = None
                     attempts += 1
+        if not self.hs.config.user_consent_at_registration:
+            yield self._auto_join_rooms(user_id)
 
+        defer.returnValue((user_id, token))
+
+    @defer.inlineCallbacks
+    def _auto_join_rooms(self, user_id):
+        """Automatically joins users to auto join rooms - creating the room in the first place
+        if the user is the first to be created.
+
+        Args:
+            user_id(str): The user to join
+        """
         # auto-join the user to any rooms we're supposed to dump them into
         fake_requester = create_requester(user_id)
+
+        # try to create the room if we're the first user on the server
+        should_auto_create_rooms = False
+        if self.hs.config.autocreate_auto_join_rooms:
+            count = yield self.store.count_all_users()
+            should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
             try:
-                yield self._join_user_to_room(fake_requester, r)
+                if should_auto_create_rooms:
+                    room_alias = RoomAlias.from_string(r)
+                    if self.hs.hostname != room_alias.domain:
+                        logger.warning(
+                            'Cannot create room alias %s, '
+                            'it does not match server domain',
+                            r,
+                        )
+                    else:
+                        # create room expects the localpart of the room alias
+                        room_alias_localpart = room_alias.localpart
+
+                        # getting the RoomCreationHandler during init gives a dependency
+                        # loop
+                        yield self.hs.get_room_creation_handler().create_room(
+                            fake_requester,
+                            config={
+                                "preset": "public_chat",
+                                "room_alias_name": room_alias_localpart
+                            },
+                            ratelimit=False,
+                        )
+                else:
+                    yield self._join_user_to_room(fake_requester, r)
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
-        # We used to generate default identicons here, but nowadays
-        # we want clients to generate their own as part of their branding
-        # rather than there being consistent matrix-wide ones, so we don't.
-        defer.returnValue((user_id, token))
+    @defer.inlineCallbacks
+    def post_consent_actions(self, user_id):
+        """A series of registration actions that can only be carried out once consent
+        has been granted
+
+        Args:
+            user_id (str): The user to join
+        """
+        yield self._auto_join_rooms(user_id)
 
     @defer.inlineCallbacks
     def appservice_register(self, user_localpart, as_token):

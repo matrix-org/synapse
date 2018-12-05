@@ -169,7 +169,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            "POST", path, json.dumps(content).encode('utf8')
+            self.hs.get_reactor(), "POST", path, json.dumps(content).encode('utf8')
         )
         render(request, self.resource, self.hs.get_reactor())
 
@@ -217,7 +217,9 @@ class RestHelper(object):
 
         data = {"membership": membership}
 
-        request, channel = make_request("PUT", path, json.dumps(data).encode('utf8'))
+        request, channel = make_request(
+            self.hs.get_reactor(), "PUT", path, json.dumps(data).encode('utf8')
+        )
 
         render(request, self.resource, self.hs.get_reactor())
 
@@ -227,18 +229,6 @@ class RestHelper(object):
         )
 
         self.auth_user_id = temp_id
-
-    @defer.inlineCallbacks
-    def register(self, user_id):
-        (code, response) = yield self.mock_resource.trigger(
-            "POST",
-            "/_matrix/client/r0/register",
-            json.dumps(
-                {"user": user_id, "password": "test", "type": "m.login.password"}
-            ),
-        )
-        self.assertEquals(200, code)
-        defer.returnValue(response)
 
     def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
         if txn_id is None:
@@ -251,7 +241,9 @@ class RestHelper(object):
         if tok:
             path = path + "?access_token=%s" % tok
 
-        request, channel = make_request("PUT", path, json.dumps(content).encode('utf8'))
+        request, channel = make_request(
+            self.hs.get_reactor(), "PUT", path, json.dumps(content).encode('utf8')
+        )
         render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (

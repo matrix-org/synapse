@@ -62,6 +62,11 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # whether to enable search. If disabled, new entries will not be inserted
+        # into the search tables and they will not be indexed. Users will receive
+        # errors when attempting to search for messages.
+        self.enable_search = config.get("enable_search", True)
+
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
         # Whether we should block invites sent to users on this server
@@ -77,6 +82,7 @@ class ServerConfig(Config):
             self.max_mau_value = config.get(
                 "max_mau_value", 0,
             )
+        self.mau_stats_only = config.get("mau_stats_only", False)
 
         self.mau_limits_reserved_threepids = config.get(
             "mau_limit_reserved_threepids", []
@@ -372,13 +378,23 @@ class ServerConfig(Config):
           # max_mau_value: 50
           # mau_trial_days: 2
           #
+          # If enabled, the metrics for the number of monthly active users will
+          # be populated, however no one will be limited. If limit_usage_by_mau
+          # is true, this is implied to be true.
+          # mau_stats_only: False
+          #
           # Sometimes the server admin will want to ensure certain accounts are
           # never blocked by mau checking. These accounts are specified here.
           #
           # mau_limit_reserved_threepids:
           # - medium: 'email'
           #   address: 'reserved_user@example.com'
-
+          #
+          # Room searching
+          #
+          # If disabled, new messages will not be indexed for searching and users
+          # will receive errors when searching for messages. Defaults to enabled.
+          # enable_search: true
         """ % locals()
 
     def read_arguments(self, args):

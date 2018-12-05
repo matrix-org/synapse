@@ -67,6 +67,6 @@ class ConfigGenerationTestCase(unittest.TestCase):
         with open(log_config_file) as f:
             config = f.read()
             # find the 'filename' line
-            matches = re.findall("^\s*filename:\s*(.*)$", config, re.M)
+            matches = re.findall(r"^\s*filename:\s*(.*)$", config, re.M)
             self.assertEqual(1, len(matches))
             self.assertEqual(matches[0], expected)

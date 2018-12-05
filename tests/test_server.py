@@ -27,6 +27,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite, logger
 from synapse.util import Clock
+from synapse.util.logcontext import make_deferred_yieldable
 
 from tests import unittest
 from tests.server import FakeTransport, make_request, render, setup_test_homeserver
@@ -57,7 +58,9 @@ class JsonResourceTests(unittest.TestCase):
             "GET", [re.compile("^/_matrix/foo/(?P<room_id>[^/]*)$")], _callback
         )
 
-        request, channel = make_request(b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83")
+        request, channel = make_request(
+            self.reactor, b"GET", b"/_matrix/foo/%E2%98%83?a=%E2%98%83"
+        )
         render(request, res, self.reactor)
 
         self.assertEqual(request.args, {b'a': [u"\N{SNOWMAN}".encode('utf8')]})
@@ -75,7 +78,7 @@ class JsonResourceTests(unittest.TestCase):
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foo")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'500')
@@ -93,12 +96,12 @@ class JsonResourceTests(unittest.TestCase):
             d = Deferred()
             d.addCallback(_throw)
             self.reactor.callLater(1, d.callback, True)
-            return d
+            return make_deferred_yieldable(d)
 
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foo")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'500')
@@ -115,7 +118,7 @@ class JsonResourceTests(unittest.TestCase):
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foo")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foo")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'403')
@@ -136,7 +139,7 @@ class JsonResourceTests(unittest.TestCase):
         res = JsonResource(self.homeserver)
         res.register_paths("GET", [re.compile("^/_matrix/foo$")], _callback)
 
-        request, channel = make_request(b"GET", b"/_matrix/foobar")
+        request, channel = make_request(self.reactor, b"GET", b"/_matrix/foobar")
         render(request, res, self.reactor)
 
         self.assertEqual(channel.result["code"], b'400')

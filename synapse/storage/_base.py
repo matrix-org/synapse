@@ -18,7 +18,7 @@ import threading
 import time
 
 from six import PY2, iteritems, iterkeys, itervalues
-from six.moves import intern, range
+from six.moves import builtins, intern, range
 
 from canonicaljson import json
 from prometheus_client import Histogram
@@ -29,6 +29,7 @@ from synapse.api.errors import StoreError
 from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.util.stringutils import exception_to_unicode
 
 logger = logging.getLogger(__name__)
 
@@ -249,32 +250,32 @@ class SQLBaseStore(object):
                 except self.database_engine.module.OperationalError as e:
                     # This can happen if the database disappears mid
                     # transaction.
-                    logger.warn(
+                    logger.warning(
                         "[TXN OPERROR] {%s} %s %d/%d",
-                        name, e, i, N
+                        name, exception_to_unicode(e), i, N
                     )
                     if i < N:
                         i += 1
                         try:
                             conn.rollback()
                         except self.database_engine.module.Error as e1:
-                            logger.warn(
+                            logger.warning(
                                 "[TXN EROLL] {%s} %s",
-                                name, e1,
+                                name, exception_to_unicode(e1),
                             )
                         continue
                     raise
                 except self.database_engine.module.DatabaseError as e:
                     if self.database_engine.is_deadlock(e):
-                        logger.warn("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
+                        logger.warning("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
                         if i < N:
                             i += 1
                             try:
                                 conn.rollback()
                             except self.database_engine.module.Error as e1:
-                                logger.warn(
+                                logger.warning(
                                     "[TXN EROLL] {%s} %s",
-                                    name, e1,
+                                    name, exception_to_unicode(e1),
                                 )
                             continue
                     raise
@@ -849,9 +850,9 @@ class SQLBaseStore(object):
         rowcount = cls._simple_update_txn(txn, table, keyvalues, updatevalues)
 
         if rowcount == 0:
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if rowcount > 1:
-            raise StoreError(500, "More than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
     @staticmethod
     def _simple_select_one_txn(txn, table, keyvalues, retcols,
@@ -868,9 +869,9 @@ class SQLBaseStore(object):
         if not row:
             if allow_none:
                 return None
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if txn.rowcount > 1:
-            raise StoreError(500, "More than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
         return dict(zip(retcols, row))
 
@@ -902,9 +903,9 @@ class SQLBaseStore(object):
 
         txn.execute(sql, list(keyvalues.values()))
         if txn.rowcount == 0:
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if txn.rowcount > 1:
-            raise StoreError(500, "more than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
     def _simple_delete(self, table, keyvalues, desc):
         return self.runInteraction(
@@ -1233,7 +1234,7 @@ def db_to_json(db_content):
 
     # psycopg2 on Python 2 returns buffer objects, which we need to cast to
     # bytes to decode
-    if PY2 and isinstance(db_content, buffer):
+    if PY2 and isinstance(db_content, builtins.buffer):
         db_content = bytes(db_content)
 
     # Decode it to a Unicode string before feeding it to json.loads, so we

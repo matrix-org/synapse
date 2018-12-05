@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import re
 
 import six
 from six import iteritems
@@ -44,6 +43,7 @@ from synapse.replication.http.federation import (
     ReplicationGetQueryRestServlet,
 )
 from synapse.types import get_domain_from_id
+from synapse.util import glob_to_regex
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.logcontext import nested_logging_context
@@ -162,8 +162,30 @@ class FederationServer(FederationBase):
                 p["age_ts"] = request_time - int(p["age"])
                 del p["age"]
 
+            # We try and pull out an event ID so that if later checks fail we
+            # can log something sensible. We don't mandate an event ID here in
+            # case future event formats get rid of the key.
+            possible_event_id = p.get("event_id", "<Unknown>")
+
+            # Now we get the room ID so that we can check that we know the
+            # version of the room.
+            room_id = p.get("room_id")
+            if not room_id:
+                logger.info(
+                    "Ignoring PDU as does not have a room_id. Event ID: %s",
+                    possible_event_id,
+                )
+                continue
+
+            try:
+                # In future we will actually use the room version to parse the
+                # PDU into an event.
+                yield self.store.get_room_version(room_id)
+            except NotFoundError:
+                logger.info("Ignoring PDU for unknown room_id: %s", room_id)
+                continue
+
             event = event_from_pdu_json(p)
-            room_id = event.room_id
             pdus_by_room.setdefault(room_id, []).append(event)
 
         pdu_results = {}
@@ -322,11 +344,6 @@ class FederationServer(FederationBase):
             )
         else:
             defer.returnValue((404, ""))
-
-    @defer.inlineCallbacks
-    @log_function
-    def on_pull_request(self, origin, versions):
-        raise NotImplementedError("Pull transactions not implemented")
 
     @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
@@ -729,20 +746,8 @@ def _acl_entry_matches(server_name, acl_entry):
     if not isinstance(acl_entry, six.string_types):
         logger.warn("Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry))
         return False
-    regex = _glob_to_regex(acl_entry)
+    regex = glob_to_regex(acl_entry)
     return regex.match(server_name)
-
-
-def _glob_to_regex(glob):
-    res = ''
-    for c in glob:
-        if c == '*':
-            res = res + '.*'
-        elif c == '?':
-            res = res + '.'
-        else:
-            res = res + re.escape(c)
-    return re.compile(res + "\\Z", re.IGNORECASE)
 
 
 class FederationHandlerRegistry(object):
@@ -800,7 +805,7 @@ class FederationHandlerRegistry(object):
             yield handler(origin, content)
         except SynapseError as e:
             logger.info("Failed to handle edu %r: %r", edu_type, e)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to handle edu %r", edu_type)
 
     def on_query(self, query_type, args):

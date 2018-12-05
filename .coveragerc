@@ -1,0 +1,12 @@
+[run]
+branch = True
+parallel = True
+source = synapse
+
+[paths]
+source=
+   coverage
+
+[report]
+precision = 2
+ignore_errors = True

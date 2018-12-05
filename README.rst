@@ -86,7 +86,7 @@ Synapse is the reference Python/Twisted Matrix homeserver implementation.
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 2.7
+- Python 3.5, 3.6, or 2.7
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Installing from source
@@ -101,13 +101,13 @@ header files for Python C extensions.
 
 Installing prerequisites on Ubuntu or Debian::
 
-    sudo apt-get install build-essential python2.7-dev libffi-dev \
+    sudo apt-get install build-essential python3-dev libffi-dev \
                          python-pip python-setuptools sqlite3 \
                          libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
 
 Installing prerequisites on ArchLinux::
 
-    sudo pacman -S base-devel python2 python-pip \
+    sudo pacman -S base-devel python python-pip \
                    python-setuptools python-virtualenv sqlite3
 
 Installing prerequisites on CentOS 7 or Fedora 25::
@@ -126,12 +126,9 @@ Installing prerequisites on Mac OS X::
 
 Installing prerequisites on Raspbian::
 
-    sudo apt-get install build-essential python2.7-dev libffi-dev \
+    sudo apt-get install build-essential python3-dev libffi-dev \
                          python-pip python-setuptools sqlite3 \
                          libssl-dev python-virtualenv libjpeg-dev
-    sudo pip install --upgrade pip
-    sudo pip install --upgrade ndg-httpsclient
-    sudo pip install --upgrade virtualenv
 
 Installing prerequisites on openSUSE::
 
@@ -142,24 +139,25 @@ Installing prerequisites on openSUSE::
 Installing prerequisites on OpenBSD::
 
     doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
-                 libxslt
+                 libxslt jpeg
 
 To install the Synapse homeserver run::
 
-    virtualenv -p python2.7 ~/.synapse
-    source ~/.synapse/bin/activate
+    mkdir -p ~/synapse
+    virtualenv -p python3 ~/synapse/env
+    source ~/synapse/env/bin/activate
     pip install --upgrade pip
     pip install --upgrade setuptools
     pip install matrix-synapse
 
 This installs Synapse, along with the libraries it uses, into a virtual
-environment under ``~/.synapse``.  Feel free to pick a different directory
+environment under ``~/synapse/env``.  Feel free to pick a different directory
 if you prefer.
 
 This Synapse installation can then be later upgraded by using pip again with the
 update flag::
 
-    source ~/.synapse/bin/activate
+    source ~/synapse/env/bin/activate
     pip install -U matrix-synapse
 
 In case of problems, please see the _`Troubleshooting` section below.
@@ -173,6 +171,12 @@ hub.docker.com.
 Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
+
+Slavi Pantaleev has created an Ansible playbook,
+which installs the offical Docker image of Matrix Synapse
+along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
+For more details, see
+https://github.com/spantaleev/matrix-docker-ansible-deploy
 
 Configuring Synapse
 -------------------
@@ -234,7 +238,7 @@ commandline script.
 
 To get started, it is easiest to use the command line to register new users::
 
-    $ source ~/.synapse/bin/activate
+    $ source ~/synapse/env/bin/activate
     $ synctl start # if not already running
     $ register_new_matrix_user -c homeserver.yaml https://localhost:8448
     New user localpart: erikj
@@ -260,12 +264,11 @@ Running Synapse
 ===============
 
 To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. ``~/.synapse``), and::
+run (e.g. ``~/synapse``), and::
 
-    cd ~/.synapse
-    source ./bin/activate
+    cd ~/synapse
+    source env/bin/activate
     synctl start
-
 
 Connecting to Synapse from a client
 ===================================
@@ -327,7 +330,7 @@ content served to web browsers a matrix API from being able to attack webapps ho
 on the same domain.  This is particularly true of sharing a matrix webclient and
 server on the same domain.
 
-See https://github.com/vector-im/vector-web/issues/1977 and
+See https://github.com/vector-im/riot-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
 
@@ -374,35 +377,17 @@ the generated config),
 https://www.archlinux.org/packages/community/any/python2-matrix-angular-sdk/ will also need to
 be installed.
 
-Alternatively, to install using pip a few changes may be needed as ArchLinux
-defaults to python 3, but synapse currently assumes python 2.7 by default:
-
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
 
-    sudo pip2.7 install --upgrade pip
-
-You also may need to explicitly specify python 2.7 again during the install
-request::
-
-    pip2.7 install https://github.com/matrix-org/synapse/tarball/master
+    sudo pip install --upgrade pip
 
 If you encounter an error with lib bcrypt causing an Wrong ELF Class:
 ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
 compile it under the right architecture. (This should not be needed if
 installing under virtualenv)::
 
-    sudo pip2.7 uninstall py-bcrypt
-    sudo pip2.7 install py-bcrypt
-
-During setup of Synapse you need to call python2.7 directly again::
-
-    cd ~/.synapse
-    python2.7 -m synapse.app.homeserver \
-      --server-name machine.my.domain.name \
-      --config-path homeserver.yaml \
-      --generate-config
-
-...substituting your host and domain name as appropriate.
+    sudo pip uninstall py-bcrypt
+    sudo pip install py-bcrypt
 
 FreeBSD
 -------
@@ -469,7 +454,7 @@ You can fix this by manually upgrading pip and virtualenv::
 
     sudo pip install --upgrade virtualenv
 
-You can next rerun ``virtualenv -p python2.7 synapse`` to update the virtual env.
+You can next rerun ``virtualenv -p python3 synapse`` to update the virtual env.
 
 Installing may fail during installing virtualenv with ``InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.``
 You can fix this  by manually installing ndg-httpsclient::
@@ -517,16 +502,6 @@ This is best diagnosed by matching up the 'Received request' and 'Processed requ
 log lines and looking for any 'Processed request' lines which take more than
 a few seconds to execute.  Please let us know at #matrix-dev:matrix.org if
 you see this failure mode so we can help debug it, however.
-
-ArchLinux
-~~~~~~~~~
-
-If running `$ synctl start` fails with 'returned non-zero exit status 1',
-you will need to explicitly call Python2.7 - either running as::
-
-    python2.7 -m synapse.app.homeserver --daemonize -c homeserver.yaml
-
-...or by editing synctl with the correct python executable.
 
 
 Upgrading an existing Synapse
@@ -651,7 +626,8 @@ Using a reverse proxy with Synapse
 
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
-`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_ or
+`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
+`Caddy <https://caddyserver.com/docs/proxy>`_ or
 `HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
@@ -682,7 +658,15 @@ so an example nginx configuration might look like::
       }
   }
 
-and an example apache configuration may look like::
+an example Caddy configuration might look like::
+
+    matrix.example.com {
+      proxy /_matrix http://localhost:8008 {
+        transparent
+      }
+    }
+
+and an example Apache configuration might look like::
 
     <VirtualHost *:443>
         SSLEngine on
@@ -714,9 +698,10 @@ port:
 
   .. __: `key_management`_
 
-* Synapse does not currently support SNI on the federation protocol
-  (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_), which
-  means that using name-based virtual hosting is unreliable.
+* Until v0.33.3, Synapse did not support SNI on the federation port
+  (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_). This bug
+  is now fixed, but means that federating with older servers can be unreliable
+  when using name-based virtual hosting.
 
 Furthermore, a number of the normal reasons for using a reverse-proxy do not
 apply:
@@ -812,7 +797,7 @@ Password reset
 ==============
 
 If a user has registered an email address to their account using an identity
-server, they can request a password-reset token via clients such as Vector.
+server, they can request a password-reset token via clients such as Riot.
 
 A manual password reset can be done via direct database access as follows.
 

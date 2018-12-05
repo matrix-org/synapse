@@ -15,9 +15,9 @@
 
 from distutils.util import strtobool
 
+from synapse.config._base import Config, ConfigError
+from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string_with_symbols
-
-from ._base import Config
 
 
 class RegistrationConfig(Config):
@@ -37,6 +37,7 @@ class RegistrationConfig(Config):
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
+        self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
         self.invite_3pid_guest = (
@@ -44,6 +45,10 @@ class RegistrationConfig(Config):
         )
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
+        for room_alias in self.auto_join_rooms:
+            if not RoomAlias.is_valid(room_alias):
+                raise ConfigError('Invalid auto_join_rooms entry %s' % (room_alias,))
+        self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
@@ -87,17 +92,34 @@ class RegistrationConfig(Config):
         # accessible to anonymous users.
         allow_guest_access: False
 
+        # The identity server which we suggest that clients should use when users log
+        # in on this server.
+        #
+        # (By default, no suggestion is made, so it is left up to the client.
+        # This setting is ignored unless public_baseurl is also set.)
+        #
+        # default_identity_server: https://matrix.org
+
         # The list of identity servers trusted to verify third party
         # identifiers by this server.
+        #
+        # Also defines the ID server which will be called when an account is
+        # deactivated (one will be picked arbitrarily).
         trusted_third_party_id_servers:
             - matrix.org
             - vector.im
-            - riot.im
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
         #auto_join_rooms:
         #    - "#example:example.com"
+
+        # Where auto_join_rooms are specified, setting this flag ensures that the
+        # the rooms exist by creating them when the first user on the
+        # homeserver registers.
+        # Setting to false means that if the rooms are not manually created,
+        # users cannot be auto-joined since they do not exist.
+        autocreate_auto_join_rooms: true
         """ % locals()
 
     def add_arguments(self, parser):

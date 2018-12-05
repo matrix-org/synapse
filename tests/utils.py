@@ -123,7 +123,10 @@ def default_config(name):
     config.user_directory_search_all_users = False
     config.user_consent_server_notice_content = None
     config.block_events_without_consent_error = None
+    config.user_consent_at_registration = False
+    config.user_consent_policy_name = "Privacy Policy"
     config.media_storage_providers = []
+    config.autocreate_auto_join_rooms = True
     config.auto_join_rooms = []
     config.limit_usage_by_mau = False
     config.hs_disabled = False
@@ -131,6 +134,7 @@ def default_config(name):
     config.hs_disabled_limit_type = ""
     config.max_mau_value = 50
     config.mau_trial_days = 0
+    config.mau_stats_only = False
     config.mau_limits_reserved_threepids = []
     config.admin_contact = None
     config.rc_messages_per_second = 10000
