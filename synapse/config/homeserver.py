@@ -45,7 +45,7 @@ from .workers import WorkerConfig
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
-                       AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
+                       AppServiceConfig, KeyConfig, CasConfig,
                        JWTConfig, PasswordConfig, EmailConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
                        SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
