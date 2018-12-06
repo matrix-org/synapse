@@ -328,35 +328,6 @@ class RegistrationHandler(BaseHandler):
             logger.info("Valid captcha entered from %s", ip)
 
     @defer.inlineCallbacks
-    def register_saml2(self, localpart):
-        """
-        Registers email_id as SAML2 Based Auth.
-        """
-        if types.contains_invalid_mxid_characters(localpart):
-            raise SynapseError(
-                400,
-                "User ID can only contain characters a-z, 0-9, or '=_-./'",
-            )
-        yield self.auth.check_auth_blocking()
-        user = UserID(localpart, self.hs.hostname)
-        user_id = user.to_string()
-
-        yield self.check_user_id_not_appservice_exclusive(user_id)
-        token = self.macaroon_gen.generate_access_token(user_id)
-        try:
-            yield self.store.register(
-                user_id=user_id,
-                token=token,
-                password_hash=None,
-                create_profile_with_localpart=user.localpart,
-            )
-        except Exception as e:
-            yield self.store.add_access_token_to_user(user_id, token)
-            # Ignore Registration errors
-            logger.exception(e)
-        defer.returnValue((user_id, token))
-
-    @defer.inlineCallbacks
     def register_email(self, threepidCreds):
         """
         Registers emails with an identity server.

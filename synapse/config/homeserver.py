@@ -32,7 +32,6 @@ from .ratelimiting import RatelimitConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
 from .room_directory import RoomDirectoryConfig
-from .saml2 import SAML2Config
 from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig
@@ -45,7 +44,7 @@ from .workers import WorkerConfig
 class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
-                       AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
+                       AppServiceConfig, KeyConfig, CasConfig,
                        JWTConfig, PasswordConfig, EmailConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
                        SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
