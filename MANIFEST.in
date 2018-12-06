@@ -26,7 +26,7 @@ recursive-include synapse/static *.js
 exclude Dockerfile
 exclude .dockerignore
 exclude test_postgresql.sh
-exclude build_debian.sh
+exclude .editorconfig
 
 include pyproject.toml
 recursive-include changelog.d *

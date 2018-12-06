@@ -4,8 +4,8 @@ jobs:
     machine: true
     steps:
       - checkout
-      - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:${CIRCLE_TAG} .
-      - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:${CIRCLE_TAG}-py3 --build-arg PYTHON_VERSION=3.6 .
+      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_TAG} .
+      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_TAG}-py3 --build-arg PYTHON_VERSION=3.6 .
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
       - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}
       - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}-py3
@@ -13,13 +13,9 @@ jobs:
     machine: true
     steps:
       - checkout
-      - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:${CIRCLE_SHA1} .
-      - run: docker build -f docker/Dockerfile -t matrixdotorg/synapse:${CIRCLE_SHA1}-py3 --build-arg PYTHON_VERSION=3.6 .
+      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_SHA1} .
+      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_SHA1}-py3 --build-arg PYTHON_VERSION=3.6 .
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker tag matrixdotorg/synapse:${CIRCLE_SHA1} matrixdotorg/synapse:latest
-      - run: docker tag matrixdotorg/synapse:${CIRCLE_SHA1}-py3 matrixdotorg/synapse:latest-py3
-      - run: docker push matrixdotorg/synapse:${CIRCLE_SHA1}
-      - run: docker push matrixdotorg/synapse:${CIRCLE_SHA1}-py3
       - run: docker push matrixdotorg/synapse:latest
       - run: docker push matrixdotorg/synapse:latest-py3
   sytestpy2:

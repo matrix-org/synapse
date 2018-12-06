@@ -123,8 +123,8 @@ class MessageAcceptTests(unittest.TestCase):
                 "test.serv", lying_event, sent_to_us_directly=True
             )
 
-        # Step the reactor, so the database fetches come back
-        self.reactor.advance(1)
+            # Step the reactor, so the database fetches come back
+            self.reactor.advance(1)
 
         # on_receive_pdu should throw an error
         failure = self.failureResultOf(d)

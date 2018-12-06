@@ -30,6 +30,7 @@ from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
+from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.module_loader import load_module
 
 from tests import unittest
@@ -113,7 +114,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             d = Deferred()
             d.addCallback(write_to)
             self.fetches.append((d, destination, path, args))
-            return d
+            return make_deferred_yieldable(d)
 
         client = Mock()
         client.get_file = get_file
