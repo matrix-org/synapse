@@ -1,20 +1,35 @@
-Source: matrix-synapse
+Source: matrix-synapse-py3
 Section: contrib/python
 Priority: extra
 Maintainer: Synapse Developers <synapse@matrix.org>
-Build-Depends: debhelper (>= 9), python3, python3-dev, libffi-dev, libssl-dev, libjpeg-dev, libxslt1-dev, dh-virtualenv (>= 0.10), tar, lsb-release
+Build-Depends:
+    debhelper (>= 9),
+    dh-virtualenv (>= 0.10),
+    libffi-dev,
+    libjpeg-dev,
+    libssl-dev,
+    libxslt1-dev,
+    lsb-release,
+    python3-dev,
+    python3,
+    tar,
 Standards-Version: 3.9.5
 Homepage: https://github.com/matrix-org/synapse
 
-Package: matrix-synapse
+Package: matrix-synapse-py3
 Architecture: any
 Pre-Depends: dpkg (>= 1.16.1)
-Depends: python3, python3-distutils, adduser, sqlite3, libpq5, libffi6, libjpeg-turbo8, libxslt1.1, openssl
-Description: A Python package and its dependencies packaged up as DEB in an isolated virtualenv.
-    .
-    This is a distribution of "matrix-synapse" as a self-contained
-    Python virtualenv wrapped into a Debian package ("omnibus" package,
-    all passengers on board). The packaged virtualenv is kept in sync with
-    the host's interpreter automatically.
-    .
-    See https://github.com/spotify/dh-virtualenv for more details.
+Depends:
+    adduser,
+    libffi6,
+    libjpeg-turbo8,
+    libpq5,
+    libxslt1.1,
+    openssl,
+    python3-distutils,
+    python3,
+    sqlite3,
+Description: Open federated Instant Messaging and VoIP server
+ Matrix is an ambitious new ecosystem for open federated Instant
+ Messaging and VoIP. Synapse is a reference Matrix server
+ implementation.

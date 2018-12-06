@@ -1,4 +1,4 @@
-matrix-synapse (0.33.9) stretch; urgency=medium
+matrix-synapse-py3 (0.33.9) stretch; urgency=medium
 
   * New upstream version 0.33.9
 
