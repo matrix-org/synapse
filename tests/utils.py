@@ -140,6 +140,8 @@ def default_config(name):
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
     config.saml2_enabled = False
+    config.public_baseurl = None
+    config.default_identity_server = None
 
     config.use_frozen_dicts = False
 
