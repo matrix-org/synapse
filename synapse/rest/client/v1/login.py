@@ -451,6 +451,7 @@ class SSOAuthHandler(object):
     @defer.inlineCallbacks
     def on_successful_auth(
         self, username, request, client_redirect_url,
+        user_display_name=None,
     ):
         """Called once the user has successfully authenticated with the SSO.
 
@@ -478,6 +479,7 @@ class SSOAuthHandler(object):
                 yield self._registration_handler.register(
                     localpart=localpart,
                     generate_token=False,
+                    default_display_name=user_display_name,
                 )
             )
 
