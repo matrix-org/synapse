@@ -80,7 +80,10 @@ CONDITIONAL_REQUIREMENTS = {
     },
     "postgres": {
         "psycopg2>=2.6": ["psycopg2"]
-    }
+    },
+    "saml2": {
+        "pysaml2>=4.5.0": ["saml2"],
+    },
 }
 
 
