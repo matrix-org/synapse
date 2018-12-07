@@ -66,6 +66,9 @@ class SAML2ResponseResource(Resource):
             raise CodeMessageException(400, "uid not in SAML2 response")
 
         username = saml2_auth.ava["uid"][0]
+
+        displayName = saml2_auth.ava.get("displayName", [None])[0]
         return self._sso_auth_handler.on_successful_auth(
             username, request, relay_state,
+            user_display_name=displayName,
         )
