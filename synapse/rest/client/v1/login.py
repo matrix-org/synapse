@@ -468,6 +468,9 @@ class SSOAuthHandler(object):
             client_redirect_url (unicode): the redirect_url the client gave us when
                 it first started the process.
 
+            user_display_name (unicode|None): if set, and we have to register a new user,
+                we will set their displayname to this.
+
         Returns:
             Deferred[none]: Completes once we have handled the request.
         """
