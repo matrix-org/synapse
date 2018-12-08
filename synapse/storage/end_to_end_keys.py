@@ -153,7 +153,8 @@ class EndToEndKeyStore(SQLBaseStore):
             user_id = attestation["user_id"]
             device_id = attestation["device_id"]
             # FIXME: combine signatures of the same payload?
-            if user_id in result and device_id in result[user_id]:
+            if user_id in result and device_id in result[user_id] \
+               and result[user_id][device_id]:
                 result[user_id][device_id].setdefault("attestations", []) \
                     .append(attestation)
 
