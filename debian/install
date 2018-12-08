@@ -1,3 +1,2 @@
 ../homeserver.yaml etc/matrix-synapse
 ../log.yaml etc/matrix-synapse
-../*.service lib/systemd/system
