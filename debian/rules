@@ -18,7 +18,7 @@ export CFLAGS=-march=x86-64
 SNAKE=/usr/bin/python3
 DEB_BUILD_OPTIONS=noddebs
 EXTRA_REQUIREMENTS=--preinstall "setuptools>=17.1" --preinstall "pip>=7" --preinstall "wheel" --preinstall "lxml"
-DH_VENV_ARGS=--with systemd --install-suffix "matrix-synapse" --with python-virtualenv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) --extra-pip-arg="--no-cache-dir" --extra-pip-arg="--compile"
+DH_VENV_ARGS=--install-suffix "matrix-synapse" --with python-virtualenv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) --extra-pip-arg="--no-cache-dir" --extra-pip-arg="--compile"
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell $(SNAKE) setup.py --version)
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)

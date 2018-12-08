@@ -5,7 +5,6 @@ Maintainer: Synapse Developers <synapse@matrix.org>
 Build-Depends:
     debhelper (>= 9),
     dh-virtualenv (>= 0.10),
-    dh-systemd (>= 1.5),
     libffi-dev,
     libjpeg-dev,
     libssl-dev,
