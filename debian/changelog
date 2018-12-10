@@ -4,7 +4,7 @@ matrix-synapse-py3 (0.34.0) stretch; urgency=medium
 
  -- Amber Brown <amber@matrix.org>  Tue, 11 Dec 2018 04:00:00 +1000
 
- matrix-synapse (0.33.9-1matrix1) stretch; urgency=medium
+matrix-synapse (0.33.9-1matrix1) stretch; urgency=medium
 
   [ Erik Johnston ]
   * Remove dependency on python-pydenticon
