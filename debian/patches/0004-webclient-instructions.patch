@@ -1,0 +1,27 @@
+From: Erik Johnston <erikj@matrix.org>
+Date: Fri, 10 Jun 2016 10:57:07 +0100
+Subject: webclient-instructions
+
+---
+ synapse/app/homeserver.py | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+Index: package-synapse-debian/synapse/app/homeserver.py
+===================================================================
+--- package-synapse-debian.orig/synapse/app/homeserver.py
++++ package-synapse-debian/synapse/app/homeserver.py
+@@ -86,12 +86,11 @@ def build_resource_for_web_client(hs):
+                 "Please either install the matrix-angular-sdk or configure\n"
+                 "the location of the source to serve via the configuration\n"
+                 "option `web_client_location`\n\n"
+-                "To install the `matrix-angular-sdk` via pip, run:\n\n"
+-                "    pip install '%(dep)s'\n"
++                "To install the `matrix-angular-sdk` via apt-get, run:\n\n"
++                "    apt-get install matrix-synapse-angular-client\n"
+                 "\n"
+                 "You can also disable hosting of the webclient via the\n"
+                 "configuration option `web_client`\n"
+-                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
+             )
+         syweb_path = os.path.dirname(syweb.__file__)
+         webclient_path = os.path.join(syweb_path, "webclient")

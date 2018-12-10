@@ -1,0 +1,34 @@
+From: Erik Johnston <erikj@matrix.org>
+Date: Fri, 10 Jun 2016 10:57:07 +0100
+Subject: change_instructions
+
+---
+ synapse/config/_base.py | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+--- a/synapse/config/_base.py
++++ b/synapse/config/_base.py
+@@ -31,6 +31,11 @@
+ MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS = """\
+ Please opt in or out of reporting anonymized homeserver usage statistics, by
+ setting the `report_stats` key in your config file to either True or False.
++
++To set it run:
++
++    dpkg-reconfigure matrix-synapse
++
+ """
+ 
+ MISSING_REPORT_STATS_SPIEL = """\
+@@ -45,6 +50,11 @@
+ 
+ MISSING_SERVER_NAME = """\
+ Missing mandatory `server_name` config option.
++
++To set it run:
++
++    dpkg-reconfigure matrix-synapse
++
+ """
+ 
+ 

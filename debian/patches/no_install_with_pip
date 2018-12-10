@@ -1,0 +1,43 @@
+Index: package-synapse-debian/synapse/app/__init__.py
+===================================================================
+--- package-synapse-debian.orig/synapse/app/__init__.py
++++ package-synapse-debian/synapse/app/__init__.py
+@@ -25,8 +25,8 @@ try:
+ except python_dependencies.MissingRequirementError as e:
+     message = "\n".join([
+         "Missing Requirement: %s" % (str(e),),
+-        "To install run:",
+-        "    pip install --upgrade --force \"%s\"" % (e.dependency,),
++        "To install, try:",
++        "    sudo apt-get install python-%s" % (e.dependency,),
+         "",
+     ])
+     sys.stderr.writelines(message)
+Index: package-synapse-debian/synapse/config/jwt_config.py
+===================================================================
+--- package-synapse-debian.orig/synapse/config/jwt_config.py
++++ package-synapse-debian/synapse/config/jwt_config.py
+@@ -19,7 +19,7 @@ MISSING_JWT = (
+     """Missing jwt library. This is required for jwt login.
+ 
+     Install by running:
+-        pip install pyjwt
++        sudo apt-get install python-jwt
+     """
+ )
+ 
+Index: package-synapse-debian/synapse/config/repository.py
+===================================================================
+--- package-synapse-debian.orig/synapse/config/repository.py
++++ package-synapse-debian/synapse/config/repository.py
+@@ -27,9 +27,7 @@ MISSING_LXML = (
+     """Missing lxml library. This is required for URL preview API.
+ 
+     Install by running:
+-        pip install lxml
+-
+-    Requires libxslt1-dev system package.
++        sudo apt-get install python-lxml
+     """
+ )
+ 

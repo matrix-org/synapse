@@ -1,0 +1,19 @@
+From: Erik Johnston <erikj@matrix.org>
+Date: Fri, 10 Jun 2016 10:57:07 +0100
+Subject: tox
+
+---
+ tox.ini | 1 +
+ 1 file changed, 1 insertion(+)
+
+Index: package-synapse-debian/tox.ini
+===================================================================
+--- package-synapse-debian.orig/tox.ini
++++ package-synapse-debian/tox.ini
+@@ -1,5 +1,6 @@
+ [tox]
+ envlist = packaging, py27, py36, pep8, check_isort
++sitepackages = True
+ 
+ [base]
+ deps =
