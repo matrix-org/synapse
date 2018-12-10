@@ -130,8 +130,8 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
-            names = ["client", "webclient"] if self.web_client else ["client"]
-
+            #names = ["client", "webclient"] if self.web_client else ["client"]
+            names = ["client"]
             self.listeners.append({
                 "port": bind_port,
                 "bind_addresses": [bind_host],
@@ -242,7 +242,7 @@ class ServerConfig(Config):
         # cpu_affinity: 0xFFFFFFFF
 
         # Whether to serve a web client from the HTTP/HTTPS root resource.
-        web_client: True
+        web_client: False
 
         # The root directory to server for the above web client.
         # If left undefined, synapse will serve the matrix-angular-sdk web client.
@@ -315,7 +315,7 @@ class ServerConfig(Config):
                 # List of resources to host on this listener.
                 names:
                   - client     # The client-server APIs, both v1 and v2
-                  - webclient  # The bundled webclient.
+                #  - webclient  # The bundled webclient.
 
                 # Should synapse compress HTTP responses to clients that support it?
                 # This should be disabled if running synapse behind a load balancer
@@ -342,7 +342,7 @@ class ServerConfig(Config):
             x_forwarded: false
 
             resources:
-              - names: [client, webclient]
+              - names: [client]
                 compress: true
               - names: [federation]
                 compress: false

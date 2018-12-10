@@ -137,27 +137,36 @@ class ConsentResource(Resource):
             request (twisted.web.http.Request):
         """
 
-        version = parse_string(request, "v",
-                               default=self._default_consent_version)
-        username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True, encoding=None)
+        version = parse_string(request, "v", default=self._default_consent_version)
+        username = parse_string(request, "u", required=False, default="")
+        userhmac = None
+        has_consented = False
+        public_version = username == ""
+        if not public_version:
+            userhmac_bytes = parse_string(request, "h", required=True, encoding=None)
 
-        self._check_hash(username, userhmac)
+            self._check_hash(username, userhmac_bytes)
 
-        if username.startswith('@'):
-            qualified_user_id = username
-        else:
-            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+            if username.startswith('@'):
+                qualified_user_id = username
+            else:
+                qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
-        u = yield self.store.get_user_by_id(qualified_user_id)
-        if u is None:
-            raise NotFoundError("Unknown user")
+            u = yield self.store.get_user_by_id(qualified_user_id)
+            if u is None:
+                raise NotFoundError("Unknown user")
+
+            has_consented = u["consent_version"] == version
+            userhmac = userhmac_bytes.decode("ascii")
 
         try:
             self._render_template(
                 request, "%s.html" % (version,),
-                user=username, userhmac=userhmac, version=version,
-                has_consented=(u["consent_version"] == version),
+                user=username,
+                userhmac=userhmac,
+                version=version,
+                has_consented=has_consented,
+                public_version=public_version,
             )
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")
@@ -223,7 +232,7 @@ class ConsentResource(Resource):
             key=self._hmac_secret,
             msg=userid.encode('utf-8'),
             digestmod=sha256,
-        ).hexdigest()
+        ).hexdigest().encode('ascii')
 
         if not compare_digest(want_mac, userhmac):
             raise SynapseError(http_client.FORBIDDEN, "HMAC incorrect")

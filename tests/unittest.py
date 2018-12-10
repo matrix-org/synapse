@@ -146,6 +146,13 @@ def DEBUG(target):
     return target
 
 
+def INFO(target):
+    """A decorator to set the .loglevel attribute to logging.INFO.
+    Can apply to either a TestCase or an individual test method."""
+    target.loglevel = logging.INFO
+    return target
+
+
 class HomeserverTestCase(TestCase):
     """
     A base TestCase that reduces boilerplate for HomeServer-using test cases.
@@ -182,11 +189,11 @@ class HomeserverTestCase(TestCase):
         for servlet in self.servlets:
             servlet(self.hs, self.resource)
 
+        from tests.rest.client.v1.utils import RestHelper
+
+        self.helper = RestHelper(self.hs, self.resource, getattr(self, "user_id", None))
+
         if hasattr(self, "user_id"):
-            from tests.rest.client.v1.utils import RestHelper
-
-            self.helper = RestHelper(self.hs, self.resource, self.user_id)
-
             if self.hijack_auth:
 
                 def get_user_by_access_token(token=None, allow_guest=False):
@@ -251,7 +258,13 @@ class HomeserverTestCase(TestCase):
         """
 
     def make_request(
-        self, method, path, content=b"", access_token=None, request=SynapseRequest
+        self,
+        method,
+        path,
+        content=b"",
+        access_token=None,
+        request=SynapseRequest,
+        shorthand=True,
     ):
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -263,6 +276,8 @@ class HomeserverTestCase(TestCase):
             escaped UTF-8 & spaces and such).
             content (bytes or dict): The body of the request. JSON-encoded, if
             a dict.
+            shorthand: Whether to try and be helpful and prefix the given URL
+            with the usual REST API path, if it doesn't contain it.
 
         Returns:
             A synapse.http.site.SynapseRequest.
@@ -270,7 +285,9 @@ class HomeserverTestCase(TestCase):
         if isinstance(content, dict):
             content = json.dumps(content).encode('utf8')
 
-        return make_request(method, path, content, access_token, request)
+        return make_request(
+            self.reactor, method, path, content, access_token, request, shorthand
+        )
 
     def render(self, request):
         """
@@ -373,5 +390,5 @@ class HomeserverTestCase(TestCase):
         self.render(request)
         self.assertEqual(channel.code, 200)
 
-        access_token = channel.json_body["access_token"].encode('ascii')
+        access_token = channel.json_body["access_token"]
         return access_token

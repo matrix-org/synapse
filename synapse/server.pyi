@@ -7,6 +7,9 @@ import synapse.handlers.auth
 import synapse.handlers.deactivate_account
 import synapse.handlers.device
 import synapse.handlers.e2e_keys
+import synapse.handlers.room
+import synapse.handlers.room_member
+import synapse.handlers.message
 import synapse.handlers.set_password
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
@@ -48,6 +51,9 @@ class HomeServer(object):
         pass
 
     def get_room_creation_handler(self) -> synapse.handlers.room.RoomCreationHandler:
+        pass
+
+    def get_room_member_handler(self) -> synapse.handlers.room_member.RoomMemberHandler:
         pass
 
     def get_event_creation_handler(self) -> synapse.handlers.message.EventCreationHandler:

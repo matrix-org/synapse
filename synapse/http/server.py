@@ -468,13 +468,13 @@ def set_cors_headers(request):
     Args:
         request (twisted.web.http.Request): The http request to add CORs to.
     """
-    request.setHeader("Access-Control-Allow-Origin", "*")
+    request.setHeader(b"Access-Control-Allow-Origin", b"*")
     request.setHeader(
-        "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"
+        b"Access-Control-Allow-Methods", b"GET, POST, PUT, DELETE, OPTIONS"
     )
     request.setHeader(
-        "Access-Control-Allow-Headers",
-        "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+        b"Access-Control-Allow-Headers",
+        b"Origin, X-Requested-With, Content-Type, Accept, Authorization"
     )
 
 
