@@ -20,7 +20,6 @@ from twisted.web.server import NOT_DONE_YET
 
 from synapse.http.server import (
     respond_with_json,
-    set_cors_headers,
     wrap_json_request_handler,
 )
 
@@ -44,11 +43,9 @@ class MediaConfigResource(Resource):
     @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
-        set_cors_headers(request)
         yield self.auth.get_user_by_req(request)
-        respond_with_json(request, 200, self.limits_dict)
+        respond_with_json(request, 200, self.limits_dict, send_cors=True)
 
     def render_OPTIONS(self, request):
-        set_cors_headers(request)
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
