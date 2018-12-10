@@ -18,7 +18,7 @@ homeserver*.db
 homeserver*.log
 homeserver*.log.*
 homeserver*.pid
-homeserver*.yaml
+/homeserver*.yaml
 
 *.signing.key
 *.tls.crt
@@ -57,3 +57,5 @@ env/
 
 .vscode/
 .ropeproject/
+
+*.deb

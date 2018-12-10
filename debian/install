@@ -1,2 +1,3 @@
-debian/homeserver.yaml etc/matrix-synapse
-debian/log.yaml etc/matrix-synapse
+../homeserver.yaml etc/matrix-synapse
+../log.yaml etc/matrix-synapse
+../matrix-synapse.service lib/systemd/system

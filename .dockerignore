@@ -5,3 +5,5 @@ demo/etc
 tox.ini
 .git/*
 .tox/*
+debian/matrix-synapse/
+debian/matrix-synapse-*/
