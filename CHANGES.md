@@ -1,3 +1,19 @@
+Synapse 0.34.0rc2 (2018-12-11)
+==============================
+
+Features
+--------
+
+- Add a welcome page for the client API port. Credit to @krombel! ([\#4289](https://github.com/matrix-org/synapse/issues/4289))
+- Remove Matrix console from the default distribution ([\#4290](https://github.com/matrix-org/synapse/issues/4290))
+
+
+Internal Changes
+----------------
+
+- Disable pager when running git-show in CI ([\#4291](https://github.com/matrix-org/synapse/issues/4291))
+
+
 Synapse 0.34.0rc1 (2018-12-04)
 ==============================
 
