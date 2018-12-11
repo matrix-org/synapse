@@ -289,10 +289,6 @@ go back in your web client and proceed further.
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
 
-(The homeserver runs a web client by default at https://localhost:8448/, though
-as of the time of writing it is somewhat outdated and not really recommended -
-https://github.com/matrix-org/synapse/issues/1527).
-
 .. _`client-user-reg`:
 
 Registering a new user from a client
@@ -372,10 +368,7 @@ ArchLinux
 
 The quickest way to get up and running with ArchLinux is probably with the community package
 https://www.archlinux.org/packages/community/any/matrix-synapse/, which should pull in most of
-the necessary dependencies. If the default web client is to be served (enabled by default in
-the generated config),
-https://www.archlinux.org/packages/community/any/python2-matrix-angular-sdk/ will also need to
-be installed.
+the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 )::
 
