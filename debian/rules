@@ -2,40 +2,25 @@
 #
 # Build Debian package using https://github.com/spotify/dh-virtualenv
 #
-# The below targets create a clean copy of the workdir via
-# using "sdist", else "pip" goes haywire when installing from
-# sourcedir ".", because that includes the debian build stage,
-# and a recursive explosion ensues when symlinks are followed.
-#
-# It also ensures your MANIFEST is complete and at least covers
-# all files needed for a release build.
-
-# Increase trace logging, see debhelper(7) (uncomment to enable)
-#DH_VERBOSE=1
 
 export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
 export CFLAGS=-march=x86-64
 SNAKE=/usr/bin/python3
-DEB_BUILD_OPTIONS=noddebs
-EXTRA_REQUIREMENTS=--preinstall "setuptools>=17.1" --preinstall "pip>=7" --preinstall "wheel" --preinstall "lxml"
-DH_VENV_ARGS=--install-suffix "matrix-synapse" --with python-virtualenv  --builtin-venv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) --extra-pip-arg="--no-cache-dir" --extra-pip-arg="--compile"
+DH_VENV_ARGS=--install-suffix "matrix-synapse" \
+			 --builtin-venv\
+			 --setuptools \
+			 --python $(SNAKE) \
+			 --preinstall "setuptools>=40.6.3" \
+			 --preinstall "pip>=18" \
+			 --preinstall "wheel" \
+			 --extra-pip-arg="--no-cache-dir" \
+			 --extra-pip-arg="--compile"
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell $(SNAKE) setup.py --version)
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
 RELEASE_VERSION=$(VERSION)
 DEBIAN_RELEASE_NUMBER=1
 DISTRO_RELEASE=$(shell lsb_release -c -s)
-
-clean:
-	test ! -d dist || rm -rf dist
-	test ! -d $(SDIST_DIR) || rm -rf $(SDIST_DIR)
-	dh $@ $(DH_VENV_ARGS)
-
-build-arch:
-	$(SNAKE) setup.py sdist --formats tar
-	mkdir -p $(SDIST_DIR)
-	tar -x -C $(SDIST_DIR) --strip-components=1 --exclude '*.egg-info' -f dist/*.tar
-	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
 
 override_dh_gencontrol:
 	dh_gencontrol -- -v$(RELEASE_VERSION)-matrix$(DEBIAN_RELEASE_NUMBER)~$(DISTRO_RELEASE)
@@ -46,5 +31,8 @@ override_dh_strip:
 override_dh_shlibdeps:
 	echo "No shlibdeps"
 
+override_dh_virtualenv:
+	dh_virtualenv $(DH_VENV_ARGS)
+
 %:
-	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
+	dh $@ --with python-virtualenv

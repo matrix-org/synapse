@@ -34,7 +34,8 @@ Depends:
  python3-distutils,
  python3,
  sqlite3,
- ${misc:Pre-Depends}
+ ${perl:Depends},
+ ${misc:Depends}
 Description: Open federated Instant Messaging and VoIP server
  Matrix is an ambitious new ecosystem for open federated Instant
  Messaging and VoIP. Synapse is a reference Matrix server

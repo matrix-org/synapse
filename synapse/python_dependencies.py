@@ -78,7 +78,10 @@ CONDITIONAL_REQUIREMENTS = {
     },
     "postgres": {
         "psycopg2>=2.6": ["psycopg2"]
-    }
+    },
+    "url_preview": {
+        "lxml": ["lxml"]
+    },
 }
 
 
