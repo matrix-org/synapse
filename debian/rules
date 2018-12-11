@@ -23,6 +23,7 @@ PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell $(SNAKE) setup.py --version)
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
 RELEASE_VERSION=$(VERSION)~$(shell lsb_release -c -s)
+DEBIAN_RELEASE_NUMBER=1
 
 clean:
 	test ! -d dist || rm -rf dist
@@ -36,10 +37,7 @@ build-arch:
 	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
 
 override_dh_gencontrol:
-	dh_gencontrol -- -v$(RELEASE_VERSION)
-
-override_dh_builddeb:
-	dh_builddeb -- -z9
+	dh_gencontrol -- -v$(RELEASE_VERSION)-matrix$(DEBIAN_RELEASE_NUMBER)
 
 override_dh_strip:
 	echo "No dhstrip"

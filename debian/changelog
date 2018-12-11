@@ -1,6 +1,8 @@
-matrix-synapse-py3 (0.34.0) stretch; urgency=medium
+matrix-synapse-py3 (0.34.0-matrix1) stretch; urgency=medium
 
   * New upstream version 0.34.0
+  * Synapse is now installed into a Python 3 virtual environment
+    with up-to-date dependencies.
 
  -- Amber Brown <amber@matrix.org>  Tue, 11 Dec 2018 04:00:00 +1000
 

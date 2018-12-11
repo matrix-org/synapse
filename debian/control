@@ -24,6 +24,7 @@ Conflicts: matrix-synapse
 Pre-Depends: dpkg (>= 1.16.1)
 Depends:
  adduser,
+ debconf,
  libffi6,
  libjpeg-turbo8,
  libpq5,
