@@ -1,4 +1,4 @@
-ARG distro="debian:stable"
+ARG distro=""
 FROM ${distro} AS dpkg-build
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \

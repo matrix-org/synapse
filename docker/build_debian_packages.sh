@@ -6,16 +6,19 @@
 # one building a Debian package for the targeted operating system. It is
 # designed to be a "single command" to produce all the images.
 
+set -ex
+
 # Make the dir where the debs will live
 mkdir -p ../debs
 
-# Build each OS image and then build the package. It gets copied out as part of
-# the process.
-for i in xenial bionic cosmic;
+# Build each OS image;
+for i in debian:stretch debian:sid ubuntu:xenial ubuntu:bionic ubuntu:cosmic;
 do
-    docker build --tag dh-venv-builder:$(i) --build-arg distro=ubuntu:$(i) -f Dockerfile-dhvirtualenv .
-    docker run -it --rm --volume=$(pwd)/../\:/synapse/build dh-venv-builder:$(i)
+    TAG=$(echo ${i} | cut -d ":" -f 2)
+    docker build --tag dh-venv-builder:${TAG} --build-arg distro=${i} -f Dockerfile-dhvirtualenv .
+    docker run -it --rm --volume=$(pwd)/../\:/synapse/build dh-venv-builder:${TAG}
 done
+
 
 # Make the debs and the Debian directory owned by the current user, not root, so
 # that it can be `git clean`ed without problems.
