@@ -55,9 +55,12 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 txn,
                 tp["medium"], tp["address"]
             )
+
             if user_id:
-                self.upsert_monthly_active_user_txn(txn, user_id)
-                reserved_user_list.append(user_id)
+                is_support = self.is_support_user_txn(txn, user_id)
+                if not is_support:
+                    self.upsert_monthly_active_user_txn(txn, user_id)
+                    reserved_user_list.append(user_id)
             else:
                 logger.warning(
                     "mau limit reserved threepid %s not found in db" % tp
@@ -211,6 +214,13 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         get_monthly_active_count. We can't do that here, because we are running
         in a database thread rather than the main thread, and we can't call
         txn.call_after because txn may not be a LoggingTransaction.
+
+        We consciously do not call is_support_txn from this method because it
+        is not possible to cache the response. is_support_txn will be false in
+        almost all cases, so it seems reasonable to call it only for
+        upsert_monthly_active_user and to call is_support_txn manually
+        for cases where upsert_monthly_active_user_txn is called directly,
+        like _initialise_reserved_users
 
         Args:
             txn (cursor):

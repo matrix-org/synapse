@@ -126,6 +126,7 @@ class UserDirectoryHandler(object):
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
         is_support = yield self.store.is_support_user(user_id)
+        # Support users are for diagnostics and should not appear in the user directory.
         if not is_support:
             yield self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url, None,
@@ -137,10 +138,8 @@ class UserDirectoryHandler(object):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        is_support = yield self.store.is_support_user(user_id)
-        if not is_support:
-            yield self.store.remove_from_user_dir(user_id)
-            yield self.store.remove_from_user_in_public_room(user_id)
+        yield self.store.remove_from_user_dir(user_id)
+        yield self.store.remove_from_user_in_public_room(user_id)
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
@@ -346,9 +345,7 @@ class UserDirectoryHandler(object):
                         # need to remove those users or not
                         user_ids = yield self.store.get_users_in_dir_due_to_room(room_id)
                         for user_id in user_ids:
-                            is_support = yield self.store.is_support_user(state_key)
-                            if not is_support:
-                                yield self._handle_remove_user(room_id, user_id)
+                            yield self._handle_remove_user(room_id, user_id)
                         return
                     else:
                         logger.debug("Server is still in room: %r", room_id)

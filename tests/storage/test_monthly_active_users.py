@@ -42,14 +42,23 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         user1_email = "user1@matrix.org"
         user2 = "@user2:server"
         user2_email = "user2@matrix.org"
+        user3 = "@user3:server"
+        user3_email = "user3@matrix.org"
+        
         threepids = [
             {'medium': 'email', 'address': user1_email},
             {'medium': 'email', 'address': user2_email},
+            {'medium': 'email', 'address': user3_email},
         ]
-        user_num = len(threepids)
+        # -1 because user3 is a support user and does not count
+        user_num = len(threepids) - 1
 
         self.store.register(user_id=user1, token="123", password_hash=None)
         self.store.register(user_id=user2, token="456", password_hash=None)
+        self.store.register(
+            user_id=user3, token="789",
+            password_hash=None, user_type=UserTypes.SUPPORT
+        )
         self.pump()
 
         now = int(self.hs.get_clock().time_msec())
@@ -63,7 +72,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
 
         active_count = self.store.get_monthly_active_count()
 
-        # Test total counts
+        # Test total counts, ensure user3 (support user) is not counted
         self.assertEquals(self.get_success(active_count), user_num)
 
         # Test user is marked as active
