@@ -18,12 +18,13 @@ export CFLAGS=-march=x86-64
 SNAKE=/usr/bin/python3
 DEB_BUILD_OPTIONS=noddebs
 EXTRA_REQUIREMENTS=--preinstall "setuptools>=17.1" --preinstall "pip>=7" --preinstall "wheel" --preinstall "lxml"
-DH_VENV_ARGS=--install-suffix "matrix-synapse" --with python-virtualenv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) --extra-pip-arg="--no-cache-dir" --extra-pip-arg="--compile"
+DH_VENV_ARGS=--install-suffix "matrix-synapse" --with python-virtualenv  --builtin-venv --setuptools --python $(SNAKE) $(EXTRA_REQUIREMENTS) --extra-pip-arg="--no-cache-dir" --extra-pip-arg="--compile"
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell $(SNAKE) setup.py --version)
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
-RELEASE_VERSION=$(VERSION)~$(shell lsb_release -c -s)
+RELEASE_VERSION=$(VERSION)
 DEBIAN_RELEASE_NUMBER=1
+DISTRO_RELEASE=$(shell lsb_release -c -s)
 
 clean:
 	test ! -d dist || rm -rf dist
@@ -37,7 +38,7 @@ build-arch:
 	dh $@ $(DH_VENV_ARGS) --sourcedir $(SDIST_DIR)
 
 override_dh_gencontrol:
-	dh_gencontrol -- -v$(RELEASE_VERSION)-matrix$(DEBIAN_RELEASE_NUMBER)
+	dh_gencontrol -- -v$(RELEASE_VERSION)-matrix$(DEBIAN_RELEASE_NUMBER)~$(DISTRO_RELEASE)
 
 override_dh_strip:
 	echo "No dhstrip"
