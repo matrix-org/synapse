@@ -137,8 +137,11 @@ class SynapseHomeServer(HomeServer):
             handler = handler_cls(config, module_api)
             resources[path] = AdditionalResource(self, handler.handle_request)
 
+        # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
             root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+        elif STATIC_PREFIX in resources:
+            root_resource = RootRedirect(STATIC_PREFIX)
         else:
             root_resource = NoResource()
 
