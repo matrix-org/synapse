@@ -69,9 +69,6 @@ REQUIREMENTS = {
 }
 
 CONDITIONAL_REQUIREMENTS = {
-    "web_client": {
-        "matrix_angular_sdk>=0.6.8": ["syweb>=0.6.8"],
-    },
     "email.enable_notifs": {
         "Jinja2>=2.8": ["Jinja2>=2.8"],
         "bleach>=1.4.2": ["bleach>=1.4.2"],

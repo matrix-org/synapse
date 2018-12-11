@@ -115,6 +115,10 @@ Upgrading to v0.34.0
    case a hypothetical future identity server was put there. If you don't
    remove it, users may be unable to deactivate their accounts.
 
+3. This release no longer installs the (unmaintained) Matrix Console web client
+   as part of the default installation. It is possible to re-enable it by
+   installing it separately and setting the ``web_client_location`` config
+   option, but please consider switching to another client.
 
 Upgrading to v0.33.7
 ====================
