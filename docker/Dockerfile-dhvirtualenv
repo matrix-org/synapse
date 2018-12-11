@@ -1,5 +1,8 @@
+# Get the distro we want to pull from as a dynamic build variable
 ARG distro=""
-FROM ${distro} AS dpkg-build
+FROM ${distro}
+
+# Install the build dependencies
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \

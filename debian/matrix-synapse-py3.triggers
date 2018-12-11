@@ -1,4 +1,4 @@
-# Register interest in Python interpreter changes (Python 2 for now); and
+# Register interest in Python interpreter changes and
 # don't make the Python package dependent on the virtualenv package
 # processing (noawait)
 interest-noawait /usr/bin/python3.5

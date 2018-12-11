@@ -13,4 +13,3 @@ RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-Alias=matrix-synapse
