@@ -332,7 +332,7 @@ class UserDirectoryHandler(object):
                     public_value=Membership.JOIN,
                 )
 
-                if not change:
+                if change is False:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
                     is_in_room = yield self.store.is_host_joined(
