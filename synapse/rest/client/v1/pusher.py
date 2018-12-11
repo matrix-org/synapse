@@ -142,7 +142,7 @@ class PushersRemoveRestServlet(RestServlet):
     To allow pusher to be delete by clicking a link (ie. GET request)
     """
     PATTERNS = client_path_patterns("/pushers/remove$")
-    SUCCESS_HTML = "<html><body>You have been unsubscribed</body><html>"
+    SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):
         super(PushersRemoveRestServlet, self).__init__()

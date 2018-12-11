@@ -37,6 +37,7 @@ class RegistrationConfig(Config):
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
+        self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
         self.invite_3pid_guest = (
@@ -90,6 +91,14 @@ class RegistrationConfig(Config):
         # participate in rooms hosted on this server which have been made
         # accessible to anonymous users.
         allow_guest_access: False
+
+        # The identity server which we suggest that clients should use when users log
+        # in on this server.
+        #
+        # (By default, no suggestion is made, so it is left up to the client.
+        # This setting is ignored unless public_baseurl is also set.)
+        #
+        # default_identity_server: https://matrix.org
 
         # The list of identity servers trusted to verify third party
         # identifiers by this server.

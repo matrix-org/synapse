@@ -48,6 +48,78 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v0.34.0
+====================
+
+1. This release is the first to fully support Python 3. We recommend switching
+   to Python 3, as it has been shown to give performance improvements.
+
+   For users who have installed Synapse into a virtualenv, we recommend doing
+   this by creating a new virtualenv. For example::
+
+       virtualenv -p python3 ~/synapse/env3
+       source ~/synapse/env3/bin/activate
+       pip install matrix-synapse
+
+   You can then start synapse as normal, having activated the new virtualenv::
+
+       cd ~/synapse
+       source env3/bin/activate
+       synctl start
+
+   Users who have installed from distribution packages should see the relevant
+   package documentation.
+
+   * When upgrading to Python 3, you **must** make sure that your log files are
+     configured as UTF-8, by adding ``encoding: utf8`` to the
+     ``RotatingFileHandler`` configuration (if you have one) in your
+     ``<server>.log.config`` file. For example, if your ``log.config`` file
+     contains::
+
+       handlers:
+         file:
+           class: logging.handlers.RotatingFileHandler
+           formatter: precise
+           filename: homeserver.log
+           maxBytes: 104857600
+           backupCount: 10
+           filters: [context]
+         console:
+           class: logging.StreamHandler
+           formatter: precise
+           filters: [context]
+
+     Then you should update this to be::
+
+       handlers:
+         file:
+           class: logging.handlers.RotatingFileHandler
+           formatter: precise
+           filename: homeserver.log
+           maxBytes: 104857600
+           backupCount: 10
+           filters: [context]
+           encoding: utf8
+         console:
+           class: logging.StreamHandler
+           formatter: precise
+           filters: [context]
+
+     There is no need to revert this change if downgrading to Python 2.
+
+2. This release removes the ``riot.im`` from the default list of trusted
+   identity servers.
+
+   If ``riot.im`` is in your homeserver's list of
+   ``trusted_third_party_id_servers``, you should remove it. It was added in
+   case a hypothetical future identity server was put there. If you don't
+   remove it, users may be unable to deactivate their accounts.
+
+3. This release no longer installs the (unmaintained) Matrix Console web client
+   as part of the default installation. It is possible to re-enable it by
+   installing it separately and setting the ``web_client_location`` config
+   option, but please consider switching to another client.
+
 Upgrading to v0.33.7
 ====================
 
