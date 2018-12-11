@@ -6,6 +6,33 @@ FROM ${distro}
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-        build-essential debhelper devscripts equivs dh-virtualenv libpq-dev sqlite3 python3-dev libffi-dev libjpeg-dev zlib1g-dev libxslt1-dev python3-setuptools python3-pip libssl-dev lsb-release python3-venv
+        build-essential \
+        debhelper \
+        devscripts \
+        equivs \
+        libffi-dev \
+        libjpeg-dev \
+        libpq-dev \
+        libssl-dev \
+        libxslt1-dev \
+        lsb-release \
+        python3-dev \
+        python3-pip \
+        python3-setuptools \
+        python3-venv \
+        sqlite3 \
+        wget \
+        zlib1g-dev
+
+RUN mkdir -p /tmp/dhvenv \
+    && cd /tmp/dhvenv \
+    && wget https://github.com/spotify/dh-virtualenv/archive/1.1.tar.gz \
+    && tar xvf 1.1.tar.gz \
+    && cd dh-virtualenv-1.1/ \
+    && mk-build-deps -ri -t "apt-get -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io" \
+    && dpkg-buildpackage -us -uc -b \
+    && cd /tmp/dhvenv \
+    && apt-get install -yqq ./dh-virtualenv_1.1-1_all.deb
+
 WORKDIR /synapse/build
 ENTRYPOINT ["bash","/synapse/build/docker/build_debian.sh"]

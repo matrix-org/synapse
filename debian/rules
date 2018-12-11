@@ -10,11 +10,10 @@ DH_VENV_ARGS=--install-suffix "matrix-synapse" \
 			 --builtin-venv\
 			 --setuptools \
 			 --python $(SNAKE) \
-			 --preinstall "setuptools>=40.6.3" \
-			 --preinstall "pip>=18" \
-			 --preinstall "wheel" \
+			 --upgrade-pip \
 			 --extra-pip-arg="--no-cache-dir" \
-			 --extra-pip-arg="--compile"
+			 --extra-pip-arg="--compile" \
+			 --extra-pip-arg="--progress-bar=off"
 PACKAGE=$(shell dh_listpackages)
 VERSION=$(shell $(SNAKE) setup.py --version)
 SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
