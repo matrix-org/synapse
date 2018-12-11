@@ -13,8 +13,7 @@
  * limitations under the License.
  */
 
-/* record whether we have sent a server notice about consenting to the
- * privacy policy. Specifically records the version of the policy we sent
- * a message about.
+/* Record the user_type of the user, initially this column is used to identify
+ * users of type Support - See synapse/api/constants.py
  */
 ALTER TABLE users ADD COLUMN user_type TEXT DEFAULT NULL;

@@ -121,7 +121,8 @@ ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
 
 
-# Allows for user type specific behaviour, if we'd had a crystal ball would
-# probably have included admin and guest, normal users are type None
 class UserTypes(object):
+    """Allows for user type specific behaviour. With the benefit of hindsight
+    'admin' and 'guest' users should also be UserTypes. Normal users are type None
+    """
     SUPPORT = "support"
