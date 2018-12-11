@@ -13,19 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.push import PusherConfigException
-from synapse.http.servlet import (
-    parse_json_object_from_request, parse_string, RestServlet
-)
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.http.server import finish_request
-from synapse.api.errors import StoreError
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.push import PusherConfigException
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ class PushersRestServlet(ClientV1RestServlet):
         ]
 
         for p in pushers:
-            for k, v in p.items():
+            for k, v in list(p.items()):
                 if k not in allowed_keys:
                     del p[k]
 
@@ -90,15 +92,11 @@ class PushersSetRestServlet(ClientV1RestServlet):
             )
             defer.returnValue((200, {}))
 
-        reqd = ['kind', 'app_id', 'app_display_name',
-                'device_display_name', 'pushkey', 'lang', 'data']
-        missing = []
-        for i in reqd:
-            if i not in content:
-                missing.append(i)
-        if len(missing):
-            raise SynapseError(400, "Missing parameters: " + ','.join(missing),
-                               errcode=Codes.MISSING_PARAM)
+        assert_params_in_dict(
+            content,
+            ['kind', 'app_id', 'app_display_name',
+             'device_display_name', 'pushkey', 'lang', 'data']
+        )
 
         logger.debug("set pushkey %s to kind %s", content['pushkey'], content['kind'])
         logger.debug("Got pushers request with body: %r", content)
@@ -128,7 +126,7 @@ class PushersSetRestServlet(ClientV1RestServlet):
                 profile_tag=content.get('profile_tag', ""),
             )
         except PusherConfigException as pce:
-            raise SynapseError(400, "Config Error: " + pce.message,
+            raise SynapseError(400, "Config Error: " + str(pce),
                                errcode=Codes.MISSING_PARAM)
 
         self.notifier.on_new_replication_data()
@@ -144,10 +142,10 @@ class PushersRemoveRestServlet(RestServlet):
     To allow pusher to be delete by clicking a link (ie. GET request)
     """
     PATTERNS = client_path_patterns("/pushers/remove$")
-    SUCCESS_HTML = "<html><body>You have been unsubscribed</body><html>"
+    SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):
-        super(RestServlet, self).__init__()
+        super(PushersRemoveRestServlet, self).__init__()
         self.hs = hs
         self.notifier = hs.get_notifier()
         self.auth = hs.get_auth()

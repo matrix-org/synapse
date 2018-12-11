@@ -13,14 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.frozenutils import freeze
-from synapse.util.caches import intern_dict
+import os
+from distutils.util import strtobool
 
+import six
+
+from synapse.util.caches import intern_dict
+from synapse.util.frozenutils import freeze
 
 # Whether we should use frozen_dict in FrozenEvent. Using frozen_dicts prevents
-# bugs where we accidentally share e.g. signature dicts. However, converting
-# a dict to frozen_dicts is expensive.
-USE_FROZEN_DICTS = True
+# bugs where we accidentally share e.g. signature dicts. However, converting a
+# dict to frozen_dicts is expensive.
+#
+# NOTE: This is overridden by the configuration by the Synapse worker apps, but
+# for the sake of tests, it is set here while it cannot be configured on the
+# homeserver object itself.
+USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 
 
 class _EventInternalMetadata(object):
@@ -147,6 +155,27 @@ class EventBase(object):
 
     def items(self):
         return list(self._event_dict.items())
+
+    def keys(self):
+        return six.iterkeys(self._event_dict)
+
+    def prev_event_ids(self):
+        """Returns the list of prev event IDs. The order matches the order
+        specified in the event, though there is no meaning to it.
+
+        Returns:
+            list[str]: The list of event IDs of this event's prev_events
+        """
+        return [e for e, _ in self.prev_events]
+
+    def auth_event_ids(self):
+        """Returns the list of auth event IDs. The order matches the order
+        specified in the event, though there is no meaning to it.
+
+        Returns:
+            list[str]: The list of event IDs of this event's auth_events
+        """
+        return [e for e, _ in self.auth_events]
 
 
 class FrozenEvent(EventBase):

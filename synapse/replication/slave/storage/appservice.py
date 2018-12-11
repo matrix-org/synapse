@@ -15,7 +15,8 @@
 # limitations under the License.
 
 from synapse.storage.appservice import (
-    ApplicationServiceWorkerStore, ApplicationServiceTransactionWorkerStore,
+    ApplicationServiceTransactionWorkerStore,
+    ApplicationServiceWorkerStore,
 )
 
 

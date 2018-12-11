@@ -14,51 +14,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-from dateutil import tz
-import time
+import calendar
 import logging
-
-from synapse.storage.devices import DeviceStore
-from .appservice import (
-    ApplicationServiceStore, ApplicationServiceTransactionStore
-)
-from .directory import DirectoryStore
-from .events import EventsStore
-from .presence import PresenceStore, UserPresenceState
-from .profile import ProfileStore
-from .registration import RegistrationStore
-from .room import RoomStore
-from .roommember import RoomMemberStore
-from .stream import StreamStore
-from .transactions import TransactionStore
-from .keys import KeyStore
-from .event_federation import EventFederationStore
-from .pusher import PusherStore
-from .push_rule import PushRuleStore
-from .media_repository import MediaRepositoryStore
-from .rejections import RejectionsStore
-from .event_push_actions import EventPushActionsStore
-from .deviceinbox import DeviceInboxStore
-from .group_server import GroupServerStore
-from .state import StateStore
-from .signatures import SignatureStore
-from .filtering import FilteringStore
-from .end_to_end_keys import EndToEndKeyStore
-
-from .receipts import ReceiptsStore
-from .search import SearchStore
-from .tags import TagsStore
-from .account_data import AccountDataStore
-from .openid import OpenIdStore
-from .client_ips import ClientIpStore
-from .user_directory import UserDirectoryStore
-
-from .util.id_generators import IdGenerator, StreamIdGenerator, ChainedIdGenerator
-from .engines import PostgresEngine
+import time
 
 from synapse.api.constants import PresenceState
+from synapse.storage.devices import DeviceStore
+from synapse.storage.user_erasure_store import UserErasureStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
+
+from .account_data import AccountDataStore
+from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
+from .client_ips import ClientIpStore
+from .deviceinbox import DeviceInboxStore
+from .directory import DirectoryStore
+from .e2e_room_keys import EndToEndRoomKeyStore
+from .end_to_end_keys import EndToEndKeyStore
+from .engines import PostgresEngine
+from .event_federation import EventFederationStore
+from .event_push_actions import EventPushActionsStore
+from .events import EventsStore
+from .filtering import FilteringStore
+from .group_server import GroupServerStore
+from .keys import KeyStore
+from .media_repository import MediaRepositoryStore
+from .monthly_active_users import MonthlyActiveUsersStore
+from .openid import OpenIdStore
+from .presence import PresenceStore, UserPresenceState
+from .profile import ProfileStore
+from .push_rule import PushRuleStore
+from .pusher import PusherStore
+from .receipts import ReceiptsStore
+from .registration import RegistrationStore
+from .rejections import RejectionsStore
+from .room import RoomStore
+from .roommember import RoomMemberStore
+from .search import SearchStore
+from .signatures import SignatureStore
+from .state import StateStore
+from .stream import StreamStore
+from .tags import TagsStore
+from .transactions import TransactionStore
+from .user_directory import UserDirectoryStore
+from .util.id_generators import ChainedIdGenerator, IdGenerator, StreamIdGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +66,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 PresenceStore, TransactionStore,
                 DirectoryStore, KeyStore, StateStore, SignatureStore,
                 ApplicationServiceStore,
+                EventsStore,
                 EventFederationStore,
                 MediaRepositoryStore,
                 RejectionsStore,
@@ -75,9 +74,9 @@ class DataStore(RoomMemberStore, RoomStore,
                 PusherStore,
                 PushRuleStore,
                 ApplicationServiceTransactionStore,
-                EventsStore,
                 ReceiptsStore,
                 EndToEndKeyStore,
+                EndToEndRoomKeyStore,
                 SearchStore,
                 TagsStore,
                 AccountDataStore,
@@ -88,6 +87,8 @@ class DataStore(RoomMemberStore, RoomStore,
                 DeviceInboxStore,
                 UserDirectoryStore,
                 GroupServerStore,
+                UserErasureStore,
+                MonthlyActiveUsersStore,
                 ):
 
     def __init__(self, db_conn, hs):
@@ -116,7 +117,6 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "device_lists_stream", "stream_id",
         )
 
-        self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
@@ -355,10 +355,11 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         Returns millisecond unixtime for start of UTC day.
         """
-        now = datetime.datetime.utcnow()
-        today_start = datetime.datetime(now.year, now.month,
-                                        now.day, tzinfo=tz.tzutc())
-        return int(time.mktime(today_start.timetuple())) * 1000
+        now = time.gmtime()
+        today_start = calendar.timegm((
+            now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0,
+        ))
+        return today_start * 1000
 
     def generate_user_daily_visits(self):
         """

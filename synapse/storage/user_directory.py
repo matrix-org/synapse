@@ -13,19 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from ._base import SQLBaseStore
-
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import get_domain_from_id, get_localpart_from_id
+import logging
+import re
 
 from six import iteritems
 
-import re
-import logging
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, JoinRules
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.types import get_domain_from_id, get_localpart_from_id
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +265,7 @@ class UserDirectoryStore(SQLBaseStore):
         self.get_user_in_public_room.invalidate((user_id,))
 
     def get_users_in_public_due_to_room(self, room_id):
-        """Get all user_ids that are in the room directory becuase they're
+        """Get all user_ids that are in the room directory because they're
         in the given room_id
         """
         return self._simple_select_onecol(
@@ -277,7 +277,7 @@ class UserDirectoryStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_users_in_dir_due_to_room(self, room_id):
-        """Get all user_ids that are in the room directory becuase they're
+        """Get all user_ids that are in the room directory because they're
         in the given room_id
         """
         user_ids_dir = yield self._simple_select_onecol(

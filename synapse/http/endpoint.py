@@ -12,20 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import collections
+import logging
+import random
+import re
+import time
+
+from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
-from twisted.internet import defer, reactor
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
 from twisted.names.error import DNSNameError, DomainError
 
-import collections
-import logging
-import random
-import time
-
-
 logger = logging.getLogger(__name__)
-
 
 SERVER_CACHE = {}
 
@@ -38,35 +37,106 @@ _Server = collections.namedtuple(
 )
 
 
-def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
+def parse_server_name(server_name):
+    """Split a server name into host/port parts.
+
+    Args:
+        server_name (str): server name to parse
+
+    Returns:
+        Tuple[str, int|None]: host/port parts.
+
+    Raises:
+        ValueError if the server name could not be parsed.
+    """
+    try:
+        if server_name[-1] == ']':
+            # ipv6 literal, hopefully
+            return server_name, None
+
+        domain_port = server_name.rsplit(":", 1)
+        domain = domain_port[0]
+        port = int(domain_port[1]) if domain_port[1:] else None
+        return domain, port
+    except Exception:
+        raise ValueError("Invalid server name '%s'" % server_name)
+
+
+VALID_HOST_REGEX = re.compile(
+    "\\A[0-9a-zA-Z.-]+\\Z",
+)
+
+
+def parse_and_validate_server_name(server_name):
+    """Split a server name into host/port parts and do some basic validation.
+
+    Args:
+        server_name (str): server name to parse
+
+    Returns:
+        Tuple[str, int|None]: host/port parts.
+
+    Raises:
+        ValueError if the server name could not be parsed.
+    """
+    host, port = parse_server_name(server_name)
+
+    # these tests don't need to be bulletproof as we'll find out soon enough
+    # if somebody is giving us invalid data. What we *do* need is to be sure
+    # that nobody is sneaking IP literals in that look like hostnames, etc.
+
+    # look for ipv6 literals
+    if host[0] == '[':
+        if host[-1] != ']':
+            raise ValueError("Mismatched [...] in server name '%s'" % (
+                server_name,
+            ))
+        return host, port
+
+    # otherwise it should only be alphanumerics.
+    if not VALID_HOST_REGEX.match(host):
+        raise ValueError("Server name '%s' contains invalid characters" % (
+            server_name,
+        ))
+
+    return host, port
+
+
+def matrix_federation_endpoint(reactor, destination, tls_client_options_factory=None,
                                timeout=None):
     """Construct an endpoint for the given matrix destination.
 
     Args:
         reactor: Twisted reactor.
-        destination (bytes): The name of the server to connect to.
-        ssl_context_factory (twisted.internet.ssl.ContextFactory): Factory
-            which generates SSL contexts to use for TLS.
+        destination (unicode): The name of the server to connect to.
+        tls_client_options_factory
+            (synapse.crypto.context_factory.ClientTLSOptionsFactory):
+            Factory which generates TLS options for client connections.
         timeout (int): connection timeout in seconds
     """
 
-    domain_port = destination.split(":")
-    domain = domain_port[0]
-    port = int(domain_port[1]) if domain_port[1:] else None
+    domain, port = parse_server_name(destination)
 
     endpoint_kw_args = {}
 
     if timeout is not None:
         endpoint_kw_args.update(timeout=timeout)
 
-    if ssl_context_factory is None:
+    if tls_client_options_factory is None:
         transport_endpoint = HostnameEndpoint
         default_port = 8008
     else:
+        # the SNI string should be the same as the Host header, minus the port.
+        # as per https://github.com/matrix-org/synapse/issues/2525#issuecomment-336896777,
+        # the Host header and SNI should therefore be the server_name of the remote
+        # server.
+        tls_options = tls_client_options_factory.get_options(domain)
+
         def transport_endpoint(reactor, host, port, timeout):
             return wrapClientTLS(
-                ssl_context_factory,
-                HostnameEndpoint(reactor, host, port, timeout=timeout))
+                tls_options,
+                HostnameEndpoint(reactor, host, port, timeout=timeout),
+            )
         default_port = 8448
 
     if port is None:
@@ -74,21 +144,22 @@ def matrix_federation_endpoint(reactor, destination, ssl_context_factory=None,
             reactor, "matrix", domain, protocol="tcp",
             default_port=default_port, endpoint=transport_endpoint,
             endpoint_kw_args=endpoint_kw_args
-        ))
+        ), reactor)
     else:
         return _WrappingEndpointFac(transport_endpoint(
             reactor, domain, port, **endpoint_kw_args
-        ))
+        ), reactor)
 
 
 class _WrappingEndpointFac(object):
-    def __init__(self, endpoint_fac):
+    def __init__(self, endpoint_fac, reactor):
         self.endpoint_fac = endpoint_fac
+        self.reactor = reactor
 
     @defer.inlineCallbacks
     def connect(self, protocolFactory):
         conn = yield self.endpoint_fac.connect(protocolFactory)
-        conn = _WrappedConnection(conn)
+        conn = _WrappedConnection(conn, self.reactor)
         defer.returnValue(conn)
 
 
@@ -98,9 +169,10 @@ class _WrappedConnection(object):
     """
     __slots__ = ["conn", "last_request"]
 
-    def __init__(self, conn):
+    def __init__(self, conn, reactor):
         object.__setattr__(self, "conn", conn)
         object.__setattr__(self, "last_request", time.time())
+        self._reactor = reactor
 
     def __getattr__(self, name):
         return getattr(self.conn, name)
@@ -131,14 +203,14 @@ class _WrappedConnection(object):
         # Time this connection out if we haven't send a request in the last
         # N minutes
         # TODO: Cancel the previous callLater?
-        reactor.callLater(3 * 60, self._time_things_out_maybe)
+        self._reactor.callLater(3 * 60, self._time_things_out_maybe)
 
         d = self.conn.request(request)
 
         def update_request_time(res):
             self.last_request = time.time()
             # TODO: Cancel the previous callLater?
-            reactor.callLater(3 * 60, self._time_things_out_maybe)
+            self._reactor.callLater(3 * 60, self._time_things_out_maybe)
             return res
 
         d.addCallback(update_request_time)

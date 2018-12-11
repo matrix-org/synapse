@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
-
 from synapse.util.module_loader import load_module
+
+from ._base import Config
 
 LDAP_PROVIDER = 'ldap_auth_provider.LdapAuthProvider'
 

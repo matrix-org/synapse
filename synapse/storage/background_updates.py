@@ -12,15 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import synapse.util.async
 
-from ._base import SQLBaseStore
-from . import engines
+import logging
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
-import simplejson as json
-import logging
+from synapse.metrics.background_process_metrics import run_as_background_process
+
+from . import engines
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +89,16 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_handlers = {}
         self._all_done = False
 
-    @defer.inlineCallbacks
     def start_doing_background_updates(self):
-        logger.info("Starting background schema updates")
+        run_as_background_process(
+            "background_updates", self._run_background_updates,
+        )
 
+    @defer.inlineCallbacks
+    def _run_background_updates(self):
+        logger.info("Starting background schema updates")
         while True:
-            yield synapse.util.async.sleep(
+            yield self.hs.get_clock().sleep(
                 self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.)
 
             try:

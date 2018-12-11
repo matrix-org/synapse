@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+import logging
+from functools import wraps
 
 from prometheus_client import Counter
+
+from twisted.internet import defer
+
+from synapse.metrics import InFlightGauge
 from synapse.util.logcontext import LoggingContext
-
-from functools import wraps
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,13 @@ block_db_txn_duration = Counter(
 block_db_sched_duration = Counter(
     "synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"])
 
+# Tracks the number of blocks currently active
+in_flight = InFlightGauge(
+    "synapse_util_metrics_block_in_flight", "",
+    labels=["block_name"],
+    sub_metrics=["real_time_max", "real_time_sum"],
+)
+
 
 def measure_func(name):
     def wrapper(func):
@@ -60,10 +68,9 @@ def measure_func(name):
 
 class Measure(object):
     __slots__ = [
-        "clock", "name", "start_context", "start", "new_context", "ru_utime",
-        "ru_stime",
-        "db_txn_count", "db_txn_duration_sec", "db_sched_duration_sec",
+        "clock", "name", "start_context", "start",
         "created_context",
+        "start_usage",
     ]
 
     def __init__(self, clock, name):
@@ -81,14 +88,15 @@ class Measure(object):
             self.start_context.__enter__()
             self.created_context = True
 
-        self.ru_utime, self.ru_stime = self.start_context.get_resource_usage()
-        self.db_txn_count = self.start_context.db_txn_count
-        self.db_txn_duration_sec = self.start_context.db_txn_duration_sec
-        self.db_sched_duration_sec = self.start_context.db_sched_duration_sec
+        self.start_usage = self.start_context.get_resource_usage()
+
+        in_flight.register((self.name,), self._update_in_flight)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if isinstance(exc_type, Exception) or not self.start_context:
             return
+
+        in_flight.unregister((self.name,), self._update_in_flight)
 
         duration = self.clock.time() - self.start
 
@@ -108,15 +116,29 @@ class Measure(object):
             logger.warn("Expected context. (%r)", self.name)
             return
 
-        ru_utime, ru_stime = context.get_resource_usage()
-
-        block_ru_utime.labels(self.name).inc(ru_utime - self.ru_utime)
-        block_ru_stime.labels(self.name).inc(ru_stime - self.ru_stime)
-        block_db_txn_count.labels(self.name).inc(context.db_txn_count - self.db_txn_count)
-        block_db_txn_duration.labels(self.name).inc(
-            context.db_txn_duration_sec - self.db_txn_duration_sec)
-        block_db_sched_duration.labels(self.name).inc(
-            context.db_sched_duration_sec - self.db_sched_duration_sec)
+        current = context.get_resource_usage()
+        usage = current - self.start_usage
+        try:
+            block_ru_utime.labels(self.name).inc(usage.ru_utime)
+            block_ru_stime.labels(self.name).inc(usage.ru_stime)
+            block_db_txn_count.labels(self.name).inc(usage.db_txn_count)
+            block_db_txn_duration.labels(self.name).inc(usage.db_txn_duration_sec)
+            block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
+        except ValueError:
+            logger.warn(
+                "Failed to save metrics! OLD: %r, NEW: %r",
+                self.start_usage, current
+            )
 
         if self.created_context:
             self.start_context.__exit__(exc_type, exc_val, exc_tb)
+
+    def _update_in_flight(self, metrics):
+        """Gets called when processing in flight metrics
+        """
+        duration = self.clock.time() - self.start
+
+        metrics.real_time_max = max(metrics.real_time_max, duration)
+        metrics.real_time_sum += duration
+
+        # TODO: Add other in flight metrics.

@@ -12,14 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.api.errors import SynapseError
-from synapse.storage.presence import UserPresenceState
-from synapse.types import UserID, RoomID
+import jsonschema
+from canonicaljson import json
+from jsonschema import FormatChecker
+
 from twisted.internet import defer
 
-import simplejson as json
-import jsonschema
-from jsonschema import FormatChecker
+from synapse.api.errors import SynapseError
+from synapse.storage.presence import UserPresenceState
+from synapse.types import RoomID, UserID
 
 FILTER_SCHEMA = {
     "additionalProperties": False,
@@ -112,7 +113,13 @@ ROOM_EVENT_FILTER_SCHEMA = {
         },
         "contains_url": {
             "type": "boolean"
-        }
+        },
+        "lazy_load_members": {
+            "type": "boolean"
+        },
+        "include_redundant_members": {
+            "type": "boolean"
+        },
     }
 }
 
@@ -165,7 +172,10 @@ USER_FILTER_SCHEMA = {
                 # events a lot easier as we can then use a negative lookbehind
                 # assertion to split '\.' If we allowed \\ then it would
                 # incorrectly split '\\.' See synapse.events.utils.serialize_event
-                "pattern": "^((?!\\\).)*$"
+                #
+                # Note that because this is a regular expression, we have to escape
+                # each backslash in the pattern.
+                "pattern": r"^((?!\\\\).)*$"
             }
         }
     },
@@ -219,7 +229,7 @@ class Filtering(object):
             jsonschema.validate(user_filter_json, USER_FILTER_SCHEMA,
                                 format_checker=FormatChecker())
         except jsonschema.ValidationError as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
 
 class FilterCollection(object):
@@ -244,6 +254,7 @@ class FilterCollection(object):
             "include_leave", False
         )
         self.event_fields = filter_json.get("event_fields", [])
+        self.event_format = filter_json.get("event_format", "client")
 
     def __repr__(self):
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)
@@ -259,6 +270,12 @@ class FilterCollection(object):
 
     def ephemeral_limit(self):
         return self._room_ephemeral_filter.limit()
+
+    def lazy_load_members(self):
+        return self._room_state_filter.lazy_load_members()
+
+    def include_redundant_members(self):
+        return self._room_state_filter.include_redundant_members()
 
     def filter_presence(self, events):
         return self._presence_filter.filter(events)
@@ -415,6 +432,12 @@ class Filter(object):
 
     def limit(self):
         return self.filter_json.get("limit", 10)
+
+    def lazy_load_members(self):
+        return self.filter_json.get("lazy_load_members", False)
+
+    def include_redundant_members(self):
+        return self.filter_json.get("include_redundant_members", False)
 
 
 def _matches_wildcard(actual_value, filter_value):

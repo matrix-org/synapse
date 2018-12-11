@@ -19,11 +19,11 @@ import shutil
 import tempfile
 
 from synapse.config.homeserver import HomeServerConfig
+
 from tests import unittest
 
 
 class ConfigGenerationTestCase(unittest.TestCase):
-
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.file = os.path.join(self.dir, "homeserver.yaml")
@@ -32,23 +32,30 @@ class ConfigGenerationTestCase(unittest.TestCase):
         shutil.rmtree(self.dir)
 
     def test_generate_config_generates_files(self):
-        HomeServerConfig.load_or_generate_config("", [
-            "--generate-config",
-            "-c", self.file,
-            "--report-stats=yes",
-            "-H", "lemurs.win"
-        ])
+        HomeServerConfig.load_or_generate_config(
+            "",
+            [
+                "--generate-config",
+                "-c",
+                self.file,
+                "--report-stats=yes",
+                "-H",
+                "lemurs.win",
+            ],
+        )
 
         self.assertSetEqual(
-            set([
-                "homeserver.yaml",
-                "lemurs.win.log.config",
-                "lemurs.win.signing.key",
-                "lemurs.win.tls.crt",
-                "lemurs.win.tls.dh",
-                "lemurs.win.tls.key",
-            ]),
-            set(os.listdir(self.dir))
+            set(
+                [
+                    "homeserver.yaml",
+                    "lemurs.win.log.config",
+                    "lemurs.win.signing.key",
+                    "lemurs.win.tls.crt",
+                    "lemurs.win.tls.dh",
+                    "lemurs.win.tls.key",
+                ]
+            ),
+            set(os.listdir(self.dir)),
         )
 
         self.assert_log_filename_is(
@@ -60,6 +67,6 @@ class ConfigGenerationTestCase(unittest.TestCase):
         with open(log_config_file) as f:
             config = f.read()
             # find the 'filename' line
-            matches = re.findall("^\s*filename:\s*(.*)$", config, re.M)
+            matches = re.findall(r"^\s*filename:\s*(.*)$", config, re.M)
             self.assertEqual(1, len(matches))
             self.assertEqual(matches[0], expected)

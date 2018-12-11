@@ -14,14 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import GroupID
 
 from ._base import client_v2_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 

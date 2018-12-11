@@ -14,15 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-from synapse.api.constants import Membership
+import logging
 
+from six.moves import urllib
+
+from twisted.internet import defer
+
+from synapse.api.constants import Membership
 from synapse.api.urls import FEDERATION_PREFIX as PREFIX
 from synapse.util.logutils import log_function
-
-import logging
-import urllib
-
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class TransportLayerClient(object):
             dest (str)
             room_id (str)
             event_tuples (list)
-            limt (int)
+            limit (int)
 
         Returns:
             Deferred: Results in a dict received from the remote homeserver.
@@ -143,9 +143,17 @@ class TransportLayerClient(object):
             transaction (Transaction)
 
         Returns:
-            Deferred: Results of the deferred is a tuple in the form of
-            (response_code, response_body) where the response_body is a
-            python dict decoded from json
+            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            will be the decoded JSON body.
+
+            Fails with ``HTTPRequestException`` if we get an HTTP response
+            code >= 300.
+
+            Fails with ``NotRetryingDestination`` if we are not yet ready
+            to retry this server.
+
+            Fails with ``FederationDeniedError`` if this destination
+            is not on our federation whitelist
         """
         logger.debug(
             "send_data dest=%s, txid=%s",
@@ -170,11 +178,6 @@ class TransportLayerClient(object):
             backoff_on_404=True,  # If we get a 404 the other side has gone
         )
 
-        logger.debug(
-            "send_data dest=%s, txid=%s, got response: 200",
-            transaction.destination, transaction.transaction_id,
-        )
-
         defer.returnValue(response)
 
     @defer.inlineCallbacks
@@ -196,7 +199,7 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def make_membership_event(self, destination, room_id, user_id, membership):
+    def make_membership_event(self, destination, room_id, user_id, membership, params):
         """Asks a remote server to build and sign us a membership event
 
         Note that this does not append any events to any graphs.
@@ -206,6 +209,8 @@ class TransportLayerClient(object):
             room_id (str): room to join/leave
             user_id (str): user to be joined/left
             membership (str): one of join/leave
+            params (dict[str, str|Iterable[str]]): Query parameters to include in the
+                request.
 
         Returns:
             Deferred: Succeeds when we get a 2xx HTTP response. The result
@@ -242,6 +247,7 @@ class TransportLayerClient(object):
         content = yield self.client.get_json(
             destination=destination,
             path=path,
+            args=params,
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=20000,
             ignore_backoff=ignore_backoff,
@@ -949,4 +955,4 @@ def _create_path(prefix, path, *args):
     Returns:
         str
     """
-    return prefix + path % tuple(urllib.quote(arg, "") for arg in args)
+    return prefix + path % tuple(urllib.parse.quote(arg, "") for arg in args)

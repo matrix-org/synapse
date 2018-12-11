@@ -16,7 +16,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util.async import ObservableDeferred
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import register_cache
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 

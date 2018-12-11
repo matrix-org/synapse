@@ -15,6 +15,7 @@
 import sys
 
 from synapse.util.logformatter import LogFormatter
+
 from tests import unittest
 
 

@@ -13,21 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
-
-from synapse.util.stringutils import random_string
-from signedjson.key import (
-    generate_signing_key, is_signing_algorithm_supported,
-    decode_signing_key_base64, decode_verify_key_bytes,
-    read_signing_keys, write_signing_keys, NACL_ED25519
-)
-from unpaddedbase64 import decode_base64
-from synapse.util.stringutils import random_string_with_symbols
-
-import os
 import hashlib
 import logging
+import os
 
+from signedjson.key import (
+    NACL_ED25519,
+    decode_signing_key_base64,
+    decode_verify_key_bytes,
+    generate_signing_key,
+    is_signing_algorithm_supported,
+    read_signing_keys,
+    write_signing_keys,
+)
+from unpaddedbase64 import decode_base64
+
+from synapse.util.stringutils import random_string, random_string_with_symbols
+
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 

@@ -14,15 +14,17 @@
 # limitations under the License.
 
 import sys
+
+from synapse import python_dependencies  # noqa: E402
+
 sys.dont_write_bytecode = True
 
-from synapse import python_dependencies   # noqa: E402
 
 try:
     python_dependencies.check_requirements()
 except python_dependencies.MissingRequirementError as e:
     message = "\n".join([
-        "Missing Requirement: %s" % (e.message,),
+        "Missing Requirement: %s" % (str(e),),
         "To install run:",
         "    pip install --upgrade --force \"%s\"" % (e.dependency,),
         "",

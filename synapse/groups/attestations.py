@@ -23,9 +23,9 @@ If a user leaves (or gets kicked out of) a group, either side can still use
 their attestation to "prove" their membership, until the attestation expires.
 Therefore attestations shouldn't be relied on to prove membership in important
 cases, but can for less important situtations, e.g. showing a users membership
-of groups on their profile, showing flairs, etc.abs
+of groups on their profile, showing flairs, etc.
 
-An attestsation is a signed blob of json that looks like:
+An attestation is a signed blob of json that looks like:
 
     {
         "user_id": "@foo:a.example.com",
@@ -38,14 +38,14 @@ An attestsation is a signed blob of json that looks like:
 import logging
 import random
 
+from signedjson.sign import sign_json
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
 from synapse.util.logcontext import run_in_background
-
-from signedjson.sign import sign_json
-
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ class GroupAttestionRenewer(object):
         self.attestations = hs.get_groups_attestation_signing()
 
         self._renew_attestations_loop = self.clock.looping_call(
-            self._renew_attestations, 30 * 60 * 1000,
+            self._start_renew_attestations, 30 * 60 * 1000,
         )
 
     @defer.inlineCallbacks
@@ -151,6 +151,9 @@ class GroupAttestionRenewer(object):
         yield self.store.update_remote_attestion(group_id, user_id, attestation)
 
         defer.returnValue({})
+
+    def _start_renew_attestations(self):
+        return run_as_background_process("renew_attestations", self._renew_attestations)
 
     @defer.inlineCallbacks
     def _renew_attestations(self):

@@ -19,10 +19,13 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
-    RestServlet, parse_json_object_from_request, parse_integer
+    RestServlet,
+    parse_integer,
+    parse_json_object_from_request,
+    parse_string,
 )
-from synapse.http.servlet import parse_string
 from synapse.types import StreamToken
+
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)

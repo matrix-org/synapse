@@ -12,16 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from six import iteritems
+
+from canonicaljson import encode_canonical_json
+
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached
 
-from canonicaljson import encode_canonical_json
-import simplejson as json
-
-from ._base import SQLBaseStore
-
-from six import iteritems
+from ._base import SQLBaseStore, db_to_json
 
 
 class EndToEndKeyStore(SQLBaseStore):
@@ -41,7 +40,10 @@ class EndToEndKeyStore(SQLBaseStore):
                 allow_none=True,
             )
 
-            new_key_json = encode_canonical_json(device_keys)
+            # In py3 we need old_key_json to match new_key_json type. The DB
+            # returns unicode while encode_canonical_json returns bytes.
+            new_key_json = encode_canonical_json(device_keys).decode("utf-8")
+
             if old_key_json == new_key_json:
                 return False
 
@@ -65,12 +67,18 @@ class EndToEndKeyStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_e2e_device_keys(self, query_list, include_all_devices=False):
+    def get_e2e_device_keys(
+        self, query_list, include_all_devices=False,
+        include_deleted_devices=False,
+    ):
         """Fetch a list of device keys.
         Args:
             query_list(list): List of pairs of user_ids and device_ids.
             include_all_devices (bool): whether to include entries for devices
                 that don't have device keys
+            include_deleted_devices (bool): whether to include null entries for
+                devices which no longer exist (but were in the query_list).
+                This option only takes effect if include_all_devices is true.
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             dict containing "key_json", "device_display_name".
@@ -80,18 +88,27 @@ class EndToEndKeyStore(SQLBaseStore):
 
         results = yield self.runInteraction(
             "get_e2e_device_keys", self._get_e2e_device_keys_txn,
-            query_list, include_all_devices,
+            query_list, include_all_devices, include_deleted_devices,
         )
 
         for user_id, device_keys in iteritems(results):
             for device_id, device_info in iteritems(device_keys):
-                device_info["keys"] = json.loads(device_info.pop("key_json"))
+                device_info["keys"] = db_to_json(device_info.pop("key_json"))
 
         defer.returnValue(results)
 
-    def _get_e2e_device_keys_txn(self, txn, query_list, include_all_devices):
+    def _get_e2e_device_keys_txn(
+        self, txn, query_list, include_all_devices=False,
+        include_deleted_devices=False,
+    ):
         query_clauses = []
         query_params = []
+
+        if include_all_devices is False:
+            include_deleted_devices = False
+
+        if include_deleted_devices:
+            deleted_devices = set(query_list)
 
         for (user_id, device_id) in query_list:
             query_clause = "user_id = ?"
@@ -120,7 +137,13 @@ class EndToEndKeyStore(SQLBaseStore):
 
         result = {}
         for row in rows:
+            if include_deleted_devices:
+                deleted_devices.remove((row["user_id"], row["device_id"]))
             result.setdefault(row["user_id"], {})[row["device_id"]] = row
+
+        if include_deleted_devices:
+            for user_id, device_id in deleted_devices:
+                result.setdefault(user_id, {})[device_id] = None
 
         return result
 

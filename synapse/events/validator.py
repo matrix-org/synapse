@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.types import EventID, RoomID, UserID
-from synapse.api.errors import SynapseError
-from synapse.api.constants import EventTypes, Membership
-
 from six import string_types
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import SynapseError
+from synapse.types import EventID, RoomID, UserID
 
 
 class EventValidator(object):

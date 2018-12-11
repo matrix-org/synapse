@@ -12,17 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from ._base import Config
-from synapse.util.logcontext import LoggingContextFilter
-from twisted.logger import globalLogBeginner, STDLibLogObserver
 import logging
 import logging.config
-import yaml
-from string import Template
 import os
 import signal
+import sys
+from string import Template
 
+import yaml
+
+from twisted.logger import STDLibLogObserver, globalLogBeginner
+
+import synapse
+from synapse.util.logcontext import LoggingContextFilter
+from synapse.util.versionstring import get_version_string
+
+from ._base import Config
 
 DEFAULT_LOG_CONFIG = Template("""
 version: 1
@@ -45,6 +50,7 @@ handlers:
         maxBytes: 104857600
         backupCount: 10
         filters: [context]
+        encoding: utf8
     console:
         class: logging.StreamHandler
         formatter: precise
@@ -163,7 +169,8 @@ def setup_logging(config, use_worker_options=False):
         if log_file:
             # TODO: Customisable file size / backup count
             handler = logging.handlers.RotatingFileHandler(
-                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3
+                log_file, maxBytes=(1000 * 1000 * 100), backupCount=3,
+                encoding='utf8'
             )
 
             def sighup(signum, stack):
@@ -188,9 +195,8 @@ def setup_logging(config, use_worker_options=False):
 
         def sighup(signum, stack):
             # it might be better to use a file watcher or something for this.
-            logging.info("Reloading log config from %s due to SIGHUP",
-                         log_config)
             load_log_config()
+            logging.info("Reloaded log config from %s due to SIGHUP", log_config)
 
         load_log_config()
 
@@ -201,6 +207,15 @@ def setup_logging(config, use_worker_options=False):
     #   it around.
     if getattr(signal, "SIGHUP"):
         signal.signal(signal.SIGHUP, sighup)
+
+    # make sure that the first thing we log is a thing we can grep backwards
+    # for
+    logging.warn("***** STARTING SERVER *****")
+    logging.warn(
+        "Server %s version %s",
+        sys.argv[0], get_version_string(synapse),
+    )
+    logging.info("Server hostname: %s", config.server_name)
 
     # It's critical to point twisted's internal logging somewhere, otherwise it
     # stacks up and leaks kup to 64K object;
@@ -213,7 +228,22 @@ def setup_logging(config, use_worker_options=False):
     #
     # However this may not be too much of a problem if we are just writing to a file.
     observer = STDLibLogObserver()
+
+    def _log(event):
+
+        if "log_text" in event:
+            if event["log_text"].startswith("DNSDatagramProtocol starting on "):
+                return
+
+            if event["log_text"].startswith("(UDP Port "):
+                return
+
+            if event["log_text"].startswith("Timing out client"):
+                return
+
+        return observer(event)
+
     globalLogBeginner.beginLoggingTo(
-        [observer],
+        [_log],
         redirectStandardIO=not config.no_redirect_stdio,
     )

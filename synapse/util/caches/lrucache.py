@@ -14,8 +14,8 @@
 # limitations under the License.
 
 
-from functools import wraps
 import threading
+from functools import wraps
 
 from synapse.util.caches.treecache import TreeCache
 

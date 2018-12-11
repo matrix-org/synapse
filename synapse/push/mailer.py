@@ -13,30 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-from twisted.mail.smtp import sendmail
-
-import email.utils
 import email.mime.multipart
-from email.mime.text import MIMEText
+import email.utils
+import logging
+import time
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-from synapse.util.async import concurrently_execute
+from six.moves import urllib
+
+import bleach
+import jinja2
+
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes
+from synapse.api.errors import StoreError
 from synapse.push.presentable_names import (
-    calculate_room_name, name_from_member_event, descriptor_from_member_events
+    calculate_room_name,
+    descriptor_from_member_events,
+    name_from_member_event,
 )
 from synapse.types import UserID
-from synapse.api.errors import StoreError
-from synapse.api.constants import EventTypes
+from synapse.util.async_helpers import concurrently_execute
+from synapse.util.logcontext import make_deferred_yieldable
 from synapse.visibility import filter_events_for_client
 
-import jinja2
-import bleach
-
-import time
-import urllib
-
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -83,6 +85,7 @@ class Mailer(object):
         self.notif_template_html = notif_template_html
         self.notif_template_text = notif_template_text
 
+        self.sendmail = self.hs.get_sendmail()
         self.store = self.hs.get_datastore()
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
@@ -189,17 +192,17 @@ class Mailer(object):
         multipart_msg.attach(html_part)
 
         logger.info("Sending email push notification to %s" % email_address)
-        # logger.debug(html_text)
 
-        yield sendmail(
+        yield make_deferred_yieldable(self.sendmail(
             self.hs.config.email_smtp_host,
-            raw_from, raw_to, multipart_msg.as_string(),
+            raw_from, raw_to, multipart_msg.as_string().encode('utf8'),
+            reactor=self.hs.get_reactor(),
             port=self.hs.config.email_smtp_port,
             requireAuthentication=self.hs.config.email_smtp_user is not None,
             username=self.hs.config.email_smtp_user,
             password=self.hs.config.email_smtp_pass,
             requireTransportSecurity=self.hs.config.require_transport_security
-        )
+        ))
 
     @defer.inlineCallbacks
     def get_room_vars(self, room_id, user_id, notifs, notif_events, room_state_ids):
@@ -331,7 +334,7 @@ class Mailer(object):
                           notif_events, user_id, reason):
         if len(notifs_by_room) == 1:
             # Only one room has new stuff
-            room_id = notifs_by_room.keys()[0]
+            room_id = list(notifs_by_room.keys())[0]
 
             # If the room has some kind of name, use it, but we don't
             # want the generated-from-names one here otherwise we'll
@@ -439,7 +442,7 @@ class Mailer(object):
 
     def make_room_link(self, room_id):
         if self.hs.config.email_riot_base_url:
-            base_url = self.hs.config.email_riot_base_url
+            base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             base_url = "https://vector.im/beta/#/room"
@@ -473,7 +476,7 @@ class Mailer(object):
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
             self.hs.config.public_baseurl,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
         )
 
 
@@ -524,8 +527,7 @@ def load_jinja2_templates(config):
     Returns:
         (notif_template_html, notif_template_text)
     """
-    logger.info("loading jinja2")
-
+    logger.info("loading email templates from '%s'", config.email_template_dir)
     loader = jinja2.FileSystemLoader(config.email_template_dir)
     env = jinja2.Environment(loader=loader)
     env.filters["format_ts"] = format_ts_filter
@@ -560,7 +562,7 @@ def _create_mxc_to_http_filter(config):
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             config.public_baseurl,
             serverAndMediaId,
-            urllib.urlencode(params),
+            urllib.parse.urlencode(params),
             fragment or "",
         )
 

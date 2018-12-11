@@ -1,19 +1,15 @@
 import twisted.python.failure
-from twisted.internet import defer
-from twisted.internet import reactor
-from .. import unittest
+from twisted.internet import defer, reactor
 
-from synapse.util.async import sleep
-from synapse.util import logcontext
+from synapse.util import Clock, logcontext
 from synapse.util.logcontext import LoggingContext
+
+from .. import unittest
 
 
 class LoggingContextTestCase(unittest.TestCase):
-
     def _check_test_key(self, value):
-        self.assertEquals(
-            LoggingContext.current_context().request, value
-        )
+        self.assertEquals(LoggingContext.current_context().request, value)
 
     def test_with_context(self):
         with LoggingContext() as context_one:
@@ -22,18 +18,20 @@ class LoggingContextTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_sleep(self):
+        clock = Clock(reactor)
+
         @defer.inlineCallbacks
         def competing_callback():
             with LoggingContext() as competing_context:
                 competing_context.request = "competing"
-                yield sleep(0)
+                yield clock.sleep(0)
                 self._check_test_key("competing")
 
         reactor.callLater(0, competing_callback)
 
         with LoggingContext() as context_one:
             context_one.request = "one"
-            yield sleep(0)
+            yield clock.sleep(0)
             self._check_test_key("one")
 
     def _test_run_in_background(self, function):
@@ -49,6 +47,7 @@ class LoggingContextTestCase(unittest.TestCase):
                 self._check_test_key("one")
                 callback_completed[0] = True
                 return res
+
             d.addCallback(cb)
 
             return d
@@ -73,8 +72,7 @@ class LoggingContextTestCase(unittest.TestCase):
             # make sure that the context was reset before it got thrown back
             # into the reactor
             try:
-                self.assertIs(LoggingContext.current_context(),
-                              sentinel_context)
+                self.assertIs(LoggingContext.current_context(), sentinel_context)
                 d2.callback(None)
             except BaseException:
                 d2.errback(twisted.python.failure.Failure())
@@ -87,7 +85,7 @@ class LoggingContextTestCase(unittest.TestCase):
     def test_run_in_background_with_blocking_fn(self):
         @defer.inlineCallbacks
         def blocking_function():
-            yield sleep(0)
+            yield Clock(reactor).sleep(0)
 
         return self._test_run_in_background(blocking_function)
 
@@ -103,9 +101,7 @@ class LoggingContextTestCase(unittest.TestCase):
         # a function which returns a deferred which looks like it has been
         # called, but is actually paused
         def testfunc():
-            return logcontext.make_deferred_yieldable(
-                _chained_deferred_function()
-            )
+            return logcontext.make_deferred_yieldable(_chained_deferred_function())
 
         return self._test_run_in_background(testfunc)
 
@@ -163,6 +159,11 @@ class LoggingContextTestCase(unittest.TestCase):
             self.assertEqual(r, "bum")
             self._check_test_key("one")
 
+    def test_nested_logging_context(self):
+        with LoggingContext(request="foo"):
+            nested_context = logcontext.nested_logging_context(suffix="bar")
+            self.assertEqual(nested_context.request, "foo-bar")
+
 
 # a function which returns a deferred which has been "called", but
 # which had a function which returned another incomplete deferred on
@@ -174,5 +175,6 @@ def _chained_deferred_function():
         d2 = defer.Deferred()
         reactor.callLater(0, d2.callback, res)
         return d2
+
     d.addCallback(cb)
     return d

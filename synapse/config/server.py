@@ -16,6 +16,8 @@
 
 import logging
 
+from synapse.http.endpoint import parse_and_validate_server_name
+
 from ._base import Config, ConfigError
 
 logger = logging.Logger(__name__)
@@ -25,6 +27,12 @@ class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
+
+        try:
+            parse_and_validate_server_name(self.server_name)
+        except ValueError as e:
+            raise ConfigError(str(e))
+
         self.pid_file = self.abspath(config.get("pid_file"))
         self.redirect_root_to_static = config.get("redirect_root_to_static", True)
         self.soft_file_limit = config["soft_file_limit"]
@@ -40,6 +48,9 @@ class ServerConfig(Config):
         # "disable" federation
         self.send_federation = config.get("send_federation", True)
 
+        # Whether to enable user presence.
+        self.use_presence = config.get("use_presence", True)
+
         # Whether to update the user directory or not. This should be set to
         # false only if we are updating the user directory in a worker
         self.update_user_directory = config.get("update_user_directory", True)
@@ -50,6 +61,11 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # whether to enable search. If disabled, new entries will not be inserted
+        # into the search tables and they will not be indexed. Users will receive
+        # errors when attempting to search for messages.
+        self.enable_search = config.get("enable_search", True)
+
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
         # Whether we should block invites sent to users on this server
@@ -57,6 +73,32 @@ class ServerConfig(Config):
         self.block_non_admin_invites = config.get(
             "block_non_admin_invites", False,
         )
+
+        # Options to control access by tracking MAU
+        self.limit_usage_by_mau = config.get("limit_usage_by_mau", False)
+        self.max_mau_value = 0
+        if self.limit_usage_by_mau:
+            self.max_mau_value = config.get(
+                "max_mau_value", 0,
+            )
+        self.mau_stats_only = config.get("mau_stats_only", False)
+
+        self.mau_limits_reserved_threepids = config.get(
+            "mau_limit_reserved_threepids", []
+        )
+
+        self.mau_trial_days = config.get(
+            "mau_trial_days", 0,
+        )
+
+        # Options to disable HS
+        self.hs_disabled = config.get("hs_disabled", False)
+        self.hs_disabled_message = config.get("hs_disabled_message", "")
+        self.hs_disabled_limit_type = config.get("hs_disabled_limit_type", "")
+
+        # Admin uri to direct users at should their instance become blocked
+        # due to resource constraints
+        self.admin_contact = config.get("admin_contact", None)
 
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
@@ -159,8 +201,8 @@ class ServerConfig(Config):
             })
 
     def default_config(self, server_name, **kwargs):
-        if ":" in server_name:
-            bind_port = int(server_name.split(":")[1])
+        _, bind_port = parse_and_validate_server_name(server_name)
+        if bind_port is not None:
             unsecure_port = bind_port - 400
         else:
             bind_port = 8448
@@ -198,6 +240,8 @@ class ServerConfig(Config):
         # different cores. See
         # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
         #
+        # This setting requires the affinity package to be installed!
+        #
         # cpu_affinity: 0xFFFFFFFF
 
         # Whether to redirect the root ressource to the static prefix or not
@@ -210,6 +254,9 @@ class ServerConfig(Config):
         # Zero is used to indicate synapse should set the soft limit to the
         # hard limit.
         soft_file_limit: 0
+
+        # Set to false to disable presence tracking on this homeserver.
+        use_presence: true
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         # gc_thresholds: [700, 10, 10]
@@ -301,6 +348,43 @@ class ServerConfig(Config):
           # - port: 9000
           #   bind_addresses: ['::1', '127.0.0.1']
           #   type: manhole
+
+
+          # Homeserver blocking
+          #
+          # How to reach the server admin, used in ResourceLimitError
+          # admin_contact: 'mailto:admin@server.com'
+          #
+          # Global block config
+          #
+          # hs_disabled: False
+          # hs_disabled_message: 'Human readable reason for why the HS is blocked'
+          # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
+          #
+          # Monthly Active User Blocking
+          #
+          # Enables monthly active user checking
+          # limit_usage_by_mau: False
+          # max_mau_value: 50
+          # mau_trial_days: 2
+          #
+          # If enabled, the metrics for the number of monthly active users will
+          # be populated, however no one will be limited. If limit_usage_by_mau
+          # is true, this is implied to be true.
+          # mau_stats_only: False
+          #
+          # Sometimes the server admin will want to ensure certain accounts are
+          # never blocked by mau checking. These accounts are specified here.
+          #
+          # mau_limit_reserved_threepids:
+          # - medium: 'email'
+          #   address: 'reserved_user@example.com'
+          #
+          # Room searching
+          #
+          # If disabled, new messages will not be indexed for searching and users
+          # will receive errors when searching for messages. Defaults to enabled.
+          # enable_search: true
         """ % locals()
 
     def read_arguments(self, args):
@@ -324,6 +408,23 @@ class ServerConfig(Config):
                                   type=int,
                                   help="Turn on the twisted telnet manhole"
                                   " service on the given port.")
+
+
+def is_threepid_reserved(config, threepid):
+    """Check the threepid against the reserved threepid config
+    Args:
+        config(ServerConfig) - to access server config attributes
+        threepid(dict) - The threepid to test for
+
+    Returns:
+        boolean Is the threepid undertest reserved_user
+    """
+
+    for tp in config.mau_limits_reserved_threepids:
+        if (threepid['medium'] == tp['medium']
+                and threepid['address'] == tp['address']):
+            return True
+    return False
 
 
 def read_gc_thresholds(thresholds):

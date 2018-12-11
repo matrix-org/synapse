@@ -44,13 +44,26 @@ Deactivate Account
 
 This API deactivates an account. It removes active access tokens, resets the
 password, and deletes third-party IDs (to prevent the user requesting a
-password reset).
+password reset). It can also mark the user as GDPR-erased (stopping their data
+from distributed further, and deleting it entirely if there are no other
+references to it).
 
 The api is::
 
     POST /_matrix/client/r0/admin/deactivate/<user_id>
 
-including an ``access_token`` of a server admin, and an empty request body.
+with a body of:
+
+.. code:: json
+
+    {
+        "erase": true
+    }
+
+including an ``access_token`` of a server admin.
+
+The erase parameter is optional and defaults to 'false'.
+An empty body may be passed for backwards compatibility.
 
 
 Reset password

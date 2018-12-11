@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +18,10 @@
 
 import logging
 
-import simplejson as json
 from six import iteritems
 from six.moves import http_client
+
+from canonicaljson import json
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,10 @@ class Codes(object):
     SERVER_NOT_TRUSTED = "M_SERVER_NOT_TRUSTED"
     CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
     CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
+    RESOURCE_LIMIT_EXCEEDED = "M_RESOURCE_LIMIT_EXCEEDED"
+    UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
+    INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
+    WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
 
 
 class CodeMessageException(RuntimeError):
@@ -67,20 +73,6 @@ class CodeMessageException(RuntimeError):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
         self.code = code
         self.msg = msg
-
-    def error_dict(self):
-        return cs_error(self.msg)
-
-
-class MatrixCodeMessageException(CodeMessageException):
-    """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
-
-    Attributes:
-        errcode (str): Matrix error code e.g 'M_FORBIDDEN'
-    """
-    def __init__(self, code, msg, errcode=Codes.UNKNOWN):
-        super(MatrixCodeMessageException, self).__init__(code, msg)
-        self.errcode = errcode
 
 
 class SynapseError(CodeMessageException):
@@ -107,38 +99,28 @@ class SynapseError(CodeMessageException):
             self.errcode,
         )
 
-    @classmethod
-    def from_http_response_exception(cls, err):
-        """Make a SynapseError based on an HTTPResponseException
 
-        This is useful when a proxied request has failed, and we need to
-        decide how to map the failure onto a matrix error to send back to the
-        client.
+class ProxiedRequestError(SynapseError):
+    """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
 
-        An attempt is made to parse the body of the http response as a matrix
-        error. If that succeeds, the errcode and error message from the body
-        are used as the errcode and error message in the new synapse error.
+    Attributes:
+        errcode (str): Matrix error code e.g 'M_FORBIDDEN'
+    """
+    def __init__(self, code, msg, errcode=Codes.UNKNOWN, additional_fields=None):
+        super(ProxiedRequestError, self).__init__(
+            code, msg, errcode
+        )
+        if additional_fields is None:
+            self._additional_fields = {}
+        else:
+            self._additional_fields = dict(additional_fields)
 
-        Otherwise, the errcode is set to M_UNKNOWN, and the error message is
-        set to the reason code from the HTTP response.
-
-        Args:
-            err (HttpResponseException):
-
-        Returns:
-            SynapseError:
-        """
-        # try to parse the body as json, to get better errcode/msg, but
-        # default to M_UNKNOWN with the HTTP status as the error text
-        try:
-            j = json.loads(err.response)
-        except ValueError:
-            j = {}
-        errcode = j.get('errcode', Codes.UNKNOWN)
-        errmsg = j.get('error', err.msg)
-
-        res = SynapseError(err.code, errmsg, errcode)
-        return res
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            **self._additional_fields
+        )
 
 
 class ConsentNotGivenError(SynapseError):
@@ -250,6 +232,30 @@ class AuthError(SynapseError):
         super(AuthError, self).__init__(*args, **kwargs)
 
 
+class ResourceLimitError(SynapseError):
+    """
+    Any error raised when there is a problem with resource usage.
+    For instance, the monthly active user limit for the server has been exceeded
+    """
+    def __init__(
+        self, code, msg,
+        errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+        admin_contact=None,
+        limit_type=None,
+    ):
+        self.admin_contact = admin_contact
+        self.limit_type = limit_type
+        super(ResourceLimitError, self).__init__(code, msg, errcode=errcode)
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            admin_contact=self.admin_contact,
+            limit_type=self.limit_type
+        )
+
+
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
@@ -307,12 +313,39 @@ class LimitExceededError(SynapseError):
         )
 
 
-def cs_exception(exception):
-    if isinstance(exception, CodeMessageException):
-        return exception.error_dict()
-    else:
-        logger.error("Unknown exception type: %s", type(exception))
-        return {}
+class RoomKeysVersionError(SynapseError):
+    """A client has tried to upload to a non-current version of the room_keys store
+    """
+    def __init__(self, current_version):
+        """
+        Args:
+            current_version (str): the current version of the store they should have used
+        """
+        super(RoomKeysVersionError, self).__init__(
+            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
+        )
+        self.current_version = current_version
+
+
+class IncompatibleRoomVersionError(SynapseError):
+    """A server is trying to join a room whose version it does not support."""
+
+    def __init__(self, room_version):
+        super(IncompatibleRoomVersionError, self).__init__(
+            code=400,
+            msg="Your homeserver does not support the features required to "
+                "join this room",
+            errcode=Codes.INCOMPATIBLE_ROOM_VERSION,
+        )
+
+        self._room_version = room_version
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            room_version=self._room_version,
+        )
 
 
 def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
@@ -371,7 +404,7 @@ class HttpResponseException(CodeMessageException):
     Represents an HTTP-level failure of an outbound request
 
     Attributes:
-        response (str): body of response
+        response (bytes): body of response
     """
     def __init__(self, code, msg, response):
         """
@@ -379,7 +412,39 @@ class HttpResponseException(CodeMessageException):
         Args:
             code (int): HTTP status code
             msg (str): reason phrase from HTTP response status line
-            response (str): body of response
+            response (bytes): body of response
         """
         super(HttpResponseException, self).__init__(code, msg)
         self.response = response
+
+    def to_synapse_error(self):
+        """Make a SynapseError based on an HTTPResponseException
+
+        This is useful when a proxied request has failed, and we need to
+        decide how to map the failure onto a matrix error to send back to the
+        client.
+
+        An attempt is made to parse the body of the http response as a matrix
+        error. If that succeeds, the errcode and error message from the body
+        are used as the errcode and error message in the new synapse error.
+
+        Otherwise, the errcode is set to M_UNKNOWN, and the error message is
+        set to the reason code from the HTTP response.
+
+        Returns:
+            SynapseError:
+        """
+        # try to parse the body as json, to get better errcode/msg, but
+        # default to M_UNKNOWN with the HTTP status as the error text
+        try:
+            j = json.loads(self.response)
+        except ValueError:
+            j = {}
+
+        if not isinstance(j, dict):
+            j = {}
+
+        errcode = j.pop('errcode', Codes.UNKNOWN)
+        errmsg = j.pop('error', self.msg)
+
+        return ProxiedRequestError(self.code, errmsg, errcode, j)

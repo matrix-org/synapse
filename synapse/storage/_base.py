@@ -13,22 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import sys
+import threading
+import time
 
-from synapse.api.errors import StoreError
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.util.caches.descriptors import Cache
-from synapse.storage.engines import PostgresEngine
+from six import PY2, iteritems, iterkeys, itervalues
+from six.moves import builtins, intern, range
 
+from canonicaljson import json
 from prometheus_client import Histogram
 
 from twisted.internet import defer
 
-import sys
-import time
-import threading
-
-from six import itervalues, iterkeys, iteritems
-from six.moves import intern, range
+from synapse.api.errors import StoreError
+from synapse.storage.engines import PostgresEngine
+from synapse.util.caches.descriptors import Cache
+from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.util.stringutils import exception_to_unicode
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +222,7 @@ class SQLBaseStore(object):
         self._clock.looping_call(loop, 10000)
 
     def _new_transaction(self, conn, desc, after_callbacks, exception_callbacks,
-                         logging_context, func, *args, **kwargs):
+                         func, *args, **kwargs):
         start = time.time()
         txn_id = self._TXN_ID
 
@@ -249,32 +250,32 @@ class SQLBaseStore(object):
                 except self.database_engine.module.OperationalError as e:
                     # This can happen if the database disappears mid
                     # transaction.
-                    logger.warn(
+                    logger.warning(
                         "[TXN OPERROR] {%s} %s %d/%d",
-                        name, e, i, N
+                        name, exception_to_unicode(e), i, N
                     )
                     if i < N:
                         i += 1
                         try:
                             conn.rollback()
                         except self.database_engine.module.Error as e1:
-                            logger.warn(
+                            logger.warning(
                                 "[TXN EROLL] {%s} %s",
-                                name, e1,
+                                name, exception_to_unicode(e1),
                             )
                         continue
                     raise
                 except self.database_engine.module.DatabaseError as e:
                     if self.database_engine.is_deadlock(e):
-                        logger.warn("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
+                        logger.warning("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
                         if i < N:
                             i += 1
                             try:
                                 conn.rollback()
                             except self.database_engine.module.Error as e1:
-                                logger.warn(
+                                logger.warning(
                                     "[TXN EROLL] {%s} %s",
-                                    name, e1,
+                                    name, exception_to_unicode(e1),
                                 )
                             continue
                     raise
@@ -285,8 +286,7 @@ class SQLBaseStore(object):
             end = time.time()
             duration = end - start
 
-            if logging_context is not None:
-                logging_context.add_database_transaction(duration)
+            LoggingContext.current_context().add_database_transaction(duration)
 
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
@@ -310,19 +310,21 @@ class SQLBaseStore(object):
         Returns:
             Deferred: The result of func
         """
-        current_context = LoggingContext.current_context()
-
         after_callbacks = []
         exception_callbacks = []
 
-        def inner_func(conn, *args, **kwargs):
-            return self._new_transaction(
-                conn, desc, after_callbacks, exception_callbacks, current_context,
-                func, *args, **kwargs
+        if LoggingContext.current_context() == LoggingContext.sentinel:
+            logger.warn(
+                "Starting db txn '%s' from sentinel context",
+                desc,
             )
 
         try:
-            result = yield self.runWithConnection(inner_func, *args, **kwargs)
+            result = yield self.runWithConnection(
+                self._new_transaction,
+                desc, after_callbacks, exception_callbacks, func,
+                *args, **kwargs
+            )
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
@@ -347,21 +349,24 @@ class SQLBaseStore(object):
         Returns:
             Deferred: The result of func
         """
-        current_context = LoggingContext.current_context()
+        parent_context = LoggingContext.current_context()
+        if parent_context == LoggingContext.sentinel:
+            logger.warn(
+                "Starting db connection from sentinel context: metrics will be lost",
+            )
+            parent_context = None
 
         start_time = time.time()
 
         def inner_func(conn, *args, **kwargs):
-            with LoggingContext("runWithConnection") as context:
+            with LoggingContext("runWithConnection", parent_context) as context:
                 sched_duration_sec = time.time() - start_time
                 sql_scheduling_timer.observe(sched_duration_sec)
-                current_context.add_database_scheduled(sched_duration_sec)
+                context.add_database_scheduled(sched_duration_sec)
 
                 if self.database_engine.is_connection_closed(conn):
                     logger.debug("Reconnecting closed database connection")
                     conn.reconnect()
-
-                current_context.copy_to(context)
 
                 return func(conn, *args, **kwargs)
 
@@ -845,9 +850,9 @@ class SQLBaseStore(object):
         rowcount = cls._simple_update_txn(txn, table, keyvalues, updatevalues)
 
         if rowcount == 0:
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if rowcount > 1:
-            raise StoreError(500, "More than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
     @staticmethod
     def _simple_select_one_txn(txn, table, keyvalues, retcols,
@@ -864,9 +869,9 @@ class SQLBaseStore(object):
         if not row:
             if allow_none:
                 return None
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if txn.rowcount > 1:
-            raise StoreError(500, "More than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
         return dict(zip(retcols, row))
 
@@ -898,9 +903,9 @@ class SQLBaseStore(object):
 
         txn.execute(sql, list(keyvalues.values()))
         if txn.rowcount == 0:
-            raise StoreError(404, "No row found")
+            raise StoreError(404, "No row found (%s)" % (table,))
         if txn.rowcount > 1:
-            raise StoreError(500, "more than one row matched")
+            raise StoreError(500, "More than one row matched (%s)" % (table,))
 
     def _simple_delete(self, table, keyvalues, desc):
         return self.runInteraction(
@@ -1147,17 +1152,16 @@ class SQLBaseStore(object):
         defer.returnValue(retval)
 
     def get_user_count_txn(self, txn):
-        """Get a total number of registerd users in the users list.
+        """Get a total number of registered users in the users list.
 
         Args:
             txn : Transaction object
         Returns:
-            defer.Deferred: resolves to int
+            int : number of users
         """
         sql_count = "SELECT COUNT(*) FROM users WHERE is_guest = 0;"
         txn.execute(sql_count)
-        count = txn.fetchone()[0]
-        defer.returnValue(count)
+        return txn.fetchone()[0]
 
     def _simple_search_list(self, table, term, col, retcols,
                             desc="_simple_search_list"):
@@ -1214,3 +1218,32 @@ class _RollbackButIsFineException(Exception):
     something went wrong.
     """
     pass
+
+
+def db_to_json(db_content):
+    """
+    Take some data from a database row and return a JSON-decoded object.
+
+    Args:
+        db_content (memoryview|buffer|bytes|bytearray|unicode)
+    """
+    # psycopg2 on Python 3 returns memoryview objects, which we need to
+    # cast to bytes to decode
+    if isinstance(db_content, memoryview):
+        db_content = db_content.tobytes()
+
+    # psycopg2 on Python 2 returns buffer objects, which we need to cast to
+    # bytes to decode
+    if PY2 and isinstance(db_content, builtins.buffer):
+        db_content = bytes(db_content)
+
+    # Decode it to a Unicode string before feeding it to json.loads, so we
+    # consistenty get a Unicode-containing object out.
+    if isinstance(db_content, (bytes, bytearray)):
+        db_content = db_content.decode('utf8')
+
+    try:
+        return json.loads(db_content)
+    except Exception:
+        logging.warning("Tried to decode '%r' as JSON and failed", db_content)
+        raise

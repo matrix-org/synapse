@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from ._base import Config
 from synapse.types import UserID
+
+from ._base import Config
 
 DEFAULT_CONFIG = """\
 # Server Notices room configuration

@@ -9,19 +9,19 @@ Set up database
 Assuming your PostgreSQL database user is called ``postgres``, create a user
 ``synapse_user`` with::
 
- su - postgres
- createuser --pwprompt synapse_user
+   su - postgres
+   createuser --pwprompt synapse_user
 
 The PostgreSQL database used *must* have the correct encoding set, otherwise it
 would not be able to store UTF8 strings. To create a database with the correct
 encoding use, e.g.::
 
- CREATE DATABASE synapse
-  ENCODING 'UTF8'
-  LC_COLLATE='C'
-  LC_CTYPE='C'
-  template=template0
-  OWNER synapse_user;
+   CREATE DATABASE synapse
+    ENCODING 'UTF8'
+    LC_COLLATE='C'
+    LC_CTYPE='C'
+    template=template0
+    OWNER synapse_user;
 
 This would create an appropriate database named ``synapse`` owned by the
 ``synapse_user`` user (which must already exist).
@@ -126,7 +126,7 @@ run::
         --postgres-config homeserver-postgres.yaml
 
 Once that has completed, change the synapse config to point at the PostgreSQL
-database configuration file ``homeserver-postgres.yaml``:
+database configuration file ``homeserver-postgres.yaml``::
 
     ./synctl stop
     mv homeserver.yaml homeserver-old-sqlite.yaml 

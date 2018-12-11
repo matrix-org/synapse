@@ -14,7 +14,6 @@
 
 import time
 
-
 ALTER_TABLE = "ALTER TABLE remote_media_cache ADD COLUMN last_access_ts BIGINT"
 
 

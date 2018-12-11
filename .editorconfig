@@ -1,0 +1,9 @@
+# EditorConfig https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# 4 space indentation
+[*.py]
+indent_style = space
+indent_size = 4

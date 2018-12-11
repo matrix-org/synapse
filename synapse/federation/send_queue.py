@@ -29,18 +29,18 @@ dead worker doesn't cause the queues to grow limitlessly.
 Events are replicated via a separate events stream.
 """
 
-from .units import Edu
-
-from synapse.storage.presence import UserPresenceState
-from synapse.util.metrics import Measure
-from synapse.metrics import LaterGauge
-
-from sortedcontainers import SortedDict
+import logging
 from collections import namedtuple
 
-import logging
+from six import iteritems
 
-from six import itervalues, iteritems
+from sortedcontainers import SortedDict
+
+from synapse.metrics import LaterGauge
+from synapse.storage.presence import UserPresenceState
+from synapse.util.metrics import Measure
+
+from .units import Edu
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +62,6 @@ class FederationRemoteSendQueue(object):
 
         self.edus = SortedDict()  # stream position -> Edu
 
-        self.failures = SortedDict()  # stream position -> (destination, Failure)
-
         self.device_messages = SortedDict()  # stream position -> destination
 
         self.pos = 1
@@ -79,7 +77,7 @@ class FederationRemoteSendQueue(object):
 
         for queue_name in [
             "presence_map", "presence_changed", "keyed_edu", "keyed_edu_changed",
-            "edus", "failures", "device_messages", "pos_time",
+            "edus", "device_messages", "pos_time",
         ]:
             register(queue_name, getattr(self, queue_name))
 
@@ -98,7 +96,7 @@ class FederationRemoteSendQueue(object):
         now = self.clock.time_msec()
 
         keys = self.pos_time.keys()
-        time = keys.bisect_left(now - FIVE_MINUTES_AGO)
+        time = self.pos_time.bisect_left(now - FIVE_MINUTES_AGO)
         if not keys[:time]:
             return
 
@@ -113,13 +111,13 @@ class FederationRemoteSendQueue(object):
         with Measure(self.clock, "send_queue._clear"):
             # Delete things out of presence maps
             keys = self.presence_changed.keys()
-            i = keys.bisect_left(position_to_delete)
+            i = self.presence_changed.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.presence_changed[key]
 
             user_ids = set(
                 user_id
-                for uids in itervalues(self.presence_changed)
+                for uids in self.presence_changed.values()
                 for user_id in uids
             )
 
@@ -131,7 +129,7 @@ class FederationRemoteSendQueue(object):
 
             # Delete things out of keyed edus
             keys = self.keyed_edu_changed.keys()
-            i = keys.bisect_left(position_to_delete)
+            i = self.keyed_edu_changed.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.keyed_edu_changed[key]
 
@@ -145,19 +143,13 @@ class FederationRemoteSendQueue(object):
 
             # Delete things out of edu map
             keys = self.edus.keys()
-            i = keys.bisect_left(position_to_delete)
+            i = self.edus.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.edus[key]
 
-            # Delete things out of failure map
-            keys = self.failures.keys()
-            i = keys.bisect_left(position_to_delete)
-            for key in keys[:i]:
-                del self.failures[key]
-
             # Delete things out of device map
             keys = self.device_messages.keys()
-            i = keys.bisect_left(position_to_delete)
+            i = self.device_messages.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.device_messages[key]
 
@@ -204,13 +196,6 @@ class FederationRemoteSendQueue(object):
 
         self.notifier.on_new_replication_data()
 
-    def send_failure(self, failure, destination):
-        """As per TransactionQueue"""
-        pos = self._next_pos()
-
-        self.failures[pos] = (destination, str(failure))
-        self.notifier.on_new_replication_data()
-
     def send_device_messages(self, destination):
         """As per TransactionQueue"""
         pos = self._next_pos()
@@ -250,13 +235,12 @@ class FederationRemoteSendQueue(object):
             self._clear_queue_before_pos(federation_ack)
 
         # Fetch changed presence
-        keys = self.presence_changed.keys()
-        i = keys.bisect_right(from_token)
-        j = keys.bisect_right(to_token) + 1
+        i = self.presence_changed.bisect_right(from_token)
+        j = self.presence_changed.bisect_right(to_token) + 1
         dest_user_ids = [
             (pos, user_id)
-            for pos in keys[i:j]
-            for user_id in self.presence_changed[pos]
+            for pos, user_id_list in self.presence_changed.items()[i:j]
+            for user_id in user_id_list
         ]
 
         for (key, user_id) in dest_user_ids:
@@ -265,13 +249,12 @@ class FederationRemoteSendQueue(object):
             )))
 
         # Fetch changes keyed edus
-        keys = self.keyed_edu_changed.keys()
-        i = keys.bisect_right(from_token)
-        j = keys.bisect_right(to_token) + 1
+        i = self.keyed_edu_changed.bisect_right(from_token)
+        j = self.keyed_edu_changed.bisect_right(to_token) + 1
         # We purposefully clobber based on the key here, python dict comprehensions
         # always use the last value, so this will correctly point to the last
         # stream position.
-        keyed_edus = {self.keyed_edu_changed[k]: k for k in keys[i:j]}
+        keyed_edus = {v: k for k, v in self.keyed_edu_changed.items()[i:j]}
 
         for ((destination, edu_key), pos) in iteritems(keyed_edus):
             rows.append((pos, KeyedEduRow(
@@ -280,31 +263,17 @@ class FederationRemoteSendQueue(object):
             )))
 
         # Fetch changed edus
-        keys = self.edus.keys()
-        i = keys.bisect_right(from_token)
-        j = keys.bisect_right(to_token) + 1
-        edus = ((k, self.edus[k]) for k in keys[i:j])
+        i = self.edus.bisect_right(from_token)
+        j = self.edus.bisect_right(to_token) + 1
+        edus = self.edus.items()[i:j]
 
         for (pos, edu) in edus:
             rows.append((pos, EduRow(edu)))
 
-        # Fetch changed failures
-        keys = self.failures.keys()
-        i = keys.bisect_right(from_token)
-        j = keys.bisect_right(to_token) + 1
-        failures = ((k, self.failures[k]) for k in keys[i:j])
-
-        for (pos, (destination, failure)) in failures:
-            rows.append((pos, FailureRow(
-                destination=destination,
-                failure=failure,
-            )))
-
         # Fetch changed device messages
-        keys = self.device_messages.keys()
-        i = keys.bisect_right(from_token)
-        j = keys.bisect_right(to_token) + 1
-        device_messages = {self.device_messages[k]: k for k in keys[i:j]}
+        i = self.device_messages.bisect_right(from_token)
+        j = self.device_messages.bisect_right(to_token) + 1
+        device_messages = {v: k for k, v in self.device_messages.items()[i:j]}
 
         for (destination, pos) in iteritems(device_messages):
             rows.append((pos, DeviceRow(
@@ -422,34 +391,6 @@ class EduRow(BaseFederationRow, namedtuple("EduRow", (
         buff.edus.setdefault(self.edu.destination, []).append(self.edu)
 
 
-class FailureRow(BaseFederationRow, namedtuple("FailureRow", (
-    "destination",  # str
-    "failure",
-))):
-    """Streams failures to a remote server. Failures are issued when there was
-    something wrong with a transaction the remote sent us, e.g. it included
-    an event that was invalid.
-    """
-
-    TypeId = "f"
-
-    @staticmethod
-    def from_data(data):
-        return FailureRow(
-            destination=data["destination"],
-            failure=data["failure"],
-        )
-
-    def to_data(self):
-        return {
-            "destination": self.destination,
-            "failure": self.failure,
-        }
-
-    def add_to_buffer(self, buff):
-        buff.failures.setdefault(self.destination, []).append(self.failure)
-
-
 class DeviceRow(BaseFederationRow, namedtuple("DeviceRow", (
     "destination",  # str
 ))):
@@ -476,7 +417,6 @@ TypeToRow = {
         PresenceRow,
         KeyedEduRow,
         EduRow,
-        FailureRow,
         DeviceRow,
     )
 }
@@ -486,7 +426,6 @@ ParsedFederationStreamData = namedtuple("ParsedFederationStreamData", (
     "presence",  # list(UserPresenceState)
     "keyed_edus",  # dict of destination -> { key -> Edu }
     "edus",  # dict of destination -> [Edu]
-    "failures",  # dict of destination -> [failures]
     "device_destinations",  # set of destinations
 ))
 
@@ -508,7 +447,6 @@ def process_rows_for_federation(transaction_queue, rows):
         presence=[],
         keyed_edus={},
         edus={},
-        failures={},
         device_destinations=set(),
     )
 
@@ -536,10 +474,6 @@ def process_rows_for_federation(transaction_queue, rows):
             transaction_queue.send_edu(
                 edu.destination, edu.edu_type, edu.content, key=None,
             )
-
-    for destination, failure_list in iteritems(buff.failures):
-        for failure in failure_list:
-            transaction_queue.send_failure(destination, failure)
 
     for destination in buff.device_destinations:
         transaction_queue.send_device_messages(destination)

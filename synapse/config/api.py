@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
-
 from synapse.api.constants import EventTypes
+
+from ._base import Config
 
 
 class ApiConfig(Config):

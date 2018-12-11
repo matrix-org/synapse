@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.prepare_database import prepare_database
-
 import struct
 import threading
+
+from synapse.storage.prepare_database import prepare_database
 
 
 class Sqlite3Engine(object):

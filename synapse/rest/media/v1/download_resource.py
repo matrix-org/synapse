@@ -18,11 +18,9 @@ from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
-from synapse.http.server import (
-    set_cors_headers,
-    wrap_json_request_handler,
-)
 import synapse.http.servlet
+from synapse.http.server import set_cors_headers, wrap_json_request_handler
+
 from ._base import parse_media_id, respond_404
 
 logger = logging.getLogger(__name__)
@@ -49,12 +47,14 @@ class DownloadResource(Resource):
     def _async_render_GET(self, request):
         set_cors_headers(request)
         request.setHeader(
-            "Content-Security-Policy",
-            "default-src 'none';"
-            " script-src 'none';"
-            " plugin-types application/pdf;"
-            " style-src 'unsafe-inline';"
-            " object-src 'self';"
+            b"Content-Security-Policy",
+            b"sandbox;"
+            b" default-src 'none';"
+            b" script-src 'none';"
+            b" plugin-types application/pdf;"
+            b" style-src 'unsafe-inline';"
+            b" media-src 'self';"
+            b" object-src 'self';"
         )
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:

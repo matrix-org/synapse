@@ -16,11 +16,12 @@
 
 import logging
 
-from synapse.api.errors import SynapseError
-from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
+from six import string_types
+
 from twisted.internet import defer
 
-from six import string_types
+from synapse.api.errors import SynapseError
+from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 

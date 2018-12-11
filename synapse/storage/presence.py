@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from synapse.api.constants import PresenceState
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
-from synapse.util import batch_iter
-
 from collections import namedtuple
+
 from twisted.internet import defer
+
+from synapse.api.constants import PresenceState
+from synapse.util import batch_iter
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
+
+from ._base import SQLBaseStore
 
 
 class UserPresenceState(namedtuple("UserPresenceState",

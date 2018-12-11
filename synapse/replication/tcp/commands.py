@@ -19,12 +19,16 @@ allowed to be sent by which side.
 """
 
 import logging
-import simplejson
+import platform
 
+if platform.python_implementation() == "PyPy":
+    import json
+    _json_encoder = json.JSONEncoder()
+else:
+    import simplejson as json
+    _json_encoder = json.JSONEncoder(namedtuple_as_object=False)
 
 logger = logging.getLogger(__name__)
-
-_json_encoder = simplejson.JSONEncoder(namedtuple_as_object=False)
 
 
 class Command(object):
@@ -54,6 +58,12 @@ class Command(object):
         prefix.
         """
         return self.data
+
+    def get_logcontext_id(self):
+        """Get a suitable string for the logcontext when processing this command"""
+
+        # by default, we just use the command name.
+        return self.NAME
 
 
 class ServerCommand(Command):
@@ -102,7 +112,7 @@ class RdataCommand(Command):
         return cls(
             stream_name,
             None if token == "batch" else int(token),
-            simplejson.loads(row_json)
+            json.loads(row_json)
         )
 
     def to_line(self):
@@ -111,6 +121,9 @@ class RdataCommand(Command):
             str(self.token) if self.token is not None else "batch",
             _json_encoder.encode(self.row),
         ))
+
+    def get_logcontext_id(self):
+        return "RDATA-" + self.stream_name
 
 
 class PositionCommand(Command):
@@ -185,6 +198,9 @@ class ReplicateCommand(Command):
 
     def to_line(self):
         return " ".join((self.stream_name, str(self.token),))
+
+    def get_logcontext_id(self):
+        return "REPLICATE-" + self.stream_name
 
 
 class UserSyncCommand(Command):
@@ -300,7 +316,7 @@ class InvalidateCacheCommand(Command):
     def from_line(cls, line):
         cache_func, keys_json = line.split(" ", 1)
 
-        return cls(cache_func, simplejson.loads(keys_json))
+        return cls(cache_func, json.loads(keys_json))
 
     def to_line(self):
         return " ".join((
@@ -329,7 +345,7 @@ class UserIpCommand(Command):
     def from_line(cls, line):
         user_id, jsn = line.split(" ", 1)
 
-        access_token, ip, user_agent, device_id, last_seen = simplejson.loads(jsn)
+        access_token, ip, user_agent, device_id, last_seen = json.loads(jsn)
 
         return cls(
             user_id, access_token, ip, user_agent, device_id, last_seen

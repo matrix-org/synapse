@@ -15,17 +15,18 @@
 
 """ This module contains REST servlets to do with presence: /presence/<paths>
 """
-from twisted.internet import defer
-
-from synapse.api.errors import SynapseError, AuthError
-from synapse.types import UserID
-from synapse.handlers.presence import format_user_presence_state
-from synapse.http.servlet import parse_json_object_from_request
-from .base import ClientV1RestServlet, client_path_patterns
+import logging
 
 from six import string_types
 
-import logging
+from twisted.internet import defer
+
+from synapse.api.errors import AuthError, SynapseError
+from synapse.handlers.presence import format_user_presence_state
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,8 @@ class PresenceStatusRestServlet(ClientV1RestServlet):
         except Exception:
             raise SynapseError(400, "Unable to parse state")
 
-        yield self.presence_handler.set_state(user, state)
+        if self.hs.config.use_presence:
+            yield self.presence_handler.set_state(user, state)
 
         defer.returnValue((200, {}))
 

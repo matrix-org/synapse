@@ -17,6 +17,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, StoreError, SynapseError
+
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)

@@ -13,14 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
+import six
+
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
 
-import logging
-
 logger = logging.getLogger(__name__)
+
+
+def __func__(inp):
+    if six.PY3:
+        return inp
+    else:
+        return inp.__func__
 
 
 class BaseSlavedStore(SQLBaseStore):

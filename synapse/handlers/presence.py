@@ -22,27 +22,26 @@ The methods that define policy are:
     - should_notify
 """
 
-from twisted.internet import defer, reactor
+import logging
 from contextlib import contextmanager
 
-from six import itervalues, iteritems
+from six import iteritems, itervalues
 
-from synapse.api.errors import SynapseError
+from prometheus_client import Counter
+
+from twisted.internet import defer
+
 from synapse.api.constants import PresenceState
+from synapse.api.errors import SynapseError
+from synapse.metrics import LaterGauge
 from synapse.storage.presence import UserPresenceState
-
+from synapse.types import UserID, get_domain_from_id
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.util.async import Linearizer
 from synapse.util.logcontext import run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
-from synapse.types import UserID, get_domain_from_id
-from synapse.metrics import LaterGauge
-
-import logging
-
-from prometheus_client import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +95,7 @@ class PresenceHandler(object):
         Args:
             hs (synapse.server.HomeServer):
         """
+        self.hs = hs
         self.is_mine = hs.is_mine
         self.is_mine_id = hs.is_mine_id
         self.clock = hs.get_clock()
@@ -179,7 +179,7 @@ class PresenceHandler(object):
         # have not yet been persisted
         self.unpersisted_users_changes = set()
 
-        reactor.addSystemEventTrigger("before", "shutdown", self._on_shutdown)
+        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self._on_shutdown)
 
         self.serial_to_user = {}
         self._next_serial = 1
@@ -231,6 +231,10 @@ class PresenceHandler(object):
         earlier than they should when synapse is restarted. This affect of this
         is some spurious presence changes that will self-correct.
         """
+        # If the DB pool has already terminated, don't try updating
+        if not self.hs.get_db_pool().running:
+            return
+
         logger.info(
             "Performing _on_shutdown. Persisting %d unpersisted changes",
             len(self.user_to_current_state)
@@ -391,6 +395,10 @@ class PresenceHandler(object):
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
+        # If presence is disabled, no-op
+        if not self.hs.config.use_presence:
+            return
+
         user_id = user.to_string()
 
         bump_active_time_counter.inc()
@@ -420,6 +428,11 @@ class PresenceHandler(object):
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
         """
+        # Override if it should affect the user's presence, if presence is
+        # disabled.
+        if not self.hs.config.use_presence:
+            affect_presence = False
+
         if affect_presence:
             curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
@@ -465,13 +478,16 @@ class PresenceHandler(object):
         Returns:
             set(str): A set of user_id strings.
         """
-        syncing_user_ids = {
-            user_id for user_id, count in self.user_to_num_current_syncs.items()
-            if count
-        }
-        for user_ids in self.external_process_to_current_syncs.values():
-            syncing_user_ids.update(user_ids)
-        return syncing_user_ids
+        if self.hs.config.use_presence:
+            syncing_user_ids = {
+                user_id for user_id, count in self.user_to_num_current_syncs.items()
+                if count
+            }
+            for user_ids in self.external_process_to_current_syncs.values():
+                syncing_user_ids.update(user_ids)
+            return syncing_user_ids
+        else:
+            return set()
 
     @defer.inlineCallbacks
     def update_external_syncs_row(self, process_id, user_id, is_syncing, sync_time_msec):

@@ -14,13 +14,12 @@
 # limitations under the License.
 
 
-from tests import unittest
+from synapse.util.async_helpers import ReadWriteLock
 
-from synapse.util.async import ReadWriteLock
+from tests import unittest
 
 
 class ReadWriteLockTestCase(unittest.TestCase):
-
     def _assert_called_before_not_after(self, lst, first_false):
         for i, d in enumerate(lst[:first_false]):
             self.assertTrue(d.called, msg="%d was unexpectedly false" % i)
@@ -36,12 +35,12 @@ class ReadWriteLockTestCase(unittest.TestCase):
         key = object()
 
         ds = [
-            rwlock.read(key),   # 0
-            rwlock.read(key),   # 1
+            rwlock.read(key),  # 0
+            rwlock.read(key),  # 1
             rwlock.write(key),  # 2
             rwlock.write(key),  # 3
-            rwlock.read(key),   # 4
-            rwlock.read(key),   # 5
+            rwlock.read(key),  # 4
+            rwlock.read(key),  # 5
             rwlock.write(key),  # 6
         ]
 

@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import client_v2_patterns
-
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.api.errors import AuthError, SynapseError
+import logging
 
 from twisted.internet import defer
 
-import logging
+from synapse.api.errors import AuthError, SynapseError
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+
+from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
 

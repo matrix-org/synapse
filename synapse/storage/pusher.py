@@ -14,18 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-from twisted.internet import defer
+import logging
 
-from canonicaljson import encode_canonical_json
+import six
+
+from canonicaljson import encode_canonical_json, json
+
+from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 
-import logging
-import simplejson as json
-import types
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
+
+if six.PY2:
+    db_binary_type = six.moves.builtins.buffer
+else:
+    db_binary_type = memoryview
 
 
 class PusherWorkerStore(SQLBaseStore):
@@ -34,18 +40,18 @@ class PusherWorkerStore(SQLBaseStore):
             dataJson = r['data']
             r['data'] = None
             try:
-                if isinstance(dataJson, types.BufferType):
+                if isinstance(dataJson, db_binary_type):
                     dataJson = str(dataJson).decode("UTF8")
 
                 r['data'] = json.loads(dataJson)
             except Exception as e:
                 logger.warn(
                     "Invalid JSON in data for pusher %d: %s, %s",
-                    r['id'], dataJson, e.message,
+                    r['id'], dataJson, e.args[0],
                 )
                 pass
 
-            if isinstance(r['pushkey'], types.BufferType):
+            if isinstance(r['pushkey'], db_binary_type):
                 r['pushkey'] = str(r['pushkey']).decode("UTF8")
 
         return rows
@@ -233,7 +239,7 @@ class PusherStore(PusherWorkerStore):
             )
 
             if newly_inserted:
-                self.runInteraction(
+                yield self.runInteraction(
                     "add_pusher",
                     self._invalidate_cache_and_stream,
                     self.get_if_user_has_pusher, (user_id,)

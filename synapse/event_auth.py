@@ -17,11 +17,11 @@ import logging
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json, SignatureVerifyException
+from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.api.errors import AuthError, SynapseError, EventSizeError
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, JoinRules, Membership
+from synapse.api.errors import AuthError, EventSizeError, SynapseError
 from synapse.types import UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -34,9 +34,11 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         event: the event being checked.
         auth_events (dict: event-key -> event): the existing room state.
 
+    Raises:
+        AuthError if the checks fail
 
     Returns:
-        True if the auth checks pass.
+         if the auth checks pass.
     """
     if do_size_check:
         _check_size_limits(event)
@@ -71,24 +73,34 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         # Oh, we don't know what the state of the room was, so we
         # are trusting that this is allowed (at least for now)
         logger.warn("Trusting event: %s", event.event_id)
-        return True
+        return
 
     if event.type == EventTypes.Create:
+        sender_domain = get_domain_from_id(event.sender)
         room_id_domain = get_domain_from_id(event.room_id)
         if room_id_domain != sender_domain:
             raise AuthError(
                 403,
                 "Creation event's room_id domain does not match sender's"
             )
+
+        room_version = event.content.get("room_version", "1")
+        if room_version not in KNOWN_ROOM_VERSIONS:
+            raise AuthError(
+                403,
+                "room appears to have unsupported version %s" % (
+                    room_version,
+                ))
         # FIXME
-        return True
+        logger.debug("Allowing! %s", event)
+        return
 
     creation_event = auth_events.get((EventTypes.Create, ""), None)
 
     if not creation_event:
-        raise SynapseError(
+        raise AuthError(
             403,
-            "Room %r does not exist" % (event.room_id,)
+            "No create event in auth events",
         )
 
     creating_domain = get_domain_from_id(event.room_id)
@@ -118,7 +130,8 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
                 403,
                 "Alias event's state_key does not match sender's domain"
             )
-        return True
+        logger.debug("Allowing! %s", event)
+        return
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
@@ -127,14 +140,9 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
         )
 
     if event.type == EventTypes.Member:
-        allowed = _is_membership_change_allowed(
-            event, auth_events
-        )
-        if allowed:
-            logger.debug("Allowing! %s", event)
-        else:
-            logger.debug("Denying! %s", event)
-        return allowed
+        _is_membership_change_allowed(event, auth_events)
+        logger.debug("Allowing! %s", event)
+        return
 
     _check_event_sender_in_room(event, auth_events)
 
@@ -147,13 +155,11 @@ def check(event, auth_events, do_sig_check=True, do_size_check=True):
 
         if user_level < invite_level:
             raise AuthError(
-                403, (
-                    "You cannot issue a third party invite for %s." %
-                    (event.content.display_name,)
-                )
+                403, "You don't have permission to invite users",
             )
         else:
-            return True
+            logger.debug("Allowing! %s", event)
+            return
 
     _can_send_event(event, auth_events)
 
@@ -194,13 +200,13 @@ def _is_membership_change_allowed(event, auth_events):
     membership = event.content["membership"]
 
     # Check if this is the room creator joining:
-    if len(event.prev_events) == 1 and Membership.JOIN == membership:
+    if len(event.prev_event_ids()) == 1 and Membership.JOIN == membership:
         # Get room creation event:
         key = (EventTypes.Create, "", )
         create = auth_events.get(key)
-        if create and event.prev_events[0][0] == create.event_id:
+        if create and event.prev_event_ids()[0] == create.event_id:
             if create.content["creator"] == event.state_key:
-                return True
+                return
 
     target_user_id = event.state_key
 
@@ -265,13 +271,13 @@ def _is_membership_change_allowed(event, auth_events):
             raise AuthError(
                 403, "%s is banned from the room" % (target_user_id,)
             )
-        return True
+        return
 
     if Membership.JOIN != membership:
         if (caller_invited
                 and Membership.LEAVE == membership
                 and target_user_id == event.user_id):
-            return True
+            return
 
         if not caller_in_room:  # caller isn't joined
             raise AuthError(
@@ -296,7 +302,7 @@ def _is_membership_change_allowed(event, auth_events):
 
             if user_level < invite_level:
                 raise AuthError(
-                    403, "You cannot invite user %s." % target_user_id
+                    403, "You don't have permission to invite users",
                 )
     elif Membership.JOIN == membership:
         # Joins are valid iff caller == target and they were:
@@ -334,8 +340,6 @@ def _is_membership_change_allowed(event, auth_events):
     else:
         raise AuthError(500, "Unknown membership %s" % membership)
 
-    return True
-
 
 def _check_event_sender_in_room(event, auth_events):
     key = (EventTypes.Member, event.user_id, )
@@ -355,35 +359,46 @@ def _check_joined_room(member, user_id, room_id):
         ))
 
 
-def get_send_level(etype, state_key, auth_events):
-    key = (EventTypes.PowerLevels, "", )
-    send_level_event = auth_events.get(key)
-    send_level = None
-    if send_level_event:
-        send_level = send_level_event.content.get("events", {}).get(
-            etype
-        )
-        if send_level is None:
-            if state_key is not None:
-                send_level = send_level_event.content.get(
-                    "state_default", 50
-                )
-            else:
-                send_level = send_level_event.content.get(
-                    "events_default", 0
-                )
+def get_send_level(etype, state_key, power_levels_event):
+    """Get the power level required to send an event of a given type
 
-    if send_level:
-        send_level = int(send_level)
+    The federation spec [1] refers to this as "Required Power Level".
+
+    https://matrix.org/docs/spec/server_server/unstable.html#definitions
+
+    Args:
+        etype (str): type of event
+        state_key (str|None): state_key of state event, or None if it is not
+            a state event.
+        power_levels_event (synapse.events.EventBase|None): power levels event
+            in force at this point in the room
+    Returns:
+        int: power level required to send this event.
+    """
+
+    if power_levels_event:
+        power_levels_content = power_levels_event.content
     else:
-        send_level = 0
+        power_levels_content = {}
 
-    return send_level
+    # see if we have a custom level for this event type
+    send_level = power_levels_content.get("events", {}).get(etype)
+
+    # otherwise, fall back to the state_default/events_default.
+    if send_level is None:
+        if state_key is not None:
+            send_level = power_levels_content.get("state_default", 50)
+        else:
+            send_level = power_levels_content.get("events_default", 0)
+
+    return int(send_level)
 
 
 def _can_send_event(event, auth_events):
+    power_levels_event = _get_power_level_event(auth_events)
+
     send_level = get_send_level(
-        event.type, event.get("state_key", None), auth_events
+        event.type, event.get("state_key"), power_levels_event,
     )
     user_level = get_user_power_level(event.user_id, auth_events)
 
@@ -515,7 +530,11 @@ def _check_power_levels(event, auth_events):
                     "to your own"
                 )
 
-        if old_level > user_level or new_level > user_level:
+        # Check if the old and new levels are greater than the user level
+        # (if defined)
+        old_level_too_big = old_level is not None and old_level > user_level
+        new_level_too_big = new_level is not None and new_level > user_level
+        if old_level_too_big or new_level_too_big:
             raise AuthError(
                 403,
                 "You don't have permission to add ops level greater "
@@ -524,13 +543,22 @@ def _check_power_levels(event, auth_events):
 
 
 def _get_power_level_event(auth_events):
-    key = (EventTypes.PowerLevels, "", )
-    return auth_events.get(key)
+    return auth_events.get((EventTypes.PowerLevels, ""))
 
 
 def get_user_power_level(user_id, auth_events):
-    power_level_event = _get_power_level_event(auth_events)
+    """Get a user's power level
 
+    Args:
+        user_id (str): user's id to look up in power_levels
+        auth_events (dict[(str, str), synapse.events.EventBase]):
+            state in force at this point in the room (or rather, a subset of
+            it including at least the create event and power levels event.
+
+    Returns:
+        int: the user's power level in this room.
+    """
+    power_level_event = _get_power_level_event(auth_events)
     if power_level_event:
         level = power_level_event.content.get("users", {}).get(user_id)
         if not level:
@@ -541,6 +569,11 @@ def get_user_power_level(user_id, auth_events):
         else:
             return int(level)
     else:
+        # if there is no power levels event, the creator gets 100 and everyone
+        # else gets 0.
+
+        # some things which call this don't pass the create event: hack around
+        # that.
         key = (EventTypes.Create, "", )
         create_event = auth_events.get(key)
         if (create_event is not None and
@@ -657,7 +690,7 @@ def auth_types_for_event(event):
     auth_types = []
 
     auth_types.append((EventTypes.PowerLevels, "", ))
-    auth_types.append((EventTypes.Member, event.user_id, ))
+    auth_types.append((EventTypes.Member, event.sender, ))
     auth_types.append((EventTypes.Create, "", ))
 
     if event.type == EventTypes.Member:

@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
 from synapse.storage.client_ips import LAST_SEEN_GRANULARITY
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.descriptors import Cache
+
+from ._base import BaseSlavedStore
 
 
 class SlavedClientIpStore(BaseSlavedStore):

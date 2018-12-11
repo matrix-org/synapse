@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+import os
+import subprocess
+from hashlib import sha256
+
+from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
-import subprocess
-import os
 
-from hashlib import sha256
-from unpaddedbase64 import encode_base64
+from ._base import Config
 
 GENERATE_DH_PARAMS = False
 

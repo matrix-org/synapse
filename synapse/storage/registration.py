@@ -15,17 +15,23 @@
 
 import re
 
+from six.moves import range
+
 from twisted.internet import defer
 
-from synapse.api.errors import StoreError, Codes
+from synapse.api.errors import Codes, StoreError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
+from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-
-from six.moves import range
 
 
 class RegistrationWorkerStore(SQLBaseStore):
+    def __init__(self, db_conn, hs):
+        super(RegistrationWorkerStore, self).__init__(db_conn, hs)
+
+        self.config = hs.config
+
     @cached()
     def get_user_by_id(self, user_id):
         return self._simple_select_one(
@@ -36,11 +42,32 @@ class RegistrationWorkerStore(SQLBaseStore):
             retcols=[
                 "name", "password_hash", "is_guest",
                 "consent_version", "consent_server_notice_sent",
-                "appservice_id",
+                "appservice_id", "creation_ts",
             ],
             allow_none=True,
             desc="get_user_by_id",
         )
+
+    @defer.inlineCallbacks
+    def is_trial_user(self, user_id):
+        """Checks if user is in the "trial" period, i.e. within the first
+        N days of registration defined by `mau_trial_days` config
+
+        Args:
+            user_id (str)
+
+        Returns:
+            Deferred[bool]
+        """
+
+        info = yield self.get_user_by_id(user_id)
+        if not info:
+            defer.returnValue(False)
+
+        now = self.clock.time_msec()
+        trial_duration_ms = self.config.mau_trial_days * 24 * 60 * 60 * 1000
+        is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
+        defer.returnValue(is_trial)
 
     @cached()
     def get_user_by_access_token(self, token):
@@ -141,7 +168,7 @@ class RegistrationStore(RegistrationWorkerStore,
 
     def register(self, user_id, token=None, password_hash=None,
                  was_guest=False, make_guest=False, appservice_id=None,
-                 create_profile_with_localpart=None, admin=False):
+                 create_profile_with_displayname=None, admin=False):
         """Attempts to register an account.
 
         Args:
@@ -155,8 +182,8 @@ class RegistrationStore(RegistrationWorkerStore,
             make_guest (boolean): True if the the new user should be guest,
                 false to add a regular user account.
             appservice_id (str): The ID of the appservice registering the user.
-            create_profile_with_localpart (str): Optionally create a profile for
-                the given localpart.
+            create_profile_with_displayname (unicode): Optionally create a profile for
+                the user, setting their displayname to the given value
         Raises:
             StoreError if the user_id could not be registered.
         """
@@ -169,7 +196,7 @@ class RegistrationStore(RegistrationWorkerStore,
             was_guest,
             make_guest,
             appservice_id,
-            create_profile_with_localpart,
+            create_profile_with_displayname,
             admin
         )
 
@@ -182,9 +209,11 @@ class RegistrationStore(RegistrationWorkerStore,
         was_guest,
         make_guest,
         appservice_id,
-        create_profile_with_localpart,
+        create_profile_with_displayname,
         admin,
     ):
+        user_id_obj = UserID.from_string(user_id)
+
         now = int(self.clock.time())
 
         next_id = self._access_tokens_id_gen.get_next()
@@ -247,12 +276,15 @@ class RegistrationStore(RegistrationWorkerStore,
                 (next_id, user_id, token,)
             )
 
-        if create_profile_with_localpart:
+        if create_profile_with_displayname:
             # set a default displayname serverside to avoid ugly race
             # between auto-joins and clients trying to set displaynames
+            #
+            # *obviously* the 'profiles' table uses localpart for user_id
+            # while everything else uses the full mxid.
             txn.execute(
                 "INSERT INTO profiles(user_id, displayname) VALUES (?,?)",
-                (create_profile_with_localpart, create_profile_with_localpart)
+                (user_id_obj.localpart, create_profile_with_displayname)
             )
 
         self._invalidate_cache_and_stream(
@@ -448,26 +480,44 @@ class RegistrationStore(RegistrationWorkerStore,
 
     @defer.inlineCallbacks
     def get_user_id_by_threepid(self, medium, address):
-        ret = yield self._simple_select_one(
+        """Returns user id from threepid
+
+        Args:
+            medium (str): threepid medium e.g. email
+            address (str): threepid address e.g. me@example.com
+
+        Returns:
+            Deferred[str|None]: user id or None if no user id/threepid mapping exists
+        """
+        user_id = yield self.runInteraction(
+            "get_user_id_by_threepid", self.get_user_id_by_threepid_txn,
+            medium, address
+        )
+        defer.returnValue(user_id)
+
+    def get_user_id_by_threepid_txn(self, txn, medium, address):
+        """Returns user id from threepid
+
+        Args:
+            txn (cursor):
+            medium (str): threepid medium e.g. email
+            address (str): threepid address e.g. me@example.com
+
+        Returns:
+            str|None: user id or None if no user id/threepid mapping exists
+        """
+        ret = self._simple_select_one_txn(
+            txn,
             "user_threepids",
             {
                 "medium": medium,
                 "address": address
             },
-            ['user_id'], True, 'get_user_id_by_threepid'
+            ['user_id'], True
         )
         if ret:
-            defer.returnValue(ret['user_id'])
-        defer.returnValue(None)
-
-    def user_delete_threepids(self, user_id):
-        return self._simple_delete(
-            "user_threepids",
-            keyvalues={
-                "user_id": user_id,
-            },
-            desc="user_delete_threepids",
-        )
+            return ret['user_id']
+        return None
 
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
@@ -550,7 +600,7 @@ class RegistrationStore(RegistrationWorkerStore,
         def _find_next_generated_user_id(txn):
             txn.execute("SELECT name FROM users")
 
-            regex = re.compile("^@(\d+):")
+            regex = re.compile(r"^@(\d+):")
 
             found = set()
 
@@ -632,7 +682,9 @@ class RegistrationStore(RegistrationWorkerStore,
         Removes the given user to the table of users who need to be parted from all the
         rooms they're in, effectively marking that user as fully deactivated.
         """
-        return self._simple_delete_one(
+        # XXX: This should be simple_delete_one but we failed to put a unique index on
+        # the table, so somehow duplicate entries have ended up in it.
+        return self._simple_delete(
             "users_pending_deactivation",
             keyvalues={
                 "user_id": user_id,

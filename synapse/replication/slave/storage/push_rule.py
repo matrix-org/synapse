@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .events import SlavedEventStore
-from ._slaved_id_tracker import SlavedIdTracker
 from synapse.storage.push_rule import PushRulesWorkerStore
+
+from ._slaved_id_tracker import SlavedIdTracker
+from .events import SlavedEventStore
 
 
 class SlavedPushRuleStore(PushRulesWorkerStore, SlavedEventStore):

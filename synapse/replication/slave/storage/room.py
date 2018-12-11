@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
 from synapse.storage.room import RoomWorkerStore
+
+from ._base import BaseSlavedStore
 from ._slaved_id_tracker import SlavedIdTracker
 
 

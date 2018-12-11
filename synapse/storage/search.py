@@ -13,18 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 import logging
 import re
-import simplejson as json
+from collections import namedtuple
 
 from six import string_types
 
+from canonicaljson import json
+
 from twisted.internet import defer
 
-from .background_updates import BackgroundUpdateStore
 from synapse.api.errors import SynapseError
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+
+from .background_updates import BackgroundUpdateStore
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,10 @@ class SearchStore(BackgroundUpdateStore):
 
     def __init__(self, db_conn, hs):
         super(SearchStore, self).__init__(db_conn, hs)
+
+        if not hs.config.enable_search:
+            return
+
         self.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
         )
@@ -314,6 +320,8 @@ class SearchStore(BackgroundUpdateStore):
             entries (iterable[SearchEntry]):
                 entries to be added to the table
         """
+        if not self.hs.config.enable_search:
+            return
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
                 "INSERT INTO event_search"

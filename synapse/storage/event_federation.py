@@ -12,23 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 import random
+
+from six.moves import range
+from six.moves.queue import Empty, PriorityQueue
+
+from unpaddedbase64 import encode_base64
 
 from twisted.internet import defer
 
-from synapse.storage._base import SQLBaseStore
-from synapse.storage.events import EventsWorkerStore
-from synapse.storage.signatures import SignatureWorkerStore
-
 from synapse.api.errors import StoreError
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage._base import SQLBaseStore
+from synapse.storage.events_worker import EventsWorkerStore
+from synapse.storage.signatures import SignatureWorkerStore
 from synapse.util.caches.descriptors import cached
-from unpaddedbase64 import encode_base64
-
-import logging
-from six.moves.queue import PriorityQueue, Empty
-
-from six.moves import range
-
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +114,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
         sql = (
             "SELECT b.event_id, MAX(e.depth) FROM events as e"
             " INNER JOIN event_edges as g"
-            " ON g.event_id = e.event_id AND g.room_id = e.room_id"
+            " ON g.event_id = e.event_id"
             " INNER JOIN event_backward_extremities as b"
-            " ON g.prev_event_id = b.event_id AND g.room_id = b.room_id"
+            " ON g.prev_event_id = b.event_id"
             " WHERE b.room_id = ? AND g.is_state is ?"
             " GROUP BY b.event_id"
         )
@@ -331,8 +330,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
             "SELECT depth, prev_event_id FROM event_edges"
             " INNER JOIN events"
             " ON prev_event_id = events.event_id"
-            " AND event_edges.room_id = events.room_id"
-            " WHERE event_edges.room_id = ? AND event_edges.event_id = ?"
+            " WHERE event_edges.event_id = ?"
             " AND event_edges.is_state = ?"
             " LIMIT ?"
         )
@@ -345,6 +343,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
                 table="events",
                 keyvalues={
                     "event_id": event_id,
+                    "room_id": room_id,
                 },
                 retcol="depth",
                 allow_none=True,
@@ -366,7 +365,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
 
             txn.execute(
                 query,
-                (room_id, event_id, False, limit - len(event_results))
+                (event_id, False, limit - len(event_results))
             )
 
             for row in txn:
@@ -377,29 +376,21 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
 
     @defer.inlineCallbacks
     def get_missing_events(self, room_id, earliest_events, latest_events,
-                           limit, min_depth):
+                           limit):
         ids = yield self.runInteraction(
             "get_missing_events",
             self._get_missing_events,
-            room_id, earliest_events, latest_events, limit, min_depth
+            room_id, earliest_events, latest_events, limit,
         )
-
         events = yield self._get_events(ids)
-
-        events = sorted(
-            [ev for ev in events if ev.depth >= min_depth],
-            key=lambda e: e.depth,
-        )
-
-        defer.returnValue(events[:limit])
+        defer.returnValue(events)
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events,
-                            limit, min_depth):
+                            limit):
 
-        earliest_events = set(earliest_events)
-        front = set(latest_events) - earliest_events
-
-        event_results = set()
+        seen_events = set(earliest_events)
+        front = set(latest_events) - seen_events
+        event_results = []
 
         query = (
             "SELECT prev_event_id FROM event_edges "
@@ -415,15 +406,17 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
                     (room_id, event_id, False, limit - len(event_results))
                 )
 
-                for e_id, in txn:
-                    new_front.add(e_id)
+                new_results = set(t[0] for t in txn) - seen_events
 
-            new_front -= earliest_events
-            new_front -= event_results
+                new_front |= new_results
+                seen_events |= new_results
+                event_results.extend(new_results)
 
             front = new_front
-            event_results |= new_front
 
+        # we built the list working backwards from latest_events; we now need to
+        # reverse it so that the events are approximately chronological.
+        event_results.reverse()
         return event_results
 
 
@@ -448,7 +441,7 @@ class EventFederationStore(EventFederationWorkerStore):
         )
 
         hs.get_clock().looping_call(
-            self._delete_old_forward_extrem_cache, 60 * 60 * 1000
+            self._delete_old_forward_extrem_cache, 60 * 60 * 1000,
         )
 
     def _update_min_depth_for_room_txn(self, txn, room_id, depth):
@@ -484,7 +477,7 @@ class EventFederationStore(EventFederationWorkerStore):
                     "is_state": False,
                 }
                 for ev in events
-                for e_id, _ in ev.prev_events
+                for e_id in ev.prev_event_ids()
             ],
         )
 
@@ -517,7 +510,7 @@ class EventFederationStore(EventFederationWorkerStore):
 
         txn.executemany(query, [
             (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
-            for ev in events for e_id, _ in ev.prev_events
+            for ev in events for e_id in ev.prev_event_ids()
             if not ev.internal_metadata.is_outlier()
         ])
 
@@ -550,9 +543,11 @@ class EventFederationStore(EventFederationWorkerStore):
                 sql,
                 (self.stream_ordering_month_ago, self.stream_ordering_month_ago,)
             )
-        return self.runInteraction(
+        return run_as_background_process(
+            "delete_old_forward_extrem_cache",
+            self.runInteraction,
             "_delete_old_forward_extrem_cache",
-            _delete_old_forward_extrem_cache_txn
+            _delete_old_forward_extrem_cache_txn,
         )
 
     def clean_room_for_join(self, room_id):

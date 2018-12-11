@@ -13,37 +13,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import datetime
-
-from twisted.internet import defer
-
-from .persistence import TransactionActions
-from .units import Transaction, Edu
-
-from synapse.api.errors import HttpResponseException, FederationDeniedError
-from synapse.util import logcontext, PreserveLoggingContext
-from synapse.util.async import run_on_reactor
-from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
-from synapse.util.metrics import measure_func
-from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
-import synapse.metrics
-from synapse.metrics import LaterGauge
-from synapse.metrics import (
-    sent_edus_counter,
-    sent_transactions_counter,
-    events_processed_counter,
-)
-
-from prometheus_client import Counter
+import logging
 
 from six import itervalues
 
-import logging
+from prometheus_client import Counter
 
+from twisted.internet import defer
+
+import synapse.metrics
+from synapse.api.errors import FederationDeniedError, HttpResponseException
+from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
+from synapse.metrics import (
+    LaterGauge,
+    event_processing_loop_counter,
+    event_processing_loop_room_count,
+    events_processed_counter,
+    sent_edus_counter,
+    sent_transactions_counter,
+)
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util import logcontext
+from synapse.util.metrics import measure_func
+from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
+
+from .persistence import TransactionActions
+from .units import Edu, Transaction
 
 logger = logging.getLogger(__name__)
 
-sent_pdus_destination_dist = Counter(
-    "synapse_federation_transaction_queue_sent_pdu_destinations", ""
+sent_pdus_destination_dist_count = Counter(
+    "synapse_federation_client_sent_pdu_destinations:count", ""
+)
+sent_pdus_destination_dist_total = Counter(
+    "synapse_federation_client_sent_pdu_destinations:total", ""
 )
 
 
@@ -55,6 +58,7 @@ class TransactionQueue(object):
     """
 
     def __init__(self, hs):
+        self.hs = hs
         self.server_name = hs.hostname
 
         self.store = hs.get_datastore()
@@ -115,9 +119,6 @@ class TransactionQueue(object):
             ),
         )
 
-        # destination -> list of tuple(failure, deferred)
-        self.pending_failures_by_dest = {}
-
         # destination -> stream_id of last successfully sent to-device message.
         # NB: may be a long or an int.
         self.last_device_stream_id_by_dest = {}
@@ -136,26 +137,6 @@ class TransactionQueue(object):
 
         self._processing_pending_presence = False
 
-    def can_send_to(self, destination):
-        """Can we send messages to the given server?
-
-        We can't send messages to ourselves. If we are running on localhost
-        then we can only federation with other servers running on localhost.
-        Otherwise we only federate with servers on a public domain.
-
-        Args:
-            destination(str): The server we are possibly trying to send to.
-        Returns:
-            bool: True if we can send to the server.
-        """
-
-        if destination == self.server_name:
-            return False
-        if self.server_name.startswith("localhost"):
-            return destination.startswith("localhost")
-        else:
-            return not destination.startswith("localhost")
-
     def notify_new_events(self, current_id):
         """This gets called when we have some new events we might want to
         send out to other servers.
@@ -165,10 +146,11 @@ class TransactionQueue(object):
         if self._is_processing:
             return
 
-        # fire off a processing loop in the background. It's likely it will
-        # outlast the current request, so run it in the sentinel logcontext.
-        with PreserveLoggingContext():
-            self._process_event_queue_loop()
+        # fire off a processing loop in the background
+        run_as_background_process(
+            "process_event_queue_for_federation",
+            self._process_event_queue_loop,
+        )
 
     @defer.inlineCallbacks
     def _process_event_queue_loop(self):
@@ -201,9 +183,7 @@ class TransactionQueue(object):
                         # banned then it won't receive the event because it won't
                         # be in the room after the ban.
                         destinations = yield self.state.get_current_hosts_in_room(
-                            event.room_id, latest_event_ids=[
-                                prev_id for prev_id, _ in event.prev_events
-                            ],
+                            event.room_id, latest_event_ids=event.prev_event_ids(),
                         )
                     except Exception:
                         logger.exception(
@@ -254,7 +234,13 @@ class TransactionQueue(object):
                     synapse.metrics.event_processing_last_ts.labels(
                         "federation_sender").set(ts)
 
-                events_processed_counter.inc(len(events))
+                    events_processed_counter.inc(len(events))
+
+                    event_processing_loop_room_count.labels(
+                        "federation_sender"
+                    ).inc(len(events_by_room))
+
+                event_processing_loop_counter.labels("federation_sender").inc()
 
                 synapse.metrics.event_processing_positions.labels(
                     "federation_sender").set(next_token)
@@ -271,16 +257,14 @@ class TransactionQueue(object):
         self._order += 1
 
         destinations = set(destinations)
-        destinations = set(
-            dest for dest in destinations if self.can_send_to(dest)
-        )
-
+        destinations.discard(self.server_name)
         logger.debug("Sending to: %s", str(destinations))
 
         if not destinations:
             return
 
-        sent_pdus_destination_dist.inc(len(destinations))
+        sent_pdus_destination_dist_total.inc(len(destinations))
+        sent_pdus_destination_dist_count.inc()
 
         for destination in destinations:
             self.pending_pdus_by_dest.setdefault(destination, []).append(
@@ -300,6 +284,9 @@ class TransactionQueue(object):
         Args:
             states (list(UserPresenceState))
         """
+        if not self.hs.config.use_presence:
+            # No-op if presence is disabled.
+            return
 
         # First we queue up the new presence by user ID, so multiple presence
         # updates in quick successtion are correctly handled
@@ -346,7 +333,7 @@ class TransactionQueue(object):
 
         for destinations, states in hosts_and_states:
             for destination in destinations:
-                if not self.can_send_to(destination):
+                if destination == self.server_name:
                     continue
 
                 self.pending_presence_by_dest.setdefault(
@@ -365,7 +352,8 @@ class TransactionQueue(object):
             content=content,
         )
 
-        if not self.can_send_to(destination):
+        if destination == self.server_name:
+            logger.info("Not sending EDU to ourselves")
             return
 
         sent_edus_counter.inc()
@@ -379,24 +367,9 @@ class TransactionQueue(object):
 
         self._attempt_new_transaction(destination)
 
-    def send_failure(self, failure, destination):
-        if destination == self.server_name or destination == "localhost":
-            return
-
-        if not self.can_send_to(destination):
-            return
-
-        self.pending_failures_by_dest.setdefault(
-            destination, []
-        ).append(failure)
-
-        self._attempt_new_transaction(destination)
-
     def send_device_messages(self, destination):
-        if destination == self.server_name or destination == "localhost":
-            return
-
-        if not self.can_send_to(destination):
+        if destination == self.server_name:
+            logger.info("Not sending device update to ourselves")
             return
 
         self._attempt_new_transaction(destination)
@@ -431,14 +404,11 @@ class TransactionQueue(object):
 
         logger.debug("TX [%s] Starting transaction loop", destination)
 
-        # Drop the logcontext before starting the transaction. It doesn't
-        # really make sense to log all the outbound transactions against
-        # whatever path led us to this point: that's pretty arbitrary really.
-        #
-        # (this also means we can fire off _perform_transaction without
-        # yielding)
-        with logcontext.PreserveLoggingContext():
-            self._transaction_transmission_loop(destination)
+        run_as_background_process(
+            "federation_transaction_transmission_loop",
+            self._transaction_transmission_loop,
+            destination,
+        )
 
     @defer.inlineCallbacks
     def _transaction_transmission_loop(self, destination):
@@ -450,9 +420,6 @@ class TransactionQueue(object):
             # quickly, but we will later check this again in the http client,
             # hence why we throw the result away.
             yield get_retry_limiter(destination, self.clock, self.store)
-
-            # XXX: what's this for?
-            yield run_on_reactor()
 
             pending_pdus = []
             while True:
@@ -470,9 +437,20 @@ class TransactionQueue(object):
                 # pending_transactions flag.
 
                 pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
+
+                # We can only include at most 50 PDUs per transactions
+                pending_pdus, leftover_pdus = pending_pdus[:50], pending_pdus[50:]
+                if leftover_pdus:
+                    self.pending_pdus_by_dest[destination] = leftover_pdus
+
                 pending_edus = self.pending_edus_by_dest.pop(destination, [])
+
+                # We can only include at most 100 EDUs per transactions
+                pending_edus, leftover_edus = pending_edus[:100], pending_edus[100:]
+                if leftover_edus:
+                    self.pending_edus_by_dest[destination] = leftover_edus
+
                 pending_presence = self.pending_presence_by_dest.pop(destination, {})
-                pending_failures = self.pending_failures_by_dest.pop(destination, [])
 
                 pending_edus.extend(
                     self.pending_edus_keyed_by_dest.pop(destination, {}).values()
@@ -500,7 +478,7 @@ class TransactionQueue(object):
                     logger.debug("TX [%s] len(pending_pdus_by_dest[dest]) = %d",
                                  destination, len(pending_pdus))
 
-                if not pending_pdus and not pending_edus and not pending_failures:
+                if not pending_pdus and not pending_edus:
                     logger.debug("TX [%s] Nothing to send", destination)
                     self.last_device_stream_id_by_dest[destination] = (
                         device_stream_id
@@ -510,7 +488,7 @@ class TransactionQueue(object):
                 # END CRITICAL SECTION
 
                 success = yield self._send_new_transaction(
-                    destination, pending_pdus, pending_edus, pending_failures,
+                    destination, pending_pdus, pending_edus,
                 )
                 if success:
                     sent_transactions_counter.inc()
@@ -587,14 +565,12 @@ class TransactionQueue(object):
 
     @measure_func("_send_new_transaction")
     @defer.inlineCallbacks
-    def _send_new_transaction(self, destination, pending_pdus, pending_edus,
-                              pending_failures):
+    def _send_new_transaction(self, destination, pending_pdus, pending_edus):
 
         # Sort based on the order field
         pending_pdus.sort(key=lambda t: t[1])
         pdus = [x[0] for x in pending_pdus]
         edus = pending_edus
-        failures = [x.get_dict() for x in pending_failures]
 
         success = True
 
@@ -604,11 +580,10 @@ class TransactionQueue(object):
 
         logger.debug(
             "TX [%s] {%s} Attempting new transaction"
-            " (pdus: %d, edus: %d, failures: %d)",
+            " (pdus: %d, edus: %d)",
             destination, txn_id,
             len(pdus),
             len(edus),
-            len(failures)
         )
 
         logger.debug("TX [%s] Persisting transaction...", destination)
@@ -620,7 +595,6 @@ class TransactionQueue(object):
             destination=destination,
             pdus=pdus,
             edus=edus,
-            pdu_failures=failures,
         )
 
         self._next_txn_id += 1
@@ -630,12 +604,11 @@ class TransactionQueue(object):
         logger.debug("TX [%s] Persisted transaction", destination)
         logger.info(
             "TX [%s] {%s} Sending transaction [%s],"
-            " (PDUs: %d, EDUs: %d, failures: %d)",
+            " (PDUs: %d, EDUs: %d)",
             destination, txn_id,
             transaction.transaction_id,
             len(pdus),
             len(edus),
-            len(failures),
         )
 
         # Actually send the transaction
@@ -658,14 +631,6 @@ class TransactionQueue(object):
                 transaction, json_data_cb
             )
             code = 200
-
-            if response:
-                for e_id, r in response.get("pdus", {}).items():
-                    if "error" in r:
-                        logger.warn(
-                            "Transaction returned error for %s: %s",
-                            e_id, r,
-                        )
         except HttpResponseException as e:
             code = e.code
             response = e.response
@@ -682,19 +647,24 @@ class TransactionQueue(object):
             destination, txn_id, code
         )
 
-        logger.debug("TX [%s] Sent transaction", destination)
-        logger.debug("TX [%s] Marking as delivered...", destination)
-
         yield self.transaction_actions.delivered(
             transaction, code, response
         )
 
-        logger.debug("TX [%s] Marked as delivered", destination)
+        logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
 
-        if code != 200:
+        if code == 200:
+            for e_id, r in response.get("pdus", {}).items():
+                if "error" in r:
+                    logger.warn(
+                        "TX [%s] {%s} Remote returned error for %s: %s",
+                        destination, txn_id, e_id, r,
+                    )
+        else:
             for p in pdus:
-                logger.info(
-                    "Failed to send event %s to %s", p.event_id, destination
+                logger.warn(
+                    "TX [%s] {%s} Failed to send event %s",
+                    destination, txn_id, p.event_id,
                 )
             success = False
 

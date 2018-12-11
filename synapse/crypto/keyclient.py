@@ -13,29 +13,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util import logcontext
-from twisted.web.http import HTTPClient
-from twisted.internet.protocol import Factory
-from twisted.internet import defer, reactor
-from synapse.http.endpoint import matrix_federation_endpoint
-import simplejson as json
 import logging
 
+from six.moves import urllib
+
+from canonicaljson import json
+
+from twisted.internet import defer, reactor
+from twisted.internet.error import ConnectError
+from twisted.internet.protocol import Factory
+from twisted.names.error import DomainError
+from twisted.web.http import HTTPClient
+
+from synapse.http.endpoint import matrix_federation_endpoint
+from synapse.util import logcontext
 
 logger = logging.getLogger(__name__)
 
-KEY_API_V1 = b"/_matrix/key/v1/"
+KEY_API_V2 = "/_matrix/key/v2/server/%s"
 
 
 @defer.inlineCallbacks
-def fetch_server_key(server_name, ssl_context_factory, path=KEY_API_V1):
+def fetch_server_key(server_name, tls_client_options_factory, key_id):
     """Fetch the keys for a remote server."""
 
     factory = SynapseKeyClientFactory()
-    factory.path = path
+    factory.path = KEY_API_V2 % (urllib.parse.quote(key_id), )
     factory.host = server_name
     endpoint = matrix_federation_endpoint(
-        reactor, server_name, ssl_context_factory, timeout=30
+        reactor, server_name, tls_client_options_factory, timeout=30
     )
 
     for i in range(5):
@@ -45,12 +51,14 @@ def fetch_server_key(server_name, ssl_context_factory, path=KEY_API_V1):
                 server_response, server_certificate = yield protocol.remote_key
                 defer.returnValue((server_response, server_certificate))
         except SynapseKeyClientError as e:
-            logger.exception("Error getting key for %r" % (server_name,))
-            if e.status.startswith("4"):
+            logger.warn("Error getting key for %r: %s", server_name, e)
+            if e.status.startswith(b"4"):
                 # Don't retry for 4xx responses.
                 raise IOError("Cannot get key for %r" % server_name)
-        except Exception as e:
-            logger.exception(e)
+        except (ConnectError, DomainError) as e:
+            logger.warn("Error getting key for %r: %s", server_name, e)
+        except Exception:
+            logger.exception("Error getting key for %r", server_name)
     raise IOError("Cannot get key for %r" % server_name)
 
 
@@ -75,6 +83,12 @@ class SynapseKeyClientProtocol(HTTPClient):
     def connectionMade(self):
         self._peer = self.transport.getPeer()
         logger.debug("Connected to %s", self._peer)
+
+        if not isinstance(self.path, bytes):
+            self.path = self.path.encode('ascii')
+
+        if not isinstance(self.host, bytes):
+            self.host = self.host.encode('ascii')
 
         self.sendCommand(b"GET", self.path)
         if self.host:

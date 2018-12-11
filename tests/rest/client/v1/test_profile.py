@@ -15,12 +15,15 @@
 
 """Tests REST events for /profile paths."""
 from mock import Mock
+
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.errors import SynapseError, AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.rest.client.v1 import profile
+
 from tests import unittest
+
 from ....utils import MockHttpResource, setup_test_homeserver
 
 myid = "@1234ABCD:test"
@@ -33,20 +36,23 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-        self.mock_handler = Mock(spec=[
-            "get_displayname",
-            "set_displayname",
-            "get_avatar_url",
-            "set_avatar_url",
-        ])
+        self.mock_handler = Mock(
+            spec=[
+                "get_displayname",
+                "set_displayname",
+                "get_avatar_url",
+                "set_avatar_url",
+            ]
+        )
 
         hs = yield setup_test_homeserver(
+            self.addCleanup,
             "test",
             http_client=None,
             resource_for_client=self.mock_resource,
             federation=Mock(),
             federation_client=Mock(),
-            profile_handler=self.mock_handler
+            profile_handler=self.mock_handler,
         )
 
         def _get_user_by_req(request=None, allow_guest=False):
@@ -75,9 +81,7 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set.return_value = defer.succeed(())
 
         (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            "/profile/%s/displayname" % (myid),
-            '{"displayname": "Frank Jr."}'
+            "PUT", "/profile/%s/displayname" % (myid), b'{"displayname": "Frank Jr."}'
         )
 
         self.assertEquals(200, code)
@@ -91,14 +95,12 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set.side_effect = AuthError(400, "message")
 
         (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/profile/%s/displayname" % ("@4567:test"),
-            '{"displayname": "Frank Jr."}'
+            "PUT",
+            "/profile/%s/displayname" % ("@4567:test"),
+            b'{"displayname": "Frank Jr."}',
         )
 
-        self.assertTrue(
-            400 <= code < 499,
-            msg="code %d is in the 4xx range" % (code)
-        )
+        self.assertTrue(400 <= code < 499, msg="code %d is in the 4xx range" % (code))
 
     @defer.inlineCallbacks
     def test_get_other_name(self):
@@ -118,14 +120,12 @@ class ProfileTestCase(unittest.TestCase):
         mocked_set.side_effect = SynapseError(400, "message")
 
         (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/profile/%s/displayname" % ("@opaque:elsewhere"),
-            '{"displayname":"bob"}'
+            "PUT",
+            "/profile/%s/displayname" % ("@opaque:elsewhere"),
+            b'{"displayname":"bob"}',
         )
 
-        self.assertTrue(
-            400 <= code <= 499,
-            msg="code %d is in the 4xx range" % (code)
-        )
+        self.assertTrue(400 <= code <= 499, msg="code %d is in the 4xx range" % (code))
 
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
@@ -148,7 +148,7 @@ class ProfileTestCase(unittest.TestCase):
         (code, response) = yield self.mock_resource.trigger(
             "PUT",
             "/profile/%s/avatar_url" % (myid),
-            '{"avatar_url": "http://my.server/pic.gif"}'
+            b'{"avatar_url": "http://my.server/pic.gif"}',
         )
 
         self.assertEquals(200, code)

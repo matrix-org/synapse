@@ -15,15 +15,15 @@
 # limitations under the License.
 
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.events.utils import prune_event
-
-from canonicaljson import encode_canonical_json
-from unpaddedbase64 import encode_base64, decode_base64
-from signedjson.sign import sign_json
-
 import hashlib
 import logging
+
+from canonicaljson import encode_canonical_json
+from signedjson.sign import sign_json
+from unpaddedbase64 import decode_base64, encode_base64
+
+from synapse.api.errors import Codes, SynapseError
+from synapse.events.utils import prune_event
 
 logger = logging.getLogger(__name__)
 

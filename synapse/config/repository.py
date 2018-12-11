@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
 from collections import namedtuple
 
 from synapse.util.module_loader import load_module
 
+from ._base import Config, ConfigError
 
 MISSING_NETADDR = (
     "Missing netaddr library. This is required for URL preview API."
@@ -178,7 +178,7 @@ class ContentRepositoryConfig(Config):
     def default_config(self, **kwargs):
         media_store = self.default_path("media_store")
         uploads_path = self.default_path("uploads")
-        return """
+        return r"""
         # Directory where uploaded images and attachments are stored.
         media_store_path: "%(media_store)s"
 
