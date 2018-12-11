@@ -1,1 +1,0 @@
-The media repository now no longer fails to decode UTF-8 filenames when downloading remote media.
