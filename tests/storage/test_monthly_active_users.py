@@ -44,7 +44,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         user2_email = "user2@matrix.org"
         user3 = "@user3:server"
         user3_email = "user3@matrix.org"
-        
+
         threepids = [
             {'medium': 'email', 'address': user1_email},
             {'medium': 'email', 'address': user2_email},
