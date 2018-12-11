@@ -158,6 +158,7 @@ class UserRegisterServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Invalid password")
 
         admin = body.get("admin", None)
+        user_type = body.get("user_type", None)
         got_mac = body["mac"]
 
         want_mac = hmac.new(
@@ -189,6 +190,7 @@ class UserRegisterServlet(ClientV1RestServlet):
             password=body["password"],
             admin=bool(admin),
             generate_token=False,
+            user_type=user_type,
         )
 
         result = yield register._create_registration_details(user_id, body)

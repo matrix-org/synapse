@@ -126,6 +126,7 @@ class RegistrationHandler(BaseHandler):
         make_guest=False,
         admin=False,
         threepid=None,
+        user_type=None,
     ):
         """Registers a new client on the server.
 
@@ -183,6 +184,7 @@ class RegistrationHandler(BaseHandler):
                     None if was_guest else user.localpart
                 ),
                 admin=admin,
+                user_type=user_type,
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -234,7 +236,7 @@ class RegistrationHandler(BaseHandler):
         fake_requester = create_requester(user_id)
 
         # try to create the room if we're the first real user on the server. Note
-        # that an auto generated support user is not a real user and never be
+        # that an auto-generated support user is not a real user and will never be
         # the user to create the room
         should_auto_create_rooms = False
         is_support = yield self.store.is_support_user(user_id)

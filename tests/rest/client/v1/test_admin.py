@@ -18,7 +18,7 @@ import hmac
 import json
 
 from mock import Mock
-
+from synapse.api.constants import UserTypes
 from synapse.rest.client.v1.admin import register_servlets
 
 from tests import unittest
@@ -156,6 +156,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "username": "bob",
                 "password": "abc123",
                 "admin": True,
+                "user_type" : UserTypes.SUPPORT,
                 "mac": want_mac,
             }
         )
@@ -202,8 +203,8 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
     def test_missing_parts(self):
         """
         Synapse will complain if you don't give nonce, username, password, and
-        mac.  Admin is optional.  Additional checks are done for length and
-        type.
+        mac.  Admin and user_types are optional.  Additional checks are done for length 
+        and type.
         """
 
         def nonce():

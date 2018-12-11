@@ -17,6 +17,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.api.constants import UserTypes
 from synapse.api.errors import ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
@@ -204,3 +205,11 @@ class RegistrationTestCase(unittest.TestCase):
         yield self.handler.post_consent_actions(res[0])
         rooms = yield self.store.get_rooms_for_user(res[0])
         self.assertEqual(len(rooms), 0)
+
+    @defer.inlineCallbacks
+    def test_register_support_user(self):
+        res = yield self.handler.register(localpart='user1', user_type=UserTypes.SUPPORT)
+        self.assertTrue(self.store.is_support_user(res[0]))
+
+        res = yield self.handler.register(localpart='user2')
+        self.assertFalse(self.store.is_support_user(res[0]))
