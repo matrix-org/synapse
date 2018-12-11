@@ -1,2 +1,0 @@
-fix start up failure when mau_limit_reserved_threepids set and db is postgres 
-

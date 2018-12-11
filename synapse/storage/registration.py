@@ -23,6 +23,7 @@ from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
+from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
 
@@ -168,7 +169,7 @@ class RegistrationStore(RegistrationWorkerStore,
 
     def register(self, user_id, token=None, password_hash=None,
                  was_guest=False, make_guest=False, appservice_id=None,
-                 create_profile_with_localpart=None, admin=False, user_type=None):
+                 create_profile_with_displayname=None, admin=False, user_type=None):
         """Attempts to register an account.
 
         Args:
@@ -182,10 +183,11 @@ class RegistrationStore(RegistrationWorkerStore,
             make_guest (boolean): True if the the new user should be guest,
                 false to add a regular user account.
             appservice_id (str): The ID of the appservice registering the user.
-            create_profile_with_localpart (str): Optionally create a profile for
-                the given localpart.
+            create_profile_with_displayname (unicode): Optionally create a profile for
+                the user, setting their displayname to the given value
             admin (boolean): is an admin user?
             user_type (synapse.api.constants import UserTypes): type of user
+
         Raises:
             StoreError if the user_id could not be registered.
         """
@@ -198,7 +200,7 @@ class RegistrationStore(RegistrationWorkerStore,
             was_guest,
             make_guest,
             appservice_id,
-            create_profile_with_localpart,
+            create_profile_with_displayname,
             admin,
             user_type
         )
@@ -212,10 +214,12 @@ class RegistrationStore(RegistrationWorkerStore,
         was_guest,
         make_guest,
         appservice_id,
-        create_profile_with_localpart,
+        create_profile_with_displayname,
         admin,
         user_type,
     ):
+        user_id_obj = UserID.from_string(user_id)
+
         now = int(self.clock.time())
 
         next_id = self._access_tokens_id_gen.get_next()
@@ -280,12 +284,15 @@ class RegistrationStore(RegistrationWorkerStore,
                 (next_id, user_id, token,)
             )
 
-        if create_profile_with_localpart:
+        if create_profile_with_displayname:
             # set a default displayname serverside to avoid ugly race
             # between auto-joins and clients trying to set displaynames
+            #
+            # *obviously* the 'profiles' table uses localpart for user_id
+            # while everything else uses the full mxid.
             txn.execute(
                 "INSERT INTO profiles(user_id, displayname) VALUES (?,?)",
-                (create_profile_with_localpart, create_profile_with_localpart)
+                (user_id_obj.localpart, create_profile_with_displayname)
             )
 
         self._invalidate_cache_and_stream(

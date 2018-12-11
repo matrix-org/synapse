@@ -1,4 +1,5 @@
-# Copyright 2016 OpenMarket Ltd
+# -*- coding: utf-8 -*-
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,22 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from twisted.web.resource import Resource
+
+from synapse.rest.saml2.metadata_resource import SAML2MetadataResource
+from synapse.rest.saml2.response_resource import SAML2ResponseResource
 
 logger = logging.getLogger(__name__)
 
 
-def run_create(cur, database_engine, *args, **kwargs):
-    if isinstance(database_engine, PostgresEngine):
-        cur.execute("TRUNCATE sent_transactions")
-    else:
-        cur.execute("DELETE FROM sent_transactions")
-
-    cur.execute("CREATE INDEX sent_transactions_ts ON sent_transactions(ts)")
-
-
-def run_upgrade(cur, database_engine, *args, **kwargs):
-    pass
+class SAML2Resource(Resource):
+    def __init__(self, hs):
+        Resource.__init__(self)
+        self.putChild(b"metadata.xml", SAML2MetadataResource(hs))
+        self.putChild(b"authn_response", SAML2ResponseResource(hs))

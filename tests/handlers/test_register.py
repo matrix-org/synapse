@@ -127,21 +127,6 @@ class RegistrationTestCase(unittest.TestCase):
             yield self.handler.register(localpart="local_part")
 
     @defer.inlineCallbacks
-    def test_register_saml2_mau_blocked(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.lots_of_users)
-        )
-        with self.assertRaises(ResourceLimitError):
-            yield self.handler.register_saml2(localpart="local_part")
-
-        self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
-        )
-        with self.assertRaises(ResourceLimitError):
-            yield self.handler.register_saml2(localpart="local_part")
-
-    @defer.inlineCallbacks
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]

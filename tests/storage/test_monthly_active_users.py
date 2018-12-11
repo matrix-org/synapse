@@ -161,7 +161,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
 
     def test_populate_monthly_users_is_guest(self):
         # Test that guest users are not added to mau list
-        user_id = "user_id"
+        user_id = "@user_id:host"
         self.store.register(
             user_id=user_id, token="123", password_hash=None, make_guest=True
         )

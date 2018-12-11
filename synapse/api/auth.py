@@ -188,16 +188,32 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            user_id, app_service = yield self._get_appservice_user_id(request)
-            if user_id:
-                request.authenticated_entity = user_id
-                defer.returnValue(
-                    synapse.types.create_requester(user_id, app_service=app_service)
-                )
+            ip_addr = self.hs.get_ip_from_request(request)
+            user_agent = request.requestHeaders.getRawHeaders(
+                b"User-Agent",
+                default=[b""]
+            )[0].decode('ascii', 'surrogateescape')
 
             access_token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
+
+            user_id, app_service = yield self._get_appservice_user_id(request)
+            if user_id:
+                request.authenticated_entity = user_id
+
+                if ip_addr and self.hs.config.track_appservice_user_ips:
+                    yield self.store.insert_client_ip(
+                        user_id=user_id,
+                        access_token=access_token,
+                        ip=ip_addr,
+                        user_agent=user_agent,
+                        device_id="dummy-device",  # stubbed
+                    )
+
+                defer.returnValue(
+                    synapse.types.create_requester(user_id, app_service=app_service)
+                )
 
             user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
@@ -208,11 +224,6 @@ class Auth(object):
             # stubbed out.
             device_id = user_info.get("device_id")
 
-            ip_addr = self.hs.get_ip_from_request(request)
-            user_agent = request.requestHeaders.getRawHeaders(
-                b"User-Agent",
-                default=[b""]
-            )[0].decode('ascii', 'surrogateescape')
             if user and access_token and ip_addr:
                 yield self.store.insert_client_ip(
                     user_id=user.to_string(),
