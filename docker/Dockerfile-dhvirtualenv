@@ -9,6 +9,7 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         build-essential \
         debhelper \
         devscripts \
+        dh-virtualenv \
         equivs \
         lsb-release \
         python3-dev \
@@ -17,16 +18,6 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         python3-venv \
         sqlite3 \
         wget
-
-RUN mkdir -p /tmp/dhvenv \
-    && cd /tmp/dhvenv \
-    && wget https://github.com/spotify/dh-virtualenv/archive/1.1.tar.gz \
-    && tar xvf 1.1.tar.gz \
-    && cd dh-virtualenv-1.1/ \
-    && env DEBIAN_FRONTEND=noninteractive mk-build-deps -ri -t "apt-get -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io" \
-    && dpkg-buildpackage -us -uc -b \
-    && cd /tmp/dhvenv \
-    && apt-get install -yqq ./dh-virtualenv_1.1-1_all.deb
 
 WORKDIR /synapse/build
 ENTRYPOINT ["bash","/synapse/build/docker/build_debian.sh"]
