@@ -4,19 +4,22 @@
 #
 
 export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
+# Use -march=x86-64 so any compiled C extensions are compiled with the most
+# generic as possible x64 instructions, so that compiling it on a new Intel chip
+# doesn't enable features not available on older ones or AMD.
 export CFLAGS=-march=x86-64
 SNAKE=/usr/bin/python3
+# Use --builtin-venv to use the better `venv` module from CPython 3.4+ rather
+# than the 2/3 compatible `virtualenv`.
 DH_VENV_ARGS=--install-suffix "matrix-synapse" \
-			 --builtin-venv\
+			 --builtin-venv \
 			 --setuptools \
 			 --python $(SNAKE) \
 			 --upgrade-pip \
+			 --preinstall="lxml" \
 			 --extra-pip-arg="--no-cache-dir" \
 			 --extra-pip-arg="--compile" \
 			 --extra-pip-arg="--progress-bar=off"
-PACKAGE=$(shell dh_listpackages)
-VERSION=$(shell $(SNAKE) setup.py --version)
-SDIST_DIR=debian/$(PACKAGE)-$(VERSION)
 RELEASE_VERSION=$(VERSION)
 DEBIAN_RELEASE_NUMBER=1
 DISTRO_RELEASE=$(shell lsb_release -c -s)
