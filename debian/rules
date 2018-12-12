@@ -17,6 +17,7 @@ DH_VENV_ARGS=--install-suffix "matrix-synapse" \
 			 --python $(SNAKE) \
 			 --upgrade-pip \
 			 --preinstall="lxml" \
+			 --preinstall="mock" \
 			 --extra-pip-arg="--no-cache-dir" \
 			 --extra-pip-arg="--compile" \
 			 --extra-pip-arg="--progress-bar=off"
@@ -35,6 +36,7 @@ override_dh_shlibdeps:
 
 override_dh_virtualenv:
 	dh_virtualenv $(DH_VENV_ARGS)
+	debian/matrix-synapse-py3/opt/venvs/matrix-synapse/bin/python -m twisted.trial --reporter=text ../tests/
 
 %:
 	dh $@ --with python-virtualenv
