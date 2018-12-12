@@ -25,7 +25,7 @@ DEBIAN_RELEASE_NUMBER=1
 DISTRO_RELEASE=$(shell lsb_release -c -s)
 
 override_dh_gencontrol:
-	dh_gencontrol -- -v$(RELEASE_VERSION)-matrix$(DEBIAN_RELEASE_NUMBER)~$(DISTRO_RELEASE)
+	dh_gencontrol -- -v$(RELEASE_VERSION)-0matrix$(DEBIAN_RELEASE_NUMBER)~$(DISTRO_RELEASE)
 
 override_dh_strip:
 	echo "No dhstrip"
