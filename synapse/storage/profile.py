@@ -153,6 +153,8 @@ class ProfileWorkerStore(SQLBaseStore):
             "batch": batchnum,
         }
         if not active and not hide:
+            # we are deactivating for real (not in hide mode)
+            # so clear the profile.
             values["avatar_url"] = None
             values["displayname"] = None
         return self._simple_upsert(

@@ -274,9 +274,9 @@ class BaseProfileHandler(BaseHandler):
         """
         Sets the 'active' flag on a user profile. If set to false, the user account is
         considered deactivated or hidden.
-        If 'hide' is true, then we just try hide the user rather than deactivate it.
-        This means withholding it from replication (and mark it as inactive) rather than
-        clearing the profile from the HS DB.
+        If 'hide' is true, then we interpret active=False as a request to try to hide the
+        user rather than deactivating it.  This means withholding the profile from replication
+        (and mark it as inactive) rather than clearing the profile from the HS DB.
         Note that unlike set_displayname and set_avatar_url, this does *not* perform
         authorization checks! This is because the only place it's used currently is
         in account deactivation where we've already done these checks anyway.
