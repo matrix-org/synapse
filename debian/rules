@@ -20,7 +20,7 @@ DH_VENV_ARGS=--install-suffix "matrix-synapse" \
 			 --extra-pip-arg="--no-cache-dir" \
 			 --extra-pip-arg="--compile" \
 			 --extra-pip-arg="--progress-bar=off"
-RELEASE_VERSION=$(VERSION)
+RELEASE_VERSION=$(shell $(SNAKE) setup.py --version)
 DEBIAN_RELEASE_NUMBER=1
 DISTRO_RELEASE=$(shell lsb_release -c -s)
 

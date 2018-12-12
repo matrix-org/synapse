@@ -5,10 +5,6 @@ Maintainer: Synapse Developers <synapse@matrix.org>
 Build-Depends:
  debhelper (>= 9),
  dh-virtualenv (>= 0.10),
- libffi-dev,
- libjpeg-dev,
- libssl-dev,
- libxslt1-dev,
  lsb-release,
  python3-dev,
  python3,
@@ -26,11 +22,6 @@ Pre-Depends: dpkg (>= 1.16.1)
 Depends:
  adduser,
  debconf,
- libffi6,
- libjpeg-turbo8,
- libpq5,
- libxslt1.1,
- openssl,
  python3-distutils,
  python3,
  sqlite3,
