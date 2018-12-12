@@ -12,7 +12,7 @@ set -ex
 mkdir -p ../debs
 
 # Build each OS image;
-for i in debian:stretch debian:sid ubuntu:xenial ubuntu:bionic ubuntu:cosmic;
+for i in debian:stretch debian:sid ubuntu:bionic ubuntu:cosmic;
 do
     TAG=$(echo ${i} | cut -d ":" -f 2)
     docker build --tag dh-venv-builder:${TAG} --build-arg distro=${i} -f Dockerfile-dhvirtualenv .
