@@ -33,4 +33,4 @@ dpkg-buildpackage -us -uc
 ls -l ..
 
 # copy the build results out
-cp ../*.deb /debs
+cp ../*.deb ../*.dsc ../*.tar.xz /debs
