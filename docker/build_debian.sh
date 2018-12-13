@@ -33,7 +33,8 @@ dpkg-buildpackage -us -uc
 ls -l ..
 
 # copy the build results out, setting perms if necessary
-for i in ../*.deb ../*.dsc ../*.tar.xz; do
+shopt -s nullglob
+for i in ../*.deb ../*.dsc ../*.tar.xz ../*.changes ../*.buildinfo; do
     [ -z "$TARGET_USERID" ] || chown "$TARGET_USERID" "$i"
     [ -z "$TARGET_GROUPID" ] || chgrp "$TARGET_GROUPID" "$i"
     mv "$i" /debs
