@@ -4,9 +4,10 @@
 
 set -ex
 
+DIST=`lsb_release -c -s`
+
 # We need to build a newer dh_virtualenv on older OSes like Xenial.
-if [[ $(lsb_release -c -s) == 'xenial' ]];
-then
+if [ "$DIST" = 'xenial' ]; then
     mkdir -p /tmp/dhvenv
     cd /tmp/dhvenv
     wget https://github.com/spotify/dh-virtualenv/archive/1.1.tar.gz
@@ -23,7 +24,11 @@ fi
 cp -aT /synapse/source /synapse/build
 cd /synapse/build
 
-dpkg-buildpackage -us -uc -b
+# add an entry to the changelog for this distribution
+dch -M -l "+$DIST" "build for $DIST"
+dch -M -r "" --force-distribution --distribution "$DIST"
+
+dpkg-buildpackage -us -uc
 
 ls -l ..
 

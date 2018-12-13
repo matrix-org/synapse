@@ -20,12 +20,6 @@ DH_VENV_ARGS=--install-suffix "matrix-synapse" \
 			 --preinstall="mock" \
 			 --extra-pip-arg="--no-cache-dir" \
 			 --extra-pip-arg="--compile"
-RELEASE_VERSION=$(shell $(SNAKE) setup.py --version)
-DEBIAN_RELEASE_NUMBER=1
-DISTRO_RELEASE=$(shell lsb_release -c -s)
-
-override_dh_gencontrol:
-	dh_gencontrol -- -v$(RELEASE_VERSION)-0matrix$(DEBIAN_RELEASE_NUMBER)~$(DISTRO_RELEASE)
 
 override_dh_installinit:
 	dh_installinit --name=matrix-synapse

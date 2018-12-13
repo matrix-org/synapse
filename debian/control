@@ -1,7 +1,7 @@
 Source: matrix-synapse-py3
 Section: contrib/python
 Priority: extra
-Maintainer: Synapse Developers <synapse@matrix.org>
+Maintainer: Synapse Packaging team <packages@matrix.org>
 Build-Depends:
  debhelper (>= 9),
  dh-systemd,
