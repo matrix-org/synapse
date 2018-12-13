@@ -19,6 +19,8 @@ then
     cd /synapse/build
 fi
 
+ls -la ../
+
 dpkg-buildpackage -us -uc -b
 
 cp ../*.deb /synapse/build/debs

@@ -9,6 +9,7 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         build-essential \
         debhelper \
         devscripts \
+        dh-systemd \
         dh-virtualenv \
         equivs \
         lsb-release \

@@ -4,6 +4,7 @@ Priority: extra
 Maintainer: Synapse Developers <synapse@matrix.org>
 Build-Depends:
  debhelper (>= 9),
+ dh-systemd,
  dh-virtualenv (>= 1.0),
  lsb-release,
  python3-dev,
