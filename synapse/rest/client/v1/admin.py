@@ -23,7 +23,7 @@ from six.moves import http_client
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     assert_params_in_dict,
@@ -159,6 +159,10 @@ class UserRegisterServlet(ClientV1RestServlet):
 
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
+
+        if user_type and user_type not in UserTypes.ALL_USER_TYPES:
+            raise SynapseError(400, "Invalid user type")
+
         got_mac = body["mac"]
 
         want_mac = hmac.new(
@@ -172,6 +176,8 @@ class UserRegisterServlet(ClientV1RestServlet):
         want_mac.update(password)
         want_mac.update(b"\x00")
         want_mac.update(b"admin" if admin else b"notadmin")
+        want_mac.update(b"\x00")
+        want_mac.update(user_type.encode('utf8') if user_type else b"no_user_type")
         want_mac = want_mac.hexdigest()
 
         if not hmac.compare_digest(

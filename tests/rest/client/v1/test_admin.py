@@ -120,7 +120,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(b"notthenonce\x00bob\x00abc123\x00admin")
+        want_mac.update(b"notthenonce\x00bob\x00abc123\x00admin\x00no_user_type")
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -148,7 +148,9 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
+        want_mac.update(
+            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin\x00support"
+        )
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -176,7 +178,9 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
+        want_mac.update(
+            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin\x00no_user_type"
+        )
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -262,7 +266,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual('Invalid username', channel.json_body["error"])
 
         #
-        # Username checks
+        # Password checks
         #
 
         # Must be present
@@ -298,3 +302,20 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid password', channel.json_body["error"])
+
+        #
+        # user_type check
+        #
+
+        # Invalid user_type
+        body = json.dumps({
+            "nonce": nonce(),
+            "username": "a",
+            "password": "1234",
+            "user_type": "invalid"}
+        )
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual('Invalid user type', channel.json_body["error"])

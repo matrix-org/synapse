@@ -39,13 +39,13 @@ As an example::
     }
 
 The MAC is the hex digest output of the HMAC-SHA1 algorithm, with the key being
-the shared secret and the content being the nonce, user, password, and either
-the string "admin" or "notadmin", each separated by NULs. For an example of
-generation in Python::
+the shared secret and the content being the nonce, user, password, user_type
+(or string "no_user_type" if None) and either the string "admin" or "notadmin",
+each separated by NULs. For an example of generation in Python::
 
   import hmac, hashlib
 
-  def generate_mac(nonce, user, password, admin=False):
+  def generate_mac(nonce, user, password, admin=False, user_type=None):
 
       mac = hmac.new(
         key=shared_secret,
@@ -59,5 +59,7 @@ generation in Python::
       mac.update(password.encode('utf8'))
       mac.update(b"\x00")
       mac.update(b"admin" if admin else b"notadmin")
+      mac.update(b"\x00")
+      mac.update(user_type.encode('utf8') if user_type else b"no_user_type")
 
       return mac.hexdigest()
