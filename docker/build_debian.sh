@@ -16,11 +16,16 @@ then
     dpkg-buildpackage -us -uc -b
     cd /tmp/dhvenv
     apt-get install -yqq ./dh-virtualenv_1.1-1_all.deb
-    cd /synapse/build
 fi
 
-ls -la ../
+
+# we get a read-only copy of the source: make a writeable copy
+cp -aT /synapse/source /synapse/build
+cd /synapse/build
 
 dpkg-buildpackage -us -uc -b
 
-cp ../*.deb /synapse/build/debs
+ls -l ..
+
+# copy the build results out
+cp ../*.deb /debs

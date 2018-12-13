@@ -20,5 +20,5 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         sqlite3 \
         wget
 
-WORKDIR /synapse/build
-ENTRYPOINT ["bash","/synapse/build/docker/build_debian.sh"]
+WORKDIR /synapse/source
+ENTRYPOINT ["bash","/synapse/source/docker/build_debian.sh"]
