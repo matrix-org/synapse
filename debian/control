@@ -23,7 +23,7 @@ Pre-Depends: dpkg (>= 1.16.1)
 Depends:
  adduser,
  debconf,
- python3-distutils,
+ python3-distutils|libpython3-stdlib (<< 3.6),
  python3,
  sqlite3,
  ${perl:Depends},
