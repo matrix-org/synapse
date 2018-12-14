@@ -19,14 +19,20 @@ else
     DISTS=("$@")
 fi
 
-# Make the dir where the debs will live
-mkdir -p ../debs
+# Make the dir where the debs will live.
+#
+# Note that we deliberately put this outside the source tree, otherwise we tend
+# to get source packages which are full of debs. (We could hack around that
+# with more magic in the build_debian.sh script, but that doesn't solve the
+# problem for natively-run dpkg-buildpakage).
+
+mkdir -p ../../debs
 
 # Build each OS image;
 for i in "${DISTS[@]}"; do
     TAG=$(echo ${i} | cut -d ":" -f 2)
     docker build --tag dh-venv-builder:${TAG} --build-arg distro=${i} -f Dockerfile-dhvirtualenv .
-    docker run -it --rm --volume=$(pwd)/../\:/synapse/source:ro --volume=$(pwd)/../debs:/debs \
+    docker run -it --rm --volume=$(pwd)/../\:/synapse/source:ro --volume=$(pwd)/../../debs:/debs \
            -e TARGET_USERID=$(id -u) \
            -e TARGET_GROUPID=$(id -g) \
            dh-venv-builder:${TAG}
