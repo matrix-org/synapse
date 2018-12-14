@@ -19,6 +19,7 @@ import json
 
 from mock import Mock
 
+from synapse.api.constants import UserTypes
 from synapse.rest.client.v1.admin import register_servlets
 
 from tests import unittest
@@ -147,7 +148,9 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
+        want_mac.update(
+            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin\x00support"
+        )
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -156,6 +159,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
                 "username": "bob",
                 "password": "abc123",
                 "admin": True,
+                "user_type": UserTypes.SUPPORT,
                 "mac": want_mac,
             }
         )
@@ -174,7 +178,9 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
+        want_mac.update(
+            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin"
+        )
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -202,8 +208,8 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
     def test_missing_parts(self):
         """
         Synapse will complain if you don't give nonce, username, password, and
-        mac.  Admin is optional.  Additional checks are done for length and
-        type.
+        mac.  Admin and user_types are optional.  Additional checks are done for length
+        and type.
         """
 
         def nonce():
@@ -260,7 +266,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual('Invalid username', channel.json_body["error"])
 
         #
-        # Username checks
+        # Password checks
         #
 
         # Must be present
@@ -296,3 +302,20 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid password', channel.json_body["error"])
+
+        #
+        # user_type check
+        #
+
+        # Invalid user_type
+        body = json.dumps({
+            "nonce": nonce(),
+            "username": "a",
+            "password": "1234",
+            "user_type": "invalid"}
+        )
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual('Invalid user type', channel.json_body["error"])

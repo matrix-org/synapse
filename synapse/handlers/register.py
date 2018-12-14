@@ -126,6 +126,7 @@ class RegistrationHandler(BaseHandler):
         make_guest=False,
         admin=False,
         threepid=None,
+        user_type=None,
         default_display_name=None,
     ):
         """Registers a new client on the server.
@@ -141,6 +142,8 @@ class RegistrationHandler(BaseHandler):
               since it offers no means of associating a device_id with the
               access_token. Instead you should call auth_handler.issue_access_token
               after registration.
+            user_type (str|None): type of user. One of the values from
+              api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
         Returns:
@@ -190,6 +193,7 @@ class RegistrationHandler(BaseHandler):
                 make_guest=make_guest,
                 create_profile_with_displayname=default_display_name,
                 admin=admin,
+                user_type=user_type,
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -242,9 +246,16 @@ class RegistrationHandler(BaseHandler):
         # auto-join the user to any rooms we're supposed to dump them into
         fake_requester = create_requester(user_id)
 
-        # try to create the room if we're the first user on the server
+        # try to create the room if we're the first real user on the server. Note
+        # that an auto-generated support user is not a real user and will never be
+        # the user to create the room
         should_auto_create_rooms = False
-        if self.hs.config.autocreate_auto_join_rooms:
+        is_support = yield self.store.is_support_user(user_id)
+        # There is an edge case where the first user is the support user, then
+        # the room is never created, though this seems unlikely and
+        # recoverable from given the support user being involved in the first
+        # place.
+        if self.hs.config.autocreate_auto_join_rooms and not is_support:
             count = yield self.store.count_all_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
