@@ -112,7 +112,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
         res = yield self.store.is_support_user(TEST_USER)
         self.assertFalse(res)
 
-        self.store.register(
+        yield self.store.register(
             user_id=SUPPORT_USER,
             token="456",
             password_hash=None,
