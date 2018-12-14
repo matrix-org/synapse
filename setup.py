@@ -84,13 +84,25 @@ version = exec_file(("synapse", "__init__.py"))["__version__"]
 dependencies = exec_file(("synapse", "python_dependencies.py"))
 long_description = read_file(("README.rst",))
 
+REQUIREMENTS = dependencies['REQUIREMENTS']
+CONDITIONAL_REQUIREMENTS = dependencies['CONDITIONAL_REQUIREMENTS']
+
+# Make `pip install matrix-synapse[all]` install all the optional dependencies.
+ALL_OPTIONAL_REQUIREMENTS = set()
+
+for optional_deps in CONDITIONAL_REQUIREMENTS.values():
+    ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
+
+CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
+
+
 setup(
     name="matrix-synapse",
     version=version,
     packages=find_packages(exclude=["tests", "tests.*"]),
     description="Reference homeserver for the Matrix decentralised comms protocol",
-    install_requires=dependencies['requirements'](include_conditional=True).keys(),
-    dependency_links=dependencies["DEPENDENCY_LINKS"].values(),
+    install_requires=REQUIREMENTS,
+    extras_require=CONDITIONAL_REQUIREMENTS,
     include_package_data=True,
     zip_safe=False,
     long_description=long_description,
