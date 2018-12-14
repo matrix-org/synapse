@@ -120,7 +120,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(b"notthenonce\x00bob\x00abc123\x00admin\x00no_user_type")
+        want_mac.update(b"notthenonce\x00bob\x00abc123\x00admin")
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -179,7 +179,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
         want_mac.update(
-            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin\x00no_user_type"
+            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin"
         )
         want_mac = want_mac.hexdigest()
 

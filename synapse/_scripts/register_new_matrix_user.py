@@ -66,8 +66,9 @@ def request_registration(
     mac.update(password.encode('utf8'))
     mac.update(b"\x00")
     mac.update(b"admin" if admin else b"notadmin")
-    mac.update(b"\x00")
-    mac.update(user_type.encode('utf8') if user_type else b"no_user_type")
+    if user_type:
+        mac.update(b"\x00")
+        mac.update(user_type.encode('utf8'))
 
     mac = mac.hexdigest()
 

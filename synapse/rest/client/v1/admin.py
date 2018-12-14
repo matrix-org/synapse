@@ -176,8 +176,9 @@ class UserRegisterServlet(ClientV1RestServlet):
         want_mac.update(password)
         want_mac.update(b"\x00")
         want_mac.update(b"admin" if admin else b"notadmin")
-        want_mac.update(b"\x00")
-        want_mac.update(user_type.encode('utf8') if user_type else b"no_user_type")
+        if user_type:
+            want_mac.update(b"\x00")
+            want_mac.update(user_type.encode('utf8'))
         want_mac = want_mac.hexdigest()
 
         if not hmac.compare_digest(
