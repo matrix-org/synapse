@@ -32,7 +32,15 @@ override_dh_shlibdeps:
 
 override_dh_virtualenv:
 	dh_virtualenv $(DH_VENV_ARGS)
-	debian/matrix-synapse-py3/opt/venvs/matrix-synapse/bin/python -B -m twisted.trial --reporter=text -j 2 ../tests/
+
+# we copy the tests to a temporary directory so that we can put them on the
+# PYTHONPATH without putting the uninstalled synapse on the pythonpath.
+	tmpdir=`mktemp -d` && cp -r tests "$$tmpdir" && \
+            cd debian/matrix-synapse-py3 && \
+            PYTHONPATH="$$tmpdir" \
+	       ./opt/venvs/matrix-synapse/bin/python \
+               -B -m twisted.trial --reporter=text -j2 tests && \
+	    rm -r "$$tmpdir"
 
 %:
 	dh $@ --with python-virtualenv --with systemd
