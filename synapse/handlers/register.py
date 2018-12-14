@@ -142,7 +142,7 @@ class RegistrationHandler(BaseHandler):
               since it offers no means of associating a device_id with the
               access_token. Instead you should call auth_handler.issue_access_token
               after registration.
-            user_type (api.constants.UserTypes) - type of user
+            user_type (str|None): type of user. One of the values from api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
         Returns:
