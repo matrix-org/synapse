@@ -1,1 +1,0 @@
-URL previews now correctly decode non-UTF-8 text if the header contains a `<meta http-equiv="Content-Type"` header.

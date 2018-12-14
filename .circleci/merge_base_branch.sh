@@ -20,7 +20,7 @@ else
 fi
 
 # Show what we are before
-git show -s
+git --no-pager show -s
 
 # Set up username so it can do a merge
 git config --global user.email bot@matrix.org
@@ -31,4 +31,4 @@ git fetch -u origin $GITBASE
 git merge --no-edit origin/$GITBASE
 
 # Show what we are after.
-git show -s
+git --no-pager show -s

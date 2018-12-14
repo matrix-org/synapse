@@ -53,7 +53,6 @@ REQUIREMENTS = {
     "pillow>=3.1.2": ["PIL"],
     "sortedcontainers>=1.4.4": ["sortedcontainers"],
     "psutil>=2.0.0": ["psutil>=2.0.0"],
-    "pysaml2>=3.0.0": ["saml2"],
     "pymacaroons-pynacl>=0.9.3": ["pymacaroons"],
     "msgpack-python>=0.4.2": ["msgpack"],
     "phonenumbers>=8.2.0": ["phonenumbers"],
@@ -69,9 +68,6 @@ REQUIREMENTS = {
 }
 
 CONDITIONAL_REQUIREMENTS = {
-    "web_client": {
-        "matrix_angular_sdk>=0.6.8": ["syweb>=0.6.8"],
-    },
     "email.enable_notifs": {
         "Jinja2>=2.8": ["Jinja2>=2.8"],
         "bleach>=1.4.2": ["bleach>=1.4.2"],
@@ -81,7 +77,10 @@ CONDITIONAL_REQUIREMENTS = {
     },
     "postgres": {
         "psycopg2>=2.6": ["psycopg2"]
-    }
+    },
+    "saml2": {
+        "pysaml2>=4.5.0": ["saml2"],
+    },
 }
 
 

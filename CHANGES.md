@@ -1,3 +1,73 @@
+Synapse 0.34.0rc2 (2018-12-11)
+==============================
+
+Features
+--------
+
+- Add a welcome page for the client API port. Credit to @krombel! ([\#4289](https://github.com/matrix-org/synapse/issues/4289))
+- Remove Matrix console from the default distribution ([\#4290](https://github.com/matrix-org/synapse/issues/4290))
+
+
+Internal Changes
+----------------
+
+- Disable pager when running git-show in CI ([\#4291](https://github.com/matrix-org/synapse/issues/4291))
+
+
+Synapse 0.34.0rc1 (2018-12-04)
+==============================
+
+Synapse 0.34 is the first release to fully support Python 3. We recommend
+upgrading to Python 3, but make sure to read the
+[upgrade notes](UPGRADE.rst#upgrading-to-v0340) when doing so.
+
+Features
+--------
+
+- Add option to track MAU stats (but not limit people) ([\#3830](https://github.com/matrix-org/synapse/issues/3830))
+- Add an option to enable recording IPs for appservice users ([\#3831](https://github.com/matrix-org/synapse/issues/3831))
+- Rename login type m.login.cas to m.login.sso ([\#4220](https://github.com/matrix-org/synapse/issues/4220))
+- Add an option to disable search for homeservers that may not be interested in it. ([\#4230](https://github.com/matrix-org/synapse/issues/4230))
+
+
+Bugfixes
+--------
+
+- Pushrules can now again be made with non-ASCII rule IDs. ([\#4165](https://github.com/matrix-org/synapse/issues/4165))
+- The media repository now no longer fails to decode UTF-8 filenames when downloading remote media. ([\#4176](https://github.com/matrix-org/synapse/issues/4176))
+- URL previews now correctly decode non-UTF-8 text if the header contains a `<meta http-equiv="Content-Type"` header. ([\#4183](https://github.com/matrix-org/synapse/issues/4183))
+- Fix an issue where public consent URLs had two slashes. ([\#4192](https://github.com/matrix-org/synapse/issues/4192))
+- Fallback auth now accepts the session parameter on Python 3. ([\#4197](https://github.com/matrix-org/synapse/issues/4197))
+- Remove riot.im from the list of trusted Identity Servers in the default configuration ([\#4207](https://github.com/matrix-org/synapse/issues/4207))
+- fix start up failure when mau_limit_reserved_threepids set and db is postgres ([\#4211](https://github.com/matrix-org/synapse/issues/4211))
+- Fix auto join failures for servers that require user consent ([\#4223](https://github.com/matrix-org/synapse/issues/4223))
+- Fix exception caused by non-ascii event IDs ([\#4241](https://github.com/matrix-org/synapse/issues/4241))
+- Pushers can now be unsubscribed from on Python 3. ([\#4250](https://github.com/matrix-org/synapse/issues/4250))
+- Fix UnicodeDecodeError when postgres is configured to give non-English errors ([\#4253](https://github.com/matrix-org/synapse/issues/4253))
+
+
+Internal Changes
+----------------
+
+- A coveragerc file, as well as the py36-coverage tox target, have been added. ([\#4180](https://github.com/matrix-org/synapse/issues/4180))
+- Add a GitHub pull request template and add multiple issue templates ([\#4182](https://github.com/matrix-org/synapse/issues/4182))
+- Update README to reflect the fact that #1491 is fixed ([\#4188](https://github.com/matrix-org/synapse/issues/4188))
+- Run the AS senders as background processes to fix warnings ([\#4189](https://github.com/matrix-org/synapse/issues/4189))
+- Add some diagnostics to the tests to detect logcontext problems ([\#4190](https://github.com/matrix-org/synapse/issues/4190))
+- Add missing `jpeg` package prerequisite for OpenBSD in README. ([\#4193](https://github.com/matrix-org/synapse/issues/4193))
+- Add a note saying you need to manually reclaim disk space after using the Purge History API ([\#4200](https://github.com/matrix-org/synapse/issues/4200))
+- More logcontext checking in unittests ([\#4205](https://github.com/matrix-org/synapse/issues/4205))
+- Ignore __pycache__ directories in the database schema folder ([\#4214](https://github.com/matrix-org/synapse/issues/4214))
+- Add note to UPGRADE.rst about removing riot.im from list of trusted identity servers ([\#4224](https://github.com/matrix-org/synapse/issues/4224))
+- Added automated coverage reporting to CI. ([\#4225](https://github.com/matrix-org/synapse/issues/4225))
+- Garbage-collect after each unit test to fix logcontext leaks ([\#4227](https://github.com/matrix-org/synapse/issues/4227))
+- add more detail to logging regarding "More than one row matched" error ([\#4234](https://github.com/matrix-org/synapse/issues/4234))
+- Drop sent_transactions table ([\#4244](https://github.com/matrix-org/synapse/issues/4244))
+- Add a basic .editorconfig ([\#4257](https://github.com/matrix-org/synapse/issues/4257))
+- Update README.rst and UPGRADE.rst for Python 3. ([\#4260](https://github.com/matrix-org/synapse/issues/4260))
+- Remove obsolete `verbose` and `log_file` settings from `homeserver.yaml` for Docker image. ([\#4261](https://github.com/matrix-org/synapse/issues/4261))
+
+
 Synapse 0.33.9 (2018-11-19)
 ===========================
 
@@ -71,7 +141,7 @@ Synapse 0.33.8rc2 (2018-10-31)
 Bugfixes
 --------
 
-- Searches that request profile info now no longer fail with a 500. Fixes 
+- Searches that request profile info now no longer fail with a 500. Fixes
   a regression in 0.33.8rc1. ([\#4122](https://github.com/matrix-org/synapse/issues/4122))
 
 

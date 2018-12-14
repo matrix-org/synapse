@@ -1,1 +1,0 @@
-Remove obsolete `verbose` and `log_file` settings from `homeserver.yaml` for Docker image.

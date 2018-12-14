@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,17 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This is a reference implementation of a Matrix home server.
-"""
 
-try:
-    from twisted.internet import protocol
-    from twisted.internet.protocol import Factory
-    from twisted.names.dns import DNSDatagramProtocol
-    protocol.Factory.noisy = False
-    Factory.noisy = False
-    DNSDatagramProtocol.noisy = False
-except ImportError:
-    pass
+import saml2.metadata
 
-__version__ = "0.34.0rc2"
+from twisted.web.resource import Resource
+
+
+class SAML2MetadataResource(Resource):
+    """A Twisted web resource which renders the SAML metadata"""
+
+    isLeaf = 1
+
+    def __init__(self, hs):
+        Resource.__init__(self)
+        self.sp_config = hs.config.saml2_sp_config
+
+    def render_GET(self, request):
+        metadata_xml = saml2.metadata.create_metadata_string(
+            configfile=None, config=self.sp_config,
+        )
+        request.setHeader(b"Content-Type", b"text/xml; charset=utf-8")
+        return metadata_xml

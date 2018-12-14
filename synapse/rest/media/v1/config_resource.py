@@ -41,7 +41,7 @@ class MediaConfigResource(Resource):
     @defer.inlineCallbacks
     def _async_render_GET(self, request):
         yield self.auth.get_user_by_req(request)
-        respond_with_json(request, 200, self.limits_dict)
+        respond_with_json(request, 200, self.limits_dict, send_cors=True)
 
     def render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)

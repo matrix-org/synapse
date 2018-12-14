@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,18 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 
-""" This is a reference implementation of a Matrix home server.
-"""
+from twisted.web.resource import Resource
 
-try:
-    from twisted.internet import protocol
-    from twisted.internet.protocol import Factory
-    from twisted.names.dns import DNSDatagramProtocol
-    protocol.Factory.noisy = False
-    Factory.noisy = False
-    DNSDatagramProtocol.noisy = False
-except ImportError:
-    pass
+from synapse.rest.saml2.metadata_resource import SAML2MetadataResource
+from synapse.rest.saml2.response_resource import SAML2ResponseResource
 
-__version__ = "0.34.0rc2"
+logger = logging.getLogger(__name__)
+
+
+class SAML2Resource(Resource):
+    def __init__(self, hs):
+        Resource.__init__(self)
+        self.putChild(b"metadata.xml", SAML2MetadataResource(hs))
+        self.putChild(b"authn_response", SAML2ResponseResource(hs))

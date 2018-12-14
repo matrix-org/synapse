@@ -102,7 +102,7 @@ Sign off
 In order to have a concrete record that your contribution is intentional
 and you agree to license it under the same terms as the project's license, we've adopted the
 same lightweight approach that the Linux Kernel
-(https://www.kernel.org/doc/Documentation/SubmittingPatches), Docker
+`submitting patches process <https://www.kernel.org/doc/html/latest/process/submitting-patches.html#sign-your-work-the-developer-s-certificate-of-origin>`_, Docker
 (https://github.com/docker/docker/blob/master/CONTRIBUTING.md), and many other
 projects use: the DCO (Developer Certificate of Origin:
 http://developercertificate.org/). This is a simple declaration that you wrote
