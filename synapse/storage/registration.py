@@ -186,7 +186,8 @@ class RegistrationStore(RegistrationWorkerStore,
             create_profile_with_displayname (unicode): Optionally create a profile for
                 the user, setting their displayname to the given value
             admin (boolean): is an admin user?
-            user_type (str|None): type of user. One of the values from api.constants.UserTypes, or None for a normal user.
+            user_type (str|None): type of user. One of the values from 
+                api.constants.UserTypes, or None for a normal user.
 
         Raises:
             StoreError if the user_id could not be registered.

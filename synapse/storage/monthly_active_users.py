@@ -222,7 +222,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         for cases where upsert_monthly_active_user_txn is called directly,
         like _initialise_reserved_users
 
-        In short, don't call this method with support users. (Support users 
+        In short, don't call this method with support users. (Support users
         should not appear in the MAU stats).
 
         Args:
