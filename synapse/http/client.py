@@ -21,7 +21,6 @@ from six.moves import urllib
 
 import treq
 from canonicaljson import encode_canonical_json, json
-from hyperlink import URL
 from netaddr import IPAddress
 from prometheus_client import Counter
 from zope.interface import implementer, provider
@@ -118,6 +117,8 @@ class BlacklistingAgentWrapper(Agent):
         self._blacklist = blacklist
 
     def request(self, method, uri, headers=None, bodyProducer=None):
+        from hyperlink import URL
+
         h = URL.from_text(uri.decode('ascii'))
 
         try:

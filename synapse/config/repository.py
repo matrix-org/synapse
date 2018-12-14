@@ -23,6 +23,10 @@ MISSING_NETADDR = (
     "Missing netaddr library. This is required for URL preview API."
 )
 
+MISSING_HYPERLINK = (
+    "Missing hyperlink library. This is required for URL preview API."
+)
+
 MISSING_LXML = (
     """Missing lxml library. This is required for URL preview API.
 
@@ -150,6 +154,12 @@ class ContentRepositoryConfig(Config):
                 lxml  # To stop unused lint.
             except ImportError:
                 raise ConfigError(MISSING_LXML)
+
+            try:
+                import hyperlink
+                hyperlink  # To stop unused lint.
+            except ImportError:
+                raise ConfigError(MISSING_HYPERLINK)
 
             try:
                 from netaddr import IPSet

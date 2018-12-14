@@ -56,6 +56,11 @@ class FakeResponse(object):
 
 class URLPreviewTests(unittest.HomeserverTestCase):
 
+    try:
+        from hyperlink import URL
+    except ImportError:
+        skip = "Hyperlink is missing -- running on an older Twisted"
+
     hijack_auth = True
     user_id = "@test:user"
     end_content = (
