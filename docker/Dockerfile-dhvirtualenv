@@ -1,3 +1,14 @@
+# A dockerfile which builds a docker image for building a debian package for
+# synapse. The distro to build for is passed as a docker build var.
+#
+# The default entrypoint expects the synapse source to be mounted as a
+# (read-only) volume at /synapse/source, and an output directory at /debs.
+#
+# A pair of environment variables (TARGET_USERID and TARGET_GROUPID) can be
+# passed to the docker container; if these are set, the build script will chown
+# the build products accordingly, to avoid ending up with things owned by root
+# in the host filesystem.
+
 # Get the distro we want to pull from as a dynamic build variable
 ARG distro=""
 FROM ${distro}
