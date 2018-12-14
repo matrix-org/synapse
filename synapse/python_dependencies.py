@@ -55,6 +55,7 @@ CONDITIONAL_REQUIREMENTS = {
     "test": ["mock>=2.0"],
 }
 
+
 def list_requirements():
     deps = set(REQUIREMENTS)
     for opt in CONDITIONAL_REQUIREMENTS.values():
@@ -62,6 +63,8 @@ def list_requirements():
 
     return list(deps)
 
+
 if __name__ == "__main__":
     import sys
+
     sys.stdout.writelines(req + "\n" for req in list_requirements())
