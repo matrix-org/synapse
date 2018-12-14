@@ -565,8 +565,6 @@ def run(hs):
 
 def main():
     with LoggingContext("main"):
-        # check base requirements
-        check_requirements()
         hs = setup(sys.argv[1:])
         run(hs)
 
