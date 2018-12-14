@@ -44,6 +44,10 @@ class RegistrationTestCase(unittest.TestCase):
             self.addCleanup,
             expire_access_token=True,
         )
+        self.macaroon_generator = Mock(
+            generate_access_token=Mock(return_value='secret')
+        )
+        self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_handlers().registration_handler
         self.store = self.hs.get_datastore()
         self.hs.config.max_mau_value = 50
@@ -62,6 +66,7 @@ class RegistrationTestCase(unittest.TestCase):
         )
         self.assertEquals(result_user_id, user_id)
         self.assertTrue(result_token is not None)
+        self.assertEquals(result_token, 'secret')
 
     @defer.inlineCallbacks
     def test_if_user_exists(self):
@@ -193,8 +198,10 @@ class RegistrationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register_support_user(self):
-        res = yield self.handler.register(localpart='user1', user_type=UserTypes.SUPPORT)
+        res = yield self.handler.register(localpart='user', user_type=UserTypes.SUPPORT)
         self.assertTrue(self.store.is_support_user(res[0]))
 
-        res = yield self.handler.register(localpart='user2')
+    @defer.inlineCallbacks
+    def test_register_not_support_user(self):
+        res = yield self.handler.register(localpart='user')
         self.assertFalse(self.store.is_support_user(res[0]))

@@ -186,7 +186,7 @@ class RegistrationStore(RegistrationWorkerStore,
             create_profile_with_displayname (unicode): Optionally create a profile for
                 the user, setting their displayname to the given value
             admin (boolean): is an admin user?
-            user_type (synapse.api.constants import UserTypes): type of user
+            user_type (synapse.api.constants.UserTypes): type of user
 
         Raises:
             StoreError if the user_id could not be registered.
@@ -253,7 +253,7 @@ class RegistrationStore(RegistrationWorkerStore,
                         "is_guest": 1 if make_guest else 0,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
-                        "user_type": user_type
+                        "user_type": user_type,
                     }
                 )
             else:

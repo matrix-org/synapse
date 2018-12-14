@@ -142,6 +142,7 @@ class RegistrationHandler(BaseHandler):
               since it offers no means of associating a device_id with the
               access_token. Instead you should call auth_handler.issue_access_token
               after registration.
+            user_type (api.constants.UserTypes) - type of user
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
         Returns:
@@ -253,7 +254,7 @@ class RegistrationHandler(BaseHandler):
         # the room is never created, though this seems unlikely and
         # recoverable from given the support user being involved in the first
         # place.
-        if (self.hs.config.autocreate_auto_join_rooms and not is_support):
+        if self.hs.config.autocreate_auto_join_rooms and not is_support:
             count = yield self.store.count_all_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:

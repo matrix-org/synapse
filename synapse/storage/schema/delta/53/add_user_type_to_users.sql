@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-/* Record the user_type of the user, initially this column is used to identify
- * users of type Support - See synapse/api/constants.py
+/* The type of the user: NULL for a regular user, or one of the constants in 
+ * synapse.api.constants.UserTypes
  */
 ALTER TABLE users ADD COLUMN user_type TEXT DEFAULT NULL;
