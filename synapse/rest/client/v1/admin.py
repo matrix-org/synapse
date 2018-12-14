@@ -160,7 +160,7 @@ class UserRegisterServlet(ClientV1RestServlet):
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
 
-        if user_type and user_type not in UserTypes.ALL_USER_TYPES:
+        if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
             raise SynapseError(400, "Invalid user type")
 
         got_mac = body["mac"]
