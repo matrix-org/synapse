@@ -42,5 +42,7 @@ override_dh_virtualenv:
                -B -m twisted.trial --reporter=text -j2 tests && \
 	    rm -r "$$tmpdir"
 
+# We are restricted to compat level 9 (because xenial), so have to
+# enable the systemd bits manually.
 %:
 	dh $@ --with python-virtualenv --with systemd
