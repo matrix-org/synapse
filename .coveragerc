@@ -1,8 +1,10 @@
 [run]
 branch = True
 parallel = True
-source = synapse
+source = .
+include = synapse/*
 
 [report]
 precision = 2
 ignore_errors = True
+include = synapse/*
