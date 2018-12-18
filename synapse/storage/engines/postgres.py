@@ -45,7 +45,7 @@ class PostgresEngine(object):
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105.
         server_version = str(db_conn.server_version)
-        self._server_version = (
+        self._version = (
             int(server_version[:-4], 10),
             int(server_version[-4:-2], 10),
             int(server_version[-2:], 10)

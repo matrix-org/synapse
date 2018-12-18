@@ -30,6 +30,10 @@ class Sqlite3Engine(object):
         self._current_state_group_id = None
         self._current_state_group_id_lock = threading.Lock()
 
+        # Get the version of SQLite we're using.
+        import sqlite3
+        self._version = sqlite3.sqlite_version_info
+
     def check_database(self, txn):
         pass
 

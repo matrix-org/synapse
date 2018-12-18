@@ -26,7 +26,7 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
@@ -519,16 +519,25 @@ class SQLBaseStore(object):
             Deferred(bool): True if a new entry was created, False if an
                 existing one was updated.
         """
-        # On PostgreSQL 9.5+ we can do UPSERTs
+        # Can we perform a native (unlocked) UPSERT?
+        native_upsert = False
+
         if isinstance(self.database_engine, PostgresEngine):
-            if self.database_engine._server_version >= (9, 5, 0):
-                # We don't put this in a loop as it is guaranteed to be atomic,
-                # so if we get an IntegrityError, it's unrelated.
-                result = yield self.runInteraction(
-                    desc,
-                    self._simple_upsert_txn_native_upsert, table, keyvalues, values, insertion_values
-                )
-                defer.returnValue(result)
+            # On PostgreSQL 9.5+ we can do native UPSERTs
+            native_upsert = self.database_engine._version >= (9, 5, 0)
+
+        if isinstance(self.database_engine, Sqlite3Engine):
+            # On SQLite 3.24+ we can do native UPSERTs
+            native_upsert = self.database_engine._version >= (3, 24, 0)
+
+        if native_upsert:
+            # We don't put this in a loop as it is guaranteed to be atomic, so
+            # if we get an IntegrityError, it's unrelated.
+            result = yield self.runInteraction(
+                desc,
+                self._simple_upsert_txn_native_upsert, table, keyvalues, values, insertion_values
+            )
+            defer.returnValue(result)
 
         attempts = 0
         while True:
@@ -587,7 +596,9 @@ class SQLBaseStore(object):
         return True
 
     def _simple_upsert_txn_native_upsert(self, txn, table, keyvalues, values, insertion_values={}):
-
+        """
+        Use the native UPSERT functionality in recent PostgreSQL and SQLite versions.
+        """
         allvalues = {}
         allvalues.update(keyvalues)
         allvalues.update(values)
