@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
 from ._base import client_v2_patterns
@@ -69,9 +69,7 @@ class AccountDataServlet(RestServlet):
         )
 
         if event is None:
-            raise SynapseError(
-                404, "Account data not found", Codes.NOT_FOUND
-            )
+            raise NotFoundError("Account data not found")
 
         defer.returnValue((200, event))
 
@@ -129,9 +127,7 @@ class RoomAccountDataServlet(RestServlet):
         )
 
         if event is None:
-            raise SynapseError(
-                404, "Room account data not found", Codes.NOT_FOUND
-            )
+            raise NotFoundError("Room account data not found")
 
         defer.returnValue((200, event))
 
