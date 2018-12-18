@@ -25,10 +25,8 @@ override_dh_installinit:
 	dh_installinit --name=matrix-synapse
 
 override_dh_strip:
-	echo "No dhstrip"
 
 override_dh_shlibdeps:
-	echo "No shlibdeps"
 
 override_dh_virtualenv:
 	dh_virtualenv $(DH_VENV_ARGS)
