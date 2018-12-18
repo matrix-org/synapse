@@ -25,7 +25,8 @@ homeserver*.yaml
 *.tls.dh
 *.tls.key
 
-.coverage
+.coverage*
+!.coveragerc
 htmlcov
 
 demo/*/*.db
