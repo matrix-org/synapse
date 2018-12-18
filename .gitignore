@@ -26,6 +26,7 @@ homeserver*.yaml
 *.tls.key
 
 .coverage*
+coverage.*
 !.coveragerc
 htmlcov
 
