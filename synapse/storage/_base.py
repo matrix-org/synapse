@@ -519,6 +519,17 @@ class SQLBaseStore(object):
             Deferred(bool): True if a new entry was created, False if an
                 existing one was updated.
         """
+        # On PostgreSQL 9.5+ we can do UPSERTs
+        if isinstance(self.database_engine, PostgresEngine):
+            if self.database_engine._server_version >= (9, 5, 0):
+                # We don't put this in a loop as it is guaranteed to be atomic,
+                # so if we get an IntegrityError, it's unrelated.
+                result = yield self.runInteraction(
+                    desc,
+                    self._simple_upsert_txn_native_upsert, table, keyvalues, values, insertion_values
+                )
+                defer.returnValue(result)
+
         attempts = 0
         while True:
             try:
@@ -573,6 +584,23 @@ class SQLBaseStore(object):
         )
         txn.execute(sql, list(allvalues.values()))
         # successfully inserted
+        return True
+
+    def _simple_upsert_txn_native_upsert(self, txn, table, keyvalues, values, insertion_values={}):
+
+        allvalues = {}
+        allvalues.update(keyvalues)
+        allvalues.update(values)
+        allvalues.update(insertion_values)
+
+        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s" % (
+            table,
+            ", ".join(k for k in allvalues),
+            ", ".join("?" for _ in allvalues),
+            ", ".join(k for k in keyvalues),
+            ", ".join(k + "=EXCLUDED." + k for k in values)
+        )
+        txn.execute(sql, list(allvalues.values()))
         return True
 
     def _simple_select_one(self, table, keyvalues, retcols,

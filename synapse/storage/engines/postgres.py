@@ -34,10 +34,23 @@ class PostgresEngine(object):
                 % (rows[0][0],)
             )
 
+
     def convert_param_style(self, sql):
         return sql.replace("?", "%s")
 
     def on_new_connection(self, db_conn):
+
+        # Get the version of PostgreSQL that we're using. As per the psycopg2
+        # docs: The number is formed by converting the major, minor, and
+        # revision numbers into two-decimal-digit numbers and appending them
+        # together. For example, version 8.1.5 will be returned as 80105.
+        server_version = str(db_conn.server_version)
+        self._server_version = (
+            int(server_version[:-4], 10),
+            int(server_version[-4:-2], 10),
+            int(server_version[-2:], 10)
+        )
+
         db_conn.set_isolation_level(
             self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         )
