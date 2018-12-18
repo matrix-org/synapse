@@ -67,6 +67,13 @@ class PostgresEngine(object):
 
         cursor.close()
 
+    @property
+    def can_native_upsert(self):
+        """
+        Can we use native UPSERTs? This requires PostgreSQL 9.5+.
+        """
+        return self._version >= (9, 5, 0)
+
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html

@@ -30,9 +30,13 @@ class Sqlite3Engine(object):
         self._current_state_group_id = None
         self._current_state_group_id_lock = threading.Lock()
 
-        # Get the version of SQLite we're using.
-        import sqlite3
-        self._version = sqlite3.sqlite_version_info
+    @property
+    def can_native_upsert(self):
+        """
+        Do we support native UPSERTs? This requires SQLite3 3.24+.
+        """
+        from sqlite3 import sqlite_version_info
+        return sqlite_version_info >= (3, 24, 0)
 
     def check_database(self, txn):
         pass

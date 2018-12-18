@@ -519,18 +519,7 @@ class SQLBaseStore(object):
             Deferred(bool): True if a new entry was created, False if an
                 existing one was updated.
         """
-        # Can we perform a native (unlocked) UPSERT?
-        native_upsert = False
-
-        if isinstance(self.database_engine, PostgresEngine):
-            # On PostgreSQL 9.5+ we can do native UPSERTs
-            native_upsert = self.database_engine._version >= (9, 5, 0)
-
-        if isinstance(self.database_engine, Sqlite3Engine):
-            # On SQLite 3.24+ we can do native UPSERTs
-            native_upsert = self.database_engine._version >= (3, 24, 0)
-
-        if native_upsert:
+        if self.database_engine.can_native_upsert:
             # We don't put this in a loop as it is guaranteed to be atomic, so
             # if we get an IntegrityError, it's unrelated.
             result = yield self.runInteraction(
