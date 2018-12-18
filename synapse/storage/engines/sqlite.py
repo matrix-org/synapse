@@ -35,8 +35,8 @@ class Sqlite3Engine(object):
         """
         Do we support native UPSERTs? This requires SQLite3 3.24+.
         """
-        from sqlite3 import dbapi2
-        return dbapi2.sqlite_version_info >= (3, 24, 0)
+        from sqlite3 import sqlite_version_info
+        return sqlite_version_info >= (3, 24, 0)
 
     def check_database(self, txn):
         pass
