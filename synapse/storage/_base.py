@@ -26,7 +26,7 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
@@ -494,8 +494,15 @@ class SQLBaseStore(object):
         txn.executemany(sql, vals)
 
     @defer.inlineCallbacks
-    def _simple_upsert(self, table, keyvalues, values,
-                       insertion_values={}, desc="_simple_upsert", lock=True):
+    def _simple_upsert(
+        self,
+        table,
+        keyvalues,
+        values,
+        insertion_values={},
+        desc="_simple_upsert",
+        lock=True,
+    ):
         """
 
         `lock` should generally be set to True (the default), but can be set
@@ -524,7 +531,11 @@ class SQLBaseStore(object):
             # if we get an IntegrityError, it's unrelated.
             result = yield self.runInteraction(
                 desc,
-                self._simple_upsert_txn_native_upsert, table, keyvalues, values, insertion_values
+                self._simple_upsert_txn_native_upsert,
+                table,
+                keyvalues,
+                values,
+                insertion_values,
             )
             defer.returnValue(result)
 
@@ -533,8 +544,12 @@ class SQLBaseStore(object):
             try:
                 result = yield self.runInteraction(
                     desc,
-                    self._simple_upsert_txn, table, keyvalues, values, insertion_values,
-                    lock=lock
+                    self._simple_upsert_txn,
+                    table,
+                    keyvalues,
+                    values,
+                    insertion_values,
+                    lock=lock,
                 )
                 defer.returnValue(result)
             except self.database_engine.module.IntegrityError as e:
@@ -546,12 +561,12 @@ class SQLBaseStore(object):
 
                 # presumably we raced with another transaction: let's retry.
                 logger.warn(
-                    "IntegrityError when upserting into %s; retrying: %s",
-                    table, e
+                    "IntegrityError when upserting into %s; retrying: %s", table, e
                 )
 
-    def _simple_upsert_txn(self, txn, table, keyvalues, values, insertion_values={},
-                           lock=True):
+    def _simple_upsert_txn(
+        self, txn, table, keyvalues, values, insertion_values={}, lock=True
+    ):
         # We need to lock the table :(, unless we're *really* careful
         if lock:
             self.database_engine.lock_table(txn, table)
@@ -560,7 +575,7 @@ class SQLBaseStore(object):
         sql = "UPDATE %s SET %s WHERE %s" % (
             table,
             ", ".join("%s = ?" % (k,) for k in values),
-            " AND ".join("%s = ?" % (k,) for k in keyvalues)
+            " AND ".join("%s = ?" % (k,) for k in keyvalues),
         )
         sqlargs = list(values.values()) + list(keyvalues.values())
 
@@ -578,13 +593,15 @@ class SQLBaseStore(object):
         sql = "INSERT INTO %s (%s) VALUES (%s)" % (
             table,
             ", ".join(k for k in allvalues),
-            ", ".join("?" for _ in allvalues)
+            ", ".join("?" for _ in allvalues),
         )
         txn.execute(sql, list(allvalues.values()))
         # successfully inserted
         return True
 
-    def _simple_upsert_txn_native_upsert(self, txn, table, keyvalues, values, insertion_values={}):
+    def _simple_upsert_txn_native_upsert(
+        self, txn, table, keyvalues, values, insertion_values={}
+    ):
         """
         Use the native UPSERT functionality in recent PostgreSQL and SQLite versions.
         """
@@ -598,7 +615,7 @@ class SQLBaseStore(object):
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
             ", ".join(k for k in keyvalues),
-            ", ".join(k + "=EXCLUDED." + k for k in values)
+            ", ".join(k + "=EXCLUDED." + k for k in values),
         )
         txn.execute(sql, list(allvalues.values()))
         return True
