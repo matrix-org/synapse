@@ -34,7 +34,6 @@ class PostgresEngine(object):
                 % (rows[0][0],)
             )
 
-
     def convert_param_style(self, sql):
         return sql.replace("?", "%s")
 
