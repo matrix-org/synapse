@@ -1674,7 +1674,11 @@ class SyncHandler(object):
 
         ephemeral = sync_config.filter_collection.filter_room_ephemeral(ephemeral)
 
-        if not (always_include or batch or account_data_events or ephemeral or full_state):
+        if not (always_include
+                or batch
+                or account_data_events
+                or ephemeral
+                or full_state):
             return
 
         state = yield self.compute_state_delta(
