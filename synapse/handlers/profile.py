@@ -270,10 +270,13 @@ class BaseProfileHandler(BaseHandler):
         run_in_background(self._replicate_profiles)
 
     @defer.inlineCallbacks
-    def set_active(self, target_user, active):
+    def set_active(self, target_user, active, hide):
         """
         Sets the 'active' flag on a user profile. If set to false, the user account is
-        considered deactivated.
+        considered deactivated or hidden.
+        If 'hide' is true, then we interpret active=False as a request to try to hide the
+        user rather than deactivating it.  This means withholding the profile from replication
+        (and mark it as inactive) rather than clearing the profile from the HS DB.
         Note that unlike set_displayname and set_avatar_url, this does *not* perform
         authorization checks! This is because the only place it's used currently is
         in account deactivation where we've already done these checks anyway.
@@ -284,7 +287,7 @@ class BaseProfileHandler(BaseHandler):
         else:
             new_batchnum = None
         yield self.store.set_profile_active(
-            target_user.localpart, active, new_batchnum
+            target_user.localpart, active, hide, new_batchnum
         )
 
         # start a profile replication push

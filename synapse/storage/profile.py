@@ -147,12 +147,14 @@ class ProfileWorkerStore(SQLBaseStore):
             lock=False  # we can do this because user_id has a unique index
         )
 
-    def set_profile_active(self, user_localpart, active, batchnum):
+    def set_profile_active(self, user_localpart, active, hide, batchnum):
         values = {
             "active": int(active),
             "batch": batchnum,
         }
-        if not active:
+        if not active and not hide:
+            # we are deactivating for real (not in hide mode)
+            # so clear the profile.
             values["avatar_url"] = None
             values["displayname"] = None
         return self._simple_upsert(
