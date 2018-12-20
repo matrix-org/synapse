@@ -1,8 +1,8 @@
 matrix-synapse-py3 (0.34.0) stable; urgency=medium
 
   matrix-synapse-py3 is intended as a drop-in replacement for the existing
-  matrix-synapse package. When the package is installed, matrix-synapse will
-  be automatically uninstalled. The replacement should be relatively seamless,
+  matrix-synapse package. When the package is installed, matrix-synapse will be
+  automatically uninstalled. The replacement should be relatively seamless,
   however, please note the following important differences to matrix-synapse:
 
   * Most importantly, the matrix-synapse service now runs under Python 3 rather
@@ -11,6 +11,11 @@ matrix-synapse-py3 (0.34.0) stable; urgency=medium
   * Synapse is installed into its own virtualenv (in /opt/venvs/matrix-synapse)
     instead of using the system python libraries. (This may mean that you can
     remove a number of old dependencies with `apt autoremove`).
+
+  * If you have previously manually installed any custom python extensions
+    (such as matrix-synapse-rest-auth) into the system python directories, you
+    will need to reinstall them in the new virtualenv. Please consult the
+    documentation of the relevant extensions for further details.
 
   matrix-synapse-py3 will take over responsibility for the existing
   configuration files, including the matrix-synapse systemd service.
