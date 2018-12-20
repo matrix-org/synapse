@@ -146,12 +146,10 @@ class BlacklistingAgentWrapper(Agent):
         self._ip_blacklist = ip_blacklist
 
     def request(self, method, uri, headers=None, bodyProducer=None):
-        from hyperlink import URL
-
-        h = URL.from_text(uri.decode('ascii'))
+        h = urllib.parse.urlparse(uri.decode('ascii'))
 
         try:
-            ip_address = IPAddress(h.host)
+            ip_address = IPAddress(h.hostname)
 
             if check_against_blacklist(
                 ip_address, self._ip_whitelist, self._ip_blacklist
