@@ -19,4 +19,8 @@ matrix-synapse-py3 (0.34.0) stable; urgency=medium
   though that service is no longer being provided by the matrix-synapse
   package. It can be re-enabled with `systemctl enable matrix-synapse`.
 
+  The matrix.org team will continue to provide Python 2 `matrix-synapse`
+  packages for the next couple of releases, to allow time for system
+  administrators to test the new packages.
+
  -- Richard van der Hoff <richard@matrix.org>  Wed, 19 Dec 2018 14:00:00 +0000
