@@ -51,8 +51,9 @@ returned by the Client-Server API:
 Upgrading to v0.34.0
 ====================
 
-1. This release is the first to fully support Python 3. We recommend switching
-   to Python 3, as it has been shown to give performance improvements.
+1. This release is the first to fully support Python 3. Synapse will now run on
+   Python versions 3.5, or 3.6 (as well as 2.7). We recommend switching to
+   Python 3, as it has been shown to give performance improvements.
 
    For users who have installed Synapse into a virtualenv, we recommend doing
    this by creating a new virtualenv. For example::

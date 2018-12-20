@@ -1,9 +1,12 @@
 Synapse 0.34.0 (2018-12-20)
 ===========================
 
-Synapse 0.34.0 is the first release to fully support Python 3. We recommend
-upgrading to Python 3, but make sure to read the
-[upgrade notes](UPGRADE.rst#upgrading-to-v0340) when doing so.
+Synapse 0.34.0 is the first release to fully support Python 3. Synapse will now
+run on Python versions 3.5 or 3.6 (as well as 2.7). Support for Python 3.7
+remains experimental.
+
+We recommend upgrading to Python 3, but make sure to read the [upgrade
+notes](UPGRADE.rst#upgrading-to-v0340) when doing so.
 
 Features
 --------
