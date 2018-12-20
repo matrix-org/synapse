@@ -25,6 +25,7 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
+from synapse.python_dependencies import check_requirements
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -565,6 +566,8 @@ def run(hs):
 
 def main():
     with LoggingContext("main"):
+        # check base requirements
+        check_requirements()
         hs = setup(sys.argv[1:])
         run(hs)
 
