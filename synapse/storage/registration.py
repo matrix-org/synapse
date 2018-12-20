@@ -19,6 +19,7 @@ from six.moves import range
 
 from twisted.internet import defer
 
+from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
@@ -168,7 +169,7 @@ class RegistrationStore(RegistrationWorkerStore,
 
     def register(self, user_id, token=None, password_hash=None,
                  was_guest=False, make_guest=False, appservice_id=None,
-                 create_profile_with_displayname=None, admin=False):
+                 create_profile_with_displayname=None, admin=False, user_type=None):
         """Attempts to register an account.
 
         Args:
@@ -184,6 +185,10 @@ class RegistrationStore(RegistrationWorkerStore,
             appservice_id (str): The ID of the appservice registering the user.
             create_profile_with_displayname (unicode): Optionally create a profile for
                 the user, setting their displayname to the given value
+            admin (boolean): is an admin user?
+            user_type (str|None): type of user. One of the values from
+                api.constants.UserTypes, or None for a normal user.
+
         Raises:
             StoreError if the user_id could not be registered.
         """
@@ -197,7 +202,8 @@ class RegistrationStore(RegistrationWorkerStore,
             make_guest,
             appservice_id,
             create_profile_with_displayname,
-            admin
+            admin,
+            user_type
         )
 
     def _register(
@@ -211,6 +217,7 @@ class RegistrationStore(RegistrationWorkerStore,
         appservice_id,
         create_profile_with_displayname,
         admin,
+        user_type,
     ):
         user_id_obj = UserID.from_string(user_id)
 
@@ -247,6 +254,7 @@ class RegistrationStore(RegistrationWorkerStore,
                         "is_guest": 1 if make_guest else 0,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
+                        "user_type": user_type,
                     }
                 )
             else:
@@ -260,6 +268,7 @@ class RegistrationStore(RegistrationWorkerStore,
                         "is_guest": 1 if make_guest else 0,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
+                        "user_type": user_type,
                     }
                 )
         except self.database_engine.module.IntegrityError:
@@ -455,6 +464,31 @@ class RegistrationStore(RegistrationWorkerStore,
         )
 
         defer.returnValue(res if res else False)
+
+    @cachedInlineCallbacks()
+    def is_support_user(self, user_id):
+        """Determines if the user is of type UserTypes.SUPPORT
+
+        Args:
+            user_id (str): user id to test
+
+        Returns:
+            Deferred[bool]: True if user is of type UserTypes.SUPPORT
+        """
+        res = yield self.runInteraction(
+            "is_support_user", self.is_support_user_txn, user_id
+        )
+        defer.returnValue(res)
+
+    def is_support_user_txn(self, txn, user_id):
+        res = self._simple_select_one_onecol_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="user_type",
+            allow_none=True,
+        )
+        return True if res == UserTypes.SUPPORT else False
 
     @defer.inlineCallbacks
     def user_add_threepid(self, user_id, medium, address, validated_at, added_at):

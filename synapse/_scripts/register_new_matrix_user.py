@@ -35,6 +35,7 @@ def request_registration(
     server_location,
     shared_secret,
     admin=False,
+    user_type=None,
     requests=_requests,
     _print=print,
     exit=sys.exit,
@@ -65,6 +66,9 @@ def request_registration(
     mac.update(password.encode('utf8'))
     mac.update(b"\x00")
     mac.update(b"admin" if admin else b"notadmin")
+    if user_type:
+        mac.update(b"\x00")
+        mac.update(user_type.encode('utf8'))
 
     mac = mac.hexdigest()
 
@@ -74,6 +78,7 @@ def request_registration(
         "password": password,
         "mac": mac,
         "admin": admin,
+        "user_type": user_type,
     }
 
     _print("Sending registration request...")
@@ -91,7 +96,7 @@ def request_registration(
     _print("Success!")
 
 
-def register_new_user(user, password, server_location, shared_secret, admin):
+def register_new_user(user, password, server_location, shared_secret, admin, user_type):
     if not user:
         try:
             default_user = getpass.getuser()
@@ -129,7 +134,8 @@ def register_new_user(user, password, server_location, shared_secret, admin):
         else:
             admin = False
 
-    request_registration(user, password, server_location, shared_secret, bool(admin))
+    request_registration(user, password, server_location, shared_secret,
+                         bool(admin), user_type)
 
 
 def main():
@@ -153,6 +159,12 @@ def main():
         "--password",
         default=None,
         help="New password for user. Will prompt if omitted.",
+    )
+    parser.add_argument(
+        "-t",
+        "--user_type",
+        default=None,
+        help="User type as specified in synapse.api.constants.UserTypes",
     )
     admin_group = parser.add_mutually_exclusive_group()
     admin_group.add_argument(
@@ -208,7 +220,8 @@ def main():
     if args.admin or args.no_admin:
         admin = args.admin
 
-    register_new_user(args.user, args.password, args.server_url, secret, admin)
+    register_new_user(args.user, args.password, args.server_url, secret,
+                      admin, args.user_type)
 
 
 if __name__ == "__main__":

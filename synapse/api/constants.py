@@ -119,3 +119,11 @@ KNOWN_ROOM_VERSIONS = {
 
 ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
+
+
+class UserTypes(object):
+    """Allows for user type specific behaviour. With the benefit of hindsight
+    'admin' and 'guest' users should also be UserTypes. Normal users are type None
+    """
+    SUPPORT = "support"
+    ALL_USER_TYPES = (SUPPORT)

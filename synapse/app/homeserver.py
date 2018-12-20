@@ -537,7 +537,7 @@ def run(hs):
         )
 
     start_generate_monthly_active_users()
-    if hs.config.limit_usage_by_mau:
+    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
         clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
