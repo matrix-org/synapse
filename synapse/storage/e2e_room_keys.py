@@ -182,7 +182,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         keyvalues = {
             "user_id": user_id,
-            "version": version,
+            "version": int(version),
         }
         if room_id:
             keyvalues['room_id'] = room_id

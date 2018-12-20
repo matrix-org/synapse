@@ -1,77 +1,37 @@
-Source: matrix-synapse
-Maintainer: Erik Johnston <erikj@matrix.org>
-Section: python
-Priority: optional
+Source: matrix-synapse-py3
+Section: contrib/python
+Priority: extra
+Maintainer: Synapse Packaging team <packages@matrix.org>
 Build-Depends:
  debhelper (>= 9),
- dh-python,
- dh-systemd (>= 1.5),
- po-debconf,
- python (>= 2.6.6-3),
- python-bcrypt,
- python-blist,
- python-canonicaljson (>=1.1.3),
- python-daemonize,
- python-frozendict (>= 0.4),
- python-lxml,
- python-mock,
- python-msgpack (>=0.3.0),
- python-nacl (>= 0.3.0),
- python-netaddr,
- python-openssl (>= 0.14),
- python-pil,
- python-psutil,
- python-pyasn1,
- python-pydenticon,
- python-pymacaroons-pynacl,
- python-pysaml2,
- python-service-identity (>= 1.0.0),
- python-setuptools (>= 0.6b3),
- python-signedjson (>= 1.0.0),
- python-sortedcontainers,
- python-syutil (>= 0.0.7),
- python-treq (>= 15.1.0),
- python-twisted (>= 17.1.0),
- python-unpaddedbase64 (>= 1.0.1),
- python-yaml,
- python-phonenumbers (>= 8.2.0),
- python-jsonschema (>=2.5.1),
- python-prometheus-client,
- python-attr
-Standards-Version: 3.9.8
-X-Python-Version: >= 2.7
+ dh-systemd,
+ dh-virtualenv (>= 1.0),
+ lsb-release,
+ python3-dev,
+ python3,
+ python3-setuptools,
+ python3-pip,
+ python3-venv,
+ tar,
+Standards-Version: 3.9.5
+Homepage: https://github.com/matrix-org/synapse
 
-Package: matrix-synapse
-Architecture: all
+Package: matrix-synapse-py3
+Architecture: amd64
+Conflicts: matrix-synapse
+Pre-Depends: dpkg (>= 1.16.1)
 Depends:
- ${misc:Depends},
- ${python:Depends},
  adduser,
  debconf,
- lsb-base (>= 3.0-6),
- python-attr (>= 16.0.0),
- python-twisted (>= 17.1.0),
- python-canonicaljson (>=1.1.3),
- python-prometheus-client (>=0.0.14),
+ python3-distutils|libpython3-stdlib (<< 3.6),
+ python3,
+ ${misc:Depends},
+# some of our scripts use perl, but none of them are important,
+# so we put perl:Depends in Suggests rather than Depends.
 Suggests:
- python-bleach (>= 1.4.2),
- python-jinja2 (>= 2.8),
-Recommends:
- python-psycopg2,
- python-lxml,
+ sqlite3,
+ ${perl:Depends},
 Description: Open federated Instant Messaging and VoIP server
  Matrix is an ambitious new ecosystem for open federated Instant
  Messaging and VoIP. Synapse is a reference Matrix server
  implementation.
- .
- Everything in Matrix happens in a room.  Rooms are distributed and do
- not exist on any single server.  Rooms can be located using
- convenience aliases like #matrix:matrix.org or #test:localhost:8448.
- .
- Matrix user IDs look like @matthew:matrix.org (although in the future
- you will normally refer to yourself and others using a 3PID: email
- address, phone number, etc rather than manipulating Matrix user IDs)
- .
- The overall architecture is:
- client <------> homeserver <=============> homeserver <------> client
-                 https://a.org/_matrix      https://b.net/_matrix

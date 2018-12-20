@@ -1,3 +1,14 @@
+matrix-synapse-py3 (0.34.0) stable; urgency=medium
+
+  * New synapse release 0.34.0.
+  * Synapse is now installed into a Python 3 virtual environment with
+    up-to-date dependencies.
+  * The matrix-synapse service will now be restarted when the package is
+    upgraded.
+    (Fixes https://github.com/matrix-org/package-synapse-debian/issues/18)
+
+ -- Synapse packaging team <packages@matrix.org>  Wed, 19 Dec 2018 14:00:00 +0000
+
 matrix-synapse (0.33.9-1matrix1) stretch; urgency=medium
 
   [ Erik Johnston ]

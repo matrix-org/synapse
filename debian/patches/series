@@ -1,7 +1,0 @@
-0001-tox.patch
-0002-change_instructions.patch
-0004-webclient-instructions.patch
-0006-Don-t-require-strict-nacl-0.3.0-requirement.patch
-remove-webclient.patch
-bcrypt.patch
-no_install_with_pip
