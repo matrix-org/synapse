@@ -68,7 +68,7 @@ Upgrading to v0.34.0
        synctl start
 
    Users who have installed from distribution packages should see the relevant
-   package documentation.
+   package documentation. See below for notes on Debian packages.
 
    * When upgrading to Python 3, you **must** make sure that your log files are
      configured as UTF-8, by adding ``encoding: utf8`` to the
@@ -106,6 +106,13 @@ Upgrading to v0.34.0
            filters: [context]
 
      There is no need to revert this change if downgrading to Python 2.
+
+   * We are also making available Debian packages which will run Synapse on
+     Python 3. You can switch to these packages with ``apt-get install
+     matrix-synapse-py3``, however, please read
+     [debian/NEWS](https://github.com/matrix-org/synapse/blob/release-v0.34.0/debian/NEWS)
+     before doing so. The existing ``matrix-synapse`` packages will continue to
+     use Python 2 for the time being.
 
 2. This release removes the ``riot.im`` from the default list of trusted
    identity servers.

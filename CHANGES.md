@@ -1,21 +1,5 @@
-Synapse 0.34.0rc2 (2018-12-11)
-==============================
-
-Features
---------
-
-- Add a welcome page for the client API port. Credit to @krombel! ([\#4289](https://github.com/matrix-org/synapse/issues/4289))
-- Remove Matrix console from the default distribution ([\#4290](https://github.com/matrix-org/synapse/issues/4290))
-
-
-Internal Changes
-----------------
-
-- Disable pager when running git-show in CI ([\#4291](https://github.com/matrix-org/synapse/issues/4291))
-
-
-Synapse 0.34.0rc1 (2018-12-04)
-==============================
+Synapse 0.34.0 (2018-12-20)
+===========================
 
 Synapse 0.34 is the first release to fully support Python 3. We recommend
 upgrading to Python 3, but make sure to read the
@@ -24,6 +8,11 @@ upgrading to Python 3, but make sure to read the
 Features
 --------
 
+- Add 'sandbox' to CSP for media reprository ([\#4284](https://github.com/matrix-org/synapse/issues/4284))
+- Make the new landing page prettier. ([\#4294](https://github.com/matrix-org/synapse/issues/4294))
+- Fix deleting E2E room keys when using old SQLite versions. ([\#4295](https://github.com/matrix-org/synapse/issues/4295))
+- Add a welcome page for the client API port. Credit to @krombel! ([\#4289](https://github.com/matrix-org/synapse/issues/4289))
+- Remove Matrix console from the default distribution ([\#4290](https://github.com/matrix-org/synapse/issues/4290))
 - Add option to track MAU stats (but not limit people) ([\#3830](https://github.com/matrix-org/synapse/issues/3830))
 - Add an option to enable recording IPs for appservice users ([\#3831](https://github.com/matrix-org/synapse/issues/3831))
 - Rename login type m.login.cas to m.login.sso ([\#4220](https://github.com/matrix-org/synapse/issues/4220))
@@ -49,6 +38,8 @@ Bugfixes
 Internal Changes
 ----------------
 
+- Debian packages utilising a virtualenv with bundled dependencies can now be built. ([\#4212](https://github.com/matrix-org/synapse/issues/4212))
+- Disable pager when running git-show in CI ([\#4291](https://github.com/matrix-org/synapse/issues/4291))
 - A coveragerc file, as well as the py36-coverage tox target, have been added. ([\#4180](https://github.com/matrix-org/synapse/issues/4180))
 - Add a GitHub pull request template and add multiple issue templates ([\#4182](https://github.com/matrix-org/synapse/issues/4182))
 - Update README to reflect the fact that #1491 is fixed ([\#4188](https://github.com/matrix-org/synapse/issues/4188))
