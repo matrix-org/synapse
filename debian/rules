@@ -3,24 +3,6 @@
 # Build Debian package using https://github.com/spotify/dh-virtualenv
 #
 
-export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
-# Use -march=x86-64 so any compiled C extensions are compiled with the most
-# generic as possible x64 instructions, so that compiling it on a new Intel chip
-# doesn't enable features not available on older ones or AMD.
-export CFLAGS=-march=x86-64
-SNAKE=/usr/bin/python3
-# Use --builtin-venv to use the better `venv` module from CPython 3.4+ rather
-# than the 2/3 compatible `virtualenv`.
-DH_VENV_ARGS=--install-suffix "matrix-synapse" \
-			 --builtin-venv \
-			 --setuptools \
-			 --python $(SNAKE) \
-			 --upgrade-pip \
-			 --preinstall="lxml" \
-			 --preinstall="mock" \
-			 --extra-pip-arg="--no-cache-dir" \
-			 --extra-pip-arg="--compile"
-
 override_dh_systemd_enable:
 	dh_systemd_enable --name=matrix-synapse
 
@@ -32,16 +14,7 @@ override_dh_strip:
 override_dh_shlibdeps:
 
 override_dh_virtualenv:
-	dh_virtualenv $(DH_VENV_ARGS)
-
-# we copy the tests to a temporary directory so that we can put them on the
-# PYTHONPATH without putting the uninstalled synapse on the pythonpath.
-	tmpdir=`mktemp -d` && cp -r tests "$$tmpdir" && \
-            cd debian/matrix-synapse-py3 && \
-            PYTHONPATH="$$tmpdir" \
-	       ./opt/venvs/matrix-synapse/bin/python \
-               -B -m twisted.trial --reporter=text -j2 tests && \
-	    rm -r "$$tmpdir"
+	./debian/build_virtualenv
 
 # We are restricted to compat level 9 (because xenial), so have to
 # enable the systemd bits manually.
