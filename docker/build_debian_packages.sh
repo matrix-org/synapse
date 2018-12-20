@@ -14,7 +14,14 @@ set -ex
 cd `dirname $0`
 
 if [ $# -lt 1 ]; then
-    DISTS=(debian:stretch debian:sid ubuntu:xenial ubuntu:bionic ubuntu:cosmic)
+    DISTS=(
+        debian:stretch
+        debian:buster
+        debian:sid
+        ubuntu:xenial
+        ubuntu:bionic
+        ubuntu:cosmic
+    )
 else
     DISTS=("$@")
 fi
