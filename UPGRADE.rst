@@ -107,12 +107,12 @@ Upgrading to v0.34.0
 
      There is no need to revert this change if downgrading to Python 2.
 
-   * We are also making available Debian packages which will run Synapse on
-     Python 3. You can switch to these packages with ``apt-get install
-     matrix-synapse-py3``, however, please read
-     [debian/NEWS](https://github.com/matrix-org/synapse/blob/release-v0.34.0/debian/NEWS)
-     before doing so. The existing ``matrix-synapse`` packages will continue to
-     use Python 2 for the time being.
+   We are also making available Debian packages which will run Synapse on
+   Python 3. You can switch to these packages with ``apt-get install
+   matrix-synapse-py3``, however, please read `debian/NEWS
+   <https://github.com/matrix-org/synapse/blob/release-v0.34.0/debian/NEWS>`_
+   before doing so. The existing ``matrix-synapse`` packages will continue to
+   use Python 2 for the time being.
 
 2. This release removes the ``riot.im`` from the default list of trusted
    identity servers.
