@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import logging
-import sys
 
 from pkg_resources import DistributionNotFound, VersionConflict, get_distribution
 
