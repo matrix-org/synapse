@@ -326,8 +326,7 @@ class PreviewUrlResource(Resource):
             except SynapseError:
                 # Pass SynapseErrors through directly, so that the servlet
                 # handler will return a SynapseError to the client instead of
-                # blank data or a 500. Currently, this is only if the IP we are
-                # trying to fetch from is blacklisted.
+                # blank data or a 500.
                 raise
             except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
