@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+#
+# Build Debian package using https://github.com/spotify/dh-virtualenv
+#
+
+override_dh_systemd_enable:
+	dh_systemd_enable --name=matrix-synapse
+
+override_dh_installinit:
+	dh_installinit --name=matrix-synapse
+
+override_dh_strip:
+
+override_dh_shlibdeps:
+
+override_dh_virtualenv:
+	./debian/build_virtualenv
+
+# We are restricted to compat level 9 (because xenial), so have to
+# enable the systemd bits manually.
+%:
+	dh $@ --with python-virtualenv --with systemd

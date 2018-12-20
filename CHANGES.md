@@ -1,32 +1,24 @@
-Synapse 0.34.0rc2 (2018-12-11)
-==============================
+Synapse 0.34.0 (2018-12-20)
+===========================
+
+Synapse 0.34.0 is the first release to fully support Python 3. Synapse will now
+run on Python versions 3.5 or 3.6 (as well as 2.7). Support for Python 3.7
+remains experimental.
+
+We recommend upgrading to Python 3, but make sure to read the [upgrade
+notes](UPGRADE.rst#upgrading-to-v0340) when doing so.
 
 Features
 --------
 
+- Add 'sandbox' to CSP for media reprository ([\#4284](https://github.com/matrix-org/synapse/issues/4284))
+- Make the new landing page prettier. ([\#4294](https://github.com/matrix-org/synapse/issues/4294))
+- Fix deleting E2E room keys when using old SQLite versions. ([\#4295](https://github.com/matrix-org/synapse/issues/4295))
 - Add a welcome page for the client API port. Credit to @krombel! ([\#4289](https://github.com/matrix-org/synapse/issues/4289))
 - Remove Matrix console from the default distribution ([\#4290](https://github.com/matrix-org/synapse/issues/4290))
-
-
-Internal Changes
-----------------
-
-- Disable pager when running git-show in CI ([\#4291](https://github.com/matrix-org/synapse/issues/4291))
-
-
-Synapse 0.34.0rc1 (2018-12-04)
-==============================
-
-Synapse 0.34 is the first release to fully support Python 3. We recommend
-upgrading to Python 3, but make sure to read the
-[upgrade notes](UPGRADE.rst#upgrading-to-v0340) when doing so.
-
-Features
---------
-
 - Add option to track MAU stats (but not limit people) ([\#3830](https://github.com/matrix-org/synapse/issues/3830))
 - Add an option to enable recording IPs for appservice users ([\#3831](https://github.com/matrix-org/synapse/issues/3831))
-- Rename login type m.login.cas to m.login.sso ([\#4220](https://github.com/matrix-org/synapse/issues/4220))
+- Rename login type `m.login.cas` to `m.login.sso` ([\#4220](https://github.com/matrix-org/synapse/issues/4220))
 - Add an option to disable search for homeservers that may not be interested in it. ([\#4230](https://github.com/matrix-org/synapse/issues/4230))
 
 
@@ -49,15 +41,17 @@ Bugfixes
 Internal Changes
 ----------------
 
-- A coveragerc file, as well as the py36-coverage tox target, have been added. ([\#4180](https://github.com/matrix-org/synapse/issues/4180))
+- Debian packages utilising a virtualenv with bundled dependencies can now be built. ([\#4212](https://github.com/matrix-org/synapse/issues/4212))
+- Disable pager when running git-show in CI ([\#4291](https://github.com/matrix-org/synapse/issues/4291))
+- A coveragerc file has been added. ([\#4180](https://github.com/matrix-org/synapse/issues/4180))
 - Add a GitHub pull request template and add multiple issue templates ([\#4182](https://github.com/matrix-org/synapse/issues/4182))
-- Update README to reflect the fact that #1491 is fixed ([\#4188](https://github.com/matrix-org/synapse/issues/4188))
+- Update README to reflect the fact that [\#1491](https://github.com/matrix-org/synapse/issues/1491) is fixed ([\#4188](https://github.com/matrix-org/synapse/issues/4188))
 - Run the AS senders as background processes to fix warnings ([\#4189](https://github.com/matrix-org/synapse/issues/4189))
 - Add some diagnostics to the tests to detect logcontext problems ([\#4190](https://github.com/matrix-org/synapse/issues/4190))
 - Add missing `jpeg` package prerequisite for OpenBSD in README. ([\#4193](https://github.com/matrix-org/synapse/issues/4193))
 - Add a note saying you need to manually reclaim disk space after using the Purge History API ([\#4200](https://github.com/matrix-org/synapse/issues/4200))
 - More logcontext checking in unittests ([\#4205](https://github.com/matrix-org/synapse/issues/4205))
-- Ignore __pycache__ directories in the database schema folder ([\#4214](https://github.com/matrix-org/synapse/issues/4214))
+- Ignore `__pycache__` directories in the database schema folder ([\#4214](https://github.com/matrix-org/synapse/issues/4214))
 - Add note to UPGRADE.rst about removing riot.im from list of trusted identity servers ([\#4224](https://github.com/matrix-org/synapse/issues/4224))
 - Added automated coverage reporting to CI. ([\#4225](https://github.com/matrix-org/synapse/issues/4225))
 - Garbage-collect after each unit test to fix logcontext leaks ([\#4227](https://github.com/matrix-org/synapse/issues/4227))
