@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+import logging
+
+from pkg_resources import get_distribution, VersionConflict, DistributionNotFound
+
+logger = logging.getLogger(__name__)
+
 REQUIREMENTS = [
     "jsonschema>=2.5.1",
     "frozendict>=1",
@@ -62,6 +69,53 @@ def list_requirements():
         deps = set(opt) | deps
 
     return list(deps)
+
+
+class DependencyException(Exception):
+    @property
+    def dependencies(self):
+        for i in self.args[0]:
+            yield '"' + i + '"'
+
+
+def check_requirements(_get_distribution=get_distribution):
+
+    deps_needed = []
+    errors = []
+
+    # Check the base dependencies exist -- they all must be installed.
+    for dependency in REQUIREMENTS:
+        try:
+            _get_distribution(dependency)
+        except VersionConflict as e:
+            deps_needed.append(dependency)
+            errors.append(
+                "Needed %s, got %s==%s"
+                % (dependency, e.dist.project_name, e.dist.version)
+            )
+        except DistributionNotFound:
+            deps_needed.append(dependency)
+            errors.append("Needed %s but it was not installed" % (dependency,))
+
+    # Check the optional dependencies are up to date. We allow them to not be
+    # installed.
+    OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])
+
+    for dependency in OPTS:
+        try:
+            _get_distribution(dependency)
+        except VersionConflict:
+            deps_needed.append(dependency)
+            errors.append("Needed %s but it was not installed" % (dependency,))
+        except DistributionNotFound:
+            # If it's not found, we don't care
+            pass
+
+    if deps_needed:
+        for e in errors:
+            logging.exception(e)
+
+        raise DependencyException(deps_needed)
 
 
 if __name__ == "__main__":
