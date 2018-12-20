@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import logging
+import sys
 
-from pkg_resources import get_distribution, VersionConflict, DistributionNotFound
+from pkg_resources import DistributionNotFound, VersionConflict, get_distribution
 
 logger = logging.getLogger(__name__)
 
