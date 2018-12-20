@@ -52,18 +52,35 @@ incoming_responses_counter = Counter(
 )
 
 
-def check_against_blacklist(ip_address, whitelist, blacklist):
-    if ip_address in blacklist:
-        if whitelist is None or ip_address not in whitelist:
+def check_against_blacklist(ip_address, ip_whitelist, ip_blacklist):
+    """
+    Args:
+        ip_address (netaddr.IPAddress)
+        ip_whitelist (netaddr.IPSet)
+        ip_blacklist (netaddr.IPSet)
+    """
+    if ip_address in ip_blacklist:
+        if ip_whitelist is None or ip_address not in ip_whitelist:
             return True
     return False
 
 
 class IPBlacklistingResolver(object):
-    def __init__(self, reactor, whitelist, blacklist):
+    """
+    A proxy for reactor.nameResolver which only produces non-blacklisted IP
+    addresses, preventing DNS rebinding attacks on URL preview.
+    """
+
+    def __init__(self, reactor, ip_whitelist, ip_blacklist):
+        """
+        Args:
+            reactor (twisted.internet.reactor)
+            ip_whitelist (netaddr.IPSet)
+            ip_blacklist (netaddr.IPSet)
+        """
         self._reactor = reactor
-        self._whitelist = whitelist
-        self._blacklist = blacklist
+        self._ip_whitelist = ip_whitelist
+        self._ip_blacklist = ip_blacklist
 
     def resolveHostName(self, recv, hostname, portNumber=0):
 
@@ -82,7 +99,7 @@ class IPBlacklistingResolver(object):
                 ip_address = IPAddress(address.host)
 
                 if check_against_blacklist(
-                    ip_address, self._whitelist, self._blacklist
+                    ip_address, self._ip_whitelist, self._ip_blacklist
                 ):
                     logger.info(
                         "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
@@ -111,10 +128,22 @@ class IPBlacklistingResolver(object):
 
 
 class BlacklistingAgentWrapper(Agent):
-    def __init__(self, agent, reactor, whitelist=None, blacklist=None):
+    """
+    An Agent wrapper which will prevent access to IP addresses being accessed
+    directly (without an IP address lookup).
+    """
+
+    def __init__(self, agent, reactor, ip_whitelist=None, ip_blacklist=None):
+        """
+        Args:
+            agent (twisted.web.client.Agent): The Agent to wrap.
+            reactor (twisted.internet.reactor)
+            ip_whitelist (netaddr.IPSet)
+            ip_blacklist (netaddr.IPSet)
+        """
         self._agent = agent
-        self._whitelist = whitelist
-        self._blacklist = blacklist
+        self._ip_whitelist = ip_whitelist
+        self._ip_blacklist = ip_blacklist
 
     def request(self, method, uri, headers=None, bodyProducer=None):
         from hyperlink import URL
@@ -124,7 +153,9 @@ class BlacklistingAgentWrapper(Agent):
         try:
             ip_address = IPAddress(h.host)
 
-            if check_against_blacklist(ip_address, self._whitelist, self._blacklist):
+            if check_against_blacklist(
+                ip_address, self._ip_whitelist, self._ip_blacklist
+            ):
                 logger.info(
                     "Blocking access to %s because of blacklist" % (ip_address,)
                 )
@@ -145,58 +176,35 @@ class SimpleHttpClient(object):
     using HTTP in Matrix
     """
 
-    def __init__(self, hs, treq_args={}, whitelist=None, blacklist=None):
+    def __init__(self, hs, treq_args={}, ip_whitelist=None, ip_blacklist=None):
         """
         Args:
             hs (synapse.server.HomeServer)
             treq_args (dict): Extra keyword arguments to be given to treq.request.
-            blacklist (netaddr.IPSet): The IP addresses that are blacklisted that
+            ip_blacklist (netaddr.IPSet): The IP addresses that are blacklisted that
                 we may not request.
-            whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
+            ip_whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
         """
         self.hs = hs
 
-        self._whitelist = whitelist
-        self._blacklist = blacklist
+        self._ip_whitelist = ip_whitelist
+        self._ip_blacklist = ip_blacklist
         self._extra_treq_args = treq_args
 
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
-        self.reactor = hs.get_reactor()
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
 
         self.user_agent = self.user_agent.encode('ascii')
-        self._make_agent()
 
-    def _make_agent(self, _agent=False):
-
-        if _agent:
-            self.agent = _agent
-        else:
-            # the pusher makes lots of concurrent SSL connections to sygnal, and
-            # tends to do so in batches, so we need to allow the pool to keep
-            # lots of idle connections around.
-            pool = HTTPConnectionPool(self.reactor)
-            pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
-            pool.cachedConnectionTimeout = 2 * 60
-
-            # The default context factory in Twisted 14.0.0 (which we require) is
-            # BrowserLikePolicyForHTTPS which will do regular cert validation
-            # 'like a browser'
-            self.agent = Agent(
-                self.reactor,
-                connectTimeout=15,
-                contextFactory=self.hs.get_http_client_context_factory(),
-                pool=pool,
-            )
-
-        # If we have an IP blacklist, use the blacklisting Agent wrapper.
-        if self._blacklist:
-
+        if self._ip_blacklist:
+            real_reactor = hs.get_reactor()
+            # If we have an IP blacklist, we need to use a DNS resolver which
+            # filters out blacklisted IP addresses, to prevent DNS rebinding.
             nameResolver = IPBlacklistingResolver(
-                self.reactor, self._whitelist, self._blacklist
+                real_reactor, self._ip_whitelist, self._ip_blacklist
             )
 
             @implementer(IReactorPluggableNameResolver)
@@ -205,20 +213,38 @@ class SimpleHttpClient(object):
                     if attr == "nameResolver":
                         return nameResolver
                     else:
-                        return getattr(self.reactor, attr)
+                        return getattr(real_reactor, attr)
 
-            self.agent = Agent(
-                Reactor(),
-                connectTimeout=15,
-                contextFactory=self.hs.get_http_client_context_factory(),
-                pool=pool,
-            )
+            self.reactor = Reactor()
+        else:
+            self.reactor = hs.get_reactor()
 
+        # the pusher makes lots of concurrent SSL connections to sygnal, and
+        # tends to do so in batches, so we need to allow the pool to keep
+        # lots of idle connections around.
+        pool = HTTPConnectionPool(self.reactor)
+        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
+        pool.cachedConnectionTimeout = 2 * 60
+
+        # The default context factory in Twisted 14.0.0 (which we require) is
+        # BrowserLikePolicyForHTTPS which will do regular cert validation
+        # 'like a browser'
+        self.agent = Agent(
+            self.reactor,
+            connectTimeout=15,
+            contextFactory=self.hs.get_http_client_context_factory(),
+            pool=pool,
+        )
+
+        if self._ip_blacklist:
+            # If we have an IP blacklist, we then install the blacklisting Agent
+            # which prevents direct access to IP addresses, that are not caught
+            # by the DNS resolution.
             self.agent = BlacklistingAgentWrapper(
                 self.agent,
                 self.reactor,
-                whitelist=self._whitelist,
-                blacklist=self._blacklist,
+                ip_whitelist=self._ip_whitelist,
+                ip_blacklist=self._ip_blacklist,
             )
 
     @defer.inlineCallbacks

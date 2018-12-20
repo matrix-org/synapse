@@ -72,8 +72,8 @@ class PreviewUrlResource(Resource):
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
-            whitelist=hs.config.url_preview_ip_range_whitelist,
-            blacklist=hs.config.url_preview_ip_range_blacklist,
+            ip_whitelist=hs.config.url_preview_ip_range_whitelist,
+            ip_blacklist=hs.config.url_preview_ip_range_blacklist,
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
