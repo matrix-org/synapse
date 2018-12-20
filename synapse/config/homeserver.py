@@ -53,10 +53,3 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        ServerNoticesConfig, RoomDirectoryConfig,
                        ):
     pass
-
-
-if __name__ == '__main__':
-    import sys
-    sys.stdout.write(
-        HomeServerConfig().generate_config(sys.argv[1], sys.argv[2], True)[0]
-    )
