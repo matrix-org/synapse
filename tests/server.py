@@ -383,7 +383,15 @@ class FakeTransport(object):
         self.disconnecting = True
 
     def pauseProducing(self):
+        if not self.producer:
+            return
+
         self.producer.pauseProducing()
+
+    def resumeProducing(self):
+        if not self.producer:
+            return
+        self.producer.resumeProducing()
 
     def unregisterProducer(self):
         if not self.producer:

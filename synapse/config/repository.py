@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 from collections import namedtuple
 
 from synapse.util.module_loader import load_module
@@ -175,9 +175,9 @@ class ContentRepositoryConfig(Config):
                 "url_preview_url_blacklist", ()
             )
 
-    def default_config(self, **kwargs):
-        media_store = self.default_path("media_store")
-        uploads_path = self.default_path("uploads")
+    def default_config(self, data_dir_path, **kwargs):
+        media_store = os.path.join(data_dir_path, "media_store")
+        uploads_path = os.path.join(data_dir_path, "uploads")
         return r"""
         # Directory where uploaded images and attachments are stored.
         media_store_path: "%(media_store)s"

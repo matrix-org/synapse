@@ -1668,13 +1668,17 @@ class SyncHandler(object):
                 "content": content,
             })
 
-        account_data = sync_config.filter_collection.filter_room_account_data(
+        account_data_events = sync_config.filter_collection.filter_room_account_data(
             account_data_events
         )
 
         ephemeral = sync_config.filter_collection.filter_room_ephemeral(ephemeral)
 
-        if not (always_include or batch or account_data or ephemeral or full_state):
+        if not (always_include
+                or batch
+                or account_data_events
+                or ephemeral
+                or full_state):
             return
 
         state = yield self.compute_state_delta(
@@ -1745,7 +1749,7 @@ class SyncHandler(object):
                 room_id=room_id,
                 timeline=batch,
                 state=state,
-                account_data=account_data,
+                account_data=account_data_events,
             )
             if room_sync or always_include:
                 sync_result_builder.archived.append(room_sync)
