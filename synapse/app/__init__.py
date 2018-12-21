@@ -22,11 +22,11 @@ sys.dont_write_bytecode = True
 
 try:
     python_dependencies.check_requirements()
-except python_dependencies.MissingRequirementError as e:
+except python_dependencies.DependencyException as e:
     message = "\n".join([
-        "Missing Requirement: %s" % (str(e),),
+        "Missing Requirements: %s" % (", ".join(e.dependencies),),
         "To install run:",
-        "    pip install --upgrade --force \"%s\"" % (e.dependency,),
+        "    pip install --upgrade --force %s" % (" ".join(e.dependencies),),
         "",
     ])
     sys.stderr.writelines(message)
