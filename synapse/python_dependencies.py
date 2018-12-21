@@ -20,6 +20,18 @@ from pkg_resources import DistributionNotFound, VersionConflict, get_distributio
 
 logger = logging.getLogger(__name__)
 
+
+# REQUIREMENTS is a simple list of requirement specifiers[1], and must be
+# installed. It is passed to setup() as install_requires in setup.py.
+#
+# CONDITIONAL_REQUIREMENTS is the optional dependencies, represented as a dict
+# of lists. The dict key is the optional dependency name and can be passed to
+# pip when installing. The list is a series of requirement specifiers[1] to be
+# installed when that optional dependency requirement is specified. It is passed
+# to setup() as extras_require in setup.py
+#
+# [1] https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers.
+
 REQUIREMENTS = [
     "jsonschema>=2.5.1",
     "frozendict>=1",
