@@ -1,0 +1,19 @@
+Template: matrix-synapse/server-name
+Type: string
+_Description: Name of the server:
+ The name that this homeserver will appear as, to clients and other
+ servers via federation. This name should match the SRV record
+ published in DNS.
+
+Template: matrix-synapse/report-stats
+Type: boolean
+Default: false
+_Description: Report anonymous statistics?
+ Developers of Matrix and Synapse really appreciate helping the
+ project out by reporting anonymized usage statistics from this
+ homeserver. Only very basic aggregate data (e.g. number of users)
+ will be reported, but it helps track the growth of the Matrix
+ community, and helps in making Matrix a success, as well as to
+ convince other networks that they should peer with Matrix.
+ .
+ Thank you.

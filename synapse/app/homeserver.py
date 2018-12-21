@@ -322,9 +322,6 @@ def setup(config_options):
 
     synapse.config.logger.setup_logging(config, use_worker_options=False)
 
-    # check any extra requirements we have now we have a config
-    check_requirements(config)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     tls_server_context_factory = context_factory.ServerContextFactory(config)
