@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# runs dh_virtualenv to build the virtualenv in the build directory,
+# and then runs the trial tests against the installed synapse.
+
+set -e
+
+export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
+SNAKE=/usr/bin/python3
+
+# try to set the CFLAGS so any compiled C extensions are compiled with the most
+# generic as possible x64 instructions, so that compiling it on a new Intel chip
+# doesn't enable features not available on older ones or AMD.
+#
+# TODO: add similar things for non-amd64, or figure out a more generic way to
+# do this.
+
+case `dpkg-architecture -q DEB_HOST_ARCH` in
+    amd64)
+        export CFLAGS=-march=x86-64
+        ;;
+esac
+
+# Use --builtin-venv to use the better `venv` module from CPython 3.4+ rather
+# than the 2/3 compatible `virtualenv`.
+
+dh_virtualenv \
+    --install-suffix "matrix-synapse" \
+    --builtin-venv \
+    --setuptools \
+    --python "$SNAKE" \
+    --upgrade-pip \
+    --preinstall="lxml" \
+    --preinstall="mock" \
+    --extra-pip-arg="--no-cache-dir" \
+    --extra-pip-arg="--compile"
+
+# we copy the tests to a temporary directory so that we can put them on the
+# PYTHONPATH without putting the uninstalled synapse on the pythonpath.
+tmpdir=`mktemp -d`
+trap "rm -r $tmpdir" EXIT
+
+cp -r tests "$tmpdir"
+cd debian/matrix-synapse-py3
+
+PYTHONPATH="$tmpdir" \
+    ./opt/venvs/matrix-synapse/bin/python \
+        -B -m twisted.trial --reporter=text -j2 tests

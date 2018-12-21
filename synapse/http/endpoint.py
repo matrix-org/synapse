@@ -218,41 +218,6 @@ class _WrappedConnection(object):
         return d
 
 
-class SpiderEndpoint(object):
-    """An endpoint which refuses to connect to blacklisted IP addresses
-    Implements twisted.internet.interfaces.IStreamClientEndpoint.
-    """
-    def __init__(self, reactor, host, port, blacklist, whitelist,
-                 endpoint=HostnameEndpoint, endpoint_kw_args={}):
-        self.reactor = reactor
-        self.host = host
-        self.port = port
-        self.blacklist = blacklist
-        self.whitelist = whitelist
-        self.endpoint = endpoint
-        self.endpoint_kw_args = endpoint_kw_args
-
-    @defer.inlineCallbacks
-    def connect(self, protocolFactory):
-        address = yield self.reactor.resolve(self.host)
-
-        from netaddr import IPAddress
-        ip_address = IPAddress(address)
-
-        if ip_address in self.blacklist:
-            if self.whitelist is None or ip_address not in self.whitelist:
-                raise ConnectError(
-                    "Refusing to spider blacklisted IP address %s" % address
-                )
-
-        logger.info("Connecting to %s:%s", address, self.port)
-        endpoint = self.endpoint(
-            self.reactor, address, self.port, **self.endpoint_kw_args
-        )
-        connection = yield endpoint.connect(protocolFactory)
-        defer.returnValue(connection)
-
-
 class SRVClientEndpoint(object):
     """An endpoint which looks up SRV records for a service.
     Cycles through the list of servers starting with each call to connect

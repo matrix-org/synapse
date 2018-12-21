@@ -6,5 +6,3 @@ include = synapse/*
 
 [report]
 precision = 2
-ignore_errors = True
-include = synapse/*
