@@ -1,7 +1,6 @@
 [run]
 branch = True
 parallel = True
-source = .
 include = synapse/*
 
 [report]
