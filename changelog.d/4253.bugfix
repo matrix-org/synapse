@@ -1,1 +1,0 @@
-Fix UnicodeDecodeError when postgres is configured to give non-English errors

@@ -373,6 +373,7 @@ class HomeserverTestCase(TestCase):
             nonce_str += b"\x00admin"
         else:
             nonce_str += b"\x00notadmin"
+
         want_mac.update(nonce.encode('ascii') + b"\x00" + nonce_str)
         want_mac = want_mac.hexdigest()
 
