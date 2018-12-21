@@ -34,7 +34,6 @@ class ServerConfig(Config):
             raise ConfigError(str(e))
 
         self.pid_file = self.abspath(config.get("pid_file"))
-        self.web_client = config["web_client"]
         self.web_client_location = config.get("web_client_location", None)
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
@@ -62,6 +61,11 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # whether to enable search. If disabled, new entries will not be inserted
+        # into the search tables and they will not be indexed. Users will receive
+        # errors when attempting to search for messages.
+        self.enable_search = config.get("enable_search", True)
+
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
         # Whether we should block invites sent to users on this server
@@ -77,6 +81,7 @@ class ServerConfig(Config):
             self.max_mau_value = config.get(
                 "max_mau_value", 0,
             )
+        self.mau_stats_only = config.get("mau_stats_only", False)
 
         self.mau_limits_reserved_threepids = config.get(
             "mau_limit_reserved_threepids", []
@@ -122,6 +127,9 @@ class ServerConfig(Config):
             elif not bind_addresses:
                 bind_addresses.append('')
 
+        if not self.web_client_location:
+            _warn_if_webclient_configured(self.listeners)
+
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         bind_port = config.get("bind_port")
@@ -130,8 +138,6 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
-            names = ["client", "webclient"] if self.web_client else ["client"]
-
             self.listeners.append({
                 "port": bind_port,
                 "bind_addresses": [bind_host],
@@ -139,7 +145,7 @@ class ServerConfig(Config):
                 "type": "http",
                 "resources": [
                     {
-                        "names": names,
+                        "names": ["client"],
                         "compress": gzip_responses,
                     },
                     {
@@ -158,7 +164,7 @@ class ServerConfig(Config):
                     "type": "http",
                     "resources": [
                         {
-                            "names": names,
+                            "names": ["client"],
                             "compress": gzip_responses,
                         },
                         {
@@ -241,13 +247,9 @@ class ServerConfig(Config):
         #
         # cpu_affinity: 0xFFFFFFFF
 
-        # Whether to serve a web client from the HTTP/HTTPS root resource.
-        web_client: True
-
-        # The root directory to server for the above web client.
-        # If left undefined, synapse will serve the matrix-angular-sdk web client.
-        # Make sure matrix-angular-sdk is installed with pip if web_client is True
-        # and web_client_location is undefined
+        # The path to the web client which will be served at /_matrix/client/
+        # if 'webclient' is configured under the 'listeners' configuration.
+        #
         # web_client_location: "/path/to/web/root"
 
         # The public-facing base URL for the client API (not including _matrix/...)
@@ -314,8 +316,8 @@ class ServerConfig(Config):
               -
                 # List of resources to host on this listener.
                 names:
-                  - client     # The client-server APIs, both v1 and v2
-                  - webclient  # The bundled webclient.
+                  - client       # The client-server APIs, both v1 and v2
+                  # - webclient  # A web client. Requires web_client_location to be set.
 
                 # Should synapse compress HTTP responses to clients that support it?
                 # This should be disabled if running synapse behind a load balancer
@@ -342,7 +344,7 @@ class ServerConfig(Config):
             x_forwarded: false
 
             resources:
-              - names: [client, webclient]
+              - names: [client]
                 compress: true
               - names: [federation]
                 compress: false
@@ -372,13 +374,23 @@ class ServerConfig(Config):
           # max_mau_value: 50
           # mau_trial_days: 2
           #
+          # If enabled, the metrics for the number of monthly active users will
+          # be populated, however no one will be limited. If limit_usage_by_mau
+          # is true, this is implied to be true.
+          # mau_stats_only: False
+          #
           # Sometimes the server admin will want to ensure certain accounts are
           # never blocked by mau checking. These accounts are specified here.
           #
           # mau_limit_reserved_threepids:
           # - medium: 'email'
           #   address: 'reserved_user@example.com'
-
+          #
+          # Room searching
+          #
+          # If disabled, new messages will not be indexed for searching and users
+          # will receive errors when searching for messages. Defaults to enabled.
+          # enable_search: true
         """ % locals()
 
     def read_arguments(self, args):
@@ -436,3 +448,19 @@ def read_gc_thresholds(thresholds):
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"
         )
+
+
+NO_MORE_WEB_CLIENT_WARNING = """
+Synapse no longer includes a web client. To enable a web client, configure
+web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
+configuration.
+"""
+
+
+def _warn_if_webclient_configured(listeners):
+    for listener in listeners:
+        for res in listener.get("resources", []):
+            for name in res.get("names", []):
+                if name == 'webclient':
+                    logger.warning(NO_MORE_WEB_CLIENT_WARNING)
+                    return

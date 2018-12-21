@@ -33,7 +33,7 @@ from .ratelimiting import RatelimitConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
 from .room_directory import RoomDirectoryConfig
-from .saml2 import SAML2Config
+from .saml2_config import SAML2Config
 from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig

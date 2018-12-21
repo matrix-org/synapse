@@ -18,7 +18,7 @@ homeserver*.db
 homeserver*.log
 homeserver*.log.*
 homeserver*.pid
-homeserver*.yaml
+/homeserver*.yaml
 
 *.signing.key
 *.tls.crt
@@ -26,6 +26,8 @@ homeserver*.yaml
 *.tls.key
 
 .coverage
+.coverage.*
+!.coverage.rc
 htmlcov
 
 demo/*/*.db
@@ -57,3 +59,7 @@ env/
 
 .vscode/
 .ropeproject/
+
+*.deb
+
+/debs

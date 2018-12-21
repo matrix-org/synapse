@@ -124,7 +124,7 @@ class PushRuleEvaluatorForEvent(object):
 
         # XXX: optimisation: cache our pattern regexps
         if condition['key'] == 'content.body':
-            body = self._event["content"].get("body", None)
+            body = self._event.content.get("body", None)
             if not body:
                 return False
 
@@ -140,7 +140,7 @@ class PushRuleEvaluatorForEvent(object):
         if not display_name:
             return False
 
-        body = self._event["content"].get("body", None)
+        body = self._event.content.get("body", None)
         if not body:
             return False
 
