@@ -356,41 +356,41 @@ class ServerConfig(Config):
           #   type: manhole
 
 
-          # Homeserver blocking
-          #
-          # How to reach the server admin, used in ResourceLimitError
-          # admin_contact: 'mailto:admin@server.com'
-          #
-          # Global block config
-          #
-          # hs_disabled: False
-          # hs_disabled_message: 'Human readable reason for why the HS is blocked'
-          # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
-          #
-          # Monthly Active User Blocking
-          #
-          # Enables monthly active user checking
-          # limit_usage_by_mau: False
-          # max_mau_value: 50
-          # mau_trial_days: 2
-          #
-          # If enabled, the metrics for the number of monthly active users will
-          # be populated, however no one will be limited. If limit_usage_by_mau
-          # is true, this is implied to be true.
-          # mau_stats_only: False
-          #
-          # Sometimes the server admin will want to ensure certain accounts are
-          # never blocked by mau checking. These accounts are specified here.
-          #
-          # mau_limit_reserved_threepids:
-          # - medium: 'email'
-          #   address: 'reserved_user@example.com'
-          #
-          # Room searching
-          #
-          # If disabled, new messages will not be indexed for searching and users
-          # will receive errors when searching for messages. Defaults to enabled.
-          # enable_search: true
+        # Homeserver blocking
+        #
+        # How to reach the server admin, used in ResourceLimitError
+        # admin_contact: 'mailto:admin@server.com'
+        #
+        # Global block config
+        #
+        # hs_disabled: False
+        # hs_disabled_message: 'Human readable reason for why the HS is blocked'
+        # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
+        #
+        # Monthly Active User Blocking
+        #
+        # Enables monthly active user checking
+        # limit_usage_by_mau: False
+        # max_mau_value: 50
+        # mau_trial_days: 2
+        #
+        # If enabled, the metrics for the number of monthly active users will
+        # be populated, however no one will be limited. If limit_usage_by_mau
+        # is true, this is implied to be true.
+        # mau_stats_only: False
+        #
+        # Sometimes the server admin will want to ensure certain accounts are
+        # never blocked by mau checking. These accounts are specified here.
+        #
+        # mau_limit_reserved_threepids:
+        # - medium: 'email'
+        #   address: 'reserved_user@example.com'
+        #
+        # Room searching
+        #
+        # If disabled, new messages will not be indexed for searching and users
+        # will receive errors when searching for messages. Defaults to enabled.
+        # enable_search: true
         """ % locals()
 
     def read_arguments(self, args):
