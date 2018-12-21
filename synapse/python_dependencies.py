@@ -133,7 +133,11 @@ def check_requirements(config=None):
                     "Can't import %r which is part of %r"
                     % (module_name, dependency), module_name, dependency
                 )
+
             version = getattr(module, "__version__", None)
+            if type(version) is bytes:
+                version = version.decode('utf-8')
+
             file_path = getattr(module, "__file__", None)
             logger.info(
                 "Using %r version %r from %r to satisfy %r",
