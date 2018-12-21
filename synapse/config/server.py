@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import os.path
 
 from synapse.http.endpoint import parse_and_validate_server_name
 
@@ -203,7 +204,7 @@ class ServerConfig(Config):
                 ]
             })
 
-    def default_config(self, server_name, **kwargs):
+    def default_config(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400
@@ -211,7 +212,7 @@ class ServerConfig(Config):
             bind_port = 8448
             unsecure_port = 8008
 
-        pid_file = self.abspath("homeserver.pid")
+        pid_file = os.path.join(data_dir_path, "homeserver.pid")
         return """\
         ## Server ##
 
