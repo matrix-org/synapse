@@ -502,6 +502,7 @@ class SQLBaseStore(object):
         insertion_values={},
         desc="_simple_upsert",
         lock=True,
+        best_effort=False,
     ):
         """
 
@@ -522,6 +523,7 @@ class SQLBaseStore(object):
             insertion_values (dict): additional key/values to use only when
                 inserting
             lock (bool): True to lock the table when doing the upsert.
+            best_effort (bool): If we run into a transaction error, do we stop trying?
         Returns:
             Deferred(bool): True if a new entry was created, False if an
                 existing one was updated.
@@ -529,15 +531,19 @@ class SQLBaseStore(object):
         if self.database_engine.can_native_upsert:
             # We don't put this in a loop as it is guaranteed to be atomic, so
             # if we get an IntegrityError, it's unrelated.
-            result = yield self.runInteraction(
-                desc,
-                self._simple_upsert_txn_native_upsert,
-                table,
-                keyvalues,
-                values,
-                insertion_values,
-            )
-            defer.returnValue(result)
+            try:
+                result = yield self.runInteraction(
+                    desc,
+                    self._simple_upsert_txn_native_upsert,
+                    table,
+                    keyvalues,
+                    values,
+                    insertion_values,
+                )
+                defer.returnValue(result)
+            except Exception as e:
+                logger.warn("Got a %s, %s", (repr(e), str(e.args)))
+                raise
 
         attempts = 0
         while True:
