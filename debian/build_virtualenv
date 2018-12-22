@@ -41,8 +41,7 @@ tmpdir=`mktemp -d`
 trap "rm -r $tmpdir" EXIT
 
 cp -r tests "$tmpdir"
-cd debian/matrix-synapse-py3
 
 PYTHONPATH="$tmpdir" \
-    ./opt/venvs/matrix-synapse/bin/python \
+    debian/matrix-synapse-py3/opt/venvs/matrix-synapse/bin/python \
         -B -m twisted.trial --reporter=text -j2 tests
