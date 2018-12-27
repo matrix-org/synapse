@@ -539,7 +539,7 @@ class SQLBaseStore(object):
             try:
                 result = yield self.runInteraction(
                     desc,
-                    self._simple_upsert_txn_native_upsert,
+                    self._simple_upsert_txn,
                     table,
                     keyvalues,
                     values,
