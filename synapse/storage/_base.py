@@ -190,6 +190,11 @@ class SQLBaseStore(object):
 
         self._pending_ds = []
 
+        # We force simple upserts always, and then update in
+        # `has_completed_background_updates`, when any required indexes are
+        # built.
+        self._force_simple_upsert = True
+
         self.database_engine = hs.database_engine
 
     def start_profiling(self):
@@ -601,7 +606,7 @@ class SQLBaseStore(object):
         Pick the UPSERT method which works best on the platform. Either the
         native one (Pg9.5+, recent SQLites), or fall back to an emulated method.
         """
-        if self.database_engine.can_native_upsert:
+        if self.database_engine.can_native_upsert and not self._force_simple_upsert:
             return self._simple_upsert_txn_native_upsert(
                 txn, table, keyvalues, values, insertion_values=insertion_values
             )

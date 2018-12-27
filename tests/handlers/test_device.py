@@ -82,7 +82,6 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         dev = self.get_success(self.handler.store.get_device("@theresa:foo", device_id))
         self.assertEqual(dev["display_name"], "display")
 
-    @unittest.INFO
     def test_get_devices_by_user(self):
         self._record_users()
 
