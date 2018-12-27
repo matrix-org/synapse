@@ -1,0 +1,1 @@
+Fix test_metric.py compatibility with prometheus_client 0.5. Contributed by Maarten de Vries <maarten@de-vri.es>.
