@@ -561,33 +561,12 @@ class SQLBaseStore(object):
                     values,
                     insertion_values,
                     lock=lock,
+                    best_effort=best_effort,
                 )
                 defer.returnValue(result)
             except (
                 self.database_engine.module.IntegrityError,
-                self.database_engine.module.OperationalError,
             ) as e:
-
-                if isinstance(e, self.database_engine.module.OperationalError):
-                    # We only care about serialization errors, so check for it
-                    if (
-                        e.args[0]
-                        == "could not serialize access due to concurrent update"
-                    ):
-                        # A concurrent update problem is when we try and do a
-                        # native UPSERT but the row has changed from under us.
-                        # We can either retry, or give up if asked to do so.
-                        if best_effort:
-                            # If it's a concurrent-update problem, and this is
-                            # marked as 'best effort' (i.e. if there's a race,
-                            # then the one we raced with will suffice), then
-                            # pretend that we succeeded.
-                            defer.returnValue(False)
-                    else:
-                        # Otherwise, raise, because it's a real OperationalError
-                        # and we will need to be rolled back and retried.
-                        raise
-
                 attempts += 1
                 if attempts >= 5:
                     # don't retry forever, because things other than races
@@ -600,7 +579,7 @@ class SQLBaseStore(object):
                 )
 
     def _simple_upsert_txn(
-        self, txn, table, keyvalues, values, insertion_values={}, lock=True
+        self, txn, table, keyvalues, values, insertion_values={}, lock=True, best_effort=False,
     ):
         """
         Pick the UPSERT method which works best on the platform. Either the
@@ -608,7 +587,7 @@ class SQLBaseStore(object):
         """
         if self.database_engine.can_native_upsert and not self._force_simple_upsert:
             return self._simple_upsert_txn_native_upsert(
-                txn, table, keyvalues, values, insertion_values=insertion_values
+                txn, table, keyvalues, values, insertion_values=insertion_values, best_effort=best_effort,
             )
         else:
             return self._simple_upsert_txn_emulated(
@@ -656,7 +635,7 @@ class SQLBaseStore(object):
         return True
 
     def _simple_upsert_txn_native_upsert(
-        self, txn, table, keyvalues, values, insertion_values={}
+        self, txn, table, keyvalues, values, insertion_values={}, best_effort=False,
     ):
         """
         Use the native UPSERT functionality in recent PostgreSQL versions.
@@ -675,7 +654,27 @@ class SQLBaseStore(object):
             ", ".join(k for k in keyvalues),
             ", ".join(k + "=EXCLUDED." + k for k in values),
         )
-        txn.execute(sql, list(allvalues.values()))
+        try:
+            txn.execute(sql, list(allvalues.values()))
+        except self.database_engine.module.OperationalError as e:
+            # We only care about serialization errors, so check for it
+            if (
+                e.args[0]
+                == "could not serialize access due to concurrent update"
+            ):
+                # A concurrent update problem is when we try and do a native
+                # UPSERT but the row has changed from under us. We can either
+                # retry, or give up if asked to do so.
+                if best_effort:
+                    # If it's a concurrent-update problem, and this is marked as
+                    # 'best effort' (i.e. if there's a race, then the one we
+                    # raced with will suffice), then pretend that we succeeded.
+                    return False
+            else:
+                # Otherwise, raise, because it's a real OperationalError and we
+                # will need to be rolled back and retried.
+                raise
+
         # One-tuple, which is a boolean for insertion or not
         res = txn.fetchone()
         return res[0]
