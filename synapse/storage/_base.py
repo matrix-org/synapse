@@ -533,23 +533,6 @@ class SQLBaseStore(object):
             Deferred(bool): True if a new entry was created, False if an
                 existing one was updated.
         """
-        if self.database_engine.can_native_upsert:
-            # We don't put this in a loop as it is guaranteed to be atomic, so
-            # if we get an IntegrityError, it's unrelated.
-            try:
-                result = yield self.runInteraction(
-                    desc,
-                    self._simple_upsert_txn,
-                    table,
-                    keyvalues,
-                    values,
-                    insertion_values,
-                )
-                defer.returnValue(result)
-            except Exception as e:
-                logger.warn("Got a %s, %s", (repr(e), str(e.args)))
-                raise
-
         attempts = 0
         while True:
             try:
