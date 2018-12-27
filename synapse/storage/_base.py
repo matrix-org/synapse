@@ -564,9 +564,7 @@ class SQLBaseStore(object):
                     best_effort=best_effort,
                 )
                 defer.returnValue(result)
-            except (
-                self.database_engine.module.IntegrityError,
-            ) as e:
+            except self.database_engine.module.IntegrityError as e:
                 attempts += 1
                 if attempts >= 5:
                     # don't retry forever, because things other than races
@@ -579,7 +577,14 @@ class SQLBaseStore(object):
                 )
 
     def _simple_upsert_txn(
-        self, txn, table, keyvalues, values, insertion_values={}, lock=True, best_effort=False,
+        self,
+        txn,
+        table,
+        keyvalues,
+        values,
+        insertion_values={},
+        lock=True,
+        best_effort=False,
     ):
         """
         Pick the UPSERT method which works best on the platform. Either the
@@ -587,7 +592,12 @@ class SQLBaseStore(object):
         """
         if self.database_engine.can_native_upsert and not self._force_simple_upsert:
             return self._simple_upsert_txn_native_upsert(
-                txn, table, keyvalues, values, insertion_values=insertion_values, best_effort=best_effort,
+                txn,
+                table,
+                keyvalues,
+                values,
+                insertion_values=insertion_values,
+                best_effort=best_effort,
             )
         else:
             return self._simple_upsert_txn_emulated(
@@ -635,7 +645,7 @@ class SQLBaseStore(object):
         return True
 
     def _simple_upsert_txn_native_upsert(
-        self, txn, table, keyvalues, values, insertion_values={}, best_effort=False,
+        self, txn, table, keyvalues, values, insertion_values={}, best_effort=False
     ):
         """
         Use the native UPSERT functionality in recent PostgreSQL versions.
@@ -645,9 +655,11 @@ class SQLBaseStore(object):
         allvalues.update(values)
         allvalues.update(insertion_values)
 
-        sql = ("INSERT INTO %s (%s) VALUES (%s) "
-               "ON CONFLICT (%s) DO UPDATE SET %s "
-               "RETURNING (xmax = 0) AS inserted") % (
+        sql = (
+            "INSERT INTO %s (%s) VALUES (%s) "
+            "ON CONFLICT (%s) DO UPDATE SET %s "
+            "RETURNING (xmax = 0) AS inserted"
+        ) % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
@@ -658,10 +670,7 @@ class SQLBaseStore(object):
             txn.execute(sql, list(allvalues.values()))
         except self.database_engine.module.OperationalError as e:
             # We only care about serialization errors, so check for it
-            if (
-                e.args[0]
-                == "could not serialize access due to concurrent update"
-            ):
+            if e.args[0] == "could not serialize access due to concurrent update":
                 # A concurrent update problem is when we try and do a native
                 # UPSERT but the row has changed from under us. We can either
                 # retry, or give up if asked to do so.
