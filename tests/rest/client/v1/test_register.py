@@ -18,14 +18,17 @@ import json
 from mock import Mock
 from six import PY3
 
-from twisted.test.proto_helpers import MemoryReactorClock
-
 from synapse.http.server import JsonResource
 from synapse.rest.client.v1_only.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
-from tests.server import make_request, render, setup_test_homeserver
+from tests.server import (
+    ThreadedMemoryReactorClock,
+    make_request,
+    render,
+    setup_test_homeserver,
+)
 
 
 class CreateUserServletTestCase(unittest.TestCase):
@@ -45,7 +48,7 @@ class CreateUserServletTestCase(unittest.TestCase):
         )
 
         handlers = Mock(registration_handler=self.registration_handler)
-        self.reactor = MemoryReactorClock()
+        self.reactor = ThreadedMemoryReactorClock()
         self.hs_clock = Clock(self.reactor)
 
         self.hs = self.hs = setup_test_homeserver(

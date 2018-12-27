@@ -196,9 +196,10 @@ class SQLBaseStore(object):
         # finished background updates (checked by `_check_safe_to_upsert`).
         self._force_simple_upsert = True
 
-        # Check ASAP (and then later, every 1s) to see if we have finished
-        # background updates.
-        self._clock.call_later(0.0, self._check_safe_to_upsert)
+        if getattr(hs.config, "_enable_native_upserts", True):
+            # Check ASAP (and then later, every 1s) to see if we have finished
+            # background updates.
+            self._clock.call_later(0.0, self._check_safe_to_upsert)
 
     @defer.inlineCallbacks
     def _check_safe_to_upsert(self):

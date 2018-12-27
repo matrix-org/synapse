@@ -49,6 +49,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.db_pool.runWithConnection = runWithConnection
 
         config = Mock()
+        config._enable_native_upserts = False
         config.event_cache_size = 1
         config.database_config = {"name": "sqlite3"}
         hs = TestHomeServer(
