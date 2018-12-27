@@ -198,7 +198,7 @@ class SQLBaseStore(object):
 
         # Check ASAP (and then later, every 1s) to see if we have finished
         # background updates.
-        hs.get_reactor().callLater(0.0, self._check_safe_to_upsert)
+        self._clock.call_later(0.0, self._check_safe_to_upsert)
 
     @defer.inlineCallbacks
     def _check_safe_to_upsert(self):
@@ -217,7 +217,7 @@ class SQLBaseStore(object):
             # the underlying database supports it.
             self._force_simple_upsert = False
         else:
-            self.hs.get_reactor().callLater(1.0, self._check_safe_to_upsert)
+            self._clock.call_later(1.0, self._check_safe_to_upsert)
 
 
     @defer.inlineCallbacks
