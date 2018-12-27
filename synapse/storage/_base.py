@@ -219,7 +219,6 @@ class SQLBaseStore(object):
         else:
             self._clock.call_later(1.0, self._check_safe_to_upsert)
 
-
     @defer.inlineCallbacks
     def has_completed_background_updates(self):
         """
