@@ -654,14 +654,16 @@ class SQLBaseStore(object):
         self, txn, table, keyvalues, values, insertion_values={}
     ):
         """
-        Use the native UPSERT functionality in recent PostgreSQL and SQLite versions.
+        Use the native UPSERT functionality in recent PostgreSQL versions.
         """
         allvalues = {}
         allvalues.update(keyvalues)
         allvalues.update(values)
         allvalues.update(insertion_values)
 
-        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s" % (
+        sql = ("INSERT INTO %s (%s) VALUES (%s) "
+               "ON CONFLICT (%s) DO UPDATE SET %s "
+               "RETURNING (xmax = 0) AS inserted") % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
@@ -669,7 +671,9 @@ class SQLBaseStore(object):
             ", ".join(k + "=EXCLUDED." + k for k in values),
         )
         txn.execute(sql, list(allvalues.values()))
-        return True
+        # One-tuple, which is a boolean for insertion or not
+        res = txn.fetchone()
+        return res[0]
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False, desc="_simple_select_one"):
