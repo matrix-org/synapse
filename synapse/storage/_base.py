@@ -190,12 +190,59 @@ class SQLBaseStore(object):
 
         self._pending_ds = []
 
-        # We force simple upserts always, and then update in
-        # `has_completed_background_updates`, when any required indexes are
-        # built.
+        self.database_engine = hs.database_engine
+
+        # We force simple upserts by default, and then enable them once we have
+        # finished background updates (checked by `_check_safe_to_upsert`).
         self._force_simple_upsert = True
 
-        self.database_engine = hs.database_engine
+        # Check ASAP (and then later, every 1s) to see if we have finished
+        # background updates.
+        hs.get_reactor().callLater(0.0, self._check_safe_to_upsert)
+
+    @defer.inlineCallbacks
+    def _check_safe_to_upsert(self):
+        """
+        Is it safe to use native UPSERT?
+
+        If there are background updates, we will need to wait, as they may be
+        the addition of indexes that set the UNIQUE constraint that we require.
+
+        If the background updates have not completed, wait a second and check again.
+        """
+        completed = yield self.has_completed_background_updates()
+
+        if completed:
+            # Now that indexes are built, we are allowed to do native UPSERTs if
+            # the underlying database supports it.
+            self._force_simple_upsert = False
+        else:
+            self.hs.get_reactor().callLater(1.0, self._check_safe_to_upsert)
+
+
+    @defer.inlineCallbacks
+    def has_completed_background_updates(self):
+        """
+        Check if all the background updates have completed. This is safe to run
+        on the master as well as slaves, and will be overridden by
+        background_updates.BackgroundUpdateStore if we are the master and have a
+        subclass with it.
+
+        Returns: Deferred[bool]: True if all background updates have completed
+        """
+        # otherwise, check if there are updates to be run. This is important,
+        # as we may be running on a worker which doesn't perform the bg updates
+        # itself, but still wants to wait for them to happen.
+        updates = yield self._simple_select_onecol(
+            "background_updates",
+            keyvalues=None,
+            retcol="1",
+            desc="check_background_updates",
+        )
+        if not updates:
+            defer.returnValue(True)
+
+        defer.returnValue(False)
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()

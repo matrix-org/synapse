@@ -337,8 +337,9 @@ class HomeserverTestCase(TestCase):
         stor = hs.get_datastore()
 
         # Run the database background updates.
-        while not self.get_success(stor.has_completed_background_updates()):
-            self.get_success(stor.do_next_background_update(1))
+        if hasattr(stor, "do_next_background_update"):
+            while not self.get_success(stor.has_completed_background_updates()):
+                self.get_success(stor.do_next_background_update(1))
 
         return hs
 

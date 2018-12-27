@@ -143,10 +143,6 @@ class BackgroundUpdateStore(SQLBaseStore):
         )
         if not updates:
             self._all_done = True
-
-            # Now that indexes are built, we are allowed to do native UPSERTs if
-            # the underlying database supports it.
-            self._force_simple_upsert = False
             defer.returnValue(True)
 
         defer.returnValue(False)
