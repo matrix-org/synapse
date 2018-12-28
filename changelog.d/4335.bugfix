@@ -1,0 +1,1 @@
+Fix IndexError on pagination when using lazy member loading but there is no event.
