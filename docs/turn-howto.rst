@@ -40,7 +40,6 @@ You may be able to setup coturn via your package manager,  or set it up manually
  4. Create or edit the config file in ``/etc/turnserver.conf``. The relevant
     lines, with example values, are::
 
-      lt-cred-mech
       use-auth-secret
       static-auth-secret=[your secret key here]
       realm=turn.myserver.org
@@ -52,7 +51,7 @@ You may be able to setup coturn via your package manager,  or set it up manually
 
  5. Consider your security settings.  TURN lets users request a relay
     which will connect to arbitrary IP addresses and ports.  At the least
-    we recommend:
+    we recommend::
 
        # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
        no-tcp-relay
@@ -106,7 +105,7 @@ Your home server configuration file needs the following extra keys:
     to refresh credentials. The TURN REST API specification recommends
     one day (86400000).
 
-  4. "turn_allow_guests": Whether to allow guest users to use the TURN
+ 4. "turn_allow_guests": Whether to allow guest users to use the TURN
     server.  This is enabled by default, as otherwise VoIP will not
     work reliably for guests.  However, it does introduce a security risk
     as it lets guests connect to arbitrary endpoints without having gone
