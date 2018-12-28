@@ -54,6 +54,7 @@ from synapse.rest.client.v2_alpha import (
     user_directory,
 )
 
+
 class ClientRestResource(JsonResource):
     """A resource for version 1 of the matrix client API."""
 
