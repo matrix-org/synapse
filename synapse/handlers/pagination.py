@@ -253,7 +253,7 @@ class PaginationHandler(object):
         )
 
         state = None
-        if event_filter and event_filter.lazy_load_members():
+        if events and event_filter and event_filter.lazy_load_members():
             # TODO: remove redundant members
 
             # FIXME: we also care about invite targets etc.
