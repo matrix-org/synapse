@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class StatsHandler(StateDeltasHandler):
     """Handles keeping the *_stats tables updated with a simple time-series of
     information about the users, rooms and media on the server, such that admins
-    have some idea of who is consuming their resouces.
+    have some idea of who is consuming their resources.
 
     Heavily derived from UserDirectoryHandler
     """
