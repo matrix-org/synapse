@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import six
+from six import text_type
 
 import jsonschema
 from canonicaljson import json
@@ -355,7 +355,7 @@ class Filter(object):
             sender = event.user_id
             room_id = None
             ev_type = "m.presence"
-            is_url = False
+            contains_url = False
         else:
             sender = event.get("sender", None)
             if not sender:
@@ -373,13 +373,13 @@ class Filter(object):
 
             content = event.get("content", {})
             # check if there is a string url field in the content for filtering purposes
-            is_url = isinstance(content.get("url"), six.text_type)
+            contains_url = isinstance(content.get("url"), text_type)
 
         return self.check_fields(
             room_id,
             sender,
             ev_type,
-            is_url,
+            contains_url,
         )
 
     def check_fields(self, room_id, sender, event_type, contains_url):
