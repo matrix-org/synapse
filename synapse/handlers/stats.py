@@ -17,9 +17,10 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.util import logcontext
 from synapse.api.constants import EventTypes, Membership, JoinRules
 from synapse.util.metrics import Measure
-
+from synapse.types import UserID
 from .state_deltas import StateDeltasHandler
 
 logger = logging.getLogger(__name__)
@@ -91,15 +92,16 @@ class StatsHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "stats_delta"):
-                deltas = yield self.store.get_current_state_deltas(self.pos)
-                if not deltas:
-                    return
+                with logcontext.PreserveLoggingContext():
+                    deltas = yield self.store.get_current_state_deltas(self.pos)
+                    if not deltas:
+                        return
 
-                logger.info("Handling %d state deltas", len(deltas))
-                yield self._handle_deltas(deltas)
+                    logger.info("Handling %d state deltas", len(deltas))
+                    yield self._handle_deltas(deltas)
 
-                self.pos = deltas[-1]["stream_id"]
-                yield self.store.update_stats_stream_pos(self.pos)
+                    self.pos = deltas[-1]["stream_id"]
+                    yield self.store.update_stats_stream_pos(self.pos)
 
     @defer.inlineCallbacks
     def _do_initial_spam(self):
@@ -258,7 +260,7 @@ class StatsHandler(StateDeltasHandler):
                 # given we're not testing for a specific result; might as well
                 # just grab the prev_membership and membership strings and
                 # compare them.
-
+                prev_event = None
                 if prev_event_id is not None:
                     prev_event = yield self.store.get_event(prev_event_id)
 
@@ -331,17 +333,32 @@ class StatsHandler(StateDeltasHandler):
                                 +1
                             )
 
+            elif typ == EventTypes.Create:
+                # Newly created room. Add it with all blank portions.
+                yield self.store.update_room_state(
+                    room_id,
+                    {
+                        "join_rules": None,
+                        "history_visibility": None,
+                        "encryption": None,
+                        "name": None,
+                        "topic": None,
+                        "avatar": None,
+                        "canonical_alias": None,
+                    }
+                )
+
             elif typ == EventTypes.JoinRules:
                 self.store.update_room_state(room_id, {
                     "join_rules": event.content.get("join_rule")
                 })
 
                 is_public = self._get_key_change(
-                    room_id, prev_event_id, event_id,
+                    prev_event_id, event_id,
                     "join_rule", JoinRules.PUBLIC
                 )
                 if is_public is not None:
-                    self.store.update_public_room_stats(
+                    self.update_public_room_stats(
                         now, self.stats_bucket_size,
                         room_id, is_public
                     )
@@ -352,7 +369,7 @@ class StatsHandler(StateDeltasHandler):
                 })
 
                 is_public = self._get_key_change(
-                    room_id, prev_event_id, event_id,
+                    prev_event_id, event_id,
                     "history_visibility", "world_readable"
                 )
                 if is_public is not None:
@@ -361,7 +378,7 @@ class StatsHandler(StateDeltasHandler):
                         room_id, is_public
                     )
 
-            elif typ == EventTypes.RoomEncryption:
+            elif typ == EventTypes.Encryption:
                 self.store.update_room_state(room_id, {
                     "encryption": event.content.get("algorithm")
                 })
@@ -390,7 +407,7 @@ class StatsHandler(StateDeltasHandler):
         user_ids = yield self.store.get_users_in_room(room_id)
 
         for user_id in user_ids:
-            if self.is_mine(user_id):
+            if self.hs.is_mine(UserID.from_string(user_id)):
                 self.store.update_stats_delta(
                     ts, bucket_size,
                     "user", user_id,
@@ -415,12 +432,12 @@ class StatsHandler(StateDeltasHandler):
         history_visibility = events.get((EventTypes.RoomHistoryVisibility, ""))
 
         if (
-            join_rules.content.get("join_rule") == JoinRules.PUBLIC or
-            history_visibility.content.get("history_visibility") == "world_readable"
+            (join_rules and join_rules.content.get("join_rule") == JoinRules.PUBLIC) or
+            (history_visibility and history_visibility.content.get("history_visibility") == "world_readable")
         ):
             defer.returnValue(True)
         else:
-            defer.returnValue(True)
+            defer.returnValue(False)
 
     @defer.inlineCallbacks
     def _handle_local_user(self, user_id):

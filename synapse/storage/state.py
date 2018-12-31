@@ -523,17 +523,17 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         def _get_current_state_txn(txn):
             sql = """SELECT type, state_key, event_id FROM current_state_events
-                     WHERE room_id = ? and %s"""
+                     WHERE room_id = ? %s"""
             # Turns out that postgres doesn't like doing a list of OR's and
             # is about 1000x slower, so we just issue a query for each specific
             # type seperately.
             if types:
                 clause_to_args = [
                     (
-                        "AND type = ? AND state_key = ?",
+                        " AND type = ? AND state_key = ?",
                         (etype, state_key)
                     ) if state_key is not None else (
-                        "AND type = ?",
+                        " AND type = ?",
                         (etype,)
                     )
                     for etype, state_key in types
@@ -542,6 +542,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 # If types is None we fetch all the state, and so just use an
                 # empty where clause with no extra args.
                 clause_to_args = [("", [])]
+
+            results = {}
             for where_clause, where_args in clause_to_args:
                 args = [room_id]
                 args.extend(where_args)
@@ -549,15 +551,15 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 for row in txn:
                     typ, state_key, event_id = row
                     key = (typ, state_key)
-                    results[intern_string(key)] = event_id
+                    results[key] = event_id
             return results
 
-        results = self.runInteraction(
+        results = yield self.runInteraction(
             "get_current_state",
             _get_current_state_txn,
         )
         for (key, event_id) in iteritems(results):
-            results[key] = yield self.store.get_event(event_id, allow_none=True)
+            results[key] = yield self.get_event(event_id, allow_none=True)
 
         defer.returnValue(results)
 

@@ -52,6 +52,7 @@ from .roommember import RoomMemberStore
 from .search import SearchStore
 from .signatures import SignatureStore
 from .state import StateStore
+from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
 from .transactions import TransactionStore
@@ -89,6 +90,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 GroupServerStore,
                 UserErasureStore,
                 MonthlyActiveUsersStore,
+                StatsStore,
                 ):
 
     def __init__(self, db_conn, hs):

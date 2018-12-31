@@ -18,6 +18,7 @@ import hashlib
 import os
 import time
 import uuid
+import sys
 import warnings
 from inspect import getcallargs
 
@@ -142,6 +143,10 @@ def default_config(name):
     config.saml2_enabled = False
     config.public_baseurl = None
     config.default_identity_server = None
+
+    config.stats_enable = True
+    config.stats_bucket_size = 86400
+    config.stats_retention = sys.maxsize
 
     config.use_frozen_dicts = False
 
@@ -296,6 +301,7 @@ def setup_test_homeserver(
                 cleanup_func(cleanup)
 
         hs.setup()
+        hs.setup_master()
     else:
         hs = homeserverToUse(
             name,

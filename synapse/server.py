@@ -68,6 +68,7 @@ from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
+from synapse.handlers.stats import StatsHandler
 from synapse.handlers.typing import TypingHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
@@ -131,6 +132,7 @@ class HomeServer(object):
         'room_list_handler',
         'auth_handler',
         'device_handler',
+        'stats_handler',
         'e2e_keys_handler',
         'e2e_room_keys_handler',
         'event_handler',
@@ -178,6 +180,11 @@ class HomeServer(object):
         'sendmail',
     ]
 
+    REQUIRED_ON_MASTER_STARTUP = [
+        "user_directory_handler",
+        "stats_handler"
+    ]
+
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
@@ -211,6 +218,10 @@ class HomeServer(object):
             self.datastore = self.DATASTORE_CLASS(conn, self)
             conn.commit()
         logger.info("Finished setting up.")
+
+    def setup_master(self):
+        for i in self.REQUIRED_ON_MASTER_STARTUP:
+            getattr(self, "get_" + i)()
 
     def get_reactor(self):
         """
@@ -438,6 +449,9 @@ class HomeServer(object):
 
     def build_secrets(self):
         return Secrets()
+
+    def build_stats_handler(self):
+        return StatsHandler(self)
 
     def build_spam_checker(self):
         return SpamChecker(self)

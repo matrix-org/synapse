@@ -733,6 +733,7 @@ class RoomInitialSyncTestCase(RoomBase):
         # create the room
         self.room_id = self.helper.create_room_as(self.user_id)
 
+    @unittest.DEBUG
     def test_initial_sync(self):
         request, channel = self.make_request(
             "GET", "/rooms/%s/initialSync" % self.room_id

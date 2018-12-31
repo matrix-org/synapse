@@ -30,7 +30,7 @@ CREATE TABLE user_stats (
     public_rooms INT NOT NULL,
     private_rooms INT NOT NULL,
     sent_file_count INT NOT NULL,
-    sent_file_size INT NOT NULL,
+    sent_file_size INT NOT NULL
 );
 
 CREATE UNIQUE INDEX user_stats_user_ts ON user_stats(user_id, ts);
@@ -47,7 +47,7 @@ CREATE TABLE room_stats (
     state_events INT NOT NULL,
     local_events INT NOT NULL,
     remote_events INT NOT NULL,
-    sent_events INT NOT NULL, -- number sent per timeslice
+    sent_events INT NOT NULL -- number sent per timeslice
 );
 
 CREATE UNIQUE INDEX room_stats_room_ts ON room_stats(room_id, ts);
@@ -55,13 +55,13 @@ CREATE UNIQUE INDEX room_stats_room_ts ON room_stats(room_id, ts);
 -- cache of current room state; useful for the publicRooms list
 CREATE TABLE room_state (
     room_id TEXT NOT NULL,
-    join_rules TEXT NOT NULL,
-    history_visibility TEXT NOT NULL,
-    encrypted BOOLEAN,
-    name TEXT NOT NULL,
-    topic TEXT NOT NULL,
-    avatar TEXT NOT NULL,
-    canonical_alias TEXT NOT NULL,
+    join_rules TEXT,
+    history_visibility TEXT,
+    encryption TEXT,
+    name TEXT,
+    topic TEXT,
+    avatar TEXT,
+    canonical_alias TEXT
     -- get aliases straight from the right table
 );
 
@@ -73,7 +73,7 @@ CREATE TABLE media_stats (
     local_media_count INT NOT NULL,
     local_media_size INT NOT NULL,
     remote_media_count INT NOT NULL,
-    remote_media_size INT NOT NULL,
+    remote_media_size INT NOT NULL
 );
 
 CREATE UNIQUE INDEX media_stats_ts ON media_stats(ts);

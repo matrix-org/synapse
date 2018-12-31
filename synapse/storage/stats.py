@@ -15,7 +15,7 @@
 
 import logging
 
-from .StateDeltasStore import StateDeltasStore
+from .state_deltas import StateDeltasStore
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class StatsStore(StateDeltasStore):
                 "SELECT * FROM %s"
                 " WHERE %s=? and ts=("
                 "  SELECT MAX(ts) FROM %s"
-                "  WHERE where %s=?"
+                "  WHERE %s=?"
                 ")"
             ) % (table, id_col, table, id_col)
             txn.execute(sql, (stats_id, stats_id))

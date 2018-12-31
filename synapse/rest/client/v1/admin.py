@@ -66,6 +66,34 @@ class UsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class RoomStatsServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/rooms")
+
+    def __init__(self, hs):
+        super(RoomStatsServlet, self).__init__(hs)
+        self.handlers = hs.get_handlers()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, user_id):
+        target_user = UserID.from_string(user_id)
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        # To allow all users to get the users list
+        # if not is_admin and target_user != auth_user:
+        #     raise AuthError(403, "You are not a server admin")
+
+        if not self.hs.is_mine(target_user):
+            raise SynapseError(400, "Can only users a local user")
+
+        ret = yield self.handlers.admin_handler.get_users()
+
+        defer.returnValue((200, ret))
+
+
 class UserRegisterServlet(ClientV1RestServlet):
     """
     Attributes:

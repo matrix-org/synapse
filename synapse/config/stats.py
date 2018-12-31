@@ -26,7 +26,7 @@ class StatsConfig(Config):
     def read_config(self, config):
         self.stats_enable = False
         self.stats_bucket_size = 86400
-        self.stats_retention = sys.maxint
+        self.stats_retention = sys.maxsize
         stats_config = config.get("stats", None)
         if stats_config:
             self.stats_enable = stats_config.get("enable", self.stats_enable)
@@ -40,7 +40,7 @@ class StatsConfig(Config):
         # Stats configuration
         #
         # stats:
-        #    enable: false
+        #    enable: true
         #    bucket_size: 86400 # 1 day
         #    retention: 31536000 # 1 year
         """
