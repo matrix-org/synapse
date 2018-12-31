@@ -20,14 +20,7 @@ from .state_deltas import StateDeltasStore
 logger = logging.getLogger(__name__)
 
 # these fields track relative numbers (e.g. number of events sent in this timeslice)
-RELATIVE_STATS_FIELDS = {
-    "room": (
-        "sent_events"
-    ),
-    "user": (
-        "sent_events"
-    )
-}
+RELATIVE_STATS_FIELDS = {"room": ("sent_events"), "user": ("sent_events")}
 
 # these fields track rather than absolutes (e.g. total number of rooms on the server)
 ABSOLUTE_STATS_FIELDS = {
@@ -52,7 +45,6 @@ ABSOLUTE_STATS_FIELDS = {
 
 
 class StatsStore(StateDeltasStore):
-
     def get_stats_stream_pos(self):
         return self._simple_select_one_onecol(
             table="stats_stream_pos",
@@ -72,9 +64,7 @@ class StatsStore(StateDeltasStore):
     def update_room_state(self, room_id, fields):
         return self._simple_upsert(
             table="room_state",
-            keyvalues={
-                "room_id": room_id,
-            },
+            keyvalues={"room_id": room_id},
             values=fields,
             desc="update_room_state",
         )
@@ -82,10 +72,7 @@ class StatsStore(StateDeltasStore):
     def update_stats(self, stats_type, stats_id, ts, fields):
         return self._simple_upsert(
             table=("%s_stats" % stats_type),
-            keyvalues={
-                ("%s_id" % stats_type): stats_id,
-                "ts": ts,
-            },
+            keyvalues={("%s_id" % stats_type): stats_id, "ts": ts},
             updatevalues=fields,
             desc="update_stats",
         )
@@ -110,9 +97,7 @@ class StatsStore(StateDeltasStore):
                 # subsequent deltas arriving.
                 return
 
-            values = {
-                key: rows[0][key] for key in ABSOLUTE_STATS_FIELDS[stats_type]
-            }
+            values = {key: rows[0][key] for key in ABSOLUTE_STATS_FIELDS[stats_type]}
             values[id_col] = stats_id
             values["ts"] = ts
             values["bucket_size"] = bucket_size
@@ -120,33 +105,23 @@ class StatsStore(StateDeltasStore):
             latest_ts = rows[0]["ts"]
             if ts != latest_ts:
                 # we have to copy our absolute counters over to the new entry.
-                self._simple_insert_txn(
-                    txn,
-                    table=table,
-                    values=values
-                )
+                self._simple_insert_txn(txn, table=table, values=values)
 
             # actually update the new value
             if stats_type in ABSOLUTE_STATS_FIELDS[stats_type]:
                 self._simple_update_txn(
                     txn,
                     table=table,
-                    keyvalues={
-                        id_col: stats_id,
-                        "ts": ts,
-                    },
-                    updatevalues={
-                        field: value
-                    }
+                    keyvalues={id_col: stats_id, "ts": ts},
+                    updatevalues={field: value},
                 )
             else:
-                sql = (
-                    "UPDATE %s "
-                    " SET %s=%s+?"
-                    " WHERE %s=? AND ts=?"
-                ) % (table, field, field, id_col)
+                sql = ("UPDATE %s " " SET %s=%s+?" " WHERE %s=? AND ts=?") % (
+                    table,
+                    field,
+                    field,
+                    id_col,
+                )
                 txn.execute(sql, (value, stats_id, ts))
 
-        return self.runInteraction(
-            "update_stats_delta", _update_stats_delta
-        )
+        return self.runInteraction("update_stats_delta", _update_stats_delta)

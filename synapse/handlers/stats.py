@@ -17,10 +17,11 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util import logcontext
-from synapse.api.constants import EventTypes, Membership, JoinRules
-from synapse.util.metrics import Measure
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.types import UserID
+from synapse.util import logcontext
+from synapse.util.metrics import Measure
+
 from .state_deltas import StateDeltasHandler
 
 logger = logging.getLogger(__name__)
@@ -120,7 +121,7 @@ class StatsHandler(StateDeltasHandler):
             logger.info("Handling room %d/%d", num_processed_rooms + 1, len(room_ids))
             yield self._handle_initial_room(room_id)
             num_processed_rooms += 1
-            yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
+            yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.0)
 
         logger.info("Processed all rooms.")
 
@@ -131,7 +132,7 @@ class StatsHandler(StateDeltasHandler):
             logger.info("Handling user %d/%d", num_processed_users + 1, len(user_ids))
             yield self._handle_local_user(user_id)
             num_processed_users += 1
-            yield self.clock.sleep(self.INITIAL_USER_SLEEP_MS / 1000.)
+            yield self.clock.sleep(self.INITIAL_USER_SLEEP_MS / 1000.0)
 
         logger.info("Processed all users")
 
@@ -153,9 +154,7 @@ class StatsHandler(StateDeltasHandler):
         encryption = yield self.store.get_event(
             current_state_ids.get((EventTypes.RoomEncryption, ""))
         )
-        name = yield self.store.get_event(
-            current_state_ids.get((EventTypes.Name, ""))
-        )
+        name = yield self.store.get_event(current_state_ids.get((EventTypes.Name, "")))
         topic = yield self.store.get_event(
             current_state_ids.get((EventTypes.Topic, ""))
         )
@@ -166,24 +165,24 @@ class StatsHandler(StateDeltasHandler):
             current_state_ids.get((EventTypes.CanonicalAlias, ""))
         )
 
+        def _or_none(x, arg):
+            if x:
+                return x.content.get(arg)
+            return None
+
         yield self.store.update_room_state(
             room_id,
             {
-                "join_rules": join_rules.content.get("join_rule")
-                if join_rules else None,
-                "history_visibility": history_visibility.content.get("history_visibility")
-                if history_visibility else None,
-                "encryption": encryption.content.get("algorithm")
-                if encryption else None,
-                "name": name.content.get("name")
-                if name else None,
-                "topic": name.content.get("topic")
-                if topic else None,
-                "avatar": name.content.get("url")
-                if avatar else None,
-                "canonical_alias": name.content.get("alias")
-                if canonical_alias else None,
-            }
+                "join_rules": _or_none(join_rules, "join_rule"),
+                "history_visibility": _or_none(
+                    history_visibility, "history_visibility"
+                ),
+                "encryption": _or_none(encryption, "algorithm"),
+                "name": _or_none(name, "name"),
+                "topic": _or_none(name, "topic"),
+                "avatar": _or_none(name, "url"),
+                "canonical_alias": _or_none(name, "alias"),
+            },
         )
 
         now = self.clock.time_msec()
@@ -224,7 +223,7 @@ class StatsHandler(StateDeltasHandler):
                 "state_events": state_events,
                 "local_events": local_events,
                 "remote_events": remote_events,
-            }
+            },
         )
 
     @defer.inlineCallbacks
@@ -272,44 +271,76 @@ class StatsHandler(StateDeltasHandler):
                 if prev_membership != membership:
                     if prev_membership == Membership.JOIN:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "joined_members", -1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "joined_members",
+                            -1,
                         )
                     elif prev_membership == Membership.INVITE:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "invited_members", -1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "invited_members",
+                            -1,
                         )
                     elif prev_membership == Membership.LEAVE:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "left_members", -1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "left_members",
+                            -1,
                         )
                     elif prev_membership == Membership.BAN:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "banned_members", -1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "banned_members",
+                            -1,
                         )
 
                     if membership == Membership.JOIN:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "joined_members", +1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "joined_members",
+                            +1,
                         )
                     elif membership == Membership.INVITE:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "invited_members", +1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "invited_members",
+                            +1,
                         )
                     elif membership == Membership.LEAVE:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "left_members", +1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "left_members",
+                            +1,
                         )
                     elif membership == Membership.BAN:
                         yield self.store.update_stats_delta(
-                            now, self.stats_bucket_size,
-                            "room", room_id, "banned_members", +1
+                            now,
+                            self.stats_bucket_size,
+                            "room",
+                            room_id,
+                            "banned_members",
+                            +1,
                         )
 
                 user_id = event.state_key
@@ -320,17 +351,21 @@ class StatsHandler(StateDeltasHandler):
                     if prev_membership != membership:
                         if prev_membership == Membership.JOIN:
                             yield self.store.update_stats_delta(
-                                now, self.stats_bucket_size,
-                                "user", user_id,
+                                now,
+                                self.stats_bucket_size,
+                                "user",
+                                user_id,
                                 "public_rooms" if public else "private_rooms",
-                                -1
+                                -1,
                             )
                         elif membership == Membership.JOIN:
                             yield self.store.update_stats_delta(
-                                now, self.stats_bucket_size,
-                                "user", user_id,
+                                now,
+                                self.stats_bucket_size,
+                                "user",
+                                user_id,
                                 "public_rooms" if public else "private_rooms",
-                                +1
+                                +1,
                             )
 
             elif typ == EventTypes.Create:
@@ -345,59 +380,56 @@ class StatsHandler(StateDeltasHandler):
                         "topic": None,
                         "avatar": None,
                         "canonical_alias": None,
-                    }
+                    },
                 )
 
             elif typ == EventTypes.JoinRules:
-                self.store.update_room_state(room_id, {
-                    "join_rules": event.content.get("join_rule")
-                })
+                self.store.update_room_state(
+                    room_id, {"join_rules": event.content.get("join_rule")}
+                )
 
                 is_public = self._get_key_change(
-                    prev_event_id, event_id,
-                    "join_rule", JoinRules.PUBLIC
+                    prev_event_id, event_id, "join_rule", JoinRules.PUBLIC
                 )
                 if is_public is not None:
                     self.update_public_room_stats(
-                        now, self.stats_bucket_size,
-                        room_id, is_public
+                        now, self.stats_bucket_size, room_id, is_public
                     )
 
             elif typ == EventTypes.RoomHistoryVisibility:
-                yield self.store.update_room_state(room_id, {
-                    "history_visibility": event.content.get("history_visibility")
-                })
+                yield self.store.update_room_state(
+                    room_id,
+                    {"history_visibility": event.content.get("history_visibility")},
+                )
 
                 is_public = self._get_key_change(
-                    prev_event_id, event_id,
-                    "history_visibility", "world_readable"
+                    prev_event_id, event_id, "history_visibility", "world_readable"
                 )
                 if is_public is not None:
                     yield self.update_public_room_stats(
-                        now, self.stats_bucket_size,
-                        room_id, is_public
+                        now, self.stats_bucket_size, room_id, is_public
                     )
 
             elif typ == EventTypes.Encryption:
-                self.store.update_room_state(room_id, {
-                    "encryption": event.content.get("algorithm")
-                })
+                self.store.update_room_state(
+                    room_id, {"encryption": event.content.get("algorithm")}
+                )
             elif typ == EventTypes.Name:
-                self.store.update_room_state(room_id, {
-                    "name": event.content.get("name")
-                })
+                self.store.update_room_state(
+                    room_id, {"name": event.content.get("name")}
+                )
             elif typ == EventTypes.Topic:
-                self.store.update_room_state(room_id, {
-                    "topic": event.content.get("topic")
-                })
+                self.store.update_room_state(
+                    room_id, {"topic": event.content.get("topic")}
+                )
             elif typ == EventTypes.RoomAvatar:
-                self.store.update_room_state(room_id, {
-                    "avatar": event.content.get("url")
-                })
+                self.store.update_room_state(
+                    room_id, {"avatar": event.content.get("url")}
+                )
             elif typ == EventTypes.CanonicalAlias:
-                self.store.update_room_state(room_id, {
-                    "canonical_alias": event.content.get("alias")
-                })
+                self.store.update_room_state(
+                    room_id, {"canonical_alias": event.content.get("alias")}
+                )
 
     @defer.inlineCallbacks
     def update_public_room_stats(self, ts, bucket_size, room_id, is_public):
@@ -409,31 +441,38 @@ class StatsHandler(StateDeltasHandler):
         for user_id in user_ids:
             if self.hs.is_mine(UserID.from_string(user_id)):
                 self.store.update_stats_delta(
-                    ts, bucket_size,
-                    "user", user_id,
-                    "public_rooms", +1 if is_public else -1
+                    ts,
+                    bucket_size,
+                    "user",
+                    user_id,
+                    "public_rooms",
+                    +1 if is_public else -1,
                 )
                 self.store.update_stats_delta(
-                    ts, bucket_size,
-                    "user", user_id,
-                    "private_rooms", -1 if is_public else +1
+                    ts,
+                    bucket_size,
+                    "user",
+                    user_id,
+                    "private_rooms",
+                    -1 if is_public else +1,
                 )
 
     @defer.inlineCallbacks
     def _is_public_room(self, room_id):
         events = yield self.store.get_current_state(
-            room_id, (
-                (EventTypes.JoinRules, ""),
-                (EventTypes.RoomHistoryVisibility, "")
-            )
+            room_id,
+            ((EventTypes.JoinRules, ""), (EventTypes.RoomHistoryVisibility, "")),
         )
 
         join_rules = events.get((EventTypes.JoinRules, ""))
         history_visibility = events.get((EventTypes.RoomHistoryVisibility, ""))
 
-        if (
-            (join_rules and join_rules.content.get("join_rule") == JoinRules.PUBLIC) or
-            (history_visibility and history_visibility.content.get("history_visibility") == "world_readable")
+        if (join_rules and join_rules.content.get("join_rule") == JoinRules.PUBLIC) or (
+            (
+                history_visibility
+                and history_visibility.content.get("history_visibility")
+                == "world_readable"
+            )
         ):
             defer.returnValue(True)
         else:
