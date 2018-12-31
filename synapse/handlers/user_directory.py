@@ -25,10 +25,12 @@ from synapse.storage.roommember import ProfileInfo
 from synapse.types import get_localpart_from_id
 from synapse.util.metrics import Measure
 
+from .state_deltas import StateDeltasHandler
+
 logger = logging.getLogger(__name__)
 
 
-class UserDirectoryHandler(object):
+class UserDirectoryHandler(StateDeltasHandler):
     """Handles querying of and keeping updated the user_directory.
 
     N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
@@ -50,6 +52,8 @@ class UserDirectoryHandler(object):
     INITIAL_USER_SLEEP_MS = 10
 
     def __init__(self, hs):
+        super(UserDirectoryHandler, self).__init__(hs)
+
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -544,7 +548,7 @@ class UserDirectoryHandler(object):
 
     @defer.inlineCallbacks
     def _handle_remove_user(self, room_id, user_id):
-        """Called when we might need to remove user to directory
+        """Called when we might need to remove user from directory
 
         Args:
             room_id (str): room_id that user left or stopped being public that
@@ -656,47 +660,3 @@ class UserDirectoryHandler(object):
             yield self.store.update_profile_in_user_dir(
                 user_id, new_name, new_avatar, room_id,
             )
-
-    @defer.inlineCallbacks
-    def _get_key_change(self, prev_event_id, event_id, key_name, public_value):
-        """Given two events check if the `key_name` field in content changed
-        from not matching `public_value` to doing so.
-
-        For example, check if `history_visibility` (`key_name`) changed from
-        `shared` to `world_readable` (`public_value`).
-
-        Returns:
-            None if the field in the events either both match `public_value`
-            or if neither do, i.e. there has been no change.
-            True if it didnt match `public_value` but now does
-            False if it did match `public_value` but now doesn't
-        """
-        prev_event = None
-        event = None
-        if prev_event_id:
-            prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
-
-        if event_id:
-            event = yield self.store.get_event(event_id, allow_none=True)
-
-        if not event and not prev_event:
-            logger.debug("Neither event exists: %r %r", prev_event_id, event_id)
-            defer.returnValue(None)
-
-        prev_value = None
-        value = None
-
-        if prev_event:
-            prev_value = prev_event.content.get(key_name)
-
-        if event:
-            value = event.content.get(key_name)
-
-        logger.debug("prev_value: %r -> value: %r", prev_value, value)
-
-        if value == public_value and prev_value != public_value:
-            defer.returnValue(True)
-        elif value != public_value and prev_value == public_value:
-            defer.returnValue(False)
-        else:
-            defer.returnValue(None)

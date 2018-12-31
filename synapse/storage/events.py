@@ -1867,6 +1867,43 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
             )
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
 
+    def get_state_event_counts(self, room_id):
+        """Gets the total number of state events in the room
+        """
+
+        def f(txn):
+            sql = (
+                "SELECT COUNT(*)"
+                " FROM state_events"
+                " WHERE room_id=?"
+            )
+            txn.execute(sql, (room_id,))
+            row = txn.fetchone()
+            return row[0] if row else 0
+
+        return self.runInteraction("get_state_event_counts", f)
+
+    def get_event_counts(self, room_id, local_server):
+        """Gets the number of events in the room, split into local versus remote
+        """
+
+        def f(txn):
+            sql = (
+                "SELECT sender LIKE '%%:%s' AS local, COUNT(*)"
+                " FROM events"
+                " WHERE room_id=?"
+                " GROUP BY local"
+            )
+            txn.execute(sql, (local_server, room_id,))
+            rows = txn.fetchall()
+            results = {
+                ("local" if row[0] else "remote") : row[1]
+                for row in rows
+            }
+            return (results.get("local", 0), results.get("remote", 0))
+
+        return self.runInteraction("get_event_counts", f)
+
     def purge_history(
         self, room_id, token, delete_local_events,
     ):

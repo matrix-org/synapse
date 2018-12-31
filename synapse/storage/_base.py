@@ -510,7 +510,7 @@ class SQLBaseStore(object):
 
         Args:
             table (str): The table to upsert into
-            keyvalues (dict): The unique key tables and their new values
+            keyvalues (dict): The unique key columns and their new values
             values (dict): The nonunique columns and their new values
             insertion_values (dict): additional key/values to use only when
                 inserting
