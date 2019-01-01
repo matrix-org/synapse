@@ -73,6 +73,7 @@ CONDITIONAL_REQUIREMENTS = {
     "resources.consent": ["Jinja2>=2.9"],
 
     "saml2": ["pysaml2>=4.5.0"],
+    "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0"],
 }
