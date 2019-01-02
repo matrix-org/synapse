@@ -725,8 +725,8 @@ caveats, you will need to do the following:
   tell other servers how to find you. See `Setting up Federation`_.
 
 When updating the SSL certificate, just update the file pointed to by
-``tls_certificate_path``: there is no need to restart synapse. (You may like to
-use a symbolic link to help make this process atomic.)
+``tls_certificate_path`` and then restart Synapse. (You may like to use a symbolic link
+to help make this process atomic.)
 
 The most common mistake when setting up federation is not to tell Synapse about
 your SSL certificate. To check it, you can visit
