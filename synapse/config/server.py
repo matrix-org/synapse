@@ -18,6 +18,7 @@ import logging
 import os.path
 
 from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -495,3 +496,8 @@ def _check_resource_config(listeners):
             raise ConfigError(
                 "Unknown listener resource '%s'" % (resource, )
             )
+        if resource == "consent":
+            try:
+                check_requirements('resources.consent')
+            except DependencyException as e:
+                raise ConfigError(e.message)
