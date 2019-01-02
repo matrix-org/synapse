@@ -1,0 +1,2 @@
+Avoid packaging _trial_temp directory in -py3 debian packages
+
