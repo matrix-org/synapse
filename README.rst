@@ -796,8 +796,7 @@ A manual password reset can be done via direct database access as follows.
 
 First calculate the hash of the new password::
 
-    $ source ~/synapse/env/bin/activate
-    $ ./scripts/hash_password
+    $ ~/synapse/env/bin/hash_password
     Password:
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
