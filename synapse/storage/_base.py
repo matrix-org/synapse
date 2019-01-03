@@ -603,7 +603,10 @@ class SQLBaseStore(object):
         Pick the UPSERT method which works best on the platform. Either the
         native one (Pg9.5+, recent SQLites), or fall back to an emulated method.
         """
-        if self.database_engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
+        if (
+            self.database_engine.can_native_upsert
+            and table not in self._unsafe_to_upsert_tables
+        ):
             return self._simple_upsert_txn_native_upsert(
                 txn,
                 table,
