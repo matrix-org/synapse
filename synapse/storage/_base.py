@@ -220,7 +220,7 @@ class SQLBaseStore(object):
 
         # The User IPs table in schema #53 was missing a unique index, which we
         # run as a background update.
-        if not "user_ips_device_unique_index" in updates:
+        if "user_ips_device_unique_index" not in updates:
             self._unsafe_to_upsert_tables.discard("user_id")
 
         # If there's any tables left to check, reschedule to run.
