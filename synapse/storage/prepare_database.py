@@ -132,6 +132,8 @@ def _setup_new_database(cur, database_engine):
             ver = int(match.group(0))
             if ver <= SCHEMA_VERSION:
                 valid_dirs.append((ver, abs_path))
+        elif filename == "README.md":
+            # Ignore the readme
         else:
             logger.warn("Unexpected entry in 'full_schemas': %s", filename)
 
