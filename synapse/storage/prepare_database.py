@@ -146,7 +146,7 @@ def _setup_new_database(cur, database_engine):
 
     directory_entries = os.listdir(sql_dir)
 
-    for filename in fnmatch.filter(directory_entries, "*.sql") + fnmatch.filter(directory_entries, "*.sql." + specific):
+    for filename in sorted(fnmatch.filter(directory_entries, "*.sql") + fnmatch.filter(directory_entries, "*.sql." + specific)):
         sql_loc = os.path.join(sql_dir, filename)
         logger.debug("Applying schema %s", sql_loc)
         executescript(cur, sql_loc)
