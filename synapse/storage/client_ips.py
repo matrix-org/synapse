@@ -123,7 +123,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         )
 
     def _update_client_ips_batch_txn(self, txn, to_update):
-        if self._force_simple_upsert or (not self.database_engine.can_native_upsert):
+        if "user_ips" in self._unsafe_to_upsert_tables or (not self.database_engine.can_native_upsert):
             self.database_engine.lock_table(txn, "user_ips")
 
         for entry in iteritems(to_update):

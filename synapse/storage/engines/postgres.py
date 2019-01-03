@@ -42,13 +42,8 @@ class PostgresEngine(object):
         # Get the version of PostgreSQL that we're using. As per the psycopg2
         # docs: The number is formed by converting the major, minor, and
         # revision numbers into two-decimal-digit numbers and appending them
-        # together. For example, version 8.1.5 will be returned as 80105.
-        server_version = str(db_conn.server_version)
-        self._version = (
-            int(server_version[:-4], 10),
-            int(server_version[-4:-2], 10),
-            int(server_version[-2:], 10)
-        )
+        # together. For example, version 8.1.5 will be returned as 80105
+        self._version = db_conn.server_version
 
         db_conn.set_isolation_level(
             self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
@@ -71,7 +66,7 @@ class PostgresEngine(object):
         """
         Can we use native UPSERTs? This requires PostgreSQL 9.5+.
         """
-        return self._version >= (9, 5, 0)
+        return self._version >= 90500
 
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):

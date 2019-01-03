@@ -22,6 +22,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import LoggingTransaction, SQLBaseStore
 from synapse.util.caches.descriptors import cachedInlineCallbacks
@@ -850,12 +851,19 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         return caught_up
 
     def _rotate_notifs_before_txn(self, txn, rotate_to_stream_ordering):
-        old_rotate_stream_ordering = self._simple_select_one_onecol_txn(
-            txn,
-            table="event_push_summary_stream_ordering",
-            keyvalues={},
-            retcol="stream_ordering",
-        )
+        try:
+            old_rotate_stream_ordering = self._simple_select_one_onecol_txn(
+                txn,
+                table="event_push_summary_stream_ordering",
+                keyvalues={},
+                retcol="stream_ordering",
+            )
+        except StoreError as e:
+            if e.code == 404:
+                # The database is empty, assume 0.
+                old_rotate_stream_ordering = 0
+            else:
+                raise
 
         # Calculate the new counts that should be upserted into event_push_summary
         sql = """

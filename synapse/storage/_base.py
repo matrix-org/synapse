@@ -192,13 +192,12 @@ class SQLBaseStore(object):
 
         self.database_engine = hs.database_engine
 
-        # We force simple upserts by default, and then enable them once we have
-        # finished background updates (checked by `_check_safe_to_upsert`).
-        self._force_simple_upsert = True
+        # A set of tables that are not safe to use native upserts in.
+        self._unsafe_to_upsert_tables = {"user_ips"}
 
-        if getattr(hs.config, "_enable_native_upserts", True):
+        if self.database_engine.can_native_upsert:
             # Check ASAP (and then later, every 1s) to see if we have finished
-            # background updates.
+            # background updates of tables that aren't safe to update.
             self._clock.call_later(0.0, self._check_safe_to_upsert)
 
     @defer.inlineCallbacks
@@ -211,38 +210,22 @@ class SQLBaseStore(object):
 
         If the background updates have not completed, wait a second and check again.
         """
-        completed = yield self.has_completed_background_updates()
-
-        if completed:
-            # Now that indexes are built, we are allowed to do native UPSERTs if
-            # the underlying database supports it.
-            self._force_simple_upsert = False
-        else:
-            self._clock.call_later(1.0, self._check_safe_to_upsert)
-
-    @defer.inlineCallbacks
-    def has_completed_background_updates(self):
-        """
-        Check if all the background updates have completed. This is safe to run
-        on the master as well as slaves, and will be overridden by
-        background_updates.BackgroundUpdateStore if we are the master and have a
-        subclass with it.
-
-        Returns: Deferred[bool]: True if all background updates have completed
-        """
-        # otherwise, check if there are updates to be run. This is important,
-        # as we may be running on a worker which doesn't perform the bg updates
-        # itself, but still wants to wait for them to happen.
-        updates = yield self._simple_select_onecol(
+        updates = yield self._simple_select_list(
             "background_updates",
             keyvalues=None,
-            retcol="1",
+            retcols=["update_name"],
             desc="check_background_updates",
         )
-        if not updates:
-            defer.returnValue(True)
+        updates = [x["update_name"] for x in updates]
 
-        defer.returnValue(False)
+        # The User IPs table in schema #53 was missing a unique index, which we
+        # run as a background update.
+        if not "user_ips_device_unique_index" in updates:
+            self._unsafe_to_upsert_tables.discard("user_id")
+
+        # If there's any tables left to check, reschedule to run.
+        if self._unsafe_to_upsert_tables:
+            self._clock.call_later(1.0, self._check_safe_to_upsert)
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
@@ -620,7 +603,7 @@ class SQLBaseStore(object):
         Pick the UPSERT method which works best on the platform. Either the
         native one (Pg9.5+, recent SQLites), or fall back to an emulated method.
         """
-        if self.database_engine.can_native_upsert and not self._force_simple_upsert:
+        if self.database_engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
             return self._simple_upsert_txn_native_upsert(
                 txn,
                 table,
