@@ -36,14 +36,15 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     assert "config" in args, "Need configuration"
+    assert args.config, "Need configuration"
 
     config = yaml.safe_load(args.config)
 
     db_type = config["database"]["name"]
-    db_config = config["database"]
+    db_config = config["database"]["args"]
 
     db_params = {
-        k: v for k, v in db_config.get("args", {}).items()
+        k: v for k, v in db_config.items()
         if not k.startswith("cp_")
     }
 
@@ -56,7 +57,7 @@ if __name__ == "__main__":
 
     cur = conn.cursor()
 
-    cur.execute("SELECT user from users;")
+    cur.execute("SELECT name from users;")
     users = cur.fetchall()
 
     for user in users:
@@ -65,12 +66,12 @@ if __name__ == "__main__":
         print("Processing user %s" % (uid,))
 
         # Get their access tokens
-        cur.execute("SELECT token FROM access_tokens WHERE user_id = ?", (uid,))
+        cur.execute("SELECT token FROM access_tokens WHERE user_id = ?;", (uid,))
         user_tokens = {x[0] for x in cur.fetchall()}
 
         print("Got %d valid tokens" % (len(user_tokens),))
 
-        cur.execute("SELECT access_token, last_seen FROM user_ips WHERE user_id = ?", (uid,))
+        cur.execute("SELECT access_token, last_seen FROM user_ips WHERE user_id = ?;", (uid,))
         rows = cur.fetchall()
         print("Got %s rows" % (len(rows),))
 
@@ -89,13 +90,13 @@ if __name__ == "__main__":
             print("Deleting %d invalid tokens" % (len(invalid_tokens),))
 
             for i in invalid_tokens:
-                cur.execute("DELETE FROM user_ips WHERE user_id = ? AND access_token = ?", (uid, i))
+                cur.execute("DELETE FROM user_ips WHERE user_id = ? AND access_token = ?;", (uid, i))
 
         for token in valid_tokens:
             max_last_seen = max(tokens[token])
-            cur.execute("DELETE FROM user_ips WHERE user_id = ? AND access_token = ? AND last_seen < ?", (uid, i, max_last_seen))
+            cur.execute("DELETE FROM user_ips WHERE user_id = ? AND access_token = ? AND last_seen < ?;", (uid, i, max_last_seen))
 
-        cur.execute("SELECT last_seen FROM user_ips WHERE user_id = ?", (uid,))
+        cur.execute("SELECT last_seen FROM user_ips WHERE user_id = ?;", (uid,))
         new_rows = cur.fetchall()
         print("Cleaned up %s rows" % (len(rows) - len(new_rows),))
 
