@@ -58,7 +58,6 @@ if __name__ == "__main__":
     conn = db_module.connect(**db_params)
 
     cur = conn.cursor()
-
     cur.execute("SELECT name from users;")
     users = cur.fetchall()
 
@@ -101,4 +100,6 @@ if __name__ == "__main__":
         cur.execute("SELECT last_seen FROM user_ips WHERE user_id = " + key + ";", (uid,))
         new_rows = cur.fetchall()
         print("Cleaned up %s rows" % (len(rows) - len(new_rows),))
+
+        conn.commit()
 
