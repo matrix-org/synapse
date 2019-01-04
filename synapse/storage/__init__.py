@@ -372,8 +372,8 @@ class DataStore(RoomMemberStore, RoomStore,
             now = self.clock.time_msec()
 
             sql = """
-                INSERT INTO user_daily_visits (user_id, device_id, timestamp)
-                    SELECT u.user_id, u.device_id, ?
+                INSERT INTO user_daily_visits (user_id, device_id, timestamp, user_agent)
+                    SELECT u.user_id, u.device_id, ?, u.user_agent
                     FROM user_ips AS u
                     LEFT JOIN (
                       SELECT user_id, device_id, timestamp FROM user_daily_visits

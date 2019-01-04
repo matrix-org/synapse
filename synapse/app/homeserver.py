@@ -500,11 +500,11 @@ def run(hs):
             "generate_user_daily_visits",
             hs.get_datastore().generate_user_daily_visits,
         )
-
-    # Rather than update on per session basis, batch up the requests.
-    # If you increase the loop period, the accuracy of user_daily_visits
-    # table will decrease
-    clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
+    if hs.config.store_user_daily_visits:
+        # Rather than update on per session basis, batch up the requests.
+        # If you increase the loop period, the accuracy of user_daily_visits
+        # table will decrease
+        clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
     # monthly active user limiting functionality
     def reap_monthly_active_users():
