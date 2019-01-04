@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
         for token in valid_tokens:
             max_last_seen = max(tokens[token])
-            cur.execute("DELETE FROM user_ips WHERE user_id = " + key + " AND access_token = " + key + " AND last_seen < " + key + ";", (uid, i, max_last_seen))
+            cur.execute("DELETE FROM user_ips WHERE user_id = " + key + " AND access_token = " + key + " AND last_seen < " + key + ";", (uid, token, max_last_seen))
 
         cur.execute("SELECT last_seen FROM user_ips WHERE user_id = " + key + ";", (uid,))
         new_rows = cur.fetchall()
