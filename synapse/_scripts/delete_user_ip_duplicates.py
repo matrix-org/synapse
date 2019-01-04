@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
         print("Got %d stores tokens" % (len(tokens),))
 
-        invalid_tokens = set(tokens.keys()) ^ user_tokens
+        invalid_tokens = set(tokens.keys()) - user_tokens
         valid_tokens = set(tokens.keys()) & user_tokens
 
         if invalid_tokens:
