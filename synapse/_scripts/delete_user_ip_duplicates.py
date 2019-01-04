@@ -39,7 +39,7 @@ if __name__ == "__main__":
     config = yaml.safe_load(args.config)
 
     db_type = config["database"]["name"]
-    db_config = config["database", "args"]
+    db_config = config["database"]["args"]
 
     db_params = {
         k: v for k, v in db_config.get("args", {}).items()
