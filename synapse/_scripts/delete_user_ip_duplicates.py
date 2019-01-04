@@ -50,8 +50,10 @@ if __name__ == "__main__":
 
     if db_type == "sqlite3":
         import sqlite3 as db_module
+        key = "?"
     elif db_type == "psycopg2":
         import psycopg2 as db_module
+        key = "%s"
 
     conn = db_module.connect(**db_params)
 
@@ -66,12 +68,12 @@ if __name__ == "__main__":
         print("Processing user %s" % (uid,))
 
         # Get their access tokens
-        cur.execute("SELECT token FROM access_tokens WHERE user_id = ?;", (uid,))
+        cur.execute("SELECT token FROM access_tokens WHERE user_id = " + key + ";", (uid,))
         user_tokens = {x[0] for x in cur.fetchall()}
 
         print("Got %d valid tokens" % (len(user_tokens),))
 
-        cur.execute("SELECT access_token, last_seen FROM user_ips WHERE user_id = ?;", (uid,))
+        cur.execute("SELECT access_token, last_seen FROM user_ips WHERE user_id = " + key + ";", (uid,))
         rows = cur.fetchall()
         print("Got %s rows" % (len(rows),))
 
@@ -90,13 +92,13 @@ if __name__ == "__main__":
             print("Deleting %d invalid tokens" % (len(invalid_tokens),))
 
             for i in invalid_tokens:
-                cur.execute("DELETE FROM user_ips WHERE user_id = ? AND access_token = ?;", (uid, i))
+                cur.execute("DELETE FROM user_ips WHERE user_id = " + key + " AND access_token = " + key + ";", (uid, i))
 
         for token in valid_tokens:
             max_last_seen = max(tokens[token])
-            cur.execute("DELETE FROM user_ips WHERE user_id = ? AND access_token = ? AND last_seen < ?;", (uid, i, max_last_seen))
+            cur.execute("DELETE FROM user_ips WHERE user_id = " + key + " AND access_token = " + key + " AND last_seen < " + key + ";", (uid, i, max_last_seen))
 
-        cur.execute("SELECT last_seen FROM user_ips WHERE user_id = ?;", (uid,))
+        cur.execute("SELECT last_seen FROM user_ips WHERE user_id = " + key + ";", (uid,))
         new_rows = cur.fetchall()
         print("Cleaned up %s rows" % (len(rows) - len(new_rows),))
 
