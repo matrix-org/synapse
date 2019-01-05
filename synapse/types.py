@@ -165,7 +165,7 @@ class DomainSpecificString(
                 domain = decode_idna(domain)
             else:
                 encode_idna(domain)
-        except (idna.IDNAError, IndexError):
+        except (Exception):
             raise SynapseError(
                 400, "%s got invalid domain name" % (cls.__name__, )
             )
