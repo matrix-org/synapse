@@ -32,7 +32,7 @@ from .ratelimiting import RatelimitConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
 from .room_directory import RoomDirectoryConfig
-from .saml2 import SAML2Config
+from .saml2_config import SAML2Config
 from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig
@@ -53,10 +53,3 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        ServerNoticesConfig, RoomDirectoryConfig,
                        ):
     pass
-
-
-if __name__ == '__main__':
-    import sys
-    sys.stdout.write(
-        HomeServerConfig().generate_config(sys.argv[1], sys.argv[2], True)[0]
-    )

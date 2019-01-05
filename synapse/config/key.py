@@ -66,26 +66,35 @@ class KeyConfig(Config):
         # falsification of values
         self.form_secret = config.get("form_secret", None)
 
-    def default_config(self, config_dir_path, server_name, is_generating_file=False,
+    def default_config(self, config_dir_path, server_name, generate_secrets=False,
                        **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        if is_generating_file:
-            macaroon_secret_key = random_string_with_symbols(50)
-            form_secret = '"%s"' % random_string_with_symbols(50)
+        if generate_secrets:
+            macaroon_secret_key = 'macaroon_secret_key: "%s"' % (
+                random_string_with_symbols(50),
+            )
+            form_secret = 'form_secret: "%s"' % random_string_with_symbols(50)
         else:
-            macaroon_secret_key = None
-            form_secret = 'null'
+            macaroon_secret_key = "# macaroon_secret_key: <PRIVATE STRING>"
+            form_secret = "# form_secret: <PRIVATE STRING>"
 
         return """\
-        macaroon_secret_key: "%(macaroon_secret_key)s"
+        # a secret which is used to sign access tokens. If none is specified,
+        # the registration_shared_secret is used, if one is given; otherwise,
+        # a secret key is derived from the signing key.
+        #
+        # Note that changing this will invalidate any active access tokens, so
+        # all clients will have to log back in.
+        %(macaroon_secret_key)s
 
         # Used to enable access token expiration.
         expire_access_token: False
 
         # a secret which is used to calculate HMACs for form values, to stop
-        # falsification of values
-        form_secret: %(form_secret)s
+        # falsification of values. Must be specified for the User Consent
+        # forms to work.
+        %(form_secret)s
 
         ## Signing Keys ##
 

@@ -16,6 +16,8 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from synapse.api.constants import UserTypes
+
 from tests.unittest import HomeserverTestCase
 
 FORTY_DAYS = 40 * 24 * 60 * 60
@@ -28,6 +30,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store = hs.get_datastore()
         hs.config.limit_usage_by_mau = True
         hs.config.max_mau_value = 50
+
         # Advance the clock a bit
         reactor.advance(FORTY_DAYS)
 
@@ -39,14 +42,23 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         user1_email = "user1@matrix.org"
         user2 = "@user2:server"
         user2_email = "user2@matrix.org"
+        user3 = "@user3:server"
+        user3_email = "user3@matrix.org"
+
         threepids = [
             {'medium': 'email', 'address': user1_email},
             {'medium': 'email', 'address': user2_email},
+            {'medium': 'email', 'address': user3_email},
         ]
-        user_num = len(threepids)
+        # -1 because user3 is a support user and does not count
+        user_num = len(threepids) - 1
 
         self.store.register(user_id=user1, token="123", password_hash=None)
         self.store.register(user_id=user2, token="456", password_hash=None)
+        self.store.register(
+            user_id=user3, token="789",
+            password_hash=None, user_type=UserTypes.SUPPORT
+        )
         self.pump()
 
         now = int(self.hs.get_clock().time_msec())
@@ -60,7 +72,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
 
         active_count = self.store.get_monthly_active_count()
 
-        # Test total counts
+        # Test total counts, ensure user3 (support user) is not counted
         self.assertEquals(self.get_success(active_count), user_num)
 
         # Test user is marked as active
@@ -149,7 +161,7 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
 
     def test_populate_monthly_users_is_guest(self):
         # Test that guest users are not added to mau list
-        user_id = "user_id"
+        user_id = "@user_id:host"
         self.store.register(
             user_id=user_id, token="123", password_hash=None, make_guest=True
         )
@@ -220,6 +232,24 @@ class MonthlyActiveUsersTestCase(HomeserverTestCase):
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
         count = self.store.get_registered_reserved_users_count()
         self.assertEquals(self.get_success(count), len(threepids))
+
+    def test_support_user_not_add_to_mau_limits(self):
+        support_user_id = "@support:test"
+        count = self.store.get_monthly_active_count()
+        self.pump()
+        self.assertEqual(self.get_success(count), 0)
+
+        self.store.register(
+            user_id=support_user_id,
+            token="123",
+            password_hash=None,
+            user_type=UserTypes.SUPPORT
+        )
+
+        self.store.upsert_monthly_active_user(support_user_id)
+        count = self.store.get_monthly_active_count()
+        self.pump()
+        self.assertEqual(self.get_success(count), 0)
 
     def test_track_monthly_users_without_cap(self):
         self.hs.config.limit_usage_by_mau = False

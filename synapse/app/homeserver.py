@@ -54,12 +54,13 @@ from synapse.metrics import RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.module_api import ModuleApi
-from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, check_requirements
+from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
+from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore, are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
@@ -77,36 +78,6 @@ logger = logging.getLogger("synapse.app.homeserver")
 
 def gz_wrap(r):
     return EncodingResourceWrapper(r, [GzipEncoderFactory()])
-
-
-def build_resource_for_web_client(hs):
-    webclient_path = hs.get_config().web_client_location
-    if not webclient_path:
-        try:
-            import syweb
-        except ImportError:
-            quit_with_error(
-                "Could not find a webclient.\n\n"
-                "Please either install the matrix-angular-sdk or configure\n"
-                "the location of the source to serve via the configuration\n"
-                "option `web_client_location`\n\n"
-                "To install the `matrix-angular-sdk` via pip, run:\n\n"
-                "    pip install '%(dep)s'\n"
-                "\n"
-                "You can also disable hosting of the webclient via the\n"
-                "configuration option `web_client`\n"
-                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
-            )
-        syweb_path = os.path.dirname(syweb.__file__)
-        webclient_path = os.path.join(syweb_path, "webclient")
-    # GZip is disabled here due to
-    # https://twistedmatrix.com/trac/ticket/7678
-    # (It can stay enabled for the API resources: they call
-    # write() with the whole body and then finish() straight
-    # after and so do not trigger the bug.
-    # GzipFile was removed in commit 184ba09
-    # return GzipFile(webclient_path)  # TODO configurable?
-    return File(webclient_path)  # TODO configurable?
 
 
 class SynapseHomeServer(HomeServer):
@@ -137,8 +108,11 @@ class SynapseHomeServer(HomeServer):
             handler = handler_cls(config, module_api)
             resources[path] = AdditionalResource(self, handler.handle_request)
 
+        # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
             root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+        elif STATIC_PREFIX in resources:
+            root_resource = RootRedirect(STATIC_PREFIX)
         else:
             root_resource = NoResource()
 
@@ -195,7 +169,12 @@ class SynapseHomeServer(HomeServer):
                 "/_matrix/client/unstable": client_resource,
                 "/_matrix/client/v2_alpha": client_resource,
                 "/_matrix/client/versions": client_resource,
+                "/.well-known/matrix/client": WellKnownResource(self),
             })
+
+            if self.get_config().saml2_enabled:
+                from synapse.rest.saml2 import SAML2Resource
+                resources["/_matrix/saml2"] = SAML2Resource(self)
 
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
@@ -237,7 +216,16 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
+            webclient_path = self.get_config().web_client_location
+
+            if webclient_path is None:
+                logger.warning(
+                    "Not enabling webclient resource, as web_client_location is unset."
+                )
+            else:
+                # GZip is disabled here due to
+                # https://twistedmatrix.com/trac/ticket/7678
+                resources[WEB_CLIENT_PREFIX] = File(webclient_path)
 
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
@@ -333,9 +321,6 @@ def setup(config_options):
         sys.exit(0)
 
     synapse.config.logger.setup_logging(config, use_worker_options=False)
-
-    # check any extra requirements we have now we have a config
-    check_requirements(config)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -549,7 +534,7 @@ def run(hs):
         )
 
     start_generate_monthly_active_users()
-    if hs.config.limit_usage_by_mau:
+    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
         clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 

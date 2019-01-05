@@ -24,10 +24,16 @@ class MetricsConfig(Config):
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
     def default_config(self, report_stats=None, **kwargs):
-        suffix = "" if report_stats is None else "report_stats: %(report_stats)s\n"
-        return ("""\
+        res = """\
         ## Metrics ###
 
         # Enable collection and rendering of performance metrics
         enable_metrics: False
-        """ + suffix) % locals()
+        """
+
+        if report_stats is None:
+            res += "# report_stats: true|false\n"
+        else:
+            res += "report_stats: %s\n" % ('true' if report_stats else 'false')
+
+        return res

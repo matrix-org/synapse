@@ -34,7 +34,9 @@ from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContext, LoggingContextFilter
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
-from tests.utils import default_config
+from tests.utils import default_config, setupdb
+
+setupdb()
 
 # Set up putting Synapse's logs into Trial's.
 rootLogger = logging.getLogger()
@@ -371,6 +373,7 @@ class HomeserverTestCase(TestCase):
             nonce_str += b"\x00admin"
         else:
             nonce_str += b"\x00notadmin"
+
         want_mac.update(nonce.encode('ascii') + b"\x00" + nonce_str)
         want_mac = want_mac.hexdigest()
 

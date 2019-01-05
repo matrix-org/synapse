@@ -433,7 +433,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        self.auth.check_auth_blocking(user_id)
+        yield self.auth.check_auth_blocking(user_id)
 
         if not self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")
