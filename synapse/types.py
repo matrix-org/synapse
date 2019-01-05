@@ -16,6 +16,8 @@ import re
 import string
 from collections import namedtuple
 
+import idna
+
 from synapse.api.errors import SynapseError
 
 
@@ -151,7 +153,16 @@ class DomainSpecificString(
                 )
             )
 
-        domain = parts[1]
+        domain = parts[1].strip()
+        try:
+            if domain[2:4] == '--':
+                domain = idna.decode(domain)
+            else:
+                idna.encode(domain)
+        except idna.IDNAError:
+            raise SynapseError(
+                400, "%s got invalid domain name" % (cls.__name__, )
+            )
 
         # This code will need changing if we want to support multiple domain
         # names on one HS
