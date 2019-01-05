@@ -148,8 +148,11 @@ class DomainSpecificString(
                 )
             )
 
+        port = None
         try:
             localpart, domain = s[1:].split(':', 1)
+            if ':' in domain:
+                domain, port = domain.split(':')
         except ValueError:
             raise SynapseError(
                 400, "Expected %s of the form '%slocalname:domain'" % (
@@ -163,10 +166,13 @@ class DomainSpecificString(
                 domain = idna.decode(domain)
             else:
                 idna.encode(domain)
-        except idna.IDNAError:
+        except (idna.IDNAError, IndexError):
             raise SynapseError(
                 400, "%s got invalid domain name" % (cls.__name__, )
             )
+
+        if port:
+            domain = ':'.join([domain, port])
 
         # This code will need changing if we want to support multiple domain
         # names on one HS
