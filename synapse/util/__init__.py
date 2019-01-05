@@ -17,6 +17,7 @@ import logging
 import re
 from itertools import islice
 
+import six
 import attr
 
 from twisted.internet import defer, task
@@ -163,3 +164,31 @@ def glob_to_regex(glob):
 
     # \A anchors at start of string, \Z at end of string
     return re.compile(r"\A" + res + r"\Z", re.IGNORECASE)
+
+
+def encode_idna(text):
+    """
+    Convert some text typed by a human into some ASCII bytes. This is a
+    copy of twisted.internet._idna._idnaBytes. For documentation, see the
+    twisted documentation.
+    """
+    try:
+        import idna
+    except ImportError:
+        return text.encode("idna")
+    else:
+        return idna.encode(text)
+
+
+def decode_idna(text):
+    """
+    Convert some idna encoded ascii string/bytes into human form.
+    """
+    try:
+        import idna
+    except ImportError:
+        if isinstance(text, six.text_type):
+            text = text.encode('ascii')
+        return text.decode("idna")
+    else:
+        return idna.decode(text)

@@ -21,6 +21,8 @@ from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.internet.ssl import CertificateOptions, ContextFactory
 from twisted.python.failure import Failure
 
+from synapse.util import encode_idna
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,20 +55,6 @@ class ServerContextFactory(ContextFactory):
         return self._context
 
 
-def _idnaBytes(text):
-    """
-    Convert some text typed by a human into some ASCII bytes. This is a
-    copy of twisted.internet._idna._idnaBytes. For documentation, see the
-    twisted documentation.
-    """
-    try:
-        import idna
-    except ImportError:
-        return text.encode("idna")
-    else:
-        return idna.encode(text)
-
-
 def _tolerateErrors(wrapped):
     """
     Wrap up an info_callback for pyOpenSSL so that if something goes wrong
@@ -97,7 +85,7 @@ class ClientTLSOptions(object):
     def __init__(self, hostname, ctx):
         self._ctx = ctx
         self._hostname = hostname
-        self._hostnameBytes = _idnaBytes(hostname)
+        self._hostnameBytes = encode_idna(hostname)
         ctx.set_info_callback(
             _tolerateErrors(self._identityVerifyingInfoCallback)
         )
