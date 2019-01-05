@@ -17,7 +17,7 @@ import string
 from collections import namedtuple
 
 from synapse.api.errors import SynapseError
-from synapse.util import encode_idna, decode_idna
+from synapse.util import decode_idna, encode_idna
 
 
 class Requester(namedtuple("Requester", [
@@ -165,7 +165,7 @@ class DomainSpecificString(
                 domain = decode_idna(domain)
             else:
                 encode_idna(domain)
-        except (Exception):
+        except Exception:
             raise SynapseError(
                 400, "%s got invalid domain name" % (cls.__name__, )
             )
