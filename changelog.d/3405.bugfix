@@ -1,0 +1,1 @@
+Fix contains_url check to be consistent with other instances in code-base and check that value is an instance of string.
