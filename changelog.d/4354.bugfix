@@ -1,0 +1,1 @@
+Improve logging to synapse.storage._base._new_transaction not to swallow exceptions

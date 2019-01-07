@@ -264,7 +264,7 @@ class SQLBaseStore(object):
                                 name, exception_to_unicode(e1),
                             )
                         continue
-                    raise
+                    raise e
                 except self.database_engine.module.DatabaseError as e:
                     if self.database_engine.is_deadlock(e):
                         logger.warning("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
@@ -278,10 +278,10 @@ class SQLBaseStore(object):
                                     name, exception_to_unicode(e1),
                                 )
                             continue
-                    raise
+                    raise e
         except Exception as e:
-            logger.debug("[TXN FAIL] {%s} %s", name, e)
-            raise
+            logger.exception("[TXN FAIL] {%s} %s", name, exception_to_unicode(e))
+            raise e
         finally:
             end = time.time()
             duration = end - start
