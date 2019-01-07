@@ -340,6 +340,30 @@ class MatrixFederationHttpClient(object):
                             request_deferred,
                         )
 
+                    logger.info(
+                        "{%s} [%s] Got response headers: %d %s",
+                        request.txn_id,
+                        request.destination,
+                        response.code,
+                        response.phrase.decode('ascii', errors='replace'),
+                    )
+
+                    if 200 <= response.code < 300:
+                        pass
+                    else:
+                        # :'(
+                        # Update transactions table?
+                        d = treq.content(response)
+                        d = timeout_deferred(
+                            d,
+                            timeout=_sec_timeout,
+                            reactor=self.hs.get_reactor(),
+                        )
+                        body = yield make_deferred_yieldable(d)
+                        raise HttpResponseException(
+                            response.code, response.phrase, body
+                        )
+
                     break
                 except Exception as e:
                     logger.warn(
@@ -353,6 +377,11 @@ class MatrixFederationHttpClient(object):
 
                     if not retry_on_dns_fail and isinstance(e, DNSLookupError):
                         raise
+
+                    if isinstance(e, HttpResponseException):
+                        # Don't retry for 4xx except 429 (Too Many Requests)
+                        if e.code != 429 and 400 <= e.code < 500:
+                            raise
 
                     if retries_left and not timeout:
                         if long_retries:
@@ -375,30 +404,6 @@ class MatrixFederationHttpClient(object):
                         retries_left -= 1
                     else:
                         raise
-
-            logger.info(
-                "{%s} [%s] Got response headers: %d %s",
-                request.txn_id,
-                request.destination,
-                response.code,
-                response.phrase.decode('ascii', errors='replace'),
-            )
-
-            if 200 <= response.code < 300:
-                pass
-            else:
-                # :'(
-                # Update transactions table?
-                d = treq.content(response)
-                d = timeout_deferred(
-                    d,
-                    timeout=_sec_timeout,
-                    reactor=self.hs.get_reactor(),
-                )
-                body = yield make_deferred_yieldable(d)
-                raise HttpResponseException(
-                    response.code, response.phrase, body
-                )
 
             defer.returnValue(response)
 
