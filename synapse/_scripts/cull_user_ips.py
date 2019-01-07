@@ -17,6 +17,7 @@ from __future__ import print_function
 
 import argparse
 from collections import defaultdict
+
 import yaml
 
 from synapse.storage.engines.postgres import PostgresEngine
