@@ -167,7 +167,7 @@ class TestHomeServer(HomeServer):
 
 @defer.inlineCallbacks
 def setup_test_homeserver(
-    cleanup_func,
+    self,
     name="test",
     datastore=None,
     config=None,
@@ -182,8 +182,7 @@ def setup_test_homeserver(
     If no datastore is supplied, one is created and given to the homeserver.
 
     Args:
-        cleanup_func : The function used to register a cleanup routine for
-                       after the test.
+        self: The UnitTest class.
     """
     if reactor is None:
         from twisted.internet import reactor
@@ -204,9 +203,12 @@ def setup_test_homeserver(
             "args": {"database": test_db, "cp_min": 1, "cp_max": 5},
         }
     else:
+        test_dir = self.mktemp()
+        os.mkdir(test_dir)
+
         config.database_config = {
             "name": "sqlite3",
-            "args": {"database": "test.db", "cp_min": 1, "cp_max": 1},
+            "args": {"database": os.path.join(test_dir, "test.db"), "cp_min": 1, "cp_max": 1},
         }
 
     db_engine = create_engine(config.database_config)
@@ -293,7 +295,7 @@ def setup_test_homeserver(
 
             if not LEAVE_DB:
                 # Register the cleanup hook
-                cleanup_func(cleanup)
+                self.addCleanup(cleanup)
 
         hs.setup()
     else:

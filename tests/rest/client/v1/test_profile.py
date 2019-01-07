@@ -46,7 +46,7 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         hs = yield setup_test_homeserver(
-            self.addCleanup,
+            self,
             "test",
             http_client=None,
             resource_for_client=self.mock_resource,

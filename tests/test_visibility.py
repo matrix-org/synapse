@@ -31,7 +31,7 @@ TEST_ROOM_ID = "!TEST:ROOM"
 class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.hs = yield setup_test_homeserver(self)
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.store = self.hs.get_datastore()

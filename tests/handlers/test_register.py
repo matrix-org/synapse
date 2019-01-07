@@ -41,7 +41,7 @@ class RegistrationTestCase(unittest.TestCase):
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
         self.hs = yield setup_test_homeserver(
-            self.addCleanup,
+            self,
             expire_access_token=True,
         )
         self.macaroon_generator = Mock(

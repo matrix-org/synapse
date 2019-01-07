@@ -35,7 +35,7 @@ class AuthHandlers(object):
 class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup, handlers=None)
+        self.hs = yield setup_test_homeserver(self, handlers=None)
         self.hs.handlers = AuthHandlers(self.hs)
         self.auth_handler = self.hs.handlers.auth_handler
         self.macaroon_generator = self.hs.get_macaroon_generator()

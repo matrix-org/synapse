@@ -39,7 +39,7 @@ class AuthTestCase(unittest.TestCase):
         self.state_handler = Mock()
         self.store = Mock()
 
-        self.hs = yield setup_test_homeserver(self.addCleanup, handlers=None)
+        self.hs = yield setup_test_homeserver(self, handlers=None)
         self.hs.get_datastore = Mock(return_value=self.store)
         self.hs.handlers = TestHandlers(self.hs)
         self.auth = Auth(self.hs)

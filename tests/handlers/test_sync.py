@@ -29,7 +29,7 @@ class SyncTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.hs = yield setup_test_homeserver(self)
         self.sync_handler = SyncHandler(self.hs)
         self.store = self.hs.get_datastore()
 

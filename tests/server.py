@@ -266,12 +266,12 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         return d
 
 
-def setup_test_homeserver(cleanup_func, *args, **kwargs):
+def setup_test_homeserver(self, *args, **kwargs):
     """
     Set up a synchronous test server, driven by the reactor used by
     the homeserver.
     """
-    d = _sth(cleanup_func, *args, **kwargs).result
+    d = _sth(self, *args, **kwargs).result
 
     if isinstance(d, Failure):
         d.raiseException()

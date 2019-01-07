@@ -29,7 +29,7 @@ BOBBY = "@bobby:a"
 class UserDirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.hs = yield setup_test_homeserver(self)
         self.store = UserDirectoryStore(self.hs.get_db_conn(), self.hs)
 
         # alice and bob are both in !room_id. bobby is not but shares

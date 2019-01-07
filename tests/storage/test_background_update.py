@@ -10,7 +10,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield setup_test_homeserver(
-            self.addCleanup
+            self
         )  # type: synapse.server.HomeServer
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()

@@ -333,7 +333,7 @@ class HomeserverTestCase(TestCase):
         """
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
-        return setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        return setup_test_homeserver(self, *args, **kwargs)
 
     def pump(self, by=0.0):
         """

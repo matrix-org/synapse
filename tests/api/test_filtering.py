@@ -46,7 +46,7 @@ class FilteringTestCase(unittest.TestCase):
         self.mock_http_client.put_json = DeferredMockCallable()
 
         hs = yield setup_test_homeserver(
-            self.addCleanup,
+            self,
             handlers=None,
             http_client=self.mock_http_client,
             keyring=Mock(),

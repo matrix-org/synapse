@@ -48,7 +48,7 @@ class ProfileTestCase(unittest.TestCase):
         self.mock_registry.register_query_handler = register_query_handler
 
         hs = yield setup_test_homeserver(
-            self.addCleanup,
+            self,
             http_client=None,
             handlers=None,
             resource_for_federation=Mock(),

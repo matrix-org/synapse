@@ -22,7 +22,7 @@ import tests.utils
 class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
+        hs = yield tests.utils.setup_test_homeserver(self)
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks

@@ -15,7 +15,7 @@ from tests.utils import setup_test_homeserver
 class TestResourceLimitsServerNotices(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.hs = yield setup_test_homeserver(self)
         self.server_notices_sender = self.hs.get_server_notices_sender()
 
         # relying on [1] is far from ideal, but the only case where
@@ -140,7 +140,7 @@ class TestResourceLimitsServerNotices(unittest.TestCase):
 class TestResourceLimitsServerNoticesWithRealRooms(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
+        self.hs = yield setup_test_homeserver(self)
         self.store = self.hs.get_datastore()
         self.server_notices_sender = self.hs.get_server_notices_sender()
         self.server_notices_manager = self.hs.get_server_notices_manager()

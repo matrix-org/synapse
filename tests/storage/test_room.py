@@ -26,7 +26,7 @@ from tests.utils import setup_test_homeserver
 class RoomStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+        hs = yield setup_test_homeserver(self)
 
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
@@ -57,7 +57,7 @@ class RoomStoreTestCase(unittest.TestCase):
 class RoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = setup_test_homeserver(self.addCleanup)
+        hs = setup_test_homeserver(self)
 
         # Room events need the full datastore, for persist_event() and
         # get_room_state()

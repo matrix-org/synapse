@@ -38,7 +38,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.as_yaml_files = []
         hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
+            self, federation_sender=Mock(), federation_client=Mock()
         )
 
         hs.config.app_service_config_files = self.as_yaml_files
@@ -102,7 +102,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         self.as_yaml_files = []
 
         hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
+            self, federation_sender=Mock(), federation_client=Mock()
         )
 
         hs.config.app_service_config_files = self.as_yaml_files
@@ -409,7 +409,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(suffix="2")
 
         hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
+            self, federation_sender=Mock(), federation_client=Mock()
         )
 
         hs.config.app_service_config_files = [f1, f2]
@@ -424,7 +424,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(id="id", suffix="2")
 
         hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
+            self, federation_sender=Mock(), federation_client=Mock()
         )
 
         hs.config.app_service_config_files = [f1, f2]
@@ -445,7 +445,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         f2 = self._write_config(as_token="as_token", suffix="2")
 
         hs = yield setup_test_homeserver(
-            self.addCleanup, federation_sender=Mock(), federation_client=Mock()
+            self, federation_sender=Mock(), federation_client=Mock()
         )
 
         hs.config.app_service_config_files = [f1, f2]

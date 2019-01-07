@@ -29,7 +29,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield setup_test_homeserver(
-            self.addCleanup, resource_for_federation=Mock(), http_client=None
+            self, resource_for_federation=Mock(), http_client=None
         )
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic

@@ -25,7 +25,7 @@ from tests.utils import setup_test_homeserver
 class DirectoryStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+        hs = yield setup_test_homeserver(self)
 
         self.store = hs.get_datastore()
 

@@ -34,7 +34,7 @@ class UserDirectoryTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
+        hs = yield setup_test_homeserver(self)
         self.store = hs.get_datastore()
         hs.handlers = UserDirectoryHandlers(hs)
 
