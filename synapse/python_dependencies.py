@@ -65,9 +65,13 @@ REQUIREMENTS = [
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email.enable_notifs": ["Jinja2>=2.8", "bleach>=1.4.2"],
+    "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
     "postgres": ["psycopg2>=2.6"],
+
+    # ConsentResource uses select_autoescape, which arrived in jinja 2.9
+    "resources.consent": ["Jinja2>=2.9"],
+
     "saml2": ["pysaml2>=4.5.0"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0"],
@@ -84,18 +88,30 @@ def list_requirements():
 
 class DependencyException(Exception):
     @property
+    def message(self):
+        return "\n".join([
+            "Missing Requirements: %s" % (", ".join(self.dependencies),),
+            "To install run:",
+            "    pip install --upgrade --force %s" % (" ".join(self.dependencies),),
+            "",
+        ])
+
+    @property
     def dependencies(self):
         for i in self.args[0]:
             yield '"' + i + '"'
 
 
-def check_requirements(_get_distribution=get_distribution):
-
+def check_requirements(for_feature=None, _get_distribution=get_distribution):
     deps_needed = []
     errors = []
 
-    # Check the base dependencies exist -- they all must be installed.
-    for dependency in REQUIREMENTS:
+    if for_feature:
+        reqs = CONDITIONAL_REQUIREMENTS[for_feature]
+    else:
+        reqs = REQUIREMENTS
+
+    for dependency in reqs:
         try:
             _get_distribution(dependency)
         except VersionConflict as e:
@@ -108,23 +124,24 @@ def check_requirements(_get_distribution=get_distribution):
             deps_needed.append(dependency)
             errors.append("Needed %s but it was not installed" % (dependency,))
 
-    # Check the optional dependencies are up to date. We allow them to not be
-    # installed.
-    OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])
+    if not for_feature:
+        # Check the optional dependencies are up to date. We allow them to not be
+        # installed.
+        OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])
 
-    for dependency in OPTS:
-        try:
-            _get_distribution(dependency)
-        except VersionConflict:
-            deps_needed.append(dependency)
-            errors.append("Needed %s but it was not installed" % (dependency,))
-        except DistributionNotFound:
-            # If it's not found, we don't care
-            pass
+        for dependency in OPTS:
+            try:
+                _get_distribution(dependency)
+            except VersionConflict:
+                deps_needed.append(dependency)
+                errors.append("Needed %s but it was not installed" % (dependency,))
+            except DistributionNotFound:
+                # If it's not found, we don't care
+                pass
 
     if deps_needed:
         for e in errors:
-            logging.exception(e)
+            logging.error(e)
 
         raise DependencyException(deps_needed)
 
