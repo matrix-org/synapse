@@ -223,7 +223,12 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def get_user_ip_and_agents(self, user):
-        user_id = user.to_string()
+
+        if isinstance(user, str):
+            user_id = user
+        else:
+            user_id = user.to_string()
+
         results = {}
 
         for key in self._batch_row_update:
