@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
 from synapse._scripts.cull_user_ips import _main
 from synapse.rest.client.v1 import admin, login
 
@@ -49,23 +47,23 @@ class CullIPTests(HomeserverTestCase):
         storage._update_client_ips_batch()
         self.pump(1)
 
-        u1_entries = self.get_success(storage._simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": u1},
-            retcols=[
-                "access_token", "ip", "user_agent", "last_seen"
-            ],
-            desc="get_user_ip_and_agents",
-        ))
+        u1_entries = self.get_success(
+            storage._simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": u1},
+                retcols=["access_token", "ip", "user_agent", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
 
-        u2_entries = self.get_success(storage._simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": u2},
-            retcols=[
-                "access_token", "ip", "user_agent", "last_seen"
-            ],
-            desc="get_user_ip_and_agents",
-        ))
+        u2_entries = self.get_success(
+            storage._simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": u2},
+                retcols=["access_token", "ip", "user_agent", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
 
         self.assertEqual(len(u1_entries), 3)
         self.assertEqual(len(u2_entries), 1)
@@ -74,23 +72,23 @@ class CullIPTests(HomeserverTestCase):
 
         _main(conn, storage.database_engine, _print=logs.append)
 
-        u1_entries = self.get_success(storage._simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": u1},
-            retcols=[
-                "access_token", "ip", "user_agent", "last_seen"
-            ],
-            desc="get_user_ip_and_agents",
-        ))
+        u1_entries = self.get_success(
+            storage._simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": u1},
+                retcols=["access_token", "ip", "user_agent", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
 
-        u2_entries = self.get_success(storage._simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": u2},
-            retcols=[
-                "access_token", "ip", "user_agent", "last_seen"
-            ],
-            desc="get_user_ip_and_agents",
-        ))
+        u2_entries = self.get_success(
+            storage._simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": u2},
+                retcols=["access_token", "ip", "user_agent", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
 
         # We deleted the invalid access token for u1, and all entries with it,
         # as well as one outdated entry for a valid access token. We did not

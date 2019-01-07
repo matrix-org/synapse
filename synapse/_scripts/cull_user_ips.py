@@ -22,40 +22,6 @@ import yaml
 from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.engines.sqlite3 import Sqlite3Engine
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=("Cull the user_ips database."))
-    parser.add_argument(
-        "-c",
-        "--config",
-        type=argparse.FileType('r'),
-        help=("Path to server config file. Used to read database configuration."),
-    )
-
-    args = parser.parse_args()
-    assert "config" in args, "Need configuration"
-    assert args.config, "Need configuration"
-
-    config = yaml.safe_load(args.config)
-
-    # Set up the database.
-    db_type = config["database"]["name"]
-    db_params = {
-        k: v for k, v in config["database"]["args"].items() if not k.startswith("cp_")
-    }
-
-    if db_type == "sqlite3":
-        import sqlite3 as db_module
-
-        engine = Sqlite3Engine(db_module, {})
-    elif db_type == "psycopg2":
-        import psycopg2 as db_module
-
-        engine = PostgresEngine(db_module, {})
-
-    conn = db_module.connect(**db_params)
-
-    _main(conn, engine)
-
 
 def _main(conn, engine, _print=print):
 
@@ -110,7 +76,10 @@ def _main(conn, engine, _print=print):
             max_last_seen = max(tokens[token])
             _print("Deleting %d old rows" % (len(tokens[token]) - 1,))
             _run(
-                "DELETE FROM user_ips WHERE user_id = ? AND access_token = ? AND last_seen < ?;",
+                (
+                    "DELETE FROM user_ips WHERE user_id = ? AND access_token = ? "
+                    "AND last_seen < ?;"
+                ),
                 (uid, token, max_last_seen),
             )
 
@@ -121,3 +90,38 @@ def _main(conn, engine, _print=print):
 
         # Commit the changes to the database
         conn.commit()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=("Cull the user_ips database."))
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=argparse.FileType('r'),
+        help=("Path to server config file. Used to read database configuration."),
+    )
+
+    args = parser.parse_args()
+    assert "config" in args, "Need configuration"
+    assert args.config, "Need configuration"
+
+    config = yaml.safe_load(args.config)
+
+    # Set up the database.
+    db_type = config["database"]["name"]
+    db_params = {
+        k: v for k, v in config["database"]["args"].items() if not k.startswith("cp_")
+    }
+
+    if db_type == "sqlite3":
+        import sqlite3 as db_module
+
+        engine = Sqlite3Engine(db_module, {})
+    elif db_type == "psycopg2":
+        import psycopg2 as db_module
+
+        engine = PostgresEngine(db_module, {})
+
+    conn = db_module.connect(**db_params)
+
+    _main(conn, engine)
