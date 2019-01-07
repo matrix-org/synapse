@@ -19,7 +19,7 @@ import random
 import sys
 from io import BytesIO
 
-from six import PY3, string_types
+from six import PY3, raise_from, string_types
 from six.moves import urllib
 
 import attr
@@ -41,6 +41,7 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     HttpResponseException,
+    RequestSendFailed,
     SynapseError,
 )
 from synapse.http.endpoint import matrix_federation_endpoint
@@ -231,7 +232,7 @@ class MatrixFederationHttpClient(object):
             Deferred: resolves with the http response object on success.
 
             Fails with ``HttpResponseException``: if we get an HTTP response
-                code >= 300.
+                code >= 300 (except 429).
 
             Fails with ``NotRetryingDestination`` if we are not yet ready
                 to retry this server.
@@ -239,8 +240,8 @@ class MatrixFederationHttpClient(object):
             Fails with ``FederationDeniedError`` if this destination
                 is not on our federation whitelist
 
-            (May also fail with plenty of other Exceptions for things like DNS
-                failures, connection failures, SSL failures.)
+            Fails with ``RequestSendFailed`` if there were problems connecting to
+                the remote, due to e.g. DNS failures, connection timeouts etc.
         """
         if timeout:
             _sec_timeout = timeout / 1000
@@ -335,10 +336,15 @@ class MatrixFederationHttpClient(object):
                         reactor=self.hs.get_reactor(),
                     )
 
-                    with Measure(self.clock, "outbound_request"):
-                        response = yield make_deferred_yieldable(
-                            request_deferred,
-                        )
+                    try:
+                        with Measure(self.clock, "outbound_request"):
+                            response = yield make_deferred_yieldable(
+                                request_deferred,
+                            )
+                    except DNSLookupError as e:
+                        raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
+                    except Exception as e:
+                        raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     logger.info(
                         "{%s} [%s] Got response headers: %d %s",
@@ -359,29 +365,46 @@ class MatrixFederationHttpClient(object):
                             timeout=_sec_timeout,
                             reactor=self.hs.get_reactor(),
                         )
-                        body = yield make_deferred_yieldable(d)
-                        raise HttpResponseException(
+
+                        try:
+                            body = yield make_deferred_yieldable(d)
+                        except Exception as e:
+                            # Eh, we're already going to raise an exception so lets
+                            # ignore if this fails.
+                            logger.warn(
+                                "{%s} [%s] Failed to get error response: %s %s: %s",
+                                request.txn_id,
+                                request.destination,
+                                request.method,
+                                url_str,
+                                _flatten_response_never_received(e),
+                            )
+                            body = None
+
+                        e = HttpResponseException(
                             response.code, response.phrase, body
                         )
 
+                        # Retry if the error is a 429 (Too Many Requests),
+                        # otherwise just raise a standard HttpResponseException
+                        if response.code == 429:
+                            raise_from(RequestSendFailed(e, can_retry=True), e)
+                        else:
+                            raise e
+
                     break
-                except Exception as e:
+                except RequestSendFailed as e:
                     logger.warn(
                         "{%s} [%s] Request failed: %s %s: %s",
                         request.txn_id,
                         request.destination,
                         request.method,
                         url_str,
-                        _flatten_response_never_received(e),
+                        _flatten_response_never_received(e.inner_exception),
                     )
 
-                    if not retry_on_dns_fail and isinstance(e, DNSLookupError):
+                    if not e.can_retry:
                         raise
-
-                    if isinstance(e, HttpResponseException):
-                        # Don't retry for 4xx except 429 (Too Many Requests)
-                        if e.code != 429 and 400 <= e.code < 500:
-                            raise
 
                     if retries_left and not timeout:
                         if long_retries:
@@ -404,6 +427,17 @@ class MatrixFederationHttpClient(object):
                         retries_left -= 1
                     else:
                         raise
+
+                except Exception as e:
+                    logger.warn(
+                        "{%s} [%s] Request failed: %s %s: %s",
+                        request.txn_id,
+                        request.destination,
+                        request.method,
+                        url_str,
+                        _flatten_response_never_received(e),
+                    )
+                    raise
 
             defer.returnValue(response)
 
