@@ -1,1 +1,0 @@
-Fix deleting E2E room keys when using old SQLite versions.

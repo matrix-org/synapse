@@ -1,1 +1,0 @@
-Return server data in /login response
