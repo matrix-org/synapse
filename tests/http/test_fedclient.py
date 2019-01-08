@@ -20,6 +20,7 @@ from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
+from synapse.api.errors import RequestSendFailed
 from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
@@ -49,7 +50,8 @@ class FederationClientTests(HomeserverTestCase):
         self.pump()
 
         f = self.failureResultOf(d)
-        self.assertIsInstance(f.value, DNSLookupError)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
 
     def test_client_never_connect(self):
         """
@@ -76,7 +78,11 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, (ConnectingCancelledError, TimeoutError))
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(
+            f.value.inner_exception,
+            (ConnectingCancelledError, TimeoutError),
+        )
 
     def test_client_connect_no_response(self):
         """
@@ -107,7 +113,8 @@ class FederationClientTests(HomeserverTestCase):
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, ResponseNeverReceived)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
 
     def test_client_gets_headers(self):
         """
