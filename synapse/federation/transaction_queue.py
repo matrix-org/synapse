@@ -528,7 +528,7 @@ class TransactionQueue(object):
             for p, _ in pending_pdus:
                 logger.info("Failed to send event %s to %s", p.event_id,
                             destination)
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "TX [%s] Failed to send transaction",
                 destination,
