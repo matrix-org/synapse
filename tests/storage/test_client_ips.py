@@ -32,6 +32,28 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
     def prepare(self, hs, reactor, clock):
         self.store = self.hs.get_datastore()
 
+
+    def test_cleanup(self):
+        user_id = "@user:server"
+
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token1", "ip", "user_agent", "device_id"
+            )
+        )
+        self.pump(1)
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token2", "ip", "user_agent", "device_id"
+            )
+        )
+        self.store._update_client_ips_batch()
+        self.pump(10)
+
+        result = self.get_success(
+            self.store._remove_user_ip_dupes_impl()
+        )
+
     def test_insert_new_client_ip(self):
         self.reactor.advance(12345678)
 

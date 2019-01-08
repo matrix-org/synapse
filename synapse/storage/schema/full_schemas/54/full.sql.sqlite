@@ -1187,11 +1187,9 @@ CREATE UNIQUE INDEX device_lists_remote_cache_unique_id ON device_lists_remote_c
   device_id
 );
 CREATE UNIQUE INDEX user_ips_device_unique_id ON user_ips(
-  user_id,
   access_token,
   ip,
-  user_agent,
-  device_id
+  user_agent
 );
 CREATE INDEX state_groups_state_type_idx ON state_groups_state(
   state_group,

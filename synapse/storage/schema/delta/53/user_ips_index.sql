@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 
--- add a new unique index to user_ips table
+-- delete duplicates
 INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('user_ips_device_unique_index', '{}');
+  ('user_ips_remove_dupes', '{}');
+
+-- add a new unique index to user_ips table
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+  ('user_ips_device_unique_index', '{}', 'user_ips_remove_dupes');

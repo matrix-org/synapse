@@ -65,16 +65,21 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             columns=["last_seen"],
         )
 
+        self.register_background_update_handler(
+            "user_ips_remove_dupes",
+            self._remove_user_ip_dupes,
+        )
+
         # Register a unique index
         self.register_background_index_update(
             "user_ips_device_unique_index",
             index_name="user_ips_device_unique_id",
             table="user_ips",
-            columns=["user_id", "access_token", "ip", "user_agent", "device_id"],
+            columns=["access_token", "ip", "user_agent"],
             unique=True,
         )
 
-        # (user_id, access_token, ip) -> (user_agent, device_id, last_seen)
+        # (access_token, ip, user_agent) -> (user_id, device_id, last_seen)
         self._batch_row_update = {}
 
         self._client_ip_looper = self._clock.looping_call(
@@ -85,11 +90,59 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         )
 
     @defer.inlineCallbacks
+    def _remove_user_ip_dupes(self, progress, batch_size):
+        yield self._remove_user_ip_dupes_impl()
+        yield self._end_background_update("user_ips_remove_dupes")
+        defer.returnValue(1)
+
+    @defer.inlineCallbacks
+    def _remove_user_ip_dupes_impl(self):
+
+        def get_users(txn):
+            txn.execute("SELECT DISTINCT user_id FROM user_ips;")
+            results = txn.fetchall()
+            return results
+
+        users = yield self.runInteraction("user_ips_dups_get_users", get_users)
+
+        def _clean(txn, user_id):
+
+            txn.execute(
+                (
+                    "SELECT access_token, ip, user_agent, last_seen "
+                    "FROM user_ips WHERE user_id = ?"
+                ),
+                (user_id,)
+            )
+            results = txn.fetchall()
+
+            seen_before = set()
+            duplicates = []
+
+            for i in results:
+                key = i[0:3]
+                if key not in seen_before:
+                    seen_before.add(key)
+                else:
+                    duplicates.append(i)
+
+            for d in duplicates:
+                txn.execute("DELETE FROM user_ips WHERE access_token = ? AND ip = ? AND user_agent = ? AND last_seen = ?", d)
+
+            print(duplicates)
+
+
+
+        for user in users:
+            yield self.runInteraction("user_ips_clean", _clean, user[0])
+
+
+    @defer.inlineCallbacks
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
                          now=None):
         if not now:
             now = int(self._clock.time_msec())
-        key = (user_id, access_token, ip)
+        key = (access_token, ip, user_agent)
 
         try:
             last_seen = self.client_ip_last_seen.get(key)
@@ -102,7 +155,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         self.client_ip_last_seen.prefill(key, now)
 
-        self._batch_row_update[key] = (user_agent, device_id, now)
+        self._batch_row_update[key] = (user_id, device_id, now)
 
     def _update_client_ips_batch(self):
 
@@ -126,20 +179,20 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self.database_engine.lock_table(txn, "user_ips")
 
         for entry in iteritems(to_update):
-            (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
+            (access_token, ip, user_agent), (user_id, device_id, last_seen) = entry
 
             try:
                 self._simple_upsert_txn(
                     txn,
                     table="user_ips",
                     keyvalues={
-                        "user_id": user_id,
                         "access_token": access_token,
                         "ip": ip,
                         "user_agent": user_agent,
-                        "device_id": device_id,
                     },
                     values={
+                        "user_id": user_id,
+                        "device_id": device_id,
                         "last_seen": last_seen,
                     },
                     lock=False,

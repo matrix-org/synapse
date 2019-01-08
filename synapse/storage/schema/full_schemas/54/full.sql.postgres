@@ -3092,7 +3092,7 @@ CREATE INDEX user_ips_device_id ON user_ips USING btree (user_id, device_id, las
 -- Name: user_ips_device_unique_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX user_ips_device_unique_id ON user_ips USING btree (user_id, access_token, ip, user_agent, device_id);
+CREATE UNIQUE INDEX user_ips_device_unique_id ON user_ips USING btree (access_token, ip, user_agent);
 
 
 --
