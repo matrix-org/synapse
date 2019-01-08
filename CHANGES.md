@@ -4,11 +4,11 @@ Synapse 0.34.1rc1 (2019-01-08)
 Features
 --------
 
-- Special-case a support user for use in verifying behaviour of a given server. The support user does not appear in user directory or monthly active user counts. ([\#4141](https://github.com/matrix-org/synapse/issues/4141))
+- Special-case a support user for use in verifying behaviour of a given server. The support user does not appear in user directory or monthly active user counts. ([\#4141](https://github.com/matrix-org/synapse/issues/4141), [\#4344](https://github.com/matrix-org/synapse/issues/4344))
 - Support for serving .well-known files ([\#4262](https://github.com/matrix-org/synapse/issues/4262))
 - Rework SAML2 authentication ([\#4265](https://github.com/matrix-org/synapse/issues/4265), [\#4267](https://github.com/matrix-org/synapse/issues/4267))
 - SAML2 authentication: Initialise user display name from SAML2 data ([\#4272](https://github.com/matrix-org/synapse/issues/4272))
-- Synapse can now have its conditional/extra dependencies installed by pip. This functionality can be used by using `pip install matrix-synapse[feature]`, where feature is a comma separated list with the possible values "email.enable_notifs", "ldap3", "postgres", "saml2", "url_preview", and "test". If you want to install all optional dependencies, you can use "all" instead. ([\#4298](https://github.com/matrix-org/synapse/issues/4298), [\#4325](https://github.com/matrix-org/synapse/issues/4325))
+- Synapse can now have its conditional/extra dependencies installed by pip. This functionality can be used by using `pip install matrix-synapse[feature]`, where feature is a comma separated list with the possible values `email.enable_notifs`, `matrix-synapse-ldap3`, `postgres`, `resources.consent`, `saml2`, `url_preview`, and `test`. If you want to install all optional dependencies, you can use "all" instead. ([\#4298](https://github.com/matrix-org/synapse/issues/4298), [\#4325](https://github.com/matrix-org/synapse/issues/4325), [\#4327](https://github.com/matrix-org/synapse/issues/4327))
 - Add routes for reading account data. ([\#4303](https://github.com/matrix-org/synapse/issues/4303))
 - Add opt-in support for v2 rooms ([\#4307](https://github.com/matrix-org/synapse/issues/4307))
 - Add a script to generate a clean config file ([\#4315](https://github.com/matrix-org/synapse/issues/4315))
@@ -32,7 +32,6 @@ Bugfixes
 - Avoid packaging _trial_temp directory in -py3 debian packages ([\#4326](https://github.com/matrix-org/synapse/issues/4326))
 - Check jinja version for consent resource ([\#4327](https://github.com/matrix-org/synapse/issues/4327))
 - fix NPE in /messages by checking if all events were filtered out ([\#4330](https://github.com/matrix-org/synapse/issues/4330))
-- Fix synchrotron exploding due to being unable to access is_support_user in storage layer ([\#4344](https://github.com/matrix-org/synapse/issues/4344))
 - Fix `python -m synapse.config` on Python 3. ([\#4356](https://github.com/matrix-org/synapse/issues/4356))
 
 
