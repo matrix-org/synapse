@@ -30,6 +30,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
     NotFoundError,
+    RequestSendFailed,
     SynapseError,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -372,10 +373,10 @@ class MediaRepository(object):
                         "allow_remote": "false",
                     }
                 )
-            except twisted.internet.error.DNSLookupError as e:
-                logger.warn("HTTP error fetching remote media %s/%s: %r",
+            except RequestSendFailed as e:
+                logger.warn("Request failed fetching remote media %s/%s: %r",
                             server_name, media_id, e)
-                raise NotFoundError()
+                raise SynapseError(502, "Failed to fetch remote media")
 
             except HttpResponseException as e:
                 logger.warn("HTTP error fetching remote media %s/%s: %s",
