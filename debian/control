@@ -13,12 +13,16 @@ Build-Depends:
  python3-pip,
  python3-venv,
  tar,
-Standards-Version: 3.9.5
+Standards-Version: 3.9.8
 Homepage: https://github.com/matrix-org/synapse
 
 Package: matrix-synapse-py3
 Architecture: amd64
-Conflicts: matrix-synapse
+Provides: matrix-synapse
+Breaks:
+ matrix-synapse-ldap3,
+ matrix-synapse (<< 0.34.0-0matrix2),
+ matrix-synapse (>= 0.34.0-1),
 Pre-Depends: dpkg (>= 1.16.1)
 Depends:
  adduser,
