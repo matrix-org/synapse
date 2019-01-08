@@ -17,7 +17,8 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.errors import ResourceLimitError
+from synapse.api.constants import UserTypes
+from synapse.api.errors import ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
@@ -64,6 +65,7 @@ class RegistrationTestCase(unittest.TestCase):
             requester, frank.localpart, "Frankie"
         )
         self.assertEquals(result_user_id, user_id)
+        self.assertTrue(result_token is not None)
         self.assertEquals(result_token, 'secret')
 
     @defer.inlineCallbacks
@@ -82,7 +84,7 @@ class RegistrationTestCase(unittest.TestCase):
             requester, local_part, None
         )
         self.assertEquals(result_user_id, user_id)
-        self.assertEquals(result_token, 'secret')
+        self.assertTrue(result_token is not None)
 
     @defer.inlineCallbacks
     def test_mau_limits_when_disabled(self):
@@ -130,21 +132,6 @@ class RegistrationTestCase(unittest.TestCase):
             yield self.handler.register(localpart="local_part")
 
     @defer.inlineCallbacks
-    def test_register_saml2_mau_blocked(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.lots_of_users)
-        )
-        with self.assertRaises(ResourceLimitError):
-            yield self.handler.register_saml2(localpart="local_part")
-
-        self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
-        )
-        with self.assertRaises(ResourceLimitError):
-            yield self.handler.register_saml2(localpart="local_part")
-
-    @defer.inlineCallbacks
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
@@ -185,6 +172,20 @@ class RegistrationTestCase(unittest.TestCase):
         self.assertEqual(len(rooms), 0)
 
     @defer.inlineCallbacks
+    def test_auto_create_auto_join_rooms_when_support_user_exists(self):
+        room_alias_str = "#room:test"
+        self.hs.config.auto_join_rooms = [room_alias_str]
+
+        self.store.is_support_user = Mock(return_value=True)
+        res = yield self.handler.register(localpart='support')
+        rooms = yield self.store.get_rooms_for_user(res[0])
+        self.assertEqual(len(rooms), 0)
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        with self.assertRaises(SynapseError):
+            yield directory_handler.get_association(room_alias)
+
+    @defer.inlineCallbacks
     def test_auto_create_auto_join_where_no_consent(self):
         self.hs.config.user_consent_at_registration = True
         self.hs.config.block_events_without_consent_error = "Error"
@@ -194,3 +195,13 @@ class RegistrationTestCase(unittest.TestCase):
         yield self.handler.post_consent_actions(res[0])
         rooms = yield self.store.get_rooms_for_user(res[0])
         self.assertEqual(len(rooms), 0)
+
+    @defer.inlineCallbacks
+    def test_register_support_user(self):
+        res = yield self.handler.register(localpart='user', user_type=UserTypes.SUPPORT)
+        self.assertTrue(self.store.is_support_user(res[0]))
+
+    @defer.inlineCallbacks
+    def test_register_not_support_user(self):
+        res = yield self.handler.register(localpart='user')
+        self.assertFalse(self.store.is_support_user(res[0]))

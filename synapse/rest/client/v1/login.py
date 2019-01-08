@@ -18,17 +18,18 @@ import xml.etree.ElementTree as ET
 
 from six.moves import urllib
 
-from canonicaljson import json
-from saml2 import BINDING_HTTP_POST, config
-from saml2.client import Saml2Client
-
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.http.server import finish_request
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.types import UserID
+from synapse.http.servlet import (
+    RestServlet,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.rest.well_known import WellKnownBuilder
+from synapse.types import UserID, map_username_to_mxid_localpart
 from synapse.util.msisdn import phone_number_to_msisdn
 
 from .base import ClientV1RestServlet, client_path_patterns
@@ -81,7 +82,6 @@ def login_id_thirdparty_from_phone(identifier):
 
 class LoginRestServlet(ClientV1RestServlet):
     PATTERNS = client_path_patterns("/login$")
-    SAML2_TYPE = "m.login.saml2"
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
@@ -89,8 +89,6 @@ class LoginRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__(hs)
-        self.idp_redirect_url = hs.config.saml2_idp_redirect_url
-        self.saml2_enabled = hs.config.saml2_enabled
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm
@@ -98,13 +96,12 @@ class LoginRestServlet(ClientV1RestServlet):
         self.auth_handler = self.hs.get_auth_handler()
         self.device_handler = self.hs.get_device_handler()
         self.handlers = hs.get_handlers()
+        self._well_known_builder = WellKnownBuilder(hs)
 
     def on_GET(self, request):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-        if self.saml2_enabled:
-            flows.append({"type": LoginRestServlet.SAML2_TYPE})
         if self.cas_enabled:
             flows.append({"type": LoginRestServlet.SSO_TYPE})
 
@@ -134,28 +131,20 @@ class LoginRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         login_submission = parse_json_object_from_request(request)
         try:
-            if self.saml2_enabled and (login_submission["type"] ==
-                                       LoginRestServlet.SAML2_TYPE):
-                relay_state = ""
-                if "relay_state" in login_submission:
-                    relay_state = "&RelayState=" + urllib.parse.quote(
-                                  login_submission["relay_state"])
-                result = {
-                    "uri": "%s%s" % (self.idp_redirect_url, relay_state)
-                }
-                defer.returnValue((200, result))
-            elif self.jwt_enabled and (login_submission["type"] ==
-                                       LoginRestServlet.JWT_TYPE):
+            if self.jwt_enabled and (login_submission["type"] ==
+                                     LoginRestServlet.JWT_TYPE):
                 result = yield self.do_jwt_login(login_submission)
-                defer.returnValue(result)
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
                 result = yield self.do_token_login(login_submission)
-                defer.returnValue(result)
             else:
                 result = yield self._do_other_login(login_submission)
-                defer.returnValue(result)
         except KeyError:
             raise SynapseError(400, "Missing JSON keys.")
+
+        well_known_data = self._well_known_builder.get_well_known()
+        if well_known_data:
+            result["well_known"] = well_known_data
+        defer.returnValue((200, result))
 
     @defer.inlineCallbacks
     def _do_other_login(self, login_submission):
@@ -165,7 +154,7 @@ class LoginRestServlet(ClientV1RestServlet):
             login_submission:
 
         Returns:
-            (int, object): HTTP code/response
+            dict: HTTP response
         """
         # Log the request we got, but only certain fields to minimise the chance of
         # logging someone's password (even if they accidentally put it in the wrong
@@ -248,7 +237,7 @@ class LoginRestServlet(ClientV1RestServlet):
         if callback is not None:
             yield callback(result)
 
-        defer.returnValue((200, result))
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def do_token_login(self, login_submission):
@@ -268,7 +257,7 @@ class LoginRestServlet(ClientV1RestServlet):
             "device_id": device_id,
         }
 
-        defer.returnValue((200, result))
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def do_jwt_login(self, login_submission):
@@ -322,7 +311,7 @@ class LoginRestServlet(ClientV1RestServlet):
                 "home_server": self.hs.hostname,
             }
 
-        defer.returnValue((200, result))
+        defer.returnValue(result)
 
     def _register_device(self, user_id, login_submission):
         """Register a device for a user.
@@ -343,50 +332,6 @@ class LoginRestServlet(ClientV1RestServlet):
         return self.device_handler.check_device_registered(
             user_id, device_id, initial_display_name
         )
-
-
-class SAML2RestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/saml2", releases=())
-
-    def __init__(self, hs):
-        super(SAML2RestServlet, self).__init__(hs)
-        self.sp_config = hs.config.saml2_config_path
-        self.handlers = hs.get_handlers()
-
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        saml2_auth = None
-        try:
-            conf = config.SPConfig()
-            conf.load_file(self.sp_config)
-            SP = Saml2Client(conf)
-            saml2_auth = SP.parse_authn_request_response(
-                request.args['SAMLResponse'][0], BINDING_HTTP_POST)
-        except Exception as e:        # Not authenticated
-            logger.exception(e)
-        if saml2_auth and saml2_auth.status_ok() and not saml2_auth.not_signed:
-            username = saml2_auth.name_id.text
-            handler = self.handlers.registration_handler
-            (user_id, token) = yield handler.register_saml2(username)
-            # Forward to the RelayState callback along with ava
-            if 'RelayState' in request.args:
-                request.redirect(urllib.parse.unquote(
-                                 request.args['RelayState'][0]) +
-                                 '?status=authenticated&access_token=' +
-                                 token + '&user_id=' + user_id + '&ava=' +
-                                 urllib.quote(json.dumps(saml2_auth.ava)))
-                finish_request(request)
-                defer.returnValue(None)
-            defer.returnValue((200, {"status": "authenticated",
-                                     "user_id": user_id, "token": token,
-                                     "ava": saml2_auth.ava}))
-        elif 'RelayState' in request.args:
-            request.redirect(urllib.parse.unquote(
-                             request.args['RelayState'][0]) +
-                             '?status=not_authenticated')
-            finish_request(request)
-            defer.returnValue(None)
-        defer.returnValue((200, {"status": "not_authenticated"}))
 
 
 class CasRedirectServlet(RestServlet):
@@ -421,17 +366,15 @@ class CasTicketServlet(ClientV1RestServlet):
         self.cas_server_url = hs.config.cas_server_url
         self.cas_service_url = hs.config.cas_service_url
         self.cas_required_attributes = hs.config.cas_required_attributes
-        self.auth_handler = hs.get_auth_handler()
-        self.handlers = hs.get_handlers()
-        self.macaroon_gen = hs.get_macaroon_generator()
+        self._sso_auth_handler = SSOAuthHandler(hs)
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        client_redirect_url = request.args[b"redirectUrl"][0]
+        client_redirect_url = parse_string(request, "redirectUrl", required=True)
         http_client = self.hs.get_simple_http_client()
         uri = self.cas_server_url + "/proxyValidate"
         args = {
-            "ticket": request.args[b"ticket"][0].decode('ascii'),
+            "ticket": parse_string(request, "ticket", required=True),
             "service": self.cas_service_url
         }
         try:
@@ -443,7 +386,6 @@ class CasTicketServlet(ClientV1RestServlet):
         result = yield self.handle_cas_response(request, body, client_redirect_url)
         defer.returnValue(result)
 
-    @defer.inlineCallbacks
     def handle_cas_response(self, request, cas_response_body, client_redirect_url):
         user, attributes = self.parse_cas_response(cas_response_body)
 
@@ -459,28 +401,9 @@ class CasTicketServlet(ClientV1RestServlet):
                 if required_value != actual_value:
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
-        user_id = UserID(user, self.hs.hostname).to_string()
-        auth_handler = self.auth_handler
-        registered_user_id = yield auth_handler.check_user_exists(user_id)
-        if not registered_user_id:
-            registered_user_id, _ = (
-                yield self.handlers.registration_handler.register(localpart=user)
-            )
-
-        login_token = self.macaroon_gen.generate_short_term_login_token(
-            registered_user_id
+        return self._sso_auth_handler.on_successful_auth(
+            user, request, client_redirect_url,
         )
-        redirect_url = self.add_login_token_to_redirect_url(client_redirect_url,
-                                                            login_token)
-        request.redirect(redirect_url)
-        finish_request(request)
-
-    def add_login_token_to_redirect_url(self, url, token):
-        url_parts = list(urllib.parse.urlparse(url))
-        query = dict(urllib.parse.parse_qsl(url_parts[4]))
-        query.update({"loginToken": token})
-        url_parts[4] = urllib.parse.urlencode(query).encode('ascii')
-        return urllib.parse.urlunparse(url_parts)
 
     def parse_cas_response(self, cas_response_body):
         user = None
@@ -515,10 +438,78 @@ class CasTicketServlet(ClientV1RestServlet):
         return user, attributes
 
 
+class SSOAuthHandler(object):
+    """
+    Utility class for Resources and Servlets which handle the response from a SSO
+    service
+
+    Args:
+        hs (synapse.server.HomeServer)
+    """
+    def __init__(self, hs):
+        self._hostname = hs.hostname
+        self._auth_handler = hs.get_auth_handler()
+        self._registration_handler = hs.get_handlers().registration_handler
+        self._macaroon_gen = hs.get_macaroon_generator()
+
+    @defer.inlineCallbacks
+    def on_successful_auth(
+        self, username, request, client_redirect_url,
+        user_display_name=None,
+    ):
+        """Called once the user has successfully authenticated with the SSO.
+
+        Registers the user if necessary, and then returns a redirect (with
+        a login token) to the client.
+
+        Args:
+            username (unicode|bytes): the remote user id. We'll map this onto
+                something sane for a MXID localpath.
+
+            request (SynapseRequest): the incoming request from the browser. We'll
+                respond to it with a redirect.
+
+            client_redirect_url (unicode): the redirect_url the client gave us when
+                it first started the process.
+
+            user_display_name (unicode|None): if set, and we have to register a new user,
+                we will set their displayname to this.
+
+        Returns:
+            Deferred[none]: Completes once we have handled the request.
+        """
+        localpart = map_username_to_mxid_localpart(username)
+        user_id = UserID(localpart, self._hostname).to_string()
+        registered_user_id = yield self._auth_handler.check_user_exists(user_id)
+        if not registered_user_id:
+            registered_user_id, _ = (
+                yield self._registration_handler.register(
+                    localpart=localpart,
+                    generate_token=False,
+                    default_display_name=user_display_name,
+                )
+            )
+
+        login_token = self._macaroon_gen.generate_short_term_login_token(
+            registered_user_id
+        )
+        redirect_url = self._add_login_token_to_redirect_url(
+            client_redirect_url, login_token
+        )
+        request.redirect(redirect_url)
+        finish_request(request)
+
+    @staticmethod
+    def _add_login_token_to_redirect_url(url, token):
+        url_parts = list(urllib.parse.urlparse(url))
+        query = dict(urllib.parse.parse_qsl(url_parts[4]))
+        query.update({"loginToken": token})
+        url_parts[4] = urllib.parse.urlencode(query)
+        return urllib.parse.urlunparse(url_parts)
+
+
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    if hs.config.saml2_enabled:
-        SAML2RestServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)

@@ -563,10 +563,10 @@ class AuthHandler(BaseHandler):
         insensitively, but return None if there are multiple inexact matches.
 
         Args:
-            (str) user_id: complete @user:id
+            (unicode|bytes) user_id: complete @user:id
 
         Returns:
-            defer.Deferred: (str) canonical_user_id, or None if zero or
+            defer.Deferred: (unicode) canonical_user_id, or None if zero or
             multiple matches
         """
         res = yield self._find_user_id_and_pwd_hash(user_id)
@@ -954,6 +954,15 @@ class MacaroonGenerator(object):
         return macaroon.serialize()
 
     def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
+        """
+
+        Args:
+            user_id (unicode):
+            duration_in_ms (int):
+
+        Returns:
+            unicode
+        """
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
         now = self.hs.get_clock().time_msec()

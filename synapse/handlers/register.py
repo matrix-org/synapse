@@ -126,6 +126,8 @@ class RegistrationHandler(BaseHandler):
         make_guest=False,
         admin=False,
         threepid=None,
+        user_type=None,
+        default_display_name=None,
     ):
         """Registers a new client on the server.
 
@@ -140,6 +142,10 @@ class RegistrationHandler(BaseHandler):
               since it offers no means of associating a device_id with the
               access_token. Instead you should call auth_handler.issue_access_token
               after registration.
+            user_type (str|None): type of user. One of the values from
+              api.constants.UserTypes, or None for a normal user.
+            default_display_name (unicode|None): if set, the new user's displayname
+              will be set to this. Defaults to 'localpart'.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -169,6 +175,13 @@ class RegistrationHandler(BaseHandler):
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
 
+            if was_guest:
+                # If the user was a guest then they already have a profile
+                default_display_name = None
+
+            elif default_display_name is None:
+                default_display_name = localpart
+
             token = None
             if generate_token:
                 token = self.macaroon_gen.generate_access_token(user_id)
@@ -178,11 +191,9 @@ class RegistrationHandler(BaseHandler):
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
-                create_profile_with_localpart=(
-                    # If the user was a guest then they already have a profile
-                    None if was_guest else user.localpart
-                ),
+                create_profile_with_displayname=default_display_name,
                 admin=admin,
+                user_type=user_type,
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -203,13 +214,15 @@ class RegistrationHandler(BaseHandler):
                 yield self.check_user_id_not_appservice_exclusive(user_id)
                 if generate_token:
                     token = self.macaroon_gen.generate_access_token(user_id)
+                if default_display_name is None:
+                    default_display_name = localpart
                 try:
                     yield self.store.register(
                         user_id=user_id,
                         token=token,
                         password_hash=password_hash,
                         make_guest=make_guest,
-                        create_profile_with_localpart=user.localpart,
+                        create_profile_with_displayname=default_display_name,
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
@@ -233,9 +246,16 @@ class RegistrationHandler(BaseHandler):
         # auto-join the user to any rooms we're supposed to dump them into
         fake_requester = create_requester(user_id)
 
-        # try to create the room if we're the first user on the server
+        # try to create the room if we're the first real user on the server. Note
+        # that an auto-generated support user is not a real user and will never be
+        # the user to create the room
         should_auto_create_rooms = False
-        if self.hs.config.autocreate_auto_join_rooms:
+        is_support = yield self.store.is_support_user(user_id)
+        # There is an edge case where the first user is the support user, then
+        # the room is never created, though this seems unlikely and
+        # recoverable from given the support user being involved in the first
+        # place.
+        if self.hs.config.autocreate_auto_join_rooms and not is_support:
             count = yield self.store.count_all_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
@@ -300,7 +320,7 @@ class RegistrationHandler(BaseHandler):
             user_id=user_id,
             password_hash="",
             appservice_id=service_id,
-            create_profile_with_localpart=user.localpart,
+            create_profile_with_displayname=user.localpart,
         )
         defer.returnValue(user_id)
 
@@ -326,35 +346,6 @@ class RegistrationHandler(BaseHandler):
             )
         else:
             logger.info("Valid captcha entered from %s", ip)
-
-    @defer.inlineCallbacks
-    def register_saml2(self, localpart):
-        """
-        Registers email_id as SAML2 Based Auth.
-        """
-        if types.contains_invalid_mxid_characters(localpart):
-            raise SynapseError(
-                400,
-                "User ID can only contain characters a-z, 0-9, or '=_-./'",
-            )
-        yield self.auth.check_auth_blocking()
-        user = UserID(localpart, self.hs.hostname)
-        user_id = user.to_string()
-
-        yield self.check_user_id_not_appservice_exclusive(user_id)
-        token = self.macaroon_gen.generate_access_token(user_id)
-        try:
-            yield self.store.register(
-                user_id=user_id,
-                token=token,
-                password_hash=None,
-                create_profile_with_localpart=user.localpart,
-            )
-        except Exception as e:
-            yield self.store.add_access_token_to_user(user_id, token)
-            # Ignore Registration errors
-            logger.exception(e)
-        defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
     def register_email(self, threepidCreds):
@@ -507,7 +498,7 @@ class RegistrationHandler(BaseHandler):
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
-                create_profile_with_localpart=user.localpart,
+                create_profile_with_displayname=user.localpart,
             )
         else:
             yield self._auth_handler.delete_access_tokens_for_user(user_id)

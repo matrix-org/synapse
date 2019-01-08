@@ -37,6 +37,7 @@ class RegistrationConfig(Config):
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
+        self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
         self.invite_3pid_guest = (
@@ -49,8 +50,13 @@ class RegistrationConfig(Config):
                 raise ConfigError('Invalid auto_join_rooms entry %s' % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
-    def default_config(self, **kwargs):
-        registration_shared_secret = random_string_with_symbols(50)
+    def default_config(self, generate_secrets=False, **kwargs):
+        if generate_secrets:
+            registration_shared_secret = 'registration_shared_secret: "%s"' % (
+                random_string_with_symbols(50),
+            )
+        else:
+            registration_shared_secret = '# registration_shared_secret: <PRIVATE STRING>'
 
         return """\
         ## Registration ##
@@ -77,7 +83,7 @@ class RegistrationConfig(Config):
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
-        registration_shared_secret: "%(registration_shared_secret)s"
+        %(registration_shared_secret)s
 
         # Set the number of bcrypt rounds used to generate password hash.
         # Larger numbers increase the work factor needed to generate the hash.
@@ -90,6 +96,14 @@ class RegistrationConfig(Config):
         # participate in rooms hosted on this server which have been made
         # accessible to anonymous users.
         allow_guest_access: False
+
+        # The identity server which we suggest that clients should use when users log
+        # in on this server.
+        #
+        # (By default, no suggestion is made, so it is left up to the client.
+        # This setting is ignored unless public_baseurl is also set.)
+        #
+        # default_identity_server: https://matrix.org
 
         # The list of identity servers trusted to verify third party
         # identifiers by this server.

@@ -51,8 +51,9 @@ returned by the Client-Server API:
 Upgrading to v0.34.0
 ====================
 
-1. This release is the first to fully support Python 3. We recommend switching
-   to Python 3, as it has been shown to give performance improvements.
+1. This release is the first to fully support Python 3. Synapse will now run on
+   Python versions 3.5, or 3.6 (as well as 2.7). We recommend switching to
+   Python 3, as it has been shown to give performance improvements.
 
    For users who have installed Synapse into a virtualenv, we recommend doing
    this by creating a new virtualenv. For example::
@@ -68,7 +69,7 @@ Upgrading to v0.34.0
        synctl start
 
    Users who have installed from distribution packages should see the relevant
-   package documentation.
+   package documentation. See below for notes on Debian packages.
 
    * When upgrading to Python 3, you **must** make sure that your log files are
      configured as UTF-8, by adding ``encoding: utf8`` to the
@@ -106,6 +107,13 @@ Upgrading to v0.34.0
            filters: [context]
 
      There is no need to revert this change if downgrading to Python 2.
+
+   We are also making available Debian packages which will run Synapse on
+   Python 3. You can switch to these packages with ``apt-get install
+   matrix-synapse-py3``, however, please read `debian/NEWS
+   <https://github.com/matrix-org/synapse/blob/release-v0.34.0/debian/NEWS>`_
+   before doing so. The existing ``matrix-synapse`` packages will continue to
+   use Python 2 for the time being.
 
 2. This release removes the ``riot.im`` from the default list of trusted
    identity servers.

@@ -60,6 +60,7 @@ from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
+from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore, are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
@@ -168,7 +169,12 @@ class SynapseHomeServer(HomeServer):
                 "/_matrix/client/unstable": client_resource,
                 "/_matrix/client/v2_alpha": client_resource,
                 "/_matrix/client/versions": client_resource,
+                "/.well-known/matrix/client": WellKnownResource(self),
             })
+
+            if self.get_config().saml2_enabled:
+                from synapse.rest.saml2 import SAML2Resource
+                resources["/_matrix/saml2"] = SAML2Resource(self)
 
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
@@ -315,9 +321,6 @@ def setup(config_options):
         sys.exit(0)
 
     synapse.config.logger.setup_logging(config, use_worker_options=False)
-
-    # check any extra requirements we have now we have a config
-    check_requirements(config)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -531,7 +534,7 @@ def run(hs):
         )
 
     start_generate_monthly_active_users()
-    if hs.config.limit_usage_by_mau:
+    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
         clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 

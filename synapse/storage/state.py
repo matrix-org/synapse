@@ -432,7 +432,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         create_id = state_ids.get((EventTypes.Create, ""))
 
         if not create_id:
-            raise NotFoundError("Unknown room")
+            raise NotFoundError("Unknown room %s" % (room_id))
 
         create_event = yield self.get_event(create_id)
         defer.returnValue(create_event.content.get("room_version", "1"))
