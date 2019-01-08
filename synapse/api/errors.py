@@ -349,8 +349,12 @@ class IncompatibleRoomVersionError(SynapseError):
 
 
 class RequestSendFailed(RuntimeError):
-    """Sending the request failed due to not being able to talk to the remote
-    for some reason.
+    """Sending a HTTP request over federation failed due to not being able to
+    talk to the remote server for some reason.
+
+    This exception is used to differentiate "expected" errors that arise due to
+    networking (e.g. DNS failures, connection timeouts etc), versus unexpected
+    errors (like programming errors).
     """
     def __init__(self, inner_exception, can_retry):
         super(RequestSendFailed, self).__init__(
