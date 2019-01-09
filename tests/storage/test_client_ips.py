@@ -33,8 +33,6 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.store = self.hs.get_datastore()
 
     def test_cleanup(self):
-        user_id = "@user:server"
-
         # Executions we've ran
         executions = []
 

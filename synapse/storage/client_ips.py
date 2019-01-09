@@ -143,7 +143,6 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         for user in users:
             yield self.runInteraction("user_ips_clean", _clean, user[0])
 
-
     @defer.inlineCallbacks
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
                          now=None):
@@ -238,9 +237,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         ret = {(d["user_id"], d["device_id"]): d for d in res}
         for key in self._batch_row_update:
-            uid, access_token, ip = key
-            if uid == user_id:
-                user_agent, did, last_seen = self._batch_row_update[key]
+            access_token, ip, user_agent = key
+            user_id, did, last_seen = self._batch_row_update[key]
+            if user_id == user_id:
                 if not device_id or did == device_id:
                     ret[(user_id, device_id)] = {
                         "user_id": user_id,
@@ -296,9 +295,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         results = {}
 
         for key in self._batch_row_update:
-            uid, access_token, ip = key
+            access_token, ip, user_agent = key
+            uid, _, last_seen = self._batch_row_update[key]
             if uid == user_id:
-                user_agent, _, last_seen = self._batch_row_update[key]
                 results[(access_token, ip)] = (user_agent, last_seen)
 
         rows = yield self._simple_select_list(
