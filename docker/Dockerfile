@@ -33,9 +33,7 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 
 COPY . /synapse
 RUN pip install --prefix="/install" --no-warn-script-location \
-        lxml \
-        psycopg2 \
-        /synapse
+        /synapse[all]
 
 ###
 ### Stage 1: runtime
