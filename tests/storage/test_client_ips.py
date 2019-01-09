@@ -32,26 +32,63 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
     def prepare(self, hs, reactor, clock):
         self.store = self.hs.get_datastore()
 
-
     def test_cleanup(self):
         user_id = "@user:server"
 
-        self.get_success(
-            self.store.insert_client_ip(
-                user_id, "access_token1", "ip", "user_agent", "device_id"
-            )
-        )
-        self.pump(1)
-        self.get_success(
-            self.store.insert_client_ip(
-                user_id, "access_token2", "ip", "user_agent", "device_id"
-            )
-        )
-        self.store._update_client_ips_batch()
-        self.pump(10)
+        # Executions we've ran
+        executions = []
 
-        result = self.get_success(
-            self.store._remove_user_ip_dupes_impl()
+        # SQL fetch results
+        results = [
+            [("user1",), ("user2",)],  # Initial user fetch
+            [
+                ("A", "1", "user agent", 1234),
+                ("A", "1", "user agent", 1235),
+                ("A", "1", "user agent", 1236),
+                ("B", "1", "user agent", 1237),
+                ("B", "1", "user agent", 1238),
+            ],  # User 1 has duplicates
+            [
+                ("C", "2", "user agent", 1234),
+                ("D", "2", "user agent", 1234),
+            ],  # User 2 does not
+        ]
+
+        txn = Mock()
+
+        def execute(sql, args=None):
+            executions.append((sql, args))
+
+        def fetchall():
+            return results.pop(0)
+
+        txn.execute = execute
+        txn.fetchall = fetchall
+
+        def runInteraction(name, func, *args):
+            return func(txn, *args)
+
+        self.store.runInteraction = runInteraction
+
+        self.get_success(self.store._remove_user_ip_dupes_impl())
+
+        # We want five executions:
+        # Fetch all the users from user_ips
+        # Fetch user1's entries
+        # Delete user1's duplicates for access token A
+        # Delete user1's duplicates for access token B
+        # Fetch user2's entries
+        self.assertEqual(len(executions), 5)
+
+        # First deletion is all access token As that aren't the latest
+        self.assertEqual(executions[2][1], ("A", "1", "user agent", 1236))
+
+        # Second deletion is all access token Bs that aren't the latest
+        self.assertEqual(executions[3][1], ("B", "1", "user agent", 1238))
+
+        self.assertEqual(
+            [x[0].split(" ")[0] for x in executions],
+            ["SELECT", "SELECT", "DELETE", "DELETE", "SELECT"],
         )
 
     def test_insert_new_client_ip(self):

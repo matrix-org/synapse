@@ -117,21 +117,28 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             results = txn.fetchall()
 
             seen_before = set()
-            duplicates = []
+            seen_before_latest = {}
+            duplicates = set()
 
             for i in results:
                 key = i[0:3]
                 if key not in seen_before:
                     seen_before.add(key)
+                    seen_before_latest[key] = i[3]
                 else:
-                    duplicates.append(i)
+                    duplicates.add(key)
+                    if seen_before_latest[key] < i[3]:
+                        seen_before_latest[key] = i[3]
 
-            for d in duplicates:
-                txn.execute("DELETE FROM user_ips WHERE access_token = ? AND ip = ? AND user_agent = ? AND last_seen = ?", d)
-
-            print(duplicates)
-
-
+            for d in sorted(duplicates):
+                access_token, ip, user_agent = d
+                txn.execute(
+                    (
+                        "DELETE FROM user_ips WHERE access_token IS ? AND ip IS ? "
+                        "AND user_agent IS ? AND last_seen != ?"
+                    ),
+                    (access_token, ip, user_agent, seen_before_latest[d])
+                )
 
         for user in users:
             yield self.runInteraction("user_ips_clean", _clean, user[0])
