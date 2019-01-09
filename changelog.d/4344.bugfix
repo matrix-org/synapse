@@ -1,1 +1,0 @@
-Fix synchrotron exploding due to being unable to access is_support_user in storage layer

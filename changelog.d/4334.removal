@@ -1,1 +1,0 @@
-Remove the deprecated v1/register API on Python 2. It was never ported to Python 3.
