@@ -1,3 +1,12 @@
+Synapse 0.34.1 (2019-01-09)
+===========================
+
+Internal Changes
+----------------
+
+- Add better logging for unexpected errors while sending transactions ([\#4361](https://github.com/matrix-org/synapse/issues/4361), [\#4362](https://github.com/matrix-org/synapse/issues/4362))
+
+
 Synapse 0.34.1rc1 (2019-01-08)
 ==============================
 
