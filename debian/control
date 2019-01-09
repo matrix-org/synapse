@@ -20,7 +20,6 @@ Package: matrix-synapse-py3
 Architecture: amd64
 Provides: matrix-synapse
 Breaks:
- matrix-synapse-ldap3,
  matrix-synapse (<< 0.34.0-0matrix2),
  matrix-synapse (>= 0.34.0-1),
 Pre-Depends: dpkg (>= 1.16.1)
