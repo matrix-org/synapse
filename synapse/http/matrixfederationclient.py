@@ -229,19 +229,18 @@ class MatrixFederationHttpClient(object):
             backoff_on_404 (bool): Back off if we get a 404
 
         Returns:
-            Deferred: resolves with the http response object on success.
+            Deferred[twisted.web.client.Response]: resolves with the HTTP
+            response object on success.
 
-            Fails with ``HttpResponseException``: if we get an HTTP response
-                code >= 300 (except 429).
-
-            Fails with ``NotRetryingDestination`` if we are not yet ready
-                to retry this server.
-
-            Fails with ``FederationDeniedError`` if this destination
-                is not on our federation whitelist
-
-            Fails with ``RequestSendFailed`` if there were problems connecting to
-                the remote, due to e.g. DNS failures, connection timeouts etc.
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+            NotRetryingDestination: If we are not yet ready to retry this
+                server.
+            FederationDeniedError: If this destination  is not on our
+                federation whitelist
+            RequestSendFailed: If there were problems connecting to the
+                remote, due to e.g. DNS failures, connection timeouts etc.
         """
         if timeout:
             _sec_timeout = timeout / 1000
@@ -516,17 +515,18 @@ class MatrixFederationHttpClient(object):
                 requests)
 
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
-            will be the decoded JSON body.
+            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            result will be the decoded JSON body.
 
-            Fails with ``HttpResponseException`` if we get an HTTP response
-            code >= 300.
-
-            Fails with ``NotRetryingDestination`` if we are not yet ready
-            to retry this server.
-
-            Fails with ``FederationDeniedError`` if this destination
-            is not on our federation whitelist
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+            NotRetryingDestination: If we are not yet ready to retry this
+                server.
+            FederationDeniedError: If this destination  is not on our
+                federation whitelist
+            RequestSendFailed: If there were problems connecting to the
+                remote, due to e.g. DNS failures, connection timeouts etc.
         """
 
         request = MatrixFederationRequest(
@@ -570,17 +570,18 @@ class MatrixFederationHttpClient(object):
                 try the request anyway.
             args (dict): query params
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
-            will be the decoded JSON body.
+            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            result will be the decoded JSON body.
 
-            Fails with ``HttpResponseException`` if we get an HTTP response
-            code >= 300.
-
-            Fails with ``NotRetryingDestination`` if we are not yet ready
-            to retry this server.
-
-            Fails with ``FederationDeniedError`` if this destination
-            is not on our federation whitelist
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+            NotRetryingDestination: If we are not yet ready to retry this
+                server.
+            FederationDeniedError: If this destination  is not on our
+                federation whitelist
+            RequestSendFailed: If there were problems connecting to the
+                remote, due to e.g. DNS failures, connection timeouts etc.
         """
 
         request = MatrixFederationRequest(
@@ -625,17 +626,18 @@ class MatrixFederationHttpClient(object):
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
-            will be the decoded JSON body.
+            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            result will be the decoded JSON body.
 
-            Fails with ``HttpResponseException`` if we get an HTTP response
-            code >= 300.
-
-            Fails with ``NotRetryingDestination`` if we are not yet ready
-            to retry this server.
-
-            Fails with ``FederationDeniedError`` if this destination
-            is not on our federation whitelist
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+            NotRetryingDestination: If we are not yet ready to retry this
+                server.
+            FederationDeniedError: If this destination  is not on our
+                federation whitelist
+            RequestSendFailed: If there were problems connecting to the
+                remote, due to e.g. DNS failures, connection timeouts etc.
         """
         logger.debug("get_json args: %s", args)
 
@@ -676,17 +678,18 @@ class MatrixFederationHttpClient(object):
             ignore_backoff (bool): true to ignore the historical backoff data and
                 try the request anyway.
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
-            will be the decoded JSON body.
+            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            result will be the decoded JSON body.
 
-            Fails with ``HttpResponseException`` if we get an HTTP response
-            code >= 300.
-
-            Fails with ``NotRetryingDestination`` if we are not yet ready
-            to retry this server.
-
-            Fails with ``FederationDeniedError`` if this destination
-            is not on our federation whitelist
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+            NotRetryingDestination: If we are not yet ready to retry this
+                server.
+            FederationDeniedError: If this destination  is not on our
+                federation whitelist
+            RequestSendFailed: If there were problems connecting to the
+                remote, due to e.g. DNS failures, connection timeouts etc.
         """
         request = MatrixFederationRequest(
             method="DELETE",
@@ -719,18 +722,20 @@ class MatrixFederationHttpClient(object):
             args (dict): Optional dictionary used to create the query string.
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
+
         Returns:
-            Deferred: resolves with an (int,dict) tuple of the file length and
-            a dict of the response headers.
+            Deferred[tuple[int, dict]]: Resolves with an (int,dict) tuple of
+            the file length and a dict of the response headers.
 
-            Fails with ``HttpResponseException`` if we get an HTTP response code
-            >= 300
-
-            Fails with ``NotRetryingDestination`` if we are not yet ready
-            to retry this server.
-
-            Fails with ``FederationDeniedError`` if this destination
-            is not on our federation whitelist
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+            NotRetryingDestination: If we are not yet ready to retry this
+                server.
+            FederationDeniedError: If this destination  is not on our
+                federation whitelist
+            RequestSendFailed: If there were problems connecting to the
+                remote, due to e.g. DNS failures, connection timeouts etc.
         """
         request = MatrixFederationRequest(
             method="GET",
