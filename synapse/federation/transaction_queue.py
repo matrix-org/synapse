@@ -522,8 +522,13 @@ class TransactionQueue(object):
             )
         except FederationDeniedError as e:
             logger.info(e)
+        except HttpResponseException as e:
+            logger.warning(
+                "TX [%s] Received %d response to transaction: %s",
+                destination, e.code, e,
+            )
         except RequestSendFailed as e:
-            logger.warning("(TX [%s] Failed to send transaction: %s", destination, e)
+            logger.warning("TX [%s] Failed to send transaction: %s", destination, e)
 
             for p, _ in pending_pdus:
                 logger.info("Failed to send event %s to %s", p.event_id,
