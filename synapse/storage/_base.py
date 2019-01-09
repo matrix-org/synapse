@@ -551,7 +551,7 @@ class SQLBaseStore(object):
             # If the value we're passing in is None (aka NULL), we need to use
             # IS, not =, as NULL = NULL equals NULL (False).
             if keyvalues[key] is None:
-                return "%s IS ?" % (key),)
+                return "%s IS ?" % (key,)
             else:
                 return "%s = ?" % (key,)
 
