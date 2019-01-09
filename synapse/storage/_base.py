@@ -550,7 +550,7 @@ class SQLBaseStore(object):
         def _getwhere(val):
             # If the value we're passing in is None (aka NULL), we need to use
             # IS, not =, as NULL = NULL equals NULL (False).
-            if values.get(val, keyvalues.get(val)) is None:
+            if keyvalues[val] is None:
                 return "%s IS ?" % (val,)
             else:
                 return "%s = ?" % (val,)
