@@ -823,21 +823,21 @@ def check_content_type_is_json(headers):
         headers (twisted.web.http_headers.Headers): headers to check
 
     Raises:
-        RuntimeError if the
+        RequestSendFailed: if the Content-Type header is missing or isn't JSON
 
     """
     c_type = headers.getRawHeaders(b"Content-Type")
     if c_type is None:
-        raise RuntimeError(
+        raise RequestSendFailed(RuntimeError(
             "No Content-Type header"
-        )
+        ), can_retry=False)
 
     c_type = c_type[0].decode('ascii')  # only the first header
     val, options = cgi.parse_header(c_type)
     if val != "application/json":
-        raise RuntimeError(
+        raise RequestSendFailed(RuntimeError(
             "Content-Type not application/json: was '%s'" % c_type
-        )
+        ), can_retry=False)
 
 
 def encode_query_args(args):
