@@ -558,7 +558,7 @@ class SQLBaseStore(object):
         # First try to update.
         sql = "UPDATE %s SET %s WHERE %s" % (
             table,
-            ", ".join("%s = ?" % (val,) for k in values),
+            ", ".join("%s = ?" % (k,) for k in values),
             " AND ".join(_getwhere(k) for k in keyvalues)
         )
         sqlargs = list(values.values()) + list(keyvalues.values())
