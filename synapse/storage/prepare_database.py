@@ -20,8 +20,6 @@ import logging
 import os
 import re
 
-from synapse.storage.engines.postgres import PostgresEngine
-
 logger = logging.getLogger(__name__)
 
 
@@ -117,24 +115,13 @@ def _setup_new_database(cur, database_engine):
 
     valid_dirs = []
     pattern = re.compile(r"^\d+(\.sql)?$")
-
-    if isinstance(database_engine, PostgresEngine):
-        specific = "postgres"
-    else:
-        specific = "sqlite"
-
-    specific_pattern = re.compile(r"^\d+(\.sql." + specific + r")?$")
-
     for filename in directory_entries:
-        match = pattern.match(filename) or specific_pattern.match(filename)
+        match = pattern.match(filename)
         abs_path = os.path.join(current_dir, filename)
         if match and os.path.isdir(abs_path):
             ver = int(match.group(0))
             if ver <= SCHEMA_VERSION:
                 valid_dirs.append((ver, abs_path))
-        elif filename == "README.md":
-            # Ignore the readme
-            pass
         else:
             logger.warn("Unexpected entry in 'full_schemas': %s", filename)
 
@@ -149,10 +136,7 @@ def _setup_new_database(cur, database_engine):
 
     directory_entries = os.listdir(sql_dir)
 
-    for filename in sorted(
-        fnmatch.filter(directory_entries, "*.sql")
-        + fnmatch.filter(directory_entries, "*.sql." + specific)
-    ):
+    for filename in fnmatch.filter(directory_entries, "*.sql"):
         sql_loc = os.path.join(sql_dir, filename)
         logger.debug("Applying schema %s", sql_loc)
         executescript(cur, sql_loc)
