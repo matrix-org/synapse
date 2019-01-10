@@ -8,6 +8,7 @@ DIST=`lsb_release -c -s`
 
 # We need to build a newer dh_virtualenv on older OSes like Xenial.
 if [ "$DIST" = 'xenial' ]; then
+    apt-get update
     mkdir -p /tmp/dhvenv
     cd /tmp/dhvenv
     wget https://github.com/spotify/dh-virtualenv/archive/1.1.tar.gz
