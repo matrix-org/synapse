@@ -71,14 +71,14 @@ class KeyConfig(Config):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if is_generating_file:
-            macaroon_secret_key = '"%s"' % random_string_with_symbols(50)
+            macaroon_secret_key = random_string_with_symbols(50)
             form_secret = '"%s"' % random_string_with_symbols(50)
         else:
-            macaroon_secret_key = 'null'
+            macaroon_secret_key = None
             form_secret = 'null'
 
         return """\
-        macaroon_secret_key: %(macaroon_secret_key)s
+        macaroon_secret_key: "%(macaroon_secret_key)s"
 
         # Used to enable access token expiration.
         expire_access_token: False
