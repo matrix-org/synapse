@@ -300,20 +300,28 @@ class Auth(object):
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
+
+        if rights == "access":
+            # first look in the database
+            r = yield self._look_up_user_by_access_token(token)
+            if r:
+                defer.returnValue(r)
+
+        # otherwise it needs to be a valid macaroon
         try:
             user_id, guest = self._parse_and_validate_macaroon(token, rights)
-        except _InvalidMacaroonException:
-            # doesn't look like a macaroon: treat it as an opaque token which
-            # must be in the database.
-            # TODO: it would be nice to get rid of this, but apparently some
-            # people use access tokens which aren't macaroons
-            r = yield self._look_up_user_by_access_token(token)
-            defer.returnValue(r)
-
-        try:
             user = UserID.from_string(user_id)
 
-            if guest:
+            if rights == "access":
+                if not guest:
+                    # non-guest access tokens must be in the database
+                    logger.warning("Unrecognised access token - not in store.")
+                    raise AuthError(
+                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                        "Unrecognised access token.",
+                        errcode=Codes.UNKNOWN_TOKEN,
+                    )
+
                 # Guest access tokens are not stored in the database (there can
                 # only be one access token per guest, anyway).
                 #
@@ -354,31 +362,15 @@ class Auth(object):
                     "device_id": None,
                 }
             else:
-                # This codepath exists for several reasons:
-                #   * so that we can actually return a token ID, which is used
-                #     in some parts of the schema (where we probably ought to
-                #     use device IDs instead)
-                #   * the only way we currently have to invalidate an
-                #     access_token is by removing it from the database, so we
-                #     have to check here that it is still in the db
-                #   * some attributes (notably device_id) aren't stored in the
-                #     macaroon. They probably should be.
-                # TODO: build the dictionary from the macaroon once the
-                # above are fixed
-                ret = yield self._look_up_user_by_access_token(token)
-                if ret["user"] != user:
-                    logger.error(
-                        "Macaroon user (%s) != DB user (%s)",
-                        user,
-                        ret["user"]
-                    )
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "User mismatch in macaroon",
-                        errcode=Codes.UNKNOWN_TOKEN
-                    )
+                raise RuntimeError("Unknown rights setting %s", rights)
             defer.returnValue(ret)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+        except (
+            _InvalidMacaroonException,
+            pymacaroons.exceptions.MacaroonException,
+            TypeError,
+            ValueError,
+        ) as e:
+            logger.warning("Invalid macaroon in auth: %s %s", type(e), e)
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
                 errcode=Codes.UNKNOWN_TOKEN
@@ -508,11 +500,8 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
-            logger.warn("Unrecognised access token - not in store.")
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
-                errcode=Codes.UNKNOWN_TOKEN
-            )
+            defer.returnValue(None)
+
         # we use ret.get() below because *lots* of unit tests stub out
         # get_user_by_access_token in a way where it only returns a couple of
         # the fields.
