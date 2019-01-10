@@ -1,1 +1,0 @@
-Fix problem reading macaroon_secret_key from config
