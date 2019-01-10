@@ -184,7 +184,7 @@ Configuring Synapse
 Before you can start Synapse, you will need to generate a configuration
 file. To do this, run (in your virtualenv, as before)::
 
-    cd ~/.synapse
+    cd ~/synapse
     python -m synapse.app.homeserver \
         --server-name my.domain.name \
         --config-path homeserver.yaml \
@@ -796,8 +796,7 @@ A manual password reset can be done via direct database access as follows.
 
 First calculate the hash of the new password::
 
-    $ source ~/.synapse/bin/activate
-    $ ./scripts/hash_password
+    $ ~/synapse/env/bin/hash_password
     Password:
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
