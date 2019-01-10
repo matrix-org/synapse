@@ -1,6 +1,8 @@
 Synapse 0.34.0.1 (2019-01-11)
 =============================
 
+This release fixes CVE-2019-5885 and is recommended for all users of Synapse 0.34.0 and below.
+
 Bugfixes
 --------
 
