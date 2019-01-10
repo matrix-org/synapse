@@ -1,3 +1,17 @@
+Synapse 0.34.1.1 (2019-01-11)
+=============================
+
+This release fixes CVE-2019-5885 and is recommended for all users of Synapse 0.34.1.
+
+This release is compatible with Python 2.7 and 3.5+. Python 3.7 is fully supported.
+
+Bugfixes
+--------
+
+- Fix spontaneous logout on upgrade
+  ([\#4374](https://github.com/matrix-org/synapse/issues/4374))
+
+
 Synapse 0.34.1 (2019-01-09)
 ===========================
 

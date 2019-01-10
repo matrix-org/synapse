@@ -57,8 +57,8 @@ class KeyConfig(Config):
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
             logger.warn("Config is missing missing macaroon_secret_key")
-            seed = self.signing_key[0].seed
-            self.macaroon_secret_key = hashlib.sha256(seed)
+            seed = bytes(self.signing_key[0])
+            self.macaroon_secret_key = hashlib.sha256(seed).digest()
 
         self.expire_access_token = config.get("expire_access_token", False)
 
