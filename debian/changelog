@@ -1,3 +1,9 @@
+matrix-synapse-py3 (0.34.1.1) stable; urgency=high
+
+  * New synapse release 0.34.1.1
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 10 Jan 2019 15:04:52 +0000
+
 matrix-synapse-py3 (0.34.1+1) stable; urgency=medium
 
   * Remove 'Breaks: matrix-synapse-ldap3'. (matrix-synapse-py3 includes
