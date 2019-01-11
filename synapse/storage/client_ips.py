@@ -76,7 +76,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             "user_ips_device_unique_index",
             index_name="user_ips_device_unique_id",
             table="user_ips",
-            columns=["access_token", "ip", "user_agent"],
+            columns=["user_id", "access_token", "ip"],
             unique=True,
         )
 
