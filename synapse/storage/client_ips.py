@@ -133,10 +133,16 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         )
 
         if not last_seen:
-            yield self._end_background_update("user_ips_remove_dupes")
-            defer.returnValue(0)
+            # If we get a None then we're reaching the end and just need to
+            # delete the last batch.
+            last = True
 
-        last_seen = last_seen[0]
+            # We fake not having an upper bound by using a future date, by
+            # just multiplying the current time by two....
+            last_seen = int(self.clock.time_msec()) * 2
+        else:
+            last = False
+            last_seen = last_seen[0]
 
         def remove(txn, last_seen_progress, last_seen):
             # This works by looking at all entries in the given time span, and
@@ -188,12 +194,14 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 )
 
             self._background_update_progress_txn(
-                txn, "user_ips_dups_remove", {"last_seen": last_seen}
+                txn, "user_ips_remove_dupes", {"last_seen": last_seen}
             )
 
         yield self.runInteraction(
             "user_ips_dups_remove", remove, last_seen_progress, last_seen
         )
+        if last:
+            yield self._end_background_update("user_ips_remove_dupes")
 
         defer.returnValue(batch_size)
 
