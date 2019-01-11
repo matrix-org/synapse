@@ -1,9 +1,18 @@
-matrix-synapse-py3 (0.34.0.1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (0.34.1+1) stable; urgency=medium
 
+  * Remove 'Breaks: matrix-synapse-ldap3'. (matrix-synapse-py3 includes
+    the matrix-synapse-ldap3 python files, which makes the
+    matrix-synapse-ldap3 debian package redundant but not broken.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Jan 2019 15:30:00 +0000
+
+matrix-synapse-py3 (0.34.1) stable; urgency=medium
+
+  * New synapse release 0.34.1.
   * Update Conflicts specifications to allow installation alongside our
     matrix-synapse transitional package.
 
- -- Synapse Packaging team <packages@matrix.org>  Wed, 02 Jan 2019 17:48:40 +0000
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 09 Jan 2019 14:52:24 +0000
 
 matrix-synapse-py3 (0.34.0) stable; urgency=medium
 
