@@ -120,7 +120,14 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         last_seen = last_seen[0]
 
         def remove(txn, last_seen_progress, last_seen):
-
+            # This works by looking at all entries in the given time span, and
+            # then for each (user_id, access_token, ip) tuple in that range
+            # checking for any duplicates in the rest of the table (via a join).
+            # It then only returns entries which have duplicates, and the max
+            # last_seen across all duplicates, which can the be used to delete
+            # all other duplicates.
+            # It is efficient due to the existence of (user_id, access_token,
+            # ip) and (last_seen) indices.
             txn.execute(
                 """
                 SELECT user_id, access_token, ip,
