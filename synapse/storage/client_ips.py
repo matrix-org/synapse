@@ -65,7 +65,6 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             columns=["last_seen"],
         )
 
-        self._dupe_remover_last_seen = 0
         self.register_background_update_handler(
             "user_ips_remove_dupes",
             self._remove_user_ip_dupes,
