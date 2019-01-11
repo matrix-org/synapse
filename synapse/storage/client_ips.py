@@ -72,8 +72,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         # Register a unique index
         self.register_background_index_update(
-            "user_ips_user_token_ip_unique_index",
-            index_name="user_ips_device_unique_id",
+            "user_ips_device_unique_index",
+            index_name="user_ips_user_token_ip_unique_index",
             table="user_ips",
             columns=["user_id", "access_token", "ip"],
             unique=True,
