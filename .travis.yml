@@ -12,6 +12,9 @@ cache:
     #
     - $HOME/.cache/pip/wheels
 
+addons:
+  postgresql: "9.4"
+
 # don't clone the whole repo history, one commit will do
 git:
   depth: 1
