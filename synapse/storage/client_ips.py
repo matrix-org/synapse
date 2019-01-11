@@ -158,7 +158,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     ORDER BY last_seen
                 ) c
                 INNER JOIN user_ips USING (user_id, access_token, ip)
-                GROUP BY user_id, access_token, ip;
+                GROUP BY user_id, access_token, ip
                 HAVING count(*) > 1""",
                 (last_seen_progress, last_seen)
             )
@@ -187,7 +187,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     (user_id, access_token, ip, device_id, user_agent, last_seen)
                 )
 
-            self._background_update_progress_txn(txn, {"last_seen": last_seen})
+            self._background_update_progress_txn(
+                txn, "user_ips_dups_remove", {"last_seen": last_seen}
+            )
 
         yield self.runInteraction(
             "user_ips_dups_remove", remove, last_seen_progress, last_seen
