@@ -29,6 +29,7 @@ from synapse.http.servlet import (
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
+from synapse.types import UserID
 
 from ._base import client_v2_patterns, interactive_auth_handler
 
@@ -117,6 +118,7 @@ class PasswordRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.datastore = self.hs.get_datastore()
         self._set_password_handler = hs.get_set_password_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -135,9 +137,13 @@ class PasswordRestServlet(RestServlet):
 
         if self.auth.has_access_token(request):
             requester = yield self.auth.get_user_by_req(request)
-            params = yield self.auth_handler.validate_user_via_ui_auth(
-                requester, body, self.hs.get_ip_from_request(request),
-            )
+            # blindly trust ASes without UI-authing them
+            if requester.app_service:
+                params = body
+            else:
+                params = yield self.auth_handler.validate_user_via_ui_auth(
+                    requester, body, self.hs.get_ip_from_request(request),
+                )
             user_id = requester.user.to_string()
         else:
             requester = None
@@ -173,10 +179,29 @@ class PasswordRestServlet(RestServlet):
             user_id, new_password, requester
         )
 
+        if self.hs.config.shadow_server:
+            shadow_user = UserID(
+                requester.user.localpart, self.hs.config.shadow_server.get("hs")
+            )
+            self.shadow_password(params, shadow_user.to_string())
+
         defer.returnValue((200, {}))
 
     def on_OPTIONS(self, _):
         return 200, {}
+
+    @defer.inlineCallbacks
+    def shadow_password(self, body, user_id):
+        # TODO: retries
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
+        as_token = self.hs.config.shadow_server.get("as_token")
+
+        yield self.http_client.post_json_get_json(
+            "%s/_matrix/client/r0/account/password?access_token=%s&user_id=%s" % (
+                shadow_hs_url, as_token, user_id,
+            ),
+            body
+        )
 
 
 class DeactivateAccountRestServlet(RestServlet):
@@ -307,7 +332,8 @@ class ThreepidRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.datastore = self.hs.get_datastore()
+        self.datastore = hs.get_datastore()
+        self.http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -326,25 +352,33 @@ class ThreepidRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        threePidCreds = body.get('threePidCreds')
-        threePidCreds = body.get('three_pid_creds', threePidCreds)
-        if threePidCreds is None:
-            raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
-
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
+        # skip validation if this is a shadow 3PID from an AS
+        if not requester.app_service:
+            threePidCreds = body.get('threePidCreds')
+            threePidCreds = body.get('three_pid_creds', threePidCreds)
+            if threePidCreds is None:
+                raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
 
-        if not threepid:
-            raise SynapseError(
-                400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED
-            )
+            threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
 
-        for reqd in ['medium', 'address', 'validated_at']:
-            if reqd not in threepid:
-                logger.warn("Couldn't add 3pid: invalid response from ID server")
-                raise SynapseError(500, "Invalid response from ID Server")
+            if not threepid:
+                raise SynapseError(
+                    400, "Failed to auth 3pid", Codes.THREEPID_AUTH_FAILED
+                )
+
+            for reqd in ['medium', 'address', 'validated_at']:
+                if reqd not in threepid:
+                    logger.warn("Couldn't add 3pid: invalid response from ID server")
+                    raise SynapseError(500, "Invalid response from ID Server")
+        else:
+            # XXX: ASes pass in a validated threepid directly to bypass the IS.
+            # This makes the API entirely change shape when we have an AS token;
+            # it really should be an entirely separate API - perhaps
+            # /account/3pid/replicate or something.
+            threepid = body.get('threepid')
 
         yield self.auth_handler.add_threepid(
             user_id,
@@ -353,7 +387,7 @@ class ThreepidRestServlet(RestServlet):
             threepid['validated_at'],
         )
 
-        if 'bind' in body and body['bind']:
+        if not requester.app_service and ('bind' in body and body['bind']):
             logger.debug(
                 "Binding threepid %s to %s",
                 threepid, user_id
@@ -362,7 +396,26 @@ class ThreepidRestServlet(RestServlet):
                 threePidCreds, user_id
             )
 
+        if self.hs.config.shadow_server:
+            shadow_user = UserID(
+                requester.user.localpart, self.hs.config.shadow_server.get("hs")
+            )
+            self.shadow_3pid({'threepid': threepid}, shadow_user.to_string())
+
         defer.returnValue((200, {}))
+
+    @defer.inlineCallbacks
+    def shadow_3pid(self, body, user_id):
+        # TODO: retries
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
+        as_token = self.hs.config.shadow_server.get("as_token")
+
+        yield self.http_client.post_json_get_json(
+            "%s/_matrix/client/r0/account/3pid?access_token=%s&user_id=%s" % (
+                shadow_hs_url, as_token, user_id,
+            ),
+            body
+        )
 
 
 class ThreepidDeleteRestServlet(RestServlet):
@@ -373,6 +426,7 @@ class ThreepidDeleteRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -396,6 +450,12 @@ class ThreepidDeleteRestServlet(RestServlet):
             logger.exception("Failed to remove threepid")
             raise SynapseError(500, "Failed to remove threepid")
 
+        if self.hs.config.shadow_server:
+            shadow_user = UserID(
+                requester.user.localpart, self.hs.config.shadow_server.get("hs")
+            )
+            self.shadow_3pid_delete(body, shadow_user.to_string())
+
         if ret:
             id_server_unbind_result = "success"
         else:
@@ -404,6 +464,19 @@ class ThreepidDeleteRestServlet(RestServlet):
         defer.returnValue((200, {
             "id_server_unbind_result": id_server_unbind_result,
         }))
+
+    @defer.inlineCallbacks
+    def shadow_3pid_delete(self, body, user_id):
+        # TODO: retries
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
+        as_token = self.hs.config.shadow_server.get("as_token")
+
+        yield self.http_client.post_json_get_json(
+            "%s/_matrix/client/r0/account/3pid/delete?access_token=%s&user_id=%s" % (
+                shadow_hs_url, as_token, user_id
+            ),
+            body
+        )
 
 
 class WhoamiRestServlet(RestServlet):

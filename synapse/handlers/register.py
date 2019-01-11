@@ -52,6 +52,7 @@ class RegistrationHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.room_creation_handler = self.hs.get_room_creation_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
+        self.http_client = hs.get_simple_http_client()
 
         self._next_generated_user_id = None
 
@@ -273,7 +274,9 @@ class RegistrationHandler(BaseHandler):
         defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
-    def appservice_register(self, user_localpart, as_token):
+    def appservice_register(self, user_localpart, as_token, password, display_name):
+        # FIXME: this should be factored out and merged with normal register()
+
         user = UserID(user_localpart, self.hs.hostname)
         user_id = user.to_string()
         service = self.store.get_app_service_by_token(as_token)
@@ -291,15 +294,25 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
+        password_hash = ""
+        if password:
+            password_hash = yield self.auth_handler().hash(password)
+
         yield self.store.register(
             user_id=user_id,
-            password_hash="",
+            password_hash=password_hash,
             appservice_id=service_id,
         )
 
         yield self.profile_handler.set_displayname(
-            user, None, user.localpart, by_admin=True,
+            user, None, display_name or user.localpart, by_admin=True,
         )
+
+        if self.hs.config.user_directory_search_all_users:
+            profile = yield self.store.get_profileinfo(user_localpart)
+            yield self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
 
         defer.returnValue(user_id)
 
@@ -424,6 +437,39 @@ class RegistrationHandler(BaseHandler):
                     400, "This user ID is reserved by an application service.",
                     errcode=Codes.EXCLUSIVE
                 )
+
+    @defer.inlineCallbacks
+    def shadow_register(self, localpart, display_name, auth_result, params):
+        """Invokes the current registration on another server, using
+        shared secret registration, passing in any auth_results from
+        other registration UI auth flows (e.g. validated 3pids)
+        Useful for setting up shadow/backup accounts on a parallel deployment.
+        """
+
+        # TODO: retries
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
+        as_token = self.hs.config.shadow_server.get("as_token")
+
+        yield self.http_client.post_json_get_json(
+            "%s/_matrix/client/r0/register?access_token=%s" % (
+                shadow_hs_url, as_token,
+            ),
+            {
+                # XXX: auth_result is an unspecified extension for shadow registration
+                'auth_result': auth_result,
+                # XXX: another unspecified extension for shadow registration to ensure
+                # that the displayname is correctly set by the masters erver
+                'display_name': display_name,
+                'username': localpart,
+                'password': params.get("password"),
+                'bind_email': params.get("bind_email"),
+                'bind_msisdn': params.get("bind_msisdn"),
+                'device_id': params.get("device_id"),
+                'initial_device_display_name': params.get("initial_device_display_name"),
+                'inhibit_login': True,
+                'access_token': as_token,
+            }
+        )
 
     @defer.inlineCallbacks
     def _generate_user_id(self, reseed=False):

@@ -63,7 +63,6 @@ class TestMauLimit(unittest.TestCase):
         self.hs.config.server_notices_mxid_display_name = None
         self.hs.config.server_notices_mxid_avatar_url = None
         self.hs.config.server_notices_room_name = "Test Server Notice Room"
-        self.hs.config.register_mxid_from_3pid = None
 
         self.resource = JsonResource(self.hs)
         register.register_servlets(self.hs, self.resource)

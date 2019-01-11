@@ -229,7 +229,7 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid username")
             desired_username = body['username']
 
-        desired_display_name = None
+        desired_display_name = body.get('display_name')
 
         appservice = None
         if self.auth.has_access_token(request):
@@ -254,7 +254,8 @@ class RegisterRestServlet(RestServlet):
 
             if isinstance(desired_username, string_types):
                 result = yield self._do_appservice_registration(
-                    desired_username, access_token, body
+                    desired_username, desired_password, desired_display_name,
+                    access_token, body
                 )
             defer.returnValue((200, result))  # we throw for non 200 responses
             return
@@ -474,7 +475,6 @@ class RegisterRestServlet(RestServlet):
                 pass
 
             guest_access_token = params.get("guest_access_token", None)
-            new_password = params.get("password", None)
 
             # XXX: don't we need to validate these for length etc like we did on
             # the ones from the JSON body earlier on in the method?
@@ -488,7 +488,7 @@ class RegisterRestServlet(RestServlet):
 
             (registered_user_id, _) = yield self.registration_handler.register(
                 localpart=desired_username,
-                password=new_password,
+                password=params.get("password", None),
                 guest_access_token=guest_access_token,
                 generate_token=False,
                 display_name=desired_display_name,
@@ -498,6 +498,14 @@ class RegisterRestServlet(RestServlet):
             # written to the db
             if is_threepid_reserved(self.hs.config, threepid):
                 yield self.store.upsert_monthly_active_user(registered_user_id)
+
+            if self.hs.config.shadow_server:
+                yield self.registration_handler.shadow_register(
+                    localpart=desired_username,
+                    display_name=desired_display_name,
+                    auth_result=auth_result,
+                    params=params,
+                )
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
@@ -532,11 +540,33 @@ class RegisterRestServlet(RestServlet):
         return 200, {}
 
     @defer.inlineCallbacks
-    def _do_appservice_registration(self, username, as_token, body):
+    def _do_appservice_registration(
+        self, username, password, display_name, as_token, body
+    ):
+
+        # FIXME: appservice_register() is horribly duplicated with register()
+        # and they should probably just be combined together with a config flag.
         user_id = yield self.registration_handler.appservice_register(
-            username, as_token
+            username, as_token, password, display_name
         )
-        defer.returnValue((yield self._create_registration_details(user_id, body)))
+        result = yield self._create_registration_details(user_id, body)
+
+        auth_result = body.get('auth_result')
+        if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
+            threepid = auth_result[LoginType.EMAIL_IDENTITY]
+            yield self._register_email_threepid(
+                user_id, threepid, result["access_token"],
+                body.get("bind_email")
+            )
+
+        if auth_result and LoginType.MSISDN in auth_result:
+            threepid = auth_result[LoginType.MSISDN]
+            yield self._register_msisdn_threepid(
+                user_id, threepid, result["access_token"],
+                body.get("bind_msisdn")
+            )
+
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def _do_shared_secret_registration(self, username, password, body):
