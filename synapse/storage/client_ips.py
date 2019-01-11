@@ -289,8 +289,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         ret = {(d["user_id"], d["device_id"]): d for d in res}
         for key in self._batch_row_update:
-            user_id, access_token, ip = key
-            if user_id == user_id:
+            uid, access_token, ip = key
+            if uid == user_id:
                 user_agent, did, last_seen = self._batch_row_update[key]
                 if not device_id or did == device_id:
                     ret[(user_id, device_id)] = {
