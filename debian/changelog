@@ -1,3 +1,9 @@
+matrix-synapse-py3 (0.34.1.1+1) UNRELEASED; urgency=medium
+
+  * Update conflicts specifications to allow smoother transition from matrix-synapse.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 11 Jan 2019 17:04:28 +0000
+
 matrix-synapse-py3 (0.34.1.1) stable; urgency=high
 
   * New synapse release 0.34.1.1
