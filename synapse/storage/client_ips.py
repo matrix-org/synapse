@@ -93,6 +93,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
     @defer.inlineCallbacks
     def _remove_user_ip_dupes(self, progress, batch_size):
 
+        last_seen_progress = progress.get("last_seen", 0)
+
         def get_last_seen(txn):
             txn.execute(
                 """
@@ -102,7 +104,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 LIMIT 1
                 OFFSET ?
                 """,
-                (self._dupe_remover_last_seen, batch_size)
+                (last_seen_progress, batch_size)
             )
             results = txn.fetchone()
             return results
@@ -118,7 +120,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         last_seen = last_seen[0]
 
-        def remove(txn, last_seen):
+        def remove(txn, last_seen_progress, last_seen):
 
             txn.execute(
                 """
@@ -133,7 +135,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 INNER JOIN user_ips USING (user_id, access_token, ip)
                 GROUP BY user_id, access_token, ip;
                 HAVING count(*) > 1""",
-                (last_seen, last_seen)
+                (last_seen_progress, last_seen)
             )
             res = txn.fetchall()
 
@@ -160,8 +162,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     (user_id, access_token, ip, device_id, user_agent, last_seen)
                 )
 
-        yield self.runInteraction("user_ips_dups_remove", remove, last_seen)
-        self._dupe_remover_last_seen = last_seen
+            self._background_update_progress_txn(txn, {"last_seen": last_seen})
+
+        yield self.runInteraction(
+            "user_ips_dups_remove", remove, last_seen_progress, last_seen
+        )
 
         defer.returnValue(batch_size)
 
