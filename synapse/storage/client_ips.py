@@ -72,11 +72,17 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         # Register a unique index
         self.register_background_index_update(
-            "user_ips_device_unique_index",
+            "user_ips_user_token_ip_unique_index",
             index_name="user_ips_device_unique_id",
             table="user_ips",
             columns=["user_id", "access_token", "ip"],
             unique=True,
+        )
+
+        # Drop the old non-unique index
+        self.register_background_update_handler(
+            "user_ips_drop_nonunique_index",
+            self._remove_user_ip_nonunique,
         )
 
         # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
@@ -88,6 +94,19 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self.hs.get_reactor().addSystemEventTrigger(
             "before", "shutdown", self._update_client_ips_batch
         )
+
+    @defer.inlineCallbacks
+    def _remove_user_ip_nonunique(self, progress, batch_size):
+        def f(conn):
+            txn = conn.cursor()
+            txn.execute(
+                "DROP INDEX IF EXISTS user_ips_user_ip"
+            )
+            txn.close()
+
+        yield self.runWithConnection(f)
+        yield self._end_background_update("user_ips_drop_nonunique_index")
+        defer.returnValue(1)
 
     @defer.inlineCallbacks
     def _remove_user_ip_dupes(self, progress, batch_size):
