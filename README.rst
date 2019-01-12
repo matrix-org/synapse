@@ -162,7 +162,7 @@ update flag::
 
 In case of problems, please see the _`Troubleshooting` section below.
 
-There is an offical synapse image available at
+There is an official synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse/tags/ which can be used with
 the docker-compose file available at `contrib/docker <contrib/docker>`_. Further information on
 this including configuration options is available in the README on
@@ -173,7 +173,7 @@ Dockerfile to automate a synapse server in a single Docker image, at
 https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Slavi Pantaleev has created an Ansible playbook,
-which installs the offical Docker image of Matrix Synapse
+which installs the official Docker image of Matrix Synapse
 along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
 For more details, see
 https://github.com/spantaleev/matrix-docker-ansible-deploy
@@ -218,7 +218,7 @@ configured without TLS; it should be behind a reverse proxy for TLS/SSL
 termination on port 443 which in turn should be used for clients. Port 8448
 is configured to use TLS with a self-signed certificate. If you would like
 to do initial test with a client without having to setup a reverse proxy,
-you can temporarly use another certificate. (Note that a self-signed
+you can temporarily use another certificate. (Note that a self-signed
 certificate is fine for `Federation`_). You can do so by changing
 ``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
 in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
@@ -877,7 +877,7 @@ common requests.  We'll improve this in future, but for now the easiest
 way to either reduce the RAM usage (at the risk of slowing things down)
 is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
 variable.  The default is 0.5, which can be decreased to reduce RAM usage
-in memory constrained enviroments, or increased if performance starts to
+in memory constrained environments, or increased if performance starts to
 degrade.
 
 Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
