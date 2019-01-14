@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from .acme import ACMEConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .captcha import CaptchaConfig
@@ -42,14 +43,34 @@ from .voip import VoipConfig
 from .workers import WorkerConfig
 
 
-class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
-                       RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
-                       VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
-                       AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
-                       JWTConfig, PasswordConfig, EmailConfig,
-                       WorkerConfig, PasswordAuthProviderConfig, PushConfig,
-                       SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
-                       ConsentConfig,
-                       ServerNoticesConfig, RoomDirectoryConfig,
-                       ):
+class HomeServerConfig(
+    TlsConfig,
+    ServerConfig,
+    DatabaseConfig,
+    LoggingConfig,
+    RatelimitConfig,
+    ContentRepositoryConfig,
+    CaptchaConfig,
+    VoipConfig,
+    RegistrationConfig,
+    MetricsConfig,
+    ApiConfig,
+    AppServiceConfig,
+    KeyConfig,
+    SAML2Config,
+    CasConfig,
+    JWTConfig,
+    PasswordConfig,
+    EmailConfig,
+    WorkerConfig,
+    PasswordAuthProviderConfig,
+    PushConfig,
+    SpamCheckerConfig,
+    GroupsConfig,
+    UserDirectoryConfig,
+    ConsentConfig,
+    ServerNoticesConfig,
+    RoomDirectoryConfig,
+    ACMEConfig,
+):
     pass
