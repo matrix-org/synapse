@@ -466,7 +466,7 @@ class RegistrationHandler(BaseHandler):
                 'bind_msisdn': params.get("bind_msisdn"),
                 'device_id': params.get("device_id"),
                 'initial_device_display_name': params.get("initial_device_display_name"),
-                'inhibit_login': True,
+                'inhibit_login': False,
                 'access_token': as_token,
             }
         )
