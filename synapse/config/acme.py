@@ -28,6 +28,7 @@ class ACMEConfig(Config):
             "url", "https://acme-v01.api.letsencrypt.org/directory"
         )
         self.acme_port = acme_config.get("port", 8449)
+        self.acme_host = acme_config.get("host", "127.0.0.1")
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
@@ -35,8 +36,10 @@ class ACMEConfig(Config):
         # acme:
         #    enabled: false
         ##   ACME path. Default: https://acme-staging.api.letsencrypt.org/directory
-        #    url: https://acme-v01.api.letsencrypt.org/directory
+        #    url: 'https://acme-v01.api.letsencrypt.org/directory'
         ##   Port number (to listen for the HTTP-01 challenge).
         ##   Using port 80 requires utilising something like authbind, or proxying to it.
         #    port: 8449
+        ##   Hosts to bind to, comma separated.
+        #    host: '127.0.0.1'
         """
