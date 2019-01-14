@@ -34,6 +34,23 @@ _Server = collections.namedtuple(
 
 @defer.inlineCallbacks
 def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=time):
+    """Look up a SRV record, with caching
+
+    The default resolver in twisted.names doesn't do any caching (it has a CacheResolver,
+    but the cache never gets populated), so we add our own caching layer here.
+
+    Args:
+        service_name (unicode|bytes): record to look up
+        dns_client (twisted.internet.interfaces.IResolver): twisted resolver impl
+        cache (dict): cache object
+        clock (object): clock implementation. must provide a time() method.
+
+    Returns:
+        Deferred[list[_Server]]: a list of the SRV records, or an empty list if none found
+    """
+    # TODO: the dns client handles both unicode names (encoding via idna) and pre-encoded
+    # byteses; however they will obviously end up as separate entries in the cache. We
+    # should pick one form and stick with it.
     cache_entry = cache.get(service_name, None)
     if cache_entry:
         if all(s.expires > int(clock.time()) for s in cache_entry):
@@ -46,6 +63,8 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
         try:
             answers, _, _ = yield dns_client.lookupService(service_name)
         except DNSNameError:
+            # TODO: cache this. We can get the SOA out of the exception, and use
+            # the negative-TTL value.
             defer.returnValue([])
 
         if (len(answers) == 1
