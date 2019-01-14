@@ -52,6 +52,11 @@ How to monitor Synapse metrics using Prometheus
 
    If your prometheus is older than 1.5.2, you will need to replace
    ``static_configs`` in the above with ``target_groups``.
+   
+   Add the rules file from https://github.com/matrix-org/synapse/tree/master/contrib/prometheus::
+   
+    rule_files:
+     - "/PATH/TO/synapse-v2.rules"
 
    Restart Prometheus.
 
