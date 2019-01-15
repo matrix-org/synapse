@@ -90,7 +90,7 @@ class AcmeHandler(BaseHandler):
         well_known = Resource()
         well_known.putChild(b'acme-challenge', responder)
         responder_resource = Resource()
-        responder_resource.putChild(b'.well-known', wellKnown)
+        responder_resource.putChild(b'.well-known', well_known)
         responder_resource.putChild(b'check', static.Data(b'OK', b'text/plain'))
 
         server = server.Site(responder_resource)
