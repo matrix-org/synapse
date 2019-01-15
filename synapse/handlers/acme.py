@@ -97,7 +97,7 @@ class AcmeHandler(BaseHandler):
 
         for host in self.hs.config.acme_host.split(","):
             endpoint = serverFromString(
-                self.reactor, "tcp:%s:interface=%s" % (self.config.acme_port, host)
+                self.reactor, "tcp:%s:interface=%s" % (self.hs.config.acme_port, host)
             )
             endpoint.listen(srv)
 
