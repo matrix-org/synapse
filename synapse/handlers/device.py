@@ -545,6 +545,10 @@ class DeviceListEduUpdater(object):
                 # up on storing the total list of devices and only handle the
                 # delta instead.
                 if len(devices) > 1000:
+                    logger.warn(
+                        "Ignoring device list snapshot for %s as it has >1K devs (%d)",
+                        user_id, len(devices)
+                    )
                     devices = []
 
                 yield self.store.update_remote_device_list_cache(
