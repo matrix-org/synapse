@@ -533,7 +533,7 @@ class DeviceListEduUpdater(object):
                 stream_id = result["stream_id"]
                 devices = result["devices"]
 
-                # If the remote server has more than ~10000 devices for this user
+                # If the remote server has more than ~1000 devices for this user
                 # we assume that something is going horribly wrong (e.g. a bot
                 # that logs in and creates a new device every time it tries to
                 # send a message).  Maintaining lots of devices per user in the
@@ -544,7 +544,7 @@ class DeviceListEduUpdater(object):
                 # server to retry, causing a DoS.  So in this scenario we give
                 # up on storing the total list of devices and only handle the
                 # delta instead.
-                if len(devices) > 10000:
+                if len(devices) > 1000:
                     devices = []
 
                 yield self.store.update_remote_device_list_cache(
