@@ -93,13 +93,13 @@ class AcmeHandler(BaseHandler):
         responder_resource.putChild(b'.well-known', well_known)
         responder_resource.putChild(b'check', static.Data(b'OK', b'text/plain'))
 
-        server = server.Site(responder_resource)
+        srv = server.Site(responder_resource)
 
         for host in self.hs.config.acme_host.split(","):
             endpoint = serverFromString(
                 self.reactor, "tcp:%s:interface=%s" % (self.config.acme_port, host)
             )
-            endpoint.listen(server)
+            endpoint.listen(srv)
 
     @defer.inlineCallbacks
     def provision_certificate(self, hostname):
