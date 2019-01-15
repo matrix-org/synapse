@@ -533,18 +533,19 @@ class DeviceListEduUpdater(object):
                 stream_id = result["stream_id"]
                 devices = result["devices"]
 
-                # Emergency hack to prevent DoS from
-                # @bot:oliviervandertoorn.nl and @bot:matrix-beta.igalia.com
-                # on Jan 15 2019: only store the most recent 1000 devices for
-                # a given user.  (We assume we receive them in chronological
-                # order, which is dubious given _get_e2e_device_keys_txn does
-                # not explicitly order its results).  Otherwise it can take
-                # longer than 60s to persist the >100K devices, at which point
-                # the internal replication request to handle the
-                # m.device_list_update EDU times out, causing the remote
-                # server to retry the transaction and thus DoS synapse master
-                # CPU and DB.
-                devices = devices[-1000:]
+                # If the remote server has more than ~10000 devices for this user
+                # we assume that something is going horribly wrong (e.g. a bot
+                # that logs in and creates a new device every time it tries to
+                # send a message).  Maintaining lots of devices per user in the
+                # cache can cause serious performance issues as if this request
+                # takes more than 60s to complete, internal replication from the
+                # inbound federation worker to the synapse master may time out
+                # causing the inbound federation to fail and causing the remote
+                # server to retry, causing a DoS.  So in this scenario we give
+                # up on storing the total list of devices and only handle the
+                # delta instead.
+                if len(devices) > 10000:
+                    devices = []
 
                 yield self.store.update_remote_device_list_cache(
                     user_id, devices, stream_id,
