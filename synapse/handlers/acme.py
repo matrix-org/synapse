@@ -87,18 +87,6 @@ class AcmeHandler(BaseHandler):
             responders=[responder],
         )
 
-        class RespondToHTTP01(Resource):
-            """
-            Respond to .well_known/acme-challenges.
-            """
-
-            def __init__(self):
-                Resource.__init__(self)
-                wellKnown = Resource()
-                wellKnown.putChild(b'acme-challenge', responder)
-                self.putChild(b'.well-known', wellKnown)
-                self.putChild(b'check', static.Data(b'OK', b'text/plain'))
-
         well_known = Resource()
         well_known.putChild(b'acme-challenge', responder)
         responder_resource = Resource()
