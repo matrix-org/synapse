@@ -22,7 +22,7 @@ from twisted.internet import defer
 
 import synapse
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
-from synapse.api.urls import FEDERATION_PREFIX as PREFIX
+from synapse.api.urls import FEDERATION_V1_PREFIX
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
@@ -227,6 +227,8 @@ class BaseFederationServlet(object):
     """
     REQUIRE_AUTH = True
 
+    PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
+
     def __init__(self, handler, authenticator, ratelimiter, server_name):
         self.handler = handler
         self.authenticator = authenticator
@@ -286,7 +288,7 @@ class BaseFederationServlet(object):
         return new_func
 
     def register(self, server):
-        pattern = re.compile("^" + PREFIX + self.PATH + "$")
+        pattern = re.compile("^" + self.PREFIX + self.PATH + "$")
 
         for method in ("GET", "PUT", "POST"):
             code = getattr(self, "on_%s" % (method), None)
