@@ -12,6 +12,9 @@ cache:
     #
     - $HOME/.cache/pip/wheels
 
+addons:
+  postgresql: "9.4"
+
 # don't clone the whole repo history, one commit will do
 git:
   depth: 1
@@ -68,6 +71,13 @@ matrix:
 
 install:
   - pip install tox
+  
+  # if we don't have python3.6 in this environment, travis unhelpfully gives us
+  # a `python3.6` on our path which does nothing but spit out a warning. Tox
+  # tries to run it (even if we're not running a py36 env), so the build logs
+  # then have warnings which look like errors. To reduce the noise, remove the
+  # non-functional python3.6.
+  - ( ! command -v python3.6 || python3.6 --version ) &>/dev/null || rm -f $(command -v python3.6)
 
 script:
   - tox -e $TOX_ENV

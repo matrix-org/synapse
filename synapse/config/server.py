@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017 New Vector Ltd
+# Copyright 2017-2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,10 @@
 # limitations under the License.
 
 import logging
+import os.path
 
 from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -203,7 +205,9 @@ class ServerConfig(Config):
                 ]
             })
 
-    def default_config(self, server_name, **kwargs):
+        _check_resource_config(self.listeners)
+
+    def default_config(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400
@@ -211,7 +215,7 @@ class ServerConfig(Config):
             bind_port = 8448
             unsecure_port = 8008
 
-        pid_file = self.abspath("homeserver.pid")
+        pid_file = os.path.join(data_dir_path, "homeserver.pid")
         return """\
         ## Server ##
 
@@ -356,41 +360,41 @@ class ServerConfig(Config):
           #   type: manhole
 
 
-          # Homeserver blocking
-          #
-          # How to reach the server admin, used in ResourceLimitError
-          # admin_contact: 'mailto:admin@server.com'
-          #
-          # Global block config
-          #
-          # hs_disabled: False
-          # hs_disabled_message: 'Human readable reason for why the HS is blocked'
-          # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
-          #
-          # Monthly Active User Blocking
-          #
-          # Enables monthly active user checking
-          # limit_usage_by_mau: False
-          # max_mau_value: 50
-          # mau_trial_days: 2
-          #
-          # If enabled, the metrics for the number of monthly active users will
-          # be populated, however no one will be limited. If limit_usage_by_mau
-          # is true, this is implied to be true.
-          # mau_stats_only: False
-          #
-          # Sometimes the server admin will want to ensure certain accounts are
-          # never blocked by mau checking. These accounts are specified here.
-          #
-          # mau_limit_reserved_threepids:
-          # - medium: 'email'
-          #   address: 'reserved_user@example.com'
-          #
-          # Room searching
-          #
-          # If disabled, new messages will not be indexed for searching and users
-          # will receive errors when searching for messages. Defaults to enabled.
-          # enable_search: true
+        # Homeserver blocking
+        #
+        # How to reach the server admin, used in ResourceLimitError
+        # admin_contact: 'mailto:admin@server.com'
+        #
+        # Global block config
+        #
+        # hs_disabled: False
+        # hs_disabled_message: 'Human readable reason for why the HS is blocked'
+        # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
+        #
+        # Monthly Active User Blocking
+        #
+        # Enables monthly active user checking
+        # limit_usage_by_mau: False
+        # max_mau_value: 50
+        # mau_trial_days: 2
+        #
+        # If enabled, the metrics for the number of monthly active users will
+        # be populated, however no one will be limited. If limit_usage_by_mau
+        # is true, this is implied to be true.
+        # mau_stats_only: False
+        #
+        # Sometimes the server admin will want to ensure certain accounts are
+        # never blocked by mau checking. These accounts are specified here.
+        #
+        # mau_limit_reserved_threepids:
+        # - medium: 'email'
+        #   address: 'reserved_user@example.com'
+        #
+        # Room searching
+        #
+        # If disabled, new messages will not be indexed for searching and users
+        # will receive errors when searching for messages. Defaults to enabled.
+        # enable_search: true
         """ % locals()
 
     def read_arguments(self, args):
@@ -464,3 +468,36 @@ def _warn_if_webclient_configured(listeners):
                 if name == 'webclient':
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
+
+
+KNOWN_RESOURCES = (
+    'client',
+    'consent',
+    'federation',
+    'keys',
+    'media',
+    'metrics',
+    'replication',
+    'static',
+    'webclient',
+)
+
+
+def _check_resource_config(listeners):
+    resource_names = set(
+        res_name
+        for listener in listeners
+        for res in listener.get("resources", [])
+        for res_name in res.get("names", [])
+    )
+
+    for resource in resource_names:
+        if resource not in KNOWN_RESOURCES:
+            raise ConfigError(
+                "Unknown listener resource '%s'" % (resource, )
+            )
+        if resource == "consent":
+            try:
+                check_requirements('resources.consent')
+            except DependencyException as e:
+                raise ConfigError(e.message)

@@ -141,6 +141,8 @@ def default_config(name):
     config.rc_message_burst_count = 10000
     config.saml2_enabled = False
     config.internal_api_modules = []
+    config.public_baseurl = None
+    config.default_identity_server = None
     config.use_frozen_dicts = False
 
     # we need a sane default_room_version, otherwise attempts to create rooms will

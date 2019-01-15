@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six import PY3
-
 from synapse.http.server import JsonResource
 from synapse.rest.client import versions
 from synapse.rest.client.v1 import (
@@ -56,11 +54,6 @@ from synapse.rest.client.v2_alpha import (
     user_directory,
 )
 
-if not PY3:
-    from synapse.rest.client.v1_only import (
-        register as v1_register,
-    )
-
 
 class ClientRestResource(JsonResource):
     """A resource for version 1 of the matrix client API."""
@@ -72,10 +65,6 @@ class ClientRestResource(JsonResource):
     @staticmethod
     def register_servlets(client_resource, hs):
         versions.register_servlets(client_resource)
-
-        if not PY3:
-            # "v1" (Python 2 only)
-            v1_register.register_servlets(hs, client_resource)
 
         # Deprecated in r0
         initial_sync.register_servlets(hs, client_resource)

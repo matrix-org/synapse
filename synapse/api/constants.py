@@ -102,6 +102,7 @@ class ThirdPartyEntityKind(object):
 
 class RoomVersions(object):
     V1 = "1"
+    V2 = "2"
     VDH_TEST = "vdh-test-version"
     STATE_V2_TEST = "state-v2-test"
 
@@ -113,6 +114,7 @@ DEFAULT_ROOM_VERSION = RoomVersions.V1
 # until we have a working v2.
 KNOWN_ROOM_VERSIONS = {
     RoomVersions.V1,
+    RoomVersions.V2,
     RoomVersions.VDH_TEST,
     RoomVersions.STATE_V2_TEST,
 }
@@ -126,4 +128,4 @@ class UserTypes(object):
     'admin' and 'guest' users should also be UserTypes. Normal users are type None
     """
     SUPPORT = "support"
-    ALL_USER_TYPES = (SUPPORT)
+    ALL_USER_TYPES = (SUPPORT,)

@@ -235,22 +235,23 @@ class PaginationHandler(object):
                 "room_key", next_key
             )
 
+        if events:
+            if event_filter:
+                events = event_filter.filter(events)
+
+            events = yield filter_events_for_client(
+                self.store,
+                user_id,
+                events,
+                is_peeking=(member_event_id is None),
+            )
+
         if not events:
             defer.returnValue({
                 "chunk": [],
                 "start": pagin_config.from_token.to_string(),
                 "end": next_token.to_string(),
             })
-
-        if event_filter:
-            events = event_filter.filter(events)
-
-        events = yield filter_events_for_client(
-            self.store,
-            user_id,
-            events,
-            is_peeking=(member_event_id is None),
-        )
 
         state = None
         if event_filter and event_filter.lazy_load_members():

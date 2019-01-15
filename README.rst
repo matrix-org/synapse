@@ -86,7 +86,7 @@ Synapse is the reference Python/Twisted Matrix homeserver implementation.
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, or 2.7
+- Python 3.5, 3.6, 3.7, or 2.7
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Installing from source
@@ -148,7 +148,7 @@ To install the Synapse homeserver run::
     source ~/synapse/env/bin/activate
     pip install --upgrade pip
     pip install --upgrade setuptools
-    pip install matrix-synapse
+    pip install matrix-synapse[all]
 
 This installs Synapse, along with the libraries it uses, into a virtual
 environment under ``~/synapse/env``.  Feel free to pick a different directory
@@ -158,7 +158,7 @@ This Synapse installation can then be later upgraded by using pip again with the
 update flag::
 
     source ~/synapse/env/bin/activate
-    pip install -U matrix-synapse
+    pip install -U matrix-synapse[all]
 
 In case of problems, please see the _`Troubleshooting` section below.
 
@@ -184,7 +184,7 @@ Configuring Synapse
 Before you can start Synapse, you will need to generate a configuration
 file. To do this, run (in your virtualenv, as before)::
 
-    cd ~/.synapse
+    cd ~/synapse
     python -m synapse.app.homeserver \
         --server-name my.domain.name \
         --config-path homeserver.yaml \
@@ -725,8 +725,8 @@ caveats, you will need to do the following:
   tell other servers how to find you. See `Setting up Federation`_.
 
 When updating the SSL certificate, just update the file pointed to by
-``tls_certificate_path``: there is no need to restart synapse. (You may like to
-use a symbolic link to help make this process atomic.)
+``tls_certificate_path`` and then restart Synapse. (You may like to use a symbolic link
+to help make this process atomic.)
 
 The most common mistake when setting up federation is not to tell Synapse about
 your SSL certificate. To check it, you can visit
@@ -796,8 +796,7 @@ A manual password reset can be done via direct database access as follows.
 
 First calculate the hash of the new password::
 
-    $ source ~/.synapse/bin/activate
-    $ ./scripts/hash_password
+    $ ~/synapse/env/bin/hash_password
     Password:
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -826,8 +825,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python2.7 env
     source env/bin/activate
-    python -m synapse.python_dependencies | xargs pip install
-    pip install lxml mock
+    python -m pip install -e .[all]
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -835,7 +833,7 @@ dependencies into a virtual env.
 Once this is done, you may wish to run Synapse's unit tests, to
 check that everything is installed as it should be::
 
-    PYTHONPATH="." trial tests
+    python -m twisted.trial tests
 
 This should end with a 'PASSED' result::
 

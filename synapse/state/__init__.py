@@ -607,7 +607,9 @@ def resolve_events_with_store(room_version, state_sets, event_map, state_res_sto
         return v1.resolve_events_with_store(
             state_sets, event_map, state_res_store.get_events,
         )
-    elif room_version in (RoomVersions.VDH_TEST, RoomVersions.STATE_V2_TEST):
+    elif room_version in (
+        RoomVersions.VDH_TEST, RoomVersions.STATE_V2_TEST, RoomVersions.V2,
+    ):
         return v2.resolve_events_with_store(
             state_sets, event_map, state_res_store,
         )

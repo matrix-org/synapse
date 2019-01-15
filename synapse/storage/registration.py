@@ -114,6 +114,31 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         return None
 
+    @cachedInlineCallbacks()
+    def is_support_user(self, user_id):
+        """Determines if the user is of type UserTypes.SUPPORT
+
+        Args:
+            user_id (str): user id to test
+
+        Returns:
+            Deferred[bool]: True if user is of type UserTypes.SUPPORT
+        """
+        res = yield self.runInteraction(
+            "is_support_user", self.is_support_user_txn, user_id
+        )
+        defer.returnValue(res)
+
+    def is_support_user_txn(self, txn, user_id):
+        res = self._simple_select_one_onecol_txn(
+            txn=txn,
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="user_type",
+            allow_none=True,
+        )
+        return True if res == UserTypes.SUPPORT else False
+
 
 class RegistrationStore(RegistrationWorkerStore,
                         background_updates.BackgroundUpdateStore):
@@ -464,31 +489,6 @@ class RegistrationStore(RegistrationWorkerStore,
         )
 
         defer.returnValue(res if res else False)
-
-    @cachedInlineCallbacks()
-    def is_support_user(self, user_id):
-        """Determines if the user is of type UserTypes.SUPPORT
-
-        Args:
-            user_id (str): user id to test
-
-        Returns:
-            Deferred[bool]: True if user is of type UserTypes.SUPPORT
-        """
-        res = yield self.runInteraction(
-            "is_support_user", self.is_support_user_txn, user_id
-        )
-        defer.returnValue(res)
-
-    def is_support_user_txn(self, txn, user_id):
-        res = self._simple_select_one_onecol_txn(
-            txn=txn,
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="user_type",
-            allow_none=True,
-        )
-        return True if res == UserTypes.SUPPORT else False
 
     @defer.inlineCallbacks
     def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
