@@ -22,7 +22,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership, RoomVersions
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -278,7 +278,20 @@ class EventCreationHandler(object):
         """
         yield self.auth.check_auth_blocking(requester.user.to_string())
 
-        builder = self.event_builder_factory.new(event_dict)
+        if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
+            # Set default room_version here
+            content = event_dict.setdefault("content", {})
+            room_version = content.get("room_version")
+            if not room_version:
+                room_version = RoomVersions.V1
+                content["room_version"] = room_version
+        else:
+            try:
+                room_version = yield self.store.get_room_version(event_dict["room_id"])
+            except NotFoundError:
+                raise AuthError(403, "Unknown room")
+
+        builder = self.event_builder_factory.new(room_version, event_dict)
 
         self.validator.validate_new(builder)
 

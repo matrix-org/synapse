@@ -25,7 +25,12 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
+from synapse.api.constants import (
+    KNOWN_ROOM_VERSIONS,
+    EventTypes,
+    Membership,
+    RoomVersions,
+)
 from synapse.api.errors import (
     CodeMessageException,
     FederationDeniedError,
@@ -187,8 +192,9 @@ class FederationClient(FederationBase):
 
         logger.debug("backfill transaction_data=%s", repr(transaction_data))
 
+        room_version = yield self.store.get_room_version(context)
         pdus = [
-            event_from_pdu_json(p, outlier=False)
+            event_from_pdu_json(p, room_version, outlier=False)
             for p in transaction_data["pdus"]
         ]
 
@@ -245,7 +251,7 @@ class FederationClient(FederationBase):
                 logger.debug("transaction_data %r", transaction_data)
 
                 pdu_list = [
-                    event_from_pdu_json(p, outlier=outlier)
+                    event_from_pdu_json(p, RoomVersions.V1, outlier=outlier)
                     for p in transaction_data["pdus"]
                 ]
 
@@ -339,12 +345,15 @@ class FederationClient(FederationBase):
             destination, room_id, event_id=event_id,
         )
 
+        room_version = yield self.store.get_room_version(room_id)
+
         pdus = [
-            event_from_pdu_json(p, outlier=True) for p in result["pdus"]
+            event_from_pdu_json(p, room_version, outlier=True)
+            for p in result["pdus"]
         ]
 
         auth_chain = [
-            event_from_pdu_json(p, outlier=True)
+            event_from_pdu_json(p, room_version, outlier=True)
             for p in result.get("auth_chain", [])
         ]
 
@@ -445,8 +454,10 @@ class FederationClient(FederationBase):
             destination, room_id, event_id,
         )
 
+        room_version = yield self.store.get_room_version(room_id)
+
         auth_chain = [
-            event_from_pdu_json(p, outlier=True)
+            event_from_pdu_json(p, room_version, outlier=True)
             for p in res["auth_chain"]
         ]
 
@@ -536,8 +547,9 @@ class FederationClient(FederationBase):
             params (dict[str, str|Iterable[str]]): Query parameters to include in the
                 request.
         Return:
-            Deferred: resolves to a tuple of (origin (str), event (object))
-            where origin is the remote homeserver which generated the event.
+            Deferred[tuple[str, dict, str]]: resolves to a tuple of
+            `(origin, event, room_version)` where origin is the remote
+            homeserver which generated the event.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
@@ -557,6 +569,8 @@ class FederationClient(FederationBase):
                 destination, room_id, user_id, membership, params,
             )
 
+            room_version = ret.get("room_version", RoomVersions.V1)
+
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
                 raise InvalidResponseError("Bad 'event' field in response")
@@ -571,17 +585,17 @@ class FederationClient(FederationBase):
             if "prev_state" not in pdu_dict:
                 pdu_dict["prev_state"] = []
 
-            ev = builder.EventBuilder(pdu_dict)
+            ev = builder.get_event_builder(room_version, pdu_dict)
 
             defer.returnValue(
-                (destination, ev)
+                (destination, ev, room_version)
             )
 
         return self._try_destination_list(
             "make_" + membership, destinations, send_request,
         )
 
-    def send_join(self, destinations, pdu):
+    def send_join(self, destinations, pdu, room_version):
         """Sends a join event to one of a list of homeservers.
 
         Doing so will cause the remote server to add the event to the graph,
@@ -614,7 +628,7 @@ class FederationClient(FederationBase):
                 )
 
             # the room version should be sane.
-            room_version = create_event.content.get("room_version", "1")
+            room_version = create_event.content.get("room_version", RoomVersions.V1)
             if room_version not in KNOWN_ROOM_VERSIONS:
                 # This shouldn't be possible, because the remote server should have
                 # rejected the join attempt during make_join.
@@ -636,12 +650,12 @@ class FederationClient(FederationBase):
             logger.debug("Got content: %s", content)
 
             state = [
-                event_from_pdu_json(p, outlier=True)
+                event_from_pdu_json(p, room_version, outlier=True)
                 for p in content.get("state", [])
             ]
 
             auth_chain = [
-                event_from_pdu_json(p, outlier=True)
+                event_from_pdu_json(p, room_version, outlier=True)
                 for p in content.get("auth_chain", [])
             ]
 
@@ -674,11 +688,6 @@ class FederationClient(FederationBase):
                 if p.event_id in valid_pdus_map
             ]
 
-            # NB: We *need* to copy to ensure that we don't have multiple
-            # references being passed on, as that causes... issues.
-            for s in signed_state:
-                s.internal_metadata = copy.deepcopy(s.internal_metadata)
-
             check_authchain_validity(signed_auth)
 
             defer.returnValue({
@@ -707,7 +716,9 @@ class FederationClient(FederationBase):
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 
-        pdu = event_from_pdu_json(pdu_dict)
+        room_version = yield self.store.get_room_version(room_id)
+
+        pdu = event_from_pdu_json(pdu_dict, room_version)
 
         # Check signatures are correct.
         pdu = yield self._check_sigs_and_hash(pdu)
@@ -785,8 +796,10 @@ class FederationClient(FederationBase):
             content=send_content,
         )
 
+        room_version = yield self.store.get_room_version(room_id)
+
         auth_chain = [
-            event_from_pdu_json(e)
+            event_from_pdu_json(e, room_version)
             for e in content["auth_chain"]
         ]
 
@@ -833,8 +846,10 @@ class FederationClient(FederationBase):
                 timeout=timeout,
             )
 
+            room_version = yield self.store.get_room_version(room_id)
+
             events = [
-                event_from_pdu_json(e)
+                event_from_pdu_json(e, room_version)
                 for e in content.get("events", [])
             ]
 

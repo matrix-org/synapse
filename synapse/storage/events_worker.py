@@ -22,9 +22,8 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.errors import NotFoundError
+from synapse.events import event_type_from_room_version
 # these are only included to make the type annotations work
-from synapse.events import EventBase  # noqa: F401
-from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -180,8 +179,6 @@ class EventsWorkerStore(SQLBaseStore):
                 else:
                     event = entry.event
 
-                events.append(event)
-
                 if get_prev_content:
                     if "replaces_state" in event.unsigned:
                         prev = yield self.get_event(
@@ -193,6 +190,8 @@ class EventsWorkerStore(SQLBaseStore):
                             event.unsigned = dict(event.unsigned)
                             event.unsigned["prev_content"] = prev.content
                             event.unsigned["prev_sender"] = prev.sender
+
+                events.append(event)
 
         defer.returnValue(events)
 
@@ -405,8 +404,8 @@ class EventsWorkerStore(SQLBaseStore):
                     desc="_get_event_from_row_rejected_reason",
                 )
 
-            original_ev = FrozenEvent(
-                d,
+            original_ev = event_type_from_room_version("1")(  # FIXME
+                event_dict=d,
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
             )
