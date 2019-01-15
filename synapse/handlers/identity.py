@@ -47,6 +47,7 @@ class IdentityHandler(BaseHandler):
         self.trust_any_id_server_just_for_testing_do_not_use = (
             hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
         )
+        self.rewrite_identity_server_urls = hs.config.rewrite_identity_server_urls
 
     def _should_trust_id_server(self, id_server):
         if id_server not in self.trusted_id_servers:
@@ -84,7 +85,10 @@ class IdentityHandler(BaseHandler):
                 'credentials', id_server
             )
             defer.returnValue(None)
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.get_json(
                 "https://%s%s" % (
@@ -119,7 +123,10 @@ class IdentityHandler(BaseHandler):
             client_secret = creds['clientSecret']
         else:
             raise SynapseError(400, "No client_secret in creds")
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.post_urlencoded_get_json(
                 "https://%s%s" % (
@@ -161,6 +168,11 @@ class IdentityHandler(BaseHandler):
         # same ID server federation, so we can pick any one of them to send the
         # deletion request to.
         id_server = next(iter(self.trusted_id_servers))
+
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
 
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         content = {
@@ -210,7 +222,10 @@ class IdentityHandler(BaseHandler):
             'send_attempt': send_attempt,
         }
         params.update(kwargs)
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.post_json_get_json(
                 "https://%s%s" % (
@@ -242,7 +257,10 @@ class IdentityHandler(BaseHandler):
             'send_attempt': send_attempt,
         }
         params.update(kwargs)
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.post_json_get_json(
                 "https://%s%s" % (
