@@ -56,7 +56,6 @@ outgoing_requests_counter = Counter("synapse_http_matrixfederationclient_request
 incoming_responses_counter = Counter("synapse_http_matrixfederationclient_responses",
                                      "", ["method", "code"])
 
-
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
 
@@ -64,6 +63,17 @@ if PY3:
     MAXINT = sys.maxsize
 else:
     MAXINT = sys.maxint
+
+class ProxyMatrixFederationEndpointFactory(object):
+    def __init__(self, hs):
+        self.reactor = hs.get_reactor()
+        self.tls_client_options_factory = hs.tls_client_options_factory
+
+    def endpointForURI(self, uri):
+        return matrix_federation_endpoint(
+            self.reactor, self.hs.proxy_federation_requests_address, timeout=10,
+            tls_client_options_factory=None
+        )
 
 
 class MatrixFederationEndpointFactory(object):
@@ -186,14 +196,22 @@ class MatrixFederationHttpClient(object):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
+        self.proxy_addr = hs.config.proxy_federation_requests_address
         reactor = hs.get_reactor()
         pool = HTTPConnectionPool(reactor)
         pool.retryAutomatically = False
         pool.maxPersistentPerHost = 5
         pool.cachedConnectionTimeout = 2 * 60
-        self.agent = Agent.usingEndpointFactory(
-            reactor, MatrixFederationEndpointFactory(hs), pool=pool
-        )
+
+        if self.proxy_addr:
+            self.agent = Agent.usingEndpointFactory(
+                reactor, ProxyMatrixFederationEndpointFactory(hs), pool=pool
+            )
+        else:
+            self.agent = Agent.usingEndpointFactory(
+                reactor, MatrixFederationEndpointFactory(hs), pool=pool
+            )
+
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
         self.version_string_bytes = hs.version_string.encode('ascii')
