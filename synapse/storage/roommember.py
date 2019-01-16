@@ -591,10 +591,7 @@ class RoomMemberStore(RoomMemberWorkerStore):
             # i.e., its something that has just happened.
             # The only current event that can also be an outlier is if its an
             # invite that has come in across federation.
-            is_new_state = not backfilled and (
-                not event.internal_metadata.is_outlier()
-                or event.internal_metadata.is_invite_from_remote()
-            )
+            is_new_state = not backfilled
             is_mine = self.hs.is_mine_id(event.state_key)
             if is_new_state and is_mine:
                 if event.membership == Membership.INVITE:

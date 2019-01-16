@@ -32,7 +32,6 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
-from synapse.events import builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -65,6 +64,8 @@ class FederationClient(FederationBase):
         )
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
+
+        self.event_builder_factory = hs.get_event_builder_factory()
 
         self._get_pdu_cache = ExpiringCache(
             cache_name="get_pdu_cache",
@@ -571,7 +572,12 @@ class FederationClient(FederationBase):
             if "prev_state" not in pdu_dict:
                 pdu_dict["prev_state"] = []
 
-            ev = builder.EventBuilder(pdu_dict)
+            # Strip off the fields that we want to clobber.
+            pdu_dict.pop("origin", None)
+            pdu_dict.pop("origin_server_ts", None)
+            pdu_dict.pop("unsigned", None)
+
+            ev = self.event_builder_factory.new(pdu_dict)
 
             defer.returnValue(
                 (destination, ev)
