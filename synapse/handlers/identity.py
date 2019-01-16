@@ -167,18 +167,21 @@ class IdentityHandler(BaseHandler):
             "mxid": mxid,
             "threepid": threepid,
         }
-        headers = {}
+
         # we abuse the federation http client to sign the request, but we have to send it
         # using the normal http client since we don't want the SRV lookup and want normal
         # 'browser-like' HTTPS.
-        self.federation_http_client.sign_request(
+        auth_headers = self.federation_http_client.build_auth_headers(
             destination=None,
             method='POST',
             url_bytes='/_matrix/identity/api/v1/3pid/unbind'.encode('ascii'),
-            headers_dict=headers,
             content=content,
             destination_is=id_server,
         )
+        headers = {
+            b"Authorization": auth_headers,
+        }
+
         try:
             yield self.http_client.post_json_get_json(
                 url,
