@@ -109,8 +109,8 @@ class ServerConfig(Config):
         )
 
         # Optional proxy address for federation traffic
-        self.proxy_federation_requests_address = config.get(
-            "proxy_federation_requests_address", None
+        self.federation_request_gateway_addr = config.get(
+            "federation_request_gateway_addr", None
         )
 
         # turn the whitelist into a hash for speed of lookup
@@ -119,10 +119,10 @@ class ServerConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
-        if self.proxy_federation_requests_address is not None:
+        if self.federation_request_gateway_addr is not None:
             # Ensure proxy address is correctly formatted
-            if len(self.proxy_federation_requests_address.split(':')) != 2:
-                self.proxy_federation_requests_address = None
+            if len(self.federation_request_gateway_addr.split(':')) != 2:
+                self.federation_request_gateway_addr = None
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -300,8 +300,10 @@ class ServerConfig(Config):
         #  - nyc.example.com
         #  - syd.example.com
 
-        # Proxy outbound federation requests through a seperate HTTP proxy.
-        # proxy_federation_requests_address: localhost:1234
+        # Send outbound federation requests through a seperate traffic gateway.
+        # Not intended to be used with a SOCKS proxy, but rather a relay for
+        # HTTP traffic.
+        # federation_request_gateway_addr: localhost:1234
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

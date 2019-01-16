@@ -71,7 +71,7 @@ class ProxyMatrixFederationEndpointFactory(object):
 
     def endpointForURI(self, uri):
         return matrix_federation_endpoint(
-            self.reactor, self.hs.proxy_federation_requests_address, timeout=10,
+            self.reactor, self.hs.federation_request_gateway_addr, timeout=10,
             tls_client_options_factory=None
         )
 
@@ -196,14 +196,14 @@ class MatrixFederationHttpClient(object):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
-        self.proxy_addr = hs.config.proxy_federation_requests_address
+        self.gateway_addr = hs.config.federation_request_gateway_addr
         reactor = hs.get_reactor()
         pool = HTTPConnectionPool(reactor)
         pool.retryAutomatically = False
         pool.maxPersistentPerHost = 5
         pool.cachedConnectionTimeout = 2 * 60
 
-        if self.proxy_addr:
+        if self.gateway_addr:
             self.agent = Agent.usingEndpointFactory(
                 reactor, ProxyMatrixFederationEndpointFactory(hs), pool=pool
             )
