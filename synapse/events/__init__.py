@@ -18,7 +18,11 @@ from distutils.util import strtobool
 
 import six
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS
+from synapse.api.constants import (
+    KNOWN_EVENT_FORMAT_VERSIONS,
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+)
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -180,6 +184,8 @@ class EventBase(object):
 
 
 class FrozenEvent(EventBase):
+    format_version = EventFormatVersions.V1  # All events of this type are V1
+
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
         event_dict = dict(event_dict)
 
@@ -242,5 +248,16 @@ def event_type_from_room_version(room_version):
     if room_version not in KNOWN_ROOM_VERSIONS:
         raise Exception(
             "No event format defined for version %r" % (room_version,)
+        )
+    return FrozenEvent
+
+
+def event_type_from_format_version(format_version):
+    """Returns the python type to use to construct an Event object for the
+    given event format version.
+    """
+    if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
+        raise Exception(
+            "No event format %r" % (format_version,)
         )
     return FrozenEvent
