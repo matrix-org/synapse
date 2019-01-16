@@ -200,6 +200,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertEqual(content, b'{"a":"b"}')
 
     def test_closes_connection(self):
+        """Check that the client closes unused HTTP connections"""
         d = self.cl.get_json("testserv:8008", "foo/bar")
 
         self.pump()
