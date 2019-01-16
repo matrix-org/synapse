@@ -53,7 +53,7 @@ REQUIREMENTS = [
     "sortedcontainers>=1.4.4",
     "psutil>=2.0.0",
     "pymacaroons-pynacl>=0.9.3",
-    "msgpack-python>=0.4.2",
+    "msgpack>=0.5.0",
     "phonenumbers>=8.2.0",
     "six>=1.10",
     # prometheus_client 0.4.0 changed the format of counter metrics
