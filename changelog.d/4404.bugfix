@@ -1,0 +1,1 @@
+Fix potential bug where creating or joining a room could fail
