@@ -28,25 +28,56 @@ GENERATE_DH_PARAMS = False
 
 class TlsConfig(Config):
     def read_config(self, config):
-        self.tls_certificate = self.read_tls_certificate(
-            config.get("tls_certificate_path")
-        )
-        self.tls_certificate_file = config.get("tls_certificate_path")
 
+        acme_config = config.get("acme", {})
+        self.acme_enabled = acme_config.get("enabled", False)
+        self.acme_url = acme_config.get(
+            "url", "https://acme-v01.api.letsencrypt.org/directory"
+        )
+        self.acme_port = acme_config.get("port", 8449)
+        self.acme_host = acme_config.get("host", "127.0.0.1")
+
+        self.tls_certificate_file = config.get("tls_certificate_path")
+        self.tls_private_key_file = config.get("tls_private_key_path")
+        self.tls_dh_params_file = config.get("tls_dh_params_path")
+        self._original_tls_fingerprints = config["tls_fingerprints"]
+        self.tls_fingerprints = list(self._original_tls_fingerprints)
         self.no_tls = config.get("no_tls", False)
 
-        if self.no_tls:
-            self.tls_private_key = None
-        else:
-            self.tls_private_key = self.read_tls_private_key(
-                config.get("tls_private_key_path")
-            )
-
         self.tls_dh_params_path = self.check_file(
-            config.get("tls_dh_params_path"), "tls_dh_params"
+            self.tls_dh_params_file, "tls_dh_params"
         )
 
-        self.tls_fingerprints = config["tls_fingerprints"]
+        # This config option applies to non-federation HTTP clients
+        # (e.g. for talking to recaptcha, identity servers, and such)
+        # It should never be used in production, and is intended for
+        # use only when running tests.
+        self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
+            "use_insecure_ssl_client_just_for_testing_do_not_use"
+        )
+
+        self.tls_certificate = None
+        self.tls_private_key = None
+
+        # If we are using ACME, do not read the certificate yet. That will be
+        # done later, and will trigger the reading code.
+        if not self.acme_enabled:
+            self._read_certificate()
+
+    def _read_certificate(self):
+        """
+        Read the certificates from disk.
+        """
+        self.tls_certificate = self.read_tls_certificate(
+            self.tls_certificate_file
+        )
+
+        if not self.no_tls:
+            self.tls_private_key = self.read_tls_private_key(
+                self.tls_private_key_file
+            )
+
+        self.tls_fingerprints = list(self._original_tls_fingerprints)
 
         # Check that our own certificate is included in the list of fingerprints
         # and include it if it is not.
@@ -58,14 +89,6 @@ class TlsConfig(Config):
         sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
         if sha256_fingerprint not in sha256_fingerprints:
             self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
-
-        # This config option applies to non-federation HTTP clients
-        # (e.g. for talking to recaptcha, identity servers, and such)
-        # It should never be used in production, and is intended for
-        # use only when running tests.
-        self.use_insecure_ssl_client_just_for_testing_do_not_use = config.get(
-            "use_insecure_ssl_client_just_for_testing_do_not_use"
-        )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -118,6 +141,17 @@ class TlsConfig(Config):
         #
         tls_fingerprints: []
         # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
+
+        ## Support for ACME certificate auto-provisioning.
+        # acme:
+        #    enabled: false
+        ##   ACME path. Default: https://acme-staging.api.letsencrypt.org/directory
+        #    url: 'https://acme-v01.api.letsencrypt.org/directory'
+        ##   Port number (to listen for the HTTP-01 challenge).
+        ##   Using port 80 requires utilising something like authbind, or proxying to it.
+        #    port: 8449
+        ##   Hosts to bind to, comma separated.
+        #    host: '127.0.0.1'
         """ % locals()
 
     def read_tls_certificate(self, cert_path):

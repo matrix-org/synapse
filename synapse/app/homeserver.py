@@ -361,9 +361,22 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
-    hs.start_listening()
+    # If configured, start up the ACME listener. We will need to check if we
+    # have a certificate, first.
+    if hs.config.acme_enabled:
+        acme = hs.get_acme_handler()
+        acme.start_listening()
+    else:
+        hs.start_listening()
 
     def start():
+        if hs.config.acme_enabled:
+            is_valid_cert = acme.is_disk_cert_valid()
+            if not is_valid_cert:
+                d = acme.provison_certificate()
+                d.addCallback(lambda _: hs.config._read_certificate())
+                d.addCallback(lambda _: hs.start_listening())
+
         hs.get_pusherpool().start()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()

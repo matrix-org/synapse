@@ -25,6 +25,8 @@ from twisted.web.resource import Resource
 
 from zope.interface import implementer
 
+from OpenSSL import crypto
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ try:
 
         def store(self, server_name, pem_objects):
             self.certs[server_name] = b''.join(o.as_bytes() for o in pem_objects)
-            return succeed(None)
+            return defer.succeed(None)
 
 
 except ImportError:
@@ -54,8 +56,18 @@ class AcmeHandler(BaseHandler):
     def __init__(self, hs):
         super(AcmeHandler, self).__init__(hs)
 
-        if self.hs.config.acme_enabled:
-            self._setup_acme()
+    def is_disk_cert_valid(self):
+        """
+        Is the certificate we have on disk valid?
+        """
+        try:
+            tls_certificate = self.hs.config.read_tls_certificate(
+                self.hs.config.tls_certificate_file
+            )
+        except Exception:
+            return False
+
+        return not tls_certificate.has_expired()
 
     def _create_key(self):
         from josepy.jwk import JWKRSA
@@ -64,7 +76,7 @@ class AcmeHandler(BaseHandler):
         key = generate_private_key(u'rsa')
         return JWKRSA(key=key)
 
-    def _setup_acme(self):
+    def start_listening(self):
         from txacme.challenges import HTTP01Responder
         from txacme.service import AcmeIssuingService
         from txacme.client import Client
@@ -72,6 +84,7 @@ class AcmeHandler(BaseHandler):
 
         self._store = ErsatzStore()
         responder = HTTP01Responder()
+        self._private_key = self._create_key()
 
         self._issuer = AcmeIssuingService(
             cert_store=ErsatzStore(),
@@ -79,7 +92,7 @@ class AcmeHandler(BaseHandler):
                 lambda: Client.from_url(
                     reactor=self.reactor,
                     url=self.config.acme_url,
-                    key=self._create_key(),
+                    key=self._private_key,
                     alg=RS256,
                 )
             ),
@@ -105,4 +118,18 @@ class AcmeHandler(BaseHandler):
     def provision_certificate(self, hostname):
 
         yield self._issuer.issue_cert(hostname)
-        defer.returnValue(self._store.certs[hostname])
+        cert_chain = self._store.certs[hostname]
+
+        tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)
+        with open(self.hs.tls_private_key_path, "wb") as private_key_file:
+            private_key_pem = crypto.dump_privatekey(
+                crypto.FILETYPE_PEM, tls_private_key
+            )
+            private_key_file.write(private_key_pem)
+
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_chain)
+        with open(self.hs.tls_certificate_path, "wb") as certificate_file:
+            cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+            certificate_file.write(cert_pem)
+
+        defer.returnValue(None)
