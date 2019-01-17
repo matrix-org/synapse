@@ -81,7 +81,7 @@ CONDITIONAL_REQUIREMENTS = {
 
     "saml2": ["pysaml2>=4.5.0"],
     "url_preview": ["lxml>=3.5.0"],
-    "test": ["mock>=2.0"],
+    "test": ["mock>=2.0", "parameterized"],
 }
 
 
