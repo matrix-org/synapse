@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import logging
 import os
@@ -381,14 +382,17 @@ def setup(config_options):
             if not is_valid_cert:
                 d = acme._issuer._ensure_registered()
                 d.addCallback(lambda _: acme.provision_certificate(hs.config.server_name))
+            else:
+                d = defer.succeed(True)
 
-                def _load_context_factories(_):
-                    hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-                    hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+            def _load_context_factories(_):
+                hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+                hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
-                d.addCallback(lambda _: hs.config._read_certificate())
-                d.addCallback(_load_context_factories)
-                d.addCallback(lambda _: hs.start_listening())
+            d.addCallback(lambda _: hs.config._read_certificate())
+            d.addCallback(_load_context_factories)
+            d.addCallback(lambda _: hs.start_listening())
+
 
         hs.get_pusherpool().start()
         hs.get_datastore().start_profiling()

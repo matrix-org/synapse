@@ -140,14 +140,14 @@ class AcmeHandler(BaseHandler):
 
         try:
             tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)
-            with open(self.hs.tls_private_key_path, "wb") as private_key_file:
+            with open(self.hs.config.tls_private_key_file, "wb") as private_key_file:
                 private_key_pem = crypto.dump_privatekey(
                     crypto.FILETYPE_PEM, tls_private_key
                 )
                 private_key_file.write(private_key_pem)
 
             cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_chain)
-            with open(self.hs.tls_certificate_path, "wb") as certificate_file:
+            with open(self.hs.config.tls_certificate_file, "wb") as certificate_file:
                 cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
                 certificate_file.write(cert_pem)
         except Exception:
