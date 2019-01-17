@@ -15,11 +15,9 @@
 
 from mock import Mock
 
-from zope.interface import implementer
-
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
-from twisted.internet.interfaces import ITransport
+from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
@@ -212,11 +210,11 @@ class FederationClientTests(HomeserverTestCase):
 
         # complete the connection and wire it up to a fake transport
         client = factory.buildProtocol(None)
-        conn = MockTransport()
+        conn = StringTransport()
         client.makeConnection(conn)
 
         # that should have made it send the request to the connection
-        self.assertRegex(conn.written, b"^GET /foo/bar")
+        self.assertRegex(conn.value(), b"^GET /foo/bar")
 
         # Send the HTTP response
         client.dataReceived(
@@ -231,30 +229,9 @@ class FederationClientTests(HomeserverTestCase):
         r = self.successResultOf(d)
         self.assertEqual(r, {})
 
-        self.assertFalse(conn.lostConnection)
+        self.assertFalse(conn.disconnecting)
 
         # wait for a while
         self.pump(120)
 
-        self.assertTrue(conn.lostConnection)
-
-
-@implementer(ITransport)
-class MockTransport(object):
-    def __init__(self):
-        self.paused = False
-        self.written = b''
-        self.lostConnection = False
-
-    def pauseProducing(self):
-        self.paused = True
-
-    def resumeProducing(self):
-        self.paused = False
-
-    def writeSequence(self, data):
-        for d in data:
-            self.written += d
-
-    def loseConnection(self):
-        self.lostConnection = True
+        self.assertTrue(conn.disconnecting)
