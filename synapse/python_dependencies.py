@@ -63,8 +63,11 @@ REQUIREMENTS = [
     # prometheus_client 0.4.0 changed the format of counter metrics
     # (cf https://github.com/matrix-org/synapse/issues/4001)
     "prometheus_client>=0.0.18,<0.4.0",
+
     # we use attr.s(slots), which arrived in 16.0.0
-    "attrs>=16.0.0",
+    # Twisted 18.7.0 requires attrs>=17.4.0
+    "attrs>=17.4.0",
+
     "netaddr>=0.7.18",
 ]
 
