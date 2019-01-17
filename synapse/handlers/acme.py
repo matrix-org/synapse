@@ -108,18 +108,13 @@ class AcmeHandler(BaseHandler):
             responders=[responder],
         )
 
-        class RespondToHTTP01(Resource):
-            def __init__(self, responderResource):
-                Resource.__init__(self)
-                wellKnown = Resource()
-                wellKnown.putChild(b'acme-challenge', responderResource)
-                self.putChild(b'.well-known', wellKnown)
-                self.putChild(b'check', static.Data(b'OK', b'text/plain'))
+        well_known = Resource()
+        well_known.putChild(b'acme-challenge', responder.resource)
+        responder_resource = Resource()
+        responder_resource.putChild(b'.well-known', well_known)
+        responder_resource.putChild(b'check', static.Data(b'OK', b'text/plain'))
 
-            def getChild(self, path, request):
-                return self
-
-        srv = server.Site(RespondToHTTP01(responder))
+        srv = server.Site(responder_resource)
 
         for host in self.hs.config.acme_host.split(","):
             logger.info("Listening for ACME requests on %s:%s", host, self.hs.config.acme_port)
