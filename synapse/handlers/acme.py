@@ -98,7 +98,7 @@ class AcmeHandler(BaseHandler):
             client_creator=(
                 lambda: Client.from_url(
                     reactor=self.reactor,
-                    url=self.config.acme_url,
+                    url=self.hs.config.acme_url,
                     key=self._private_key,
                     alg=RS256,
                 )
