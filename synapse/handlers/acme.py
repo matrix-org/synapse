@@ -20,6 +20,7 @@ import attr
 
 from twisted.web import server, static
 from twisted.internet import defer
+from twisted.python.url import URL
 from twisted.internet.endpoints import serverFromString
 from twisted.web.resource import Resource
 
@@ -98,7 +99,7 @@ class AcmeHandler(BaseHandler):
             client_creator=(
                 lambda: Client.from_url(
                     reactor=self.reactor,
-                    url=self.hs.config.acme_url,
+                    url=URL.from_text(self.hs.config.acme_url),
                     key=self._private_key,
                     alg=RS256,
                 )
