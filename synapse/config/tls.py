@@ -32,7 +32,7 @@ class TlsConfig(Config):
         acme_config = config.get("acme", {})
         self.acme_enabled = acme_config.get("enabled", False)
         self.acme_url = acme_config.get(
-            "url", "https://acme-v01.api.letsencrypt.org/directory"
+            "url", "https://acme-staging.api.letsencrypt.org/directory"
         )
         self.acme_key = config.get("client_key", "client.key")
         self.acme_port = acme_config.get("port", 8449)
