@@ -324,8 +324,14 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+    # These will be loaded in later
+    if config.acme_enabled:
+        tls_server_context_factory = None
+        tls_client_options_factory = None
+    else:
+        tls_server_context_factory = context_factory.ServerContextFactory(config)
+        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+
 
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
@@ -374,7 +380,13 @@ def setup(config_options):
             is_valid_cert = acme.is_disk_cert_valid()
             if not is_valid_cert:
                 d = acme.provison_certificate()
+
+                def _load_context_factories(_):
+                    hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+                    hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+
                 d.addCallback(lambda _: hs.config._read_certificate())
+                d.addCallback(_load_context_factories)
                 d.addCallback(lambda _: hs.start_listening())
 
         hs.get_pusherpool().start()
