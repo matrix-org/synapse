@@ -64,6 +64,7 @@ if PY3:
 else:
     MAXINT = sys.maxint
 
+
 class ProxyMatrixFederationEndpointFactory(object):
     def __init__(self, hs):
         self.reactor = hs.get_reactor()
