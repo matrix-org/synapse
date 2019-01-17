@@ -77,22 +77,21 @@ class AcmeHandler(BaseHandler):
 
         return True
 
-    def _create_key(self):
-        from josepy.jwk import JWKRSA
-        from txacme.util import generate_private_key
-
-        key = generate_private_key(u'rsa')
-        return JWKRSA(key=key)
-
     def start_listening(self):
+
+        # Configure logging for txacme
+        from eliot import add_destinations
+        from eliot.twisted import TwistedDestination
+        add_destinations(TwistedDestination())
+
         from txacme.challenges import HTTP01Responder
         from txacme.service import AcmeIssuingService
+        from txacme.endpoint import load_or_create_client_key
         from txacme.client import Client
         from josepy.jwa import RS256
 
         self._store = ErsatzStore()
         responder = HTTP01Responder()
-        self._private_key = self._create_key()
 
         self._issuer = AcmeIssuingService(
             cert_store=ErsatzStore(),
@@ -100,7 +99,7 @@ class AcmeHandler(BaseHandler):
                 lambda: Client.from_url(
                     reactor=self.reactor,
                     url=URL.from_text(self.hs.config.acme_url),
-                    key=self._private_key,
+                    key=load_or_create_client_key(self.hs.config.acme_client_key),
                     alg=RS256,
                 )
             ),
