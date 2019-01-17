@@ -126,14 +126,14 @@ class AcmeHandler(BaseHandler):
     @defer.inlineCallbacks
     def provision_certificate(self, hostname):
 
-        logger.warning("Reprovisioning %s", (hostname,))
+        logger.warning("Reprovisioning %s", hostname)
 
         try:
             yield self._issuer.issue_cert(hostname)
         except Exception:
             logger.exception("Fail!")
             raise
-        logger.warning("Reprovisioned %s, saving.", (hostname,))
+        logger.warning("Reprovisioned %s, saving.", hostname)
         cert_chain = self._store.certs[hostname]
 
         try:
