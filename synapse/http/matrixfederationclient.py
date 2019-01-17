@@ -69,11 +69,10 @@ class ProxyMatrixFederationEndpointFactory(object):
     def __init__(self, hs):
         self.reactor = hs.get_reactor()
         self.tls_client_options_factory = hs.tls_client_options_factory
-        self.federation_request_gateway_addr = hs.config.federation_request_gateway_addr
 
     def endpointForURI(self, uri):
         return matrix_federation_endpoint(
-            self.reactor, self.federation_request_gateway_addr, timeout=10,
+            self.reactor, self.hs.config.federation_request_gateway_addr, timeout=10,
             tls_client_options_factory=None
         )
 
