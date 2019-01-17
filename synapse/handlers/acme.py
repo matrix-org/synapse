@@ -95,7 +95,7 @@ class AcmeHandler(BaseHandler):
         responder = HTTP01Responder()
 
         self._issuer = AcmeIssuingService(
-            cert_store=ErsatzStore(),
+            cert_store=self._store,
             client_creator=(
                 lambda: Client.from_url(
                     reactor=self.reactor,
@@ -136,7 +136,7 @@ class AcmeHandler(BaseHandler):
             logger.exception("Fail!")
             raise
         logger.warning("Reprovisioned %s, saving.", hostname)
-        cert_chain = self._store.certs[hostname.encode('ascii')]
+        cert_chain = self._store.certs[hostname]
 
         try:
             tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)
