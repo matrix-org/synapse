@@ -260,8 +260,27 @@ class RoomCreationHandler(BaseHandler):
             }
         }
 
+        # Copy over whether this room is considered a direct message by this
+        # user or not
+        user_account_data = yield self.store.get_account_data_for_user(
+            user_id,
+        )
+
+        if user_account_data:
+            direct_rooms = user_account_data[0]["m.direct"]
+            # Check if this room was a DM
+            if old_room_id in direct_rooms[user_id]:
+                # Add this room ID to the list of direct rooms
+                direct_rooms[user_id].append(new_room_id)
+
+                # Add this room ID to the list of direct rooms for this user
+                yield self.store.add_account_data_for_user(
+                    user_id, "m.direct", direct_rooms,
+                )
+
         initial_state = dict()
 
+        # Replicate relevant room events
         types_to_copy = (
             (EventTypes.JoinRules, ""),
             (EventTypes.Name, ""),
