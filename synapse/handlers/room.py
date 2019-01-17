@@ -266,7 +266,7 @@ class RoomCreationHandler(BaseHandler):
             user_id,
         )
 
-        if user_account_data:
+        if user_account_data and "m.direct" in user_account_data[0]:
             direct_rooms = user_account_data[0]["m.direct"]
             # Check if this room was a DM
             if old_room_id in direct_rooms[user_id]:
