@@ -40,7 +40,11 @@ REQUIREMENTS = [
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
     "service_identity>=16.0.0",
-    "Twisted>=17.1.0",
+
+    # our logcontext handling relies on the ability to cancel inlineCallbacks
+    # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
+    "Twisted>=18.7.0",
+
     "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",

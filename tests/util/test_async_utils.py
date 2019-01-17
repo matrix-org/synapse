@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from twisted.internet import defer
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import CancelledError, Deferred
 from twisted.internet.task import Clock
 
 from synapse.util import logcontext
@@ -64,11 +64,17 @@ class TimeoutDeferredTest(TestCase):
         self.failureResultOf(timing_out_d, defer.TimeoutError, )
 
     def test_logcontext_is_preserved_on_cancellation(self):
+        blocking_was_cancelled = [False]
+
         @defer.inlineCallbacks
         def blocking():
             non_completing_d = Deferred()
             with logcontext.PreserveLoggingContext():
-                yield non_completing_d
+                try:
+                    yield non_completing_d
+                except CancelledError:
+                    blocking_was_cancelled[0] = True
+                    raise
 
         with logcontext.LoggingContext("one") as context_one:
             # the errbacks should be run in the test logcontext
@@ -90,5 +96,9 @@ class TimeoutDeferredTest(TestCase):
 
             self.clock.pump((1.0, ))
 
+            self.assertTrue(
+                blocking_was_cancelled[0],
+                "non-completing deferred was not cancelled",
+            )
             self.failureResultOf(timing_out_d, defer.TimeoutError, )
             self.assertIs(LoggingContext.current_context(), context_one)
