@@ -116,7 +116,7 @@ class AcmeHandler(BaseHandler):
         srv = server.Site(responder_resource)
 
         for host in self.hs.config.acme_host.split(","):
-            logger.info("Listening for ACME requests on %s:%s", (self.hs.config.acme_port, host))
+            logger.info("Listening for ACME requests on %s:%s", self.hs.config.acme_port, host)
             endpoint = serverFromString(
                 self.reactor, "tcp:%s:interface=%s" % (self.hs.config.acme_port, host)
             )
