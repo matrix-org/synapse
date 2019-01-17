@@ -100,7 +100,7 @@ class AcmeHandler(BaseHandler):
                 lambda: Client.from_url(
                     reactor=self.reactor,
                     url=URL.from_text(self.hs.config.acme_url),
-                    key=load_or_create_client_key(FilePath(self.hs.config.acme_client_key),
+                    key=load_or_create_client_key(FilePath(self.hs.config.acme_client_key)),
                     alg=RS256,
                 )
             ),
