@@ -65,9 +65,16 @@ class AcmeHandler(BaseHandler):
                 self.hs.config.tls_certificate_file
             )
         except Exception:
+            logger.warning("Certificate does not exist, will reprovision....")
             return False
 
-        return not tls_certificate.has_expired()
+        expired = tls_certificate.has_expired()
+
+        if expired:
+            logger.warning("Certificate is expired, will reprovision...")
+            return False
+
+        return True
 
     def _create_key(self):
         from josepy.jwk import JWKRSA
@@ -109,6 +116,7 @@ class AcmeHandler(BaseHandler):
         srv = server.Site(responder_resource)
 
         for host in self.hs.config.acme_host.split(","):
+            logger.info("Listening for ACME requests on %s:%s", (self.hs.config.acme_port, host))
             endpoint = serverFromString(
                 self.reactor, "tcp:%s:interface=%s" % (self.hs.config.acme_port, host)
             )
@@ -117,19 +125,30 @@ class AcmeHandler(BaseHandler):
     @defer.inlineCallbacks
     def provision_certificate(self, hostname):
 
-        yield self._issuer.issue_cert(hostname)
+        logger.warning("Reprovisioning %s", (hostname,))
+
+        try:
+            yield self._issuer.issue_cert(hostname)
+        except Exception:
+            logger.exception("Fail!")
+            raise
+        logger.warning("Reprovisioned %s, saving.", (hostname,))
         cert_chain = self._store.certs[hostname]
 
-        tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)
-        with open(self.hs.tls_private_key_path, "wb") as private_key_file:
-            private_key_pem = crypto.dump_privatekey(
-                crypto.FILETYPE_PEM, tls_private_key
-            )
-            private_key_file.write(private_key_pem)
+        try:
+            tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)
+            with open(self.hs.tls_private_key_path, "wb") as private_key_file:
+                private_key_pem = crypto.dump_privatekey(
+                    crypto.FILETYPE_PEM, tls_private_key
+                )
+                private_key_file.write(private_key_pem)
 
-        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_chain)
-        with open(self.hs.tls_certificate_path, "wb") as certificate_file:
-            cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
-            certificate_file.write(cert_pem)
+            cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_chain)
+            with open(self.hs.tls_certificate_path, "wb") as certificate_file:
+                cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+                certificate_file.write(cert_pem)
+        except Exception:
+            logger.exception("Failed saving!")
+            raise
 
         defer.returnValue(None)
