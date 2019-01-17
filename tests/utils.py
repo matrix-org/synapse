@@ -115,6 +115,7 @@ def default_config(name):
     config.email_enable_notifs = False
     config.block_non_admin_invites = False
     config.federation_domain_whitelist = None
+    config.federation_request_gateway_addr = None
     config.federation_rc_reject_limit = 10
     config.federation_rc_sleep_limit = 10
     config.federation_rc_sleep_delay = 100

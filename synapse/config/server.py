@@ -108,16 +108,16 @@ class ServerConfig(Config):
             "federation_domain_whitelist", None
         )
 
-        # Optional proxy address for federation traffic
-        self.federation_request_gateway_addr = config.get(
-            "federation_request_gateway_addr", None
-        )
-
         # turn the whitelist into a hash for speed of lookup
         if federation_domain_whitelist is not None:
             self.federation_domain_whitelist = {}
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
+
+        # Optional proxy address for federation traffic
+        self.federation_request_gateway_addr = config.get(
+            "federation_request_gateway_addr", None
+        )
 
         if self.federation_request_gateway_addr is not None:
             # Ensure proxy address is correctly formatted
