@@ -124,7 +124,6 @@ class AcmeHandler(BaseHandler):
             endpoint.listen(srv)
 
         self._issuer._registered = False
-        self._issuer._ensure_registered()
 
     @defer.inlineCallbacks
     def provision_certificate(self, hostname):
