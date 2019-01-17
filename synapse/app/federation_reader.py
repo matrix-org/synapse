@@ -99,7 +99,8 @@ class FederationReaderServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
-            )
+            ),
+            reactor=self.get_reactor()
         )
 
         logger.info("Synapse federation reader now listening on port %d", port)
