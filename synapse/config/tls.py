@@ -34,7 +34,7 @@ class TlsConfig(Config):
         self.acme_url = acme_config.get(
             "url", "https://acme-staging.api.letsencrypt.org/directory"
         )
-        self.acme_key = config.get("client_key", "client.key")
+        self.acme_client_key = config.get("client_key", "client.key")
         self.acme_port = acme_config.get("port", 8449)
         self.acme_host = acme_config.get("host", "127.0.0.1")
 
