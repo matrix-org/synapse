@@ -59,7 +59,7 @@ class FrontendProxyTests(HomeserverTestCase):
 
     def test_listen_http_with_presence_disabled(self):
         """
-        When presence is on, the stub servlet will register.
+        When presence is off, the stub servlet will register.
         """
         # Presence is off
         self.hs.config.use_presence = False
