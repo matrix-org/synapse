@@ -154,4 +154,4 @@ class AcmeHandler(BaseHandler):
             logger.exception("Failed saving!")
             raise
 
-        defer.returnValue(None)
+        defer.returnValue(True)
