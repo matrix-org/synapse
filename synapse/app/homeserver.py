@@ -379,7 +379,7 @@ def setup(config_options):
         if hs.config.acme_enabled:
             is_valid_cert = acme.is_disk_cert_valid()
             if not is_valid_cert:
-                d = acme.provison_certificate()
+                d = acme.provision_certificate()
 
                 def _load_context_factories(_):
                     hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
