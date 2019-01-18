@@ -14,21 +14,19 @@
 # limitations under the License.
 
 import logging
-from ._base import BaseHandler
 
 import attr
-
-from twisted.web import server, static
-from twisted.internet import defer
-from twisted.python.url import URL
-from twisted.python.filepath import FilePath
-from twisted.internet.endpoints import serverFromString
-from twisted.web.resource import Resource
-
 from zope.interface import implementer
 
 from OpenSSL import crypto
+from twisted.internet import defer
+from twisted.internet.endpoints import serverFromString
+from twisted.python.filepath import FilePath
+from twisted.python.url import URL
+from twisted.web import server, static
+from twisted.web.resource import Resource
 
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +81,7 @@ class AcmeHandler(BaseHandler):
         # Configure logging for txacme
         from eliot import add_destinations
         from eliot.twisted import TwistedDestination
+
         add_destinations(TwistedDestination())
 
         from txacme.challenges import HTTP01Responder
@@ -100,7 +99,9 @@ class AcmeHandler(BaseHandler):
                 lambda: Client.from_url(
                     reactor=self.reactor,
                     url=URL.from_text(self.hs.config.acme_url),
-                    key=load_or_create_client_key(FilePath(self.hs.config.acme_client_key)),
+                    key=load_or_create_client_key(
+                        FilePath(self.hs.config.acme_client_key)
+                    ),
                     alg=RS256,
                 )
             ),
@@ -117,7 +118,9 @@ class AcmeHandler(BaseHandler):
         srv = server.Site(responder_resource)
 
         for host in self.hs.config.acme_host.split(","):
-            logger.info("Listening for ACME requests on %s:%s", host, self.hs.config.acme_port)
+            logger.info(
+                "Listening for ACME requests on %s:%s", host, self.hs.config.acme_port
+            )
             endpoint = serverFromString(
                 self.reactor, "tcp:%s:interface=%s" % (self.hs.config.acme_port, host)
             )

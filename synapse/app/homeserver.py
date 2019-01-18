@@ -325,7 +325,7 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    # These will be loaded in later
+    # These will be loaded in later, once we have provisioned keys via ACME.
     if config.acme_enabled:
         tls_server_context_factory = None
         tls_client_options_factory = None
@@ -381,13 +381,19 @@ def setup(config_options):
             is_valid_cert = acme.is_disk_cert_valid()
             if not is_valid_cert:
                 d = acme._issuer._ensure_registered()
-                d.addCallback(lambda _: acme.provision_certificate(hs.config.server_name))
+                d.addCallback(
+                    lambda _: acme.provision_certificate(hs.config.server_name)
+                )
             else:
                 d = defer.succeed(True)
 
             def _load_context_factories(_):
-                hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-                hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+                hs.tls_server_context_factory = context_factory.ServerContextFactory(
+                    config
+                )
+                hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+                    config
+                )
 
             d.addCallback(lambda _: hs.config._read_certificate())
             d.addCallback(_load_context_factories)
