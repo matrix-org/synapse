@@ -40,7 +40,7 @@ try:
         A store that only stores in memory.
         """
 
-        certs = attr.ib(factory=dict)
+        certs = attr.ib(default=attr.Factory(dict))
 
         def store(self, server_name, pem_objects):
             self.certs[server_name] = b''.join(o.as_bytes() for o in pem_objects)
