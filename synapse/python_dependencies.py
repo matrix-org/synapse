@@ -72,6 +72,7 @@ CONDITIONAL_REQUIREMENTS = {
     # ConsentResource uses select_autoescape, which arrived in jinja 2.9
     "resources.consent": ["Jinja2>=2.9"],
 
+    "acme": ["txacme>=0.9.2"],
     "saml2": ["pysaml2>=4.5.0"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0"],

@@ -333,7 +333,6 @@ def setup(config_options):
         tls_server_context_factory = context_factory.ServerContextFactory(config)
         tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
-
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
 
@@ -398,7 +397,6 @@ def setup(config_options):
             d.addCallback(lambda _: hs.config._read_certificate())
             d.addCallback(_load_context_factories)
             d.addCallback(lambda _: hs.start_listening())
-
 
         hs.get_pusherpool().start()
         hs.get_datastore().start_profiling()

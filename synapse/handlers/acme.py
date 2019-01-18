@@ -78,11 +78,11 @@ class AcmeHandler(BaseHandler):
 
     def start_listening(self):
 
-        # Configure logging for txacme
-        from eliot import add_destinations
-        from eliot.twisted import TwistedDestination
-
-        add_destinations(TwistedDestination())
+        # Configure logging for txacme, if you need to debug
+        #from eliot import add_destinations
+        #from eliot.twisted import TwistedDestination
+        #
+        #add_destinations(TwistedDestination())
 
         from txacme.challenges import HTTP01Responder
         from txacme.service import AcmeIssuingService
