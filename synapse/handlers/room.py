@@ -272,15 +272,19 @@ class RoomCreationHandler(BaseHandler):
         # Copy direct message state if applicable
         if user_account_data and "m.direct" in user_account_data[0]:
             direct_rooms = user_account_data[0]["m.direct"]
-            # Check if this room was a DM
-            if old_room_id in direct_rooms[user_id]:
-                # Add this room ID to the list of direct rooms
-                direct_rooms[user_id].append(new_room_id)
 
-                # Add this room ID to the list of direct rooms for this user
-                yield self.store.add_account_data_for_user(
-                    user_id, "m.direct", direct_rooms,
-                )
+            # Check which key this room is under
+            for key, room_id_list in direct_rooms.items():
+                for room_id in room_id_list:
+                    if room_id == old_room_id:
+                        # Add new room_id to this key
+                        direct_rooms[key].append(new_room_id)
+
+                        # Save back to user's m.direct account data
+                        yield self.store.add_account_data_for_user(
+                            user_id, "m.direct", direct_rooms,
+                        )
+                        break
 
         # Copy room tags if applicable
         if room_tags:

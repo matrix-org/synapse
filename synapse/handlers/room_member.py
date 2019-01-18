@@ -161,6 +161,8 @@ class RoomMemberHandler(object):
         ratelimit=True,
         content=None,
     ):
+        user_id = target.to_string()
+
         if content is None:
             content = {}
 
@@ -175,7 +177,7 @@ class RoomMemberHandler(object):
                 "content": content,
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
-                "state_key": target.to_string(),
+                "state_key": user_id,
 
                 # For backwards compatibility:
                 "membership": membership,
@@ -204,7 +206,7 @@ class RoomMemberHandler(object):
         prev_state_ids = yield context.get_prev_state_ids(self.store)
 
         prev_member_event_id = prev_state_ids.get(
-            (EventTypes.Member, target.to_string()),
+            (EventTypes.Member, user_id),
             None
         )
 
@@ -218,6 +220,51 @@ class RoomMemberHandler(object):
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 yield self._user_joined_room(target, room_id)
+
+            # Copy over direct message status and room tags if this is a join
+            # on an upgraded room
+
+            # Check if this is an upgraded room
+            state_ids = yield self.store.get_current_state_ids(room_id)
+            create_id = state_ids.get((EventTypes.Create, ""))
+            if not create_id:
+                return
+            create_event = yield self.store.get_event(create_id)
+
+            if "predecessor" in create_event["content"]:
+                old_room_id = create_event["content"]["predecessor"]["room_id"]
+
+                # Copy over room account data from predecessor room to upgraded room
+                user_account_data = yield self.store.get_account_data_for_user(
+                    user_id,
+                )
+                room_tags = yield self.store.get_tags_for_room(
+                    user_id, old_room_id,
+                )
+
+                # Copy direct message state if applicable
+                if user_account_data and "m.direct" in user_account_data[0]:
+                    direct_rooms = user_account_data[0]["m.direct"]
+
+                    # Check which key this room is under
+                    for key, room_id_list in direct_rooms.items():
+                        for rid in room_id_list:
+                            if rid == old_room_id:
+                                # Add new room_id to this key
+                                direct_rooms[key].append(room_id)
+
+                                # Save back to user's m.direct account data
+                                yield self.store.add_account_data_for_user(
+                                    user_id, "m.direct", direct_rooms,
+                                )
+                                break
+
+                # Copy room tags if applicable
+                if room_tags:
+                    # Copy each room tag to the new room
+                    for tag in room_tags.keys():
+                        tag_content = room_tags[tag]
+                        yield self.store.add_tag_to_room(user_id, room_id, tag, tag_content)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
