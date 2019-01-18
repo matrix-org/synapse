@@ -130,6 +130,7 @@ class SynapseHomeServer(HomeServer):
                     self.version_string,
                 ),
                 self.tls_server_context_factory,
+                reactor=self.get_reactor(),
             )
 
         else:
@@ -142,7 +143,8 @@ class SynapseHomeServer(HomeServer):
                     listener_config,
                     root_resource,
                     self.version_string,
-                )
+                ),
+                reactor=self.get_reactor(),
             )
         logger.info("Synapse now listening on port %d", port)
 
