@@ -321,23 +321,23 @@ class MatrixFederationHttpClient(object):
                         url_str,
                     )
 
-                    # we don't want all the fancy cookie and redirect handling that
-                    # treq.request gives: just use the raw Agent.
-                    request_deferred = self.agent.request(
-                        method_bytes,
-                        url_bytes,
-                        headers=Headers(headers_dict),
-                        bodyProducer=producer,
-                    )
-
-                    request_deferred = timeout_deferred(
-                        request_deferred,
-                        timeout=_sec_timeout,
-                        reactor=self.hs.get_reactor(),
-                    )
-
                     try:
                         with Measure(self.clock, "outbound_request"):
+                            # we don't want all the fancy cookie and redirect handling
+                            # that treq.request gives: just use the raw Agent.
+                            request_deferred = self.agent.request(
+                                method_bytes,
+                                url_bytes,
+                                headers=Headers(headers_dict),
+                                bodyProducer=producer,
+                            )
+
+                            request_deferred = timeout_deferred(
+                                request_deferred,
+                                timeout=_sec_timeout,
+                                reactor=self.hs.get_reactor(),
+                            )
+
                             response = yield make_deferred_yieldable(
                                 request_deferred,
                             )
