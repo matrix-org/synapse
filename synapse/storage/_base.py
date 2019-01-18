@@ -690,23 +690,7 @@ class SQLBaseStore(object):
             ", ".join(k for k in keyvalues),
             ", ".join(k + "=EXCLUDED." + k for k in values),
         )
-        try:
-            txn.execute(sql, list(allvalues.values()))
-        except self.database_engine.module.OperationalError as e:
-            # We only care about serialization errors, so check for it
-            if e.args[0] == "could not serialize access due to concurrent update":
-                # A concurrent update problem is when we try and do a native
-                # UPSERT but the row has changed from under us. We can either
-                # retry, or give up if asked to do so.
-                if best_effort:
-                    # If it's a concurrent-update problem, and this is marked as
-                    # 'best effort' (i.e. if there's a race, then the one we
-                    # raced with will suffice), then pretend that we succeeded.
-                    return False
-            else:
-                # Otherwise, raise, because it's a real OperationalError and we
-                # will need to be rolled back and retried.
-                raise
+        txn.execute(sql, list(allvalues.values()))
 
         # One-tuple, which is a boolean for insertion or not
         res = txn.fetchone()

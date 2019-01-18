@@ -237,9 +237,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         # Am consciously deciding to lock the table on the basis that is ought
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
-        # See https://github.com/matrix-org/synapse/issues/3854 for more.
-        # If we support native upserts, we'll not lock, but also not retry
-        # on any races, by setting best_effort=True.
+        # See https://github.com/matrix-org/synapse/issues/3854 for more
         is_insert = self._simple_upsert_txn(
             txn,
             table="monthly_active_users",
@@ -249,7 +247,6 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             values={
                 "timestamp": int(self._clock.time_msec()),
             },
-            best_effort=True,
         )
 
         return is_insert
