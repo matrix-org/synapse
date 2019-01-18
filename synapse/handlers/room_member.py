@@ -63,7 +63,7 @@ class RoomMemberHandler(object):
         self.directory_handler = hs.get_handlers().directory_handler
         self.registration_handler = hs.get_handlers().registration_handler
         self.profile_handler = hs.get_profile_handler()
-        self.event_creation_hander = hs.get_event_creation_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
         self.member_linearizer = Linearizer(name="member")
 
@@ -168,7 +168,7 @@ class RoomMemberHandler(object):
         if requester.is_guest:
             content["kind"] = "guest"
 
-        event, context = yield self.event_creation_hander.create_event(
+        event, context = yield self.event_creation_handler.create_event(
             requester,
             {
                 "type": EventTypes.Member,
@@ -186,14 +186,14 @@ class RoomMemberHandler(object):
         )
 
         # Check if this event matches the previous membership event for the user.
-        duplicate = yield self.event_creation_hander.deduplicate_state_event(
+        duplicate = yield self.event_creation_handler.deduplicate_state_event(
             event, context,
         )
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
             defer.returnValue(duplicate)
 
-        yield self.event_creation_hander.handle_new_client_event(
+        yield self.event_creation_handler.handle_new_client_event(
             requester,
             event,
             context,
@@ -493,7 +493,7 @@ class RoomMemberHandler(object):
         else:
             requester = synapse.types.create_requester(target_user)
 
-        prev_event = yield self.event_creation_hander.deduplicate_state_event(
+        prev_event = yield self.event_creation_handler.deduplicate_state_event(
             event, context,
         )
         if prev_event is not None:
@@ -513,7 +513,7 @@ class RoomMemberHandler(object):
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
 
-        yield self.event_creation_hander.handle_new_client_event(
+        yield self.event_creation_handler.handle_new_client_event(
             requester,
             event,
             context,
@@ -527,7 +527,7 @@ class RoomMemberHandler(object):
         )
 
         if event.membership == Membership.JOIN:
-            # Only fire user_joined_room if the user has acutally joined the
+            # Only fire user_joined_room if the user has actually joined the
             # room. Don't bother if the user is just changing their profile
             # info.
             newly_joined = True
@@ -755,7 +755,7 @@ class RoomMemberHandler(object):
             )
         )
 
-        yield self.event_creation_hander.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.ThirdPartyInvite,
