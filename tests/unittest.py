@@ -96,7 +96,7 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.DEBUG))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.WARNING))
 
         @around(self)
         def setUp(orig):
