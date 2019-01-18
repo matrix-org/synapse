@@ -40,7 +40,11 @@ REQUIREMENTS = [
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
     "service_identity>=16.0.0",
-    "Twisted>=17.1.0",
+
+    # our logcontext handling relies on the ability to cancel inlineCallbacks
+    # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
+    "Twisted>=18.7.0",
+
     "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",
@@ -52,22 +56,29 @@ REQUIREMENTS = [
     "pillow>=3.1.2",
     "sortedcontainers>=1.4.4",
     "psutil>=2.0.0",
-    "pymacaroons-pynacl>=0.9.3",
-    "msgpack-python>=0.4.2",
+    "pymacaroons>=0.13.0",
+    "msgpack>=0.5.0",
     "phonenumbers>=8.2.0",
     "six>=1.10",
     # prometheus_client 0.4.0 changed the format of counter metrics
     # (cf https://github.com/matrix-org/synapse/issues/4001)
     "prometheus_client>=0.0.18,<0.4.0",
+
     # we use attr.s(slots), which arrived in 16.0.0
-    "attrs>=16.0.0",
+    # Twisted 18.7.0 requires attrs>=17.4.0
+    "attrs>=17.4.0",
+
     "netaddr>=0.7.18",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
-    "email.enable_notifs": ["Jinja2>=2.8", "bleach>=1.4.2"],
+    "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
     "postgres": ["psycopg2>=2.6"],
+
+    # ConsentResource uses select_autoescape, which arrived in jinja 2.9
+    "resources.consent": ["Jinja2>=2.9"],
+
     "saml2": ["pysaml2>=4.5.0"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0"],
@@ -84,18 +95,30 @@ def list_requirements():
 
 class DependencyException(Exception):
     @property
+    def message(self):
+        return "\n".join([
+            "Missing Requirements: %s" % (", ".join(self.dependencies),),
+            "To install run:",
+            "    pip install --upgrade --force %s" % (" ".join(self.dependencies),),
+            "",
+        ])
+
+    @property
     def dependencies(self):
         for i in self.args[0]:
             yield '"' + i + '"'
 
 
-def check_requirements(_get_distribution=get_distribution):
-
+def check_requirements(for_feature=None, _get_distribution=get_distribution):
     deps_needed = []
     errors = []
 
-    # Check the base dependencies exist -- they all must be installed.
-    for dependency in REQUIREMENTS:
+    if for_feature:
+        reqs = CONDITIONAL_REQUIREMENTS[for_feature]
+    else:
+        reqs = REQUIREMENTS
+
+    for dependency in reqs:
         try:
             _get_distribution(dependency)
         except VersionConflict as e:
@@ -108,23 +131,24 @@ def check_requirements(_get_distribution=get_distribution):
             deps_needed.append(dependency)
             errors.append("Needed %s but it was not installed" % (dependency,))
 
-    # Check the optional dependencies are up to date. We allow them to not be
-    # installed.
-    OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])
+    if not for_feature:
+        # Check the optional dependencies are up to date. We allow them to not be
+        # installed.
+        OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])
 
-    for dependency in OPTS:
-        try:
-            _get_distribution(dependency)
-        except VersionConflict:
-            deps_needed.append(dependency)
-            errors.append("Needed %s but it was not installed" % (dependency,))
-        except DistributionNotFound:
-            # If it's not found, we don't care
-            pass
+        for dependency in OPTS:
+            try:
+                _get_distribution(dependency)
+            except VersionConflict:
+                deps_needed.append(dependency)
+                errors.append("Needed %s but it was not installed" % (dependency,))
+            except DistributionNotFound:
+                # If it's not found, we don't care
+                pass
 
     if deps_needed:
         for e in errors:
-            logging.exception(e)
+            logging.error(e)
 
         raise DependencyException(deps_needed)
 

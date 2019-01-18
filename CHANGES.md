@@ -1,3 +1,86 @@
+Synapse 0.34.1.1 (2019-01-11)
+=============================
+
+This release fixes CVE-2019-5885 and is recommended for all users of Synapse 0.34.1.
+
+This release is compatible with Python 2.7 and 3.5+. Python 3.7 is fully supported.
+
+Bugfixes
+--------
+
+- Fix spontaneous logout on upgrade
+  ([\#4374](https://github.com/matrix-org/synapse/issues/4374))
+
+
+Synapse 0.34.1 (2019-01-09)
+===========================
+
+Internal Changes
+----------------
+
+- Add better logging for unexpected errors while sending transactions ([\#4361](https://github.com/matrix-org/synapse/issues/4361), [\#4362](https://github.com/matrix-org/synapse/issues/4362))
+
+
+Synapse 0.34.1rc1 (2019-01-08)
+==============================
+
+Features
+--------
+
+- Special-case a support user for use in verifying behaviour of a given server. The support user does not appear in user directory or monthly active user counts. ([\#4141](https://github.com/matrix-org/synapse/issues/4141), [\#4344](https://github.com/matrix-org/synapse/issues/4344))
+- Support for serving .well-known files ([\#4262](https://github.com/matrix-org/synapse/issues/4262))
+- Rework SAML2 authentication ([\#4265](https://github.com/matrix-org/synapse/issues/4265), [\#4267](https://github.com/matrix-org/synapse/issues/4267))
+- SAML2 authentication: Initialise user display name from SAML2 data ([\#4272](https://github.com/matrix-org/synapse/issues/4272))
+- Synapse can now have its conditional/extra dependencies installed by pip. This functionality can be used by using `pip install matrix-synapse[feature]`, where feature is a comma separated list with the possible values `email.enable_notifs`, `matrix-synapse-ldap3`, `postgres`, `resources.consent`, `saml2`, `url_preview`, and `test`. If you want to install all optional dependencies, you can use "all" instead. ([\#4298](https://github.com/matrix-org/synapse/issues/4298), [\#4325](https://github.com/matrix-org/synapse/issues/4325), [\#4327](https://github.com/matrix-org/synapse/issues/4327))
+- Add routes for reading account data. ([\#4303](https://github.com/matrix-org/synapse/issues/4303))
+- Add opt-in support for v2 rooms ([\#4307](https://github.com/matrix-org/synapse/issues/4307))
+- Add a script to generate a clean config file ([\#4315](https://github.com/matrix-org/synapse/issues/4315))
+- Return server data in /login response ([\#4319](https://github.com/matrix-org/synapse/issues/4319))
+
+
+Bugfixes
+--------
+
+- Fix contains_url check to be consistent with other instances in code-base and check that value is an instance of string. ([\#3405](https://github.com/matrix-org/synapse/issues/3405))
+- Fix CAS login when username is not valid in an MXID ([\#4264](https://github.com/matrix-org/synapse/issues/4264))
+- Send CORS headers for /media/config ([\#4279](https://github.com/matrix-org/synapse/issues/4279))
+- Add 'sandbox' to CSP for media reprository ([\#4284](https://github.com/matrix-org/synapse/issues/4284))
+- Make the new landing page prettier. ([\#4294](https://github.com/matrix-org/synapse/issues/4294))
+- Fix deleting E2E room keys when using old SQLite versions. ([\#4295](https://github.com/matrix-org/synapse/issues/4295))
+- The metric synapse_admin_mau:current previously did not update when config.mau_stats_only was set to True ([\#4305](https://github.com/matrix-org/synapse/issues/4305))
+- Fixed per-room account data filters ([\#4309](https://github.com/matrix-org/synapse/issues/4309))
+- Fix indentation in default config ([\#4313](https://github.com/matrix-org/synapse/issues/4313))
+- Fix synapse:latest docker upload ([\#4316](https://github.com/matrix-org/synapse/issues/4316))
+- Fix test_metric.py compatibility with prometheus_client 0.5. Contributed by Maarten de Vries <maarten@de-vri.es>. ([\#4317](https://github.com/matrix-org/synapse/issues/4317))
+- Avoid packaging _trial_temp directory in -py3 debian packages ([\#4326](https://github.com/matrix-org/synapse/issues/4326))
+- Check jinja version for consent resource ([\#4327](https://github.com/matrix-org/synapse/issues/4327))
+- fix NPE in /messages by checking if all events were filtered out ([\#4330](https://github.com/matrix-org/synapse/issues/4330))
+- Fix `python -m synapse.config` on Python 3. ([\#4356](https://github.com/matrix-org/synapse/issues/4356))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove the deprecated v1/register API on Python 2. It was never ported to Python 3. ([\#4334](https://github.com/matrix-org/synapse/issues/4334))
+
+
+Internal Changes
+----------------
+
+- Getting URL previews of IP addresses no longer fails on Python 3. ([\#4215](https://github.com/matrix-org/synapse/issues/4215))
+- drop undocumented dependency on dateutil ([\#4266](https://github.com/matrix-org/synapse/issues/4266))
+- Update the example systemd config to use a virtualenv ([\#4273](https://github.com/matrix-org/synapse/issues/4273))
+- Update link to kernel DCO guide ([\#4274](https://github.com/matrix-org/synapse/issues/4274))
+- Make isort tox check print diff when it fails ([\#4283](https://github.com/matrix-org/synapse/issues/4283))
+- Log room_id in Unknown room errors ([\#4297](https://github.com/matrix-org/synapse/issues/4297))
+- Documentation improvements for coturn setup. Contributed by Krithin Sitaram. ([\#4333](https://github.com/matrix-org/synapse/issues/4333))
+- Update pull request template to use absolute links ([\#4341](https://github.com/matrix-org/synapse/issues/4341))
+- Update README to not lie about required restart when updating TLS certificates ([\#4343](https://github.com/matrix-org/synapse/issues/4343))
+- Update debian packaging for compatibility with transitional package ([\#4349](https://github.com/matrix-org/synapse/issues/4349))
+- Fix command hint to generate a config file when trying to start without a config file ([\#4353](https://github.com/matrix-org/synapse/issues/4353))
+- Add better logging for unexpected errors while sending transactions ([\#4358](https://github.com/matrix-org/synapse/issues/4358))
+
+
 Synapse 0.34.0 (2018-12-20)
 ===========================
 

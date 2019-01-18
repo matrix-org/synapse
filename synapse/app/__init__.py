@@ -19,15 +19,8 @@ from synapse import python_dependencies  # noqa: E402
 
 sys.dont_write_bytecode = True
 
-
 try:
     python_dependencies.check_requirements()
 except python_dependencies.DependencyException as e:
-    message = "\n".join([
-        "Missing Requirements: %s" % (", ".join(e.dependencies),),
-        "To install run:",
-        "    pip install --upgrade --force %s" % (" ".join(e.dependencies),),
-        "",
-    ])
-    sys.stderr.writelines(message)
+    sys.stderr.writelines(e.message)
     sys.exit(1)

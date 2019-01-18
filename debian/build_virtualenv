@@ -33,7 +33,8 @@ dh_virtualenv \
     --preinstall="lxml" \
     --preinstall="mock" \
     --extra-pip-arg="--no-cache-dir" \
-    --extra-pip-arg="--compile"
+    --extra-pip-arg="--compile" \
+    --extras="all"
 
 # we copy the tests to a temporary directory so that we can put them on the
 # PYTHONPATH without putting the uninstalled synapse on the pythonpath.
@@ -41,8 +42,7 @@ tmpdir=`mktemp -d`
 trap "rm -r $tmpdir" EXIT
 
 cp -r tests "$tmpdir"
-cd debian/matrix-synapse-py3
 
 PYTHONPATH="$tmpdir" \
-    ./opt/venvs/matrix-synapse/bin/python \
+    debian/matrix-synapse-py3/opt/venvs/matrix-synapse/bin/python \
         -B -m twisted.trial --reporter=text -j2 tests

@@ -632,11 +632,19 @@ class SQLBaseStore(object):
         if lock:
             self.database_engine.lock_table(txn, table)
 
+        def _getwhere(key):
+            # If the value we're passing in is None (aka NULL), we need to use
+            # IS, not =, as NULL = NULL equals NULL (False).
+            if keyvalues[key] is None:
+                return "%s IS ?" % (key,)
+            else:
+                return "%s = ?" % (key,)
+
         # First try to update.
         sql = "UPDATE %s SET %s WHERE %s" % (
             table,
             ", ".join("%s = ?" % (k,) for k in values),
-            " AND ".join("%s = ?" % (k,) for k in keyvalues),
+            " AND ".join(_getwhere(k) for k in keyvalues)
         )
         sqlargs = list(values.values()) + list(keyvalues.values())
 
