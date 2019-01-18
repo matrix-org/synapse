@@ -448,6 +448,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             deferred: dict of (type, state_key) -> event_id
         """
+
         def _get_current_state_ids_txn(txn):
             txn.execute(
                 """SELECT type, state_key, event_id FROM current_state_events
