@@ -260,12 +260,16 @@ class RoomCreationHandler(BaseHandler):
             }
         }
 
-        # Copy over whether this room is considered a direct message by this
-        # user or not
+        # Copy over room account data for this user
         user_account_data = yield self.store.get_account_data_for_user(
             user_id,
         )
 
+        room_tags = yield self.store.get_tags_for_room(
+            user_id, old_room_id,
+        )
+
+        # Copy direct message state if applicable
         if user_account_data and "m.direct" in user_account_data[0]:
             direct_rooms = user_account_data[0]["m.direct"]
             # Check if this room was a DM
@@ -277,6 +281,13 @@ class RoomCreationHandler(BaseHandler):
                 yield self.store.add_account_data_for_user(
                     user_id, "m.direct", direct_rooms,
                 )
+
+        # Copy room tags if applicable
+        if room_tags:
+            # Copy each room tag to the new room
+            for tag in room_tags.keys():
+                tag_content = room_tags[tag]
+                yield self.store.add_tag_to_room(user_id, new_room_id, tag, tag_content)
 
         initial_state = dict()
 
