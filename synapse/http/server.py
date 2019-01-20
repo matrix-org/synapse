@@ -414,27 +414,27 @@ def respond_with_json(request, code, json_object, send_cors=False,
             "Not sending response to request %s, already disconnected.",
             request)
         return
-
     encoding = "application/json"
-    if pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object) + b"\n"
+    if canonical_json or synapse.events.USE_FROZEN_DICTS:
+        # canonicaljson already encodes to bytes
+        json_bytes = encode_canonical_json(json_object)
     else:
-        if canonical_json or synapse.events.USE_FROZEN_DICTS:
-            # canonicaljson already encodes to bytes
-            json_bytes = encode_canonical_json(json_object)
-        else:
-            # Check what encoding the client prefers.
-            encoding = select_content_type(request)
-            logger.debug(
-                "Selected encoding %s.",
-                encoding)
-            if encoding == "application/cbor":
-                json_bytes = cbor.dumps(json_object)
-            else: # Default to json
+        # Check what encoding the client prefers.
+        encoding = select_content_type(request)
+        logger.debug(
+            "Selected encoding %s.",
+            encoding)
+        if encoding == "application/cbor":
+            json_bytes = cbor.dumps(json_object)
+        else: # Default to json
+            if encoding != "application/json":
+                encoding = "application/json"
                 logger.warn(
                     "Unknown encoding %s, responding with application/json.",
                     encoding)
-                encoding = "application/json"
+            if pretty_print:
+                json_bytes = encode_pretty_printed_json(json_object) + b"\n"
+            else:
                 json_bytes = json.dumps(json_object).encode("utf-8")
 
     return respond_with_json_bytes(
@@ -447,14 +447,14 @@ def respond_with_json(request, code, json_object, send_cors=False,
 def select_content_type(request):
     accepts = request.getHeader(b"Accept")
     if accepts is None:
-        return "application/json"
+        return None
     mimetypes = accepts.decode().split(",")
-    mimetypes = [mt.strip().lower().split(";q=")for mt in mimetypes]
-    mimetype = "application/json"
+    mimetypes = [mt.strip().lower().split(";q=") for mt in mimetypes]
+    mimetype = None
     currentQuality = 0
     for mt in mimetypes:
         try:
-            quality = 1 if len(mt) == 1 else float("1.0")
+            quality = 1 if len(mt) == 1 else float(mt[1])
         except ValueError:
             # Bad float value, just set it to 1
             quality = 1
