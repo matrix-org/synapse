@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017 New Vector Ltd
+# Copyright 2017-2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import logging
 import os.path
 
 from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -203,6 +204,8 @@ class ServerConfig(Config):
                     },
                 ]
             })
+
+        _check_resource_config(self.listeners)
 
     def default_config(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
@@ -465,3 +468,36 @@ def _warn_if_webclient_configured(listeners):
                 if name == 'webclient':
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
+
+
+KNOWN_RESOURCES = (
+    'client',
+    'consent',
+    'federation',
+    'keys',
+    'media',
+    'metrics',
+    'replication',
+    'static',
+    'webclient',
+)
+
+
+def _check_resource_config(listeners):
+    resource_names = set(
+        res_name
+        for listener in listeners
+        for res in listener.get("resources", [])
+        for res_name in res.get("names", [])
+    )
+
+    for resource in resource_names:
+        if resource not in KNOWN_RESOURCES:
+            raise ConfigError(
+                "Unknown listener resource '%s'" % (resource, )
+            )
+        if resource == "consent":
+            try:
+                check_requirements('resources.consent')
+            except DependencyException as e:
+                raise ConfigError(e.message)

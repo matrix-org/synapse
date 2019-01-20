@@ -37,6 +37,7 @@ prune docker
 prune .circleci
 prune .coveragerc
 prune debian
+prune .codecov.yml
 
 exclude jenkins*
 recursive-exclude jenkins *.sh

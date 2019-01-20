@@ -17,9 +17,11 @@ from mock import Mock
 
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
+from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
+from synapse.api.errors import RequestSendFailed
 from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
@@ -43,13 +45,14 @@ class FederationClientTests(HomeserverTestCase):
 
     def test_dns_error(self):
         """
-        If the DNS raising returns an error, it will bubble up.
+        If the DNS lookup returns an error, it will bubble up.
         """
         d = self.cl.get_json("testserv2:8008", "foo/bar", timeout=10000)
         self.pump()
 
         f = self.failureResultOf(d)
-        self.assertIsInstance(f.value, DNSLookupError)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
 
     def test_client_never_connect(self):
         """
@@ -61,7 +64,7 @@ class FederationClientTests(HomeserverTestCase):
         self.pump()
 
         # Nothing happened yet
-        self.assertFalse(d.called)
+        self.assertNoResult(d)
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
@@ -70,13 +73,17 @@ class FederationClientTests(HomeserverTestCase):
         self.assertEqual(clients[0][1], 8008)
 
         # Deferred is still without a result
-        self.assertFalse(d.called)
+        self.assertNoResult(d)
 
         # Push by enough to time it out
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, (ConnectingCancelledError, TimeoutError))
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(
+            f.value.inner_exception,
+            (ConnectingCancelledError, TimeoutError),
+        )
 
     def test_client_connect_no_response(self):
         """
@@ -88,7 +95,7 @@ class FederationClientTests(HomeserverTestCase):
         self.pump()
 
         # Nothing happened yet
-        self.assertFalse(d.called)
+        self.assertNoResult(d)
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
@@ -101,13 +108,14 @@ class FederationClientTests(HomeserverTestCase):
         client.makeConnection(conn)
 
         # Deferred is still without a result
-        self.assertFalse(d.called)
+        self.assertNoResult(d)
 
         # Push by enough to time it out
         self.reactor.advance(10.5)
         f = self.failureResultOf(d)
 
-        self.assertIsInstance(f.value, ResponseNeverReceived)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
 
     def test_client_gets_headers(self):
         """
@@ -128,7 +136,7 @@ class FederationClientTests(HomeserverTestCase):
         client.makeConnection(conn)
 
         # Deferred does not have a result
-        self.assertFalse(d.called)
+        self.assertNoResult(d)
 
         # Send it the HTTP response
         client.dataReceived(b"HTTP/1.1 200 OK\r\nServer: Fake\r\n\r\n")
@@ -152,7 +160,7 @@ class FederationClientTests(HomeserverTestCase):
         client.makeConnection(conn)
 
         # Deferred does not have a result
-        self.assertFalse(d.called)
+        self.assertNoResult(d)
 
         # Send it the HTTP response
         client.dataReceived(
@@ -188,3 +196,42 @@ class FederationClientTests(HomeserverTestCase):
         request = server.requests[0]
         content = request.content.read()
         self.assertEqual(content, b'{"a":"b"}')
+
+    def test_closes_connection(self):
+        """Check that the client closes unused HTTP connections"""
+        d = self.cl.get_json("testserv:8008", "foo/bar")
+
+        self.pump()
+
+        # there should have been a call to connectTCP
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (_host, _port, factory, _timeout, _bindAddress) = clients[0]
+
+        # complete the connection and wire it up to a fake transport
+        client = factory.buildProtocol(None)
+        conn = StringTransport()
+        client.makeConnection(conn)
+
+        # that should have made it send the request to the connection
+        self.assertRegex(conn.value(), b"^GET /foo/bar")
+
+        # Send the HTTP response
+        client.dataReceived(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 2\r\n"
+            b"\r\n"
+            b"{}"
+        )
+
+        # We should get a successful response
+        r = self.successResultOf(d)
+        self.assertEqual(r, {})
+
+        self.assertFalse(conn.disconnecting)
+
+        # wait for a while
+        self.pump(120)
+
+        self.assertTrue(conn.disconnecting)

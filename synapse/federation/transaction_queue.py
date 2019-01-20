@@ -22,7 +22,11 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse.metrics
-from synapse.api.errors import FederationDeniedError, HttpResponseException
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    RequestSendFailed,
+)
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 from synapse.metrics import (
     LaterGauge,
@@ -518,11 +522,21 @@ class TransactionQueue(object):
             )
         except FederationDeniedError as e:
             logger.info(e)
-        except Exception as e:
-            logger.warn(
-                "TX [%s] Failed to send transaction: %s",
+        except HttpResponseException as e:
+            logger.warning(
+                "TX [%s] Received %d response to transaction: %s",
+                destination, e.code, e,
+            )
+        except RequestSendFailed as e:
+            logger.warning("TX [%s] Failed to send transaction: %s", destination, e)
+
+            for p, _ in pending_pdus:
+                logger.info("Failed to send event %s to %s", p.event_id,
+                            destination)
+        except Exception:
+            logger.exception(
+                "TX [%s] Failed to send transaction",
                 destination,
-                e,
             )
             for p, _ in pending_pdus:
                 logger.info("Failed to send event %s to %s", p.event_id,

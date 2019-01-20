@@ -140,82 +140,15 @@ def matrix_federation_endpoint(reactor, destination, tls_client_options_factory=
         default_port = 8448
 
     if port is None:
-        return _WrappingEndpointFac(SRVClientEndpoint(
+        return SRVClientEndpoint(
             reactor, "matrix", domain, protocol="tcp",
             default_port=default_port, endpoint=transport_endpoint,
             endpoint_kw_args=endpoint_kw_args
-        ), reactor)
+        )
     else:
-        return _WrappingEndpointFac(transport_endpoint(
+        return transport_endpoint(
             reactor, domain, port, **endpoint_kw_args
-        ), reactor)
-
-
-class _WrappingEndpointFac(object):
-    def __init__(self, endpoint_fac, reactor):
-        self.endpoint_fac = endpoint_fac
-        self.reactor = reactor
-
-    @defer.inlineCallbacks
-    def connect(self, protocolFactory):
-        conn = yield self.endpoint_fac.connect(protocolFactory)
-        conn = _WrappedConnection(conn, self.reactor)
-        defer.returnValue(conn)
-
-
-class _WrappedConnection(object):
-    """Wraps a connection and calls abort on it if it hasn't seen any action
-    for 2.5-3 minutes.
-    """
-    __slots__ = ["conn", "last_request"]
-
-    def __init__(self, conn, reactor):
-        object.__setattr__(self, "conn", conn)
-        object.__setattr__(self, "last_request", time.time())
-        self._reactor = reactor
-
-    def __getattr__(self, name):
-        return getattr(self.conn, name)
-
-    def __setattr__(self, name, value):
-        setattr(self.conn, name, value)
-
-    def _time_things_out_maybe(self):
-        # We use a slightly shorter timeout here just in case the callLater is
-        # triggered early. Paranoia ftw.
-        # TODO: Cancel the previous callLater rather than comparing time.time()?
-        if time.time() - self.last_request >= 2.5 * 60:
-            self.abort()
-            # Abort the underlying TLS connection. The abort() method calls
-            # loseConnection() on the TLS connection which tries to
-            # shutdown the connection cleanly. We call abortConnection()
-            # since that will promptly close the TLS connection.
-            #
-            # In Twisted >18.4; the TLS connection will be None if it has closed
-            # which will make abortConnection() throw. Check that the TLS connection
-            # is not None before trying to close it.
-            if self.transport.getHandle() is not None:
-                self.transport.abortConnection()
-
-    def request(self, request):
-        self.last_request = time.time()
-
-        # Time this connection out if we haven't send a request in the last
-        # N minutes
-        # TODO: Cancel the previous callLater?
-        self._reactor.callLater(3 * 60, self._time_things_out_maybe)
-
-        d = self.conn.request(request)
-
-        def update_request_time(res):
-            self.last_request = time.time()
-            # TODO: Cancel the previous callLater?
-            self._reactor.callLater(3 * 60, self._time_things_out_maybe)
-            return res
-
-        d.addCallback(update_request_time)
-
-        return d
+        )
 
 
 class SRVClientEndpoint(object):
