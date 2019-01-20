@@ -87,6 +87,13 @@ class FederationReaderServer(HomeServer):
                     resources.update({
                         FEDERATION_PREFIX: TransportLayerServer(self),
                     })
+                if name == "openid" and "federation" not in res["names"]:
+                    # Only load the openid resource separately if federation resource
+                    # is not specified since federation resource includes openid
+                    # resource.
+                    resources.update({
+                        FEDERATION_PREFIX: TransportLayerServer(self, servlet_groups=["openid"]),
+                    })
 
         root_resource = create_resource_tree(resources, NoResource())
 

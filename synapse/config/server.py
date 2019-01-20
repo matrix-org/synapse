@@ -151,7 +151,7 @@ class ServerConfig(Config):
                         "compress": gzip_responses,
                     },
                     {
-                        "names": ["federation"],
+                        "names": ["federation", "openid"],
                         "compress": False,
                     }
                 ]
@@ -170,7 +170,7 @@ class ServerConfig(Config):
                             "compress": gzip_responses,
                         },
                         {
-                            "names": ["federation"],
+                            "names": ["federation", "openid"],
                             "compress": False,
                         }
                     ]
@@ -328,7 +328,7 @@ class ServerConfig(Config):
                 # that can do automatic compression.
                 compress: true
 
-              - names: [federation]  # Federation APIs
+              - names: [federation, openid]  # Federation APIs
                 compress: false
 
             # optional list of additional endpoints which can be loaded via
@@ -350,7 +350,7 @@ class ServerConfig(Config):
             resources:
               - names: [client]
                 compress: true
-              - names: [federation]
+              - names: [federation, openid]
                 compress: false
 
           # Turn on the twisted ssh manhole service on localhost on the given
@@ -477,6 +477,7 @@ KNOWN_RESOURCES = (
     'keys',
     'media',
     'metrics',
+    'openid',
     'replication',
     'static',
     'webclient',

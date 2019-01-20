@@ -43,9 +43,10 @@ logger = logging.getLogger(__name__)
 class TransportLayerServer(JsonResource):
     """Handles incoming federation HTTP requests"""
 
-    def __init__(self, hs):
+    def __init__(self, hs, servlet_groups=None):
         self.hs = hs
         self.clock = hs.get_clock()
+        self.servlet_groups = servlet_groups
 
         super(TransportLayerServer, self).__init__(hs, canonical_json=False)
 
@@ -67,6 +68,7 @@ class TransportLayerServer(JsonResource):
             resource=self,
             ratelimiter=self.ratelimiter,
             authenticator=self.authenticator,
+            servlet_groups=self.servlet_groups,
         )
 
 
@@ -1308,10 +1310,12 @@ FEDERATION_SERVLET_CLASSES = (
     FederationClientKeysClaimServlet,
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,
-    OpenIdUserInfo,
     FederationVersionServlet,
 )
 
+OPENID_SERVLET_CLASSES = (
+    OpenIdUserInfo,
+)
 
 ROOM_LIST_CLASSES = (
     PublicRoomList,
@@ -1350,44 +1354,70 @@ GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )
 
+DEFAULT_SERVLET_GROUPS = (
+    "federation",
+    "room_list",
+    "group_server",
+    "group_local",
+    "group_attestation",
+    "openid",
+)
 
-def register_servlets(hs, resource, authenticator, ratelimiter):
-    for servletclass in FEDERATION_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_federation_server(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
 
-    for servletclass in ROOM_LIST_CLASSES:
-        servletclass(
-            handler=hs.get_room_list_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=None):
+    if not servlet_groups:
+        servlet_groups = DEFAULT_SERVLET_GROUPS
 
-    for servletclass in GROUP_SERVER_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_server_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    if "federation" in servlet_groups:
+        for servletclass in FEDERATION_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_federation_server(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
 
-    for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_local_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    if "openid" in servlet_groups:
+        for servletclass in OPENID_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_federation_server(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
 
-    for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_attestation_renewer(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    if "room_list" in servlet_groups:
+        for servletclass in ROOM_LIST_CLASSES:
+            servletclass(
+                handler=hs.get_room_list_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_server" in servlet_groups:
+        for servletclass in GROUP_SERVER_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_server_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_local" in servlet_groups:
+        for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_local_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_attestation" in servlet_groups:
+        for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_attestation_renewer(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
