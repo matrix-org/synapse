@@ -59,7 +59,7 @@ REQUIREMENTS = [
     # prometheus_client 0.4.0 changed the format of counter metrics
     # (cf https://github.com/matrix-org/synapse/issues/4001)
     "prometheus_client>=0.0.18,<0.4.0",
-    "cbor2>=4.1.1": ["cbor2"],
+    "cbor2>=4.1.1",
     # we use attr.s(slots), which arrived in 16.0.0
     "attrs>=16.0.0",
     "netaddr>=0.7.18",
