@@ -68,6 +68,7 @@ class EventTypes(object):
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
+    Encryption = "m.room.encryption"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
@@ -141,4 +142,4 @@ class UserTypes(object):
     'admin' and 'guest' users should also be UserTypes. Normal users are type None
     """
     SUPPORT = "support"
-    ALL_USER_TYPES = (SUPPORT)
+    ALL_USER_TYPES = (SUPPORT,)

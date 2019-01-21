@@ -298,9 +298,9 @@ class MatrixFederationHttpClient(object):
                     json = request.get_json()
                     if json:
                         headers_dict[b"Content-Type"] = [b"application/json"]
-                        self.sign_request(
+                        auth_headers = self.build_auth_headers(
                             destination_bytes, method_bytes, url_to_sign_bytes,
-                            headers_dict, json,
+                            json,
                         )
                         data = encode_canonical_json(json)
                         producer = FileBodyProducer(
@@ -309,10 +309,11 @@ class MatrixFederationHttpClient(object):
                         )
                     else:
                         producer = None
-                        self.sign_request(
+                        auth_headers = self.build_auth_headers(
                             destination_bytes, method_bytes, url_to_sign_bytes,
-                            headers_dict,
                         )
+
+                    headers_dict[b"Authorization"] = auth_headers
 
                     logger.info(
                         "{%s} [%s] Sending request: %s %s",
@@ -320,23 +321,23 @@ class MatrixFederationHttpClient(object):
                         url_str,
                     )
 
-                    # we don't want all the fancy cookie and redirect handling that
-                    # treq.request gives: just use the raw Agent.
-                    request_deferred = self.agent.request(
-                        method_bytes,
-                        url_bytes,
-                        headers=Headers(headers_dict),
-                        bodyProducer=producer,
-                    )
-
-                    request_deferred = timeout_deferred(
-                        request_deferred,
-                        timeout=_sec_timeout,
-                        reactor=self.hs.get_reactor(),
-                    )
-
                     try:
                         with Measure(self.clock, "outbound_request"):
+                            # we don't want all the fancy cookie and redirect handling
+                            # that treq.request gives: just use the raw Agent.
+                            request_deferred = self.agent.request(
+                                method_bytes,
+                                url_bytes,
+                                headers=Headers(headers_dict),
+                                bodyProducer=producer,
+                            )
+
+                            request_deferred = timeout_deferred(
+                                request_deferred,
+                                timeout=_sec_timeout,
+                                reactor=self.hs.get_reactor(),
+                            )
+
                             response = yield make_deferred_yieldable(
                                 request_deferred,
                             )
@@ -440,24 +441,23 @@ class MatrixFederationHttpClient(object):
 
             defer.returnValue(response)
 
-    def sign_request(self, destination, method, url_bytes, headers_dict,
-                     content=None, destination_is=None):
+    def build_auth_headers(
+        self, destination, method, url_bytes, content=None, destination_is=None,
+    ):
         """
-        Signs a request by adding an Authorization header to headers_dict
+        Builds the Authorization headers for a federation request
         Args:
             destination (bytes|None): The desination home server of the request.
                 May be None if the destination is an identity server, in which case
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request
             url_bytes (bytes): The URI path of the request
-            headers_dict (dict[bytes, list[bytes]]): Dictionary of request headers to
-                append to
             content (object): The body of the request
             destination_is (bytes): As 'destination', but if the destination is an
                 identity server
 
         Returns:
-            None
+            list[bytes]: a list of headers to be added as "Authorization:" headers
         """
         request = {
             "method": method,
@@ -484,8 +484,7 @@ class MatrixFederationHttpClient(object):
                     self.server_name, key, sig,
                 )).encode('ascii')
             )
-
-        headers_dict[b"Authorization"] = auth_headers
+        return auth_headers
 
     @defer.inlineCallbacks
     def put_json(self, destination, path, args={}, data={},

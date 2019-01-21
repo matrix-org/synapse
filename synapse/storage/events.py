@@ -738,7 +738,18 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
         }
 
         events_map = {ev.event_id: ev for ev, _ in events_context}
-        room_version = yield self.get_room_version(room_id)
+
+        # We need to get the room version, which is in the create event.
+        # Normally that'd be in the database, but its also possible that we're
+        # currently trying to persist it.
+        room_version = None
+        for ev, _ in events_context:
+            if ev.type == EventTypes.Create and ev.state_key == "":
+                room_version = ev.content.get("room_version", "1")
+                break
+
+        if not room_version:
+            room_version = yield self.get_room_version(room_id)
 
         logger.debug("calling resolve_state_groups from preserve_events")
         res = yield self._state_resolution_handler.resolve_state_groups(
