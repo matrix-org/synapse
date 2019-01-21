@@ -138,10 +138,10 @@ class AcmeHandler(object):
                 )
                 private_key_file.write(private_key_pem)
 
-            cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_chain)
+            chain = cert_chain.split("RSA PRIVATE KEY-----")[1]
+            chain = chain.split("-----BEGIN RSA PRIVATE KEY")[0]
             with open(self.hs.config.tls_certificate_file, "wb") as certificate_file:
-                cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
-                certificate_file.write(cert_pem)
+                certificate_file.write(chain)
         except Exception:
             logger.exception("Failed saving!")
             raise
