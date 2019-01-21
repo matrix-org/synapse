@@ -152,6 +152,5 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
             expires=int(clock.time()) + answer.ttl,
         ))
 
-    servers.sort()  # FIXME: get rid of this (it's broken by the attrs change)
     cache[service_name] = list(servers)
     defer.returnValue(servers)
