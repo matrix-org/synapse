@@ -532,6 +532,25 @@ class DeviceListEduUpdater(object):
 
                 stream_id = result["stream_id"]
                 devices = result["devices"]
+
+                # If the remote server has more than ~1000 devices for this user
+                # we assume that something is going horribly wrong (e.g. a bot
+                # that logs in and creates a new device every time it tries to
+                # send a message).  Maintaining lots of devices per user in the
+                # cache can cause serious performance issues as if this request
+                # takes more than 60s to complete, internal replication from the
+                # inbound federation worker to the synapse master may time out
+                # causing the inbound federation to fail and causing the remote
+                # server to retry, causing a DoS.  So in this scenario we give
+                # up on storing the total list of devices and only handle the
+                # delta instead.
+                if len(devices) > 1000:
+                    logger.warn(
+                        "Ignoring device list snapshot for %s as it has >1K devs (%d)",
+                        user_id, len(devices)
+                    )
+                    devices = []
+
                 yield self.store.update_remote_device_list_cache(
                     user_id, devices, stream_id,
                 )

@@ -83,9 +83,6 @@ class KeyConfig(Config):
         # a secret which is used to sign access tokens. If none is specified,
         # the registration_shared_secret is used, if one is given; otherwise,
         # a secret key is derived from the signing key.
-        #
-        # Note that changing this will invalidate any active access tokens, so
-        # all clients will have to log back in.
         %(macaroon_secret_key)s
 
         # Used to enable access token expiration.
