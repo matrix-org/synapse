@@ -50,7 +50,9 @@ class RegistrationConfig(Config):
                 raise ConfigError('Invalid auto_join_rooms entry %s' % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
-        self.disable_msisdn_registration = config.get("disable_msisdn_registration", False)
+        self.disable_msisdn_registration = (
+            config.get("disable_msisdn_registration", False)
+        )
 
     def default_config(self, generate_secrets=False, **kwargs):
         if generate_secrets:
