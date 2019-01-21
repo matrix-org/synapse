@@ -24,7 +24,8 @@ from synapse.config import ConfigError
 
 CLIENT_PREFIX = "/_matrix/client/api/v1"
 CLIENT_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha"
-FEDERATION_PREFIX = "/_matrix/federation/v1"
+FEDERATION_PREFIX = "/_matrix/federation"
+FEDERATION_V1_PREFIX = FEDERATION_PREFIX + "/v1"
 STATIC_PREFIX = "/_matrix/static"
 WEB_CLIENT_PREFIX = "/_matrix/client"
 CONTENT_REPO_PREFIX = "/_matrix/content"
