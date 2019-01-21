@@ -244,6 +244,13 @@ class FrozenEvent(EventBase):
 def event_type_from_room_version(room_version):
     """Returns the python type to use to construct an Event object for the
     given room version.
+
+    Args:
+        room_version (str): The room version
+
+    Returns:
+        type: A type that can be initialized as per the initializer of
+        `FrozenEvent`
     """
     if room_version not in KNOWN_ROOM_VERSIONS:
         raise Exception(
@@ -255,6 +262,13 @@ def event_type_from_room_version(room_version):
 def event_type_from_format_version(format_version):
     """Returns the python type to use to construct an Event object for the
     given event format version.
+
+    Args:
+        format_version (int): The event format version
+
+    Returns:
+        type: A type that can be initialized as per the initializer of
+        `FrozenEvent`
     """
     if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
         raise Exception(

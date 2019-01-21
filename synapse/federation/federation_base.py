@@ -301,7 +301,8 @@ def event_from_pdu_json(pdu_json, room_version, outlier=False):
     """Construct a FrozenEvent from an event json received over federation
 
     Args:
-        pdu_json (object): pdu as received over federation
+        pdu_json (object): PDU as received over federation
+        room_version (str): The version of the room this PDU belongs to
         outlier (bool): True to mark this event as an outlier
 
     Returns:

@@ -24,6 +24,16 @@ from . import EventBase, FrozenEvent, _event_dict_property
 
 def get_event_builder(room_version, key_values={}, internal_metadata_dict={}):
     """Generate an event builder appropriate for the given room version
+
+    Args:
+        room_version (str): Version of the room that we're creating an
+            event builder for
+        key_values (dict): Fields used as the basis of the new event
+        internal_metadata_dict (dict): Used to create the `_EventInternalMetadata`
+            object.
+
+    Returns:
+        EventBuilder
     """
     if room_version in {
         RoomVersions.V1,
@@ -77,9 +87,17 @@ class EventBuilderFactory(object):
 
     def new(self, room_version, key_values={}):
         """Generate an event builder appropriate for the given room version
+
+        Args:
+            room_version (str): Version of the room that we're creating an
+                event builder for
+            key_values (dict): Fields used as the basis of the new event
+
+        Returns:
+            EventBuilder
         """
 
-        # There's currently only the one room version defined
+        # There's currently only the one event version defined
         if room_version not in {
             RoomVersions.V1,
             RoomVersions.V2,
