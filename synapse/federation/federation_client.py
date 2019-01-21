@@ -688,6 +688,11 @@ class FederationClient(FederationBase):
                 if p.event_id in valid_pdus_map
             ]
 
+            # NB: We *need* to copy to ensure that we don't have multiple
+            # references being passed on, as that causes... issues.
+            for s in signed_state:
+                s.internal_metadata = copy.deepcopy(s.internal_metadata)
+
             check_authchain_validity(signed_auth)
 
             defer.returnValue({
