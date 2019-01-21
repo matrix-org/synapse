@@ -387,12 +387,14 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
     deferred that wraps and times out the given deferred, correctly handling
     the case where the given deferred's canceller throws.
 
+    (See https://twistedmatrix.com/trac/ticket/9534)
+
     NOTE: Unlike `Deferred.addTimeout`, this function returns a new deferred
 
     Args:
         deferred (Deferred)
         timeout (float): Timeout in seconds
-        reactor (twisted.internet.reactor): The twisted reactor to use
+        reactor (twisted.interfaces.IReactorTime): The twisted reactor to use
         on_timeout_cancel (callable): A callable which is called immediately
             after the deferred times out, and not if this deferred is
             otherwise cancelled before the timeout.
