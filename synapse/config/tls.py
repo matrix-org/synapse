@@ -65,7 +65,9 @@ class TlsConfig(Config):
         Is the certificate we have on disk valid, and if so, for how long?
         """
         try:
-            tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
+            with open(self.tls_certificate_file, 'wb') as f:
+                cert_pem = f.read()
+            tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         except IOError:
             return None
 
