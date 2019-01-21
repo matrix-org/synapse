@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import logging
 import time
+
+import attr
 
 from twisted.internet import defer
 from twisted.internet.error import ConnectError
@@ -27,9 +28,25 @@ logger = logging.getLogger(__name__)
 
 SERVER_CACHE = {}
 
-_Server = collections.namedtuple(
-    "_Server", "priority weight host port expires"
-)
+
+@attr.s
+class Server(object):
+    """
+    Our record of an individual server which can be tried to reach a destination.
+
+    Attributes:
+        host (bytes): target hostname
+        port (int):
+        priority (int):
+        weight (int):
+        expires (int): when the cache should expire this record - in *seconds* since
+            the epoch
+    """
+    host = attr.ib()
+    port = attr.ib()
+    priority = attr.ib(default=0)
+    weight = attr.ib(default=0)
+    expires = attr.ib(default=0)
 
 
 @defer.inlineCallbacks
@@ -46,7 +63,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
         clock (object): clock implementation. must provide a time() method.
 
     Returns:
-        Deferred[list[_Server]]: a list of the SRV records, or an empty list if none found
+        Deferred[list[Server]]: a list of the SRV records, or an empty list if none found
     """
     # TODO: the dns client handles both unicode names (encoding via idna) and pre-encoded
     # byteses; however they will obviously end up as separate entries in the cache. We
@@ -79,7 +96,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
 
             payload = answer.payload
 
-            servers.append(_Server(
+            servers.append(Server(
                 host=str(payload.target),
                 port=int(payload.port),
                 priority=int(payload.priority),
@@ -87,7 +104,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
                 expires=int(clock.time()) + answer.ttl,
             ))
 
-        servers.sort()
+        servers.sort()  # FIXME: get rid of this (it's broken by the attrs change)
         cache[service_name] = list(servers)
     except DomainError as e:
         # We failed to resolve the name (other than a NameError)

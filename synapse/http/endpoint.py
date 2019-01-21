@@ -20,7 +20,7 @@ from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.internet.error import ConnectError
 
-from synapse.http.federation.srv_resolver import _Server, resolve_service
+from synapse.http.federation.srv_resolver import Server, resolve_service
 
 logger = logging.getLogger(__name__)
 
@@ -153,12 +153,9 @@ class SRVClientEndpoint(object):
         self.service_name = "_%s._%s.%s" % (service, protocol, domain)
 
         if default_port is not None:
-            self.default_server = _Server(
+            self.default_server = Server(
                 host=domain,
                 port=default_port,
-                priority=0,
-                weight=0,
-                expires=0,
             )
         else:
             self.default_server = None
