@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,15 +19,13 @@ from mock import Mock
 from twisted.internet import defer
 from twisted.names import dns, error
 
-from synapse.http.endpoint import resolve_service
+from synapse.http.federation.srv_resolver import resolve_service
 
+from tests import unittest
 from tests.utils import MockClock
 
-from . import unittest
 
-
-@unittest.DEBUG
-class DnsTestCase(unittest.TestCase):
+class SrvResolverTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_resolve(self):
         dns_client_mock = Mock()
