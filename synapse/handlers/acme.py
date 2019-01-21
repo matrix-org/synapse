@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vector Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -120,14 +120,14 @@ class AcmeHandler(object):
     @defer.inlineCallbacks
     def provision_certificate(self):
 
-        logger.warning("Reprovisioning %s", hs.hostname)
+        logger.warning("Reprovisioning %s", self.hs.hostname)
 
         try:
-            yield self._issuer.issue_cert(hs.hostname)
+            yield self._issuer.issue_cert(self.hs.hostname)
         except Exception:
             logger.exception("Fail!")
             raise
-        logger.warning("Reprovisioned %s, saving.", hs.hostname)
+        logger.warning("Reprovisioned %s, saving.", self.hs.hostname)
         cert_chain = self._store.certs[hs.hostname]
 
         try:

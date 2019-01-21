@@ -74,14 +74,12 @@ class TlsConfig(Config):
         try:
             tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
         except IOError:
-            logger.warning("Certificate on disk does not exist")
             return None
 
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(tls_certificate.get_notAfter(), "%Y%m%d%H%M%SZ")
         now = datetime.utcnow()
         days_remaining = (expires_on - now).days
-
         return days_remaining
 
     def _read_certificate(self):
