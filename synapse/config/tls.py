@@ -65,6 +65,26 @@ class TlsConfig(Config):
         if not self.acme_enabled:
             self._read_certificate()
 
+    def is_disk_cert_valid(self):
+        """
+        Is the certificate we have on disk valid?
+        """
+        try:
+            tls_certificate = self.read_tls_certificate(
+                self.tls_certificate_file
+            )
+        except Exception:
+            logger.warning("Certificate does not exist, will reprovision....")
+            return False
+
+        expired = tls_certificate.has_expired()
+
+        if expired:
+            logger.warning("Certificate is expired, will reprovision...")
+            return False
+
+        return True
+
     def _read_certificate(self):
         """
         Read the certificates from disk.

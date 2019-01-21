@@ -26,8 +26,6 @@ from twisted.python.url import URL
 from twisted.web import server, static
 from twisted.web.resource import Resource
 
-from ._base import BaseHandler
-
 logger = logging.getLogger(__name__)
 
 try:
@@ -52,29 +50,10 @@ except ImportError:
     pass
 
 
-class AcmeHandler(BaseHandler):
+class AcmeHandler(object):
     def __init__(self, hs):
-        super(AcmeHandler, self).__init__(hs)
-
-    def is_disk_cert_valid(self):
-        """
-        Is the certificate we have on disk valid?
-        """
-        try:
-            tls_certificate = self.hs.config.read_tls_certificate(
-                self.hs.config.tls_certificate_file
-            )
-        except Exception:
-            logger.warning("Certificate does not exist, will reprovision....")
-            return False
-
-        expired = tls_certificate.has_expired()
-
-        if expired:
-            logger.warning("Certificate is expired, will reprovision...")
-            return False
-
-        return True
+        self.hs = hs
+        self.reactor = hs.get_reactor()
 
     def start_listening(self):
 
@@ -117,6 +96,8 @@ class AcmeHandler(BaseHandler):
 
         srv = server.Site(responder_resource)
 
+        listeners = []
+
         for host in self.hs.config.acme_host.split(","):
             logger.info(
                 "Listening for ACME requests on %s:%s", host, self.hs.config.acme_port
@@ -124,22 +105,30 @@ class AcmeHandler(BaseHandler):
             endpoint = serverFromString(
                 self.reactor, "tcp:%s:interface=%s" % (self.hs.config.acme_port, host)
             )
-            endpoint.listen(srv)
+            listeners.append(endpoint.listen(srv))
 
+        # Make sure we are registered to the ACME server. There's no public API
+        # for this, it is usually triggered by startService, but since we don't
+        # want it to control where we save the certificates, we have to reach in
+        # and trigger the registration machinery ourselves.
+        yield self._issuer._ensure_registered()
         self._issuer._registered = False
 
-    @defer.inlineCallbacks
-    def provision_certificate(self, hostname):
+        # Return a Deferred that will fire when all the servers have started up.
+        return defer.DeferredList(listeners, fireOnOneErrback=True, consumeErrors=True)
 
-        logger.warning("Reprovisioning %s", hostname)
+    @defer.inlineCallbacks
+    def provision_certificate(self):
+
+        logger.warning("Reprovisioning %s", hs.hostname)
 
         try:
-            yield self._issuer.issue_cert(hostname)
+            yield self._issuer.issue_cert(hs.hostname)
         except Exception:
             logger.exception("Fail!")
             raise
-        logger.warning("Reprovisioned %s, saving.", hostname)
-        cert_chain = self._store.certs[hostname]
+        logger.warning("Reprovisioned %s, saving.", hs.hostname)
+        cert_chain = self._store.certs[hs.hostname]
 
         try:
             tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)

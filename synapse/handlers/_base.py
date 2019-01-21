@@ -46,7 +46,6 @@ class BaseHandler(object):
         self.distributor = hs.get_distributor()
         self.ratelimiter = hs.get_ratelimiter()
         self.clock = hs.get_clock()
-        self.reactor = hs.get_reactor()
         self.hs = hs
 
         self.server_name = hs.hostname

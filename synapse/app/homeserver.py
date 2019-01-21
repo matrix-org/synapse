@@ -367,37 +367,45 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
-    # If configured, start up the ACME listener. We will need to check if we
-    # have a certificate, first.
-    if hs.config.acme_enabled:
-        acme = hs.get_acme_handler()
-        acme.start_listening()
-    else:
-        hs.start_listening()
 
+    @defer.inlineCallbacks
     def start():
+
         if hs.config.acme_enabled:
-            is_valid_cert = acme.is_disk_cert_valid()
-            if not is_valid_cert:
-                d = acme._issuer._ensure_registered()
-                d.addCallback(
-                    lambda _: acme.provision_certificate(hs.config.server_name)
-                )
-            else:
-                d = defer.succeed(True)
+            # If ACME is enabled, we might need to provision a certificate
+            # before starting.
+        acme = hs.get_acme_handler()
 
-            def _load_context_factories(_):
-                hs.tls_server_context_factory = context_factory.ServerContextFactory(
-                    config
-                )
-                hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-                    config
-                )
+            # Start up the webservices which we will respond to ACME challenges
+            # with.
+            try:
+                yield acme.start_listening()
+            except defer.FirstError as e:
+                # We couldn't listen on a port, for some reason. Print the
+                # traceback to stderr and bail.
+                e.subFailure.printTraceback(sys.stderr)
+                sys.exit(1)
 
-            d.addCallback(lambda _: hs.config._read_certificate())
-            d.addCallback(_load_context_factories)
-            d.addCallback(lambda _: hs.start_listening())
+            # Check if the certificate is still valid.
+            is_valid_cert = hs.config.is_disk_cert_valid()
 
+            # We want to reprovision if is_valid_cert is None (meaning no
+            # certificate exists), or the days remaining number it returns is
+            # less than our re-registration threshold.
+            if (
+                is_valid_cert is None
+                or is_valid_cert < hs.config.acme_reregistration_threshold
+            ):
+                yield acme.provision_certificate()
+
+        # Read the certificate from disk and build the context factories for
+        # TLS.
+        hs.config._read_certificate()
+        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+
+        # It is now safe to start your Synapse.
+        hs.start_listening()
         hs.get_pusherpool().start()
         hs.get_datastore().start_profiling()
         hs.get_datastore().start_doing_background_updates()
