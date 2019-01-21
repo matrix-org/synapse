@@ -15,13 +15,14 @@
 
 import os
 import subprocess
+from datetime import datetime
 from hashlib import sha256
 
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
 
-from ._base import Config
+from synapse.config._base import Config
 
 GENERATE_DH_PARAMS = False
 
@@ -36,7 +37,8 @@ class TlsConfig(Config):
         )
         self.acme_client_key = config.get("client_key", self.config_dir_path)
         self.acme_port = acme_config.get("port", 8449)
-        self.acme_host = acme_config.get("host", "127.0.0.1")
+        self.acme_bind_addresses = acme_config.get("bind_addresses", ["127.0.0.1"])
+        self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 10)
 
         self.tls_certificate_file = config.get("tls_certificate_path")
         self.tls_private_key_file = config.get("tls_private_key_path")
@@ -67,44 +69,36 @@ class TlsConfig(Config):
 
     def is_disk_cert_valid(self):
         """
-        Is the certificate we have on disk valid?
+        Is the certificate we have on disk valid, and if so, for how long?
         """
         try:
-            tls_certificate = self.read_tls_certificate(
-                self.tls_certificate_file
-            )
-        except Exception:
-            logger.warning("Certificate does not exist, will reprovision....")
-            return False
+            tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
+        except IOError:
+            logger.warning("Certificate on disk does not exist")
+            return None
 
-        expired = tls_certificate.has_expired()
+        # YYYYMMDDhhmmssZ -- in UTC
+        expires_on = datetime.strptime(tls_certificate.get_notAfter(), "%Y%m%d%H%M%SZ")
+        now = datetime.utcnow()
+        days_remaining = (expires_on - now).days
 
-        if expired:
-            logger.warning("Certificate is expired, will reprovision...")
-            return False
-
-        return True
+        return days_remaining
 
     def _read_certificate(self):
         """
         Read the certificates from disk.
         """
-        self.tls_certificate = self.read_tls_certificate(
-            self.tls_certificate_file
-        )
+        self.tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
 
         if not self.no_tls:
-            self.tls_private_key = self.read_tls_private_key(
-                self.tls_private_key_file
-            )
+            self.tls_private_key = self.read_tls_private_key(self.tls_private_key_file)
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
 
         # Check that our own certificate is included in the list of fingerprints
         # and include it if it is not.
         x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1,
-            self.tls_certificate
+            crypto.FILETYPE_ASN1, self.tls_certificate
         )
         sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
         sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
@@ -118,7 +112,8 @@ class TlsConfig(Config):
         tls_private_key_path = base_key_name + ".tls.key"
         tls_dh_params_path = base_key_name + ".tls.dh"
 
-        return """\
+        return (
+            """\
         # PEM encoded X509 certificate for TLS.
         # You can replace the self-signed certificate that synapse
         # autogenerates on launch with your own SSL certificate + key pair
@@ -171,9 +166,13 @@ class TlsConfig(Config):
         ##   Port number (to listen for the HTTP-01 challenge).
         ##   Using port 80 requires utilising something like authbind, or proxying to it.
         #    port: 8449
-        ##   Hosts to bind to, comma separated.
-        #    host: '127.0.0.1'
-        """ % locals()
+        ##   Hosts to bind to.
+        #    bind_addresses: ['127.0.0.1']
+        ##   How many days remaining on a certificate before it is renewed.
+        #    reprovision_threshold: 10
+        """
+            % locals()
+        )
 
     def read_tls_certificate(self, cert_path):
         cert_pem = self.read_file(cert_path, "tls_certificate")
@@ -223,12 +222,17 @@ class TlsConfig(Config):
 
         if not self.path_exists(tls_dh_params_path):
             if GENERATE_DH_PARAMS:
-                subprocess.check_call([
-                    "openssl", "dhparam",
-                    "-outform", "PEM",
-                    "-out", tls_dh_params_path,
-                    "2048"
-                ])
+                subprocess.check_call(
+                    [
+                        "openssl",
+                        "dhparam",
+                        "-outform",
+                        "PEM",
+                        "-out",
+                        tls_dh_params_path,
+                        "2048",
+                    ]
+                )
             else:
                 with open(tls_dh_params_path, "w") as dh_params_file:
                     dh_params_file.write(

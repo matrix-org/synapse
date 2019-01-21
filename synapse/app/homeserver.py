@@ -361,10 +361,14 @@ def setup(config_options):
     @defer.inlineCallbacks
     def start():
 
+
+        # Check if the certificate is still valid.
+        cert_days_remaining = hs.config.is_disk_cert_valid()
+
         if hs.config.acme_enabled:
             # If ACME is enabled, we might need to provision a certificate
             # before starting.
-        acme = hs.get_acme_handler()
+            acme = hs.get_acme_handler()
 
             # Start up the webservices which we will respond to ACME challenges
             # with.
@@ -376,16 +380,10 @@ def setup(config_options):
                 e.subFailure.printTraceback(sys.stderr)
                 sys.exit(1)
 
-            # Check if the certificate is still valid.
-            is_valid_cert = hs.config.is_disk_cert_valid()
-
             # We want to reprovision if is_valid_cert is None (meaning no
             # certificate exists), or the days remaining number it returns is
             # less than our re-registration threshold.
-            if (
-                is_valid_cert is None
-                or is_valid_cert < hs.config.acme_reregistration_threshold
-            ):
+            if not cert_days_remaining > self.hs.config.acme_reprovision_threshold:
                 yield acme.provision_certificate()
 
         # Read the certificate from disk and build the context factories for

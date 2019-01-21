@@ -98,7 +98,7 @@ class AcmeHandler(object):
 
         listeners = []
 
-        for host in self.hs.config.acme_host.split(","):
+        for host in self.hs.config.acme_bind_addresses:
             logger.info(
                 "Listening for ACME requests on %s:%s", host, self.hs.config.acme_port
             )
