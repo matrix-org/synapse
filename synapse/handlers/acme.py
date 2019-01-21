@@ -112,8 +112,8 @@ class AcmeHandler(object):
         # for this, it is usually triggered by startService, but since we don't
         # want it to control where we save the certificates, we have to reach in
         # and trigger the registration machinery ourselves.
-        yield self._issuer._ensure_registered()
         self._issuer._registered = False
+        yield self._issuer._ensure_registered()
 
         # Return a Deferred that will fire when all the servers have started up.
         yield defer.DeferredList(listeners, fireOnOneErrback=True, consumeErrors=True)
