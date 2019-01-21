@@ -128,7 +128,7 @@ class AcmeHandler(object):
             logger.exception("Fail!")
             raise
         logger.warning("Reprovisioned %s, saving.", self.hs.hostname)
-        cert_chain = self._store.certs[hs.hostname]
+        cert_chain = self._store.certs[self.hs.hostname]
 
         try:
             tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)

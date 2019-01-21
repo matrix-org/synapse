@@ -77,7 +77,9 @@ class TlsConfig(Config):
             return None
 
         # YYYYMMDDhhmmssZ -- in UTC
-        expires_on = datetime.strptime(tls_certificate.get_notAfter(), "%Y%m%d%H%M%SZ")
+        expires_on = datetime.strptime(
+            tls_certificate.get_notAfter().decode('ascii'), "%Y%m%d%H%M%SZ"
+        )
         now = datetime.utcnow()
         days_remaining = (expires_on - now).days
         return days_remaining
