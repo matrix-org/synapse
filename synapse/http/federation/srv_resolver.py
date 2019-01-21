@@ -24,6 +24,8 @@ from twisted.internet.error import ConnectError
 from twisted.names import client, dns
 from twisted.names.error import DNSNameError, DomainError
 
+from synapse.util.logcontext import make_deferred_yieldable
+
 logger = logging.getLogger(__name__)
 
 SERVER_CACHE = {}
@@ -75,7 +77,9 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
             defer.returnValue(servers)
 
     try:
-        answers, _, _ = yield dns_client.lookupService(service_name)
+        answers, _, _ = yield make_deferred_yieldable(
+            dns_client.lookupService(service_name),
+        )
     except DNSNameError:
         # TODO: cache this. We can get the SOA out of the exception, and use
         # the negative-TTL value.

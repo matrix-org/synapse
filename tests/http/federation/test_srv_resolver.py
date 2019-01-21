@@ -17,16 +17,17 @@
 from mock import Mock
 
 from twisted.internet import defer
+from twisted.internet.defer import Deferred
 from twisted.names import dns, error
 
 from synapse.http.federation.srv_resolver import resolve_service
+from synapse.util.logcontext import LoggingContext
 
 from tests import unittest
 from tests.utils import MockClock
 
 
 class SrvResolverTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
     def test_resolve(self):
         dns_client_mock = Mock()
 
@@ -37,17 +38,40 @@ class SrvResolverTestCase(unittest.TestCase):
             type=dns.SRV, payload=dns.Record_SRV(target=host_name)
         )
 
-        dns_client_mock.lookupService.return_value = defer.succeed(
-            ([answer_srv], None, None)
-        )
+        result_deferred = Deferred()
+        dns_client_mock.lookupService.return_value = result_deferred
 
         cache = {}
 
-        servers = yield resolve_service(
-            service_name, dns_client=dns_client_mock, cache=cache
-        )
+        @defer.inlineCallbacks
+        def do_lookup():
+            with LoggingContext("one") as ctx:
+                resolve_d = resolve_service(
+                    service_name, dns_client=dns_client_mock, cache=cache
+                )
+
+                self.assertNoResult(resolve_d)
+
+                # should have reset to the sentinel context
+                self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+
+                result = yield resolve_d
+
+                # should have restored our context
+                self.assertIs(LoggingContext.current_context(), ctx)
+
+                defer.returnValue(result)
+
+        test_d = do_lookup()
+        self.assertNoResult(test_d)
 
         dns_client_mock.lookupService.assert_called_once_with(service_name)
+
+        result_deferred.callback(
+            ([answer_srv], None, None)
+        )
+
+        servers = self.successResultOf(test_d)
 
         self.assertEquals(len(servers), 1)
         self.assertEquals(servers, cache[service_name])
