@@ -65,6 +65,8 @@ class RegistrationConfig(Config):
             self.replicate_user_profiles_to = [self.replicate_user_profiles_to, ]
 
         self.shadow_server = config.get("shadow_server", None)
+        self.rewrite_identity_server_urls = config.get("rewrite_identity_server_urls", {})
+
 
     def default_config(self, **kwargs):
         registration_shared_secret = random_string_with_symbols(50)
