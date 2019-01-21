@@ -381,7 +381,9 @@ def setup(config_options):
             # We want to reprovision if is_valid_cert is None (meaning no
             # certificate exists), or the days remaining number it returns is
             # less than our re-registration threshold.
-            if not cert_days_remaining > hs.config.acme_reprovision_threshold:
+            if (cert_days_remaining is None) or (
+                not cert_days_remaining > hs.config.acme_reprovision_threshold
+            ):
                 yield acme.provision_certificate()
 
         # Read the certificate from disk and build the context factories for
