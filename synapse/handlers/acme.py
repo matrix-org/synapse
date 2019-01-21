@@ -115,7 +115,7 @@ class AcmeHandler(object):
         self._issuer._registered = False
 
         # Return a Deferred that will fire when all the servers have started up.
-        return defer.DeferredList(listeners, fireOnOneErrback=True, consumeErrors=True)
+        yield defer.DeferredList(listeners, fireOnOneErrback=True, consumeErrors=True)
 
     @defer.inlineCallbacks
     def provision_certificate(self):
