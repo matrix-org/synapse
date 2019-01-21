@@ -74,38 +74,12 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
             servers = list(cache_entry)
             defer.returnValue(servers)
 
-    servers = []
-
     try:
-        try:
-            answers, _, _ = yield dns_client.lookupService(service_name)
-        except DNSNameError:
-            # TODO: cache this. We can get the SOA out of the exception, and use
-            # the negative-TTL value.
-            defer.returnValue([])
-
-        if (len(answers) == 1
-                and answers[0].type == dns.SRV
-                and answers[0].payload
-                and answers[0].payload.target == dns.Name(b'.')):
-            raise ConnectError("Service %s unavailable" % service_name)
-
-        for answer in answers:
-            if answer.type != dns.SRV or not answer.payload:
-                continue
-
-            payload = answer.payload
-
-            servers.append(Server(
-                host=str(payload.target),
-                port=int(payload.port),
-                priority=int(payload.priority),
-                weight=int(payload.weight),
-                expires=int(clock.time()) + answer.ttl,
-            ))
-
-        servers.sort()  # FIXME: get rid of this (it's broken by the attrs change)
-        cache[service_name] = list(servers)
+        answers, _, _ = yield dns_client.lookupService(service_name)
+    except DNSNameError:
+        # TODO: cache this. We can get the SOA out of the exception, and use
+        # the negative-TTL value.
+        defer.returnValue([])
     except DomainError as e:
         # We failed to resolve the name (other than a NameError)
         # Try something in the cache, else rereaise
@@ -115,8 +89,32 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
                 "Failed to resolve %r, falling back to cache. %r",
                 service_name, e
             )
-            servers = list(cache_entry)
+            defer.returnValue(list(cache_entry))
         else:
             raise e
 
+    if (len(answers) == 1
+            and answers[0].type == dns.SRV
+            and answers[0].payload
+            and answers[0].payload.target == dns.Name(b'.')):
+        raise ConnectError("Service %s unavailable" % service_name)
+
+    servers = []
+
+    for answer in answers:
+        if answer.type != dns.SRV or not answer.payload:
+            continue
+
+        payload = answer.payload
+
+        servers.append(Server(
+            host=str(payload.target),
+            port=int(payload.port),
+            priority=int(payload.priority),
+            weight=int(payload.weight),
+            expires=int(clock.time()) + answer.ttl,
+        ))
+
+    servers.sort()  # FIXME: get rid of this (it's broken by the attrs change)
+    cache[service_name] = list(servers)
     defer.returnValue(servers)
