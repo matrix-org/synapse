@@ -24,8 +24,6 @@ from OpenSSL import crypto
 
 from synapse.config._base import Config
 
-GENERATE_DH_PARAMS = False
-
 
 class TlsConfig(Config):
     def read_config(self, config):
@@ -42,14 +40,9 @@ class TlsConfig(Config):
 
         self.tls_certificate_file = config.get("tls_certificate_path")
         self.tls_private_key_file = config.get("tls_private_key_path")
-        self.tls_dh_params_file = config.get("tls_dh_params_path")
         self._original_tls_fingerprints = config["tls_fingerprints"]
         self.tls_fingerprints = list(self._original_tls_fingerprints)
         self.no_tls = config.get("no_tls", False)
-
-        self.tls_dh_params_path = self.check_file(
-            self.tls_dh_params_file, "tls_dh_params"
-        )
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -110,7 +103,6 @@ class TlsConfig(Config):
 
         tls_certificate_path = base_key_name + ".tls.crt"
         tls_private_key_path = base_key_name + ".tls.key"
-        tls_dh_params_path = base_key_name + ".tls.dh"
 
         return (
             """\
@@ -123,9 +115,6 @@ class TlsConfig(Config):
 
         # PEM encoded private key for TLS
         tls_private_key_path: "%(tls_private_key_path)s"
-
-        # PEM dh parameters for ephemeral keys
-        tls_dh_params_path: "%(tls_dh_params_path)s"
 
         # Don't bind to the https port
         no_tls: False
@@ -185,7 +174,6 @@ class TlsConfig(Config):
     def generate_files(self, config):
         tls_certificate_path = config["tls_certificate_path"]
         tls_private_key_path = config["tls_private_key_path"]
-        tls_dh_params_path = config["tls_dh_params_path"]
 
         if not self.path_exists(tls_private_key_path):
             with open(tls_private_key_path, "wb") as private_key_file:
@@ -219,36 +207,3 @@ class TlsConfig(Config):
                 cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
 
                 certificate_file.write(cert_pem)
-
-        if not self.path_exists(tls_dh_params_path):
-            if GENERATE_DH_PARAMS:
-                subprocess.check_call(
-                    [
-                        "openssl",
-                        "dhparam",
-                        "-outform",
-                        "PEM",
-                        "-out",
-                        tls_dh_params_path,
-                        "2048",
-                    ]
-                )
-            else:
-                with open(tls_dh_params_path, "w") as dh_params_file:
-                    dh_params_file.write(
-                        "2048-bit DH parameters taken from rfc3526\n"
-                        "-----BEGIN DH PARAMETERS-----\n"
-                        "MIIBCAKCAQEA///////////JD9qiIWjC"
-                        "NMTGYouA3BzRKQJOCIpnzHQCC76mOxOb\n"
-                        "IlFKCHmONATd75UZs806QxswKwpt8l8U"
-                        "N0/hNW1tUcJF5IW1dmJefsb0TELppjft\n"
-                        "awv/XLb0Brft7jhr+1qJn6WunyQRfEsf"
-                        "5kkoZlHs5Fs9wgB8uKFjvwWY2kg2HFXT\n"
-                        "mmkWP6j9JM9fg2VdI9yjrZYcYvNWIIVS"
-                        "u57VKQdwlpZtZww1Tkq8mATxdGwIyhgh\n"
-                        "fDKQXkYuNs474553LBgOhgObJ4Oi7Aei"
-                        "j7XFXfBvTFLJ3ivL9pVYFxg5lUl86pVq\n"
-                        "5RXSJhiY+gUQFXKOWoqsqmj/////////"
-                        "/wIBAg==\n"
-                        "-----END DH PARAMETERS-----\n"
-                    )
