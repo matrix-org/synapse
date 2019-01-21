@@ -41,7 +41,7 @@ try:
         certs = attr.ib(default=attr.Factory(dict))
 
         def store(self, server_name, pem_objects):
-            self.certs[server_name] = b''.join(o.as_bytes() for o in pem_objects)
+            self.certs[server_name] = [o.as_bytes() for o in pem_objects]
             return defer.succeed(None)
 
 
@@ -131,17 +131,15 @@ class AcmeHandler(object):
         cert_chain = self._store.certs[self.hs.hostname]
 
         try:
-            tls_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM, cert_chain)
             with open(self.hs.config.tls_private_key_file, "wb") as private_key_file:
-                private_key_pem = crypto.dump_privatekey(
-                    crypto.FILETYPE_PEM, tls_private_key
-                )
-                private_key_file.write(private_key_pem)
+                for x in cert_chain:
+                    if x.startswith(b"-----BEGIN RSA PRIVATE KEY-----"):
+                        private_key_file.write(x)
 
-            chain = cert_chain.split("RSA PRIVATE KEY-----")[1]
-            chain = chain.split("-----BEGIN RSA PRIVATE KEY")[0]
             with open(self.hs.config.tls_certificate_file, "wb") as certificate_file:
-                certificate_file.write(chain)
+                for x in cert_chain:
+                    if x.startswith(b"-----BEGIN CERTIFICATE-----"):
+                        certificate_file.write(x)
         except Exception:
             logger.exception("Failed saving!")
             raise
