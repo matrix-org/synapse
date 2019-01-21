@@ -325,22 +325,12 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    # These will be loaded in later, once we have provisioned keys via ACME.
-    if config.acme_enabled:
-        tls_server_context_factory = None
-        tls_client_options_factory = None
-    else:
-        tls_server_context_factory = context_factory.ServerContextFactory(config)
-        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
-
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
 
     hs = SynapseHomeServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
-        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
