@@ -360,8 +360,6 @@ def setup(config_options):
 
     @defer.inlineCallbacks
     def start():
-
-
         # Check if the certificate is still valid.
         cert_days_remaining = hs.config.is_disk_cert_valid()
 
