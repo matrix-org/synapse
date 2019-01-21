@@ -55,6 +55,7 @@ class AcmeHandler(object):
         self.hs = hs
         self.reactor = hs.get_reactor()
 
+    @defer.inlineCallbacks
     def start_listening(self):
 
         # Configure logging for txacme, if you need to debug
