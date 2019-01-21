@@ -178,8 +178,6 @@ class FederationServer(FederationBase):
                 continue
 
             try:
-                # In future we will actually use the room version to parse the
-                # PDU into an event.
                 room_version = yield self.store.get_room_version(room_id)
             except NotFoundError:
                 logger.info("Ignoring PDU for unknown room_id: %s", room_id)
