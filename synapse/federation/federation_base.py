@@ -43,7 +43,8 @@ class FederationBase(object):
         self._clock = hs.get_clock()
 
     @defer.inlineCallbacks
-    def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False,
+    def _check_sigs_and_hash_and_fetch(self, origin, pdus, room_version,
+                                       outlier=False,
                                        include_none=False):
         """Takes a list of PDUs and checks the signatures and hashs of each
         one. If a PDU fails its signature check then we check if we have it in
@@ -56,8 +57,12 @@ class FederationBase(object):
         a new list.
 
         Args:
-            pdu (list)
-            outlier (bool)
+            origin (str): where the events came from
+            pdus (list)
+            room_version (str): The version of the room the events belong to
+            outlier (bool): Are the event outliers or not
+            include_none (bool): Whether the returned list should have `None`
+                for invalid PDUs or not
 
         Returns:
             Deferred : A list of PDUs that have valid signatures and hashes.
@@ -84,6 +89,7 @@ class FederationBase(object):
                     res = yield self.get_pdu(
                         destinations=[pdu.origin],
                         event_id=pdu.event_id,
+                        room_version=room_version,
                         outlier=outlier,
                         timeout=10000,
                     )

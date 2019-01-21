@@ -334,6 +334,8 @@ class FederationHandler(BaseHandler):
                     # we don't need this any more, let's delete it.
                     del ours
 
+                    room_version = yield self.store.get_room_version(room_id)
+
                     # Ask the remote server for the states we don't
                     # know about
                     for p in prevs - seen:
@@ -355,7 +357,9 @@ class FederationHandler(BaseHandler):
                             # we want the state *after* p; get_state_for_room returns the
                             # state *before* p.
                             remote_event = yield self.federation_client.get_pdu(
-                                [origin], p, outlier=True,
+                                [origin], p,
+                                room_version=room_version,
+                                outlier=True,
                             )
 
                             if remote_event is None:
@@ -379,7 +383,6 @@ class FederationHandler(BaseHandler):
                             for x in remote_state:
                                 event_map[x.event_id] = x
 
-                    room_version = yield self.store.get_room_version(room_id)
                     state_map = yield resolve_events_with_store(
                         room_version, state_maps, event_map,
                         state_res_store=StateResolutionStore(self.store),
@@ -1120,7 +1123,8 @@ class FederationHandler(BaseHandler):
                 pass
 
             yield self._persist_auth_tree(
-                origin, auth_chain, state, event
+                origin, auth_chain, state, event,
+                room_version=room_version,
             )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
@@ -1637,7 +1641,7 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _persist_auth_tree(self, origin, auth_events, state, event):
+    def _persist_auth_tree(self, origin, auth_events, state, event, room_version):
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -1650,6 +1654,7 @@ class FederationHandler(BaseHandler):
             auth_events (list)
             state (list)
             event (Event)
+            room_version (str): Version of the room the event belongs to
 
         Returns:
             Deferred
@@ -1681,6 +1686,7 @@ class FederationHandler(BaseHandler):
             m_ev = yield self.federation_client.get_pdu(
                 [origin],
                 e_id,
+                room_version=room_version,
                 outlier=True,
                 timeout=10000,
             )

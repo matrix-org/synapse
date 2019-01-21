@@ -208,7 +208,7 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
-    def get_pdu(self, destinations, event_id, outlier=False, timeout=None):
+    def get_pdu(self, destinations, event_id, room_version, outlier=False, timeout=None):
         """Requests the PDU with given origin and ID from the remote home
         servers.
 
@@ -218,6 +218,7 @@ class FederationClient(FederationBase):
         Args:
             destinations (list): Which home servers to query
             event_id (str): event to fetch
+            room_version (str): The room version of the room of the event
             outlier (bool): Indicates whether the PDU is an `outlier`, i.e. if
                 it's from an arbitary point in the context as opposed to part
                 of the current block of PDUs. Defaults to `False`
@@ -251,7 +252,7 @@ class FederationClient(FederationBase):
                 logger.debug("transaction_data %r", transaction_data)
 
                 pdu_list = [
-                    event_from_pdu_json(p, RoomVersions.V1, outlier=outlier)
+                    event_from_pdu_json(p, room_version, outlier=outlier)
                     for p in transaction_data["pdus"]
                 ]
 
@@ -305,6 +306,8 @@ class FederationClient(FederationBase):
                 A list of events in the state, and a list of events in the auth chain
                 for the given event.
         """
+        room_version = yield self.store.get_room_version(room_id)
+
         try:
             # First we try and ask for just the IDs, as thats far quicker if
             # we have most of the state and auth_chain already.
@@ -317,7 +320,8 @@ class FederationClient(FederationBase):
             auth_event_ids = result.get("auth_chain_ids", [])
 
             fetched_events, failed_to_fetch = yield self.get_events(
-                [destination], room_id, set(state_event_ids + auth_event_ids)
+                [destination], room_id, set(state_event_ids + auth_event_ids),
+                room_version=room_version,
             )
 
             if failed_to_fetch:
@@ -345,8 +349,6 @@ class FederationClient(FederationBase):
             destination, room_id, event_id=event_id,
         )
 
-        room_version = yield self.store.get_room_version(room_id)
-
         pdus = [
             event_from_pdu_json(p, room_version, outlier=True)
             for p in result["pdus"]
@@ -364,6 +366,7 @@ class FederationClient(FederationBase):
         signed_pdus = yield self._check_sigs_and_hash_and_fetch(
             destination,
             [p for p in pdus if p.event_id not in seen_events],
+            room_version=room_version,
             outlier=True
         )
         signed_pdus.extend(
@@ -373,6 +376,7 @@ class FederationClient(FederationBase):
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
             destination,
             [p for p in auth_chain if p.event_id not in seen_events],
+            room_version=room_version,
             outlier=True
         )
         signed_auth.extend(
@@ -384,7 +388,8 @@ class FederationClient(FederationBase):
         defer.returnValue((signed_pdus, signed_auth))
 
     @defer.inlineCallbacks
-    def get_events(self, destinations, room_id, event_ids, return_local=True):
+    def get_events(self, destinations, room_id, event_ids, room_version,
+                   return_local=True):
         """Fetch events from some remote destinations, checking if we already
         have them.
 
@@ -392,6 +397,7 @@ class FederationClient(FederationBase):
             destinations (list)
             room_id (str)
             event_ids (list)
+            room_version (str): The version of the room the events belong to
             return_local (bool): Whether to include events we already have in
                 the DB in the returned list of events
 
@@ -430,6 +436,7 @@ class FederationClient(FederationBase):
                     self.get_pdu,
                     destinations=random_server_list(),
                     event_id=e_id,
+                    room_version=room_version,
                 )
                 for e_id in batch
             ]
@@ -462,7 +469,8 @@ class FederationClient(FederationBase):
         ]
 
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True
+            destination, auth_chain,
+            room_version=room_version, outlier=True,
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -666,6 +674,7 @@ class FederationClient(FederationBase):
 
             valid_pdus = yield self._check_sigs_and_hash_and_fetch(
                 destination, list(pdus.values()),
+                room_version=room_version,
                 outlier=True,
             )
 
@@ -809,7 +818,9 @@ class FederationClient(FederationBase):
         ]
 
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True
+            destination, auth_chain,
+            room_version=room_version,
+            outlier=True,
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -859,7 +870,9 @@ class FederationClient(FederationBase):
             ]
 
             signed_events = yield self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False
+                destination, events,
+                room_version=room_version,
+                outlier=False,
             )
         except HttpResponseException as e:
             if not e.code == 400:

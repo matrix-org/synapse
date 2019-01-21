@@ -468,7 +468,9 @@ class FederationServer(FederationBase):
             ]
 
             signed_auth = yield self._check_sigs_and_hash_and_fetch(
-                origin, auth_chain, outlier=True
+                origin, auth_chain,
+                room_version=room_version,
+                outlier=True,
             )
 
             ret = yield self.handler.on_query_auth(
