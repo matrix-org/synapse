@@ -12,9 +12,6 @@ cache:
     #
     - $HOME/.cache/pip/wheels
 
-addons:
-  postgresql: "9.4"
-
 # don't clone the whole repo history, one commit will do
 git:
   depth: 1
@@ -46,6 +43,8 @@ matrix:
 
   - python: 2.7
     env: TOX_ENV=py27-postgres,codecov TRIAL_FLAGS="-j 4"
+    addons:
+      postgresql: "9.4"
     services:
       - postgresql
 
@@ -57,6 +56,8 @@ matrix:
 
   - python: 3.6
     env: TOX_ENV=py36-postgres,codecov TRIAL_FLAGS="-j 4"
+    addons:
+      postgresql: "9.4"
     services:
       - postgresql
 
@@ -71,7 +72,7 @@ matrix:
 
 install:
   - pip install tox
-  
+
   # if we don't have python3.6 in this environment, travis unhelpfully gives us
   # a `python3.6` on our path which does nothing but spit out a warning. Tox
   # tries to run it (even if we're not running a py36 env), so the build logs
