@@ -453,16 +453,16 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            return None
+            defer.returnValue(None)
 
         # Retrieve the room's create event
         create_event = yield self.get_event(create_id)
 
         if not create_event:
-            return None
+            defer.returnValue(None)
 
         # Return predecessor if present
-        return create_event.content.get("predecessor", None)
+        defer.returnValue(create_event.content.get("predecessor", None))
 
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
