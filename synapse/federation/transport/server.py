@@ -44,6 +44,16 @@ class TransportLayerServer(JsonResource):
     """Handles incoming federation HTTP requests"""
 
     def __init__(self, hs, servlet_groups=None):
+        """Initialize the TransportLayerServer
+
+        Will by default register all servlets. For custom behaviour, pass in
+        a list of servlet_groups to register.
+
+        Args:
+            hs (synapse.server.HomeServer): homeserver
+            servlet_groups (list[str], optional): List of servlet groups to register.
+                Defaults to ``DEFAULT_SERVLET_GROUPS``.
+        """
         self.hs = hs
         self.clock = hs.get_clock()
         self.servlet_groups = servlet_groups
@@ -1365,6 +1375,19 @@ DEFAULT_SERVLET_GROUPS = (
 
 
 def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=None):
+    """Initialize and register servlet classes.
+
+    Will by default register all servlets. For custom behaviour, pass in
+    a list of servlet_groups to register.
+
+    Args:
+        hs (synapse.server.HomeServer): homeserver
+        resource (TransportLayerServer): resource class to register to
+        authenticator (Authenticator): authenticator to use
+        ratelimiter (util.ratelimitutils.FederationRateLimiter): ratelimiter to use
+        servlet_groups (list[str], optional): List of servlet groups to register.
+            Defaults to ``DEFAULT_SERVLET_GROUPS``.
+    """
     if not servlet_groups:
         servlet_groups = DEFAULT_SERVLET_GROUPS
 
