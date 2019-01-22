@@ -420,19 +420,20 @@ class ServerConfig(Config):
                                   " service on the given port.")
 
 
-def is_threepid_reserved(config, threepid):
+def is_threepid_reserved(reserved_threepids, threepid):
     """Check the threepid against the reserved threepid config
     Args:
-        config(ServerConfig) - to access server config attributes
+        reserved_threepids([dict]) - list of reserved threepids
         threepid(dict) - The threepid to test for
 
     Returns:
         boolean Is the threepid undertest reserved_user
     """
+    if not threepid:
+        return False
 
-    for tp in config.mau_limits_reserved_threepids:
-        if (threepid['medium'] == tp['medium']
-                and threepid['address'] == tp['address']):
+    for tp in reserved_threepids:
+        if (threepid['medium'] == tp['medium'] and threepid['address'] == tp['address']):
             return True
     return False
 
