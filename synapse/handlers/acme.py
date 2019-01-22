@@ -18,7 +18,6 @@ import logging
 import attr
 from zope.interface import implementer
 
-from OpenSSL import crypto
 from twisted.internet import defer
 from twisted.internet.endpoints import serverFromString
 from twisted.python.filepath import FilePath
@@ -80,7 +79,7 @@ class AcmeHandler(object):
                     reactor=self.reactor,
                     url=URL.from_text(self.hs.config.acme_url),
                     key=load_or_create_client_key(
-                        FilePath(self.hs.config.acme_client_key)
+                        FilePath(self.hs.config.config_dir_path)
                     ),
                     alg=RS256,
                 )

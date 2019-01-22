@@ -386,7 +386,9 @@ def setup(config_options):
             # TLS.
             hs.config.read_certificate_from_disk()
             hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+                config
+            )
 
             # It is now safe to start your Synapse.
             hs.start_listening()
