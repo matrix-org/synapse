@@ -70,13 +70,13 @@ class TlsConfig(Config):
         try:
             with open(self.tls_certificate_file, 'rb') as f:
                 cert_pem = f.read()
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to read existing certificate off disk!")
             raise
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to parse existing certificate off disk!")
             raise
 
