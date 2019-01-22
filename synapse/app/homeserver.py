@@ -18,6 +18,7 @@ import gc
 import logging
 import os
 import sys
+import traceback
 
 from six import iteritems
 
@@ -360,43 +361,48 @@ def setup(config_options):
 
     @defer.inlineCallbacks
     def start():
-        # Check if the certificate is still valid.
-        cert_days_remaining = hs.config.is_disk_cert_valid()
+        try:
+            # Check if the certificate is still valid.
+            cert_days_remaining = hs.config.is_disk_cert_valid()
 
-        if hs.config.acme_enabled:
-            # If ACME is enabled, we might need to provision a certificate
-            # before starting.
-            acme = hs.get_acme_handler()
+            if hs.config.acme_enabled:
+                # If ACME is enabled, we might need to provision a certificate
+                # before starting.
+                acme = hs.get_acme_handler()
 
-            # Start up the webservices which we will respond to ACME challenges
-            # with.
-            try:
+                # Start up the webservices which we will respond to ACME challenges
+                # with.
                 yield acme.start_listening()
-            except defer.FirstError as e:
-                # We couldn't listen on a port, for some reason. Print the
-                # traceback to stderr and bail.
+
+                # We want to reprovision if is_valid_cert is None (meaning no
+                # certificate exists), or the days remaining number it returns is
+                # less than our re-registration threshold.
+                if (cert_days_remaining is None) or (
+                    not cert_days_remaining > hs.config.acme_reprovision_threshold
+                ):
+                    yield acme.provision_certificate()
+
+            # Read the certificate from disk and build the context factories for
+            # TLS.
+            hs.config.read_certificate_from_disk()
+            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
+
+            # It is now safe to start your Synapse.
+            hs.start_listening()
+            hs.get_pusherpool().start()
+            hs.get_datastore().start_profiling()
+            hs.get_datastore().start_doing_background_updates()
+        except Exception as e:
+            # If a DeferredList failed (like in listening on the ACME listener),
+            # we need to print the subfailure explicitly.
+            if isinstance(e, defer.FirstError):
                 e.subFailure.printTraceback(sys.stderr)
                 sys.exit(1)
 
-            # We want to reprovision if is_valid_cert is None (meaning no
-            # certificate exists), or the days remaining number it returns is
-            # less than our re-registration threshold.
-            if (cert_days_remaining is None) or (
-                not cert_days_remaining > hs.config.acme_reprovision_threshold
-            ):
-                yield acme.provision_certificate()
-
-        # Read the certificate from disk and build the context factories for
-        # TLS.
-        hs.config._read_certificate()
-        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
-
-        # It is now safe to start your Synapse.
-        hs.start_listening()
-        hs.get_pusherpool().start()
-        hs.get_datastore().start_profiling()
-        hs.get_datastore().start_doing_background_updates()
+            # Something else went wrong when starting. Print it and bail out.
+            traceback.print_exc(file=sys.stderr)
+            sys.exit(1)
 
     reactor.callWhenRunning(start)
 

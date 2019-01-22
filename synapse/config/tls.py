@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import os
-import subprocess
 from datetime import datetime
 from hashlib import sha256
 
@@ -55,11 +54,6 @@ class TlsConfig(Config):
         self.tls_certificate = None
         self.tls_private_key = None
 
-        # If we are using ACME, do not read the certificate yet. That will be
-        # done later, and will trigger the reading code.
-        if not self.acme_enabled:
-            self._read_certificate()
-
     def is_disk_cert_valid(self):
         """
         Is the certificate we have on disk valid, and if so, for how long?
@@ -79,7 +73,7 @@ class TlsConfig(Config):
         days_remaining = (expires_on - now).days
         return days_remaining
 
-    def _read_certificate(self):
+    def read_certificate_from_disk(self):
         """
         Read the certificates from disk.
         """
