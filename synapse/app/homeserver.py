@@ -378,7 +378,7 @@ def setup(config_options):
                 e.subFailure.printTraceback(sys.stderr)
                 sys.exit(1)
 
-            # We want to reprovision if is_valid_cert is None (meaning no
+            # We want to reprovision if cert_days_remaining is None (meaning no
             # certificate exists), or the days remaining number it returns is
             # less than our re-registration threshold.
             if (cert_days_remaining is None) or (
