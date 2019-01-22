@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import logging
 from datetime import datetime
 from hashlib import sha256
 
@@ -22,6 +23,8 @@ from unpaddedbase64 import encode_base64
 from OpenSSL import crypto
 
 from synapse.config._base import Config
+
+logger = logging.getLogger()
 
 
 class TlsConfig(Config):
@@ -36,8 +39,8 @@ class TlsConfig(Config):
         self.acme_bind_addresses = acme_config.get("bind_addresses", ["127.0.0.1"])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 10)
 
-        self.tls_certificate_file = config.get("tls_certificate_path")
-        self.tls_private_key_file = config.get("tls_private_key_path")
+        self.tls_certificate_file = os.path.abspath(config.get("tls_certificate_path"))
+        self.tls_private_key_file = os.path.abspath(config.get("tls_private_key_path"))
         self._original_tls_fingerprints = config["tls_fingerprints"]
         self.tls_fingerprints = list(self._original_tls_fingerprints)
         self.no_tls = config.get("no_tls", False)
@@ -56,14 +59,26 @@ class TlsConfig(Config):
     def is_disk_cert_valid(self):
         """
         Is the certificate we have on disk valid, and if so, for how long?
+
+        Returns:
+            int: Days remaining of certificate validity.
+            None: No certificate exists.
         """
+        if not os.path.exists(self.tls_certificate_file):
+            return None
+
         try:
             with open(self.tls_certificate_file, 'rb') as f:
                 cert_pem = f.read()
-        except IOError:
-            return None
+        except Exception as e:
+            logger.exception("Failed to read existing certificate off disk!")
+            raise
 
-        tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+        try:
+            tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+        except Exception as e:
+            logger.exception("Failed to parse existing certificate off disk!")
+            raise
 
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(
