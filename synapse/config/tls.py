@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import os
-import subprocess
 from hashlib import sha256
 
 from unpaddedbase64 import encode_base64
