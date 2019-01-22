@@ -61,9 +61,10 @@ class TlsConfig(Config):
         try:
             with open(self.tls_certificate_file, 'rb') as f:
                 cert_pem = f.read()
-            tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         except IOError:
             return None
+
+        tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
 
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(
