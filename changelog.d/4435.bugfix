@@ -1,1 +1,1 @@
-Fix None guard in config.server.is_threepid_reserved
+Fix None guard in calling config.server.is_threepid_reserved

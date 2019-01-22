@@ -429,8 +429,6 @@ def is_threepid_reserved(reserved_threepids, threepid):
     Returns:
         boolean Is the threepid undertest reserved_user
     """
-    if not threepid:
-        return False
 
     for tp in reserved_threepids:
         if (threepid['medium'] == tp['medium'] and threepid['address'] == tp['address']):
