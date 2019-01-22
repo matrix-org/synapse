@@ -260,39 +260,6 @@ class RoomCreationHandler(BaseHandler):
             }
         }
 
-        # Copy over room account data for this user
-        user_account_data = yield self.store.get_account_data_for_user(
-            user_id,
-        )
-
-        room_tags = yield self.store.get_tags_for_room(
-            user_id, old_room_id,
-        )
-
-        # Copy direct message state if applicable
-        if user_account_data and "m.direct" in user_account_data[0]:
-            direct_rooms = user_account_data[0]["m.direct"]
-
-            # Check which key this room is under
-            for key, room_id_list in direct_rooms.items():
-                for room_id in room_id_list:
-                    if room_id == old_room_id:
-                        # Add new room_id to this key
-                        direct_rooms[key].append(new_room_id)
-
-                        # Save back to user's m.direct account data
-                        yield self.store.add_account_data_for_user(
-                            user_id, "m.direct", direct_rooms,
-                        )
-                        break
-
-        # Copy room tags if applicable
-        if room_tags:
-            # Copy each room tag to the new room
-            for tag in room_tags.keys():
-                tag_content = room_tags[tag]
-                yield self.store.add_tag_to_room(user_id, new_room_id, tag, tag_content)
-
         initial_state = dict()
 
         # Replicate relevant room events
