@@ -49,39 +49,26 @@ class SearchHandler(BaseHandler):
         The full list of all found rooms in then returned.
 
         Args:
-            room_id (str): The ID of the room to search through.
+            room_id (str): id of the room to search through.
 
         Returns:
-            dict of past room IDs as strings
+            Deferred[iterable[str]]: predecessor room ids
         """
 
         historical_room_ids = []
 
         while True:
-            state_ids = yield self.store.get_current_state_ids(room_id)
-            create_id = state_ids.get((EventTypes.Create, ""))
+            predecessor = yield self.store.get_room_predecessor(room_id)
 
-            # If we can't find the create event, assume we've hit a dead end
-            if not create_id:
-                break
-
-            # Retrieve the room's create event
-            create_event = yield self.store.get_event(create_id)
-
-            if not create_event:
-                break
-
-            # Check if a predecessor room is present
-            predecessor = create_event.content.get("predecessor", None)
+            # If no predecessor, assume we've hit a dead end
             if not predecessor:
                 break
 
             # Add predecessor's room ID
-            historical_room_id = predecessor["room_id"]
-            historical_room_ids.append(historical_room_id)
+            historical_room_ids.append(predecessor["room_id"])
 
             # Scan through the old room for further predecessors
-            room_id = historical_room_id
+            room_id = predecessor["room_id"]
 
         defer.returnValue(historical_room_ids)
 
@@ -185,28 +172,19 @@ class SearchHandler(BaseHandler):
         )
         room_ids = set(r.room_id for r in rooms)
 
-        room_ids = search_filter.filter_rooms(room_ids)
-
         # If doing a subset of all rooms seearch, check if any of the rooms
         # are from an upgraded room, and search their contents as well
-        # XXX: There is the possibility that we don't have a create event for
-        # the room in question, in which case we can't return all the results
-        # we want to.
-        # Ideally we would just return the results we can get now, and
-        # try to get more results from other servers in the background.
         if search_filter.rooms:
             historical_room_ids = []
-            for room_id in room_ids:
+            for room_id in search_filter.rooms:
                 # Add any previous rooms to the search if they exist
                 ids = yield self.get_old_rooms_from_upgraded_room(room_id)
                 historical_room_ids += ids
 
-            # Add any found rooms to the list to search
-            for historical_room_id in historical_room_ids:
-                room_ids.add(historical_room_id)
-
             # Prevent any historical events from being filtered
-            search_filter.add_room_ids(historical_room_ids)
+            search_filter = search_filter.with_room_ids(historical_room_ids)
+
+        room_ids = search_filter.filter_rooms(room_ids)
 
         if batch_group == "room_id":
             room_ids.intersection_update({batch_group_key})

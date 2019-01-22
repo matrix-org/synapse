@@ -444,8 +444,19 @@ class Filter(object):
     def include_redundant_members(self):
         return self.filter_json.get("include_redundant_members", False)
 
-    def add_room_ids(self, room_ids):
-        self.rooms += room_ids
+    def with_room_ids(self, room_ids):
+        """Returns a new filter with the given room IDs appended.
+
+        Args:
+            room_ids (list): A list of room_ids.
+
+        Returns:
+            filter: A new filter including the given rooms and the old
+                    filter's rooms.
+        """
+        newFilter = self
+        newFilter.rooms += room_ids
+        return newFilter
 
 
 def _matches_wildcard(actual_value, filter_value):

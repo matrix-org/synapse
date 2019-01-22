@@ -437,6 +437,34 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         create_event = yield self.get_event(create_id)
         defer.returnValue(create_event.content.get("room_version", "1"))
 
+    @defer.inlineCallbacks
+    def get_room_predecessor(self, room_id):
+        """Get the predecessor room of an upgraded room if one exists.
+        Otherwise return None.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[str]: predecessor room id
+        """
+
+        state_ids = yield self.get_current_state_ids(room_id)
+        create_id = state_ids.get((EventTypes.Create, ""))
+
+        # If we can't find the create event, assume we've hit a dead end
+        if not create_id:
+            return None
+
+        # Retrieve the room's create event
+        create_event = yield self.get_event(create_id)
+
+        if not create_event:
+            return None
+
+        # Return predecessor if present
+        return create_event.content.get("predecessor", None)
+
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
         """Get the current state event ids for a room based on the
@@ -448,7 +476,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             deferred: dict of (type, state_key) -> event_id
         """
-
         def _get_current_state_ids_txn(txn):
             txn.execute(
                 """SELECT type, state_key, event_id FROM current_state_events
