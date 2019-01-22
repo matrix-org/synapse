@@ -112,10 +112,10 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
         payload = answer.payload
 
         servers.append(Server(
-            host=str(payload.target),
-            port=int(payload.port),
-            priority=int(payload.priority),
-            weight=int(payload.weight),
+            host=payload.target.name,
+            port=payload.port,
+            priority=payload.priority,
+            weight=payload.weight,
             expires=int(clock.time()) + answer.ttl,
         ))
 
