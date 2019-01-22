@@ -92,7 +92,7 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
     but the cache never gets populated), so we add our own caching layer here.
 
     Args:
-        service_name (unicode|bytes): record to look up
+        service_name (bytes): record to look up
         dns_client (twisted.internet.interfaces.IResolver): twisted resolver impl
         cache (dict): cache object
         clock (object): clock implementation. must provide a time() method.
@@ -100,9 +100,9 @@ def resolve_service(service_name, dns_client=client, cache=SERVER_CACHE, clock=t
     Returns:
         Deferred[list[Server]]: a list of the SRV records, or an empty list if none found
     """
-    # TODO: the dns client handles both unicode names (encoding via idna) and pre-encoded
-    # byteses; however they will obviously end up as separate entries in the cache. We
-    # should pick one form and stick with it.
+    if not isinstance(service_name, bytes):
+        raise TypeError("%r is not a byte string" % (service_name,))
+
     cache_entry = cache.get(service_name, None)
     if cache_entry:
         if all(s.expires > int(clock.time()) for s in cache_entry):
