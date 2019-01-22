@@ -4,7 +4,6 @@
 
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
-tls_dh_params_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.dh"
 no_tls: {{ "True" if SYNAPSE_NO_TLS else "False" }}
 tls_fingerprints: []
 
