@@ -110,8 +110,13 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _remove_user_ip_dupes(self, progress, batch_size):
+        # This works function works by scanning the user_ips table in batches
+        # based on `last_seen`. For each row in a batch it searches the rest of
+        # the table to see if there are any duplicates, if there are then they
+        # are removed and replaced with a suitable row.
 
-        last_seen_progress = progress.get("last_seen", 0)
+        # Fetch the start of the batch
+        begin_last_seen = progress.get("last_seen", 0)
 
         def get_last_seen(txn):
             txn.execute(
@@ -122,17 +127,20 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 LIMIT 1
                 OFFSET ?
                 """,
-                (last_seen_progress, batch_size)
+                (begin_last_seen, batch_size)
             )
-            results = txn.fetchone()
-            return results
+            row = txn.fetchone()
+            if row:
+                return row[0]
+            else:
+                return None
 
-        # Get a last seen that's sufficiently far away enough from the last one
-        last_seen = yield self.runInteraction(
+        # Get a last seen that has roughly `batch_size` since `begin_last_seen`
+        end_last_seen = yield self.runInteraction(
             "user_ips_dups_get_last_seen", get_last_seen
         )
 
-        if not last_seen:
+        if end_last_seen is None:
             # If we get a None then we're reaching the end and just need to
             # delete the last batch.
             last = True
@@ -142,9 +150,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             last_seen = int(self.clock.time_msec()) * 2
         else:
             last = False
-            last_seen = last_seen[0]
 
-        def remove(txn, last_seen_progress, last_seen):
+        def remove(txn, begin_last_seen, end_last_seen):
             # This works by looking at all entries in the given time span, and
             # then for each (user_id, access_token, ip) tuple in that range
             # checking for any duplicates in the rest of the table (via a join).
@@ -166,7 +173,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 INNER JOIN user_ips USING (user_id, access_token, ip)
                 GROUP BY user_id, access_token, ip
                 HAVING count(*) > 1""",
-                (last_seen_progress, last_seen)
+                (begin_last_seen, end_last_seen)
             )
             res = txn.fetchall()
 
@@ -194,11 +201,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 )
 
             self._background_update_progress_txn(
-                txn, "user_ips_remove_dupes", {"last_seen": last_seen}
+                txn, "user_ips_remove_dupes", {"last_seen": end_last_seen}
             )
 
         yield self.runInteraction(
-            "user_ips_dups_remove", remove, last_seen_progress, last_seen
+            "user_ips_dups_remove", remove, begin_last_seen, end_last_seen
         )
         if last:
             yield self._end_background_update("user_ips_remove_dupes")
