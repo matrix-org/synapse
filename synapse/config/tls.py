@@ -22,8 +22,6 @@ from OpenSSL import crypto
 
 from ._base import Config
 
-GENERATE_DH_PARAMS = False
-
 
 class TlsConfig(Config):
     def read_config(self, config):
