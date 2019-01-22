@@ -263,7 +263,9 @@ class RoomMemberHandler(object):
                     # Copy each room tag to the new room
                     for tag in room_tags.keys():
                         tag_content = room_tags[tag]
-                        yield self.store.add_tag_to_room(user_id, room_id, tag, tag_content)
+                        yield self.store.add_tag_to_room(
+                            user_id, room_id, tag, tag_content
+                        )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
