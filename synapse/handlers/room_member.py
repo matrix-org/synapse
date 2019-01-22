@@ -211,7 +211,7 @@ class RoomMemberHandler(object):
         )
 
         if event.membership == Membership.JOIN:
-            # Only fire user_joined_room if the user has acutally joined the
+            # Only fire user_joined_room if the user has actually joined the
             # room. Don't bother if the user is just changing their profile
             # info.
             newly_joined = True
@@ -234,7 +234,7 @@ class RoomMemberHandler(object):
             if "predecessor" in create_event["content"]:
                 old_room_id = create_event["content"]["predecessor"]["room_id"]
 
-                # Copy over room account data from predecessor room to upgraded room
+                # Retrieve room account data for predecessor room
                 user_account_data = yield self.store.get_account_data_for_user(
                     user_id,
                 )
