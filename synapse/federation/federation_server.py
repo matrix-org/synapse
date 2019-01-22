@@ -369,13 +369,13 @@ class FederationServer(FederationBase):
         })
 
     @defer.inlineCallbacks
-    def on_invite_request(self, origin, content):
+    def on_invite_request(self, origin, content, room_version):
         pdu = event_from_pdu_json(content)
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
         time_now = self._clock.time_msec()
-        defer.returnValue((200, {"event": ret_pdu.get_pdu_json(time_now)}))
+        defer.returnValue({"event": ret_pdu.get_pdu_json(time_now)})
 
     @defer.inlineCallbacks
     def on_send_join_request(self, origin, content):

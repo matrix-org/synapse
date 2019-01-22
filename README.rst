@@ -220,7 +220,7 @@ is configured to use TLS with a self-signed certificate. If you would like
 to do initial test with a client without having to setup a reverse proxy,
 you can temporarly use another certificate. (Note that a self-signed
 certificate is fine for `Federation`_). You can do so by changing
-``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
+``tls_certificate_path`` and ``tls_private_key_path``
 in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
 to read `Using a reverse proxy with Synapse`_ when doing so.
 
