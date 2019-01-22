@@ -140,16 +140,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             "user_ips_dups_get_last_seen", get_last_seen
         )
 
-        if end_last_seen is None:
-            # If we get a None then we're reaching the end and just need to
-            # delete the last batch.
-            last = True
-
-            # We fake not having an upper bound by using a future date, by
-            # just multiplying the current time by two....
-            last_seen = int(self.clock.time_msec()) * 2
-        else:
-            last = False
+        # If it returns None, then we're processing the last batch
+        last = end_last_seen is None
 
         def remove(txn):
             # This works by looking at all entries in the given time span, and
@@ -160,6 +152,16 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             # all other duplicates.
             # It is efficient due to the existence of (user_id, access_token,
             # ip) and (last_seen) indices.
+
+            # Define the search space, which requires handling the last batch in
+            # a different way
+            if last:
+                clause = "? <= last_seen"
+                args = (begin_last_seen,)
+            else:
+                clause = "? <= last_seen AND last_seen < ?"
+                args = (begin_last_seen, end_last_seen)
+
             txn.execute(
                 """
                 SELECT user_id, access_token, ip,
@@ -167,13 +169,14 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 FROM (
                     SELECT user_id, access_token, ip
                     FROM user_ips
-                    WHERE ? <= last_seen AND last_seen < ?
+                    WHERE {}
                     ORDER BY last_seen
                 ) c
                 INNER JOIN user_ips USING (user_id, access_token, ip)
                 GROUP BY user_id, access_token, ip
-                HAVING count(*) > 1""",
-                (begin_last_seen, end_last_seen)
+                HAVING count(*) > 1
+                """.format(clause),
+                args
             )
             res = txn.fetchall()
 
