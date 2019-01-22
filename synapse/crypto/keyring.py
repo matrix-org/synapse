@@ -512,9 +512,6 @@ class Keyring(object):
                     or server_name not in response[u"signatures"]):
                 raise KeyLookupError("Key response not signed by remote server")
 
-            if "tls_fingerprints" not in response:
-                raise KeyLookupError("Key response missing TLS fingerprints")
-
             response_keys = yield self.process_v2_response(
                 from_server=server_name,
                 requested_ids=[requested_key_id],
