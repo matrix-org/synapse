@@ -151,7 +151,7 @@ class ServerConfig(Config):
                         "compress": gzip_responses,
                     },
                     {
-                        "names": ["federation", "openid"],
+                        "names": ["federation"],
                         "compress": False,
                     }
                 ]
@@ -170,7 +170,7 @@ class ServerConfig(Config):
                             "compress": gzip_responses,
                         },
                         {
-                            "names": ["federation", "openid"],
+                            "names": ["federation"],
                             "compress": False,
                         }
                     ]
@@ -328,8 +328,13 @@ class ServerConfig(Config):
                 # that can do automatic compression.
                 compress: true
 
-              - names: [federation, openid]  # Federation APIs
+              - names: [federation]  # Federation APIs
                 compress: false
+                
+              # # If federation is disabled synapse can still expose the open ID endpoint
+              # # to allow integrations to authenticate users
+              # - names: [openid]
+              #   compress: false
 
             # optional list of additional endpoints which can be loaded via
             # dynamic modules
@@ -350,8 +355,12 @@ class ServerConfig(Config):
             resources:
               - names: [client]
                 compress: true
-              - names: [federation, openid]
+              - names: [federation]
                 compress: false
+              # # If federation is disabled synapse can still expose the open ID endpoint
+              # # to allow integrations to authenticate users
+              # - names: [openid]
+              #   compress: false
 
           # Turn on the twisted ssh manhole service on localhost on the given
           # port.
