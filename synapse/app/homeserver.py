@@ -370,13 +370,13 @@ def setup(config_options):
                 # before starting.
                 acme = hs.get_acme_handler()
 
-                # Start up the webservices which we will respond to ACME challenges
-                # with.
+                # Start up the webservices which we will respond to ACME
+                # challenges with.
                 yield acme.start_listening()
 
                 # We want to reprovision if is_valid_cert is None (meaning no
-                # certificate exists), or the days remaining number it returns is
-                # less than our re-registration threshold.
+                # certificate exists), or the days remaining number it returns
+                # is less than our re-registration threshold.
                 if (cert_days_remaining is None) or (
                     not cert_days_remaining > hs.config.acme_reprovision_threshold
                 ):
