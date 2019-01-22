@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import patch, Mock
+from mock import Mock, patch
+
 from parameterized import parameterized
 
 from synapse.app.federation_reader import FederationReaderServer
@@ -21,7 +22,6 @@ from synapse.app.homeserver import SynapseHomeServer
 from tests.unittest import HomeserverTestCase
 
 
-@patch("synapse.app.homeserver.KeyApiV2Resource", new=Mock())
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
