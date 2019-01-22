@@ -248,16 +248,15 @@ class RoomMemberHandler(object):
 
                     # Check which key this room is under
                     for key, room_id_list in direct_rooms.items():
-                        for rid in room_id_list:
-                            if rid == old_room_id:
-                                # Add new room_id to this key
-                                direct_rooms[key].append(room_id)
+                        if old_room_id in room_id_list and room_id not in room_id_list:
+                            # Add new room_id to this key
+                            direct_rooms[key].append(room_id)
 
-                                # Save back to user's m.direct account data
-                                yield self.store.add_account_data_for_user(
-                                    user_id, "m.direct", direct_rooms,
-                                )
-                                break
+                            # Save back to user's m.direct account data
+                            yield self.store.add_account_data_for_user(
+                                user_id, "m.direct", direct_rooms,
+                            )
+                            break
 
                 # Copy room tags if applicable
                 if room_tags:
