@@ -9,9 +9,6 @@ tls_certificate_path: "/etc/matrix-synapse/homeserver.tls.crt"
 # PEM encoded private key for TLS
 tls_private_key_path: "/etc/matrix-synapse/homeserver.tls.key"
 
-# PEM dh parameters for ephemeral keys
-tls_dh_params_path: "/etc/matrix-synapse/homeserver.tls.dh"
-
 # Don't bind to the https port
 no_tls: False
 
