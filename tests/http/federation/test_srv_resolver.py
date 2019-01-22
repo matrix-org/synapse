@@ -18,6 +18,7 @@ from mock import Mock
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
+from twisted.internet.error import ConnectError
 from twisted.names import dns, error
 
 from synapse.http.federation.srv_resolver import resolve_service
@@ -31,8 +32,8 @@ class SrvResolverTestCase(unittest.TestCase):
     def test_resolve(self):
         dns_client_mock = Mock()
 
-        service_name = "test_service.example.com"
-        host_name = "example.com"
+        service_name = b"test_service.example.com"
+        host_name = b"example.com"
 
         answer_srv = dns.RRHeader(
             type=dns.SRV, payload=dns.Record_SRV(target=host_name)
@@ -150,3 +151,59 @@ class SrvResolverTestCase(unittest.TestCase):
 
         self.assertEquals(len(servers), 0)
         self.assertEquals(len(cache), 0)
+
+    def test_disabled_service(self):
+        """
+        test the behaviour when there is a single record which is ".".
+        """
+        service_name = b"test_service.example.com"
+
+        lookup_deferred = Deferred()
+        dns_client_mock = Mock()
+        dns_client_mock.lookupService.return_value = lookup_deferred
+        cache = {}
+
+        resolve_d = resolve_service(
+            service_name, dns_client=dns_client_mock, cache=cache
+        )
+        self.assertNoResult(resolve_d)
+
+        # returning a single "." should make the lookup fail with a ConenctError
+        lookup_deferred.callback((
+            [dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"."))],
+            None,
+            None,
+        ))
+
+        self.failureResultOf(resolve_d, ConnectError)
+
+    def test_non_srv_answer(self):
+        """
+        test the behaviour when the dns server gives us a spurious non-SRV response
+        """
+        service_name = b"test_service.example.com"
+
+        lookup_deferred = Deferred()
+        dns_client_mock = Mock()
+        dns_client_mock.lookupService.return_value = lookup_deferred
+        cache = {}
+
+        resolve_d = resolve_service(
+            service_name, dns_client=dns_client_mock, cache=cache
+        )
+        self.assertNoResult(resolve_d)
+
+        lookup_deferred.callback((
+            [
+                dns.RRHeader(type=dns.A, payload=dns.Record_A()),
+                dns.RRHeader(type=dns.SRV, payload=dns.Record_SRV(target=b"host")),
+            ],
+            None,
+            None,
+        ))
+
+        servers = self.successResultOf(resolve_d)
+
+        self.assertEquals(len(servers), 1)
+        self.assertEquals(servers, cache[service_name])
+        self.assertEquals(servers[0].host, b"host")
