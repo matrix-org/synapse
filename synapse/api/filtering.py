@@ -454,7 +454,7 @@ class Filter(object):
             filter: A new filter including the given rooms and the old
                     filter's rooms.
         """
-        newFilter = self
+        newFilter = Filter(self.filter_json)
         newFilter.rooms += room_ids
         return newFilter
 
