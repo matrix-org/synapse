@@ -151,7 +151,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         else:
             last = False
 
-        def remove(txn, begin_last_seen, end_last_seen):
+        def remove(txn):
             # This works by looking at all entries in the given time span, and
             # then for each (user_id, access_token, ip) tuple in that range
             # checking for any duplicates in the rest of the table (via a join).
@@ -204,9 +204,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 txn, "user_ips_remove_dupes", {"last_seen": end_last_seen}
             )
 
-        yield self.runInteraction(
-            "user_ips_dups_remove", remove, begin_last_seen, end_last_seen
-        )
+        yield self.runInteraction("user_ips_dups_remove", remove)
+
         if last:
             yield self._end_background_update("user_ips_remove_dupes")
 
