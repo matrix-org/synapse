@@ -32,6 +32,7 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
+from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -577,7 +578,13 @@ class FederationClient(FederationBase):
             pdu_dict.pop("origin_server_ts", None)
             pdu_dict.pop("unsigned", None)
 
-            ev = self.event_builder_factory.new(pdu_dict)
+            builder = self.event_builder_factory.new(pdu_dict)
+            add_hashes_and_signatures(
+                builder,
+                self.hs.hostname,
+                self.hs.config.signing_key[0]
+            )
+            ev = builder.build()
 
             defer.returnValue(
                 (destination, ev)

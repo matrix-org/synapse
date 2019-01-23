@@ -43,7 +43,6 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.crypto.event_signing import compute_event_signature
 from synapse.events.validator import EventValidator
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
@@ -1079,7 +1078,6 @@ class FederationHandler(BaseHandler):
         handled_events = set()
 
         try:
-            self._sign_event(event)
             event.internal_metadata.outlier = False
 
             # Try the host we successfully got a response to /make_join/
@@ -1287,8 +1285,6 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.outlier = True
         event.internal_metadata.invite_from_remote = True
 
-        self._sign_event(event)
-
         context = yield self.state_handler.compute_event_context(event)
         yield self.persist_events_and_notify([(event, context)])
 
@@ -1305,7 +1301,6 @@ class FederationHandler(BaseHandler):
         # Mark as outlier as we don't have any state for this event; we're not
         # even in the room.
         event.internal_metadata.outlier = True
-        self._sign_event(event)
 
         # Try the host that we succesfully called /make_leave/ on first for
         # the /send_leave/ request.
@@ -1348,15 +1343,6 @@ class FederationHandler(BaseHandler):
         assert(event.state_key == user_id)
         assert(event.room_id == room_id)
         defer.returnValue((origin, event))
-
-    def _sign_event(self, event):
-        event.signatures.update(
-            compute_event_signature(
-                event,
-                self.hs.hostname,
-                self.hs.config.signing_key[0]
-            )
-        )
 
     @defer.inlineCallbacks
     @log_function
