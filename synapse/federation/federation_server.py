@@ -34,6 +34,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.events import room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
@@ -178,14 +179,13 @@ class FederationServer(FederationBase):
                 continue
 
             try:
-                # In future we will actually use the room version to parse the
-                # PDU into an event.
-                yield self.store.get_room_version(room_id)
+                room_version = yield self.store.get_room_version(room_id)
+                format_ver = room_version_to_event_format(room_version)
             except NotFoundError:
                 logger.info("Ignoring PDU for unknown room_id: %s", room_id)
                 continue
 
-            event = event_from_pdu_json(p)
+            event = event_from_pdu_json(p, format_ver)
             pdus_by_room.setdefault(room_id, []).append(event)
 
         pdu_results = {}
@@ -370,7 +370,9 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content, room_version):
-        pdu = event_from_pdu_json(content)
+        format_ver = room_version_to_event_format(room_version)
+
+        pdu = event_from_pdu_json(content, format_ver)
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
@@ -378,9 +380,12 @@ class FederationServer(FederationBase):
         defer.returnValue({"event": ret_pdu.get_pdu_json(time_now)})
 
     @defer.inlineCallbacks
-    def on_send_join_request(self, origin, content):
+    def on_send_join_request(self, origin, content, room_id):
         logger.debug("on_send_join_request: content: %s", content)
-        pdu = event_from_pdu_json(content)
+
+        room_version = yield self.store.get_room_version(room_id)
+        format_ver = room_version_to_event_format(room_version)
+        pdu = event_from_pdu_json(content, format_ver)
 
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
@@ -410,9 +415,12 @@ class FederationServer(FederationBase):
         })
 
     @defer.inlineCallbacks
-    def on_send_leave_request(self, origin, content):
+    def on_send_leave_request(self, origin, content, room_id):
         logger.debug("on_send_leave_request: content: %s", content)
-        pdu = event_from_pdu_json(content)
+
+        room_version = yield self.store.get_room_version(room_id)
+        format_ver = room_version_to_event_format(room_version)
+        pdu = event_from_pdu_json(content, format_ver)
 
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
@@ -458,12 +466,13 @@ class FederationServer(FederationBase):
             origin_host, _ = parse_server_name(origin)
             yield self.check_server_matches_acl(origin_host, room_id)
 
+            room_version = yield self.store.get_room_version(room_id)
+            format_ver = room_version_to_event_format(room_version)
+
             auth_chain = [
-                event_from_pdu_json(e)
+                event_from_pdu_json(e, format_ver)
                 for e in content["auth_chain"]
             ]
-
-            room_version = yield self.store.get_room_version(room_id)
 
             signed_auth = yield self._check_sigs_and_hash_and_fetch(
                 origin, auth_chain, outlier=True, room_version=room_version,
