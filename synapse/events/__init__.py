@@ -18,9 +18,7 @@ from distutils.util import strtobool
 
 import six
 
-from synapse.api.constants import (
-    EventFormatVersions,
-)
+from synapse.api.constants import EventFormatVersions
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 

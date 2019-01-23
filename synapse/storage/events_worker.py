@@ -23,9 +23,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventFormatVersions
 from synapse.api.errors import NotFoundError
+from synapse.events import FrozenEvent
 # these are only included to make the type annotations work
 from synapse.events.snapshot import EventContext  # noqa: F401
-from synapse.events import FrozenEvent
 from synapse.events.utils import prune_event
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.logcontext import (
