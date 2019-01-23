@@ -9,9 +9,7 @@ include demo/*.py
 include demo/*.sh
 
 recursive-include synapse/storage/schema *.sql
-recursive-include synapse/storage/schema *.sql.*
 recursive-include synapse/storage/schema *.py
-recursive-include synapse/storage/schema *.md
 
 recursive-include docs *
 recursive-include scripts *
