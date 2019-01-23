@@ -54,7 +54,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         site = self.reactor.tcpServers[0][1]
         try:
             self.resource = (
-                site.resource.children[b"_matrix"].children[b"federation"].children[b"v1"]
+                site.resource.children[b"_matrix"].children[b"federation"]
             )
         except KeyError:
             if expectation == "no_resource":
@@ -100,7 +100,7 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         site = self.reactor.tcpServers[0][1]
         try:
             self.resource = (
-                site.resource.children[b"_matrix"].children[b"federation"].children[b"v1"]
+                site.resource.children[b"_matrix"].children[b"federation"]
             )
         except KeyError:
             if expectation == "no_resource":
