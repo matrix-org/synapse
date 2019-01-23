@@ -18,7 +18,7 @@ from distutils.util import strtobool
 
 import six
 
-from synapse.api.constants import EventFormatVersions
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventFormatVersions
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -235,3 +235,18 @@ class FrozenEvent(EventBase):
             self.get("type", None),
             self.get("state_key", None),
         )
+
+
+def room_version_to_event_format(room_version):
+    """Converts a room version string to the event format
+
+    Args:
+        room_version (str)
+
+    Returns:
+        int
+    """
+    if room_version not in KNOWN_ROOM_VERSIONS:
+        raise
+
+    return EventFormatVersions.V1
