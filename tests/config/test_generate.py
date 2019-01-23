@@ -51,7 +51,6 @@ class ConfigGenerationTestCase(unittest.TestCase):
                     "lemurs.win.log.config",
                     "lemurs.win.signing.key",
                     "lemurs.win.tls.crt",
-                    "lemurs.win.tls.dh",
                     "lemurs.win.tls.key",
                 ]
             ),
