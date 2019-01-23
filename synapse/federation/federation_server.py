@@ -463,8 +463,10 @@ class FederationServer(FederationBase):
                 for e in content["auth_chain"]
             ]
 
+            room_version = yield self.store.get_room_version(room_id)
+
             signed_auth = yield self._check_sigs_and_hash_and_fetch(
-                origin, auth_chain, outlier=True
+                origin, auth_chain, outlier=True, room_version=room_version,
             )
 
             ret = yield self.handler.on_query_auth(

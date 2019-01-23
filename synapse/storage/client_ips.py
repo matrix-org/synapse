@@ -143,6 +143,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         # If it returns None, then we're processing the last batch
         last = end_last_seen is None
 
+        logger.info(
+            "Scanning for duplicate 'user_ips' rows in range: %s <= last_seen < %s",
+            begin_last_seen, end_last_seen,
+        )
+
         def remove(txn):
             # This works by looking at all entries in the given time span, and
             # then for each (user_id, access_token, ip) tuple in that range
@@ -170,7 +175,6 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     SELECT user_id, access_token, ip
                     FROM user_ips
                     WHERE {}
-                    ORDER BY last_seen
                 ) c
                 INNER JOIN user_ips USING (user_id, access_token, ip)
                 GROUP BY user_id, access_token, ip
