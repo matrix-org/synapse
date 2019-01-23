@@ -255,7 +255,6 @@ class MatrixFederationHttpClient(object):
 
         headers_dict = {
             b"User-Agent": [self.version_string_bytes],
-            b"Host": [destination_bytes],
         }
 
         with limiter:
