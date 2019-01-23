@@ -1,1 +1,1 @@
-Add support for persisting event format versions in the database
+Add infrastructure to support different event formats
