@@ -33,11 +33,11 @@ class TlsConfig(Config):
         acme_config = config.get("acme", {})
         self.acme_enabled = acme_config.get("enabled", False)
         self.acme_url = acme_config.get(
-            "url", "https://acme-staging.api.letsencrypt.org/directory"
+            "url", "https://acme-v01.api.letsencrypt.org/directory"
         )
         self.acme_port = acme_config.get("port", 8449)
         self.acme_bind_addresses = acme_config.get("bind_addresses", ["127.0.0.1"])
-        self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 10)
+        self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
 
         self.tls_certificate_file = os.path.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = os.path.abspath(config.get("tls_private_key_path"))
@@ -161,7 +161,9 @@ class TlsConfig(Config):
         ## Support for ACME certificate auto-provisioning.
         # acme:
         #    enabled: false
-        ##   ACME path. Default: https://acme-staging.api.letsencrypt.org/directory
+        ##   ACME path.
+        ##   If you only want to test, use the staging url:
+        ##   https://acme-staging.api.letsencrypt.org/directory
         #    url: 'https://acme-v01.api.letsencrypt.org/directory'
         ##   Port number (to listen for the HTTP-01 challenge).
         ##   Using port 80 requires utilising something like authbind, or proxying to it.
@@ -169,7 +171,7 @@ class TlsConfig(Config):
         ##   Hosts to bind to.
         #    bind_addresses: ['127.0.0.1']
         ##   How many days remaining on a certificate before it is renewed.
-        #    reprovision_threshold: 10
+        #    reprovision_threshold: 30
         """
             % locals()
         )
