@@ -374,7 +374,7 @@ def setup(config_options):
                 # challenges with.
                 yield acme.start_listening()
 
-                # We want to reprovision if is_valid_cert is None (meaning no
+                # We want to reprovision if cert_days_remaining is None (meaning no
                 # certificate exists), or the days remaining number it returns
                 # is less than our re-registration threshold.
                 if (cert_days_remaining is None) or (
