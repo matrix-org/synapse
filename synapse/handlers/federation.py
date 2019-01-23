@@ -34,6 +34,7 @@ from synapse.api.constants import (
     EventTypes,
     Membership,
     RejectedReason,
+    RoomVersions,
 )
 from synapse.api.errors import (
     AuthError,
@@ -342,6 +343,8 @@ class FederationHandler(BaseHandler):
                             room_id, event_id, p,
                         )
 
+                        room_version = yield self.store.get_room_version(room_id)
+
                         with logcontext.nested_logging_context(p):
                             # note that if any of the missing prevs share missing state or
                             # auth events, the requests to fetch those events are deduped
@@ -355,7 +358,7 @@ class FederationHandler(BaseHandler):
                             # we want the state *after* p; get_state_for_room returns the
                             # state *before* p.
                             remote_event = yield self.federation_client.get_pdu(
-                                [origin], p, outlier=True,
+                                [origin], p, room_version, outlier=True,
                             )
 
                             if remote_event is None:
@@ -379,7 +382,6 @@ class FederationHandler(BaseHandler):
                             for x in remote_state:
                                 event_map[x.event_id] = x
 
-                    room_version = yield self.store.get_room_version(room_id)
                     state_map = yield resolve_events_with_store(
                         room_version, state_maps, event_map,
                         state_res_store=StateResolutionStore(self.store),
@@ -655,6 +657,8 @@ class FederationHandler(BaseHandler):
         if dest == self.server_name:
             raise SynapseError(400, "Can't backfill from self.")
 
+        room_version = yield self.store.get_room_version(room_id)
+
         events = yield self.federation_client.backfill(
             dest,
             room_id,
@@ -748,6 +752,7 @@ class FederationHandler(BaseHandler):
                             self.federation_client.get_pdu,
                             [dest],
                             event_id,
+                            room_version=room_version,
                             outlier=True,
                             timeout=10000,
                         )
@@ -1659,6 +1664,8 @@ class FederationHandler(BaseHandler):
                 create_event = e
                 break
 
+        room_version = create_event.content.get("room_version", RoomVersions.V1)
+
         missing_auth_events = set()
         for e in itertools.chain(auth_events, state, [event]):
             for e_id in e.auth_event_ids():
@@ -1669,6 +1676,7 @@ class FederationHandler(BaseHandler):
             m_ev = yield self.federation_client.get_pdu(
                 [origin],
                 e_id,
+                room_version=room_version,
                 outlier=True,
                 timeout=10000,
             )
