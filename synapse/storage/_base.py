@@ -681,8 +681,7 @@ class SQLBaseStore(object):
 
         sql = (
             "INSERT INTO %s (%s) VALUES (%s) "
-            "ON CONFLICT (%s) DO UPDATE SET %s "
-            "RETURNING (xmax = 0) AS inserted"
+            "ON CONFLICT (%s) DO UPDATE SET %s"
         ) % (
             table,
             ", ".join(k for k in allvalues),
@@ -691,10 +690,6 @@ class SQLBaseStore(object):
             ", ".join(k + "=EXCLUDED." + k for k in values),
         )
         txn.execute(sql, list(allvalues.values()))
-
-        # One-tuple, which is a boolean for insertion or not
-        res = txn.fetchone()
-        return res[0]
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False, desc="_simple_select_one"):

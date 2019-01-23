@@ -15,6 +15,7 @@
 
 import struct
 import threading
+from sqlite3 import sqlite_version_info
 
 from synapse.storage.prepare_database import prepare_database
 
@@ -36,14 +37,7 @@ class Sqlite3Engine(object):
         Do we support native UPSERTs? This requires SQLite3 3.24+, plus some
         more work we haven't done yet to tell what was inserted vs updated.
         """
-        # SQLite currently doesn't have a way of telling if an UPSERT ended up
-        # with an INSERT or an UPDATE
-        # To enable, uncomment:
-        #
-        # from sqlite3 import sqlite_version_info
-        # return sqlite_version_info >= (3, 24, 0)
-
-        return False
+        return sqlite_version_info >= (3, 24, 0)
 
     def check_database(self, txn):
         pass
