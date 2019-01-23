@@ -41,8 +41,12 @@ class _EventInternalMetadata(object):
     def is_outlier(self):
         return getattr(self, "outlier", False)
 
-    def is_invite_from_remote(self):
-        return getattr(self, "invite_from_remote", False)
+    def is_new_remote_event(self):
+        """Whether this is a new remote event, like an invite or an invite
+        rejection. This is needed as those events are marked as outliers, but
+        they still need to be processed.
+        """
+        return getattr(self, "new_remote_event", False)
 
     def get_send_on_behalf_of(self):
         """Whether this server should send the event on behalf of another server.

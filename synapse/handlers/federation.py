@@ -43,6 +43,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.crypto.event_signing import compute_event_signature
 from synapse.events.validator import EventValidator
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
@@ -1283,7 +1284,15 @@ class FederationHandler(BaseHandler):
             )
 
         event.internal_metadata.outlier = True
-        event.internal_metadata.invite_from_remote = True
+        event.internal_metadata.new_remote_event = True
+
+        event.signatures.update(
+            compute_event_signature(
+                event,
+                self.hs.hostname,
+                self.hs.config.signing_key[0]
+            )
+        )
 
         context = yield self.state_handler.compute_event_context(event)
         yield self.persist_events_and_notify([(event, context)])
@@ -1301,6 +1310,7 @@ class FederationHandler(BaseHandler):
         # Mark as outlier as we don't have any state for this event; we're not
         # even in the room.
         event.internal_metadata.outlier = True
+        event.internal_metadata.new_remote_event = True
 
         # Try the host that we succesfully called /make_leave/ on first for
         # the /send_leave/ request.
