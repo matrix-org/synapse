@@ -92,7 +92,10 @@ class FederationReaderServer(HomeServer):
                     # is not specified since federation resource includes openid
                     # resource.
                     resources.update({
-                        FEDERATION_PREFIX: TransportLayerServer(self, servlet_groups=["openid"]),
+                        FEDERATION_PREFIX: TransportLayerServer(
+                            self,
+                            servlet_groups=["openid"],
+                        ),
                     })
 
         root_resource = create_resource_tree(resources, NoResource())

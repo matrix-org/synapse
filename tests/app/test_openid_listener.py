@@ -61,7 +61,10 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
                 return
             raise
 
-        request, channel = self.make_request("GET", "/_matrix/federation/v1/openid/userinfo")
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/federation/v1/openid/userinfo",
+        )
         self.render(request)
 
         self.assertEqual(channel.code, 401)
@@ -107,7 +110,10 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
                 return
             raise
 
-        request, channel = self.make_request("GET", "/_matrix/federation/v1/openid/userinfo")
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/federation/v1/openid/userinfo",
+        )
         self.render(request)
 
         self.assertEqual(channel.code, 401)

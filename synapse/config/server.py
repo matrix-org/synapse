@@ -330,7 +330,7 @@ class ServerConfig(Config):
 
               - names: [federation]  # Federation APIs
                 compress: false
-                
+
               # # If federation is disabled synapse can still expose the open ID endpoint
               # # to allow integrations to authenticate users
               # - names: [openid]
