@@ -143,9 +143,12 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
         for dependency in OPTS:
             try:
                 _get_distribution(dependency)
-            except VersionConflict:
+            except VersionConflict as e:
                 deps_needed.append(dependency)
-                errors.append("Needed %s but it was not installed" % (dependency,))
+                errors.append(
+                    "Needed optional %s, got %s==%s"
+                    % (dependency, e.dist.project_name, e.dist.version)
+                )
             except DistributionNotFound:
                 # If it's not found, we don't care
                 pass
