@@ -19,7 +19,6 @@ from six import iteritems
 
 from twisted.internet import defer
 
-from prometheus_client import Gauge
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
@@ -27,9 +26,6 @@ from synapse.types import get_localpart_from_id
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
-
-# Expose event stream processing position
-event_processing_position = Gauge("synapse_user_dir_event_stream_position", "Currently processed up to position in the event stream")
 
 class UserDirectoryHandler(object):
     """Handles querying of and keeping updated the user_directory.
@@ -168,7 +164,8 @@ class UserDirectoryHandler(object):
                 self.pos = deltas[-1]["stream_id"]
 
                 # Expose current event processing position to prometheus
-                event_processing_position.set(self.pos)
+                synapse.metrics.event_processing_positions.labels(
+                    "user_dir").set(self.pos)
 
                 yield self.store.update_user_directory_stream_pos(self.pos)
 
