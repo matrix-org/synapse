@@ -29,7 +29,7 @@ from synapse.util.metrics import Measure
 logger = logging.getLogger(__name__)
 
 # Expose event stream processing position
-event_processing_position = Gauge("event_stream_processing_position", "Currently processed up to position in the event stream")
+event_processing_position = Gauge("synapse_user_dir_event_stream_position", "Currently processed up to position in the event stream")
 
 class UserDirectoryHandler(object):
     """Handles querying of and keeping updated the user_directory.
