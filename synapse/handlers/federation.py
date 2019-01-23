@@ -1336,7 +1336,7 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _make_and_verify_event(self, target_hosts, room_id, user_id, membership,
                                content={}, params=None):
-        origin, pdu = yield self.federation_client.make_membership_event(
+        origin, pdu, _ = yield self.federation_client.make_membership_event(
             target_hosts,
             room_id,
             user_id,

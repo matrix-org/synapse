@@ -25,14 +25,19 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
+from synapse.api.constants import (
+    KNOWN_ROOM_VERSIONS,
+    EventTypes,
+    Membership,
+    RoomVersions,
+)
 from synapse.api.errors import (
     CodeMessageException,
     FederationDeniedError,
     HttpResponseException,
     SynapseError,
 )
-from synapse.events import builder
+from synapse.events import builder, room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -536,8 +541,9 @@ class FederationClient(FederationBase):
             params (dict[str, str|Iterable[str]]): Query parameters to include in the
                 request.
         Return:
-            Deferred: resolves to a tuple of (origin (str), event (object))
-            where origin is the remote homeserver which generated the event.
+            Deferred[tuple[str, dict, int]]: resolves to a tuple of
+            `(origin, event, event_format)` where origin is the remote
+            homeserver which generated the event.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
@@ -557,6 +563,11 @@ class FederationClient(FederationBase):
                 destination, room_id, user_id, membership, params,
             )
 
+            # Note: If not supplied, the room version may be either v1 or v2,
+            # however either way the event format version will be v1.
+            room_version = ret.get("room_version", RoomVersions.V1)
+            event_format = room_version_to_event_format(room_version)
+
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
                 raise InvalidResponseError("Bad 'event' field in response")
@@ -574,7 +585,7 @@ class FederationClient(FederationBase):
             ev = builder.EventBuilder(pdu_dict)
 
             defer.returnValue(
-                (destination, ev)
+                (destination, ev, event_format)
             )
 
         return self._try_destination_list(
