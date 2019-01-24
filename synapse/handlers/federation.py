@@ -1664,6 +1664,11 @@ class FederationHandler(BaseHandler):
                 create_event = e
                 break
 
+        if create_event is None:
+            # If the state doesn't have a create event then the room is
+            # invalid, and it would fail auth checks anyway.
+            raise SynapseError(400, "No create event in state")
+
         room_version = create_event.content.get("room_version", RoomVersions.V1)
 
         missing_auth_events = set()

@@ -674,7 +674,8 @@ class FederationClient(FederationBase):
                     break
 
             if room_version is None:
-                # We use this error has that is what
+                # If the state doesn't have a create event then the room is
+                # invalid, and it would fail auth checks anyway.
                 raise SynapseError(400, "No create event in state")
 
             valid_pdus = yield self._check_sigs_and_hash_and_fetch(
