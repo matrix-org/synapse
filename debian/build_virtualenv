@@ -6,7 +6,16 @@
 set -e
 
 export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
-SNAKE=/usr/bin/python3
+
+# make sure that the virtualenv links to the specific version of python, by
+# dereferencing the python3 symlink.
+#
+# Otherwise, if somebody tries to install (say) the stretch package on buster,
+# they will get a confusing error about "No module named 'synapse'", because
+# python won't look in the right directory. At least this way, the error will
+# be a *bit* more obvious.
+#
+SNAKE=`readlink -e /usr/bin/python3`
 
 # try to set the CFLAGS so any compiled C extensions are compiled with the most
 # generic as possible x64 instructions, so that compiling it on a new Intel chip
@@ -46,3 +55,7 @@ cp -r tests "$tmpdir"
 PYTHONPATH="$tmpdir" \
     debian/matrix-synapse-py3/opt/venvs/matrix-synapse/bin/python \
         -B -m twisted.trial --reporter=text -j2 tests
+
+# add a dependency on the right version of python to substvars.
+PYPKG=`basename $SNAKE`
+echo "synapse:pydepends=$PYPKG" >> debian/matrix-synapse-py3.substvars

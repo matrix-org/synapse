@@ -40,7 +40,11 @@ REQUIREMENTS = [
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
     "service_identity>=16.0.0",
-    "Twisted>=17.1.0",
+
+    # our logcontext handling relies on the ability to cancel inlineCallbacks
+    # (https://twistedmatrix.com/trac/ticket/4632) which landed in Twisted 18.7.
+    "Twisted>=18.7.0",
+
     "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",
@@ -52,15 +56,18 @@ REQUIREMENTS = [
     "pillow>=3.1.2",
     "sortedcontainers>=1.4.4",
     "psutil>=2.0.0",
-    "pymacaroons-pynacl>=0.9.3",
-    "msgpack-python>=0.4.2",
+    "pymacaroons>=0.13.0",
+    "msgpack>=0.5.0",
     "phonenumbers>=8.2.0",
     "six>=1.10",
     # prometheus_client 0.4.0 changed the format of counter metrics
     # (cf https://github.com/matrix-org/synapse/issues/4001)
     "prometheus_client>=0.0.18,<0.4.0",
+
     # we use attr.s(slots), which arrived in 16.0.0
-    "attrs>=16.0.0",
+    # Twisted 18.7.0 requires attrs>=17.4.0
+    "attrs>=17.4.0",
+
     "netaddr>=0.7.18",
 ]
 
@@ -71,6 +78,10 @@ CONDITIONAL_REQUIREMENTS = {
 
     # ConsentResource uses select_autoescape, which arrived in jinja 2.9
     "resources.consent": ["Jinja2>=2.9"],
+
+    # ACME support is required to provision TLS certificates from authorities
+    # that use the protocol, such as Let's Encrypt.
+    "acme": ["txacme>=0.9.2"],
 
     "saml2": ["pysaml2>=4.5.0"],
     "url_preview": ["lxml>=3.5.0"],

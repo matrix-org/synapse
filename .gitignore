@@ -25,9 +25,9 @@ homeserver*.pid
 *.tls.dh
 *.tls.key
 
-.coverage
-.coverage.*
-!.coverage.rc
+.coverage*
+coverage.*
+!.coveragerc
 htmlcov
 
 demo/*/*.db

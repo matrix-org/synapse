@@ -1,4 +1,5 @@
 import json
+import logging
 from io import BytesIO
 
 from six import text_type
@@ -21,6 +22,8 @@ from synapse.http.site import SynapseRequest
 from synapse.util import Clock
 
 from tests.utils import setup_test_homeserver as _sth
+
+logger = logging.getLogger(__name__)
 
 
 class TimedOutException(Exception):
@@ -339,7 +342,7 @@ def get_clock():
     return (clock, hs_clock)
 
 
-@attr.s
+@attr.s(cmp=False)
 class FakeTransport(object):
     """
     A twisted.internet.interfaces.ITransport implementation which sends all its data
@@ -414,6 +417,11 @@ class FakeTransport(object):
         self.buffer = self.buffer + byt
 
         def _write():
+            if not self.buffer:
+                # nothing to do. Don't write empty buffers: it upsets the
+                # TLSMemoryBIOProtocol
+                return
+
             if getattr(self.other, "transport") is not None:
                 self.other.dataReceived(self.buffer)
                 self.buffer = b""
@@ -421,7 +429,10 @@ class FakeTransport(object):
 
             self._reactor.callLater(0.0, _write)
 
-        _write()
+        # always actually do the write asynchronously. Some protocols (notably the
+        # TLSMemoryBIOProtocol) get very confused if a read comes back while they are
+        # still doing a write. Doing a callLater here breaks the cycle.
+        self._reactor.callLater(0.0, _write)
 
     def writeSequence(self, seq):
         for x in seq:

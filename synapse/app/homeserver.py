@@ -13,10 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import logging
 import os
 import sys
+import traceback
 
 from six import iteritems
 
@@ -324,17 +326,12 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
-
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
 
     hs = SynapseHomeServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
-        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
@@ -361,12 +358,53 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
-    hs.start_listening()
 
+    @defer.inlineCallbacks
     def start():
-        hs.get_pusherpool().start()
-        hs.get_datastore().start_profiling()
-        hs.get_datastore().start_doing_background_updates()
+        try:
+            # Check if the certificate is still valid.
+            cert_days_remaining = hs.config.is_disk_cert_valid()
+
+            if hs.config.acme_enabled:
+                # If ACME is enabled, we might need to provision a certificate
+                # before starting.
+                acme = hs.get_acme_handler()
+
+                # Start up the webservices which we will respond to ACME
+                # challenges with.
+                yield acme.start_listening()
+
+                # We want to reprovision if cert_days_remaining is None (meaning no
+                # certificate exists), or the days remaining number it returns
+                # is less than our re-registration threshold.
+                if (cert_days_remaining is None) or (
+                    not cert_days_remaining > hs.config.acme_reprovision_threshold
+                ):
+                    yield acme.provision_certificate()
+
+            # Read the certificate from disk and build the context factories for
+            # TLS.
+            hs.config.read_certificate_from_disk()
+            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+                config
+            )
+
+            # It is now safe to start your Synapse.
+            hs.start_listening()
+            hs.get_pusherpool().start()
+            hs.get_datastore().start_profiling()
+            hs.get_datastore().start_doing_background_updates()
+        except Exception as e:
+            # If a DeferredList failed (like in listening on the ACME listener),
+            # we need to print the subfailure explicitly.
+            if isinstance(e, defer.FirstError):
+                e.subFailure.printTraceback(sys.stderr)
+                sys.exit(1)
+
+            # Something else went wrong when starting. Print it and bail out.
+            traceback.print_exc(file=sys.stderr)
+            sys.exit(1)
 
     reactor.callWhenRunning(start)
 

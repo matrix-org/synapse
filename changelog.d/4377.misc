@@ -1,0 +1,1 @@
+Silence travis-ci build warnings by removing non-functional python3.6

@@ -20,6 +20,7 @@ from six import iteritems
 
 from twisted.internet import defer
 
+import synapse.metrics
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo

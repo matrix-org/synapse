@@ -367,7 +367,7 @@ class Config(object):
         if not keys_directory:
             keys_directory = os.path.dirname(config_files[-1])
 
-        config_dir_path = os.path.abspath(keys_directory)
+        self.config_dir_path = os.path.abspath(keys_directory)
 
         specified_config = {}
         for config_file in config_files:
@@ -379,7 +379,7 @@ class Config(object):
 
         server_name = specified_config["server_name"]
         config_string = self.generate_config(
-            config_dir_path=config_dir_path,
+            config_dir_path=self.config_dir_path,
             data_dir_path=os.getcwd(),
             server_name=server_name,
             generate_secrets=False,

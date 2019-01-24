@@ -19,16 +19,16 @@ Homepage: https://github.com/matrix-org/synapse
 Package: matrix-synapse-py3
 Architecture: amd64
 Provides: matrix-synapse
-Breaks:
- matrix-synapse (<< 0.34.0-0matrix2),
- matrix-synapse (>= 0.34.0-1),
+Conflicts:
+ matrix-synapse (<< 0.34.0.1-0matrix2),
+ matrix-synapse (>= 0.34.0.1-1),
 Pre-Depends: dpkg (>= 1.16.1)
 Depends:
  adduser,
  debconf,
  python3-distutils|libpython3-stdlib (<< 3.6),
- python3,
  ${misc:Depends},
+ ${synapse:pydepends},
 # some of our scripts use perl, but none of them are important,
 # so we put perl:Depends in Suggests rather than Depends.
 Suggests:

@@ -1,11 +1,7 @@
 [run]
 branch = True
 parallel = True
-source = synapse
-
-[paths]
-source=
-   coverage
+include = synapse/*
 
 [report]
 precision = 2
