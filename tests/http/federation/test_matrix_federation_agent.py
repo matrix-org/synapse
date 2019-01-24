@@ -174,7 +174,9 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_called_once()
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.1.2.3.4",
+        )
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
@@ -212,7 +214,9 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_called_once()
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv",
+        )
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
@@ -251,7 +255,9 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_called_once()
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv",
+        )
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
