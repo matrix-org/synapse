@@ -256,7 +256,11 @@ class ServerConfig(Config):
         #
         # web_client_location: "/path/to/web/root"
 
-        # The public-facing base URL for the client API (not including _matrix/...)
+        # The public-facing base URL that clients use to access this HS
+        # (not including _matrix/...). This is the same URL a user would
+        # enter into the 'custom HS URL' field on their client. If you
+        # use synapse with a reverse proxy, this should be the URL to reach
+        # synapse via the proxy.
         # public_baseurl: https://example.com:8448/
 
         # Set the soft limit on the number of file descriptors synapse can use
