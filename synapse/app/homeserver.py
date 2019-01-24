@@ -260,14 +260,14 @@ class SynapseHomeServer(HomeServer):
             Deferred
         """
         waiting_on = []
-        print(self._listening_services)
+        logging.info(self._listening_services)
 
         for i in self._listening_services:
             d = i.stopListening()
             if isinstance(d, defer.Deferred):
                 waiting_on.append(d)
 
-        print(waiting_on)
+        logging.info(repr(waiting_on))
 
         self._listening_services = []
 
