@@ -415,7 +415,7 @@ def setup(config_options):
 
     hs.setup()
 
-    def refresh_certificate(*args, **kwargs):
+    def refresh_certificate():
 
         logging.info("Stopping web listeners...")
         d = hs._stop_listening_web()
@@ -437,7 +437,7 @@ def setup(config_options):
 
         d.addCallback(after)
 
-    sighup_callbacks.append(refresh_certificate)
+    sighup_callbacks.append(lambda *a, **b: reactor.callLater(0.0, refresh_certificate))
 
     @defer.inlineCallbacks
     def start():
