@@ -52,7 +52,7 @@ class SearchHandler(BaseHandler):
             room_id (str): id of the room to search through.
 
         Returns:
-            Deferred[iterable[str]]: predecessor room ids
+            Deferred[iterable[unicode]]: predecessor room ids
         """
 
         historical_room_ids = []
