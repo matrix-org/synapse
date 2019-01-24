@@ -32,7 +32,7 @@ from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import Agent, FileBodyProducer, HTTPConnectionPool
+from twisted.web.client import FileBodyProducer
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
@@ -44,7 +44,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.http.endpoint import matrix_federation_endpoint
+from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
@@ -64,20 +64,6 @@ if PY3:
     MAXINT = sys.maxsize
 else:
     MAXINT = sys.maxint
-
-
-class MatrixFederationEndpointFactory(object):
-    def __init__(self, hs):
-        self.reactor = hs.get_reactor()
-        self.tls_client_options_factory = hs.tls_client_options_factory
-
-    def endpointForURI(self, uri):
-        destination = uri.netloc.decode('ascii')
-
-        return matrix_federation_endpoint(
-            self.reactor, destination, timeout=10,
-            tls_client_options_factory=self.tls_client_options_factory
-        )
 
 
 _next_id = 1
@@ -187,12 +173,10 @@ class MatrixFederationHttpClient(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         reactor = hs.get_reactor()
-        pool = HTTPConnectionPool(reactor)
-        pool.retryAutomatically = False
-        pool.maxPersistentPerHost = 5
-        pool.cachedConnectionTimeout = 2 * 60
-        self.agent = Agent.usingEndpointFactory(
-            reactor, MatrixFederationEndpointFactory(hs), pool=pool
+
+        self.agent = MatrixFederationAgent(
+            hs.get_reactor(),
+            hs.tls_client_options_factory,
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
@@ -316,9 +300,9 @@ class MatrixFederationHttpClient(object):
                     headers_dict[b"Authorization"] = auth_headers
 
                     logger.info(
-                        "{%s} [%s] Sending request: %s %s",
+                        "{%s} [%s] Sending request: %s %s; timeout %fs",
                         request.txn_id, request.destination, request.method,
-                        url_str,
+                        url_str, _sec_timeout,
                     )
 
                     try:
@@ -338,12 +322,11 @@ class MatrixFederationHttpClient(object):
                                 reactor=self.hs.get_reactor(),
                             )
 
-                            response = yield make_deferred_yieldable(
-                                request_deferred,
-                            )
+                            response = yield request_deferred
                     except DNSLookupError as e:
                         raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
                     except Exception as e:
+                        logger.info("Failed to send request: %s", e)
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     logger.info(
