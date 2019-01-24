@@ -26,10 +26,10 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.stringutils import exception_to_unicode
 
 logger = logging.getLogger(__name__)
