@@ -123,7 +123,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            r = listen_ssl(
+            listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -240,10 +240,7 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def _listen_web(self):
-        """
-        Listen with all the HTTP services.
-        """
+    def start_listening(self):
         config = self.get_config()
 
         for listener in config.listeners:
@@ -251,38 +248,6 @@ class SynapseHomeServer(HomeServer):
                 self._listening_services.extend(
                     self._listener_http(config, listener)
                 )
-
-    def _stop_listening_web(self):
-        """
-        Stop listening on all the web services.
-
-        Returns:
-            Deferred
-        """
-        waiting_on = []
-        logging.info(self._listening_services)
-
-        for i in self._listening_services:
-            d = i.stopListening()
-            if isinstance(d, defer.Deferred):
-                waiting_on.append(d)
-
-        logging.info(repr(waiting_on))
-
-        self._listening_services = []
-
-        if waiting_on:
-            return defer.DeferredList(waiting_on)
-        else:
-            return defer.succeed(True)
-
-    def start_listening(self):
-        config = self.get_config()
-
-        for listener in config.listeners:
-            if listener["type"] == "http":
-                # Not handled here
-                pass
             elif listener["type"] == "manhole":
                 listen_tcp(
                     listener["bind_addresses"],
@@ -312,9 +277,6 @@ class SynapseHomeServer(HomeServer):
                                          listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
-
-        # Listen on the web ports differently.
-        self._listen_web()
 
     def run_startup_checks(self, db_conn, database_engine):
         all_users_native = are_all_users_on_domain(
@@ -415,29 +377,22 @@ def setup(config_options):
 
     hs.setup()
 
-    def refresh_certificate():
+    def refresh_certificate(*args):
 
-        logging.info("Stopping web listeners...")
-        d = hs._stop_listening_web()
+        logging.info("Reloading certificate from disk")
+        hs.config.read_certificate_from_disk()
+        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            config
+        )
+        logging.info("Certificate reloaded.")
 
-        def after(_):
-            logging.info("Web listeners stopped.")
+        logging.info("Updating context factories...")
+        for i in hs._listening_services:
+            i.ctxFactory = hs.tls_server_context_factory
+        logging.info("Context factories updated..")
 
-            logging.info("Reloading certificate from disk")
-            hs.config.read_certificate_from_disk()
-            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-                config
-            )
-            logging.info("Certificate reloaded.")
-
-            logging.info("Restarting web listeners...")
-            hs._listen_web()
-            logging.info("Web listeners started.")
-
-        d.addCallback(after)
-
-    sighup_callbacks.append(lambda *a, **b: reactor.callLater(0.0, refresh_certificate))
+    sighup_callbacks.append(refresh_certificate)
 
     @defer.inlineCallbacks
     def start():
