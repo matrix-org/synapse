@@ -26,6 +26,8 @@ from six import iteritems
 import psutil
 from prometheus_client import Gauge
 
+
+from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.web.resource import EncodingResourceWrapper, NoResource
@@ -388,8 +390,14 @@ def setup(config_options):
 
         logging.info("Updating context factories...")
         for i in hs._listening_services:
-            i.ctxFactory = hs.tls_server_context_factory
-        logging.info("Context factories updated..")
+            if isinstance(i.factory, TLSMemoryBIOFactory):
+                old = i.factory
+                i.factory = TLSMemoryBIOFactory(
+                    hs.tls_server_context_factory,
+                    False,
+                    i.factory.wrappedFactory
+                )
+        logging.info("Context factories updated.")
 
     sighup_callbacks.append(refresh_certificate)
 
