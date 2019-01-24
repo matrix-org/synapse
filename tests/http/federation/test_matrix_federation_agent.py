@@ -26,6 +26,7 @@ from twisted.web.http import HTTPChannel
 
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.http.federation.srv_resolver import Server
 from synapse.util.logcontext import LoggingContext
 
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
@@ -105,7 +106,7 @@ class MatrixFederationAgentTests(TestCase):
 
     def test_get(self):
         """
-        happy-path test of a GET request
+        happy-path test of a GET request with an explicit port
         """
         self.reactor.lookups["testserv"] = "1.2.3.4"
         test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
@@ -130,10 +131,6 @@ class MatrixFederationAgentTests(TestCase):
         request = http_server.requests[0]
         self.assertEqual(request.method, b'GET')
         self.assertEqual(request.path, b'/foo/bar')
-        self.assertEqual(
-            request.requestHeaders.getRawHeaders(b'host'),
-            [b'testserv:8448']
-        )
         content = request.content.read()
         self.assertEqual(content, b'')
 
@@ -177,7 +174,9 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_called_once()
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.1.2.3.4",
+        )
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
@@ -196,11 +195,87 @@ class MatrixFederationAgentTests(TestCase):
         request = http_server.requests[0]
         self.assertEqual(request.method, b'GET')
         self.assertEqual(request.path, b'/foo/bar')
-        # XXX currently broken
-        # self.assertEqual(
-        #     request.requestHeaders.getRawHeaders(b'host'),
-        #     [b'1.2.3.4:8448']
-        # )
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
+    def test_get_hostname_no_srv(self):
+        """
+        Test the behaviour when the server name has no port, and no SRV record
+        """
+
+        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+
+        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv",
+        )
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 8448)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(
+            client_factory,
+            expected_sni=b'testserv',
+        )
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b'GET')
+        self.assertEqual(request.path, b'/foo/bar')
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
+    def test_get_hostname_srv(self):
+        """
+        Test the behaviour when there is a single SRV record
+        """
+        self.mock_resolver.resolve_service.side_effect = lambda _: [
+            Server(host="srvtarget", port=8443)
+        ]
+        self.reactor.lookups["srvtarget"] = "1.2.3.4"
+
+        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv",
+        )
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 8443)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(
+            client_factory,
+            expected_sni=b'testserv',
+        )
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b'GET')
+        self.assertEqual(request.path, b'/foo/bar')
 
         # finish the request
         request.finish()
