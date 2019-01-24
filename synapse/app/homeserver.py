@@ -123,7 +123,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            listen_ssl(
+            r = listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -335,7 +335,6 @@ def setup(config_options):
     )
 
     def handle_sighup(*args, **kwargs):
-        print(sighup_callbacks)
         for i in sighup_callbacks:
             i(*args, **kwargs)
 
