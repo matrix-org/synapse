@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from datetime import datetime, timedelta
 
 from six import PY3, iteritems
 from six.moves import range
@@ -31,7 +32,6 @@ from synapse.util.caches.descriptors import cachedInlineCallbacks
 from synapse.util.caches.response_cache import ResponseCache
 
 from ._base import BaseHandler
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
