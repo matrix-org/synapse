@@ -458,9 +458,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         # Retrieve the room's create event
         create_event = yield self.get_event(create_id)
 
-        if not create_event:
-            defer.returnValue(None)
-
         # Return predecessor if present
         defer.returnValue(create_event.content.get("predecessor", None))
 
