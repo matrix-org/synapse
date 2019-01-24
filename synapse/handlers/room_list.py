@@ -80,7 +80,8 @@ class RoomListHandler(BaseHandler):
             # solution at some point
             timeout = datetime.now() + timedelta(seconds=60)
             return self._get_public_room_list(
-                limit, since_token, search_filter, network_tuple=network_tuple, timeout=timeout,
+                limit, since_token, search_filter,
+                network_tuple=network_tuple, timeout=timeout,
             )
 
         key = (limit, since_token, network_tuple)
