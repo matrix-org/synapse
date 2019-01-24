@@ -1079,8 +1079,6 @@ class FederationHandler(BaseHandler):
         handled_events = set()
 
         try:
-            event.internal_metadata.outlier = False
-
             # Try the host we successfully got a response to /make_join/
             # request first.
             try:
