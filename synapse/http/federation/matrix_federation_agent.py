@@ -101,7 +101,8 @@ class MatrixFederationAgent(object):
         if port is not None:
             target = (host, port)
         else:
-            server_list = yield self._srv_resolver.resolve_service(server_name_bytes)
+            service_name = b"_matrix._tcp.%s" % (server_name_bytes, )
+            server_list = yield self._srv_resolver.resolve_service(service_name)
             if not server_list:
                 target = (host, 8448)
                 logger.debug("No SRV record for %s, using %s", host, target)
