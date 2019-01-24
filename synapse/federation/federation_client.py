@@ -32,7 +32,7 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
-from synapse.events import builder
+from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -65,6 +65,8 @@ class FederationClient(FederationBase):
         )
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
+
+        self.event_builder_factory = hs.get_event_builder_factory()
 
         self._get_pdu_cache = ExpiringCache(
             cache_name="get_pdu_cache",
@@ -522,6 +524,8 @@ class FederationClient(FederationBase):
         Does so by asking one of the already participating servers to create an
         event with proper context.
 
+        Returns a fully signed and hashed event.
+
         Note that this does not append any events to any graphs.
 
         Args:
@@ -536,8 +540,9 @@ class FederationClient(FederationBase):
             params (dict[str, str|Iterable[str]]): Query parameters to include in the
                 request.
         Return:
-            Deferred: resolves to a tuple of (origin (str), event (object))
-            where origin is the remote homeserver which generated the event.
+            Deferred[tuple[str, FrozenEvent]]: resolves to a tuple of `origin`
+            and event where origin is the remote homeserver which generated
+            the event.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
@@ -571,7 +576,18 @@ class FederationClient(FederationBase):
             if "prev_state" not in pdu_dict:
                 pdu_dict["prev_state"] = []
 
-            ev = builder.EventBuilder(pdu_dict)
+            # Strip off the fields that we want to clobber.
+            pdu_dict.pop("origin", None)
+            pdu_dict.pop("origin_server_ts", None)
+            pdu_dict.pop("unsigned", None)
+
+            builder = self.event_builder_factory.new(pdu_dict)
+            add_hashes_and_signatures(
+                builder,
+                self.hs.hostname,
+                self.hs.config.signing_key[0]
+            )
+            ev = builder.build()
 
             defer.returnValue(
                 (destination, ev)
