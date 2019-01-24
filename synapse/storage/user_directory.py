@@ -185,7 +185,10 @@ class UserDirectoryStore(SQLBaseStore):
                         )
                     )
                 else:
-                    if new_entry:
+                    # TODO: Remove this code after we've bumped the minimum version
+                    # of postgres to always support upserts, so we can get rid of
+                    # `new_entry` usage
+                    if new_entry is True:
                         sql = """
                             INSERT INTO user_directory_search(user_id, vector)
                             VALUES (?,
@@ -201,7 +204,7 @@ class UserDirectoryStore(SQLBaseStore):
                                 get_domain_from_id(user_id), display_name,
                             )
                         )
-                    else:
+                    elif new_entry is False:
                         sql = """
                             UPDATE user_directory_search
                             SET vector = setweight(to_tsvector('english', ?), 'A')
@@ -216,6 +219,10 @@ class UserDirectoryStore(SQLBaseStore):
                                 get_domain_from_id(user_id),
                                 display_name, user_id,
                             )
+                        )
+                    else:
+                        raise RuntimeError(
+                            "upsert returned None when 'can_native_upsert' is False"
                         )
             elif isinstance(self.database_engine, Sqlite3Engine):
                 value = "%s %s" % (user_id, display_name,) if display_name else user_id

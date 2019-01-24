@@ -536,8 +536,7 @@ class SQLBaseStore(object):
         values,
         insertion_values={},
         desc="_simple_upsert",
-        lock=True,
-        best_effort=False,
+        lock=True
     ):
         """
 
@@ -558,10 +557,10 @@ class SQLBaseStore(object):
             insertion_values (dict): additional key/values to use only when
                 inserting
             lock (bool): True to lock the table when doing the upsert.
-            best_effort (bool): If we run into a transaction error, do we stop trying?
         Returns:
-            Deferred(bool): True if a new entry was created, False if an
-                existing one was updated.
+            Deferred(None or bool): Native upserts always return None. Emulated
+            upserts return True if a new entry was created, False if an existing
+            one was updated.
         """
         attempts = 0
         while True:
@@ -574,7 +573,6 @@ class SQLBaseStore(object):
                     values,
                     insertion_values,
                     lock=lock,
-                    best_effort=best_effort,
                 )
                 defer.returnValue(result)
             except self.database_engine.module.IntegrityError as e:
@@ -597,11 +595,23 @@ class SQLBaseStore(object):
         values,
         insertion_values={},
         lock=True,
-        best_effort=False,
     ):
         """
         Pick the UPSERT method which works best on the platform. Either the
         native one (Pg9.5+, recent SQLites), or fall back to an emulated method.
+
+        Args:
+            txn: The transaction to use.
+            table (str): The table to upsert into
+            keyvalues (dict): The unique key tables and their new values
+            values (dict): The nonunique columns and their new values
+            insertion_values (dict): additional key/values to use only when
+                inserting
+            lock (bool): True to lock the table when doing the upsert.
+        Returns:
+            Deferred(None or bool): Native upserts always return None. Emulated
+            upserts return True if a new entry was created, False if an existing
+            one was updated.
         """
         if (
             self.database_engine.can_native_upsert
@@ -613,7 +623,6 @@ class SQLBaseStore(object):
                 keyvalues,
                 values,
                 insertion_values=insertion_values,
-                best_effort=best_effort,
             )
         else:
             return self._simple_upsert_txn_emulated(
@@ -669,10 +678,19 @@ class SQLBaseStore(object):
         return True
 
     def _simple_upsert_txn_native_upsert(
-        self, txn, table, keyvalues, values, insertion_values={}, best_effort=False
+        self, txn, table, keyvalues, values, insertion_values={}
     ):
         """
         Use the native UPSERT functionality in recent PostgreSQL versions.
+
+        Args:
+            table (str): The table to upsert into
+            keyvalues (dict): The unique key tables and their new values
+            values (dict): The nonunique columns and their new values
+            insertion_values (dict): additional key/values to use only when
+                inserting
+        Returns:
+            None
         """
         allvalues = {}
         allvalues.update(keyvalues)
