@@ -524,6 +524,8 @@ class FederationClient(FederationBase):
         Does so by asking one of the already participating servers to create an
         event with proper context.
 
+        Returns a fully signed and hashed event.
+
         Note that this does not append any events to any graphs.
 
         Args:
@@ -538,8 +540,9 @@ class FederationClient(FederationBase):
             params (dict[str, str|Iterable[str]]): Query parameters to include in the
                 request.
         Return:
-            Deferred: resolves to a tuple of (origin (str), event (object))
-            where origin is the remote homeserver which generated the event.
+            Deferred[tuple[str, FrozenEvent]]: resolves to a tuple of `origin`
+            and event where origin is the remote homeserver which generated
+            the event.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
