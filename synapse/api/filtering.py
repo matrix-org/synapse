@@ -448,7 +448,7 @@ class Filter(object):
         """Returns a new filter with the given room IDs appended.
 
         Args:
-            room_ids (list): A list of room_ids.
+            room_ids (iterable[unicode]): The room_ids to add
 
         Returns:
             filter: A new filter including the given rooms and the old
