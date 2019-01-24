@@ -18,6 +18,7 @@ from distutils.util import strtobool
 
 import six
 
+from synapse.api.constants import EventFormatVersions
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -179,6 +180,8 @@ class EventBase(object):
 
 
 class FrozenEvent(EventBase):
+    format_version = EventFormatVersions.V1  # All events of this type are V1
+
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
         event_dict = dict(event_dict)
 
