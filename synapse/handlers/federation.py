@@ -1284,7 +1284,7 @@ class FederationHandler(BaseHandler):
             )
 
         event.internal_metadata.outlier = True
-        event.internal_metadata.new_remote_event = True
+        event.internal_metadata.out_of_band_membership = True
 
         event.signatures.update(
             compute_event_signature(
@@ -1310,7 +1310,7 @@ class FederationHandler(BaseHandler):
         # Mark as outlier as we don't have any state for this event; we're not
         # even in the room.
         event.internal_metadata.outlier = True
-        event.internal_metadata.new_remote_event = True
+        event.internal_metadata.out_of_band_membership = True
 
         # Try the host that we succesfully called /make_leave/ on first for
         # the /send_leave/ request.
