@@ -15,7 +15,6 @@
 
 import logging
 from collections import namedtuple
-from datetime import datetime, timedelta
 
 from six import PY3, iteritems
 from six.moves import range
@@ -78,7 +77,7 @@ class RoomListHandler(BaseHandler):
             # XXX: Quick hack to stop room directory queries taking too long.
             # Timeout request after 60s. Probably want a more fundamental
             # solution at some point
-            timeout = datetime.now() + timedelta(seconds=60)
+            timeout = self.clock.time() + 60
             return self._get_public_room_list(
                 limit, since_token, search_filter,
                 network_tuple=network_tuple, timeout=timeout,
@@ -95,7 +94,7 @@ class RoomListHandler(BaseHandler):
     def _get_public_room_list(self, limit=None, since_token=None,
                               search_filter=None,
                               network_tuple=EMPTY_THIRD_PARTY_ID,
-                              timeout=None,):
+                              timeout=0,):
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -210,7 +209,7 @@ class RoomListHandler(BaseHandler):
 
         chunk = []
         for i in range(0, len(rooms_to_scan), step):
-            if timeout and datetime.now() > timeout:
+            if timeout and self.clock.time() > timeout:
                 raise Exception("Timed out searching room directory")
 
             batch = rooms_to_scan[i:i + step]
