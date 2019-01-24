@@ -154,7 +154,9 @@ def default_config(name):
     config.update_user_directory = False
 
     def is_threepid_reserved(threepid):
-        return ServerConfig.is_threepid_reserved(config, threepid)
+        return ServerConfig.is_threepid_reserved(
+            config.mau_limits_reserved_threepids, threepid
+        )
 
     config.is_threepid_reserved.side_effect = is_threepid_reserved
 
