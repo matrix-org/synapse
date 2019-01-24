@@ -25,7 +25,12 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
+from synapse.api.constants import (
+    KNOWN_ROOM_VERSIONS,
+    EventTypes,
+    Membership,
+    RoomVersions,
+)
 from synapse.api.errors import (
     CodeMessageException,
     FederationDeniedError,
@@ -204,7 +209,8 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
-    def get_pdu(self, destinations, event_id, outlier=False, timeout=None):
+    def get_pdu(self, destinations, event_id, room_version, outlier=False,
+                timeout=None):
         """Requests the PDU with given origin and ID from the remote home
         servers.
 
@@ -214,6 +220,7 @@ class FederationClient(FederationBase):
         Args:
             destinations (list): Which home servers to query
             event_id (str): event to fetch
+            room_version (str): version of the room
             outlier (bool): Indicates whether the PDU is an `outlier`, i.e. if
                 it's from an arbitary point in the context as opposed to part
                 of the current block of PDUs. Defaults to `False`
@@ -354,10 +361,13 @@ class FederationClient(FederationBase):
             ev.event_id for ev in itertools.chain(pdus, auth_chain)
         ])
 
+        room_version = yield self.store.get_room_version(room_id)
+
         signed_pdus = yield self._check_sigs_and_hash_and_fetch(
             destination,
             [p for p in pdus if p.event_id not in seen_events],
-            outlier=True
+            outlier=True,
+            room_version=room_version,
         )
         signed_pdus.extend(
             seen_events[p.event_id] for p in pdus if p.event_id in seen_events
@@ -366,7 +376,8 @@ class FederationClient(FederationBase):
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
             destination,
             [p for p in auth_chain if p.event_id not in seen_events],
-            outlier=True
+            outlier=True,
+            room_version=room_version,
         )
         signed_auth.extend(
             seen_events[p.event_id] for p in auth_chain if p.event_id in seen_events
@@ -413,6 +424,8 @@ class FederationClient(FederationBase):
             random.shuffle(srvs)
             return srvs
 
+        room_version = yield self.store.get_room_version(room_id)
+
         batch_size = 20
         missing_events = list(missing_events)
         for i in range(0, len(missing_events), batch_size):
@@ -423,6 +436,7 @@ class FederationClient(FederationBase):
                     self.get_pdu,
                     destinations=random_server_list(),
                     event_id=e_id,
+                    room_version=room_version,
                 )
                 for e_id in batch
             ]
@@ -452,8 +466,11 @@ class FederationClient(FederationBase):
             for p in res["auth_chain"]
         ]
 
+        room_version = yield self.store.get_room_version(room_id)
+
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True
+            destination, auth_chain,
+            outlier=True, room_version=room_version,
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -666,9 +683,21 @@ class FederationClient(FederationBase):
                 for p in itertools.chain(state, auth_chain)
             }
 
+            room_version = None
+            for e in state:
+                if (e.type, e.state_key) == (EventTypes.Create, ""):
+                    room_version = e.content.get("room_version", RoomVersions.V1)
+                    break
+
+            if room_version is None:
+                # If the state doesn't have a create event then the room is
+                # invalid, and it would fail auth checks anyway.
+                raise SynapseError(400, "No create event in state")
+
             valid_pdus = yield self._check_sigs_and_hash_and_fetch(
                 destination, list(pdus.values()),
                 outlier=True,
+                room_version=room_version,
             )
 
             valid_pdus_map = {
@@ -806,8 +835,10 @@ class FederationClient(FederationBase):
             for e in content["auth_chain"]
         ]
 
+        room_version = yield self.store.get_room_version(room_id)
+
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True
+            destination, auth_chain, outlier=True, room_version=room_version,
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -854,8 +885,10 @@ class FederationClient(FederationBase):
                 for e in content.get("events", [])
             ]
 
+            room_version = yield self.store.get_room_version(room_id)
+
             signed_events = yield self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False
+                destination, events, outlier=False, room_version=room_version,
             )
         except HttpResponseException as e:
             if not e.code == 400:
