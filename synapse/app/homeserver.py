@@ -373,6 +373,7 @@ def setup(config_options):
     )
 
     def handle_sighup(*args, **kwargs):
+        print(sighup_callbacks)
         for i in sighup_callbacks:
             i(*args, **kwargs)
 
@@ -415,7 +416,7 @@ def setup(config_options):
     hs.setup()
 
     @defer.inlineCallbacks
-    def refresh_certificate(*args):
+    def refresh_certificate(*args, **kwargs):
 
         logging.info("Stopping web listeners...")
         yield hs._stop_listening_web()
