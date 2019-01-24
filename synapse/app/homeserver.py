@@ -248,7 +248,7 @@ class SynapseHomeServer(HomeServer):
 
         for listener in config.listeners:
             if listener["type"] == "http":
-                self._listening_services.append(
+                self._listening_services.extend(
                     self._listener_http(config, listener)
                 )
 

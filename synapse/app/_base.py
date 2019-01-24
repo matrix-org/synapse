@@ -155,6 +155,8 @@ def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
 
+    return []
+
 
 def listen_ssl(
     bind_addresses, port, factory, context_factory, reactor=reactor, backlog=50
@@ -162,17 +164,22 @@ def listen_ssl(
     """
     Create an SSL socket for a port and several addresses
     """
+    r = []
     for address in bind_addresses:
         try:
-            reactor.listenSSL(
-                port,
-                factory,
-                context_factory,
-                backlog,
-                address
+            r.append(
+                reactor.listenSSL(
+                    port,
+                    factory,
+                    context_factory,
+                    backlog,
+                    address
+                )
             )
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
+
+    return r
 
 
 def check_bind_error(e, address, bind_addresses):
