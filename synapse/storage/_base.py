@@ -221,7 +221,7 @@ class SQLBaseStore(object):
         # The User IPs table in schema #53 was missing a unique index, which we
         # run as a background update.
         if "user_ips_device_unique_index" not in updates:
-            self._unsafe_to_upsert_tables.discard("user_id")
+            self._unsafe_to_upsert_tables.discard("user_ips")
 
         # If there's any tables left to check, reschedule to run.
         if self._unsafe_to_upsert_tables:
@@ -609,7 +609,7 @@ class SQLBaseStore(object):
                 inserting
             lock (bool): True to lock the table when doing the upsert.
         Returns:
-            Deferred(None or bool): Native upserts always return None. Emulated
+            None or bool: Native upserts always return None. Emulated
             upserts return True if a new entry was created, False if an existing
             one was updated.
         """
@@ -637,6 +637,18 @@ class SQLBaseStore(object):
     def _simple_upsert_txn_emulated(
         self, txn, table, keyvalues, values, insertion_values={}, lock=True
     ):
+        """
+        Args:
+            table (str): The table to upsert into
+            keyvalues (dict): The unique key tables and their new values
+            values (dict): The nonunique columns and their new values
+            insertion_values (dict): additional key/values to use only when
+                inserting
+            lock (bool): True to lock the table when doing the upsert.
+        Returns:
+            bool: Return True if a new entry was created, False if an existing
+            one was updated.
+        """
         # We need to lock the table :(, unless we're *really* careful
         if lock:
             self.database_engine.lock_table(txn, table)
