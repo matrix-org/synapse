@@ -415,24 +415,27 @@ def setup(config_options):
 
     hs.setup()
 
-    @defer.inlineCallbacks
     def refresh_certificate(*args, **kwargs):
 
         logging.info("Stopping web listeners...")
-        yield hs._stop_listening_web()
-        logging.info("Web listeners stopped.")
+        d = hs._stop_listening_web()
 
-        logging.info("Reloading certificate from disk")
-        hs.config.read_certificate_from_disk()
-        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-            config
-        )
-        logging.info("Certificate reloaded.")
+        def after(_):
+            logging.info("Web listeners stopped.")
 
-        logging.info("Restarting web listeners...")
-        hs._listen_web()
-        logging.info("Web listeners started.")
+            logging.info("Reloading certificate from disk")
+            hs.config.read_certificate_from_disk()
+            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+                config
+            )
+            logging.info("Certificate reloaded.")
+
+            logging.info("Restarting web listeners...")
+            hs._listen_web()
+            logging.info("Web listeners started.")
+
+        d.addCallback(after)
 
     sighup_callbacks.append(refresh_certificate)
 
