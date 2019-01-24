@@ -543,7 +543,8 @@ class FederationClient(FederationBase):
         Return:
             Deferred[tuple[str, dict, int]]: resolves to a tuple of
             `(origin, event, event_format)` where origin is the remote
-            homeserver which generated the event.
+            homeserver which generated the event, and event_format is one of
+            `synapse.api.constants.EventFormatVersions`.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
