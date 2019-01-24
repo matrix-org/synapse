@@ -1084,8 +1084,6 @@ class FederationHandler(BaseHandler):
         handled_events = set()
 
         try:
-            event.internal_metadata.outlier = False
-
             # Try the host we successfully got a response to /make_join/
             # request first.
             try:
@@ -1296,7 +1294,7 @@ class FederationHandler(BaseHandler):
             )
 
         event.internal_metadata.outlier = True
-        event.internal_metadata.new_remote_event = True
+        event.internal_metadata.out_of_band_membership = True
 
         event.signatures.update(
             compute_event_signature(
@@ -1322,7 +1320,7 @@ class FederationHandler(BaseHandler):
         # Mark as outlier as we don't have any state for this event; we're not
         # even in the room.
         event.internal_metadata.outlier = True
-        event.internal_metadata.new_remote_event = True
+        event.internal_metadata.out_of_band_membership = True
 
         # Try the host that we succesfully called /make_leave/ on first for
         # the /send_leave/ request.
@@ -1648,6 +1646,11 @@ class FederationHandler(BaseHandler):
             if (e.type, e.state_key) == (EventTypes.Create, ""):
                 create_event = e
                 break
+
+        if create_event is None:
+            # If the state doesn't have a create event then the room is
+            # invalid, and it would fail auth checks anyway.
+            raise SynapseError(400, "No create event in state")
 
         room_version = create_event.content.get("room_version", RoomVersions.V1)
 

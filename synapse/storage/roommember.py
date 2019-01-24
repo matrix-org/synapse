@@ -589,11 +589,11 @@ class RoomMemberStore(RoomMemberWorkerStore):
 
             # We update the local_invites table only if the event is "current",
             # i.e., its something that has just happened. If the event is an
-            # outlier it is only current if its a "new remote event", like a
-            # remote invite or a rejection of a remote invite.
+            # outlier it is only current if its an "out of band membership",
+            # like a remote invite or a rejection of a remote invite.
             is_new_state = not backfilled and (
                 not event.internal_metadata.is_outlier()
-                or event.internal_metadata.is_new_remote_event()
+                or event.internal_metadata.is_out_of_band_membership()
             )
             is_mine = self.hs.is_mine_id(event.state_key)
             if is_new_state and is_mine:
