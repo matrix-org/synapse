@@ -17,6 +17,7 @@
 import gc
 import logging
 import os
+import signal
 import sys
 import traceback
 
@@ -84,6 +85,7 @@ def gz_wrap(r):
 
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
+    _listening_services = []
 
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
@@ -121,7 +123,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            listen_ssl(
+            r = listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -135,7 +137,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         else:
-            listen_tcp(
+            r = listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -147,6 +149,7 @@ class SynapseHomeServer(HomeServer):
                 )
             )
         logger.info("Synapse now listening on port %d", port)
+        return r
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
@@ -237,12 +240,44 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
+    def _listen_web(self):
+        """
+        Listen with all the HTTP services.
+        """
+        config = self.get_config()
+
+        for listener in config.listeners:
+            if listener["type"] == "http":
+                self._listening_services.append(
+                    self._listener_http(config, listener)
+                )
+
+    def _stop_listening_web(self):
+        """
+        Stop listening on all the web services.
+
+        Returns:
+            Deferred
+        """
+        waiting_on = []
+
+        for i in self._listening_services:
+            d = i.stopListening()
+            if isinstance(d, defer.Deferred):
+                waiting_on.append(d)
+
+        if waiting_on:
+            return defer.DeferredList(waiting_on)
+        else:
+            return defer.succeed(True)
+
     def start_listening(self):
         config = self.get_config()
 
         for listener in config.listeners:
             if listener["type"] == "http":
-                self._listener_http(config, listener)
+                # Not handled here
+                pass
             elif listener["type"] == "manhole":
                 listen_tcp(
                     listener["bind_addresses"],
@@ -272,6 +307,9 @@ class SynapseHomeServer(HomeServer):
                                          listener["port"])
             else:
                 logger.warn("Unrecognized listener type: %s", listener["type"])
+
+        # Listen on the web ports differently.
+        self._listen_web()
 
     def run_startup_checks(self, db_conn, database_engine):
         all_users_native = are_all_users_on_domain(
@@ -322,7 +360,19 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    synapse.config.logger.setup_logging(config, use_worker_options=False)
+    sighup_callbacks = []
+    synapse.config.logger.setup_logging(
+        config,
+        use_worker_options=False,
+        register_sighup=sighup_callbacks.append
+    )
+
+    def handle_sighup(*args, **kwargs):
+        for i in sighup_callbacks:
+            i(*args, **kwargs)
+
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, handle_sighup)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -358,6 +408,29 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
+
+    def refresh_certificate(*args):
+
+        logging.info("Stopping web listeners...")
+        d = hs._stop_listening_web()
+
+        def after(_):
+            logging.info("Web listeners stopped.")
+
+            logging.info("Reloading certificate from disk")
+            hs.config.read_certificate_from_disk()
+            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+                config
+            )
+            logging.info("Certificate reloaded.")
+
+            logging.info("Restarting web listeners...")
+            hs._listen_web()
+            logging.info("Web listeners started.")
+        d.append(after)
+
+    sighup_callbacks.append(refresh_certificate)
 
     @defer.inlineCallbacks
     def start():
