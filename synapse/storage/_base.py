@@ -29,6 +29,7 @@ from synapse.api.errors import StoreError
 from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.stringutils import exception_to_unicode
 
 logger = logging.getLogger(__name__)
@@ -198,7 +199,12 @@ class SQLBaseStore(object):
         if self.database_engine.can_native_upsert:
             # Check ASAP (and then later, every 1s) to see if we have finished
             # background updates of tables that aren't safe to update.
-            self._clock.call_later(0.0, self._check_safe_to_upsert)
+            self._clock.call_later(
+                0.0,
+                run_as_background_process,
+                "upsert_safety_check",
+                self._check_safe_to_upsert
+            )
 
     @defer.inlineCallbacks
     def _check_safe_to_upsert(self):
@@ -208,7 +214,7 @@ class SQLBaseStore(object):
         If there are background updates, we will need to wait, as they may be
         the addition of indexes that set the UNIQUE constraint that we require.
 
-        If the background updates have not completed, wait a second and check again.
+        If the background updates have not completed, wait 15 sec and check again.
         """
         updates = yield self._simple_select_list(
             "background_updates",
@@ -225,7 +231,12 @@ class SQLBaseStore(object):
 
         # If there's any tables left to check, reschedule to run.
         if self._unsafe_to_upsert_tables:
-            self._clock.call_later(1.0, self._check_safe_to_upsert)
+            self._clock.call_later(
+                15.0,
+                run_as_background_process,
+                "upsert_safety_check",
+                self._check_safe_to_upsert
+            )
 
     def start_profiling(self):
         self._previous_loop_ts = self._clock.time_msec()
