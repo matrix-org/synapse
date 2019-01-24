@@ -260,6 +260,7 @@ class SynapseHomeServer(HomeServer):
             Deferred
         """
         waiting_on = []
+        print(self._listening_services)
 
         for i in self._listening_services:
             d = i.stopListening()
