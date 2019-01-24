@@ -266,6 +266,10 @@ class SynapseHomeServer(HomeServer):
             if isinstance(d, defer.Deferred):
                 waiting_on.append(d)
 
+        print(waiting_on)
+
+        self._listening_services = []
+
         if waiting_on:
             return defer.DeferredList(waiting_on)
         else:
