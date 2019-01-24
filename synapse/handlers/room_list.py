@@ -94,7 +94,7 @@ class RoomListHandler(BaseHandler):
     def _get_public_room_list(self, limit=None, since_token=None,
                               search_filter=None,
                               network_tuple=EMPTY_THIRD_PARTY_ID,
-                              timeout=0,):
+                              timeout=None,):
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
