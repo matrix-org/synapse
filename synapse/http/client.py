@@ -333,9 +333,10 @@ class SimpleHttpClient(object):
             "POST", uri, headers=Headers(actual_headers), data=query_bytes
         )
 
+        body = yield make_deferred_yieldable(readBody(response))
+
         if 200 <= response.code < 300:
-            body = yield make_deferred_yieldable(treq.json_content(response))
-            defer.returnValue(body)
+            defer.returnValue(json.loads(body))
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 

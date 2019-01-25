@@ -18,7 +18,7 @@ import platform
 
 from ._base import IncorrectDatabaseSetup
 from .postgres import PostgresEngine
-from .sqlite3 import Sqlite3Engine
+from .sqlite import Sqlite3Engine
 
 SUPPORTED_MODULE = {
     "sqlite3": Sqlite3Engine,

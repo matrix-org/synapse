@@ -17,6 +17,7 @@ from zope.interface import implementer
 
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import _defaultCurveName
+from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.internet.ssl import CertificateOptions, ContextFactory
 from twisted.python.failure import Failure
@@ -98,8 +99,14 @@ class ClientTLSOptions(object):
 
     def __init__(self, hostname, ctx):
         self._ctx = ctx
-        self._hostname = hostname
-        self._hostnameBytes = _idnaBytes(hostname)
+
+        if isIPAddress(hostname) or isIPv6Address(hostname):
+            self._hostnameBytes = hostname.encode('ascii')
+            self._sendSNI = False
+        else:
+            self._hostnameBytes = _idnaBytes(hostname)
+            self._sendSNI = True
+
         ctx.set_info_callback(
             _tolerateErrors(self._identityVerifyingInfoCallback)
         )
@@ -111,7 +118,9 @@ class ClientTLSOptions(object):
         return connection
 
     def _identityVerifyingInfoCallback(self, connection, where, ret):
-        if where & SSL.SSL_CB_HANDSHAKE_START:
+        # Literal IPv4 and IPv6 addresses are not permitted
+        # as host names according to the RFCs
+        if where & SSL.SSL_CB_HANDSHAKE_START and self._sendSNI:
             connection.set_tlsext_host_name(self._hostnameBytes)
 
 

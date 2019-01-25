@@ -96,7 +96,7 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.ERROR))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.WARNING))
 
         @around(self)
         def setUp(orig):
@@ -333,7 +333,15 @@ class HomeserverTestCase(TestCase):
         """
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
-        return setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        stor = hs.get_datastore()
+
+        # Run the database background updates.
+        if hasattr(stor, "do_next_background_update"):
+            while not self.get_success(stor.has_completed_background_updates()):
+                self.get_success(stor.do_next_background_update(1))
+
+        return hs
 
     def pump(self, by=0.0):
         """

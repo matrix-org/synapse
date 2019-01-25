@@ -19,6 +19,7 @@ from six import iteritems
 
 from twisted.internet import defer
 
+import synapse.metrics
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
@@ -163,6 +164,11 @@ class UserDirectoryHandler(object):
                 yield self._handle_deltas(deltas)
 
                 self.pos = deltas[-1]["stream_id"]
+
+                # Expose current event processing position to prometheus
+                synapse.metrics.event_processing_positions.labels(
+                    "user_dir").set(self.pos)
+
                 yield self.store.update_user_directory_stream_pos(self.pos)
 
     @defer.inlineCallbacks

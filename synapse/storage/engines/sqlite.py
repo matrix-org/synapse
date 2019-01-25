@@ -15,6 +15,7 @@
 
 import struct
 import threading
+from sqlite3 import sqlite_version_info
 
 from synapse.storage.prepare_database import prepare_database
 
@@ -29,6 +30,14 @@ class Sqlite3Engine(object):
         # in the DB yet.
         self._current_state_group_id = None
         self._current_state_group_id_lock = threading.Lock()
+
+    @property
+    def can_native_upsert(self):
+        """
+        Do we support native UPSERTs? This requires SQLite3 3.24+, plus some
+        more work we haven't done yet to tell what was inserted vs updated.
+        """
+        return sqlite_version_info >= (3, 24, 0)
 
     def check_database(self, txn):
         pass

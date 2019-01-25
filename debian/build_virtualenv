@@ -6,7 +6,16 @@
 set -e
 
 export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
-SNAKE=/usr/bin/python3
+
+# make sure that the virtualenv links to the specific version of python, by
+# dereferencing the python3 symlink.
+#
+# Otherwise, if somebody tries to install (say) the stretch package on buster,
+# they will get a confusing error about "No module named 'synapse'", because
+# python won't look in the right directory. At least this way, the error will
+# be a *bit* more obvious.
+#
+SNAKE=`readlink -e /usr/bin/python3`
 
 # try to set the CFLAGS so any compiled C extensions are compiled with the most
 # generic as possible x64 instructions, so that compiling it on a new Intel chip
@@ -36,6 +45,10 @@ dh_virtualenv \
     --extra-pip-arg="--compile" \
     --extras="all"
 
+PACKAGE_BUILD_DIR="debian/matrix-synapse-py3"
+VIRTUALENV_DIR="${PACKAGE_BUILD_DIR}${DH_VIRTUALENV_INSTALL_ROOT}/matrix-synapse"
+TARGET_PYTHON="${VIRTUALENV_DIR}/bin/python"
+
 # we copy the tests to a temporary directory so that we can put them on the
 # PYTHONPATH without putting the uninstalled synapse on the pythonpath.
 tmpdir=`mktemp -d`
@@ -44,5 +57,35 @@ trap "rm -r $tmpdir" EXIT
 cp -r tests "$tmpdir"
 
 PYTHONPATH="$tmpdir" \
-    debian/matrix-synapse-py3/opt/venvs/matrix-synapse/bin/python \
-        -B -m twisted.trial --reporter=text -j2 tests
+    "${TARGET_PYTHON}" -B -m twisted.trial --reporter=text -j2 tests
+
+# build the config file
+"${TARGET_PYTHON}" -B "${VIRTUALENV_DIR}/bin/generate_config" \
+        --config-dir="/etc/matrix-synapse" \
+        --data-dir="/var/lib/matrix-synapse" |
+    perl -pe '
+# tweak the paths to the tls certs and signing keys
+/^tls_.*_path:/ and s/SERVERNAME/homeserver/;
+/^signing_key_path:/ and s/SERVERNAME/homeserver/;
+
+# tweak the pid file location
+/^pid_file:/ and s#:.*#: "/var/run/matrix-synapse.pid"#;
+
+# tweak the path to the log config
+/^log_config:/ and s/SERVERNAME\.log\.config/log.yaml/;
+
+# tweak the path to the media store
+/^media_store_path:/ and s#/media_store#/media#;
+
+# remove the server_name setting, which is set in a separate file
+/^server_name:/ and $_ = "#\n# This is set in /etc/matrix-synapse/conf.d/server_name.yaml for Debian installations.\n# $_";
+
+# remove the report_stats setting, which is set in a separate file
+/^# report_stats:/ and $_ = "";
+
+' > "${PACKAGE_BUILD_DIR}/etc/matrix-synapse/homeserver.yaml"
+
+
+# add a dependency on the right version of python to substvars.
+PYPKG=`basename $SNAKE`
+echo "synapse:pydepends=$PYPKG" >> debian/matrix-synapse-py3.substvars
