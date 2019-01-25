@@ -104,6 +104,7 @@ class ThirdPartyEntityKind(object):
 class RoomVersions(object):
     V1 = "1"
     V2 = "2"
+    V3 = "3"
     VDH_TEST = "vdh-test-version"
     STATE_V2_TEST = "state-v2-test"
 
@@ -118,6 +119,7 @@ KNOWN_ROOM_VERSIONS = {
     RoomVersions.V2,
     RoomVersions.VDH_TEST,
     RoomVersions.STATE_V2_TEST,
+    RoomVersions.V3,
 }
 
 ServerNoticeMsgType = "m.server_notice"
