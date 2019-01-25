@@ -18,12 +18,12 @@ from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
 
-from tests.unittest import HomeserverTestCase
+from tests import unittest
 
 FORTY_DAYS = 40 * 24 * 60 * 60
 
 
-class MonthlyActiveUsersTestCase(HomeserverTestCase):
+class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver()
