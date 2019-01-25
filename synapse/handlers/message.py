@@ -278,15 +278,7 @@ class EventCreationHandler(object):
         """
         yield self.auth.check_auth_blocking(requester.user.to_string())
 
-        if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
-            room_version = event_dict["content"]["room_version"]
-        else:
-            try:
-                room_version = yield self.store.get_room_version(event_dict["room_id"])
-            except NotFoundError:
-                raise AuthError(403, "Unknown room")
-
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.new(event_dict)
 
         self.validator.validate_new(builder)
 

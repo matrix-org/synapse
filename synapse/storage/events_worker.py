@@ -23,7 +23,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventFormatVersions
 from synapse.api.errors import NotFoundError
-from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
+from synapse.events import FrozenEvent
 # these are only included to make the type annotations work
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
@@ -412,7 +412,11 @@ class EventsWorkerStore(SQLBaseStore):
                 # of a event format version, so it must be a V1 event.
                 format_version = EventFormatVersions.V1
 
-            original_ev = event_type_from_format_version(format_version)(
+            # TODO: When we implement new event formats we'll need to use a
+            # different event python type
+            assert format_version == EventFormatVersions.V1
+
+            original_ev = FrozenEvent(
                 event_dict=d,
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
