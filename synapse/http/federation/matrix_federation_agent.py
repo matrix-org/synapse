@@ -22,7 +22,6 @@ from twisted.web.client import URI, Agent, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
 
-from synapse.http.endpoint import parse_server_name
 from synapse.http.federation.srv_resolver import SrvResolver, pick_server_from_list
 from synapse.util.logcontext import make_deferred_yieldable
 
@@ -87,9 +86,7 @@ class MatrixFederationAgent(object):
                 from being sent).
         """
 
-        parsed_uri = URI.fromBytes(uri)
-        server_name_bytes = parsed_uri.netloc
-        host, port = parse_server_name(server_name_bytes.decode("ascii"))
+        parsed_uri = URI.fromBytes(uri, defaultPort=-1)
 
         # XXX disabling TLS is really only supported here for the benefit of the
         # unit tests. We should make the UTs cope with TLS rather than having to make
@@ -97,16 +94,20 @@ class MatrixFederationAgent(object):
         if self._tls_client_options_factory is None:
             tls_options = None
         else:
-            tls_options = self._tls_client_options_factory.get_options(host)
+            tls_options = self._tls_client_options_factory.get_options(
+                parsed_uri.host.decode("ascii")
+            )
 
-        if port is not None:
-            target = (host, port)
+        if parsed_uri.port != -1:
+            # there was an explicit port in the URI
+            target = parsed_uri.host, parsed_uri.port
         else:
-            service_name = b"_matrix._tcp.%s" % (server_name_bytes, )
+            service_name = b"_matrix._tcp.%s" % (parsed_uri.host, )
             server_list = yield self._srv_resolver.resolve_service(service_name)
             if not server_list:
-                target = (host, 8448)
-                logger.debug("No SRV record for %s, using %s", host, target)
+                target = (parsed_uri.host, 8448)
+                logger.debug(
+                    "No SRV record for %s, using %s", service_name, target)
             else:
                 target = pick_server_from_list(server_list)
 
@@ -117,7 +118,7 @@ class MatrixFederationAgent(object):
             headers = headers.copy()
 
         if not headers.hasHeader(b'host'):
-            headers.addRawHeader(b'host', server_name_bytes)
+            headers.addRawHeader(b'host', parsed_uri.netloc)
 
         class EndpointFactory(object):
             @staticmethod
