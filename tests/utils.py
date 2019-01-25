@@ -26,7 +26,7 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 
-from synapse.api.constants import EventTypes, RoomVersions
+from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.config.server import ServerConfig
 from synapse.federation.transport import server
@@ -624,7 +624,6 @@ def create_room(hs, room_id, creator_id):
     event_creation_handler = hs.get_event_creation_handler()
 
     builder = event_builder_factory.new(
-        RoomVersions.V1,
         {
             "type": EventTypes.Create,
             "state_key": "",

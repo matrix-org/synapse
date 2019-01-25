@@ -469,7 +469,7 @@ class FederationSendLeaveServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, room_id, event_id):
-        content = yield self.handler.on_send_leave_request(origin, content, room_id)
+        content = yield self.handler.on_send_leave_request(origin, content)
         defer.returnValue((200, content))
 
 
@@ -487,7 +487,7 @@ class FederationSendJoinServlet(BaseFederationServlet):
     def on_PUT(self, origin, content, query, context, event_id):
         # TODO(paul): assert that context/event_id parsed from path actually
         #   match those given in content
-        content = yield self.handler.on_send_join_request(origin, content, context)
+        content = yield self.handler.on_send_join_request(origin, content)
         defer.returnValue((200, content))
 
 
