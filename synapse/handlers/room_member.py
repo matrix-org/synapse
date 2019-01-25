@@ -287,13 +287,12 @@ class RoomMemberHandler(object):
                 user_id, old_room_id,
             )
 
-            if room_tags:
-                # Copy each room tag to the new room
-                for tag in room_tags.keys():
-                    tag_content = room_tags[tag]
-                    yield self.store.add_tag_to_room(
-                        user_id, room_id, tag, tag_content
-                    )
+            # Copy each room tag to the new room
+            for tag in room_tags.keys():
+                tag_content = room_tags[tag]
+                yield self.store.add_tag_to_room(
+                    user_id, room_id, tag, tag_content
+                )
 
     @defer.inlineCallbacks
     def update_membership(
