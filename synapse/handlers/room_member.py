@@ -288,8 +288,7 @@ class RoomMemberHandler(object):
             )
 
             # Copy each room tag to the new room
-            for tag in room_tags.keys():
-                tag_content = room_tags[tag]
+            for tag, tag_content in room_tags.items():
                 yield self.store.add_tag_to_room(
                     user_id, room_id, tag, tag_content
                 )
