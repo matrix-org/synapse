@@ -38,6 +38,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
+from synapse.events import room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -557,9 +558,10 @@ class FederationClient(FederationBase):
             params (dict[str, str|Iterable[str]]): Query parameters to include in the
                 request.
         Return:
-            Deferred[tuple[str, FrozenEvent]]: resolves to a tuple of `origin`
-            and event where origin is the remote homeserver which generated
-            the event.
+            Deferred[tuple[str, FrozenEvent, int]]: resolves to a tuple of
+            `(origin, event, event_format)` where origin is the remote
+            homeserver which generated the event, and event_format is one of
+            `synapse.api.constants.EventFormatVersions`.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
@@ -578,6 +580,11 @@ class FederationClient(FederationBase):
             ret = yield self.transport_layer.make_membership_event(
                 destination, room_id, user_id, membership, params,
             )
+
+            # Note: If not supplied, the room version may be either v1 or v2,
+            # however either way the event format version will be v1.
+            room_version = ret.get("room_version", RoomVersions.V1)
+            event_format = room_version_to_event_format(room_version)
 
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
@@ -607,7 +614,7 @@ class FederationClient(FederationBase):
             ev = builder.build()
 
             defer.returnValue(
-                (destination, ev)
+                (destination, ev, event_format)
             )
 
         return self._try_destination_list(
