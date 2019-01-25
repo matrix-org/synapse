@@ -33,10 +33,14 @@ class Sqlite3Engine(object):
     @property
     def can_native_upsert(self):
         """
-        Do we support native UPSERTs? This requires SQLite3 3.24+, plus some
-        more work we haven't done yet to tell what was inserted vs updated.
+        Do we support native UPSERTs?
         """
-        return self.module.sqlite_version_info >= (3, 24, 0)
+        # SQLite3 3.24+ supports them, but empirically the unit tests don't work
+        # when its enabled.
+        # FIXME: Figure out what is wrong so we can re-enable native upserts
+
+        # return self.module.sqlite_version_info >= (3, 24, 0)
+        return False
 
     def check_database(self, txn):
         pass
