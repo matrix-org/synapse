@@ -267,10 +267,10 @@ class RoomMemberHandler(object):
             )
 
             # Copy direct message state if applicable
-            if user_account_data and "m.direct" in user_account_data:
-                direct_rooms = user_account_data["m.direct"]
+            direct_rooms = user_account_data.get("m.direct", {})
 
-                # Check which key this room is under
+            # Check which key this room is under
+            if isinstance(direct_rooms, dict):
                 for key, room_id_list in direct_rooms.items():
                     if old_room_id in room_id_list and new_room_id not in room_id_list:
                         # Add new room_id to this key
