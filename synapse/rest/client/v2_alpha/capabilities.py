@@ -38,7 +38,6 @@ class CapabilitiesRestServlet(RestServlet):
                         "1": "stable",
                         "2": "stable",
                         "state-v2-test": "unstable",
-                        "3": "unstable"
                     }
                 }
             }
