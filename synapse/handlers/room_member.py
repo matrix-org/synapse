@@ -261,12 +261,9 @@ class RoomMemberHandler(object):
         if "predecessor" in create_event["content"]:
             old_room_id = create_event["content"]["predecessor"]["room_id"]
 
-            # Retrieve room account data for predecessor room
+            # Retrieve user account data for predecessor room
             user_account_data = yield self.store.get_account_data_for_user(
                 user_id,
-            )
-            room_tags = yield self.store.get_tags_for_room(
-                user_id, old_room_id,
             )
 
             # Copy direct message state if applicable
@@ -286,6 +283,10 @@ class RoomMemberHandler(object):
                         break
 
             # Copy room tags if applicable
+            room_tags = yield self.store.get_tags_for_room(
+                user_id, old_room_id,
+            )
+
             if room_tags:
                 # Copy each room tag to the new room
                 for tag in room_tags.keys():
