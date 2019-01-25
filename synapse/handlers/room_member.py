@@ -29,6 +29,7 @@ import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.storage.state import StateFilter
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -223,7 +224,18 @@ class RoomMemberHandler(object):
 
             # Copy over direct message status and room tags if this is a join
             # on an upgraded room
-            self.copy_room_tags_and_direct_to_room(old_room_id, room_id, user_id)
+            # Check if this is an upgraded room
+            state_ids = yield self.store.get_filtered_current_state_ids(
+                room_id, StateFilter.from_types([(EventTypes.Create, "")]),
+            )
+            create_id = state_ids.get((EventTypes.Create, ""))
+            if not create_id:
+                return
+            create_event = yield self.store.get_event(create_id)
+
+            if "predecessor" in create_event["content"]:
+                old_room_id = create_event["content"]["predecessor"]["room_id"]
+                self.copy_room_tags_and_direct_to_room(old_room_id, room_id, user_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
@@ -249,49 +261,37 @@ class RoomMemberHandler(object):
         Returns:
             Deferred|None
         """
-        # Check if this is an upgraded room
-        state_ids = yield self.store.get_filtered_current_state_ids(
-            new_room_id, StateFilter.from_types(((EventTypes.Create, ""))),
+        # Retrieve user account data for predecessor room
+        user_account_data, _ = yield self.store.get_account_data_for_user(
+            user_id,
         )
-        create_id = state_ids.get((EventTypes.Create, ""))
-        if not create_id:
-            return
-        create_event = yield self.store.get_event(create_id)
 
-        if "predecessor" in create_event["content"]:
-            old_room_id = create_event["content"]["predecessor"]["room_id"]
+        # Copy direct message state if applicable
+        direct_rooms = user_account_data.get("m.direct", {})
 
-            # Retrieve user account data for predecessor room
-            user_account_data, _ = yield self.store.get_account_data_for_user(
-                user_id,
+        # Check which key this room is under
+        if isinstance(direct_rooms, dict):
+            for key, room_id_list in direct_rooms.items():
+                if old_room_id in room_id_list and new_room_id not in room_id_list:
+                    # Add new room_id to this key
+                    direct_rooms[key].append(new_room_id)
+
+                    # Save back to user's m.direct account data
+                    yield self.store.add_account_data_for_user(
+                        user_id, "m.direct", direct_rooms,
+                    )
+                    break
+
+        # Copy room tags if applicable
+        room_tags = yield self.store.get_tags_for_room(
+            user_id, old_room_id,
+        )
+
+        # Copy each room tag to the new room
+        for tag, tag_content in room_tags.items():
+            yield self.store.add_tag_to_room(
+                user_id, new_room_id, tag, tag_content
             )
-
-            # Copy direct message state if applicable
-            direct_rooms = user_account_data.get("m.direct", {})
-
-            # Check which key this room is under
-            if isinstance(direct_rooms, dict):
-                for key, room_id_list in direct_rooms.items():
-                    if old_room_id in room_id_list and new_room_id not in room_id_list:
-                        # Add new room_id to this key
-                        direct_rooms[key].append(new_room_id)
-
-                        # Save back to user's m.direct account data
-                        yield self.store.add_account_data_for_user(
-                            user_id, "m.direct", direct_rooms,
-                        )
-                        break
-
-            # Copy room tags if applicable
-            room_tags = yield self.store.get_tags_for_room(
-                user_id, old_room_id,
-            )
-
-            # Copy each room tag to the new room
-            for tag, tag_content in room_tags.items():
-                yield self.store.add_tag_to_room(
-                    user_id, room_id, tag, tag_content
-                )
 
     @defer.inlineCallbacks
     def update_membership(
