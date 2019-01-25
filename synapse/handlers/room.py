@@ -123,7 +123,10 @@ class RoomCreationHandler(BaseHandler):
                     token_id=requester.access_token_id,
                 )
             )
-            yield self.auth.check_from_context(tombstone_event, tombstone_context)
+            old_room_version = yield self.store.get_room_version(old_room_id)
+            yield self.auth.check_from_context(
+                old_room_version, tombstone_event, tombstone_context,
+            )
 
             yield self.clone_exiting_room(
                 requester,

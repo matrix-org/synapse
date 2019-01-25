@@ -611,8 +611,13 @@ class EventCreationHandler(object):
             extra_users (list(UserID)): Any extra users to notify about event
         """
 
+        if event.is_state() and (event.type, event.state_key) == (EventTypes.Create, ""):
+            room_version = event.content["room_version"]
+        else:
+            room_version = yield self.store.get_room_version(event.room_id)
+
         try:
-            yield self.auth.check_from_context(event, context)
+            yield self.auth.check_from_context(room_version, event, context)
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err
