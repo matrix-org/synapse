@@ -25,14 +25,20 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
+from synapse.api.constants import (
+    KNOWN_ROOM_VERSIONS,
+    EventTypes,
+    Membership,
+    RoomVersions,
+)
 from synapse.api.errors import (
     CodeMessageException,
     FederationDeniedError,
     HttpResponseException,
     SynapseError,
 )
-from synapse.events import builder
+from synapse.crypto.event_signing import add_hashes_and_signatures
+from synapse.events import room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -65,6 +71,8 @@ class FederationClient(FederationBase):
         )
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
+
+        self.event_builder_factory = hs.get_event_builder_factory()
 
         self._get_pdu_cache = ExpiringCache(
             cache_name="get_pdu_cache",
@@ -202,7 +210,8 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     @log_function
-    def get_pdu(self, destinations, event_id, outlier=False, timeout=None):
+    def get_pdu(self, destinations, event_id, room_version, outlier=False,
+                timeout=None):
         """Requests the PDU with given origin and ID from the remote home
         servers.
 
@@ -212,6 +221,7 @@ class FederationClient(FederationBase):
         Args:
             destinations (list): Which home servers to query
             event_id (str): event to fetch
+            room_version (str): version of the room
             outlier (bool): Indicates whether the PDU is an `outlier`, i.e. if
                 it's from an arbitary point in the context as opposed to part
                 of the current block of PDUs. Defaults to `False`
@@ -352,10 +362,13 @@ class FederationClient(FederationBase):
             ev.event_id for ev in itertools.chain(pdus, auth_chain)
         ])
 
+        room_version = yield self.store.get_room_version(room_id)
+
         signed_pdus = yield self._check_sigs_and_hash_and_fetch(
             destination,
             [p for p in pdus if p.event_id not in seen_events],
-            outlier=True
+            outlier=True,
+            room_version=room_version,
         )
         signed_pdus.extend(
             seen_events[p.event_id] for p in pdus if p.event_id in seen_events
@@ -364,7 +377,8 @@ class FederationClient(FederationBase):
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
             destination,
             [p for p in auth_chain if p.event_id not in seen_events],
-            outlier=True
+            outlier=True,
+            room_version=room_version,
         )
         signed_auth.extend(
             seen_events[p.event_id] for p in auth_chain if p.event_id in seen_events
@@ -411,6 +425,8 @@ class FederationClient(FederationBase):
             random.shuffle(srvs)
             return srvs
 
+        room_version = yield self.store.get_room_version(room_id)
+
         batch_size = 20
         missing_events = list(missing_events)
         for i in range(0, len(missing_events), batch_size):
@@ -421,6 +437,7 @@ class FederationClient(FederationBase):
                     self.get_pdu,
                     destinations=random_server_list(),
                     event_id=e_id,
+                    room_version=room_version,
                 )
                 for e_id in batch
             ]
@@ -450,8 +467,11 @@ class FederationClient(FederationBase):
             for p in res["auth_chain"]
         ]
 
+        room_version = yield self.store.get_room_version(room_id)
+
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True
+            destination, auth_chain,
+            outlier=True, room_version=room_version,
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -522,6 +542,8 @@ class FederationClient(FederationBase):
         Does so by asking one of the already participating servers to create an
         event with proper context.
 
+        Returns a fully signed and hashed event.
+
         Note that this does not append any events to any graphs.
 
         Args:
@@ -536,8 +558,10 @@ class FederationClient(FederationBase):
             params (dict[str, str|Iterable[str]]): Query parameters to include in the
                 request.
         Return:
-            Deferred: resolves to a tuple of (origin (str), event (object))
-            where origin is the remote homeserver which generated the event.
+            Deferred[tuple[str, FrozenEvent, int]]: resolves to a tuple of
+            `(origin, event, event_format)` where origin is the remote
+            homeserver which generated the event, and event_format is one of
+            `synapse.api.constants.EventFormatVersions`.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
@@ -557,6 +581,11 @@ class FederationClient(FederationBase):
                 destination, room_id, user_id, membership, params,
             )
 
+            # Note: If not supplied, the room version may be either v1 or v2,
+            # however either way the event format version will be v1.
+            room_version = ret.get("room_version", RoomVersions.V1)
+            event_format = room_version_to_event_format(room_version)
+
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
                 raise InvalidResponseError("Bad 'event' field in response")
@@ -571,10 +600,21 @@ class FederationClient(FederationBase):
             if "prev_state" not in pdu_dict:
                 pdu_dict["prev_state"] = []
 
-            ev = builder.EventBuilder(pdu_dict)
+            # Strip off the fields that we want to clobber.
+            pdu_dict.pop("origin", None)
+            pdu_dict.pop("origin_server_ts", None)
+            pdu_dict.pop("unsigned", None)
+
+            builder = self.event_builder_factory.new(pdu_dict)
+            add_hashes_and_signatures(
+                builder,
+                self.hs.hostname,
+                self.hs.config.signing_key[0]
+            )
+            ev = builder.build()
 
             defer.returnValue(
-                (destination, ev)
+                (destination, ev, event_format)
             )
 
         return self._try_destination_list(
@@ -650,9 +690,21 @@ class FederationClient(FederationBase):
                 for p in itertools.chain(state, auth_chain)
             }
 
+            room_version = None
+            for e in state:
+                if (e.type, e.state_key) == (EventTypes.Create, ""):
+                    room_version = e.content.get("room_version", RoomVersions.V1)
+                    break
+
+            if room_version is None:
+                # If the state doesn't have a create event then the room is
+                # invalid, and it would fail auth checks anyway.
+                raise SynapseError(400, "No create event in state")
+
             valid_pdus = yield self._check_sigs_and_hash_and_fetch(
                 destination, list(pdus.values()),
                 outlier=True,
+                room_version=room_version,
             )
 
             valid_pdus_map = {
@@ -790,8 +842,10 @@ class FederationClient(FederationBase):
             for e in content["auth_chain"]
         ]
 
+        room_version = yield self.store.get_room_version(room_id)
+
         signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True
+            destination, auth_chain, outlier=True, room_version=room_version,
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -838,8 +892,10 @@ class FederationClient(FederationBase):
                 for e in content.get("events", [])
             ]
 
+            room_version = yield self.store.get_room_version(room_id)
+
             signed_events = yield self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False
+                destination, events, outlier=False, room_version=room_version,
             )
         except HttpResponseException as e:
             if not e.code == 400:

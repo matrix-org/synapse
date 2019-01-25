@@ -400,8 +400,14 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, room_id)
         pdu = yield self.handler.on_make_leave_request(room_id, user_id)
+
+        room_version = yield self.store.get_room_version(room_id)
+
         time_now = self._clock.time_msec()
-        defer.returnValue({"event": pdu.get_pdu_json(time_now)})
+        defer.returnValue({
+            "event": pdu.get_pdu_json(time_now),
+            "room_version": room_version,
+        })
 
     @defer.inlineCallbacks
     def on_send_leave_request(self, origin, content):
@@ -457,8 +463,10 @@ class FederationServer(FederationBase):
                 for e in content["auth_chain"]
             ]
 
+            room_version = yield self.store.get_room_version(room_id)
+
             signed_auth = yield self._check_sigs_and_hash_and_fetch(
-                origin, auth_chain, outlier=True
+                origin, auth_chain, outlier=True, room_version=room_version,
             )
 
             ret = yield self.handler.on_query_auth(

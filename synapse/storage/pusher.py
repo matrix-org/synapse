@@ -215,7 +215,7 @@ class PusherStore(PusherWorkerStore):
         with self._pushers_id_gen.get_next() as stream_id:
             # no need to lock because `pushers` has a unique key on
             # (app_id, pushkey, user_name) so _simple_upsert will retry
-            newly_inserted = yield self._simple_upsert(
+            yield self._simple_upsert(
                 table="pushers",
                 keyvalues={
                     "app_id": app_id,
@@ -238,7 +238,12 @@ class PusherStore(PusherWorkerStore):
                 lock=False,
             )
 
-            if newly_inserted:
+            user_has_pusher = self.get_if_user_has_pusher.cache.get(
+                (user_id,), None, update_metrics=False
+            )
+
+            if user_has_pusher is not True:
+                # invalidate, since we the user might not have had a pusher before
                 yield self.runInteraction(
                     "add_pusher",
                     self._invalidate_cache_and_stream,

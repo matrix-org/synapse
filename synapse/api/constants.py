@@ -120,6 +120,19 @@ KNOWN_ROOM_VERSIONS = {
     RoomVersions.STATE_V2_TEST,
 }
 
+
+class EventFormatVersions(object):
+    """This is an internal enum for tracking the version of the event format,
+    independently from the room version.
+    """
+    V1 = 1
+
+
+KNOWN_EVENT_FORMAT_VERSIONS = {
+    EventFormatVersions.V1,
+}
+
+
 ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
 
