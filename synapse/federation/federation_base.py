@@ -23,7 +23,7 @@ from twisted.internet.defer import DeferredList
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
-from synapse.events import FrozenEvent
+from synapse.events import event_type_from_format_version
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
 from synapse.types import get_domain_from_id
@@ -302,11 +302,12 @@ def _is_invite_via_3pid(event):
     )
 
 
-def event_from_pdu_json(pdu_json, outlier=False):
+def event_from_pdu_json(pdu_json, event_format_version, outlier=False):
     """Construct a FrozenEvent from an event json received over federation
 
     Args:
         pdu_json (object): pdu as received over federation
+        event_format_version (int): The event format version
         outlier (bool): True to mark this event as an outlier
 
     Returns:
@@ -330,8 +331,8 @@ def event_from_pdu_json(pdu_json, outlier=False):
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
-    event = FrozenEvent(
-        pdu_json
+    event = event_type_from_format_version(event_format_version)(
+        pdu_json,
     )
 
     event.internal_metadata.outlier = outlier
