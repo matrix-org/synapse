@@ -1,0 +1,1 @@
+Search now includes results from predecessor rooms after a room upgrade.

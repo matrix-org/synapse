@@ -18,6 +18,7 @@ from distutils.util import strtobool
 
 import six
 
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventFormatVersions
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -41,8 +42,13 @@ class _EventInternalMetadata(object):
     def is_outlier(self):
         return getattr(self, "outlier", False)
 
-    def is_invite_from_remote(self):
-        return getattr(self, "invite_from_remote", False)
+    def is_out_of_band_membership(self):
+        """Whether this is an out of band membership, like an invite or an invite
+        rejection. This is needed as those events are marked as outliers, but
+        they still need to be processed as if they're new events (e.g. updating
+        invite state in the database, relaying to clients, etc).
+        """
+        return getattr(self, "out_of_band_membership", False)
 
     def get_send_on_behalf_of(self):
         """Whether this server should send the event on behalf of another server.
@@ -179,6 +185,8 @@ class EventBase(object):
 
 
 class FrozenEvent(EventBase):
+    format_version = EventFormatVersions.V1  # All events of this type are V1
+
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
         event_dict = dict(event_dict)
 
@@ -232,3 +240,19 @@ class FrozenEvent(EventBase):
             self.get("type", None),
             self.get("state_key", None),
         )
+
+
+def room_version_to_event_format(room_version):
+    """Converts a room version string to the event format
+
+    Args:
+        room_version (str)
+
+    Returns:
+        int
+    """
+    if room_version not in KNOWN_ROOM_VERSIONS:
+        # We should have already checked version, so this should not happen
+        raise RuntimeError("Unrecognized room version %s" % (room_version,))
+
+    return EventFormatVersions.V1
