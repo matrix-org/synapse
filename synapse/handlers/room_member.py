@@ -262,13 +262,13 @@ class RoomMemberHandler(object):
             old_room_id = create_event["content"]["predecessor"]["room_id"]
 
             # Retrieve user account data for predecessor room
-            user_account_data = yield self.store.get_account_data_for_user(
+            user_account_data, _ = yield self.store.get_account_data_for_user(
                 user_id,
             )
 
             # Copy direct message state if applicable
-            if user_account_data and "m.direct" in user_account_data[0]:
-                direct_rooms = user_account_data[0]["m.direct"]
+            if user_account_data and "m.direct" in user_account_data:
+                direct_rooms = user_account_data["m.direct"]
 
                 # Check which key this room is under
                 for key, room_id_list in direct_rooms.items():
