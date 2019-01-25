@@ -131,6 +131,10 @@ class MatrixFederationAgentTests(TestCase):
         request = http_server.requests[0]
         self.assertEqual(request.method, b'GET')
         self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b'host'),
+            [b'testserv:8448']
+        )
         content = request.content.read()
         self.assertEqual(content, b'')
 
@@ -195,6 +199,10 @@ class MatrixFederationAgentTests(TestCase):
         request = http_server.requests[0]
         self.assertEqual(request.method, b'GET')
         self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b'host'),
+            [b'1.2.3.4'],
+        )
 
         # finish the request
         request.finish()
@@ -235,6 +243,10 @@ class MatrixFederationAgentTests(TestCase):
         request = http_server.requests[0]
         self.assertEqual(request.method, b'GET')
         self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b'host'),
+            [b'testserv'],
+        )
 
         # finish the request
         request.finish()
@@ -276,6 +288,10 @@ class MatrixFederationAgentTests(TestCase):
         request = http_server.requests[0]
         self.assertEqual(request.method, b'GET')
         self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b'host'),
+            [b'testserv'],
+        )
 
         # finish the request
         request.finish()

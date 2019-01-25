@@ -19,6 +19,7 @@ from zope.interface import implementer
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
 from twisted.web.client import URI, Agent, HTTPConnectionPool
+from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
 
 from synapse.http.endpoint import parse_server_name
@@ -108,6 +109,15 @@ class MatrixFederationAgent(object):
                 logger.debug("No SRV record for %s, using %s", host, target)
             else:
                 target = pick_server_from_list(server_list)
+
+        # make sure that the Host header is set correctly
+        if headers is None:
+            headers = Headers()
+        else:
+            headers = headers.copy()
+
+        if not headers.hasHeader(b'host'):
+            headers.addRawHeader(b'host', server_name_bytes)
 
         class EndpointFactory(object):
             @staticmethod

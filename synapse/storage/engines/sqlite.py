@@ -15,7 +15,6 @@
 
 import struct
 import threading
-from sqlite3 import sqlite_version_info
 
 from synapse.storage.prepare_database import prepare_database
 
@@ -40,7 +39,7 @@ class Sqlite3Engine(object):
         # when its enabled.
         # FIXME: Figure out what is wrong so we can re-enable native upserts
 
-        # return sqlite_version_info >= (3, 24, 0)
+        # return self.module.sqlite_version_info >= (3, 24, 0)
         return False
 
     def check_database(self, txn):
