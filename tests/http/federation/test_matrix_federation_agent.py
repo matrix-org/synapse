@@ -166,21 +166,13 @@ class MatrixFederationAgentTests(TestCase):
         """
         Test the behaviour when the server name contains an explicit IP (with no port)
         """
-
-        # the SRV lookup will return an empty list (XXX: why do we even do an SRV lookup?)
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
-
-        # then there will be a getaddrinfo on the IP
+        # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.4"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://1.2.3.4/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
-
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.1.2.3.4",
-        )
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
@@ -215,20 +207,13 @@ class MatrixFederationAgentTests(TestCase):
         (with no port)
         """
 
-        # the SRV lookup will return an empty list (XXX: why do we even do an SRV lookup?)
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
-
-        # then there will be a getaddrinfo on the IP
+        # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
 
         test_d = self._make_get_request(b"matrix://[::1]/foo/bar")
 
         # Nothing happened yet
         self.assertNoResult(test_d)
-
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.::1",
-        )
 
         # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
