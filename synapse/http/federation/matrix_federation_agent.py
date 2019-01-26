@@ -15,6 +15,7 @@
 import logging
 
 import attr
+from netaddr import IPAddress
 from zope.interface import implementer
 
 from twisted.internet import defer
@@ -137,6 +138,24 @@ class MatrixFederationAgent(object):
         Returns:
             Deferred[_RoutingResult]
         """
+        # check for an IP literal
+        try:
+            ip_address = IPAddress(parsed_uri.host.decode("ascii"))
+        except Exception:
+            # not an IP address
+            ip_address = None
+
+        if ip_address:
+            port = parsed_uri.port
+            if port == -1:
+                port = 8448
+            defer.returnValue(_RoutingResult(
+                host_header=parsed_uri.netloc,
+                tls_server_name=parsed_uri.host,
+                target_host=parsed_uri.host,
+                target_port=port,
+            ))
+
         if parsed_uri.port != -1:
             # there is an explicit port
             defer.returnValue(_RoutingResult(
