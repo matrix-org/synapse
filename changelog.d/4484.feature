@@ -1,0 +1,1 @@
+Add snapcraft packaging support
