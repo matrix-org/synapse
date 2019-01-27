@@ -1,0 +1,60 @@
+name: matrix-synapse
+version: git
+summary: Synapse, Matrix reference homeserver
+description: |
+  Matrix is an ambitious new ecosystem for open federated Instant Messaging and
+  VoIP. The basics you need to know to get up and running are:
+
+  Everything in Matrix happens in a room. Rooms are distributed and do not
+  exist on any single server. Rooms can be located using convenience aliases
+  like #matrix:matrix.org or #test:localhost:8448. Matrix user IDs look like
+  @matthew:matrix.org (although in the future you will normally refer to
+  yourself and others using a third party identifier (3PID): email address,
+  phone number, etc rather than manipulating Matrix user IDs)
+
+  The overall architecture is:
+  client <----> homeserver <=====================> homeserver <----> client
+      https://somewhere.org/_matrix        https://elsewhere.net/_matrix
+
+  #matrix:matrix.org is the official support room for Matrix, and can be
+  accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html
+  or via IRC bridge at irc://irc.freenode.net/matrix.
+
+  Synapse is currently in rapid development, but as of version 0.5 we believe
+  it is sufficiently stable to be run as an internet-facing service for real
+  usage!
+
+grade: stable
+confinement: strict
+
+parts:
+  synapse:
+    plugin: python
+    source: .
+    build-packages:
+      - build-essential
+      - libffi-dev
+      - libjpeg-dev
+      - libssl-dev
+      - libxslt1-dev
+      - python3-dev
+      - sqlite3
+    python-packages:
+      - setuptools
+      - matrix-synapse
+      - Jinja2
+
+apps:
+  matrix-synapse:
+    command: synctl
+    plugs:
+      - network
+      - network-bind
+
+  homeserver:
+    command: python3 -B -m synapse.app.homeserver
+
+  register-new-matrix-user:
+    command: register_new_matrix_user
+    plugs:
+      - network

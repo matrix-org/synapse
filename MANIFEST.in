@@ -39,5 +39,7 @@ prune .coveragerc
 prune debian
 prune .codecov.yml
 
+prune snap
+
 exclude jenkins*
 recursive-exclude jenkins *.sh

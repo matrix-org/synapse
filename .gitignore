@@ -61,3 +61,9 @@ env/
 .ropeproject/
 *.deb
 /debs
+
+*.snap
+parts/
+prime/
+snap/.snapcraft/
+stage/
