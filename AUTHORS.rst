@@ -69,3 +69,6 @@ Serban Constantin <serban.constantin at gmail dot com>
 
 Jason Robinson <jasonr at matrix.org>
  * Minor fixes
+
+Marco Trevisan <marco at ubuntu dot com>
+ * Snapcraft packaging support
