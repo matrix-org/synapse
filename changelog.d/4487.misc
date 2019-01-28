@@ -1,0 +1,1 @@
+Fix idna and ipv6 literal handling in MatrixFederationAgent

@@ -27,7 +27,11 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
+<<<<<<< HEAD
 from synapse.storage.engines import PostgresEngine
+=======
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+>>>>>>> origin/develop
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
@@ -196,6 +200,12 @@ class SQLBaseStore(object):
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = {"user_ips"}
 
+        # We add the user_directory_search table to the blacklist on SQLite
+        # because the existing search table does not have an index, making it
+        # unsafe to use native upserts.
+        if isinstance(self.database_engine, Sqlite3Engine):
+            self._unsafe_to_upsert_tables.add("user_directory_search")
+
         if self.database_engine.can_native_upsert:
             # Check ASAP (and then later, every 1s) to see if we have finished
             # background updates of tables that aren't safe to update.
@@ -230,7 +240,7 @@ class SQLBaseStore(object):
             self._unsafe_to_upsert_tables.discard("user_ips")
 
         # If there's any tables left to check, reschedule to run.
-        if self._unsafe_to_upsert_tables:
+        if self.updates:
             self._clock.call_later(
                 15.0,
                 run_as_background_process,

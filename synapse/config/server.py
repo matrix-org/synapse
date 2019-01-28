@@ -256,7 +256,11 @@ class ServerConfig(Config):
         #
         # web_client_location: "/path/to/web/root"
 
-        # The public-facing base URL for the client API (not including _matrix/...)
+        # The public-facing base URL that clients use to access this HS
+        # (not including _matrix/...). This is the same URL a user would
+        # enter into the 'custom HS URL' field on their client. If you
+        # use synapse with a reverse proxy, this should be the URL to reach
+        # synapse via the proxy.
         # public_baseurl: https://example.com:8448/
 
         # Set the soft limit on the number of file descriptors synapse can use
@@ -420,19 +424,18 @@ class ServerConfig(Config):
                                   " service on the given port.")
 
 
-def is_threepid_reserved(config, threepid):
+def is_threepid_reserved(reserved_threepids, threepid):
     """Check the threepid against the reserved threepid config
     Args:
-        config(ServerConfig) - to access server config attributes
+        reserved_threepids([dict]) - list of reserved threepids
         threepid(dict) - The threepid to test for
 
     Returns:
         boolean Is the threepid undertest reserved_user
     """
 
-    for tp in config.mau_limits_reserved_threepids:
-        if (threepid['medium'] == tp['medium']
-                and threepid['address'] == tp['address']):
+    for tp in reserved_threepids:
+        if (threepid['medium'] == tp['medium'] and threepid['address'] == tp['address']):
             return True
     return False
 
