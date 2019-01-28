@@ -767,7 +767,8 @@ class EventCreationHandler(object):
             auth_events = {
                 (e.type, e.state_key): e for e in auth_events.values()
             }
-            if self.auth.check_redaction(event, auth_events=auth_events):
+            room_version = yield self.store.get_room_version(event.room_id)
+            if self.auth.check_redaction(room_version, event, auth_events=auth_events):
                 original_event = yield self.store.get_event(
                     event.redacts,
                     check_redacted=False,
@@ -780,6 +781,9 @@ class EventCreationHandler(object):
                         403,
                         "You don't have permission to redact events"
                     )
+
+                # We've already checked.
+                event.internal_metadata.recheck_redaction = False
 
         if event.type == EventTypes.Create:
             prev_state_ids = yield context.get_prev_state_ids(self.store)

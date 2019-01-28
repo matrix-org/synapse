@@ -21,13 +21,14 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventFormatVersions
+from synapse.api.constants import EventFormatVersions, EventTypes
 from synapse.api.errors import NotFoundError
 from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
 # these are only included to make the type annotations work
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import get_domain_from_id
 from synapse.util.logcontext import (
     LoggingContext,
     PreserveLoggingContext,
@@ -173,6 +174,29 @@ class EventsWorkerStore(SQLBaseStore):
             entry = event_entry_map.get(event_id, None)
             if not entry:
                 continue
+
+            # Some redactions in room version v3 need to be rechecked if we
+            # didn't have the redacted event at the time, so we recheck on read
+            # instead.
+            if not allow_rejected and entry.event.type == EventTypes.Redaction:
+                if entry.event.internal_metadata.need_to_check_redaction():
+                    orig = yield self.get_event(
+                        entry.event.redacts,
+                        allow_none=True,
+                        allow_rejected=True,
+                        get_prev_content=False,
+                    )
+                    expected_domain = get_domain_from_id(entry.event.sender)
+                    if orig and get_domain_from_id(orig.sender) == expected_domain:
+                        # This redaction event is allowed. Mark as not needing a
+                        # recheck.
+                        entry.event.recheck_redaction = False
+                    else:
+                        # We don't have the event that is being redacted, so we
+                        # assume that the event isn't authorized for now. (If we
+                        # later receive the event, then we will always redact
+                        # it anyway, since we have this redaction)
+                        continue
 
             if allow_rejected or not entry.event.rejected_reason:
                 if check_redacted and entry.redacted_event:

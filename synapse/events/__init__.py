@@ -63,6 +63,9 @@ class _EventInternalMetadata(object):
         """
         return getattr(self, "send_on_behalf_of", None)
 
+    def need_to_check_redaction(self):
+        return getattr(self, "recheck_redaction", False)
+
 
 def _event_dict_property(key):
     # We want to be able to use hasattr with the event dict properties.
