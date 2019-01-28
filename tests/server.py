@@ -369,6 +369,11 @@ class FakeTransport(object):
     :type: twisted.internet.interfaces.IReactorTime
     """
 
+    _protocol = attr.ib(default=None)
+    """The Protocol which is producing data for this transport. Optional, but if set
+    will get called back for connectionLost() notifications etc.
+    """
+
     disconnecting = False
     buffer = attr.ib(default=b'')
     producer = attr.ib(default=None)
@@ -379,8 +384,12 @@ class FakeTransport(object):
     def getHost(self):
         return None
 
-    def loseConnection(self):
-        self.disconnecting = True
+    def loseConnection(self, reason=None):
+        logger.info("FakeTransport: loseConnection(%s)", reason)
+        if not self.disconnecting:
+            self.disconnecting = True
+            if self._protocol:
+                self._protocol.connectionLost(reason)
 
     def abortConnection(self):
         self.disconnecting = True
