@@ -130,7 +130,11 @@ class MatrixFederationAgent(object):
         class EndpointFactory(object):
             @staticmethod
             def endpointForURI(_uri):
-                logger.info("Connecting to %s:%s", res.target_host, res.target_port)
+                logger.info(
+                    "Connecting to %s:%i",
+                    res.target_host.decode("ascii"),
+                    res.target_port,
+                )
                 ep = HostnameEndpoint(self._reactor, res.target_host, res.target_port)
                 if tls_options is not None:
                     ep = wrapClientTLS(tls_options, ep)
@@ -190,7 +194,7 @@ class MatrixFederationAgent(object):
 
         if not server_list and lookup_well_known:
             # try a .well-known lookup
-            well_known_server = yield self.get_well_known(parsed_uri.host)
+            well_known_server = yield self._get_well_known(parsed_uri.host)
 
             if well_known_server:
                 # if we found a .well-known, start again, but don't do another
@@ -216,7 +220,7 @@ class MatrixFederationAgent(object):
                     fragment=parsed_uri.fragment,
                 )
 
-                res = yield self.route_matrix_uri(new_uri, lookup_well_known=False)
+                res = yield self._route_matrix_uri(new_uri, lookup_well_known=False)
                 defer.returnValue(res)
 
         if not server_list:
@@ -241,11 +245,11 @@ class MatrixFederationAgent(object):
         ))
 
     @defer.inlineCallbacks
-    def get_well_known(self, server_name):
+    def _get_well_known(self, server_name):
         # FIXME: add a cache
 
         uri = b"https://%s/.well-known/matrix/server" % (server_name, )
-        logger.debug("Fetching %s", uri.decode("ascii"))
+        logger.info("Fetching %s", uri.decode("ascii"))
         try:
             response = yield make_deferred_yieldable(
                 self._well_known_agent.request(b"GET", uri),
@@ -259,12 +263,10 @@ class MatrixFederationAgent(object):
 
         body = yield make_deferred_yieldable(readBody(response))
 
-        logger.info("Response from .well-known: %s", body)
-
         if response.code != 200:
             logger.info(
-                "Error response %i from %s",
-                response.code, uri.decode("ascii"),
+                "Error response %i from %s: %s",
+                response.code, uri.decode("ascii"), body,
             )
             defer.returnValue(None)
 
@@ -275,6 +277,7 @@ class MatrixFederationAgent(object):
         if content_type != 'application/json':
             raise Exception("content-type not application/json on .well-known response")
         parsed_body = json.loads(body)
+        logger.info("Response from .well-known: %s", parsed_body)
         if not isinstance(parsed_body, dict) or "m.server" not in parsed_body:
             raise Exception("invalid .well-known response")
         defer.returnValue(parsed_body["m.server"].encode("ascii"))

@@ -109,6 +109,9 @@ class MatrixFederationAgentTests(TestCase):
             try:
                 fetch_res = yield fetch_d
                 defer.returnValue(fetch_res)
+            except Exception as e:
+                logger.info("Fetch of %s failed: %s", uri.decode("ascii"), e)
+                raise
             finally:
                 _check_logcontext(context)
 
