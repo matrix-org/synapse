@@ -18,7 +18,11 @@ from distutils.util import strtobool
 
 import six
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.api.constants import (
+    KNOWN_EVENT_FORMAT_VERSIONS,
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+)
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -256,3 +260,21 @@ def room_version_to_event_format(room_version):
         raise RuntimeError("Unrecognized room version %s" % (room_version,))
 
     return EventFormatVersions.V1
+
+
+def event_type_from_format_version(format_version):
+    """Returns the python type to use to construct an Event object for the
+    given event format version.
+
+    Args:
+        format_version (int): The event format version
+
+    Returns:
+        type: A type that can be initialized as per the initializer of
+        `FrozenEvent`
+    """
+    if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
+        raise Exception(
+            "No event format %r" % (format_version,)
+        )
+    return FrozenEvent
