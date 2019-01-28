@@ -1,1 +1,0 @@
-Synapse will now take advantage of native UPSERT functionality in PostgreSQL 9.5+.
