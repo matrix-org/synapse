@@ -578,10 +578,24 @@ class MatrixFederationAgentTests(TestCase):
             b"_matrix._tcp.xn--bcher-kva.com",
         )
 
-        # Make sure treq is trying to connect
+        # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 443)
+
+        # fonx the connection
+        client_factory.clientConnectionFailed(None, Exception("nope"))
+
+        # attemptdelay on the hostnameendpoint is 0.3, so  takes that long before the
+        # .well-known request fails.
+        self.reactor.pump((0.4,))
+
+        # We should fall back to port 8448
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 2)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[1]
         self.assertEqual(host, '1.2.3.4')
         self.assertEqual(port, 8448)
 
