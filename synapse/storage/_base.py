@@ -27,11 +27,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
-<<<<<<< HEAD
-from synapse.storage.engines import PostgresEngine
-=======
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
->>>>>>> origin/develop
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
