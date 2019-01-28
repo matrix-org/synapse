@@ -169,12 +169,6 @@ class IdentityHandler(BaseHandler):
         # deletion request to.
         id_server = next(iter(self.trusted_id_servers))
 
-        # if we have a rewrite rule set for the identity server,
-        # apply it now.
-        if id_server in self.rewrite_identity_server_urls:
-            id_server = self.rewrite_identity_server_urls[id_server]
-
-        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         content = {
             "mxid": mxid,
             "threepid": threepid,
@@ -191,6 +185,15 @@ class IdentityHandler(BaseHandler):
             content=content,
             destination_is=id_server,
         )
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        #
+        # Note that destination_is has to be the real id_server, not
+        # the server we connect to.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
+
+        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         try:
             yield self.http_client.post_json_get_json(
                 url,
