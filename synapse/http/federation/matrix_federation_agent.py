@@ -200,11 +200,16 @@ class MatrixFederationAgent(object):
                 # if we found a .well-known, start again, but don't do another
                 # .well-known lookup.
 
+                # parse the server name in the .well-known response into host/port.
+                # (This code is lifted from twisted.web.client.URI.fromBytes).
                 if b':' in well_known_server:
                     well_known_host, well_known_port = well_known_server.rsplit(b':', 1)
                     try:
                         well_known_port = int(well_known_port)
                     except ValueError:
+                        # the part after the colon could not be parsed as an int
+                        # - we assume it is an IPv6 literal with no port (the closing
+                        # ']' stops it being parsed as an int)
                         well_known_host, well_known_port = well_known_server, -1
                 else:
                     well_known_host, well_known_port = well_known_server, -1
@@ -246,6 +251,15 @@ class MatrixFederationAgent(object):
 
     @defer.inlineCallbacks
     def _get_well_known(self, server_name):
+        """Attempt to fetch and parse a .well-known file for the given server
+
+        Args:
+            server_name (bytes): name of the server, from the requested url
+
+        Returns:
+            Deferred[bytes|None]: either the new server name, from the .well-known, or
+                None if there was no .well-known file.
+        """
         # FIXME: add a cache
 
         uri = b"https://%s/.well-known/matrix/server" % (server_name, )
