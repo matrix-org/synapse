@@ -18,7 +18,7 @@ instructions that may be required are listed later in this document.
 
    .. code:: bash
 
-       pip install --upgrade --process-dependency-links matrix-synapse
+       pip install --upgrade matrix-synapse
 
        # restart synapse
        synctl restart
