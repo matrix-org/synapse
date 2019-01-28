@@ -46,15 +46,46 @@ parts:
 
 apps:
   matrix-synapse:
-    command: synctl
+    daemon: simple
+    command: |
+      sh -c 'cd $SNAP_COMMON &&
+      mkdir -p $SNAP_COMMON/config.d &&
+      [ -f $SNAP_COMMON/homeserver.yaml ] && \
+      python3 -B -m synapse.app.homeserver \
+        --config-path $SNAP_COMMON/homeserver.yaml \
+        --config-path $SNAP_COMMON/config.d \
+        --keys-directory $SNAP_COMMON \
+        -d $SNAP_COMMON/homeserver.db ||
+      echo Missing conifiguration in $SNAP_COMMON/homeserver.yaml, use sudo $SNAP_NAME.generate-config &&
+      exit 0'
+    restart-condition: on-failure
+    plugs:
+      - network
+      - network-bind
+
+  synctl:
+    command: sh -c 'cd $SNAP_COMMON && synctl $*'
     plugs:
       - network
       - network-bind
 
   homeserver:
-    command: python3 -B -m synapse.app.homeserver
+    command: |
+      sh -c 'cd $SNAP_COMMON &&
+             python3 -B -m synapse.app.homeserver \
+             -c $SNAP_COMMON/homeserver.yaml $*'
+    plugs:
+      - network
+      - network-bind
+
+  generate-config:
+    command: |
+      sh -c 'cd $SNAP_COMMON &&
+             python3 -B -m synapse.app.homeserver \
+             --generate-config \
+             -c $SNAP_COMMON/homeserver.yaml $*'
 
   register-new-matrix-user:
-    command: register_new_matrix_user
+    command: register_new_matrix_user -c $SNAP_COMMON/homeserver.yaml
     plugs:
       - network
