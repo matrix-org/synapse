@@ -211,6 +211,7 @@ def start(config_options):
     # Force the pushers to start since they will be disabled in the main config
     config.update_user_directory = True
 
+    hs.config.read_certificate_from_disk()
     tls_server_context_factory = context_factory.ServerContextFactory(config)
     tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 

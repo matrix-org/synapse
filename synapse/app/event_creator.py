@@ -185,6 +185,7 @@ def start(config_options):
 
     database_engine = create_engine(config.database_config)
 
+    hs.config.read_certificate_from_disk()
     tls_server_context_factory = context_factory.ServerContextFactory(config)
     tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
