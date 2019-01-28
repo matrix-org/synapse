@@ -288,7 +288,7 @@ class EventCreationHandler(object):
 
         builder = self.event_builder_factory.new(room_version, event_dict)
 
-        self.validator.validate_new(builder)
+        self.validator.validate_builder(builder)
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
@@ -325,6 +325,8 @@ class EventCreationHandler(object):
             requester=requester,
             prev_events_and_hashes=prev_events_and_hashes,
         )
+
+        self.validator.validate_new(event)
 
         defer.returnValue((event, context))
 

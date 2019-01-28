@@ -24,14 +24,13 @@ class EventValidator(object):
 
     def validate(self, event):
         EventID.from_string(event.event_id)
-        RoomID.from_string(event.room_id)
 
         required = [
-            # "auth_events",
+            "auth_events",
             "content",
-            # "hashes",
+            "hashes",
             "origin",
-            # "prev_events",
+            "prev_events",
             "sender",
             "type",
         ]
@@ -43,31 +42,19 @@ class EventValidator(object):
         # Check that the following keys have string values
         strings = [
             "origin",
-            "sender",
-            "type",
         ]
-
-        if hasattr(event, "state_key"):
-            strings.append("state_key")
 
         for s in strings:
             if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))
 
-        if event.type == EventTypes.Member:
-            if "membership" not in event.content:
-                raise SynapseError(400, "Content has not membership key")
-
-            if event.content["membership"] not in Membership.LIST:
-                raise SynapseError(400, "Invalid membership key")
-
-        # Check that the following keys have dictionary values
-        # TODO
-
-        # Check that the following keys have the correct format for DAGs
-        # TODO
-
     def validate_new(self, event):
+        """Validates the event has roughly the right format
+
+        Args:
+            event (FrozenEvent)
+        """
+        self.validate_builder(event)
         self.validate(event)
 
         UserID.from_string(event.sender)
@@ -85,6 +72,52 @@ class EventValidator(object):
 
         elif event.type == EventTypes.Name:
             self._ensure_strings(event.content, ["name"])
+
+    def validate_builder(self, event):
+        """Validates that the builder/event has roughly the right format. Only
+        checks values that we expect a proto event to have, rather than all the
+        fields an event would have
+
+        Args:
+            event (EventBuilder|FrozenEvent)
+        """
+
+        strings = [
+            "room_id",
+            "sender",
+            "type",
+        ]
+
+        if hasattr(event, "state_key"):
+            strings.append("state_key")
+
+        for s in strings:
+            if not isinstance(getattr(event, s), string_types):
+                raise SynapseError(400, "Not '%s' a string type" % (s,))
+
+        RoomID.from_string(event.room_id)
+        UserID.from_string(event.sender)
+
+        if event.type == EventTypes.Message:
+            strings = [
+                "body",
+                "msgtype",
+            ]
+
+            self._ensure_strings(event.content, strings)
+
+        elif event.type == EventTypes.Topic:
+            self._ensure_strings(event.content, ["topic"])
+
+        elif event.type == EventTypes.Name:
+            self._ensure_strings(event.content, ["name"])
+
+        elif event.type == EventTypes.Member:
+            if "membership" not in event.content:
+                raise SynapseError(400, "Content has not membership key")
+
+            if event.content["membership"] not in Membership.LIST:
+                raise SynapseError(400, "Invalid membership key")
 
     def _ensure_strings(self, d, keys):
         for s in keys:
