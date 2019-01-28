@@ -84,11 +84,11 @@ class RegistrationConfig(Config):
         #
         # allowed_local_3pids:
         #     - medium: email
-        #       pattern: ".*@matrix\\.org"
+        #       pattern: '.*@matrix\\.org'
         #     - medium: email
-        #       pattern: ".*@vector\\.im"
+        #       pattern: '.*@vector\\.im'
         #     - medium: msisdn
-        #       pattern: "\\+44"
+        #       pattern: '\\+44'
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.

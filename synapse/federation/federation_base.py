@@ -23,7 +23,7 @@ from twisted.internet.defer import DeferredList
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
-from synapse.events import FrozenEvent
+from synapse.events import event_type_from_format_version
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
 from synapse.types import get_domain_from_id
@@ -43,8 +43,8 @@ class FederationBase(object):
         self._clock = hs.get_clock()
 
     @defer.inlineCallbacks
-    def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False,
-                                       include_none=False):
+    def _check_sigs_and_hash_and_fetch(self, origin, pdus, room_version,
+                                       outlier=False, include_none=False):
         """Takes a list of PDUs and checks the signatures and hashs of each
         one. If a PDU fails its signature check then we check if we have it in
         the database and if not then request if from the originating server of
@@ -56,8 +56,12 @@ class FederationBase(object):
         a new list.
 
         Args:
+            origin (str)
             pdu (list)
-            outlier (bool)
+            room_version (str)
+            outlier (bool): Whether the events are outliers or not
+            include_none (str): Whether to include None in the returned list
+                for events that have failed their checks
 
         Returns:
             Deferred : A list of PDUs that have valid signatures and hashes.
@@ -84,6 +88,7 @@ class FederationBase(object):
                     res = yield self.get_pdu(
                         destinations=[pdu.origin],
                         event_id=pdu.event_id,
+                        room_version=room_version,
                         outlier=outlier,
                         timeout=10000,
                     )
@@ -297,11 +302,12 @@ def _is_invite_via_3pid(event):
     )
 
 
-def event_from_pdu_json(pdu_json, outlier=False):
+def event_from_pdu_json(pdu_json, event_format_version, outlier=False):
     """Construct a FrozenEvent from an event json received over federation
 
     Args:
         pdu_json (object): pdu as received over federation
+        event_format_version (int): The event format version
         outlier (bool): True to mark this event as an outlier
 
     Returns:
@@ -325,8 +331,8 @@ def event_from_pdu_json(pdu_json, outlier=False):
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
-    event = FrozenEvent(
-        pdu_json
+    event = event_type_from_format_version(event_format_version)(
+        pdu_json,
     )
 
     event.internal_metadata.outlier = outlier

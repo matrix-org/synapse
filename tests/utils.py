@@ -26,7 +26,7 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, RoomVersions
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.config.server import ServerConfig
 from synapse.federation.transport import server
@@ -154,7 +154,9 @@ def default_config(name):
     config.update_user_directory = False
 
     def is_threepid_reserved(threepid):
-        return ServerConfig.is_threepid_reserved(config, threepid)
+        return ServerConfig.is_threepid_reserved(
+            config.mau_limits_reserved_threepids, threepid
+        )
 
     config.is_threepid_reserved.side_effect = is_threepid_reserved
 
@@ -622,6 +624,7 @@ def create_room(hs, room_id, creator_id):
     event_creation_handler = hs.get_event_creation_handler()
 
     builder = event_builder_factory.new(
+        RoomVersions.V1,
         {
             "type": EventTypes.Create,
             "state_key": "",
