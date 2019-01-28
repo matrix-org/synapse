@@ -21,7 +21,7 @@ from six.moves import urllib
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
-from synapse.api.urls import FEDERATION_V1_PREFIX
+from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
 from synapse.util.logutils import log_function
 
 logger = logging.getLogger(__name__)
@@ -289,8 +289,22 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_invite(self, destination, room_id, event_id, content):
+    def send_invite_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
+
+        response = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=content,
+            ignore_backoff=True,
+        )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_invite_v2(self, destination, room_id, event_id, content):
+        path = _create_v2_path("/invite/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
             destination=destination,
@@ -956,5 +970,26 @@ def _create_v1_path(path, *args):
     """
     return (
         FEDERATION_V1_PREFIX
+        + path % tuple(urllib.parse.quote(arg, "") for arg in args)
+    )
+
+
+def _create_v2_path(path, *args):
+    """Creates a path against V2 federation API from the path template and
+    args. Ensures that all args are url encoded.
+
+    Example:
+
+        _create_v2_path("/event/%s/", event_id)
+
+    Args:
+        path (str): String template for the path
+        args: ([str]): Args to insert into path. Each arg will be url encoded
+
+    Returns:
+        str
+    """
+    return (
+        FEDERATION_V2_PREFIX
         + path % tuple(urllib.parse.quote(arg, "") for arg in args)
     )
