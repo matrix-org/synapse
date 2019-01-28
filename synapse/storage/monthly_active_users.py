@@ -197,14 +197,20 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         if is_support:
             return
 
-        is_insert = yield self.runInteraction(
+        yield self.runInteraction(
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn,
             user_id
         )
 
-        if is_insert:
-            self.user_last_seen_monthly_active.invalidate((user_id,))
+        user_in_mau = self.user_last_seen_monthly_active.cache.get(
+            (user_id,),
+            None,
+            update_metrics=False
+        )
+        if user_in_mau is None:
             self.get_monthly_active_count.invalidate(())
+
+        self.user_last_seen_monthly_active.invalidate((user_id,))
 
     def upsert_monthly_active_user_txn(self, txn, user_id):
         """Updates or inserts monthly active user member
