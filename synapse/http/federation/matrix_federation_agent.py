@@ -193,7 +193,43 @@ class MatrixFederationAgent(object):
 
 @attr.s
 class _RoutingResult(object):
+    """The result returned by `_route_matrix_uri`.
+
+    Contains the parameters needed to direct a federation connection to a particular
+    server.
+
+    Where a SRV record points to several servers, this object contains a single server
+    chosen from the list.
+    """
+
     host_header = attr.ib()
+    """
+    The value we should assign to the Host header (host:port from the matrix
+    URI, or .well-known).
+
+    :type: bytes
+    """
+
     tls_server_name = attr.ib()
+    """
+    The server name we should set in the SNI (typically host, without port, from the
+    matrix URI or .well-known)
+
+    :type: bytes
+    """
+
     target_host = attr.ib()
+    """
+    The hostname (or IP literal) we should route the TCP connection to (the target of the
+    SRV record, or the hostname from the URL/.well-known)
+
+    :type: bytes
+    """
+
     target_port = attr.ib()
+    """
+    The port we should route the TCP connection to (the target of the SRV record, or
+    the port from the URL/.well-known, or 8448)
+
+    :type: int
+    """
