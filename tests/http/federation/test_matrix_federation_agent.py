@@ -564,9 +564,8 @@ class MatrixFederationAgentTests(TestCase):
 
         self.mock_resolver.resolve_service.side_effect = lambda _: []
 
-        # hostnameendpoint does the lookup on the unicode value (getaddrinfo encodes
-        # it back to idna)
-        self.reactor.lookups[u"bücher.com"] = "1.2.3.4"
+        # the resolver is always called with the IDNA hostname as a native string.
+        self.reactor.lookups["xn--bcher-kva.com"] = "1.2.3.4"
 
         # this is idna for bücher.com
         test_d = self._make_get_request(b"matrix://xn--bcher-kva.com/foo/bar")
@@ -625,7 +624,7 @@ class MatrixFederationAgentTests(TestCase):
         self.mock_resolver.resolve_service.side_effect = lambda _: [
             Server(host=b"xn--trget-3qa.com", port=8443)  # târget.com
         ]
-        self.reactor.lookups[u"târget.com"] = "1.2.3.4"
+        self.reactor.lookups["xn--trget-3qa.com"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://xn--bcher-kva.com/foo/bar")
 
