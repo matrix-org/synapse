@@ -29,7 +29,6 @@ import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.storage.state import StateFilter
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -224,18 +223,15 @@ class RoomMemberHandler(object):
 
             # Copy over direct message status and room tags if this is a join
             # on an upgraded room
-            # Check if this is an upgraded room
-            state_ids = yield self.store.get_filtered_current_state_ids(
-                room_id, StateFilter.from_types([(EventTypes.Create, "")]),
-            )
-            create_id = state_ids.get((EventTypes.Create, ""))
-            if not create_id:
-                return
-            create_event = yield self.store.get_event(create_id)
 
-            if "predecessor" in create_event["content"]:
-                old_room_id = create_event["content"]["predecessor"]["room_id"]
-                self.copy_room_tags_and_direct_to_room(old_room_id, room_id, user_id)
+            # Check if this is an upgraded room
+            predecessor = yield self.store.get_room_predecessor(room_id)
+
+            if predecessor:
+                # It is an upgraded room. Copy over old tags
+                self.copy_room_tags_and_direct_to_room(
+                    predecessor["room_id"], room_id, user_id,
+                )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
