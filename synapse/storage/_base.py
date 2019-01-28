@@ -26,7 +26,7 @@ from prometheus_client import Histogram
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
@@ -195,6 +195,9 @@ class SQLBaseStore(object):
         # A set of tables that are not safe to use native upserts in.
         self._unsafe_to_upsert_tables = {"user_ips"}
 
+        if isinstance(self.database_engine, Sqlite3Engine):
+            self._unsafe_to_upsert_tables.add("user_directory_search")
+
         if self.database_engine.can_native_upsert:
             # Check ASAP (and then later, every 1s) to see if we have finished
             # background updates of tables that aren't safe to update.
@@ -223,8 +226,8 @@ class SQLBaseStore(object):
         if "user_ips_device_unique_index" not in updates:
             self._unsafe_to_upsert_tables.discard("user_id")
 
-        # If there's any tables left to check, reschedule to run.
-        if self._unsafe_to_upsert_tables:
+        # If there's any updates remaining, reschedule to run.
+        if updates:
             self._clock.call_later(1.0, self._check_safe_to_upsert)
 
     def start_profiling(self):
