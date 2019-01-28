@@ -255,7 +255,7 @@ class RoomMemberHandler(object):
             user_id (str)
 
         Returns:
-            Deferred|None
+            Deferred[None]
         """
         # Retrieve user account data for predecessor room
         user_account_data, _ = yield self.store.get_account_data_for_user(
