@@ -1300,7 +1300,7 @@ class FederationHandler(BaseHandler):
 
         event.signatures.update(
             compute_event_signature(
-                event,
+                event.get_pdu_json(),
                 self.hs.hostname,
                 self.hs.config.signing_key[0]
             )
