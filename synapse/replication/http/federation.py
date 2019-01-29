@@ -95,7 +95,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
             event_and_contexts = []
             for event_payload in event_payloads:
                 event_dict = event_payload["event"]
-                format_ver = content["event_format_version"]
+                format_ver = event_payload["event_format_version"]
                 internal_metadata = event_payload["internal_metadata"]
                 rejected_reason = event_payload["rejected_reason"]
 
