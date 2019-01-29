@@ -64,6 +64,18 @@ class _EventInternalMetadata(object):
         return getattr(self, "send_on_behalf_of", None)
 
     def need_to_check_redaction(self):
+        """Whether the redaction event needs to be rechecked when fetching
+        from the database.
+
+        Starting in room v3 redaction events are accepted up front, and later
+        checked to see if the redacter and redactee's domains match.
+
+        If the sender of the redaction event is allowed to redact due to auth
+        rules, then this will always return false.
+
+        Returns:
+            bool
+        """
         return getattr(self, "recheck_redaction", False)
 
 
