@@ -31,6 +31,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.url = b"/_matrix/client/r0/capabilities"
         hs = self.setup_test_homeserver()
+        self.store = hs.get_datastore()
         return hs
 
     def test_check_auth_required(self):
@@ -53,3 +54,25 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             DEFAULT_ROOM_VERSION, capabilities['m.room_versions']['default']
         )
+
+    def test_get_change_password_capabilities(self):
+        localpart = "user"
+        password = "pass"
+        user = self.register_user(localpart, password)
+        access_token = self.login(user, password)
+
+        request, channel = self.make_request("GET", self.url, access_token=access_token)
+        self.render(request)
+        capabilities = channel.json_body['capabilities']
+
+        self.assertEqual(channel.code, 200)
+
+        # Test case where password is handled outside of Synapse
+        self.assertTrue(capabilities['m.change_password'])
+        self.get_success(self.store.user_set_password_hash(user, None))
+        request, channel = self.make_request("GET", self.url, access_token=access_token)
+        self.render(request)
+        capabilities = channel.json_body['capabilities']
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities['m.change_password'])
