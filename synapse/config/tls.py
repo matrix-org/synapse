@@ -40,10 +40,8 @@ class TlsConfig(Config):
         self.acme_bind_addresses = acme_config.get("bind_addresses", ["127.0.0.1"])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
 
-        self.tls_certificate_file = os.path.abspath(config.get("tls_certificate_path"))
-        self.tls_private_key_file = config.get("tls_private_key_path")
-        if self.tls_private_key_file:
-            self.tls_private_key_file = os.path.abspath(self.tls_private_key_file)
+        self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
+        self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
         self._original_tls_fingerprints = config["tls_fingerprints"]
         self.tls_fingerprints = list(self._original_tls_fingerprints)
         self.no_tls = config.get("no_tls", False)
