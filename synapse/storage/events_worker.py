@@ -189,7 +189,7 @@ class EventsWorkerStore(SQLBaseStore):
                     if orig and get_domain_from_id(orig.sender) == expected_domain:
                         # This redaction event is allowed. Mark as not needing a
                         # recheck.
-                        entry.event.recheck_redaction = False
+                        entry.event.internal_metadata.recheck_redaction = False
                     else:
                         # We don't have the event that is being redacted, so we
                         # assume that the event isn't authorized for now. (If we
