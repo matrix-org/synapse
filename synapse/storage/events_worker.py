@@ -163,7 +163,6 @@ class EventsWorkerStore(SQLBaseStore):
 
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
-                check_redacted=check_redacted,
                 allow_rejected=allow_rejected,
             )
 
@@ -334,7 +333,7 @@ class EventsWorkerStore(SQLBaseStore):
                     self.hs.get_reactor().callFromThread(fire, event_list, e)
 
     @defer.inlineCallbacks
-    def _enqueue_events(self, events, check_redacted=True, allow_rejected=False):
+    def _enqueue_events(self, events, allow_rejected=False):
         """Fetches events from the database using the _event_fetch_list. This
         allows batch and bulk fetching of events - it allows us to fetch events
         without having to create a new transaction for each request for events.
