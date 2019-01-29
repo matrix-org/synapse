@@ -34,6 +34,7 @@ from synapse.rest.client.v2_alpha import (
     account,
     account_data,
     auth,
+    capabilities,
     devices,
     filter,
     groups,
@@ -107,3 +108,4 @@ class ClientRestResource(JsonResource):
         user_directory.register_servlets(hs, client_resource)
         groups.register_servlets(hs, client_resource)
         room_upgrade_rest_servlet.register_servlets(hs, client_resource)
+        capabilities.register_servlets(hs, client_resource)
