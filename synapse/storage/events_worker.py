@@ -476,7 +476,7 @@ class EventsWorkerStore(SQLBaseStore):
                             # recheck.
                             because.internal_metadata.recheck_redaction = False
                         else:
-                            # Senders don't match, so the event is actually redacted
+                            # Senders don't match, so the event isn't actually redacted
                             redacted_event = None
 
             cache_entry = _EventCacheEntry(
