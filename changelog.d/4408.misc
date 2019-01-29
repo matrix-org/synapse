@@ -1,1 +1,0 @@
-Refactor 'sign_request' as 'build_auth_headers'

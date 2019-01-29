@@ -322,7 +322,7 @@ class FederationServer(FederationBase):
             if self.hs.is_mine_id(event.event_id):
                 event.signatures.update(
                     compute_event_signature(
-                        event,
+                        event.get_pdu_json(),
                         self.hs.hostname,
                         self.hs.config.signing_key[0]
                     )
