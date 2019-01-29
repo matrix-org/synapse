@@ -380,56 +380,87 @@ def setup(config_options):
         Refresh the TLS certificates that Synapse is using by re-reading them
         from disk and updating the TLS context factories to use them.
         """
-        logging.info("Reloading certificate from disk...")
+        logging.info("Loading certificate from disk...")
         hs.config.read_certificate_from_disk()
         hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
         hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
             config
         )
-        logging.info("Certificate reloaded.")
+        logging.info("Certificate loaded.")
 
-        logging.info("Updating context factories...")
-        for i in hs._listening_services:
-            if isinstance(i.factory, TLSMemoryBIOFactory):
-                i.factory = TLSMemoryBIOFactory(
-                    hs.tls_server_context_factory,
-                    False,
-                    i.factory.wrappedFactory
-                )
-        logging.info("Context factories updated.")
+        if hs._listening_services:
+            logging.info("Updating context factories...")
+            for i in hs._listening_services:
+                if isinstance(i.factory, TLSMemoryBIOFactory):
+                    i.factory = TLSMemoryBIOFactory(
+                        hs.tls_server_context_factory,
+                        False,
+                        i.factory.wrappedFactory
+                    )
+            logging.info("Context factories updated.")
 
     sighup_callbacks.append(refresh_certificate)
 
     @defer.inlineCallbacks
+    def do_acme():
+        """
+        Reprovision an ACME certificate, if it's required.
+
+        Returns:
+            Deferred[bool]: Whether the cert has been updated.
+        """
+        acme = hs.get_acme_handler()
+
+        # Check how long the certificate is active for.
+        cert_days_remaining = hs.config.is_disk_cert_valid(
+            allow_self_signed=False
+        )
+
+        # We want to reprovision if cert_days_remaining is None (meaning no
+        # certificate exists), or the days remaining number it returns
+        # is less than our re-registration threshold.
+        provision = False
+
+        if (cert_days_remaining is None):
+            provision = True
+
+        if cert_days_remaining > hs.config.acme_reprovision_threshold:
+            provision = True
+
+        if provision:
+            yield acme.provision_certificate()
+
+        defer.returnValue(provision)
+
+    @defer.inlineCallbacks
+    def reprovision_acme():
+        """
+        Provision a certificate from ACME, if required, and reload the TLS
+        certificate if it's renewed.
+        """
+        reprovisioned = yield do_acme()
+        if reprovisioned:
+            refresh_certificate()
+
+    @defer.inlineCallbacks
     def start():
         try:
-            # Check if the certificate is still valid.
-            cert_days_remaining = hs.config.is_disk_cert_valid()
-
+            # Run the ACME provisioning code, if it's enabled.
             if hs.config.acme_enabled:
-                # If ACME is enabled, we might need to provision a certificate
-                # before starting.
                 acme = hs.get_acme_handler()
-
                 # Start up the webservices which we will respond to ACME
-                # challenges with.
+                # challenges with, and then provision.
                 yield acme.start_listening()
+                yield do_acme()
 
-                # We want to reprovision if cert_days_remaining is None (meaning no
-                # certificate exists), or the days remaining number it returns
-                # is less than our re-registration threshold.
-                if (cert_days_remaining is None) or (
-                    not cert_days_remaining > hs.config.acme_reprovision_threshold
-                ):
-                    yield acme.provision_certificate()
+                # Check if it needs to be reprovisioned every day.
+                hs.get_clock().looping_call(
+                    reprovision_acme,
+                    24 * 60 * 60 * 1000
+                )
 
-            # Read the certificate from disk and build the context factories for
-            # TLS.
-            hs.config.read_certificate_from_disk()
-            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-                config
-            )
+            # Load the certificate from disk.
+            refresh_certificate()
 
             # It is now safe to start your Synapse.
             hs.start_listening()
