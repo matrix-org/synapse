@@ -180,8 +180,6 @@ class EventBuilderFactory(object):
                 "No event format defined for version %r" % (room_version,)
             )
 
-        key_values["event_id"] = _create_event_id(self.clock, self.hostname)
-
         return EventBuilder(
             store=self.store,
             state=self.state,
