@@ -69,8 +69,8 @@ class _EventInternalMetadata(object):
         Starting in room v3 redaction events are accepted up front, and later
         checked to see if the redacter and redactee's domains match.
 
-        If the sender of the redaction event is allowed to redact due to auth
-        rules, then this will always return false.
+        If the sender of the redaction event is allowed to redact any event
+        due to auth rules, then this will always return false.
 
         Returns:
             bool
