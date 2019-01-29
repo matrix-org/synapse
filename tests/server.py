@@ -360,6 +360,7 @@ class FakeTransport(object):
     """
 
     disconnecting = False
+    disconnected = False
     buffer = attr.ib(default=b'')
     producer = attr.ib(default=None)
 
@@ -370,14 +371,16 @@ class FakeTransport(object):
         return None
 
     def loseConnection(self, reason=None):
-        logger.info("FakeTransport: loseConnection(%s)", reason)
         if not self.disconnecting:
+            logger.info("FakeTransport: loseConnection(%s)", reason)
             self.disconnecting = True
             if self._protocol:
                 self._protocol.connectionLost(reason)
+            self.disconnected = True
 
     def abortConnection(self):
-        self.disconnecting = True
+        logger.info("FakeTransport: abortConnection()")
+        self.loseConnection()
 
     def pauseProducing(self):
         if not self.producer:
@@ -416,9 +419,16 @@ class FakeTransport(object):
                 # TLSMemoryBIOProtocol
                 return
 
+            if self.disconnected:
+                return
+            logger.info("%s->%s: %s", self._protocol, self.other, self.buffer)
+
             if getattr(self.other, "transport") is not None:
-                self.other.dataReceived(self.buffer)
-                self.buffer = b""
+                try:
+                    self.other.dataReceived(self.buffer)
+                    self.buffer = b""
+                except Exception as e:
+                    logger.warning("Exception writing to protocol: %s", e)
                 return
 
             self._reactor.callLater(0.0, _write)
