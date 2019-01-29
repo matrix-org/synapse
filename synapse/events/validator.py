@@ -52,7 +52,7 @@ class EventValidator(object):
 
         for s in event_strings:
             if not isinstance(getattr(event, s), string_types):
-                raise SynapseError(400, "Not '%s' a string type" % (s,))
+                raise SynapseError(400, "'%s' not a string type" % (s,))
 
         if event.type == EventTypes.Message:
             content_strings = [
@@ -119,4 +119,4 @@ class EventValidator(object):
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))
             if not isinstance(d[s], string_types):
-                raise SynapseError(400, "Not '%s' a string type" % (s,))
+                raise SynapseError(400, "'%s' not a string type" % (s,))
