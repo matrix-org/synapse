@@ -346,6 +346,8 @@ def room_version_to_event_format(room_version):
         RoomVersions.V1, RoomVersions.V2, RoomVersions.STATE_V2_TEST,
     ):
         return EventFormatVersions.V1
+    elif room_version in (RoomVersions.V3,):
+        return EventFormatVersions.V2
     else:
         raise RuntimeError("Unrecognized room version %s" % (room_version,))
 
