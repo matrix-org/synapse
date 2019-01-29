@@ -65,7 +65,7 @@ class Auth(object):
         register_cache("cache", "token_cache", self.token_cache)
 
     @defer.inlineCallbacks
-    def check_from_context(self, event, context, do_sig_check=True):
+    def check_from_context(self, room_version, event, context, do_sig_check=True):
         prev_state_ids = yield context.get_prev_state_ids(self.store)
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True,
@@ -74,12 +74,16 @@ class Auth(object):
         auth_events = {
             (e.type, e.state_key): e for e in itervalues(auth_events)
         }
-        self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
+        self.check(
+            room_version, event,
+            auth_events=auth_events, do_sig_check=do_sig_check,
+        )
 
-    def check(self, event, auth_events, do_sig_check=True):
+    def check(self, room_version, event, auth_events, do_sig_check=True):
         """ Checks if this event is correctly authed.
 
         Args:
+            room_version (str): version of the room
             event: the event being checked.
             auth_events (dict: event-key -> event): the existing room state.
 
@@ -88,7 +92,9 @@ class Auth(object):
             True if the auth checks pass.
         """
         with Measure(self.clock, "auth.check"):
-            event_auth.check(event, auth_events, do_sig_check=do_sig_check)
+            event_auth.check(
+                room_version, event, auth_events, do_sig_check=do_sig_check
+            )
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):

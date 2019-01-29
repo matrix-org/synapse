@@ -22,7 +22,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership, RoomVersions
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -278,7 +278,15 @@ class EventCreationHandler(object):
         """
         yield self.auth.check_auth_blocking(requester.user.to_string())
 
-        builder = self.event_builder_factory.new(event_dict)
+        if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
+            room_version = event_dict["content"]["room_version"]
+        else:
+            try:
+                room_version = yield self.store.get_room_version(event_dict["room_id"])
+            except NotFoundError:
+                raise AuthError(403, "Unknown room")
+
+        builder = self.event_builder_factory.new(room_version, event_dict)
 
         self.validator.validate_new(builder)
 
@@ -603,8 +611,13 @@ class EventCreationHandler(object):
             extra_users (list(UserID)): Any extra users to notify about event
         """
 
+        if event.is_state() and (event.type, event.state_key) == (EventTypes.Create, ""):
+            room_version = event.content.get("room_version", RoomVersions.V1)
+        else:
+            room_version = yield self.store.get_room_version(event.room_id)
+
         try:
-            yield self.auth.check_from_context(event, context)
+            yield self.auth.check_from_context(room_version, event, context)
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err

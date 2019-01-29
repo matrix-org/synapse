@@ -19,7 +19,7 @@ from six.moves import zip
 
 import attr
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import EventTypes, JoinRules, Membership, RoomVersions
 from synapse.event_auth import auth_types_for_event
 from synapse.events import FrozenEvent
 from synapse.state.v2 import lexicographical_topological_sort, resolve_events_with_store
@@ -539,6 +539,7 @@ class StateTestCase(unittest.TestCase):
                 state_before = dict(state_at_event[prev_events[0]])
             else:
                 state_d = resolve_events_with_store(
+                    RoomVersions.V2,
                     [state_at_event[n] for n in prev_events],
                     event_map=event_map,
                     state_res_store=TestStateResolutionStore(event_map),
@@ -685,6 +686,7 @@ class SimpleParamStateTestCase(unittest.TestCase):
         # Test that we correctly handle passing `None` as the event_map
 
         state_d = resolve_events_with_store(
+            RoomVersions.V2,
             [self.state_at_bob, self.state_at_charlie],
             event_map=None,
             state_res_store=TestStateResolutionStore(self.event_map),
