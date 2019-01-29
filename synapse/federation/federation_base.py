@@ -227,9 +227,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
 
     # we want to check that the event is signed by:
     #
-    # (a) the server which created the event_id
-    #
-    # (b) the sender's server.
+    # (a) the sender's server
     #
     #     - except in the case of invites created from a 3pid invite, which are exempt
     #     from this check, because the sender has to match that of the original 3pid
@@ -242,6 +240,8 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
     #     (because it will then look like a regular invite without a valid signature),
     #     and signatures are *supposed* to be valid whether or not an event has been
     #     redacted. But this isn't the worst of the ways that 3pid invites are broken.
+    #
+    # (b) for V1 and V2 rooms, the server which created the event_id
     #
     # let's start by getting the domain for each pdu, and flattening the event back
     # to JSON.
