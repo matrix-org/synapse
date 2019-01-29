@@ -54,20 +54,6 @@ class EventValidator(object):
             if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "'%s' not a string type" % (s,))
 
-        if event.type == EventTypes.Message:
-            content_strings = [
-                "body",
-                "msgtype",
-            ]
-
-            self._ensure_strings(event.content, content_strings)
-
-        elif event.type == EventTypes.Topic:
-            self._ensure_strings(event.content, ["topic"])
-
-        elif event.type == EventTypes.Name:
-            self._ensure_strings(event.content, ["name"])
-
     def validate_builder(self, event):
         """Validates that the builder/event has roughly the right format. Only
         checks values that we expect a proto event to have, rather than all the
