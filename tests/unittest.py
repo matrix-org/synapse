@@ -34,7 +34,7 @@ from synapse.types import UserID, create_requester
 from synapse.util.logcontext import LoggingContext
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
-from tests.test_utils.logging import setup_logging
+from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
 setupdb()
