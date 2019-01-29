@@ -20,7 +20,7 @@ import six
 from twisted.internet import defer
 from twisted.internet.defer import DeferredList
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership, RoomVersions
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import event_type_from_format_version
@@ -274,7 +274,10 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
     # now let's look for events where the sender's domain is different to the
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
-    if room_version in KNOWN_ROOM_VERSIONS:
+    if room_version in (
+        RoomVersions.V1, RoomVersions.V2, RoomVersions.VDH_TEST,
+        RoomVersions.STATE_V2_TEST,
+    ):
         pdus_to_check_event_id = [
             p for p in pdus_to_check
             if p.sender_domain != get_domain_from_id(p.pdu.event_id)
@@ -287,6 +290,10 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
 
         for p, d in zip(pdus_to_check_event_id, more_deferreds):
             p.deferreds.append(d)
+    elif room_version in (RoomVersions.V3,):
+        pass  # No further checks needed, as event IDs are hashes here
+    else:
+        raise RuntimeError("Unrecognized room version %s" % (room_version,))
 
     # replace lists of deferreds with single Deferreds
     return [_flatten_deferred_list(p.deferreds) for p in pdus_to_check]

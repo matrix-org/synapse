@@ -104,7 +104,7 @@ class ThirdPartyEntityKind(object):
 class RoomVersions(object):
     V1 = "1"
     V2 = "2"
-    V3 = "3"  # Not currently fully supported, so we don't add to known versions below
+    V3 = "3"
     STATE_V2_TEST = "state-v2-test"
 
 
@@ -116,6 +116,7 @@ DEFAULT_ROOM_VERSION = RoomVersions.V1
 KNOWN_ROOM_VERSIONS = {
     RoomVersions.V1,
     RoomVersions.V2,
+    RoomVersions.V3,
     RoomVersions.STATE_V2_TEST,
 }
 
