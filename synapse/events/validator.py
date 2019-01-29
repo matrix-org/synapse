@@ -21,8 +21,14 @@ from synapse.types import EventID, RoomID, UserID
 
 
 class EventValidator(object):
+    def validate_new(self, event):
+        """Validates the event has roughly the right format
 
-    def validate(self, event):
+        Args:
+            event (FrozenEvent)
+        """
+        self.validate_builder(event)
+
         EventID.from_string(event.event_id)
 
         required = [
@@ -40,32 +46,21 @@ class EventValidator(object):
                 raise SynapseError(400, "Event does not have key %s" % (k,))
 
         # Check that the following keys have string values
-        strings = [
+        event_strings = [
             "origin",
         ]
 
-        for s in strings:
+        for s in event_strings:
             if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))
 
-    def validate_new(self, event):
-        """Validates the event has roughly the right format
-
-        Args:
-            event (FrozenEvent)
-        """
-        self.validate_builder(event)
-        self.validate(event)
-
-        UserID.from_string(event.sender)
-
         if event.type == EventTypes.Message:
-            strings = [
+            content_strings = [
                 "body",
                 "msgtype",
             ]
 
-            self._ensure_strings(event.content, strings)
+            self._ensure_strings(event.content, content_strings)
 
         elif event.type == EventTypes.Topic:
             self._ensure_strings(event.content, ["topic"])
