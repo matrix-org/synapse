@@ -275,8 +275,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
     if room_version in (
-        RoomVersions.V1, RoomVersions.V2, RoomVersions.VDH_TEST,
-        RoomVersions.STATE_V2_TEST,
+        RoomVersions.V1, RoomVersions.V2, RoomVersions.STATE_V2_TEST,
     ):
         pdus_to_check_event_id = [
             p for p in pdus_to_check
