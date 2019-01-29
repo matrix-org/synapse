@@ -21,17 +21,22 @@ from synapse.types import EventID, RoomID, UserID
 
 
 class EventValidator(object):
+    def validate_new(self, event):
+        """Validates the event has roughly the right format
 
-    def validate(self, event):
+        Args:
+            event (FrozenEvent)
+        """
+        self.validate_builder(event)
+
         EventID.from_string(event.event_id)
-        RoomID.from_string(event.room_id)
 
         required = [
-            # "auth_events",
+            "auth_events",
             "content",
-            # "hashes",
+            "hashes",
             "origin",
-            # "prev_events",
+            "prev_events",
             "sender",
             "type",
         ]
@@ -41,8 +46,25 @@ class EventValidator(object):
                 raise SynapseError(400, "Event does not have key %s" % (k,))
 
         # Check that the following keys have string values
-        strings = [
+        event_strings = [
             "origin",
+        ]
+
+        for s in event_strings:
+            if not isinstance(getattr(event, s), string_types):
+                raise SynapseError(400, "'%s' not a string type" % (s,))
+
+    def validate_builder(self, event):
+        """Validates that the builder/event has roughly the right format. Only
+        checks values that we expect a proto event to have, rather than all the
+        fields an event would have
+
+        Args:
+            event (EventBuilder|FrozenEvent)
+        """
+
+        strings = [
+            "room_id",
             "sender",
             "type",
         ]
@@ -54,22 +76,7 @@ class EventValidator(object):
             if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "Not '%s' a string type" % (s,))
 
-        if event.type == EventTypes.Member:
-            if "membership" not in event.content:
-                raise SynapseError(400, "Content has not membership key")
-
-            if event.content["membership"] not in Membership.LIST:
-                raise SynapseError(400, "Invalid membership key")
-
-        # Check that the following keys have dictionary values
-        # TODO
-
-        # Check that the following keys have the correct format for DAGs
-        # TODO
-
-    def validate_new(self, event):
-        self.validate(event)
-
+        RoomID.from_string(event.room_id)
         UserID.from_string(event.sender)
 
         if event.type == EventTypes.Message:
@@ -86,9 +93,16 @@ class EventValidator(object):
         elif event.type == EventTypes.Name:
             self._ensure_strings(event.content, ["name"])
 
+        elif event.type == EventTypes.Member:
+            if "membership" not in event.content:
+                raise SynapseError(400, "Content has not membership key")
+
+            if event.content["membership"] not in Membership.LIST:
+                raise SynapseError(400, "Invalid membership key")
+
     def _ensure_strings(self, d, keys):
         for s in keys:
             if s not in d:
                 raise SynapseError(400, "'%s' not in content" % (s,))
             if not isinstance(d[s], string_types):
-                raise SynapseError(400, "Not '%s' a string type" % (s,))
+                raise SynapseError(400, "'%s' not a string type" % (s,))
