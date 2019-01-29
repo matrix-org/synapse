@@ -175,7 +175,7 @@ class TransactionQueue(object):
                 def handle_event(event):
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
-                    is_mine = self.is_mine_id(event.event_id)
+                    is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
                         return
 

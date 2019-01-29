@@ -940,7 +940,8 @@ class RoomMemberHandler(object):
         # first member event?
         create_event_id = current_state_ids.get(("m.room.create", ""))
         if len(current_state_ids) == 1 and create_event_id:
-            defer.returnValue(self.hs.is_mine_id(create_event_id))
+            # We can only get here if we're in the process of creating the room
+            defer.returnValue(True)
 
         for etype, state_key in current_state_ids:
             if etype != EventTypes.Member or not self.hs.is_mine_id(state_key):
