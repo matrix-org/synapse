@@ -290,7 +290,7 @@ class MatrixFederationAgent(object):
         content_type, _opts = cgi.parse_header(content_types[-1])
         if content_type != 'application/json':
             raise Exception("content-type not application/json on .well-known response")
-        parsed_body = json.loads(body)
+        parsed_body = json.loads(body.decode('utf-8'))
         logger.info("Response from .well-known: %s", parsed_body)
         if not isinstance(parsed_body, dict) or "m.server" not in parsed_body:
             raise Exception("invalid .well-known response")
