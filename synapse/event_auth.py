@@ -22,6 +22,7 @@ from unpaddedbase64 import decode_base64
 
 from synapse.api.constants import (
     KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
     EventTypes,
     JoinRules,
     Membership,
@@ -55,7 +56,6 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
 
     if do_sig_check:
         sender_domain = get_domain_from_id(event.sender)
-        event_id_domain = get_domain_from_id(event.event_id)
 
         is_invite_via_3pid = (
             event.type == EventTypes.Member
@@ -72,9 +72,13 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
             if not is_invite_via_3pid:
                 raise AuthError(403, "Event not signed by sender's server")
 
-        # Check the event_id's domain has signed the event
-        if not event.signatures.get(event_id_domain):
-            raise AuthError(403, "Event not signed by sending server")
+        if event.format_version in (EventFormatVersions.V1,):
+            # Only older room versions have event IDs to check.
+            event_id_domain = get_domain_from_id(event.event_id)
+
+            # Check the origin domain has signed the event
+            if not event.signatures.get(event_id_domain):
+                raise AuthError(403, "Event not signed by sending server")
 
     if auth_events is None:
         # Oh, we don't know what the state of the room was, so we
