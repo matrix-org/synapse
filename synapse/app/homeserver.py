@@ -390,7 +390,6 @@ def setup(config_options):
         logging.info("Updating context factories...")
         for i in hs._listening_services:
             if isinstance(i.factory, TLSMemoryBIOFactory):
-                old = i.factory
                 i.factory = TLSMemoryBIOFactory(
                     hs.tls_server_context_factory,
                     False,
