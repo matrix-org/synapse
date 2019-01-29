@@ -72,7 +72,7 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.WARNING))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", None))
 
         @around(self)
         def setUp(orig):
@@ -90,7 +90,7 @@ class TestCase(unittest.TestCase):
                 )
 
             old_level = logging.getLogger().level
-            if old_level != level:
+            if level is not None and old_level != level:
 
                 @around(self)
                 def tearDown(orig):
@@ -98,7 +98,8 @@ class TestCase(unittest.TestCase):
                     logging.getLogger().setLevel(old_level)
                     return ret
 
-            logging.getLogger().setLevel(level)
+                logging.getLogger().setLevel(level)
+
             return orig()
 
         @around(self)
