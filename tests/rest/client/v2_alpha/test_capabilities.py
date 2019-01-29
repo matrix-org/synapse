@@ -14,8 +14,9 @@
 # limitations under the License.
 
 from synapse.api.constants import DEFAULT_ROOM_VERSION, KNOWN_ROOM_VERSIONS
+from synapse.rest.client.v1 import admin, login
 from synapse.rest.client.v2_alpha import capabilities
-from synapse.rest.client.v1 import login, admin
+
 from tests import unittest
 
 
