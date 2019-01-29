@@ -150,8 +150,7 @@ class FederationServer(FederationBase):
 
         # Reject if PDU count > 50 and EDU count > 100
         if (len(transaction.pdus) > 50
-            or (hasattr(transaction, "edus") and len(transaction.edus) > 100)
-        ):
+                or (hasattr(transaction, "edus") and len(transaction.edus) > 100)):
             response = {
                 "pdus": {}
             }
