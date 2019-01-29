@@ -55,7 +55,9 @@ class CapabilitiesRestServlet(RestServlet):
                             "state-v2-test": "unstable",
                         }
                     },
-                    "m.change_password": change_password,
+                    "m.change_password": {
+                        "enabled": change_password,
+                    },
                 }
             })
         )

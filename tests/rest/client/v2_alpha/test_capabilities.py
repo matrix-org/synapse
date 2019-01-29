@@ -68,11 +68,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Test case where password is handled outside of Synapse
-        self.assertTrue(capabilities['m.change_password'])
+        self.assertTrue(capabilities['m.change_password']['enabled'])
         self.get_success(self.store.user_set_password_hash(user, None))
         request, channel = self.make_request("GET", self.url, access_token=access_token)
         self.render(request)
         capabilities = channel.json_body['capabilities']
 
         self.assertEqual(channel.code, 200)
-        self.assertFalse(capabilities['m.change_password'])
+        self.assertFalse(capabilities['m.change_password']['enabled'])
