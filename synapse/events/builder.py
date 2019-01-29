@@ -38,7 +38,6 @@ def get_event_builder(room_version, key_values={}, internal_metadata_dict={}):
     if room_version in {
         RoomVersions.V1,
         RoomVersions.V2,
-        RoomVersions.VDH_TEST,
         RoomVersions.STATE_V2_TEST,
     }:
         return EventBuilder(key_values, internal_metadata_dict)
@@ -101,7 +100,6 @@ class EventBuilderFactory(object):
         if room_version not in {
             RoomVersions.V1,
             RoomVersions.V2,
-            RoomVersions.VDH_TEST,
             RoomVersions.STATE_V2_TEST,
         }:
             raise Exception(

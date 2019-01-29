@@ -448,7 +448,7 @@ def check_redaction(room_version, event, auth_events):
     if user_level >= redact_level:
         return False
 
-    if room_version in (RoomVersions.V1, RoomVersions.V2, RoomVersions.VDH_TEST):
+    if room_version in (RoomVersions.V1, RoomVersions.V2,):
         redacter_domain = get_domain_from_id(event.event_id)
         redactee_domain = get_domain_from_id(event.redacts)
         if redacter_domain == redactee_domain:
