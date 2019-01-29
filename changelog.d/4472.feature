@@ -1,1 +1,1 @@
-Support room version capabilities in CS API (MSC1804)
+Support exposing server capabilities in CS API (MSC1753, MSC1804)
