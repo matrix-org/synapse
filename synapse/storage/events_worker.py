@@ -175,7 +175,7 @@ class EventsWorkerStore(SQLBaseStore):
             if not entry:
                 continue
 
-            # Some redactions in room version v3 need to be rechecked if we
+            # Starting in room version v3, some redactions need to be rechecked if we
             # didn't have the redacted event at the time, so we recheck on read
             # instead.
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
