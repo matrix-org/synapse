@@ -751,18 +751,9 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     def send_invite(self, destination, room_id, event_id, pdu):
-        time_now = self._clock.time_msec()
-        try:
-            code, content = yield self.transport_layer.send_invite(
-                destination=destination,
-                room_id=room_id,
-                event_id=event_id,
-                content=pdu.get_pdu_json(time_now),
-            )
-        except HttpResponseException as e:
-            if e.code == 403:
-                raise e.to_synapse_error()
-            raise
+        room_version = yield self.store.get_room_version(room_id)
+
+        content = yield self._do_send_invite(destination, pdu, room_version)
 
         pdu_dict = content["event"]
 
@@ -779,6 +770,55 @@ class FederationClient(FederationBase):
         # FIXME: We should handle signature failures more gracefully.
 
         defer.returnValue(pdu)
+
+    @defer.inlineCallbacks
+    def _do_send_invite(self, destination, pdu, room_version):
+        """Actually sends the invite, first trying v2 API and falling back to
+        v1 API if necessary.
+
+        Args:
+            destination (str): Target server
+            pdu (FrozenEvent)
+            room_version (str)
+
+        Returns:
+            dict: The event as a dict as returned by the remote server
+        """
+        time_now = self._clock.time_msec()
+
+        try:
+            content = yield self.transport_layer.send_invite_v2(
+                destination=destination,
+                room_id=pdu.room_id,
+                event_id=pdu.event_id,
+                content={
+                    "event": pdu.get_pdu_json(time_now),
+                    "room_version": room_version,
+                    "invite_room_state": pdu.unsigned.get("invite_room_state", []),
+                },
+            )
+            defer.returnValue(content)
+        except HttpResponseException as e:
+            if e.code in [400, 404]:
+                if room_version in (RoomVersions.V1, RoomVersions.V2):
+                    pass  # We'll fall through
+                else:
+                    raise Exception("Remote server is too old")
+            elif e.code == 403:
+                raise e.to_synapse_error()
+            else:
+                raise
+
+        # Didn't work, try v1 API.
+        # Note the v1 API returns a tuple of `(200, content)`
+
+        _, content = yield self.transport_layer.send_invite_v1(
+            destination=destination,
+            room_id=pdu.room_id,
+            event_id=pdu.event_id,
+            content=pdu.get_pdu_json(time_now),
+        )
+        defer.returnValue(content)
 
     def send_leave(self, destinations, pdu):
         """Sends a leave event to one of a list of homeservers.

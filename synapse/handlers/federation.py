@@ -1189,7 +1189,9 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        yield self.auth.check_from_context(event, context, do_sig_check=False)
+        yield self.auth.check_from_context(
+            room_version, event, context, do_sig_check=False,
+        )
 
         defer.returnValue(event)
 
@@ -1388,7 +1390,9 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            yield self.auth.check_from_context(event, context, do_sig_check=False)
+            yield self.auth.check_from_context(
+                room_version, event, context, do_sig_check=False,
+            )
         except AuthError as e:
             logger.warn("Failed to create new leave %r because %s", event, e)
             raise e
@@ -1683,7 +1687,7 @@ class FederationHandler(BaseHandler):
                 auth_for_e[(EventTypes.Create, "")] = create_event
 
             try:
-                self.auth.check(e, auth_events=auth_for_e)
+                self.auth.check(room_version, e, auth_events=auth_for_e)
             except SynapseError as err:
                 # we may get SynapseErrors here as well as AuthErrors. For
                 # instance, there are a couple of (ancient) events in some
@@ -1927,6 +1931,8 @@ class FederationHandler(BaseHandler):
         current_state = set(e.event_id for e in auth_events.values())
         different_auth = event_auth_events - current_state
 
+        room_version = yield self.store.get_room_version(event.room_id)
+
         if different_auth and not event.internal_metadata.is_outlier():
             # Do auth conflict res.
             logger.info("Different auth: %s", different_auth)
@@ -1950,8 +1956,6 @@ class FederationHandler(BaseHandler):
                 remote_view.update({
                     (d.type, d.state_key): d for d in different_events if d
                 })
-
-                room_version = yield self.store.get_room_version(event.room_id)
 
                 new_state = yield self.state_handler.resolve_events(
                     room_version,
@@ -2052,7 +2056,7 @@ class FederationHandler(BaseHandler):
                 )
 
         try:
-            self.auth.check(event, auth_events=auth_events)
+            self.auth.check(room_version, event, auth_events=auth_events)
         except AuthError as e:
             logger.warn("Failed auth resolution for %r because %s", event, e)
             raise e
@@ -2278,7 +2282,7 @@ class FederationHandler(BaseHandler):
             room_version = yield self.store.get_room_version(room_id)
             builder = self.event_builder_factory.new(room_version, event_dict)
 
-            EventValidator().validate_new(builder)
+            EventValidator().validate_builder(builder)
             event, context = yield self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
@@ -2287,8 +2291,10 @@ class FederationHandler(BaseHandler):
                 room_version, event_dict, event, context
             )
 
+            EventValidator().validate_new(event)
+
             try:
-                yield self.auth.check_from_context(event, context)
+                yield self.auth.check_from_context(room_version, event, context)
             except AuthError as e:
                 logger.warn("Denying new third party invite %r because %s", event, e)
                 raise e
@@ -2330,7 +2336,7 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            self.auth.check_from_context(event, context)
+            self.auth.check_from_context(room_version, event, context)
         except AuthError as e:
             logger.warn("Denying third party invite %r because %s", event, e)
             raise e
@@ -2372,10 +2378,11 @@ class FederationHandler(BaseHandler):
             # auth check code will explode appropriately.
 
         builder = self.event_builder_factory.new(room_version, event_dict)
-        EventValidator().validate_new(builder)
+        EventValidator().validate_builder(builder)
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder=builder,
         )
+        EventValidator().validate_new(event)
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks

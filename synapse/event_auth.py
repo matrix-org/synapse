@@ -27,10 +27,11 @@ from synapse.types import UserID, get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-def check(event, auth_events, do_sig_check=True, do_size_check=True):
+def check(room_version, event, auth_events, do_sig_check=True, do_size_check=True):
     """ Checks if this event is correctly authed.
 
     Args:
+        room_version (str): the version of the room
         event: the event being checked.
         auth_events (dict: event-key -> event): the existing room state.
 
