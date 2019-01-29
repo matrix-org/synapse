@@ -104,6 +104,7 @@ class ThirdPartyEntityKind(object):
 class RoomVersions(object):
     V1 = "1"
     V2 = "2"
+    V3 = "3"  # Not currently fully supported, so
     VDH_TEST = "vdh-test-version"
     STATE_V2_TEST = "state-v2-test"
 
