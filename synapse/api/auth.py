@@ -551,17 +551,6 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
-    def add_auth_events(self, builder, context):
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
-        auth_ids = yield self.compute_auth_events(builder, prev_state_ids)
-
-        auth_events_entries = yield self.store.add_event_hashes(
-            auth_ids
-        )
-
-        builder.auth_events = auth_events_entries
-
-    @defer.inlineCallbacks
     def compute_auth_events(self, event, current_state_ids, for_verification=False):
         if event.type == EventTypes.Create:
             defer.returnValue([])
