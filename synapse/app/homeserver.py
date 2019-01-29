@@ -26,10 +26,9 @@ from six import iteritems
 import psutil
 from prometheus_client import Gauge
 
-
-from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.application import service
 from twisted.internet import defer, reactor
+from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
