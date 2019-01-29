@@ -553,6 +553,8 @@ class EventCreationHandler(object):
             prev_event_ids=[p for p, _ in prev_events],
         )
         context = yield self.state.compute_event_context(event)
+        if requester:
+            context.app_service = requester.app_service
 
         self.validator.validate_new(event)
 
