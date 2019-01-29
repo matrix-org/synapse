@@ -123,8 +123,6 @@ class SynapseHomeServer(HomeServer):
 
         root_resource = create_resource_tree(resources, root_resource)
 
-        port = None
-
         if tls:
             return listen_ssl(
                 bind_addresses,
