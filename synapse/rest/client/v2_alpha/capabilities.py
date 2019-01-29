@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet
 
@@ -28,20 +29,26 @@ class CapabilitiesRestServlet(RestServlet):
         """
         super(CapabilitiesRestServlet, self).__init__()
         self.hs = hs
+        self.auth = hs.get_auth()
 
+    @defer.inlineCallbacks
     def on_GET(self, request):
-        return 200, {
-            "capabilities": {
-                "m.room_versions": {
-                    "default": "1",
-                    "available": {
-                        "1": "stable",
-                        "2": "stable",
-                        "state-v2-test": "unstable",
+
+        yield self.auth.get_user_by_req(request, allow_guest=True)
+        defer.returnValue(
+            (200, {
+                "capabilities": {
+                    "m.room_versions": {
+                        "default": "1",
+                        "available": {
+                            "1": "stable",
+                            "2": "stable",
+                            "state-v2-test": "unstable",
+                        }
                     }
                 }
-            }
-        }
+            })
+        )
 
 
 def register_servlets(hs, http_server):

@@ -14,23 +14,38 @@
 # limitations under the License.
 
 from synapse.api.constants import DEFAULT_ROOM_VERSION, KNOWN_ROOM_VERSIONS
-from synapse.rest.client.v2_alpha.capabilities import register_servlets
-
+from synapse.rest.client.v2_alpha import capabilities
+from synapse.rest.client.v1 import login, admin
 from tests import unittest
 
 
 class CapabilitiesTestCase(unittest.HomeserverTestCase):
-    servlets = [register_servlets]
+
+    servlets = [
+        admin.register_servlets,
+        capabilities.register_servlets,
+        login.register_servlets,
+    ]
 
     def make_homeserver(self, reactor, clock):
         self.url = b"/_matrix/client/r0/capabilities"
         hs = self.setup_test_homeserver()
         return hs
 
-    def test_get_room_version_capabilities(self):
+    def test_check_auth_required(self):
         request, channel = self.make_request("GET", self.url)
         self.render(request)
+
+        self.assertEqual(channel.code, 401)
+
+    def test_get_room_version_capabilities(self):
+        self.register_user("user", "pass")
+        access_token = self.login("user", "pass")
+
+        request, channel = self.make_request("GET", self.url, access_token=access_token)
+        self.render(request)
         capabilities = channel.json_body['capabilities']
+
         self.assertEqual(channel.code, 200)
         for room_version in capabilities['m.room_versions']['available'].keys():
             self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
