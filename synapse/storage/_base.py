@@ -236,7 +236,7 @@ class SQLBaseStore(object):
             self._unsafe_to_upsert_tables.discard("user_ips")
 
         # If there's any tables left to check, reschedule to run.
-        if self.updates:
+        if updates:
             self._clock.call_later(
                 15.0,
                 run_as_background_process,
