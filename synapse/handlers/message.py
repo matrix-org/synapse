@@ -22,7 +22,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership, RoomVersions
+from synapse.api.constants import EventTypes, Membership, RoomVersions
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -31,7 +31,6 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.urls import ConsentURIBuilder
-from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -545,40 +544,19 @@ class EventCreationHandler(object):
             prev_events_and_hashes = \
                 yield self.store.get_prev_events_for_room(builder.room_id)
 
-        if prev_events_and_hashes:
-            depth = max([d for _, _, d in prev_events_and_hashes]) + 1
-            # we cap depth of generated events, to ensure that they are not
-            # rejected by other servers (and so that they can be persisted in
-            # the db)
-            depth = min(depth, MAX_DEPTH)
-        else:
-            depth = 1
-
         prev_events = [
             (event_id, prev_hashes)
             for event_id, prev_hashes, _ in prev_events_and_hashes
         ]
 
-        builder.prev_events = prev_events
-        builder.depth = depth
-
-        context = yield self.state.compute_event_context(builder)
+        event = yield builder.build(
+            prev_event_ids=[p for p, _ in prev_events],
+        )
+        context = yield self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service
 
-        if builder.is_state():
-            builder.prev_state = yield self.store.add_event_hashes(
-                context.prev_state_events
-            )
-
-        yield self.auth.add_auth_events(builder, context)
-
-        signing_key = self.hs.config.signing_key[0]
-        add_hashes_and_signatures(
-            builder, self.server_name, signing_key
-        )
-
-        event = builder.build()
+        self.validator.validate_new(event)
 
         logger.debug(
             "Created event %s",
