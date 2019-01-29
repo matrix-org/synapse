@@ -577,7 +577,7 @@ class Auth(object):
         key = (EventTypes.JoinRules, "", )
         join_rule_event_id = current_state_ids.get(key)
 
-        key = (EventTypes.Member, event.user_id, )
+        key = (EventTypes.Member, event.sender, )
         member_event_id = current_state_ids.get(key)
 
         key = (EventTypes.Create, "", )
