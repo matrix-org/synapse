@@ -645,9 +645,12 @@ class FederationServer(FederationBase):
                     pdu.event_id, origin
                 )
 
+        # We've already checked that we know the room version by this point
+        room_version = yield self.store.get_room_version(pdu.room_id)
+
         # Check signature.
         try:
-            pdu = yield self._check_sigs_and_hash(pdu)
+            pdu = yield self._check_sigs_and_hash(room_version, pdu)
         except SynapseError as e:
             raise FederationError(
                 "ERROR",

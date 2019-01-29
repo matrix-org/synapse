@@ -205,7 +205,7 @@ class FederationClient(FederationBase):
 
         # FIXME: We should handle signature failures more gracefully.
         pdus[:] = yield logcontext.make_deferred_yieldable(defer.gatherResults(
-            self._check_sigs_and_hashes(pdus),
+            self._check_sigs_and_hashes(room_version, pdus),
             consumeErrors=True,
         ).addErrback(unwrapFirstError))
 
@@ -268,7 +268,7 @@ class FederationClient(FederationBase):
                     pdu = pdu_list[0]
 
                     # Check signatures are correct.
-                    signed_pdu = yield self._check_sigs_and_hash(pdu)
+                    signed_pdu = yield self._check_sigs_and_hash(room_version, pdu)
 
                     break
 
@@ -757,7 +757,7 @@ class FederationClient(FederationBase):
         pdu = event_from_pdu_json(pdu_dict, format_ver)
 
         # Check signatures are correct.
-        pdu = yield self._check_sigs_and_hash(pdu)
+        pdu = yield self._check_sigs_and_hash(room_version, pdu)
 
         # FIXME: We should handle signature failures more gracefully.
 
