@@ -62,6 +62,21 @@ class _EventInternalMetadata(object):
         """
         return getattr(self, "send_on_behalf_of", None)
 
+    def need_to_check_redaction(self):
+        """Whether the redaction event needs to be rechecked when fetching
+        from the database.
+
+        Starting in room v3 redaction events are accepted up front, and later
+        checked to see if the redacter and redactee's domains match.
+
+        If the sender of the redaction event is allowed to redact any event
+        due to auth rules, then this will always return false.
+
+        Returns:
+            bool
+        """
+        return getattr(self, "recheck_redaction", False)
+
 
 def _event_dict_property(key):
     # We want to be able to use hasattr with the event dict properties.
@@ -328,8 +343,7 @@ def room_version_to_event_format(room_version):
         raise RuntimeError("Unrecognized room version %s" % (room_version,))
 
     if room_version in (
-        RoomVersions.V1, RoomVersions.V2, RoomVersions.VDH_TEST,
-        RoomVersions.STATE_V2_TEST,
+        RoomVersions.V1, RoomVersions.V2, RoomVersions.STATE_V2_TEST,
     ):
         return EventFormatVersions.V1
     else:
