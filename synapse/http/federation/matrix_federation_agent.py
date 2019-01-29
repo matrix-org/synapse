@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import cgi
 import json
 import logging
 
@@ -263,37 +262,31 @@ class MatrixFederationAgent(object):
         # FIXME: add a cache
 
         uri = b"https://%s/.well-known/matrix/server" % (server_name, )
-        logger.info("Fetching %s", uri.decode("ascii"))
+        uri_str = uri.decode("ascii")
+        logger.info("Fetching %s", uri_str)
         try:
             response = yield make_deferred_yieldable(
                 self._well_known_agent.request(b"GET", uri),
             )
         except Exception as e:
-            logger.info(
-                "Connection error fetching %s: %s",
-                uri.decode("ascii"), e,
-            )
+            logger.info("Connection error fetching %s: %s", uri_str, e)
             defer.returnValue(None)
 
         body = yield make_deferred_yieldable(readBody(response))
 
         if response.code != 200:
-            logger.info(
-                "Error response %i from %s: %s",
-                response.code, uri.decode("ascii"), body,
-            )
+            logger.info("Error response %i from %s", response.code, uri_str)
             defer.returnValue(None)
 
-        content_types = response.headers.getRawHeaders(u'content-type')
-        if content_types is None:
-            raise Exception("no content-type header on .well-known response")
-        content_type, _opts = cgi.parse_header(content_types[-1])
-        if content_type != 'application/json':
-            raise Exception("content-type not application/json on .well-known response")
-        parsed_body = json.loads(body.decode('utf-8'))
-        logger.info("Response from .well-known: %s", parsed_body)
-        if not isinstance(parsed_body, dict) or "m.server" not in parsed_body:
-            raise Exception("invalid .well-known response")
+        try:
+            parsed_body = json.loads(body.decode('utf-8'))
+            logger.info("Response from .well-known: %s", parsed_body)
+            if not isinstance(parsed_body, dict):
+                raise Exception("not a dict")
+            if "m.server" not in parsed_body:
+                raise Exception("Missing key 'm.server'")
+        except Exception as e:
+            raise Exception("invalid .well-known response from %s: %s" % (uri_str, e,))
         defer.returnValue(parsed_body["m.server"].encode("ascii"))
 
 

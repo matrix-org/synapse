@@ -146,7 +146,6 @@ class MatrixFederationAgentTests(TestCase):
             [b'testserv'],
         )
         # send back a response
-        request.responseHeaders.setRawHeaders(b'Content-Type', [b'application/json'])
         request.write(b'{ "m.server": "%s" }' % (target_server,))
         request.finish()
 
