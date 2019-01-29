@@ -50,5 +50,5 @@ def setup_logging():
     handler.addFilter(LoggingContextFilter(request=""))
     root_logger.addHandler(handler)
 
-    log_level = os.environ.get("TEST_LOG_LEVEL", "ERROR")
+    log_level = os.environ.get("SYNAPSE_TEST_LOG_LEVEL", "ERROR")
     root_logger.setLevel(log_level)
