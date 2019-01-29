@@ -123,8 +123,10 @@ class SynapseHomeServer(HomeServer):
 
         root_resource = create_resource_tree(resources, root_resource)
 
+        port = None
+
         if tls:
-            r = listen_ssl(
+            return listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -138,7 +140,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         else:
-            r = listen_tcp(
+            return listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -149,8 +151,6 @@ class SynapseHomeServer(HomeServer):
                     self.version_string,
                 )
             )
-        logger.info("Synapse now listening on port %d", port)
-        return r
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
@@ -378,8 +378,11 @@ def setup(config_options):
     hs.setup()
 
     def refresh_certificate(*args):
-
-        logging.info("Reloading certificate from disk")
+        """
+        Refresh the TLS certificates that Synapse is using by re-reading them
+        from disk and updating the TLS context factories to use them.
+        """
+        logging.info("Reloading certificate from disk...")
         hs.config.read_certificate_from_disk()
         hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
         hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
