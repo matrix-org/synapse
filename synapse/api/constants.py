@@ -126,10 +126,12 @@ class EventFormatVersions(object):
     independently from the room version.
     """
     V1 = 1
+    V2 = 2
 
 
 KNOWN_EVENT_FORMAT_VERSIONS = {
     EventFormatVersions.V1,
+    EventFormatVersions.V2,
 }
 
 

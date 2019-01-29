@@ -21,6 +21,7 @@ from synapse.api.constants import (
     KNOWN_EVENT_FORMAT_VERSIONS,
     KNOWN_ROOM_VERSIONS,
     MAX_DEPTH,
+    EventFormatVersions,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.types import EventID
@@ -109,8 +110,12 @@ class EventBuilder(object):
             self, state_ids,
         )
 
-        auth_events = yield self._store.add_event_hashes(auth_ids)
-        prev_events = yield self._store.add_event_hashes(prev_event_ids)
+        if self.format_version == EventFormatVersions.V1:
+            auth_events = yield self._store.add_event_hashes(auth_ids)
+            prev_events = yield self._store.add_event_hashes(prev_event_ids)
+        else:
+            auth_events = auth_ids
+            prev_events = prev_event_ids
 
         old_depth = yield self._store.get_max_depth_of(
             prev_event_ids,
@@ -228,7 +233,8 @@ def create_local_event_from_event_dict(clock, hostname, signing_key,
 
     time_now = int(clock.time_msec())
 
-    event_dict["event_id"] = _create_event_id(clock, hostname)
+    if format_version == EventFormatVersions.V1:
+        event_dict["event_id"] = _create_event_id(clock, hostname)
 
     event_dict["origin"] = hostname
     event_dict["origin_server_ts"] = time_now
