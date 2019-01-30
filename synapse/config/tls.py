@@ -31,13 +31,16 @@ logger = logging.getLogger()
 class TlsConfig(Config):
     def read_config(self, config):
 
-        acme_config = config.get("acme", {})
+        acme_config = config.get("acme", None)
+        if acme_config is None:
+            acme_config = {}
+
         self.acme_enabled = acme_config.get("enabled", False)
         self.acme_url = acme_config.get(
             "url", "https://acme-v01.api.letsencrypt.org/directory"
         )
-        self.acme_port = acme_config.get("port", 8449)
-        self.acme_bind_addresses = acme_config.get("bind_addresses", ["127.0.0.1"])
+        self.acme_port = acme_config.get("port", 80)
+        self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
@@ -136,21 +139,80 @@ class TlsConfig(Config):
         tls_certificate_path = base_key_name + ".tls.crt"
         tls_private_key_path = base_key_name + ".tls.key"
 
+        # this is to avoid the max line length. Sorrynotsorry
+        proxypassline = (
+            'ProxyPass /.well-known/acme-challenge '
+            'http://localhost:8009/.well-known/acme-challenge'
+        )
+
         return (
             """\
-        # PEM encoded X509 certificate for TLS.
-        # This certificate, as of Synapse 1.0, will need to be a valid
-        # and verifiable certificate, with a root that is available in
-        # the root store of other servers you wish to federate to. Any
-        # required intermediary certificates can be appended after the
-        # primary certificate in hierarchical order.
+        # PEM-encoded X509 certificate for TLS.
+        # This certificate, as of Synapse 1.0, will need to be a valid and verifiable
+        # certificate, signed by a recognised Certificate Authority.
+        #
+        # See 'ACME support' below to enable auto-provisioning this certificate via
+        # Let's Encrypt.
+        #
         tls_certificate_path: "%(tls_certificate_path)s"
 
-        # PEM encoded private key for TLS
+        # PEM-encoded private key for TLS
         tls_private_key_path: "%(tls_private_key_path)s"
 
-        # Don't bind to the https port
-        no_tls: False
+        # ACME support: This will configure Synapse to request a valid TLS certificate
+        # for your configured `server_name` via Let's Encrypt.
+        #
+        # Note that provisioning a certificate in this way requires port 80 to be
+        # routed to Synapse so that it can complete the http-01 ACME challenge.
+        # By default, if you enable ACME support, Synapse will attempt to listen on
+        # port 80 for incoming http-01 challenges - however, this will likely fail
+        # with 'Permission denied' or a similar error.
+        #
+        # There are a couple of potential solutions to this:
+        #
+        #  * If you already have an Apache, Nginx, or similar listening on port 80,
+        #    you can configure Synapse to use an alternate port, and have your web
+        #    server forward the requests. For example, assuming you set 'port: 8009'
+        #    below, on Apache, you would write:
+        #
+        #    %(proxypassline)s
+        #
+        #  * Alternatively, you can use something like `authbind` to give Synapse
+        #    permission to listen on port 80.
+        #
+        acme:
+            # ACME support is disabled by default. Uncomment the following line
+            # to enable it.
+            #
+            # enabled: true
+
+            # Endpoint to use to request certificates. If you only want to test,
+            # use Let's Encrypt's staging url:
+            #     https://acme-staging.api.letsencrypt.org/directory
+            #
+            # url: https://acme-v01.api.letsencrypt.org/directory
+
+            # Port number to listen on for the HTTP-01 challenge. Change this if
+            # you are forwarding connections through Apache/Nginx/etc.
+            #
+            # port: 80
+
+            # Local addresses to listen on for incoming connections.
+            # Again, you may want to change this if you are forwarding connections
+            # through Apache/Nginx/etc.
+            #
+            # bind_addresses: ['::', '0.0.0.0']
+
+            # How many days remaining on a certificate before it is renewed.
+            #
+            # reprovision_threshold: 30
+
+        # If your server runs behind a reverse-proxy which terminates TLS connections
+        # (for both client and federation connections), it may be useful to disable
+        # All TLS support for incoming connections. Setting no_tls to False will
+        # do so (and avoid the need to give synapse a TLS private key).
+        #
+        # no_tls: False
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
@@ -180,20 +242,6 @@ class TlsConfig(Config):
         tls_fingerprints: []
         # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
-        ## Support for ACME certificate auto-provisioning.
-        # acme:
-        #    enabled: false
-        ##   ACME path.
-        ##   If you only want to test, use the staging url:
-        ##   https://acme-staging.api.letsencrypt.org/directory
-        #    url: 'https://acme-v01.api.letsencrypt.org/directory'
-        ##   Port number (to listen for the HTTP-01 challenge).
-        ##   Using port 80 requires utilising something like authbind, or proxying to it.
-        #    port: 8449
-        ##   Hosts to bind to.
-        #    bind_addresses: ['127.0.0.1']
-        ##   How many days remaining on a certificate before it is renewed.
-        #    reprovision_threshold: 30
         """
             % locals()
         )

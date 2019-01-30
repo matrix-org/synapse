@@ -26,6 +26,7 @@ from twisted.internet import error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 from synapse.crypto import context_factory
+from synapse.app import check_bind_error
 from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
 
@@ -195,27 +196,6 @@ def listen_ssl(
 
     logger.info("Synapse now listening on port %d (TLS)", port)
     return r
-
-
-def check_bind_error(e, address, bind_addresses):
-    """
-    This method checks an exception occurred while binding on 0.0.0.0.
-    If :: is specified in the bind addresses a warning is shown.
-    The exception is still raised otherwise.
-
-    Binding on both 0.0.0.0 and :: causes an exception on Linux and macOS
-    because :: binds on both IPv4 and IPv6 (as per RFC 3493).
-    When binding on 0.0.0.0 after :: this can safely be ignored.
-
-    Args:
-        e (Exception): Exception that was caught.
-        address (str): Address on which binding was attempted.
-        bind_addresses (list): Addresses on which the service listens.
-    """
-    if address == '0.0.0.0' and '::' in bind_addresses:
-        logger.warn('Failed to listen on 0.0.0.0, continuing because listening on [::]')
-    else:
-        raise e
 
 
 def refresh_certificate(hs):
