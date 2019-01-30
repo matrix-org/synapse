@@ -17,7 +17,6 @@
 import gc
 import logging
 import os
-import signal
 import sys
 import traceback
 
@@ -28,7 +27,6 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
-from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -49,7 +47,6 @@ from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
-from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
@@ -326,11 +323,9 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    sighup_callbacks = []
     synapse.config.logger.setup_logging(
         config,
-        use_worker_options=False,
-        register_sighup=sighup_callbacks.append
+        use_worker_options=False
     )
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
@@ -345,13 +340,6 @@ def setup(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
-
-    def handle_sighup(*args, **kwargs):
-        for i in sighup_callbacks:
-            i(hs)
-
-    if hasattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, handle_sighup)
 
     logger.info("Preparing database: %s...", config.database_config['name'])
 
@@ -374,32 +362,6 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
-
-    def refresh_certificate(hs):
-        """
-        Refresh the TLS certificates that Synapse is using by re-reading them
-        from disk and updating the TLS context factories to use them.
-        """
-        logging.info("Loading certificate from disk...")
-        hs.config.read_certificate_from_disk()
-        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-            config
-        )
-        logging.info("Certificate loaded.")
-
-        if hs._listening_services:
-            logging.info("Updating context factories...")
-            for i in hs._listening_services:
-                if isinstance(i.factory, TLSMemoryBIOFactory):
-                    i.factory = TLSMemoryBIOFactory(
-                        hs.tls_server_context_factory,
-                        False,
-                        i.factory.wrappedFactory
-                    )
-            logging.info("Context factories updated.")
-
-    sighup_callbacks.append(refresh_certificate)
 
     @defer.inlineCallbacks
     def do_acme():
@@ -440,7 +402,7 @@ def setup(config_options):
         """
         reprovisioned = yield do_acme()
         if reprovisioned:
-            refresh_certificate()
+            _base.refresh_certificate(hs)
 
     @defer.inlineCallbacks
     def start():
@@ -459,23 +421,23 @@ def setup(config_options):
                     24 * 60 * 60 * 1000
                 )
 
-            # Load the certificate from disk.
-            refresh_certificate()
+            _base.start(hs)
 
-            # It is now safe to start your Synapse.
-            hs.start_listening()
             hs.get_pusherpool().start()
-            hs.get_datastore().start_profiling()
             hs.get_datastore().start_doing_background_updates()
         except Exception as e:
             # If a DeferredList failed (like in listening on the ACME listener),
             # we need to print the subfailure explicitly.
             if isinstance(e, defer.FirstError):
                 e.subFailure.printTraceback(sys.stderr)
+                if reactor.running:
+                    reactor.stop()
                 sys.exit(1)
 
             # Something else went wrong when starting. Print it and bail out.
             traceback.print_exc(file=sys.stderr)
+            if reactor.running:
+                reactor.stop()
             sys.exit(1)
 
     reactor.callWhenRunning(start)
@@ -484,7 +446,8 @@ def setup(config_options):
 
 
 class SynapseService(service.Service):
-    """A twisted Service class that will start synapse. Used to run synapse
+    """
+    A twisted Service class that will start synapse. Used to run synapse
     via twistd and a .tac.
     """
     def __init__(self, config):

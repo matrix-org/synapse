@@ -15,7 +15,6 @@
 import logging
 import logging.config
 import os
-import signal
 import sys
 from string import Template
 
@@ -24,6 +23,7 @@ import yaml
 from twisted.logger import STDLibLogObserver, globalLogBeginner
 
 import synapse
+from synapse.app import _base as appbase
 from synapse.util.logcontext import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
@@ -127,7 +127,7 @@ class LoggingConfig(Config):
                 )
 
 
-def setup_logging(config, use_worker_options=False, register_sighup=None):
+def setup_logging(config, use_worker_options=False):
     """ Set up python logging
 
     Args:
@@ -140,9 +140,6 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
         register_sighup (func | None): Function to call to register a
             sighup handler.
     """
-    if not register_sighup:
-        register_sighup = lambda x: None
-
     log_config = (config.worker_log_config if use_worker_options
                   else config.log_config)
     log_file = (config.worker_log_file if use_worker_options
@@ -204,7 +201,7 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
 
         load_log_config()
 
-    register_sighup(sighup)
+    appbase.register_sighup(sighup)
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for
