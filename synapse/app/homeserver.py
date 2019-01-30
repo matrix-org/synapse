@@ -426,16 +426,8 @@ def setup(config_options):
 
             hs.get_pusherpool().start()
             hs.get_datastore().start_doing_background_updates()
-        except Exception as e:
-            # If a DeferredList failed (like in listening on the ACME listener),
-            # we need to print the subfailure explicitly.
-            if isinstance(e, defer.FirstError):
-                e.subFailure.printTraceback(sys.stderr)
-                if reactor.running:
-                    reactor.stop()
-                sys.exit(1)
-
-            # Something else went wrong when starting. Print it and bail out.
+        except Exception:
+            # Print the exception and bail out.
             traceback.print_exc(file=sys.stderr)
             if reactor.running:
                 reactor.stop()
