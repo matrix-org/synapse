@@ -16,7 +16,8 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import DEFAULT_ROOM_VERSION
+from synapse.api.constants import DEFAULT_ROOM_VERSION, RoomVersions, RoomDisposition
+
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
@@ -43,26 +44,23 @@ class CapabilitiesRestServlet(RestServlet):
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         user = yield self.store.get_user_by_id(requester.user.to_string())
-        change_password = bool(user['password_hash'])
+        change_password = bool(user["password_hash"])
 
-        defer.returnValue(
-            (200, {
-                "capabilities": {
-                    "m.room_versions": {
-                        "default": DEFAULT_ROOM_VERSION,
-                        "available": {
-                            "1": "stable",
-                            "2": "stable",
-                            "state-v2-test": "unstable",
-                            "3": "stable",
-                        }
+        response = {
+            "capabilities": {
+                "m.room_versions": {
+                    "default": DEFAULT_ROOM_VERSION,
+                    "available": {
+                        RoomVersions.V1: RoomDisposition.STABLE,
+                        RoomVersions.V2: RoomDisposition.STABLE,
+                        RoomVersions.STATE_V2_TEST: RoomDisposition.UNSTABLE,
+                        RoomVersions.V3: RoomDisposition.STABLE,
                     },
-                    "m.change_password": {
-                        "enabled": change_password,
-                    },
-                }
-            })
-        )
+                },
+                "m.change_password": {"enabled": change_password},
+            }
+        }
+        defer.returnValue((200, response))
 
 
 def register_servlets(hs, http_server):
