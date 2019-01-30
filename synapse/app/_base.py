@@ -243,25 +243,26 @@ def refresh_certificate(hs):
         logging.info("Context factories updated.")
 
 
-def start(hs):
+def start(hs, listeners=None):
     """
     Start a Synapse server or worker.
     """
     try:
-        def handle_sighup(*args, **kwargs):
-            for i in _sighup_callbacks:
-                i(hs)
-
+        # Set up the SIGHUP machinery.
         if hasattr(signal, "SIGHUP"):
+            def handle_sighup(*args, **kwargs):
+                for i in _sighup_callbacks:
+                    i(hs)
+
             signal.signal(signal.SIGHUP, handle_sighup)
 
-        register_sighup(refresh_certificate)
+            register_sighup(refresh_certificate)
 
         # Load the certificate from disk.
         refresh_certificate(hs)
 
         # It is now safe to start your Synapse.
-        hs.start_listening()
+        hs.start_listening(listeners)
         hs.get_datastore().start_profiling()
     except Exception:
         traceback.print_exc(file=sys.stderr)
