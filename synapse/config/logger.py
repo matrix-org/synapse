@@ -141,10 +141,7 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
             sighup handler.
     """
     if not register_sighup:
-        if getattr(signal, "SIGHUP"):
-            register_sighup = lambda x: signal.signal(signal.SIGHUP, x)
-        else:
-            register_sighup = lambda x: None
+        register_sighup = lambda x: None
 
     log_config = (config.worker_log_config if use_worker_options
                   else config.log_config)
@@ -187,7 +184,7 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
         else:
             handler = logging.StreamHandler()
 
-            def sighup(signum, stack):
+            def sighup(*args):
                 pass
 
         handler.setFormatter(formatter)
@@ -200,7 +197,7 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
             with open(log_config, 'r') as f:
                 logging.config.dictConfig(yaml.load(f))
 
-        def sighup(signum, stack):
+        def sighup(*args):
             # it might be better to use a file watcher or something for this.
             load_log_config()
             logging.info("Reloaded log config from %s due to SIGHUP", log_config)

@@ -333,13 +333,6 @@ def setup(config_options):
         register_sighup=sighup_callbacks.append
     )
 
-    def handle_sighup(*args, **kwargs):
-        for i in sighup_callbacks:
-            i(*args, **kwargs)
-
-    if hasattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, handle_sighup)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -352,6 +345,13 @@ def setup(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    def handle_sighup(*args, **kwargs):
+        for i in sighup_callbacks:
+            i(hs)
+
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, handle_sighup)
 
     logger.info("Preparing database: %s...", config.database_config['name'])
 
@@ -375,7 +375,7 @@ def setup(config_options):
 
     hs.setup()
 
-    def refresh_certificate(*args):
+    def refresh_certificate(hs):
         """
         Refresh the TLS certificates that Synapse is using by re-reading them
         from disk and updating the TLS context factories to use them.
