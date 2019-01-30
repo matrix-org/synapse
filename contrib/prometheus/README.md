@@ -6,8 +6,10 @@ To use it, first install prometheus by following the instructions at
   http://prometheus.io/
 
 ### for Prometheus v1
+
 Add a new job to the main prometheus.conf file:
 
+```yaml
   job: {
     name: "synapse"
 
@@ -15,10 +17,12 @@ Add a new job to the main prometheus.conf file:
       target: "http://SERVER.LOCATION.HERE:PORT/_synapse/metrics"
     }
   }
+```
 
 ### for Prometheus v2
 Add a new job to the main prometheus.yml file:
 
+```yaml
   - job_name: "synapse"
     metrics_path: "/_synapse/metrics"
     # when endpoint uses https:
@@ -26,11 +30,14 @@ Add a new job to the main prometheus.yml file:
 
     static_configs:
     - targets: ['SERVER.LOCATION:PORT']
+```
 
 To use `synapse.rules` add
 
+```yaml
     rule_files:
       - "/PATH/TO/synapse-v2.rules"
+```
 
 Metrics are disabled by default when running synapse; they must be enabled
 with the 'enable-metrics' option, either in the synapse config file or as a
