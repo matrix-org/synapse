@@ -237,7 +237,7 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self):
+    def start_listening(self, ign):
         config = self.get_config()
 
         for listener in config.listeners:
