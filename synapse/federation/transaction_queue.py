@@ -22,7 +22,11 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse.metrics
-from synapse.api.errors import FederationDeniedError, HttpResponseException
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    RequestSendFailed,
+)
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 from synapse.metrics import (
     LaterGauge,
@@ -137,26 +141,6 @@ class TransactionQueue(object):
 
         self._processing_pending_presence = False
 
-    def can_send_to(self, destination):
-        """Can we send messages to the given server?
-
-        We can't send messages to ourselves. If we are running on localhost
-        then we can only federation with other servers running on localhost.
-        Otherwise we only federate with servers on a public domain.
-
-        Args:
-            destination(str): The server we are possibly trying to send to.
-        Returns:
-            bool: True if we can send to the server.
-        """
-
-        if destination == self.server_name:
-            return False
-        if self.server_name.startswith("localhost"):
-            return destination.startswith("localhost")
-        else:
-            return not destination.startswith("localhost")
-
     def notify_new_events(self, current_id):
         """This gets called when we have some new events we might want to
         send out to other servers.
@@ -191,7 +175,7 @@ class TransactionQueue(object):
                 def handle_event(event):
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
-                    is_mine = self.is_mine_id(event.event_id)
+                    is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
                         return
 
@@ -203,9 +187,7 @@ class TransactionQueue(object):
                         # banned then it won't receive the event because it won't
                         # be in the room after the ban.
                         destinations = yield self.state.get_current_hosts_in_room(
-                            event.room_id, latest_event_ids=[
-                                prev_id for prev_id, _ in event.prev_events
-                            ],
+                            event.room_id, latest_event_ids=event.prev_event_ids(),
                         )
                     except Exception:
                         logger.exception(
@@ -279,10 +261,7 @@ class TransactionQueue(object):
         self._order += 1
 
         destinations = set(destinations)
-        destinations = set(
-            dest for dest in destinations if self.can_send_to(dest)
-        )
-
+        destinations.discard(self.server_name)
         logger.debug("Sending to: %s", str(destinations))
 
         if not destinations:
@@ -358,7 +337,7 @@ class TransactionQueue(object):
 
         for destinations, states in hosts_and_states:
             for destination in destinations:
-                if not self.can_send_to(destination):
+                if destination == self.server_name:
                     continue
 
                 self.pending_presence_by_dest.setdefault(
@@ -377,7 +356,8 @@ class TransactionQueue(object):
             content=content,
         )
 
-        if not self.can_send_to(destination):
+        if destination == self.server_name:
+            logger.info("Not sending EDU to ourselves")
             return
 
         sent_edus_counter.inc()
@@ -392,10 +372,8 @@ class TransactionQueue(object):
         self._attempt_new_transaction(destination)
 
     def send_device_messages(self, destination):
-        if destination == self.server_name or destination == "localhost":
-            return
-
-        if not self.can_send_to(destination):
+        if destination == self.server_name:
+            logger.info("Not sending device update to ourselves")
             return
 
         self._attempt_new_transaction(destination)
@@ -544,11 +522,21 @@ class TransactionQueue(object):
             )
         except FederationDeniedError as e:
             logger.info(e)
-        except Exception as e:
-            logger.warn(
-                "TX [%s] Failed to send transaction: %s",
+        except HttpResponseException as e:
+            logger.warning(
+                "TX [%s] Received %d response to transaction: %s",
+                destination, e.code, e,
+            )
+        except RequestSendFailed as e:
+            logger.warning("TX [%s] Failed to send transaction: %s", destination, e)
+
+            for p, _ in pending_pdus:
+                logger.info("Failed to send event %s to %s", p.event_id,
+                            destination)
+        except Exception:
+            logger.exception(
+                "TX [%s] Failed to send transaction",
                 destination,
-                e,
             )
             for p, _ in pending_pdus:
                 logger.info("Failed to send event %s to %s", p.event_id,
@@ -657,14 +645,6 @@ class TransactionQueue(object):
                 transaction, json_data_cb
             )
             code = 200
-
-            if response:
-                for e_id, r in response.get("pdus", {}).items():
-                    if "error" in r:
-                        logger.warn(
-                            "Transaction returned error for %s: %s",
-                            e_id, r,
-                        )
         except HttpResponseException as e:
             code = e.code
             response = e.response
@@ -681,19 +661,24 @@ class TransactionQueue(object):
             destination, txn_id, code
         )
 
-        logger.debug("TX [%s] Sent transaction", destination)
-        logger.debug("TX [%s] Marking as delivered...", destination)
-
         yield self.transaction_actions.delivered(
             transaction, code, response
         )
 
-        logger.debug("TX [%s] Marked as delivered", destination)
+        logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
 
-        if code != 200:
+        if code == 200:
+            for e_id, r in response.get("pdus", {}).items():
+                if "error" in r:
+                    logger.warn(
+                        "TX [%s] {%s} Remote returned error for %s: %s",
+                        destination, txn_id, e_id, r,
+                    )
+        else:
             for p in pdus:
-                logger.info(
-                    "Failed to send event %s to %s", p.event_id, destination
+                logger.warn(
+                    "TX [%s] {%s} Failed to send event %s",
+                    destination, txn_id, p.event_id,
                 )
             success = False
 

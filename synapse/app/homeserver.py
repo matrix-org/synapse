@@ -13,17 +13,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import logging
 import os
+import signal
 import sys
+import traceback
 
 from six import iteritems
 
+import psutil
 from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
+from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -36,7 +41,6 @@ from synapse.api.urls import (
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_PREFIX,
-    SERVER_KEY_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
     WEB_CLIENT_PREFIX,
@@ -54,13 +58,13 @@ from synapse.metrics import RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
 from synapse.module_api import ModuleApi
-from synapse.python_dependencies import CONDITIONAL_REQUIREMENTS, check_requirements
+from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
-from synapse.rest.key.v1.server_key_resource import LocalKey
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
+from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore, are_all_users_on_domain
 from synapse.storage.engines import IncorrectDatabaseSetup, create_engine
@@ -80,38 +84,9 @@ def gz_wrap(r):
     return EncodingResourceWrapper(r, [GzipEncoderFactory()])
 
 
-def build_resource_for_web_client(hs):
-    webclient_path = hs.get_config().web_client_location
-    if not webclient_path:
-        try:
-            import syweb
-        except ImportError:
-            quit_with_error(
-                "Could not find a webclient.\n\n"
-                "Please either install the matrix-angular-sdk or configure\n"
-                "the location of the source to serve via the configuration\n"
-                "option `web_client_location`\n\n"
-                "To install the `matrix-angular-sdk` via pip, run:\n\n"
-                "    pip install '%(dep)s'\n"
-                "\n"
-                "You can also disable hosting of the webclient via the\n"
-                "configuration option `web_client`\n"
-                % {"dep": CONDITIONAL_REQUIREMENTS["web_client"].keys()[0]}
-            )
-        syweb_path = os.path.dirname(syweb.__file__)
-        webclient_path = os.path.join(syweb_path, "webclient")
-    # GZip is disabled here due to
-    # https://twistedmatrix.com/trac/ticket/7678
-    # (It can stay enabled for the API resources: they call
-    # write() with the whole body and then finish() straight
-    # after and so do not trigger the bug.
-    # GzipFile was removed in commit 184ba09
-    # return GzipFile(webclient_path)  # TODO configurable?
-    return File(webclient_path)  # TODO configurable?
-
-
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
+    _listening_services = []
 
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
@@ -120,7 +95,9 @@ class SynapseHomeServer(HomeServer):
         site_tag = listener_config.get("tag", port)
 
         if tls and config.no_tls:
-            return
+            raise ConfigError(
+                "Listener on port %i has TLS enabled, but no_tls is set" % (port,),
+            )
 
         resources = {}
         for res in listener_config["resources"]:
@@ -138,15 +115,18 @@ class SynapseHomeServer(HomeServer):
             handler = handler_cls(config, module_api)
             resources[path] = AdditionalResource(self, handler.handle_request)
 
+        # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
             root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+        elif STATIC_PREFIX in resources:
+            root_resource = RootRedirect(STATIC_PREFIX)
         else:
             root_resource = NoResource()
 
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            listen_ssl(
+            return listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -160,7 +140,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         else:
-            listen_tcp(
+            return listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -171,7 +151,6 @@ class SynapseHomeServer(HomeServer):
                     self.version_string,
                 )
             )
-        logger.info("Synapse now listening on port %d", port)
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
@@ -196,7 +175,12 @@ class SynapseHomeServer(HomeServer):
                 "/_matrix/client/unstable": client_resource,
                 "/_matrix/client/v2_alpha": client_resource,
                 "/_matrix/client/versions": client_resource,
+                "/.well-known/matrix/client": WellKnownResource(self),
             })
+
+            if self.get_config().saml2_enabled:
+                from synapse.rest.saml2 import SAML2Resource
+                resources["/_matrix/saml2"] = SAML2Resource(self)
 
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
@@ -235,13 +219,19 @@ class SynapseHomeServer(HomeServer):
                 )
 
         if name in ["keys", "federation"]:
-            resources.update({
-                SERVER_KEY_PREFIX: LocalKey(self),
-                SERVER_KEY_V2_PREFIX: KeyApiV2Resource(self),
-            })
+            resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            resources[WEB_CLIENT_PREFIX] = build_resource_for_web_client(self)
+            webclient_path = self.get_config().web_client_location
+
+            if webclient_path is None:
+                logger.warning(
+                    "Not enabling webclient resource, as web_client_location is unset."
+                )
+            else:
+                # GZip is disabled here due to
+                # https://twistedmatrix.com/trac/ticket/7678
+                resources[WEB_CLIENT_PREFIX] = File(webclient_path)
 
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
@@ -256,7 +246,9 @@ class SynapseHomeServer(HomeServer):
 
         for listener in config.listeners:
             if listener["type"] == "http":
-                self._listener_http(config, listener)
+                self._listening_services.extend(
+                    self._listener_http(config, listener)
+                )
             elif listener["type"] == "manhole":
                 listen_tcp(
                     listener["bind_addresses"],
@@ -301,7 +293,7 @@ class SynapseHomeServer(HomeServer):
         try:
             database_engine.check_database(db_conn.cursor())
         except IncorrectDatabaseSetup as e:
-            quit_with_error(e.message)
+            quit_with_error(str(e))
 
 
 # Gauges to expose monthly active user control metrics
@@ -328,7 +320,7 @@ def setup(config_options):
             config_options,
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     if not config:
@@ -336,15 +328,21 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    synapse.config.logger.setup_logging(config, use_worker_options=False)
+    sighup_callbacks = []
+    synapse.config.logger.setup_logging(
+        config,
+        use_worker_options=False,
+        register_sighup=sighup_callbacks.append
+    )
 
-    # check any extra requirements we have now we have a config
-    check_requirements(config)
+    def handle_sighup(*args, **kwargs):
+        for i in sighup_callbacks:
+            i(*args, **kwargs)
+
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, handle_sighup)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
-
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
@@ -352,8 +350,6 @@ def setup(config_options):
     hs = SynapseHomeServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
-        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
@@ -380,14 +376,78 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
-    hs.start_listening()
 
+    def refresh_certificate(*args):
+        """
+        Refresh the TLS certificates that Synapse is using by re-reading them
+        from disk and updating the TLS context factories to use them.
+        """
+        logging.info("Reloading certificate from disk...")
+        hs.config.read_certificate_from_disk()
+        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            config
+        )
+        logging.info("Certificate reloaded.")
+
+        logging.info("Updating context factories...")
+        for i in hs._listening_services:
+            if isinstance(i.factory, TLSMemoryBIOFactory):
+                i.factory = TLSMemoryBIOFactory(
+                    hs.tls_server_context_factory,
+                    False,
+                    i.factory.wrappedFactory
+                )
+        logging.info("Context factories updated.")
+
+    sighup_callbacks.append(refresh_certificate)
+
+    @defer.inlineCallbacks
     def start():
-        hs.get_pusherpool().start()
-        hs.get_state_handler().start_caching()
-        hs.get_datastore().start_profiling()
-        hs.get_datastore().start_doing_background_updates()
-        hs.get_federation_client().start_get_pdu_cache()
+        try:
+            # Check if the certificate is still valid.
+            cert_days_remaining = hs.config.is_disk_cert_valid()
+
+            if hs.config.acme_enabled:
+                # If ACME is enabled, we might need to provision a certificate
+                # before starting.
+                acme = hs.get_acme_handler()
+
+                # Start up the webservices which we will respond to ACME
+                # challenges with.
+                yield acme.start_listening()
+
+                # We want to reprovision if cert_days_remaining is None (meaning no
+                # certificate exists), or the days remaining number it returns
+                # is less than our re-registration threshold.
+                if (cert_days_remaining is None) or (
+                    not cert_days_remaining > hs.config.acme_reprovision_threshold
+                ):
+                    yield acme.provision_certificate()
+
+            # Read the certificate from disk and build the context factories for
+            # TLS.
+            hs.config.read_certificate_from_disk()
+            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+                config
+            )
+
+            # It is now safe to start your Synapse.
+            hs.start_listening()
+            hs.get_pusherpool().start()
+            hs.get_datastore().start_profiling()
+            hs.get_datastore().start_doing_background_updates()
+        except Exception as e:
+            # If a DeferredList failed (like in listening on the ACME listener),
+            # we need to print the subfailure explicitly.
+            if isinstance(e, defer.FirstError):
+                e.subFailure.printTraceback(sys.stderr)
+                sys.exit(1)
+
+            # Something else went wrong when starting. Print it and bail out.
+            traceback.print_exc(file=sys.stderr)
+            sys.exit(1)
 
     reactor.callWhenRunning(start)
 
@@ -457,6 +517,10 @@ def run(hs):
         stats["homeserver"] = hs.config.server_name
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
+        version = sys.version_info
+        stats["python_version"] = "{}.{}.{}".format(
+            version.major, version.minor, version.micro
+        )
         stats["total_users"] = yield hs.get_datastore().count_all_users()
 
         total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
@@ -500,7 +564,6 @@ def run(hs):
 
     def performance_stats_init():
         try:
-            import psutil
             process = psutil.Process()
             # Ensure we can fetch both, and make the initial request for cpu_percent
             # so the next request will use this as the initial point.
@@ -508,12 +571,9 @@ def run(hs):
             process.cpu_percent(interval=None)
             logger.info("report_stats can use psutil")
             stats_process.append(process)
-        except (ImportError, AttributeError):
-            logger.warn(
-                "report_stats enabled but psutil is not installed or incorrect version."
-                " Disabling reporting of memory/cpu stats."
-                " Ensuring psutil is available will help matrix.org track performance"
-                " changes across releases."
+        except (AttributeError):
+            logger.warning(
+                "Unable to read memory/cpu stats. Disabling reporting."
             )
 
     def generate_user_daily_visit_stats():
@@ -528,29 +588,35 @@ def run(hs):
     clock.looping_call(generate_user_daily_visit_stats, 5 * 60 * 1000)
 
     # monthly active user limiting functionality
-    clock.looping_call(
-        hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60
-    )
-    hs.get_datastore().reap_monthly_active_users()
+    def reap_monthly_active_users():
+        return run_as_background_process(
+            "reap_monthly_active_users",
+            hs.get_datastore().reap_monthly_active_users,
+        )
+    clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
+    reap_monthly_active_users()
 
     @defer.inlineCallbacks
     def generate_monthly_active_users():
         current_mau_count = 0
         reserved_count = 0
         store = hs.get_datastore()
-        if hs.config.limit_usage_by_mau:
+        if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
             current_mau_count = yield store.get_monthly_active_count()
             reserved_count = yield store.get_registered_reserved_users_count()
         current_mau_gauge.set(float(current_mau_count))
         registered_reserved_users_mau_gauge.set(float(reserved_count))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 
-    hs.get_datastore().initialise_reserved_users(
-        hs.config.mau_limits_reserved_threepids
-    )
-    generate_monthly_active_users()
-    if hs.config.limit_usage_by_mau:
-        clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
+    def start_generate_monthly_active_users():
+        return run_as_background_process(
+            "generate_monthly_active_users",
+            generate_monthly_active_users,
+        )
+
+    start_generate_monthly_active_users()
+    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
+        clock.looping_call(start_generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings
 
     if hs.config.report_stats:
@@ -566,7 +632,7 @@ def run(hs):
         clock.call_later(5 * 60, start_phone_stats_home)
 
     if hs.config.daemonize and hs.config.print_pidfile:
-        print (hs.config.pid_file)
+        print(hs.config.pid_file)
 
     _base.start_reactor(
         "synapse-homeserver",

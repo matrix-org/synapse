@@ -9,15 +9,18 @@ source $BASH_ENV
 
 if [[ -z "${CIRCLE_PR_NUMBER}" ]]
 then
-    echo "Can't figure out what the PR number is!"
-    exit 1
+    echo "Can't figure out what the PR number is! Assuming merge target is develop."
+
+    # It probably hasn't had a PR opened yet. Since all PRs land on develop, we
+    # can probably assume it's based on it and will be merged into it.
+    GITBASE="develop"
+else
+    # Get the reference, using the GitHub API
+    GITBASE=`wget -O- https://api.github.com/repos/matrix-org/synapse/pulls/${CIRCLE_PR_NUMBER} | jq -r '.base.ref'`
 fi
 
-# Get the reference, using the GitHub API
-GITBASE=`curl -q https://api.github.com/repos/matrix-org/synapse/pulls/${CIRCLE_PR_NUMBER} | jq -r '.base.ref'`
-
 # Show what we are before
-git show -s
+git --no-pager show -s
 
 # Set up username so it can do a merge
 git config --global user.email bot@matrix.org
@@ -28,4 +31,4 @@ git fetch -u origin $GITBASE
 git merge --no-edit origin/$GITBASE
 
 # Show what we are after.
-git show -s
+git --no-pager show -s

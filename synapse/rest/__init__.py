@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six import PY3
-
 from synapse.http.server import JsonResource
 from synapse.rest.client import versions
 from synapse.rest.client.v1 import (
@@ -36,6 +34,7 @@ from synapse.rest.client.v2_alpha import (
     account,
     account_data,
     auth,
+    capabilities,
     devices,
     filter,
     groups,
@@ -46,6 +45,8 @@ from synapse.rest.client.v2_alpha import (
     receipts,
     register,
     report_event,
+    room_keys,
+    room_upgrade_rest_servlet,
     sendtodevice,
     sync,
     tags,
@@ -53,11 +54,6 @@ from synapse.rest.client.v2_alpha import (
     tokenrefresh,
     user_directory,
 )
-
-if not PY3:
-    from synapse.rest.client.v1_only import (
-        register as v1_register,
-    )
 
 
 class ClientRestResource(JsonResource):
@@ -70,10 +66,6 @@ class ClientRestResource(JsonResource):
     @staticmethod
     def register_servlets(client_resource, hs):
         versions.register_servlets(client_resource)
-
-        if not PY3:
-            # "v1" (Python 2 only)
-            v1_register.register_servlets(hs, client_resource)
 
         # Deprecated in r0
         initial_sync.register_servlets(hs, client_resource)
@@ -102,6 +94,7 @@ class ClientRestResource(JsonResource):
         auth.register_servlets(hs, client_resource)
         receipts.register_servlets(hs, client_resource)
         read_marker.register_servlets(hs, client_resource)
+        room_keys.register_servlets(hs, client_resource)
         keys.register_servlets(hs, client_resource)
         tokenrefresh.register_servlets(hs, client_resource)
         tags.register_servlets(hs, client_resource)
@@ -114,3 +107,5 @@ class ClientRestResource(JsonResource):
         sendtodevice.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
         groups.register_servlets(hs, client_resource)
+        room_upgrade_rest_servlet.register_servlets(hs, client_resource)
+        capabilities.register_servlets(hs, client_resource)

@@ -57,8 +57,8 @@ class KeyConfig(Config):
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
             logger.warn("Config is missing missing macaroon_secret_key")
-            seed = self.signing_key[0].seed
-            self.macaroon_secret_key = hashlib.sha256(seed)
+            seed = bytes(self.signing_key[0])
+            self.macaroon_secret_key = hashlib.sha256(seed).digest()
 
         self.expire_access_token = config.get("expire_access_token", False)
 
@@ -66,26 +66,32 @@ class KeyConfig(Config):
         # falsification of values
         self.form_secret = config.get("form_secret", None)
 
-    def default_config(self, config_dir_path, server_name, is_generating_file=False,
+    def default_config(self, config_dir_path, server_name, generate_secrets=False,
                        **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        if is_generating_file:
-            macaroon_secret_key = random_string_with_symbols(50)
-            form_secret = '"%s"' % random_string_with_symbols(50)
+        if generate_secrets:
+            macaroon_secret_key = 'macaroon_secret_key: "%s"' % (
+                random_string_with_symbols(50),
+            )
+            form_secret = 'form_secret: "%s"' % random_string_with_symbols(50)
         else:
-            macaroon_secret_key = None
-            form_secret = 'null'
+            macaroon_secret_key = "# macaroon_secret_key: <PRIVATE STRING>"
+            form_secret = "# form_secret: <PRIVATE STRING>"
 
         return """\
-        macaroon_secret_key: "%(macaroon_secret_key)s"
+        # a secret which is used to sign access tokens. If none is specified,
+        # the registration_shared_secret is used, if one is given; otherwise,
+        # a secret key is derived from the signing key.
+        %(macaroon_secret_key)s
 
         # Used to enable access token expiration.
         expire_access_token: False
 
         # a secret which is used to calculate HMACs for form values, to stop
-        # falsification of values
-        form_secret: %(form_secret)s
+        # falsification of values. Must be specified for the User Consent
+        # forms to work.
+        %(form_secret)s
 
         ## Signing Keys ##
 

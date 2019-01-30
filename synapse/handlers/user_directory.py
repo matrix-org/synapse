@@ -19,7 +19,9 @@ from six import iteritems
 
 from twisted.internet import defer
 
+import synapse.metrics
 from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import get_localpart_from_id
 from synapse.util.metrics import Measure
@@ -98,7 +100,6 @@ class UserDirectoryHandler(object):
         """
         return self.store.search_user_dir(user_id, search_term, limit)
 
-    @defer.inlineCallbacks
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
@@ -108,11 +109,15 @@ class UserDirectoryHandler(object):
         if self._is_processing:
             return
 
+        @defer.inlineCallbacks
+        def process():
+            try:
+                yield self._unsafe_process()
+            finally:
+                self._is_processing = False
+
         self._is_processing = True
-        try:
-            yield self._unsafe_process()
-        finally:
-            self._is_processing = False
+        run_as_background_process("user_directory.notify_new_event", process)
 
     @defer.inlineCallbacks
     def handle_local_profile_change(self, user_id, profile):
@@ -121,9 +126,12 @@ class UserDirectoryHandler(object):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        yield self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url, None,
-        )
+        is_support = yield self.store.is_support_user(user_id)
+        # Support users are for diagnostics and should not appear in the user directory.
+        if not is_support:
+            yield self.store.update_profile_in_user_dir(
+                user_id, profile.display_name, profile.avatar_url, None,
+            )
 
     @defer.inlineCallbacks
     def handle_user_deactivated(self, user_id):
@@ -156,6 +164,11 @@ class UserDirectoryHandler(object):
                 yield self._handle_deltas(deltas)
 
                 self.pos = deltas[-1]["stream_id"]
+
+                # Expose current event processing position to prometheus
+                synapse.metrics.event_processing_positions.labels(
+                    "user_dir").set(self.pos)
+
                 yield self.store.update_user_directory_stream_pos(self.pos)
 
     @defer.inlineCallbacks
@@ -325,14 +338,7 @@ class UserDirectoryHandler(object):
                     public_value=Membership.JOIN,
                 )
 
-                if change is None:
-                    # Handle any profile changes
-                    yield self._handle_profile_change(
-                        state_key, room_id, prev_event_id, event_id,
-                    )
-                    continue
-
-                if not change:
+                if change is False:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
                     is_in_room = yield self.store.is_host_joined(
@@ -350,16 +356,25 @@ class UserDirectoryHandler(object):
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                if change:  # The user joined
-                    event = yield self.store.get_event(event_id, allow_none=True)
-                    profile = ProfileInfo(
-                        avatar_url=event.content.get("avatar_url"),
-                        display_name=event.content.get("displayname"),
-                    )
+                is_support = yield self.store.is_support_user(state_key)
+                if not is_support:
+                    if change is None:
+                        # Handle any profile changes
+                        yield self._handle_profile_change(
+                            state_key, room_id, prev_event_id, event_id,
+                        )
+                        continue
 
-                    yield self._handle_new_user(room_id, state_key, profile)
-                else:  # The user left
-                    yield self._handle_remove_user(room_id, state_key)
+                    if change:  # The user joined
+                        event = yield self.store.get_event(event_id, allow_none=True)
+                        profile = ProfileInfo(
+                            avatar_url=event.content.get("avatar_url"),
+                            display_name=event.content.get("displayname"),
+                        )
+
+                        yield self._handle_new_user(room_id, state_key, profile)
+                    else:  # The user left
+                        yield self._handle_remove_user(room_id, state_key)
             else:
                 logger.debug("Ignoring irrelevant type: %r", typ)
 

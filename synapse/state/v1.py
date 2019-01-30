@@ -21,7 +21,7 @@ from six import iteritems, iterkeys, itervalues
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, RoomVersions
 from synapse.api.errors import AuthError
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ POWER_KEY = (EventTypes.PowerLevels, "")
 
 
 @defer.inlineCallbacks
-def resolve_events_with_factory(state_sets, event_map, state_map_factory):
+def resolve_events_with_store(state_sets, event_map, state_map_factory):
     """
     Args:
         state_sets(list): List of dicts of (type, state_key) -> event_id,
@@ -65,10 +65,15 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
         for event_ids in itervalues(conflicted_state)
         for event_id in event_ids
     )
+    needed_event_count = len(needed_events)
     if event_map is not None:
         needed_events -= set(iterkeys(event_map))
 
-    logger.info("Asking for %d conflicted events", len(needed_events))
+    logger.info(
+        "Asking for %d/%d conflicted events",
+        len(needed_events),
+        needed_event_count,
+    )
 
     # dict[str, FrozenEvent]: a map from state event id to event. Only includes
     # the state events which are in conflict (and those in event_map)
@@ -85,11 +90,16 @@ def resolve_events_with_factory(state_sets, event_map, state_map_factory):
     )
 
     new_needed_events = set(itervalues(auth_events))
+    new_needed_event_count = len(new_needed_events)
     new_needed_events -= needed_events
     if event_map is not None:
         new_needed_events -= set(iterkeys(event_map))
 
-    logger.info("Asking for %d auth events", len(new_needed_events))
+    logger.info(
+        "Asking for %d/%d auth events",
+        len(new_needed_events),
+        new_needed_event_count,
+    )
 
     state_map_new = yield state_map_factory(new_needed_events)
     state_map.update(state_map_new)
@@ -264,7 +274,11 @@ def _resolve_auth_events(events, auth_events):
         auth_events[(prev_event.type, prev_event.state_key)] = prev_event
         try:
             # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
+            event_auth.check(
+                RoomVersions.V1, event, auth_events,
+                do_sig_check=False,
+                do_size_check=False,
+            )
             prev_event = event
         except AuthError:
             return prev_event
@@ -276,7 +290,11 @@ def _resolve_normal_events(events, auth_events):
     for event in _ordered_events(events):
         try:
             # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
+            event_auth.check(
+                RoomVersions.V1, event, auth_events,
+                do_sig_check=False,
+                do_size_check=False,
+            )
             return event
         except AuthError:
             pass
@@ -288,6 +306,8 @@ def _resolve_normal_events(events, auth_events):
 
 def _ordered_events(events):
     def key_func(e):
-        return -int(e.depth), hashlib.sha1(e.event_id.encode('ascii')).hexdigest()
+        # we have to use utf-8 rather than ascii here because it turns out we allow
+        # people to send us events with non-ascii event IDs :/
+        return -int(e.depth), hashlib.sha1(e.event_id.encode('utf-8')).hexdigest()
 
     return sorted(events, key=key_func)

@@ -50,6 +50,7 @@ handlers:
         maxBytes: 104857600
         backupCount: 10
         filters: [context]
+        encoding: utf8
     console:
         class: logging.StreamHandler
         formatter: precise
@@ -79,9 +80,7 @@ class LoggingConfig(Config):
         self.log_file = self.abspath(config.get("log_file"))
 
     def default_config(self, config_dir_path, server_name, **kwargs):
-        log_config = self.abspath(
-            os.path.join(config_dir_path, server_name + ".log.config")
-        )
+        log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return """
         # A yaml python logging config file
         log_config: "%(log_config)s"
@@ -128,7 +127,7 @@ class LoggingConfig(Config):
                 )
 
 
-def setup_logging(config, use_worker_options=False):
+def setup_logging(config, use_worker_options=False, register_sighup=None):
     """ Set up python logging
 
     Args:
@@ -137,7 +136,16 @@ def setup_logging(config, use_worker_options=False):
 
         use_worker_options (bool): True to use 'worker_log_config' and
             'worker_log_file' options instead of 'log_config' and 'log_file'.
+
+        register_sighup (func | None): Function to call to register a
+            sighup handler.
     """
+    if not register_sighup:
+        if getattr(signal, "SIGHUP"):
+            register_sighup = lambda x: signal.signal(signal.SIGHUP, x)
+        else:
+            register_sighup = lambda x: None
+
     log_config = (config.worker_log_config if use_worker_options
                   else config.log_config)
     log_file = (config.worker_log_file if use_worker_options
@@ -199,13 +207,7 @@ def setup_logging(config, use_worker_options=False):
 
         load_log_config()
 
-    # TODO(paul): obviously this is a terrible mechanism for
-    #   stealing SIGHUP, because it means no other part of synapse
-    #   can use it instead. If we want to catch SIGHUP anywhere
-    #   else as well, I'd suggest we find a nicer way to broadcast
-    #   it around.
-    if getattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, sighup)
+    register_sighup(sighup)
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for

@@ -59,6 +59,7 @@ class Codes(object):
     RESOURCE_LIMIT_EXCEEDED = "M_RESOURCE_LIMIT_EXCEEDED"
     UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
+    WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
 
 
 class CodeMessageException(RuntimeError):
@@ -312,6 +313,20 @@ class LimitExceededError(SynapseError):
         )
 
 
+class RoomKeysVersionError(SynapseError):
+    """A client has tried to upload to a non-current version of the room_keys store
+    """
+    def __init__(self, current_version):
+        """
+        Args:
+            current_version (str): the current version of the store they should have used
+        """
+        super(RoomKeysVersionError, self).__init__(
+            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
+        )
+        self.current_version = current_version
+
+
 class IncompatibleRoomVersionError(SynapseError):
     """A server is trying to join a room whose version it does not support."""
 
@@ -331,6 +346,24 @@ class IncompatibleRoomVersionError(SynapseError):
             self.errcode,
             room_version=self._room_version,
         )
+
+
+class RequestSendFailed(RuntimeError):
+    """Sending a HTTP request over federation failed due to not being able to
+    talk to the remote server for some reason.
+
+    This exception is used to differentiate "expected" errors that arise due to
+    networking (e.g. DNS failures, connection timeouts etc), versus unexpected
+    errors (like programming errors).
+    """
+    def __init__(self, inner_exception, can_retry):
+        super(RequestSendFailed, self).__init__(
+            "Failed to send request: %s: %s" % (
+                type(inner_exception).__name__, inner_exception,
+            )
+        )
+        self.inner_exception = inner_exception
+        self.can_retry = can_retry
 
 
 def cs_error(msg, code=Codes.UNKNOWN, **kwargs):

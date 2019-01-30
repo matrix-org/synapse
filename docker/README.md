@@ -88,6 +88,7 @@ variables are available for configuration:
 * ``SYNAPSE_TURN_URIS``, set this variable to the coma-separated list of TURN
   uris to enable TURN for this homeserver.
 * ``SYNAPSE_TURN_SECRET``, set this to the TURN shared secret if required.
+* ``SYNAPSE_MAX_UPLOAD_SIZE``, set this variable to change the max upload size [default `10M`].
 
 Shared secrets, that will be initialized to random values if not set:
 

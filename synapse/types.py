@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import re
 import string
 from collections import namedtuple
 
@@ -226,6 +227,71 @@ def contains_invalid_mxid_characters(localpart):
         bool: True if there are any naughty characters
     """
     return any(c not in mxid_localpart_allowed_characters for c in localpart)
+
+
+UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
+
+# the following is a pattern which matches '=', and bytes which are not allowed in a mxid
+# localpart.
+#
+# It works by:
+#  * building a string containing the allowed characters (excluding '=')
+#  * escaping every special character with a backslash (to stop '-' being interpreted as a
+#    range operator)
+#  * wrapping it in a '[^...]' regex
+#  * converting the whole lot to a 'bytes' sequence, so that we can use it to match
+#    bytes rather than strings
+#
+NON_MXID_CHARACTER_PATTERN = re.compile(
+    ("[^%s]" % (
+        re.escape("".join(mxid_localpart_allowed_characters - {"="}),),
+    )).encode("ascii"),
+)
+
+
+def map_username_to_mxid_localpart(username, case_sensitive=False):
+    """Map a username onto a string suitable for a MXID
+
+    This follows the algorithm laid out at
+    https://matrix.org/docs/spec/appendices.html#mapping-from-other-character-sets.
+
+    Args:
+        username (unicode|bytes): username to be mapped
+        case_sensitive (bool): true if TEST and test should be mapped
+            onto different mxids
+
+    Returns:
+        unicode: string suitable for a mxid localpart
+    """
+    if not isinstance(username, bytes):
+        username = username.encode('utf-8')
+
+    # first we sort out upper-case characters
+    if case_sensitive:
+        def f1(m):
+            return b"_" + m.group().lower()
+
+        username = UPPER_CASE_PATTERN.sub(f1, username)
+    else:
+        username = username.lower()
+
+    # then we sort out non-ascii characters
+    def f2(m):
+        g = m.group()[0]
+        if isinstance(g, str):
+            # on python 2, we need to do a ord(). On python 3, the
+            # byte itself will do.
+            g = ord(g)
+        return b"=%02x" % (g,)
+
+    username = NON_MXID_CHARACTER_PATTERN.sub(f2, username)
+
+    # we also do the =-escaping to mxids starting with an underscore.
+    username = re.sub(b'^_', b'=5f', username)
+
+    # we should now only have ascii bytes left, so can decode back to a
+    # unicode.
+    return username.decode('ascii')
 
 
 class StreamToken(

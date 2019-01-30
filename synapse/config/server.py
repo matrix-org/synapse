@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017 New Vector Ltd
+# Copyright 2017-2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,10 @@
 # limitations under the License.
 
 import logging
+import os.path
 
 from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -34,7 +36,6 @@ class ServerConfig(Config):
             raise ConfigError(str(e))
 
         self.pid_file = self.abspath(config.get("pid_file"))
-        self.web_client = config["web_client"]
         self.web_client_location = config.get("web_client_location", None)
         self.soft_file_limit = config["soft_file_limit"]
         self.daemonize = config.get("daemonize")
@@ -62,6 +63,11 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # whether to enable search. If disabled, new entries will not be inserted
+        # into the search tables and they will not be indexed. Users will receive
+        # errors when attempting to search for messages.
+        self.enable_search = config.get("enable_search", True)
+
         self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
 
         # Whether we should block invites sent to users on this server
@@ -77,6 +83,7 @@ class ServerConfig(Config):
             self.max_mau_value = config.get(
                 "max_mau_value", 0,
             )
+        self.mau_stats_only = config.get("mau_stats_only", False)
 
         self.mau_limits_reserved_threepids = config.get(
             "mau_limit_reserved_threepids", []
@@ -122,6 +129,9 @@ class ServerConfig(Config):
             elif not bind_addresses:
                 bind_addresses.append('')
 
+        if not self.web_client_location:
+            _warn_if_webclient_configured(self.listeners)
+
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
         bind_port = config.get("bind_port")
@@ -130,8 +140,6 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
-            names = ["client", "webclient"] if self.web_client else ["client"]
-
             self.listeners.append({
                 "port": bind_port,
                 "bind_addresses": [bind_host],
@@ -139,7 +147,7 @@ class ServerConfig(Config):
                 "type": "http",
                 "resources": [
                     {
-                        "names": names,
+                        "names": ["client"],
                         "compress": gzip_responses,
                     },
                     {
@@ -158,7 +166,7 @@ class ServerConfig(Config):
                     "type": "http",
                     "resources": [
                         {
-                            "names": names,
+                            "names": ["client"],
                             "compress": gzip_responses,
                         },
                         {
@@ -197,7 +205,9 @@ class ServerConfig(Config):
                 ]
             })
 
-    def default_config(self, server_name, **kwargs):
+        _check_resource_config(self.listeners)
+
+    def default_config(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400
@@ -205,7 +215,7 @@ class ServerConfig(Config):
             bind_port = 8448
             unsecure_port = 8008
 
-        pid_file = self.abspath("homeserver.pid")
+        pid_file = os.path.join(data_dir_path, "homeserver.pid")
         return """\
         ## Server ##
 
@@ -241,17 +251,17 @@ class ServerConfig(Config):
         #
         # cpu_affinity: 0xFFFFFFFF
 
-        # Whether to serve a web client from the HTTP/HTTPS root resource.
-        web_client: True
-
-        # The root directory to server for the above web client.
-        # If left undefined, synapse will serve the matrix-angular-sdk web client.
-        # Make sure matrix-angular-sdk is installed with pip if web_client is True
-        # and web_client_location is undefined
+        # The path to the web client which will be served at /_matrix/client/
+        # if 'webclient' is configured under the 'listeners' configuration.
+        #
         # web_client_location: "/path/to/web/root"
 
-        # The public-facing base URL for the client API (not including _matrix/...)
-        # public_baseurl: https://example.com:8448/
+        # The public-facing base URL that clients use to access this HS
+        # (not including _matrix/...). This is the same URL a user would
+        # enter into the 'custom HS URL' field on their client. If you
+        # use synapse with a reverse proxy, this should be the URL to reach
+        # synapse via the proxy.
+        # public_baseurl: https://example.com/
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
@@ -314,8 +324,8 @@ class ServerConfig(Config):
               -
                 # List of resources to host on this listener.
                 names:
-                  - client     # The client-server APIs, both v1 and v2
-                  - webclient  # The bundled webclient.
+                  - client       # The client-server APIs, both v1 and v2
+                  # - webclient  # A web client. Requires web_client_location to be set.
 
                 # Should synapse compress HTTP responses to clients that support it?
                 # This should be disabled if running synapse behind a load balancer
@@ -342,7 +352,7 @@ class ServerConfig(Config):
             x_forwarded: false
 
             resources:
-              - names: [client, webclient]
+              - names: [client]
                 compress: true
               - names: [federation]
                 compress: false
@@ -354,31 +364,41 @@ class ServerConfig(Config):
           #   type: manhole
 
 
-          # Homeserver blocking
-          #
-          # How to reach the server admin, used in ResourceLimitError
-          # admin_contact: 'mailto:admin@server.com'
-          #
-          # Global block config
-          #
-          # hs_disabled: False
-          # hs_disabled_message: 'Human readable reason for why the HS is blocked'
-          # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
-          #
-          # Monthly Active User Blocking
-          #
-          # Enables monthly active user checking
-          # limit_usage_by_mau: False
-          # max_mau_value: 50
-          # mau_trial_days: 2
-          #
-          # Sometimes the server admin will want to ensure certain accounts are
-          # never blocked by mau checking. These accounts are specified here.
-          #
-          # mau_limit_reserved_threepids:
-          # - medium: 'email'
-          #   address: 'reserved_user@example.com'
-
+        # Homeserver blocking
+        #
+        # How to reach the server admin, used in ResourceLimitError
+        # admin_contact: 'mailto:admin@server.com'
+        #
+        # Global block config
+        #
+        # hs_disabled: False
+        # hs_disabled_message: 'Human readable reason for why the HS is blocked'
+        # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
+        #
+        # Monthly Active User Blocking
+        #
+        # Enables monthly active user checking
+        # limit_usage_by_mau: False
+        # max_mau_value: 50
+        # mau_trial_days: 2
+        #
+        # If enabled, the metrics for the number of monthly active users will
+        # be populated, however no one will be limited. If limit_usage_by_mau
+        # is true, this is implied to be true.
+        # mau_stats_only: False
+        #
+        # Sometimes the server admin will want to ensure certain accounts are
+        # never blocked by mau checking. These accounts are specified here.
+        #
+        # mau_limit_reserved_threepids:
+        # - medium: 'email'
+        #   address: 'reserved_user@example.com'
+        #
+        # Room searching
+        #
+        # If disabled, new messages will not be indexed for searching and users
+        # will receive errors when searching for messages. Defaults to enabled.
+        # enable_search: true
         """ % locals()
 
     def read_arguments(self, args):
@@ -404,19 +424,18 @@ class ServerConfig(Config):
                                   " service on the given port.")
 
 
-def is_threepid_reserved(config, threepid):
+def is_threepid_reserved(reserved_threepids, threepid):
     """Check the threepid against the reserved threepid config
     Args:
-        config(ServerConfig) - to access server config attributes
+        reserved_threepids([dict]) - list of reserved threepids
         threepid(dict) - The threepid to test for
 
     Returns:
         boolean Is the threepid undertest reserved_user
     """
 
-    for tp in config.mau_limits_reserved_threepids:
-        if (threepid['medium'] == tp['medium']
-                and threepid['address'] == tp['address']):
+    for tp in reserved_threepids:
+        if (threepid['medium'] == tp['medium'] and threepid['address'] == tp['address']):
             return True
     return False
 
@@ -436,3 +455,52 @@ def read_gc_thresholds(thresholds):
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"
         )
+
+
+NO_MORE_WEB_CLIENT_WARNING = """
+Synapse no longer includes a web client. To enable a web client, configure
+web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
+configuration.
+"""
+
+
+def _warn_if_webclient_configured(listeners):
+    for listener in listeners:
+        for res in listener.get("resources", []):
+            for name in res.get("names", []):
+                if name == 'webclient':
+                    logger.warning(NO_MORE_WEB_CLIENT_WARNING)
+                    return
+
+
+KNOWN_RESOURCES = (
+    'client',
+    'consent',
+    'federation',
+    'keys',
+    'media',
+    'metrics',
+    'replication',
+    'static',
+    'webclient',
+)
+
+
+def _check_resource_config(listeners):
+    resource_names = set(
+        res_name
+        for listener in listeners
+        for res in listener.get("resources", [])
+        for res_name in res.get("names", [])
+    )
+
+    for resource in resource_names:
+        if resource not in KNOWN_RESOURCES:
+            raise ConfigError(
+                "Unknown listener resource '%s'" % (resource, )
+            )
+        if resource == "consent":
+            try:
+                check_requirements('resources.consent')
+            except DependencyException as e:
+                raise ConfigError(e.message)

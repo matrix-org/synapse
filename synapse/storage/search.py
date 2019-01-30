@@ -45,6 +45,10 @@ class SearchStore(BackgroundUpdateStore):
 
     def __init__(self, db_conn, hs):
         super(SearchStore, self).__init__(db_conn, hs)
+
+        if not hs.config.enable_search:
+            return
+
         self.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
         )
@@ -316,6 +320,8 @@ class SearchStore(BackgroundUpdateStore):
             entries (iterable[SearchEntry]):
                 entries to be added to the table
         """
+        if not self.hs.config.enable_search:
+            return
         if isinstance(self.database_engine, PostgresEngine):
             sql = (
                 "INSERT INTO event_search"

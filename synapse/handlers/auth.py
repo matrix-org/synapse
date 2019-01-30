@@ -22,7 +22,7 @@ import bcrypt
 import pymacaroons
 from canonicaljson import json
 
-from twisted.internet import defer, threads
+from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
 import synapse.util.stringutils as stringutils
@@ -37,8 +37,8 @@ from synapse.api.errors import (
 )
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
+from synapse.util import logcontext
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logcontext import make_deferred_yieldable
 
 from ._base import BaseHandler
 
@@ -59,6 +59,7 @@ class AuthHandler(BaseHandler):
             LoginType.EMAIL_IDENTITY: self._check_email_identity,
             LoginType.MSISDN: self._check_msisdn,
             LoginType.DUMMY: self._check_dummy_auth,
+            LoginType.TERMS: self._check_terms_auth,
         }
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
@@ -431,6 +432,9 @@ class AuthHandler(BaseHandler):
     def _check_dummy_auth(self, authdict, _):
         return defer.succeed(True)
 
+    def _check_terms_auth(self, authdict, _):
+        return defer.succeed(True)
+
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict):
         if 'threepid_creds' not in authdict:
@@ -462,6 +466,22 @@ class AuthHandler(BaseHandler):
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
 
+    def _get_params_terms(self):
+        return {
+            "policies": {
+                "privacy_policy": {
+                    "version": self.hs.config.user_consent_version,
+                    "en": {
+                        "name": self.hs.config.user_consent_policy_name,
+                        "url": "%s_matrix/consent?v=%s" % (
+                            self.hs.config.public_baseurl,
+                            self.hs.config.user_consent_version,
+                        ),
+                    },
+                },
+            },
+        }
+
     def _auth_dict_for_flows(self, flows, session):
         public_flows = []
         for f in flows:
@@ -469,6 +489,7 @@ class AuthHandler(BaseHandler):
 
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
+            LoginType.TERMS: self._get_params_terms,
         }
 
         params = {}
@@ -542,10 +563,10 @@ class AuthHandler(BaseHandler):
         insensitively, but return None if there are multiple inexact matches.
 
         Args:
-            (str) user_id: complete @user:id
+            (unicode|bytes) user_id: complete @user:id
 
         Returns:
-            defer.Deferred: (str) canonical_user_id, or None if zero or
+            defer.Deferred: (unicode) canonical_user_id, or None if zero or
             multiple matches
         """
         res = yield self._find_user_id_and_pwd_hash(user_id)
@@ -884,11 +905,7 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode('ascii')
 
-        return make_deferred_yieldable(
-            threads.deferToThreadPool(
-                self.hs.get_reactor(), self.hs.get_reactor().getThreadPool(), _do_hash
-            ),
-        )
+        return logcontext.defer_to_thread(self.hs.get_reactor(), _do_hash)
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
@@ -913,13 +930,7 @@ class AuthHandler(BaseHandler):
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode('ascii')
 
-            return make_deferred_yieldable(
-                threads.deferToThreadPool(
-                    self.hs.get_reactor(),
-                    self.hs.get_reactor().getThreadPool(),
-                    _do_validate_hash,
-                ),
-            )
+            return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
 
@@ -943,6 +954,15 @@ class MacaroonGenerator(object):
         return macaroon.serialize()
 
     def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
+        """
+
+        Args:
+            user_id (unicode):
+            duration_in_ms (int):
+
+        Returns:
+            unicode
+        """
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
         now = self.hs.get_clock().time_msec()

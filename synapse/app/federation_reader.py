@@ -140,7 +140,7 @@ def start(config_options):
             "Synapse federation reader", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.federation_reader"
@@ -151,24 +151,23 @@ def start(config_options):
 
     database_engine = create_engine(config.database_config)
 
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
-
     ss = FederationReaderServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
-        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 
     ss.setup()
-    ss.start_listening(config.worker_listeners)
 
     def start():
-        ss.get_state_handler().start_caching()
+        ss.config.read_certificate_from_disk()
+        ss.tls_server_context_factory = context_factory.ServerContextFactory(config)
+        ss.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            config
+        )
+        ss.start_listening(config.worker_listeners)
         ss.get_datastore().start_profiling()
 
     reactor.callWhenRunning(start)

@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import glob
+import codecs
 
 # Utility functions
 convert = lambda src, dst, environ: open(dst, "w").write(jinja2.Template(open(src).read()).render(**environ))
@@ -23,7 +24,7 @@ def generate_secrets(environ, secrets):
                 with open(filename) as handle: value = handle.read()
             else:
                 print("Generating a random secret for {}".format(name))
-                value = os.urandom(32).encode("hex")
+                value = codecs.encode(os.urandom(32), "hex").decode()
                 with open(filename, "w") as handle: handle.write(value)
             environ[secret] = value
 

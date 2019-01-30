@@ -15,8 +15,6 @@
 
 from mock import Mock, NonCallableMock
 
-import attr
-
 from synapse.replication.tcp.client import (
     ReplicationClientFactory,
     ReplicationClientHandler,
@@ -24,6 +22,7 @@ from synapse.replication.tcp.client import (
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 
 from tests import unittest
+from tests.server import FakeTransport
 
 
 class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
@@ -56,36 +55,8 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         server = server_factory.buildProtocol(None)
         client = client_factory.buildProtocol(None)
 
-        @attr.s
-        class FakeTransport(object):
-
-            other = attr.ib()
-            disconnecting = False
-            buffer = attr.ib(default=b'')
-
-            def registerProducer(self, producer, streaming):
-
-                self.producer = producer
-
-                def _produce():
-                    self.producer.resumeProducing()
-                    reactor.callLater(0.1, _produce)
-
-                reactor.callLater(0.0, _produce)
-
-            def write(self, byt):
-                self.buffer = self.buffer + byt
-
-                if getattr(self.other, "transport") is not None:
-                    self.other.dataReceived(self.buffer)
-                    self.buffer = b""
-
-            def writeSequence(self, seq):
-                for x in seq:
-                    self.write(x)
-
-        client.makeConnection(FakeTransport(server))
-        server.makeConnection(FakeTransport(client))
+        client.makeConnection(FakeTransport(server, reactor))
+        server.makeConnection(FakeTransport(client, reactor))
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then

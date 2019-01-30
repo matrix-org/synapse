@@ -48,10 +48,12 @@ class DownloadResource(Resource):
         set_cors_headers(request)
         request.setHeader(
             b"Content-Security-Policy",
-            b"default-src 'none';"
+            b"sandbox;"
+            b" default-src 'none';"
             b" script-src 'none';"
             b" plugin-types application/pdf;"
             b" style-src 'unsafe-inline';"
+            b" media-src 'self';"
             b" object-src 'self';"
         )
         server_name, media_id, name = parse_media_id(request)
