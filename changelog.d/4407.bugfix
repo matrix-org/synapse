@@ -1,1 +1,0 @@
-Fix incorrect logcontexts after a Deferred was cancelled

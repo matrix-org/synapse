@@ -110,7 +110,7 @@ class RoomVersions(object):
 
 
 class RoomDisposition(object):
-    STABLE = "stable",
+    STABLE = "stable"
     UNSTABLE = "unstable"
 
 

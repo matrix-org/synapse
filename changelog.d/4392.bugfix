@@ -1,1 +1,0 @@
-Fix typo in ALL_USER_TYPES definition to ensure type is a tuple
