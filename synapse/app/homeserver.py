@@ -17,6 +17,7 @@
 import gc
 import logging
 import os
+import signal
 import sys
 import traceback
 
@@ -27,6 +28,7 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
+from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -84,6 +86,7 @@ def gz_wrap(r):
 
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
+    _listening_services = []
 
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
@@ -121,7 +124,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            listen_ssl(
+            return listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -135,7 +138,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         else:
-            listen_tcp(
+            return listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -146,7 +149,6 @@ class SynapseHomeServer(HomeServer):
                     self.version_string,
                 )
             )
-        logger.info("Synapse now listening on port %d", port)
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
@@ -242,7 +244,9 @@ class SynapseHomeServer(HomeServer):
 
         for listener in config.listeners:
             if listener["type"] == "http":
-                self._listener_http(config, listener)
+                self._listening_services.extend(
+                    self._listener_http(config, listener)
+                )
             elif listener["type"] == "manhole":
                 listen_tcp(
                     listener["bind_addresses"],
@@ -322,7 +326,19 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    synapse.config.logger.setup_logging(config, use_worker_options=False)
+    sighup_callbacks = []
+    synapse.config.logger.setup_logging(
+        config,
+        use_worker_options=False,
+        register_sighup=sighup_callbacks.append
+    )
+
+    def handle_sighup(*args, **kwargs):
+        for i in sighup_callbacks:
+            i(*args, **kwargs)
+
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, handle_sighup)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -358,6 +374,31 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
+
+    def refresh_certificate(*args):
+        """
+        Refresh the TLS certificates that Synapse is using by re-reading them
+        from disk and updating the TLS context factories to use them.
+        """
+        logging.info("Reloading certificate from disk...")
+        hs.config.read_certificate_from_disk()
+        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            config
+        )
+        logging.info("Certificate reloaded.")
+
+        logging.info("Updating context factories...")
+        for i in hs._listening_services:
+            if isinstance(i.factory, TLSMemoryBIOFactory):
+                i.factory = TLSMemoryBIOFactory(
+                    hs.tls_server_context_factory,
+                    False,
+                    i.factory.wrappedFactory
+                )
+        logging.info("Context factories updated.")
+
+    sighup_callbacks.append(refresh_certificate)
 
     @defer.inlineCallbacks
     def start():
