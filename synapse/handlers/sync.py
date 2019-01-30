@@ -1476,10 +1476,22 @@ class SyncHandler(object):
                 if since_token and since_token.is_after(leave_token):
                     continue
 
+                # If this is an out of band message, like a remote invite
+                # rejection, we include it in the recents batch. Otherwise, we
+                # let _load_filtered_recents handle fetching the correct
+                # batches.
+                #
+                # This is all screaming out for a refactor, as the logic here is
+                # subtle and the moving parts numerous.
+                if leave_event.internal_metadata.is_out_of_band_membership():
+                    batch_events = [leave_event]
+                else:
+                    batch_events = None
+
                 room_entries.append(RoomSyncResultBuilder(
                     room_id=room_id,
                     rtype="archived",
-                    events=None,
+                    events=batch_events,
                     newly_joined=room_id in newly_joined_rooms,
                     full_state=False,
                     since_token=since_token,

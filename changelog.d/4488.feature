@@ -1,1 +1,0 @@
-Implement MSC1708 (.well-known routing for server-server federation)

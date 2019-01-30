@@ -1,1 +1,0 @@
-Prevent users with access tokens predating the introduction of device IDs from creating spurious entries in the user_ips table.
