@@ -28,9 +28,6 @@ logger = logging.getLogger(__name__)
 
 
 class StateStoreTestCase(tests.unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(StateStoreTestCase, self).__init__(*args, **kwargs)
-        self.store = None  # type: synapse.storage.DataStore
 
     @defer.inlineCallbacks
     def setUp(self):

@@ -317,7 +317,7 @@ class DataStore(RoomMemberStore, RoomStore,
                               thirty_days_ago_in_secs))
 
             for row in txn:
-                if row[0] is 'unknown':
+                if row[0] == 'unknown':
                     pass
                 results[row[0]] = row[1]
 
