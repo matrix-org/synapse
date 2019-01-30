@@ -15,19 +15,17 @@
 
 import gc
 import logging
-import traceback
-import sys
 import signal
+import sys
+import traceback
 
 import psutil
-from synapse.crypto import context_factory
-
 from daemonize import Daemonize
 
 from twisted.internet import error, reactor
-
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
+from synapse.crypto import context_factory
 from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
 
