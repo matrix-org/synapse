@@ -1,5 +1,22 @@
+Synapse 0.99.0rc2 (2019-01-30)
+==============================
+
+Bugfixes
+--------
+
+- Fix bug when rejecting remote invites. ([\#4527](https://github.com/matrix-org/synapse/issues/4527))
+- Fix incorrect rendering of server capabilities. ([81b7e7eed](https://github.com/matrix-org/synapse/commit/81b7e7eed323f55d6550e7a270a9dc2c4c7b0fe0))
+
+Improved Documentation
+----------------------
+
+- Add documentation on enabling ACME support when upgrading to v0.99. ([\#4528](https://github.com/matrix-org/synapse/issues/4528))
+
+
 Synapse 0.99.0rc1 (2019-01-30)
 ==============================
+
+Synapse v0.99.x is a precursor to the upcoming Synapse v1.0 release. It contains foundational changes to room architecture and the federation security model necessary to support the upcoming r0 release of the Server to Server API.
 
 Features
 --------
