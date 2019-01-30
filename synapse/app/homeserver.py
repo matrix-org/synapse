@@ -95,7 +95,7 @@ class SynapseHomeServer(HomeServer):
         site_tag = listener_config.get("tag", port)
 
         if tls and config.no_tls:
-            return
+            return []
 
         resources = {}
         for res in listener_config["resources"]:
