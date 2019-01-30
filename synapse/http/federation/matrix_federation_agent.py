@@ -14,6 +14,7 @@
 # limitations under the License.
 import json
 import logging
+import random
 import time
 
 import attr
@@ -33,6 +34,9 @@ from synapse.util.logcontext import make_deferred_yieldable
 
 # period to cache .well-known results for by default
 WELL_KNOWN_DEFAULT_CACHE_PERIOD = 24 * 3600
+
+# jitter to add to the .well-known default cache ttl
+WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER = 10 * 60
 
 # period to cache failure to fetch .well-known for
 WELL_KNOWN_INVALID_CACHE_PERIOD = 1 * 3600
@@ -322,6 +326,9 @@ class MatrixFederationAgent(object):
         )
         if cache_period is None:
             cache_period = WELL_KNOWN_DEFAULT_CACHE_PERIOD
+            # add some randomness to the TTL to avoid a stampeding herd every hour after
+            # startup
+            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
         else:
             cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
 
