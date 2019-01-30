@@ -83,7 +83,6 @@ def gz_wrap(r):
 
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
-    _listening_services = []
 
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
