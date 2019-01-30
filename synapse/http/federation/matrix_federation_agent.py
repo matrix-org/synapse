@@ -362,11 +362,9 @@ def _parse_cache_control(headers):
     cache_controls = {}
     for hdr in headers.getRawHeaders(b'cache-control', []):
         for directive in hdr.split(b','):
-            if b'=' in directive:
-                k, v = directive.split(b'=', 1)
-            else:
-                k, v = directive, None
-            k = k.lower()
+            splits = [x.strip() for x in directive.split(b'=', 1)]
+            k = splits[0].lower()
+            v = splits[1] if len(splits) > 1 else None
             cache_controls[k] = v
     return cache_controls
 

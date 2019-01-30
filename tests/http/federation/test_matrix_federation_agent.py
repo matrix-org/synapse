@@ -24,10 +24,14 @@ from twisted.internet._sslverify import ClientTLSOptions, OpenSSLCertificateOpti
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.http import HTTPChannel
+from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
-from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.http.federation.matrix_federation_agent import (
+    MatrixFederationAgent,
+    _cache_period_from_headers,
+)
 from synapse.http.federation.srv_resolver import Server
 from synapse.util.caches.ttlcache import TTLCache
 from synapse.util.logcontext import LoggingContext
@@ -738,6 +742,66 @@ class MatrixFederationAgentTests(TestCase):
 
         r = self.successResultOf(fetch_d)
         self.assertEqual(r, b'other-server')
+
+
+class TestCachePeriodFromHeaders(TestCase):
+    def test_cache_control(self):
+        # uppercase
+        self.assertEqual(
+            _cache_period_from_headers(
+                Headers({b'Cache-Control': [b'foo, Max-Age = 100, bar']}),
+            ), 100,
+        )
+
+        # missing value
+        self.assertIsNone(_cache_period_from_headers(
+            Headers({b'Cache-Control': [b'max-age=, bar']}),
+        ))
+
+        # hackernews: bogus due to semicolon
+        self.assertIsNone(_cache_period_from_headers(
+            Headers({b'Cache-Control': [b'private; max-age=0']}),
+        ))
+
+        # github
+        self.assertEqual(
+            _cache_period_from_headers(
+                Headers({b'Cache-Control': [b'max-age=0, private, must-revalidate']}),
+            ), 0,
+        )
+
+        # google
+        self.assertEqual(
+            _cache_period_from_headers(
+                Headers({b'cache-control': [b'private, max-age=0']}),
+            ), 0,
+        )
+
+    def test_expires(self):
+        self.assertEqual(
+            _cache_period_from_headers(
+                Headers({b'Expires': [b'Wed, 30 Jan 2019 07:35:33 GMT']}),
+                time_now=lambda: 1548833700
+            ), 33,
+        )
+
+        # cache-control overrides expires
+        self.assertEqual(
+            _cache_period_from_headers(
+                Headers({
+                    b'cache-control': [b'max-age=10'],
+                    b'Expires': [b'Wed, 30 Jan 2019 07:35:33 GMT']
+                }),
+                time_now=lambda: 1548833700
+            ), 10,
+        )
+
+        # invalid expires means immediate expiry
+        self.assertEqual(
+            _cache_period_from_headers(
+                Headers({b'Expires': [b'0']}),
+            ), 0,
+        )
 
 
 def _check_logcontext(context):
