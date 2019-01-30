@@ -95,7 +95,9 @@ class SynapseHomeServer(HomeServer):
         site_tag = listener_config.get("tag", port)
 
         if tls and config.no_tls:
-            return
+            raise ConfigError(
+                "Listener on port %i has TLS enabled, but no_tls is set" % (port,),
+            )
 
         resources = {}
         for res in listener_config["resources"]:
