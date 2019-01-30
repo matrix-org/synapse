@@ -49,7 +49,6 @@ class FederationClientTests(HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, homeserver):
-
         self.cl = MatrixFederationHttpClient(self.hs)
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
@@ -95,6 +94,7 @@ class FederationClientTests(HomeserverTestCase):
 
         # that should have made it send the request to the transport
         self.assertRegex(transport.value(), b"^GET /foo/bar")
+        self.assertRegex(transport.value(), b"Host: testserv:8008")
 
         # Deferred is still without a result
         self.assertNoResult(test_d)

@@ -261,7 +261,7 @@ class ServerConfig(Config):
         # enter into the 'custom HS URL' field on their client. If you
         # use synapse with a reverse proxy, this should be the URL to reach
         # synapse via the proxy.
-        # public_baseurl: https://example.com:8448/
+        # public_baseurl: https://example.com/
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the

@@ -21,13 +21,14 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventFormatVersions, EventTypes
 from synapse.api.errors import NotFoundError
+from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
 # these are only included to make the type annotations work
-from synapse.events import EventBase  # noqa: F401
-from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.events.utils import prune_event
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import get_domain_from_id
 from synapse.util.logcontext import (
     LoggingContext,
     PreserveLoggingContext,
@@ -162,7 +163,6 @@ class EventsWorkerStore(SQLBaseStore):
 
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
-                check_redacted=check_redacted,
                 allow_rejected=allow_rejected,
             )
 
@@ -173,6 +173,29 @@ class EventsWorkerStore(SQLBaseStore):
             entry = event_entry_map.get(event_id, None)
             if not entry:
                 continue
+
+            # Starting in room version v3, some redactions need to be rechecked if we
+            # didn't have the redacted event at the time, so we recheck on read
+            # instead.
+            if not allow_rejected and entry.event.type == EventTypes.Redaction:
+                if entry.event.internal_metadata.need_to_check_redaction():
+                    orig = yield self.get_event(
+                        entry.event.redacts,
+                        allow_none=True,
+                        allow_rejected=True,
+                        get_prev_content=False,
+                    )
+                    expected_domain = get_domain_from_id(entry.event.sender)
+                    if orig and get_domain_from_id(orig.sender) == expected_domain:
+                        # This redaction event is allowed. Mark as not needing a
+                        # recheck.
+                        entry.event.internal_metadata.recheck_redaction = False
+                    else:
+                        # We don't have the event that is being redacted, so we
+                        # assume that the event isn't authorized for now. (If we
+                        # later receive the event, then we will always redact
+                        # it anyway, since we have this redaction)
+                        continue
 
             if allow_rejected or not entry.event.rejected_reason:
                 if check_redacted and entry.redacted_event:
@@ -310,7 +333,7 @@ class EventsWorkerStore(SQLBaseStore):
                     self.hs.get_reactor().callFromThread(fire, event_list, e)
 
     @defer.inlineCallbacks
-    def _enqueue_events(self, events, check_redacted=True, allow_rejected=False):
+    def _enqueue_events(self, events, allow_rejected=False):
         """Fetches events from the database using the _event_fetch_list. This
         allows batch and bulk fetching of events - it allows us to fetch events
         without having to create a new transaction for each request for events.
@@ -353,6 +376,7 @@ class EventsWorkerStore(SQLBaseStore):
                     self._get_event_from_row,
                     row["internal_metadata"], row["json"], row["redacts"],
                     rejected_reason=row["rejects"],
+                    format_version=row["format_version"],
                 )
                 for row in rows
             ],
@@ -377,6 +401,7 @@ class EventsWorkerStore(SQLBaseStore):
                 " e.event_id as event_id, "
                 " e.internal_metadata,"
                 " e.json,"
+                " e.format_version, "
                 " r.redacts as redacts,"
                 " rej.event_id as rejects "
                 " FROM event_json as e"
@@ -392,7 +417,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _get_event_from_row(self, internal_metadata, js, redacted,
-                            rejected_reason=None):
+                            format_version, rejected_reason=None):
         with Measure(self._clock, "_get_event_from_row"):
             d = json.loads(js)
             internal_metadata = json.loads(internal_metadata)
@@ -405,8 +430,13 @@ class EventsWorkerStore(SQLBaseStore):
                     desc="_get_event_from_row_rejected_reason",
                 )
 
-            original_ev = FrozenEvent(
-                d,
+            if format_version is None:
+                # This means that we stored the event before we had the concept
+                # of a event format version, so it must be a V1 event.
+                format_version = EventFormatVersions.V1
+
+            original_ev = event_type_from_format_version(format_version)(
+                event_dict=d,
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
             )
@@ -435,6 +465,19 @@ class EventsWorkerStore(SQLBaseStore):
                     # It's fine to do add the event directly, since get_pdu_json
                     # will serialise this field correctly
                     redacted_event.unsigned["redacted_because"] = because
+
+                    # Starting in room version v3, some redactions need to be
+                    # rechecked if we didn't have the redacted event at the
+                    # time, so we recheck on read instead.
+                    if because.internal_metadata.need_to_check_redaction():
+                        expected_domain = get_domain_from_id(original_ev.sender)
+                        if get_domain_from_id(because.sender) == expected_domain:
+                            # This redaction event is allowed. Mark as not needing a
+                            # recheck.
+                            because.internal_metadata.recheck_redaction = False
+                        else:
+                            # Senders don't match, so the event isn't actually redacted
+                            redacted_event = None
 
             cache_entry = _EventCacheEntry(
                 event=original_ev,

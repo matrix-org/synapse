@@ -1,0 +1,1 @@
+Fix a bug where setting a relative consent directory path would cause a crash.

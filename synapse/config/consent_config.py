@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from os import path
+
+from synapse.config import ConfigError
+
 from ._base import Config
 
 DEFAULT_CONFIG = """\
@@ -85,7 +89,15 @@ class ConsentConfig(Config):
         if consent_config is None:
             return
         self.user_consent_version = str(consent_config["version"])
-        self.user_consent_template_dir = consent_config["template_dir"]
+        self.user_consent_template_dir = self.abspath(
+            consent_config["template_dir"]
+        )
+        if not path.isdir(self.user_consent_template_dir):
+            raise ConfigError(
+                "Could not find template directory '%s'" % (
+                    self.user_consent_template_dir,
+                ),
+            )
         self.user_consent_server_notice_content = consent_config.get(
             "server_notice_content",
         )

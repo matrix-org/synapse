@@ -8,11 +8,10 @@ import attr
 from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
-from twisted.internet._resolver import HostResolution
-from twisted.internet.address import IPv4Address
-from twisted.internet.defer import Deferred
+from twisted.internet._resolver import SimpleResolverComplexifier
+from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.error import DNSLookupError
-from twisted.internet.interfaces import IReactorPluggableNameResolver
+from twisted.internet.interfaces import IReactorPluggableNameResolver, IResolverSimple
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactorClock
 from twisted.web.http import unquote
@@ -227,30 +226,16 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
     def __init__(self):
         self._udp = []
-        self.lookups = {}
+        lookups = self.lookups = {}
 
-        class Resolver(object):
-            def resolveHostName(
-                _self,
-                resolutionReceiver,
-                hostName,
-                portNumber=0,
-                addressTypes=None,
-                transportSemantics='TCP',
-            ):
+        @implementer(IResolverSimple)
+        class FakeResolver(object):
+            def getHostByName(self, name, timeout=None):
+                if name not in lookups:
+                    return fail(DNSLookupError("OH NO: unknown %s" % (name, )))
+                return succeed(lookups[name])
 
-                resolution = HostResolution(hostName)
-                resolutionReceiver.resolutionBegan(resolution)
-                if hostName not in self.lookups:
-                    raise DNSLookupError("OH NO")
-
-                resolutionReceiver.addressResolved(
-                    IPv4Address('TCP', self.lookups[hostName], portNumber)
-                )
-                resolutionReceiver.resolutionComplete()
-                return resolution
-
-        self.nameResolver = Resolver()
+        self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super(ThreadedMemoryReactorClock, self).__init__()
 
     def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
@@ -369,6 +354,11 @@ class FakeTransport(object):
     :type: twisted.internet.interfaces.IReactorTime
     """
 
+    _protocol = attr.ib(default=None)
+    """The Protocol which is producing data for this transport. Optional, but if set
+    will get called back for connectionLost() notifications etc.
+    """
+
     disconnecting = False
     buffer = attr.ib(default=b'')
     producer = attr.ib(default=None)
@@ -379,8 +369,12 @@ class FakeTransport(object):
     def getHost(self):
         return None
 
-    def loseConnection(self):
-        self.disconnecting = True
+    def loseConnection(self, reason=None):
+        logger.info("FakeTransport: loseConnection(%s)", reason)
+        if not self.disconnecting:
+            self.disconnecting = True
+            if self._protocol:
+                self._protocol.connectionLost(reason)
 
     def abortConnection(self):
         self.disconnecting = True
