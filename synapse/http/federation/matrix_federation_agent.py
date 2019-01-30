@@ -23,7 +23,7 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
-from twisted.web.client import URI, Agent, HTTPConnectionPool, readBody
+from twisted.web.client import URI, Agent, HTTPConnectionPool, RedirectAgent, readBody
 from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
@@ -93,7 +93,9 @@ class MatrixFederationAgent(object):
             # the param is called 'contextFactory', but actually passing a
             # contextfactory is deprecated, and it expects an IPolicyForHTTPS.
             agent_args['contextFactory'] = _well_known_tls_policy
-        _well_known_agent = Agent(self._reactor, pool=self._pool, **agent_args)
+        _well_known_agent = RedirectAgent(
+            Agent(self._reactor, pool=self._pool, **agent_args),
+        )
         self._well_known_agent = _well_known_agent
 
         self._well_known_cache = _well_known_cache
