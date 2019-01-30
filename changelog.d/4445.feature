@@ -1,1 +1,0 @@
-Add a metric for tracking event stream position of the user directory.
