@@ -18,12 +18,15 @@ import logging
 import attr
 from zope.interface import implementer
 
+import twisted
+import twisted.internet.error
 from twisted.internet import defer
-from twisted.internet.endpoints import serverFromString
 from twisted.python.filepath import FilePath
 from twisted.python.url import URL
 from twisted.web import server, static
 from twisted.web.resource import Resource
+
+from synapse.app import check_bind_error
 
 logger = logging.getLogger(__name__)
 
@@ -96,16 +99,19 @@ class AcmeHandler(object):
 
         srv = server.Site(responder_resource)
 
-        listeners = []
-
-        for host in self.hs.config.acme_bind_addresses:
+        bind_addresses = self.hs.config.acme_bind_addresses
+        for host in bind_addresses:
             logger.info(
-                "Listening for ACME requests on %s:%s", host, self.hs.config.acme_port
+                "Listening for ACME requests on %s:%i", host, self.hs.config.acme_port,
             )
-            endpoint = serverFromString(
-                self.reactor, "tcp:%s:interface=%s" % (self.hs.config.acme_port, host)
-            )
-            listeners.append(endpoint.listen(srv))
+            try:
+                self.reactor.listenTCP(
+                    self.hs.config.acme_port,
+                    srv,
+                    interface=host,
+                )
+            except twisted.internet.error.CannotListenError as e:
+                check_bind_error(e, host, bind_addresses)
 
         # Make sure we are registered to the ACME server. There's no public API
         # for this, it is usually triggered by startService, but since we don't
@@ -113,9 +119,6 @@ class AcmeHandler(object):
         # and trigger the registration machinery ourselves.
         self._issuer._registered = False
         yield self._issuer._ensure_registered()
-
-        # Return a Deferred that will fire when all the servers have started up.
-        yield defer.DeferredList(listeners, fireOnOneErrback=True, consumeErrors=True)
 
     @defer.inlineCallbacks
     def provision_certificate(self):
