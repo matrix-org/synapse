@@ -108,6 +108,11 @@ class RoomVersions(object):
     STATE_V2_TEST = "state-v2-test"
 
 
+class RoomDisposition(object):
+    STABLE = "stable",
+    UNSTABLE = "unstable"
+
+
 # the version we will give rooms which are created on this server
 DEFAULT_ROOM_VERSION = RoomVersions.V1
 
@@ -118,6 +123,7 @@ KNOWN_ROOM_VERSIONS = {
     RoomVersions.V2,
     RoomVersions.V3,
     RoomVersions.STATE_V2_TEST,
+    RoomVersions.V3,
 }
 
 
