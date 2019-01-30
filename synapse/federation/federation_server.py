@@ -151,26 +151,18 @@ class FederationServer(FederationBase):
         # Reject if PDU count > 50 and EDU count > 100
         if (len(transaction.pdus) > 50
                 or (hasattr(transaction, "edus") and len(transaction.edus) > 100)):
-            response = {
-                "pdus": {}
-            }
 
-            for pdu_key in transaction["pdus"].keys():
-                response["pdus"][pdu_key] = {
-                    "error": "Processing failed. More than 50 PDUs or 100 EDUs sent."
-                }
-
-            logger.debug(
-                "Transaction PDU or EDU count too large. Returning: %s", str(response)
+            logger.info(
+                "Transaction PDU or EDU count too large. Returning 400",
             )
 
+            response = {}
             yield self.transaction_actions.set_response(
                 origin,
                 transaction,
                 400, response
             )
             defer.returnValue((400, response))
-            return
 
         received_pdus_counter.inc(len(transaction.pdus))
 
