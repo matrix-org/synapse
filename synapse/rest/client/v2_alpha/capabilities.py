@@ -16,8 +16,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import DEFAULT_ROOM_VERSION, RoomVersions, RoomDisposition
-
+from synapse.api.constants import DEFAULT_ROOM_VERSION, RoomDisposition, RoomVersions
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
