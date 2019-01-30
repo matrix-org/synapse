@@ -16,6 +16,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.api.constants import DEFAULT_ROOM_VERSION
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
@@ -48,7 +49,7 @@ class CapabilitiesRestServlet(RestServlet):
             (200, {
                 "capabilities": {
                     "m.room_versions": {
-                        "default": "1",
+                        "default": DEFAULT_ROOM_VERSION,
                         "available": {
                             "1": "stable",
                             "2": "stable",
