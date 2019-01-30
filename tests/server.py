@@ -354,7 +354,13 @@ class FakeTransport(object):
     :type: twisted.internet.interfaces.IReactorTime
     """
 
+    _protocol = attr.ib(default=None)
+    """The Protocol which is producing data for this transport. Optional, but if set
+    will get called back for connectionLost() notifications etc.
+    """
+
     disconnecting = False
+    disconnected = False
     buffer = attr.ib(default=b'')
     producer = attr.ib(default=None)
 
@@ -364,11 +370,17 @@ class FakeTransport(object):
     def getHost(self):
         return None
 
-    def loseConnection(self):
-        self.disconnecting = True
+    def loseConnection(self, reason=None):
+        if not self.disconnecting:
+            logger.info("FakeTransport: loseConnection(%s)", reason)
+            self.disconnecting = True
+            if self._protocol:
+                self._protocol.connectionLost(reason)
+            self.disconnected = True
 
     def abortConnection(self):
-        self.disconnecting = True
+        logger.info("FakeTransport: abortConnection()")
+        self.loseConnection()
 
     def pauseProducing(self):
         if not self.producer:
@@ -407,9 +419,16 @@ class FakeTransport(object):
                 # TLSMemoryBIOProtocol
                 return
 
+            if self.disconnected:
+                return
+            logger.info("%s->%s: %s", self._protocol, self.other, self.buffer)
+
             if getattr(self.other, "transport") is not None:
-                self.other.dataReceived(self.buffer)
-                self.buffer = b""
+                try:
+                    self.other.dataReceived(self.buffer)
+                    self.buffer = b""
+                except Exception as e:
+                    logger.warning("Exception writing to protocol: %s", e)
                 return
 
             self._reactor.callLater(0.0, _write)

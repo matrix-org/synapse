@@ -57,8 +57,8 @@ class DirectoryHandler(BaseHandler):
         # general association creation for both human users and app services
 
         for wchar in string.whitespace:
-                if wchar in room_alias.localpart:
-                    raise SynapseError(400, "Invalid characters in room alias")
+            if wchar in room_alias.localpart:
+                raise SynapseError(400, "Invalid characters in room alias")
 
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")

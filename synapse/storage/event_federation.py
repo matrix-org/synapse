@@ -125,6 +125,29 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
 
         return dict(txn)
 
+    @defer.inlineCallbacks
+    def get_max_depth_of(self, event_ids):
+        """Returns the max depth of a set of event IDs
+
+        Args:
+            event_ids (list[str])
+
+        Returns
+            Deferred[int]
+        """
+        rows = yield self._simple_select_many_batch(
+            table="events",
+            column="event_id",
+            iterable=event_ids,
+            retcols=("depth",),
+            desc="get_max_depth_of",
+        )
+
+        if not rows:
+            defer.returnValue(0)
+        else:
+            defer.returnValue(max(row["depth"] for row in rows))
+
     def _get_oldest_events_in_room_txn(self, txn, room_id):
         return self._simple_select_onecol_txn(
             txn,

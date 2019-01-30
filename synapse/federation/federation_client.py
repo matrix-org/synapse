@@ -37,8 +37,7 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
-from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.events import room_version_to_event_format
+from synapse.events import builder, room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -72,7 +71,8 @@ class FederationClient(FederationBase):
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
 
-        self.event_builder_factory = hs.get_event_builder_factory()
+        self.hostname = hs.hostname
+        self.signing_key = hs.config.signing_key[0]
 
         self._get_pdu_cache = ExpiringCache(
             cache_name="get_pdu_cache",
@@ -205,7 +205,7 @@ class FederationClient(FederationBase):
 
         # FIXME: We should handle signature failures more gracefully.
         pdus[:] = yield logcontext.make_deferred_yieldable(defer.gatherResults(
-            self._check_sigs_and_hashes(pdus),
+            self._check_sigs_and_hashes(room_version, pdus),
             consumeErrors=True,
         ).addErrback(unwrapFirstError))
 
@@ -268,7 +268,7 @@ class FederationClient(FederationBase):
                     pdu = pdu_list[0]
 
                     # Check signatures are correct.
-                    signed_pdu = yield self._check_sigs_and_hash(pdu)
+                    signed_pdu = yield self._check_sigs_and_hash(room_version, pdu)
 
                     break
 
@@ -608,18 +608,10 @@ class FederationClient(FederationBase):
             if "prev_state" not in pdu_dict:
                 pdu_dict["prev_state"] = []
 
-            # Strip off the fields that we want to clobber.
-            pdu_dict.pop("origin", None)
-            pdu_dict.pop("origin_server_ts", None)
-            pdu_dict.pop("unsigned", None)
-
-            builder = self.event_builder_factory.new(room_version, pdu_dict)
-            add_hashes_and_signatures(
-                builder,
-                self.hs.hostname,
-                self.hs.config.signing_key[0]
+            ev = builder.create_local_event_from_event_dict(
+                self._clock, self.hostname, self.signing_key,
+                format_version=event_format, event_dict=pdu_dict,
             )
-            ev = builder.build()
 
             defer.returnValue(
                 (destination, ev, event_format)
@@ -751,18 +743,9 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     def send_invite(self, destination, room_id, event_id, pdu):
-        time_now = self._clock.time_msec()
-        try:
-            code, content = yield self.transport_layer.send_invite(
-                destination=destination,
-                room_id=room_id,
-                event_id=event_id,
-                content=pdu.get_pdu_json(time_now),
-            )
-        except HttpResponseException as e:
-            if e.code == 403:
-                raise e.to_synapse_error()
-            raise
+        room_version = yield self.store.get_room_version(room_id)
+
+        content = yield self._do_send_invite(destination, pdu, room_version)
 
         pdu_dict = content["event"]
 
@@ -774,11 +757,60 @@ class FederationClient(FederationBase):
         pdu = event_from_pdu_json(pdu_dict, format_ver)
 
         # Check signatures are correct.
-        pdu = yield self._check_sigs_and_hash(pdu)
+        pdu = yield self._check_sigs_and_hash(room_version, pdu)
 
         # FIXME: We should handle signature failures more gracefully.
 
         defer.returnValue(pdu)
+
+    @defer.inlineCallbacks
+    def _do_send_invite(self, destination, pdu, room_version):
+        """Actually sends the invite, first trying v2 API and falling back to
+        v1 API if necessary.
+
+        Args:
+            destination (str): Target server
+            pdu (FrozenEvent)
+            room_version (str)
+
+        Returns:
+            dict: The event as a dict as returned by the remote server
+        """
+        time_now = self._clock.time_msec()
+
+        try:
+            content = yield self.transport_layer.send_invite_v2(
+                destination=destination,
+                room_id=pdu.room_id,
+                event_id=pdu.event_id,
+                content={
+                    "event": pdu.get_pdu_json(time_now),
+                    "room_version": room_version,
+                    "invite_room_state": pdu.unsigned.get("invite_room_state", []),
+                },
+            )
+            defer.returnValue(content)
+        except HttpResponseException as e:
+            if e.code in [400, 404]:
+                if room_version in (RoomVersions.V1, RoomVersions.V2):
+                    pass  # We'll fall through
+                else:
+                    raise Exception("Remote server is too old")
+            elif e.code == 403:
+                raise e.to_synapse_error()
+            else:
+                raise
+
+        # Didn't work, try v1 API.
+        # Note the v1 API returns a tuple of `(200, content)`
+
+        _, content = yield self.transport_layer.send_invite_v1(
+            destination=destination,
+            room_id=pdu.room_id,
+            event_id=pdu.event_id,
+            content=pdu.get_pdu_json(time_now),
+        )
+        defer.returnValue(content)
 
     def send_leave(self, destinations, pdu):
         """Sends a leave event to one of a list of homeservers.

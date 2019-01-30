@@ -15,6 +15,7 @@
 
 import logging
 import os
+import warnings
 from datetime import datetime
 from hashlib import sha256
 
@@ -39,8 +40,8 @@ class TlsConfig(Config):
         self.acme_bind_addresses = acme_config.get("bind_addresses", ["127.0.0.1"])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
 
-        self.tls_certificate_file = os.path.abspath(config.get("tls_certificate_path"))
-        self.tls_private_key_file = os.path.abspath(config.get("tls_private_key_path"))
+        self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
+        self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
         self._original_tls_fingerprints = config["tls_fingerprints"]
         self.tls_fingerprints = list(self._original_tls_fingerprints)
         self.no_tls = config.get("no_tls", False)
@@ -104,6 +105,16 @@ class TlsConfig(Config):
         """
         self.tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
 
+        # Check if it is self-signed, and issue a warning if so.
+        if self.tls_certificate.get_issuer() == self.tls_certificate.get_subject():
+            warnings.warn(
+                (
+                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
+                    "Please either provide a valid certificate, or use Synapse's ACME "
+                    "support to provision one."
+                )
+            )
+
         if not self.no_tls:
             self.tls_private_key = self.read_tls_private_key(self.tls_private_key_file)
 
@@ -128,10 +139,11 @@ class TlsConfig(Config):
         return (
             """\
         # PEM encoded X509 certificate for TLS.
-        # You can replace the self-signed certificate that synapse
-        # autogenerates on launch with your own SSL certificate + key pair
-        # if you like.  Any required intermediary certificates can be
-        # appended after the primary certificate in hierarchical order.
+        # This certificate, as of Synapse 1.0, will need to be a valid
+        # and verifiable certificate, with a root that is available in
+        # the root store of other servers you wish to federate to. Any
+        # required intermediary certificates can be appended after the
+        # primary certificate in hierarchical order.
         tls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM encoded private key for TLS
@@ -193,40 +205,3 @@ class TlsConfig(Config):
     def read_tls_private_key(self, private_key_path):
         private_key_pem = self.read_file(private_key_path, "tls_private_key")
         return crypto.load_privatekey(crypto.FILETYPE_PEM, private_key_pem)
-
-    def generate_files(self, config):
-        tls_certificate_path = config["tls_certificate_path"]
-        tls_private_key_path = config["tls_private_key_path"]
-
-        if not self.path_exists(tls_private_key_path):
-            with open(tls_private_key_path, "wb") as private_key_file:
-                tls_private_key = crypto.PKey()
-                tls_private_key.generate_key(crypto.TYPE_RSA, 2048)
-                private_key_pem = crypto.dump_privatekey(
-                    crypto.FILETYPE_PEM, tls_private_key
-                )
-                private_key_file.write(private_key_pem)
-        else:
-            with open(tls_private_key_path) as private_key_file:
-                private_key_pem = private_key_file.read()
-                tls_private_key = crypto.load_privatekey(
-                    crypto.FILETYPE_PEM, private_key_pem
-                )
-
-        if not self.path_exists(tls_certificate_path):
-            with open(tls_certificate_path, "wb") as certificate_file:
-                cert = crypto.X509()
-                subject = cert.get_subject()
-                subject.CN = config["server_name"]
-
-                cert.set_serial_number(1000)
-                cert.gmtime_adj_notBefore(0)
-                cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
-                cert.set_issuer(cert.get_subject())
-                cert.set_pubkey(tls_private_key)
-
-                cert.sign(tls_private_key, 'sha256')
-
-                cert_pem = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
-
-                certificate_file.write(cert_pem)

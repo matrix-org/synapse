@@ -166,7 +166,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
         if content is None:
-            content = {"body": "testytest"}
+            content = {"body": "testytest", "msgtype": "m.text"}
         builder = self.event_builder_factory.new(
             RoomVersions.V1,
             {

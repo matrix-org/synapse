@@ -102,7 +102,7 @@ class FederationHandler(BaseHandler):
 
         self.hs = hs
 
-        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
+        self.store = hs.get_datastore()
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -1300,7 +1300,7 @@ class FederationHandler(BaseHandler):
 
         event.signatures.update(
             compute_event_signature(
-                event,
+                event.get_pdu_json(),
                 self.hs.hostname,
                 self.hs.config.signing_key[0]
             )
@@ -2293,6 +2293,10 @@ class FederationHandler(BaseHandler):
 
             EventValidator().validate_new(event)
 
+            # We need to tell the transaction queue to send this out, even
+            # though the sender isn't a local user.
+            event.internal_metadata.send_on_behalf_of = self.hs.hostname
+
             try:
                 yield self.auth.check_from_context(room_version, event, context)
             except AuthError as e:
@@ -2341,6 +2345,10 @@ class FederationHandler(BaseHandler):
             logger.warn("Denying third party invite %r because %s", event, e)
             raise e
         yield self._check_signature(event, context)
+
+        # We need to tell the transaction queue to send this out, even
+        # though the sender isn't a local user.
+        event.internal_metadata.send_on_behalf_of = get_domain_from_id(event.sender)
 
         # XXX we send the invite here, but send_membership_event also sends it,
         # so we end up making two requests. I think this is redundant.

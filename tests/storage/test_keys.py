@@ -22,9 +22,6 @@ import tests.utils
 
 
 class KeyStoreTestCase(tests.unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(KeyStoreTestCase, self).__init__(*args, **kwargs)
-        self.store = None  # type: synapse.storage.keys.KeyStore
 
     @defer.inlineCallbacks
     def setUp(self):

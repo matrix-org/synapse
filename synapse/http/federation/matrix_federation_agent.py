@@ -12,7 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
+import random
+import time
 
 import attr
 from netaddr import IPAddress
@@ -20,14 +23,30 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
-from twisted.web.client import URI, Agent, HTTPConnectionPool
+from twisted.web.client import URI, Agent, HTTPConnectionPool, readBody
+from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
 
 from synapse.http.federation.srv_resolver import SrvResolver, pick_server_from_list
+from synapse.util.caches.ttlcache import TTLCache
 from synapse.util.logcontext import make_deferred_yieldable
 
+# period to cache .well-known results for by default
+WELL_KNOWN_DEFAULT_CACHE_PERIOD = 24 * 3600
+
+# jitter to add to the .well-known default cache ttl
+WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER = 10 * 60
+
+# period to cache failure to fetch .well-known for
+WELL_KNOWN_INVALID_CACHE_PERIOD = 1 * 3600
+
+# cap for .well-known cache period
+WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
+
+
 logger = logging.getLogger(__name__)
+well_known_cache = TTLCache('well-known')
 
 
 @implementer(IAgent)
@@ -43,13 +62,20 @@ class MatrixFederationAgent(object):
         tls_client_options_factory (ClientTLSOptionsFactory|None):
             factory to use for fetching client tls options, or none to disable TLS.
 
+        _well_known_tls_policy (IPolicyForHTTPS|None):
+            TLS policy to use for fetching .well-known files. None to use a default
+            (browser-like) implementation.
+
         srv_resolver (SrvResolver|None):
             SRVResolver impl to use for looking up SRV records. None to use a default
             implementation.
     """
 
     def __init__(
-        self, reactor, tls_client_options_factory, _srv_resolver=None,
+        self, reactor, tls_client_options_factory,
+        _well_known_tls_policy=None,
+        _srv_resolver=None,
+        _well_known_cache=well_known_cache,
     ):
         self._reactor = reactor
         self._tls_client_options_factory = tls_client_options_factory
@@ -61,6 +87,16 @@ class MatrixFederationAgent(object):
         self._pool.retryAutomatically = False
         self._pool.maxPersistentPerHost = 5
         self._pool.cachedConnectionTimeout = 2 * 60
+
+        agent_args = {}
+        if _well_known_tls_policy is not None:
+            # the param is called 'contextFactory', but actually passing a
+            # contextfactory is deprecated, and it expects an IPolicyForHTTPS.
+            agent_args['contextFactory'] = _well_known_tls_policy
+        _well_known_agent = Agent(self._reactor, pool=self._pool, **agent_args)
+        self._well_known_agent = _well_known_agent
+
+        self._well_known_cache = _well_known_cache
 
     @defer.inlineCallbacks
     def request(self, method, uri, headers=None, bodyProducer=None):
@@ -114,7 +150,11 @@ class MatrixFederationAgent(object):
         class EndpointFactory(object):
             @staticmethod
             def endpointForURI(_uri):
-                logger.info("Connecting to %s:%s", res.target_host, res.target_port)
+                logger.info(
+                    "Connecting to %s:%i",
+                    res.target_host.decode("ascii"),
+                    res.target_port,
+                )
                 ep = HostnameEndpoint(self._reactor, res.target_host, res.target_port)
                 if tls_options is not None:
                     ep = wrapClientTLS(tls_options, ep)
@@ -127,13 +167,16 @@ class MatrixFederationAgent(object):
         defer.returnValue(res)
 
     @defer.inlineCallbacks
-    def _route_matrix_uri(self, parsed_uri):
+    def _route_matrix_uri(self, parsed_uri, lookup_well_known=True):
         """Helper for `request`: determine the routing for a Matrix URI
 
         Args:
             parsed_uri (twisted.web.client.URI): uri to route. Note that it should be
                 parsed with URI.fromBytes(uri, defaultPort=-1) to set the `port` to -1
                 if there is no explicit port given.
+
+            lookup_well_known (bool): True if we should look up the .well-known file if
+                there is no SRV record.
 
         Returns:
             Deferred[_RoutingResult]
@@ -169,6 +212,42 @@ class MatrixFederationAgent(object):
         service_name = b"_matrix._tcp.%s" % (parsed_uri.host,)
         server_list = yield self._srv_resolver.resolve_service(service_name)
 
+        if not server_list and lookup_well_known:
+            # try a .well-known lookup
+            well_known_server = yield self._get_well_known(parsed_uri.host)
+
+            if well_known_server:
+                # if we found a .well-known, start again, but don't do another
+                # .well-known lookup.
+
+                # parse the server name in the .well-known response into host/port.
+                # (This code is lifted from twisted.web.client.URI.fromBytes).
+                if b':' in well_known_server:
+                    well_known_host, well_known_port = well_known_server.rsplit(b':', 1)
+                    try:
+                        well_known_port = int(well_known_port)
+                    except ValueError:
+                        # the part after the colon could not be parsed as an int
+                        # - we assume it is an IPv6 literal with no port (the closing
+                        # ']' stops it being parsed as an int)
+                        well_known_host, well_known_port = well_known_server, -1
+                else:
+                    well_known_host, well_known_port = well_known_server, -1
+
+                new_uri = URI(
+                    scheme=parsed_uri.scheme,
+                    netloc=well_known_server,
+                    host=well_known_host,
+                    port=well_known_port,
+                    path=parsed_uri.path,
+                    params=parsed_uri.params,
+                    query=parsed_uri.query,
+                    fragment=parsed_uri.fragment,
+                )
+
+                res = yield self._route_matrix_uri(new_uri, lookup_well_known=False)
+                defer.returnValue(res)
+
         if not server_list:
             target_host = parsed_uri.host
             port = 8448
@@ -189,6 +268,112 @@ class MatrixFederationAgent(object):
             target_host=target_host,
             target_port=port,
         ))
+
+    @defer.inlineCallbacks
+    def _get_well_known(self, server_name):
+        """Attempt to fetch and parse a .well-known file for the given server
+
+        Args:
+            server_name (bytes): name of the server, from the requested url
+
+        Returns:
+            Deferred[bytes|None]: either the new server name, from the .well-known, or
+                None if there was no .well-known file.
+        """
+        try:
+            cached = self._well_known_cache[server_name]
+            defer.returnValue(cached)
+        except KeyError:
+            pass
+
+        # TODO: should we linearise so that we don't end up doing two .well-known requests
+        # for the same server in parallel?
+
+        uri = b"https://%s/.well-known/matrix/server" % (server_name, )
+        uri_str = uri.decode("ascii")
+        logger.info("Fetching %s", uri_str)
+        try:
+            response = yield make_deferred_yieldable(
+                self._well_known_agent.request(b"GET", uri),
+            )
+        except Exception as e:
+            logger.info("Connection error fetching %s: %s", uri_str, e)
+            self._well_known_cache.set(server_name, None, WELL_KNOWN_INVALID_CACHE_PERIOD)
+            defer.returnValue(None)
+
+        body = yield make_deferred_yieldable(readBody(response))
+
+        if response.code != 200:
+            logger.info("Error response %i from %s", response.code, uri_str)
+            self._well_known_cache.set(server_name, None, WELL_KNOWN_INVALID_CACHE_PERIOD)
+            defer.returnValue(None)
+
+        try:
+            parsed_body = json.loads(body.decode('utf-8'))
+            logger.info("Response from .well-known: %s", parsed_body)
+            if not isinstance(parsed_body, dict):
+                raise Exception("not a dict")
+            if "m.server" not in parsed_body:
+                raise Exception("Missing key 'm.server'")
+        except Exception as e:
+            raise Exception("invalid .well-known response from %s: %s" % (uri_str, e,))
+
+        result = parsed_body["m.server"].encode("ascii")
+
+        cache_period = _cache_period_from_headers(
+            response.headers,
+            time_now=self._reactor.seconds,
+        )
+        if cache_period is None:
+            cache_period = WELL_KNOWN_DEFAULT_CACHE_PERIOD
+            # add some randomness to the TTL to avoid a stampeding herd every hour after
+            # startup
+            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
+        else:
+            cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
+
+        if cache_period > 0:
+            self._well_known_cache.set(server_name, result, cache_period)
+
+        defer.returnValue(result)
+
+
+def _cache_period_from_headers(headers, time_now=time.time):
+    cache_controls = _parse_cache_control(headers)
+
+    if b'no-store' in cache_controls:
+        return 0
+
+    if b'max-age' in cache_controls:
+        try:
+            max_age = int(cache_controls[b'max-age'])
+            return max_age
+        except ValueError:
+            pass
+
+    expires = headers.getRawHeaders(b'expires')
+    if expires is not None:
+        try:
+            expires_date = stringToDatetime(expires[-1])
+            return expires_date - time_now()
+        except ValueError:
+            # RFC7234 says 'A cache recipient MUST interpret invalid date formats,
+            # especially the value "0", as representing a time in the past (i.e.,
+            # "already expired").
+            return 0
+
+    return None
+
+
+def _parse_cache_control(headers):
+    cache_controls = {}
+    for hdr in headers.getRawHeaders(b'cache-control', []):
+        for directive in hdr.split(b','):
+            splits = [x.strip() for x in directive.split(b'=', 1)]
+            k = splits[0].lower()
+            v = splits[1] if len(splits) > 1 else None
+            cache_controls[k] = v
+    return cache_controls
 
 
 @attr.s
