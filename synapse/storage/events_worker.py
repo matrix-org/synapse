@@ -220,7 +220,7 @@ class EventsWorkerStore(SQLBaseStore):
         defer.returnValue(events)
 
     def _invalidate_get_event_cache(self, event_id):
-            self._get_event_cache.invalidate((event_id,))
+        self._get_event_cache.invalidate((event_id,))
 
     def _get_events_from_cache(self, events, allow_rejected, update_metrics=True):
         """Fetch events from the caches
