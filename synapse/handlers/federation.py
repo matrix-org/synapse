@@ -102,7 +102,7 @@ class FederationHandler(BaseHandler):
 
         self.hs = hs
 
-        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
+        self.store = hs.get_datastore()
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -1300,7 +1300,7 @@ class FederationHandler(BaseHandler):
 
         event.signatures.update(
             compute_event_signature(
-                event,
+                event.get_pdu_json(),
                 self.hs.hostname,
                 self.hs.config.signing_key[0]
             )
@@ -2282,7 +2282,7 @@ class FederationHandler(BaseHandler):
             room_version = yield self.store.get_room_version(room_id)
             builder = self.event_builder_factory.new(room_version, event_dict)
 
-            EventValidator().validate_new(builder)
+            EventValidator().validate_builder(builder)
             event, context = yield self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
@@ -2290,6 +2290,12 @@ class FederationHandler(BaseHandler):
             event, context = yield self.add_display_name_to_third_party_invite(
                 room_version, event_dict, event, context
             )
+
+            EventValidator().validate_new(event)
+
+            # We need to tell the transaction queue to send this out, even
+            # though the sender isn't a local user.
+            event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
                 yield self.auth.check_from_context(room_version, event, context)
@@ -2340,6 +2346,10 @@ class FederationHandler(BaseHandler):
             raise e
         yield self._check_signature(event, context)
 
+        # We need to tell the transaction queue to send this out, even
+        # though the sender isn't a local user.
+        event.internal_metadata.send_on_behalf_of = get_domain_from_id(event.sender)
+
         # XXX we send the invite here, but send_membership_event also sends it,
         # so we end up making two requests. I think this is redundant.
         returned_invite = yield self.send_invite(origin, event)
@@ -2376,10 +2386,11 @@ class FederationHandler(BaseHandler):
             # auth check code will explode appropriately.
 
         builder = self.event_builder_factory.new(room_version, event_dict)
-        EventValidator().validate_new(builder)
+        EventValidator().validate_builder(builder)
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder=builder,
         )
+        EventValidator().validate_new(event)
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks

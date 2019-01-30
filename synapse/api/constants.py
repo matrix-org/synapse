@@ -104,7 +104,7 @@ class ThirdPartyEntityKind(object):
 class RoomVersions(object):
     V1 = "1"
     V2 = "2"
-    VDH_TEST = "vdh-test-version"
+    V3 = "3"
     STATE_V2_TEST = "state-v2-test"
 
 
@@ -116,7 +116,7 @@ DEFAULT_ROOM_VERSION = RoomVersions.V1
 KNOWN_ROOM_VERSIONS = {
     RoomVersions.V1,
     RoomVersions.V2,
-    RoomVersions.VDH_TEST,
+    RoomVersions.V3,
     RoomVersions.STATE_V2_TEST,
 }
 
@@ -126,10 +126,12 @@ class EventFormatVersions(object):
     independently from the room version.
     """
     V1 = 1
+    V2 = 2
 
 
 KNOWN_EVENT_FORMAT_VERSIONS = {
     EventFormatVersions.V1,
+    EventFormatVersions.V2,
 }
 
 

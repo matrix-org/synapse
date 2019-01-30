@@ -355,10 +355,7 @@ class HomeServer(object):
         return Keyring(self)
 
     def build_event_builder_factory(self):
-        return EventBuilderFactory(
-            clock=self.get_clock(),
-            hostname=self.hostname,
-        )
+        return EventBuilderFactory(self)
 
     def build_filtering(self):
         return Filtering(self)

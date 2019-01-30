@@ -551,17 +551,6 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
-    def add_auth_events(self, builder, context):
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
-        auth_ids = yield self.compute_auth_events(builder, prev_state_ids)
-
-        auth_events_entries = yield self.store.add_event_hashes(
-            auth_ids
-        )
-
-        builder.auth_events = auth_events_entries
-
-    @defer.inlineCallbacks
     def compute_auth_events(self, event, current_state_ids, for_verification=False):
         if event.type == EventTypes.Create:
             defer.returnValue([])
@@ -577,7 +566,7 @@ class Auth(object):
         key = (EventTypes.JoinRules, "", )
         join_rule_event_id = current_state_ids.get(key)
 
-        key = (EventTypes.Member, event.user_id, )
+        key = (EventTypes.Member, event.sender, )
         member_event_id = current_state_ids.get(key)
 
         key = (EventTypes.Create, "", )
@@ -627,7 +616,7 @@ class Auth(object):
 
         defer.returnValue(auth_ids)
 
-    def check_redaction(self, event, auth_events):
+    def check_redaction(self, room_version, event, auth_events):
         """Check whether the event sender is allowed to redact the target event.
 
         Returns:
@@ -640,7 +629,7 @@ class Auth(object):
             AuthError if the event sender is definitely not allowed to redact
             the target event.
         """
-        return event_auth.check_redaction(event, auth_events)
+        return event_auth.check_redaction(room_version, event, auth_events)
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):

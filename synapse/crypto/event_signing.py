@@ -131,12 +131,12 @@ def compute_event_signature(event_dict, signature_name, signing_key):
     return redact_json["signatures"]
 
 
-def add_hashes_and_signatures(event, signature_name, signing_key,
+def add_hashes_and_signatures(event_dict, signature_name, signing_key,
                               hash_algorithm=hashlib.sha256):
     """Add content hash and sign the event
 
     Args:
-        event_dict (EventBuilder): The event to add hashes to and sign
+        event_dict (dict): The event to add hashes to and sign
         signature_name (str): The name of the entity signing the event
             (typically the server's hostname).
         signing_key (syutil.crypto.SigningKey): The key to sign with
@@ -144,16 +144,12 @@ def add_hashes_and_signatures(event, signature_name, signing_key,
             to hash the event
     """
 
-    name, digest = compute_content_hash(
-        event.get_pdu_json(), hash_algorithm=hash_algorithm,
-    )
+    name, digest = compute_content_hash(event_dict, hash_algorithm=hash_algorithm)
 
-    if not hasattr(event, "hashes"):
-        event.hashes = {}
-    event.hashes[name] = encode_base64(digest)
+    event_dict.setdefault("hashes", {})[name] = encode_base64(digest)
 
-    event.signatures = compute_event_signature(
-        event.get_pdu_json(),
+    event_dict["signatures"] = compute_event_signature(
+        event_dict,
         signature_name=signature_name,
         signing_key=signing_key,
     )

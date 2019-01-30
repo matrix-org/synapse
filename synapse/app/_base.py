@@ -143,6 +143,9 @@ def listen_metrics(bind_addresses, port):
 def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
     """
     Create a TCP socket for a port and several addresses
+
+    Returns:
+        list (empty)
     """
     for address in bind_addresses:
         try:
@@ -155,24 +158,36 @@ def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
 
+    logger.info("Synapse now listening on TCP port %d", port)
+    return []
+
 
 def listen_ssl(
     bind_addresses, port, factory, context_factory, reactor=reactor, backlog=50
 ):
     """
-    Create an SSL socket for a port and several addresses
+    Create an TLS-over-TCP socket for a port and several addresses
+
+    Returns:
+        list of twisted.internet.tcp.Port listening for TLS connections
     """
+    r = []
     for address in bind_addresses:
         try:
-            reactor.listenSSL(
-                port,
-                factory,
-                context_factory,
-                backlog,
-                address
+            r.append(
+                reactor.listenSSL(
+                    port,
+                    factory,
+                    context_factory,
+                    backlog,
+                    address
+                )
             )
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
+
+    logger.info("Synapse now listening on port %d (TLS)", port)
+    return r
 
 
 def check_bind_error(e, address, bind_addresses):

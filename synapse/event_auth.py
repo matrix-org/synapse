@@ -20,7 +20,14 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, JoinRules, Membership
+from synapse.api.constants import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    EventTypes,
+    JoinRules,
+    Membership,
+    RoomVersions,
+)
 from synapse.api.errors import AuthError, EventSizeError, SynapseError
 from synapse.types import UserID, get_domain_from_id
 
@@ -49,7 +56,6 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
 
     if do_sig_check:
         sender_domain = get_domain_from_id(event.sender)
-        event_id_domain = get_domain_from_id(event.event_id)
 
         is_invite_via_3pid = (
             event.type == EventTypes.Member
@@ -66,9 +72,13 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
             if not is_invite_via_3pid:
                 raise AuthError(403, "Event not signed by sender's server")
 
-        # Check the event_id's domain has signed the event
-        if not event.signatures.get(event_id_domain):
-            raise AuthError(403, "Event not signed by sending server")
+        if event.format_version in (EventFormatVersions.V1,):
+            # Only older room versions have event IDs to check.
+            event_id_domain = get_domain_from_id(event.event_id)
+
+            # Check the origin domain has signed the event
+            if not event.signatures.get(event_id_domain):
+                raise AuthError(403, "Event not signed by sending server")
 
     if auth_events is None:
         # Oh, we don't know what the state of the room was, so we
@@ -168,7 +178,7 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
         _check_power_levels(event, auth_events)
 
     if event.type == EventTypes.Redaction:
-        check_redaction(event, auth_events)
+        check_redaction(room_version, event, auth_events)
 
     logger.debug("Allowing! %s", event)
 
@@ -422,7 +432,7 @@ def _can_send_event(event, auth_events):
     return True
 
 
-def check_redaction(event, auth_events):
+def check_redaction(room_version, event, auth_events):
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
@@ -442,10 +452,16 @@ def check_redaction(event, auth_events):
     if user_level >= redact_level:
         return False
 
-    redacter_domain = get_domain_from_id(event.event_id)
-    redactee_domain = get_domain_from_id(event.redacts)
-    if redacter_domain == redactee_domain:
+    if room_version in (RoomVersions.V1, RoomVersions.V2,):
+        redacter_domain = get_domain_from_id(event.event_id)
+        redactee_domain = get_domain_from_id(event.redacts)
+        if redacter_domain == redactee_domain:
+            return True
+    elif room_version == RoomVersions.V3:
+        event.internal_metadata.recheck_redaction = True
         return True
+    else:
+        raise RuntimeError("Unrecognized room version %r" % (room_version,))
 
     raise AuthError(
         403,

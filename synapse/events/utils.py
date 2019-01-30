@@ -267,6 +267,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
     Returns:
         dict
     """
+
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -275,6 +276,8 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     # Should this strip out None's?
     d = {k: v for k, v in e.get_dict().items()}
+
+    d["event_id"] = e.event_id
 
     if "age_ts" in d["unsigned"]:
         d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]
