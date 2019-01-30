@@ -298,7 +298,7 @@ class MatrixFederationAgent(object):
             )
             body = yield make_deferred_yieldable(readBody(response))
             if response.code != 200:
-                raise Exception("Non-200 response %s", response.code)
+                raise Exception("Non-200 response %s" % (response.code, ))
         except Exception as e:
             logger.info("Error fetching %s: %s", uri_str, e)
 
