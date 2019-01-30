@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.events import FrozenEvent
+from synapse.events import event_type_from_format_version
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -70,6 +70,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
             event_payloads.append({
                 "event": event.get_pdu_json(),
+                "event_format_version": event.format_version,
                 "internal_metadata": event.internal_metadata.get_dict(),
                 "rejected_reason": event.rejected_reason,
                 "context": serialized_context,
@@ -94,9 +95,12 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
             event_and_contexts = []
             for event_payload in event_payloads:
                 event_dict = event_payload["event"]
+                format_ver = event_payload["event_format_version"]
                 internal_metadata = event_payload["internal_metadata"]
                 rejected_reason = event_payload["rejected_reason"]
-                event = FrozenEvent(event_dict, internal_metadata, rejected_reason)
+
+                EventType = event_type_from_format_version(format_ver)
+                event = EventType(event_dict, internal_metadata, rejected_reason)
 
                 context = yield EventContext.deserialize(
                     self.store, event_payload["context"],

@@ -101,16 +101,7 @@ class ConsentResource(Resource):
                 "missing in config file.",
             )
 
-        # daemonize changes the cwd to /, so make the path absolute now.
-        consent_template_directory = path.abspath(
-            hs.config.user_consent_template_dir,
-        )
-        if not path.isdir(consent_template_directory):
-            raise ConfigError(
-                "Could not find template directory '%s'" % (
-                    consent_template_directory,
-                ),
-            )
+        consent_template_directory = hs.config.user_consent_template_dir
 
         loader = jinja2.FileSystemLoader(consent_template_directory)
         self._jinja_env = jinja2.Environment(
