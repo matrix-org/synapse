@@ -470,6 +470,103 @@ class MatrixFederationAgentTests(TestCase):
         self.well_known_cache.expire()
         self.assertNotIn(b"testserv", self.well_known_cache)
 
+    def test_get_well_known_redirect(self):
+        """Test the behaviour when the server name has no port and no SRV record, but
+        the .well-known has a 300 redirect
+        """
+        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+        self.reactor.lookups["target-server"] = "1::f"
+
+        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv",
+        )
+        self.mock_resolver.resolve_service.reset_mock()
+
+        # there should be an attempt to connect on port 443 for the .well-known
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 443)
+
+        redirect_server = self._make_connection(
+            client_factory,
+            expected_sni=b"testserv",
+        )
+
+        # send a 302 redirect
+        self.assertEqual(len(redirect_server.requests), 1)
+        request = redirect_server.requests[0]
+        request.redirect(b'https://testserv/even_better_known')
+        request.finish()
+
+        self.reactor.pump((0.1, ))
+
+        # now there should be another connection
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 443)
+
+        well_known_server = self._make_connection(
+            client_factory,
+            expected_sni=b"testserv",
+        )
+
+        self.assertEqual(len(well_known_server.requests), 1, "No request after 302")
+        request = well_known_server.requests[0]
+        self.assertEqual(request.method, b'GET')
+        self.assertEqual(request.path, b'/even_better_known')
+        request.write(b'{ "m.server": "target-server" }')
+        request.finish()
+
+        self.reactor.pump((0.1, ))
+
+        # there should be another SRV lookup
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.target-server",
+        )
+
+        # now we should get a connection to the target server
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1::f')
+        self.assertEqual(port, 8448)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(
+            client_factory,
+            expected_sni=b'target-server',
+        )
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b'GET')
+        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b'host'),
+            [b'target-server'],
+        )
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
+        self.assertEqual(self.well_known_cache[b"testserv"], b"target-server")
+
+        # check the cache expires
+        self.reactor.pump((25 * 3600,))
+        self.well_known_cache.expire()
+        self.assertNotIn(b"testserv", self.well_known_cache)
+
     def test_get_hostname_srv(self):
         """
         Test the behaviour when there is a single SRV record

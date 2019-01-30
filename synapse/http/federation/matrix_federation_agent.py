@@ -23,7 +23,7 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
-from twisted.web.client import URI, Agent, HTTPConnectionPool, readBody
+from twisted.web.client import URI, Agent, HTTPConnectionPool, RedirectAgent, readBody
 from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
@@ -93,7 +93,9 @@ class MatrixFederationAgent(object):
             # the param is called 'contextFactory', but actually passing a
             # contextfactory is deprecated, and it expects an IPolicyForHTTPS.
             agent_args['contextFactory'] = _well_known_tls_policy
-        _well_known_agent = Agent(self._reactor, pool=self._pool, **agent_args)
+        _well_known_agent = RedirectAgent(
+            Agent(self._reactor, pool=self._pool, **agent_args),
+        )
         self._well_known_agent = _well_known_agent
 
         self._well_known_cache = _well_known_cache
@@ -296,16 +298,18 @@ class MatrixFederationAgent(object):
             response = yield make_deferred_yieldable(
                 self._well_known_agent.request(b"GET", uri),
             )
+            body = yield make_deferred_yieldable(readBody(response))
+            if response.code != 200:
+                raise Exception("Non-200 response %s" % (response.code, ))
         except Exception as e:
-            logger.info("Connection error fetching %s: %s", uri_str, e)
-            self._well_known_cache.set(server_name, None, WELL_KNOWN_INVALID_CACHE_PERIOD)
-            defer.returnValue(None)
+            logger.info("Error fetching %s: %s", uri_str, e)
 
-        body = yield make_deferred_yieldable(readBody(response))
+            # add some randomness to the TTL to avoid a stampeding herd every hour
+            # after startup
+            cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
+            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
 
-        if response.code != 200:
-            logger.info("Error response %i from %s", response.code, uri_str)
-            self._well_known_cache.set(server_name, None, WELL_KNOWN_INVALID_CACHE_PERIOD)
+            self._well_known_cache.set(server_name, None, cache_period)
             defer.returnValue(None)
 
         try:
@@ -326,8 +330,8 @@ class MatrixFederationAgent(object):
         )
         if cache_period is None:
             cache_period = WELL_KNOWN_DEFAULT_CACHE_PERIOD
-            # add some randomness to the TTL to avoid a stampeding herd every hour after
-            # startup
+            # add some randomness to the TTL to avoid a stampeding herd every 24 hours
+            # after startup
             cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
         else:
             cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
