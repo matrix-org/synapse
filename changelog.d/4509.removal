@@ -1,1 +1,0 @@
-Synapse no longer generates self-signed TLS certificates when generating a configuration file.
