@@ -1,0 +1,1 @@
+Fix infinite loop when an event is redacted in a v3 room

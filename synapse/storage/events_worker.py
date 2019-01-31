@@ -161,6 +161,12 @@ class EventsWorkerStore(SQLBaseStore):
             log_ctx = LoggingContext.current_context()
             log_ctx.record_event_fetch(len(missing_events_ids))
 
+            # Note that _enqueue_events is also responsible for turning db rows
+            # into FrozenEvents (via _get_event_from_row), which involves seeing if
+            # the events have been redacted, and if so pulling the redaction event out
+            # of the database to check it.
+            #
+            # _enqueue_events is a bit of a rubbish name but naming is hard.
             missing_events = yield self._enqueue_events(
                 missing_events_ids,
                 allow_rejected=allow_rejected,
@@ -179,14 +185,35 @@ class EventsWorkerStore(SQLBaseStore):
             # instead.
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
                 if entry.event.internal_metadata.need_to_check_redaction():
-                    orig = yield self.get_event(
-                        entry.event.redacts,
+                    # XXX: we need to avoid calling get_event here.
+                    #
+                    # The problem is that we end up at this point when an event
+                    # which has been redacted is pulled out of the database by
+                    # _enqueue_events, because _enqueue_events needs to check the
+                    # redaction before it can cache the redacted event. So obviously,
+                    # calling get_event to get the redacted event out of the database
+                    # gives us an infinite loop.
+                    #
+                    # For now (quick hack to fix during 0.99 release cycle), we just
+                    # go and fetch the relevant row from the db, but it would be nice
+                    # to think about how we can cache this rather than hit the db
+                    # every time we access a redaction event.
+                    #
+                    # One thought on how to do this:
+                    #  1. split _get_events up so that it is divided into (a) get the
+                    #     rawish event from the db/cache, (b) do the redaction/rejection
+                    #     filtering
+                    #  2. have _get_event_from_row just call the first half of that
+
+                    orig_sender = yield self._simple_select_one_onecol(
+                        table="events",
+                        keyvalues={"event_id": entry.event.redacts},
+                        retcol="sender",
                         allow_none=True,
-                        allow_rejected=True,
-                        get_prev_content=False,
                     )
+
                     expected_domain = get_domain_from_id(entry.event.sender)
-                    if orig and get_domain_from_id(orig.sender) == expected_domain:
+                    if orig_sender and get_domain_from_id(orig_sender) == expected_domain:
                         # This redaction event is allowed. Mark as not needing a
                         # recheck.
                         entry.event.internal_metadata.recheck_redaction = False
