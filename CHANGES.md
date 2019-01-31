@@ -1,3 +1,24 @@
+Synapse 0.99.0rc3 (2019-01-31)
+==============================
+
+Bugfixes
+--------
+
+- Fix infinite loop when an event is redacted in a v3 room ([\#4535](https://github.com/matrix-org/synapse/issues/4535))
+
+
+Improved Documentation
+----------------------
+
+- Update debian installation instructions ([\#4526](https://github.com/matrix-org/synapse/issues/4526))
+
+
+Internal Changes
+----------------
+
+- Add some debug for membership syncing issues ([\#4538](https://github.com/matrix-org/synapse/issues/4538))
+
+
 Synapse 0.99.0rc2 (2019-01-30)
 ==============================
 
