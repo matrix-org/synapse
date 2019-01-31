@@ -738,7 +738,7 @@ class SQLBaseStore(object):
         )
         txn.execute(sql, list(allvalues.values()))
 
-    def _simple_upsert_many_txn(self, txn, table, keys, keyvalues, values, valuevalues):
+    def _simple_upsert_many_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
         if (
             self.database_engine.can_native_upsert
             and table not in self._unsafe_to_upsert_tables
