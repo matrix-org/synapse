@@ -559,13 +559,13 @@ class UserDirectoryHandler(object):
                     found_public_share = j_room_id
                 else:
                     found_public_share = None
-                    yield self.store.insert_users_who_share_room(
+                    yield self.store.add_users_who_share_room(
                         room_id, not is_public, [(user_id, other_user_id)],
                     )
                     break
 
             if found_public_share:
-                yield self.store.insert_users_who_share_room(
+                yield self.store.add_users_who_share_room(
                     room_id, not is_public, [(user_id, other_user_id)],
                 )
 
