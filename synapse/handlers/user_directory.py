@@ -311,6 +311,24 @@ class UserDirectoryHandler(object):
                     public_value=Membership.JOIN,
                 )
 
+                if change is False:
+                    # Need to check if the server left the room entirely, if so
+                    # we might need to remove all the users in that room
+                    is_in_room = yield self.store.is_host_joined(
+                        room_id, self.server_name,
+                    )
+                    if not is_in_room:
+                        logger.info("Server left room: %r", room_id)
+                        # Fetch all the users that we marked as being in user
+                        # directory due to being in the room and then check if
+                        # need to remove those users or not
+                        user_ids = yield self.store.get_users_in_dir_due_to_room(room_id)
+                        for user_id in user_ids:
+                            yield self._handle_remove_user(room_id, user_id)
+                        return
+                    else:
+                        logger.debug("Server is still in room: %r", room_id)
+
                 is_support = yield self.store.is_support_user(state_key)
                 if not is_support:
                     if change is None:
