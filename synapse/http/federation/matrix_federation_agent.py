@@ -23,6 +23,7 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet.endpoints import HostnameEndpoint, wrapClientTLS
+from twisted.internet.interfaces import IStreamClientEndpoint
 from twisted.web.client import URI, Agent, HTTPConnectionPool, RedirectAgent, readBody
 from twisted.web.http import stringToDatetime
 from twisted.web.http_headers import Headers
@@ -152,12 +153,9 @@ class MatrixFederationAgent(object):
         class EndpointFactory(object):
             @staticmethod
             def endpointForURI(_uri):
-                logger.info(
-                    "Connecting to %s:%i",
-                    res.target_host.decode("ascii"),
-                    res.target_port,
+                ep = LoggingHostnameEndpoint(
+                    self._reactor, res.target_host, res.target_port,
                 )
-                ep = HostnameEndpoint(self._reactor, res.target_host, res.target_port)
                 if tls_options is not None:
                     ep = wrapClientTLS(tls_options, ep)
                 return ep
@@ -340,6 +338,19 @@ class MatrixFederationAgent(object):
             self._well_known_cache.set(server_name, result, cache_period)
 
         defer.returnValue(result)
+
+
+@implementer(IStreamClientEndpoint)
+class LoggingHostnameEndpoint(object):
+    """A wrapper for HostnameEndpint which logs when it connects"""
+    def __init__(self, reactor, host, port, *args, **kwargs):
+        self.host = host
+        self.port = port
+        self.ep = HostnameEndpoint(reactor, host, port, *args, **kwargs)
+
+    def connect(self, protocol_factory):
+        logger.info("Connecting to %s:%i", self.host, self.port)
+        return self.ep.connect(protocol_factory)
 
 
 def _cache_period_from_headers(headers, time_now=time.time):
