@@ -24,6 +24,7 @@ import attr
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
+from synapse.api.errors import NotFoundError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine
@@ -442,6 +443,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         Returns:
             Deferred[unicode|None]: predecessor room id
+
+        Raises:
+            NotFoundError if the room is unknown
         """
         # Retrieve the room's create event
         create_event = yield self.get_create_event_for_room(room_id)
@@ -457,14 +461,17 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id (str)
 
         Returns:
-            Deferred[EventBase|None]: The room creation event. None if can not be found
+            Deferred[EventBase]: The room creation event.
+
+        Raises:
+            NotFoundError if the room is unknown
         """
         state_ids = yield self.get_current_state_ids(room_id)
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            defer.returnValue(None)
+            raise NotFoundError("Unknown room %s" % (room_id))
 
         # Retrieve the room's create event and return
         create_event = yield self.get_event(create_id)
