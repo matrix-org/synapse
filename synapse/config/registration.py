@@ -50,6 +50,10 @@ class RegistrationConfig(Config):
                 raise ConfigError('Invalid auto_join_rooms entry %s' % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
+        self.disable_msisdn_registration = (
+            config.get("disable_msisdn_registration", False)
+        )
+
     def default_config(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
@@ -70,16 +74,21 @@ class RegistrationConfig(Config):
         #     - email
         #     - msisdn
 
+        # Explicitly disable asking for MSISDNs from the registration
+        # flow (overrides registrations_require_3pid if MSISDNs are set as required)
+        #
+        # disable_msisdn_registration = True
+
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
         #
         # allowed_local_3pids:
         #     - medium: email
-        #       pattern: ".*@matrix\\.org"
+        #       pattern: '.*@matrix\\.org'
         #     - medium: email
-        #       pattern: ".*@vector\\.im"
+        #       pattern: '.*@vector\\.im'
         #     - medium: msisdn
-        #       pattern: "\\+44"
+        #       pattern: '\\+44'
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.

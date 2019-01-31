@@ -11,7 +11,7 @@ class BackgroundUpdateTestCase(unittest.TestCase):
     def setUp(self):
         hs = yield setup_test_homeserver(
             self.addCleanup
-        )  # type: synapse.server.HomeServer
+        )
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 

@@ -13,10 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import gc
 import logging
 import os
+import signal
 import sys
+import traceback
 
 from six import iteritems
 
@@ -25,6 +28,7 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
+from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -82,6 +86,7 @@ def gz_wrap(r):
 
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
+    _listening_services = []
 
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
@@ -90,7 +95,9 @@ class SynapseHomeServer(HomeServer):
         site_tag = listener_config.get("tag", port)
 
         if tls and config.no_tls:
-            return
+            raise ConfigError(
+                "Listener on port %i has TLS enabled, but no_tls is set" % (port,),
+            )
 
         resources = {}
         for res in listener_config["resources"]:
@@ -119,7 +126,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            listen_ssl(
+            return listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -133,7 +140,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         else:
-            listen_tcp(
+            return listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -144,7 +151,6 @@ class SynapseHomeServer(HomeServer):
                     self.version_string,
                 )
             )
-        logger.info("Synapse now listening on port %d", port)
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
@@ -240,7 +246,9 @@ class SynapseHomeServer(HomeServer):
 
         for listener in config.listeners:
             if listener["type"] == "http":
-                self._listener_http(config, listener)
+                self._listening_services.extend(
+                    self._listener_http(config, listener)
+                )
             elif listener["type"] == "manhole":
                 listen_tcp(
                     listener["bind_addresses"],
@@ -320,12 +328,21 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    synapse.config.logger.setup_logging(config, use_worker_options=False)
+    sighup_callbacks = []
+    synapse.config.logger.setup_logging(
+        config,
+        use_worker_options=False,
+        register_sighup=sighup_callbacks.append
+    )
+
+    def handle_sighup(*args, **kwargs):
+        for i in sighup_callbacks:
+            i(*args, **kwargs)
+
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, handle_sighup)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
-
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
 
     database_engine = create_engine(config.database_config)
     config.database_config["args"]["cp_openfun"] = database_engine.on_new_connection
@@ -333,8 +350,6 @@ def setup(config_options):
     hs = SynapseHomeServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
-        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
@@ -361,12 +376,78 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
-    hs.start_listening()
 
+    def refresh_certificate(*args):
+        """
+        Refresh the TLS certificates that Synapse is using by re-reading them
+        from disk and updating the TLS context factories to use them.
+        """
+        logging.info("Reloading certificate from disk...")
+        hs.config.read_certificate_from_disk()
+        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            config
+        )
+        logging.info("Certificate reloaded.")
+
+        logging.info("Updating context factories...")
+        for i in hs._listening_services:
+            if isinstance(i.factory, TLSMemoryBIOFactory):
+                i.factory = TLSMemoryBIOFactory(
+                    hs.tls_server_context_factory,
+                    False,
+                    i.factory.wrappedFactory
+                )
+        logging.info("Context factories updated.")
+
+    sighup_callbacks.append(refresh_certificate)
+
+    @defer.inlineCallbacks
     def start():
-        hs.get_pusherpool().start()
-        hs.get_datastore().start_profiling()
-        hs.get_datastore().start_doing_background_updates()
+        try:
+            # Check if the certificate is still valid.
+            cert_days_remaining = hs.config.is_disk_cert_valid()
+
+            if hs.config.acme_enabled:
+                # If ACME is enabled, we might need to provision a certificate
+                # before starting.
+                acme = hs.get_acme_handler()
+
+                # Start up the webservices which we will respond to ACME
+                # challenges with.
+                yield acme.start_listening()
+
+                # We want to reprovision if cert_days_remaining is None (meaning no
+                # certificate exists), or the days remaining number it returns
+                # is less than our re-registration threshold.
+                if (cert_days_remaining is None) or (
+                    not cert_days_remaining > hs.config.acme_reprovision_threshold
+                ):
+                    yield acme.provision_certificate()
+
+            # Read the certificate from disk and build the context factories for
+            # TLS.
+            hs.config.read_certificate_from_disk()
+            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
+            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+                config
+            )
+
+            # It is now safe to start your Synapse.
+            hs.start_listening()
+            hs.get_pusherpool().start()
+            hs.get_datastore().start_profiling()
+            hs.get_datastore().start_doing_background_updates()
+        except Exception as e:
+            # If a DeferredList failed (like in listening on the ACME listener),
+            # we need to print the subfailure explicitly.
+            if isinstance(e, defer.FirstError):
+                e.subFailure.printTraceback(sys.stderr)
+                sys.exit(1)
+
+            # Something else went wrong when starting. Print it and bail out.
+            traceback.print_exc(file=sys.stderr)
+            sys.exit(1)
 
     reactor.callWhenRunning(start)
 

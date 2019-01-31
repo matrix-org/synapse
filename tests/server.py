@@ -1,4 +1,5 @@
 import json
+import logging
 from io import BytesIO
 
 from six import text_type
@@ -7,11 +8,10 @@ import attr
 from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
-from twisted.internet._resolver import HostResolution
-from twisted.internet.address import IPv4Address
-from twisted.internet.defer import Deferred
+from twisted.internet._resolver import SimpleResolverComplexifier
+from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.error import DNSLookupError
-from twisted.internet.interfaces import IReactorPluggableNameResolver
+from twisted.internet.interfaces import IReactorPluggableNameResolver, IResolverSimple
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import MemoryReactorClock
 from twisted.web.http import unquote
@@ -21,6 +21,8 @@ from synapse.http.site import SynapseRequest
 from synapse.util import Clock
 
 from tests.utils import setup_test_homeserver as _sth
+
+logger = logging.getLogger(__name__)
 
 
 class TimedOutException(Exception):
@@ -224,30 +226,16 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
     def __init__(self):
         self._udp = []
-        self.lookups = {}
+        lookups = self.lookups = {}
 
-        class Resolver(object):
-            def resolveHostName(
-                _self,
-                resolutionReceiver,
-                hostName,
-                portNumber=0,
-                addressTypes=None,
-                transportSemantics='TCP',
-            ):
+        @implementer(IResolverSimple)
+        class FakeResolver(object):
+            def getHostByName(self, name, timeout=None):
+                if name not in lookups:
+                    return fail(DNSLookupError("OH NO: unknown %s" % (name, )))
+                return succeed(lookups[name])
 
-                resolution = HostResolution(hostName)
-                resolutionReceiver.resolutionBegan(resolution)
-                if hostName not in self.lookups:
-                    raise DNSLookupError("OH NO")
-
-                resolutionReceiver.addressResolved(
-                    IPv4Address('TCP', self.lookups[hostName], portNumber)
-                )
-                resolutionReceiver.resolutionComplete()
-                return resolution
-
-        self.nameResolver = Resolver()
+        self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super(ThreadedMemoryReactorClock, self).__init__()
 
     def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
@@ -339,7 +327,7 @@ def get_clock():
     return (clock, hs_clock)
 
 
-@attr.s
+@attr.s(cmp=False)
 class FakeTransport(object):
     """
     A twisted.internet.interfaces.ITransport implementation which sends all its data
@@ -366,7 +354,13 @@ class FakeTransport(object):
     :type: twisted.internet.interfaces.IReactorTime
     """
 
+    _protocol = attr.ib(default=None)
+    """The Protocol which is producing data for this transport. Optional, but if set
+    will get called back for connectionLost() notifications etc.
+    """
+
     disconnecting = False
+    disconnected = False
     buffer = attr.ib(default=b'')
     producer = attr.ib(default=None)
 
@@ -376,11 +370,17 @@ class FakeTransport(object):
     def getHost(self):
         return None
 
-    def loseConnection(self):
-        self.disconnecting = True
+    def loseConnection(self, reason=None):
+        if not self.disconnecting:
+            logger.info("FakeTransport: loseConnection(%s)", reason)
+            self.disconnecting = True
+            if self._protocol:
+                self._protocol.connectionLost(reason)
+            self.disconnected = True
 
     def abortConnection(self):
-        self.disconnecting = True
+        logger.info("FakeTransport: abortConnection()")
+        self.loseConnection()
 
     def pauseProducing(self):
         if not self.producer:
@@ -414,14 +414,29 @@ class FakeTransport(object):
         self.buffer = self.buffer + byt
 
         def _write():
+            if not self.buffer:
+                # nothing to do. Don't write empty buffers: it upsets the
+                # TLSMemoryBIOProtocol
+                return
+
+            if self.disconnected:
+                return
+            logger.info("%s->%s: %s", self._protocol, self.other, self.buffer)
+
             if getattr(self.other, "transport") is not None:
-                self.other.dataReceived(self.buffer)
-                self.buffer = b""
+                try:
+                    self.other.dataReceived(self.buffer)
+                    self.buffer = b""
+                except Exception as e:
+                    logger.warning("Exception writing to protocol: %s", e)
                 return
 
             self._reactor.callLater(0.0, _write)
 
-        _write()
+        # always actually do the write asynchronously. Some protocols (notably the
+        # TLSMemoryBIOProtocol) get very confused if a read comes back while they are
+        # still doing a write. Doing a callLater here breaks the cycle.
+        self._reactor.callLater(0.0, _write)
 
     def writeSequence(self, seq):
         for x in seq:

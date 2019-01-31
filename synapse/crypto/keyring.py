@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import hashlib
 import logging
 from collections import namedtuple
+
+from six.moves import urllib
 
 from signedjson.key import (
     decode_verify_key_bytes,
@@ -30,13 +31,11 @@ from signedjson.sign import (
     signature_ids,
     verify_signed_json,
 )
-from unpaddedbase64 import decode_base64, encode_base64
+from unpaddedbase64 import decode_base64
 
-from OpenSSL import crypto
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.crypto.keyclient import fetch_server_key
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.logcontext import (
     LoggingContext,
@@ -503,30 +502,15 @@ class Keyring(object):
             if requested_key_id in keys:
                 continue
 
-            (response, tls_certificate) = yield fetch_server_key(
-                server_name, self.hs.tls_client_options_factory, requested_key_id
+            response = yield self.client.get_json(
+                destination=server_name,
+                path="/_matrix/key/v2/server/" + urllib.parse.quote(requested_key_id),
+                ignore_backoff=True,
             )
 
             if (u"signatures" not in response
                     or server_name not in response[u"signatures"]):
                 raise KeyLookupError("Key response not signed by remote server")
-
-            if "tls_fingerprints" not in response:
-                raise KeyLookupError("Key response missing TLS fingerprints")
-
-            certificate_bytes = crypto.dump_certificate(
-                crypto.FILETYPE_ASN1, tls_certificate
-            )
-            sha256_fingerprint = hashlib.sha256(certificate_bytes).digest()
-            sha256_fingerprint_b64 = encode_base64(sha256_fingerprint)
-
-            response_sha256_fingerprints = set()
-            for fingerprint in response[u"tls_fingerprints"]:
-                if u"sha256" in fingerprint:
-                    response_sha256_fingerprints.add(fingerprint[u"sha256"])
-
-            if sha256_fingerprint_b64 not in response_sha256_fingerprints:
-                raise KeyLookupError("TLS certificate not allowed by fingerprints")
 
             response_keys = yield self.process_v2_response(
                 from_server=server_name,

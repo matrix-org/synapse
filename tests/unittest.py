@@ -31,38 +31,14 @@ from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
-from synapse.util.logcontext import LoggingContext, LoggingContextFilter
+from synapse.util.logcontext import LoggingContext
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
+from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
 setupdb()
-
-# Set up putting Synapse's logs into Trial's.
-rootLogger = logging.getLogger()
-
-log_format = (
-    "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s"
-)
-
-
-class ToTwistedHandler(logging.Handler):
-    tx_log = twisted.logger.Logger()
-
-    def emit(self, record):
-        log_entry = self.format(record)
-        log_level = record.levelname.lower().replace('warning', 'warn')
-        self.tx_log.emit(
-            twisted.logger.LogLevel.levelWithName(log_level),
-            log_entry.replace("{", r"(").replace("}", r")"),
-        )
-
-
-handler = ToTwistedHandler()
-formatter = logging.Formatter(log_format)
-handler.setFormatter(formatter)
-handler.addFilter(LoggingContextFilter(request=""))
-rootLogger.addHandler(handler)
+setup_logging()
 
 
 def around(target):
@@ -96,7 +72,7 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.ERROR))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", None))
 
         @around(self)
         def setUp(orig):
@@ -114,7 +90,7 @@ class TestCase(unittest.TestCase):
                 )
 
             old_level = logging.getLogger().level
-            if old_level != level:
+            if level is not None and old_level != level:
 
                 @around(self)
                 def tearDown(orig):
@@ -122,7 +98,8 @@ class TestCase(unittest.TestCase):
                     logging.getLogger().setLevel(old_level)
                     return ret
 
-            logging.getLogger().setLevel(level)
+                logging.getLogger().setLevel(level)
+
             return orig()
 
         @around(self)
@@ -333,7 +310,15 @@ class HomeserverTestCase(TestCase):
         """
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
-        return setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        stor = hs.get_datastore()
+
+        # Run the database background updates.
+        if hasattr(stor, "do_next_background_update"):
+            while not self.get_success(stor.has_completed_background_updates()):
+                self.get_success(stor.do_next_background_update(1))
+
+        return hs
 
     def pump(self, by=0.0):
         """

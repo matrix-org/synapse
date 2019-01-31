@@ -184,7 +184,7 @@ Configuring Synapse
 Before you can start Synapse, you will need to generate a configuration
 file. To do this, run (in your virtualenv, as before)::
 
-    cd ~/.synapse
+    cd ~/synapse
     python -m synapse.app.homeserver \
         --server-name my.domain.name \
         --config-path homeserver.yaml \
@@ -220,7 +220,7 @@ is configured to use TLS with a self-signed certificate. If you would like
 to do initial test with a client without having to setup a reverse proxy,
 you can temporarly use another certificate. (Note that a self-signed
 certificate is fine for `Federation`_). You can do so by changing
-``tls_certificate_path``, ``tls_private_key_path`` and ``tls_dh_params_path``
+``tls_certificate_path`` and ``tls_private_key_path``
 in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
 to read `Using a reverse proxy with Synapse`_ when doing so.
 
@@ -725,8 +725,8 @@ caveats, you will need to do the following:
   tell other servers how to find you. See `Setting up Federation`_.
 
 When updating the SSL certificate, just update the file pointed to by
-``tls_certificate_path``: there is no need to restart synapse. (You may like to
-use a symbolic link to help make this process atomic.)
+``tls_certificate_path`` and then restart Synapse. (You may like to use a symbolic link
+to help make this process atomic.)
 
 The most common mistake when setting up federation is not to tell Synapse about
 your SSL certificate. To check it, you can visit
@@ -796,8 +796,7 @@ A manual password reset can be done via direct database access as follows.
 
 First calculate the hash of the new password::
 
-    $ source ~/.synapse/bin/activate
-    $ ./scripts/hash_password
+    $ ~/synapse/env/bin/hash_password
     Password:
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

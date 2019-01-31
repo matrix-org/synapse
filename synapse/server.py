@@ -46,6 +46,7 @@ from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler
 from synapse.handlers import Handlers
+from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
@@ -130,6 +131,7 @@ class HomeServer(object):
         'sync_handler',
         'typing_handler',
         'room_list_handler',
+        'acme_handler',
         'auth_handler',
         'device_handler',
         'stats_handler',
@@ -321,6 +323,9 @@ class HomeServer(object):
     def build_e2e_room_keys_handler(self):
         return E2eRoomKeysHandler(self)
 
+    def build_acme_handler(self):
+        return AcmeHandler(self)
+
     def build_application_service_api(self):
         return ApplicationServiceApi(self)
 
@@ -361,10 +366,7 @@ class HomeServer(object):
         return Keyring(self)
 
     def build_event_builder_factory(self):
-        return EventBuilderFactory(
-            clock=self.get_clock(),
-            hostname=self.hostname,
-        )
+        return EventBuilderFactory(self)
 
     def build_filtering(self):
         return Filtering(self)

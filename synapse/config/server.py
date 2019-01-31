@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017 New Vector Ltd
+# Copyright 2017-2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import logging
 import os.path
 
 from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -204,6 +205,8 @@ class ServerConfig(Config):
                 ]
             })
 
+        _check_resource_config(self.listeners)
+
     def default_config(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
@@ -253,8 +256,12 @@ class ServerConfig(Config):
         #
         # web_client_location: "/path/to/web/root"
 
-        # The public-facing base URL for the client API (not including _matrix/...)
-        # public_baseurl: https://example.com:8448/
+        # The public-facing base URL that clients use to access this HS
+        # (not including _matrix/...). This is the same URL a user would
+        # enter into the 'custom HS URL' field on their client. If you
+        # use synapse with a reverse proxy, this should be the URL to reach
+        # synapse via the proxy.
+        # public_baseurl: https://example.com/
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
@@ -417,19 +424,18 @@ class ServerConfig(Config):
                                   " service on the given port.")
 
 
-def is_threepid_reserved(config, threepid):
+def is_threepid_reserved(reserved_threepids, threepid):
     """Check the threepid against the reserved threepid config
     Args:
-        config(ServerConfig) - to access server config attributes
+        reserved_threepids([dict]) - list of reserved threepids
         threepid(dict) - The threepid to test for
 
     Returns:
         boolean Is the threepid undertest reserved_user
     """
 
-    for tp in config.mau_limits_reserved_threepids:
-        if (threepid['medium'] == tp['medium']
-                and threepid['address'] == tp['address']):
+    for tp in reserved_threepids:
+        if (threepid['medium'] == tp['medium'] and threepid['address'] == tp['address']):
             return True
     return False
 
@@ -465,3 +471,36 @@ def _warn_if_webclient_configured(listeners):
                 if name == 'webclient':
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
+
+
+KNOWN_RESOURCES = (
+    'client',
+    'consent',
+    'federation',
+    'keys',
+    'media',
+    'metrics',
+    'replication',
+    'static',
+    'webclient',
+)
+
+
+def _check_resource_config(listeners):
+    resource_names = set(
+        res_name
+        for listener in listeners
+        for res in listener.get("resources", [])
+        for res_name in res.get("names", [])
+    )
+
+    for resource in resource_names:
+        if resource not in KNOWN_RESOURCES:
+            raise ConfigError(
+                "Unknown listener resource '%s'" % (resource, )
+            )
+        if resource == "consent":
+            try:
+                check_requirements('resources.consent')
+            except DependencyException as e:
+                raise ConfigError(e.message)

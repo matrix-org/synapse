@@ -21,8 +21,9 @@ import re
 from twisted.internet import defer
 
 import synapse
+from synapse.api.constants import RoomVersions
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
-from synapse.api.urls import FEDERATION_PREFIX as PREFIX
+from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
@@ -227,6 +228,8 @@ class BaseFederationServlet(object):
     """
     REQUIRE_AUTH = True
 
+    PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
+
     def __init__(self, handler, authenticator, ratelimiter, server_name):
         self.handler = handler
         self.authenticator = authenticator
@@ -286,7 +289,7 @@ class BaseFederationServlet(object):
         return new_func
 
     def register(self, server):
-        pattern = re.compile("^" + PREFIX + self.PATH + "$")
+        pattern = re.compile("^" + self.PREFIX + self.PATH + "$")
 
         for method in ("GET", "PUT", "POST"):
             code = getattr(self, "on_%s" % (method), None)
@@ -466,7 +469,7 @@ class FederationSendLeaveServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, room_id, event_id):
-        content = yield self.handler.on_send_leave_request(origin, content)
+        content = yield self.handler.on_send_leave_request(origin, content, room_id)
         defer.returnValue((200, content))
 
 
@@ -484,18 +487,50 @@ class FederationSendJoinServlet(BaseFederationServlet):
     def on_PUT(self, origin, content, query, context, event_id):
         # TODO(paul): assert that context/event_id parsed from path actually
         #   match those given in content
-        content = yield self.handler.on_send_join_request(origin, content)
+        content = yield self.handler.on_send_join_request(origin, content, context)
         defer.returnValue((200, content))
 
 
-class FederationInviteServlet(BaseFederationServlet):
+class FederationV1InviteServlet(BaseFederationServlet):
     PATH = "/invite/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+
+    @defer.inlineCallbacks
+    def on_PUT(self, origin, content, query, context, event_id):
+        # We don't get a room version, so we have to assume its EITHER v1 or
+        # v2. This is "fine" as the only difference between V1 and V2 is the
+        # state resolution algorithm, and we don't use that for processing
+        # invites
+        content = yield self.handler.on_invite_request(
+            origin, content, room_version=RoomVersions.V1,
+        )
+
+        # V1 federation API is defined to return a content of `[200, {...}]`
+        # due to a historical bug.
+        defer.returnValue((200, (200, content)))
+
+
+class FederationV2InviteServlet(BaseFederationServlet):
+    PATH = "/invite/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+
+    PREFIX = FEDERATION_V2_PREFIX
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, context, event_id):
         # TODO(paul): assert that context/event_id parsed from path actually
         #   match those given in content
-        content = yield self.handler.on_invite_request(origin, content)
+
+        room_version = content["room_version"]
+        event = content["event"]
+        invite_room_state = content["invite_room_state"]
+
+        # Synapse expects invite_room_state to be in unsigned, as it is in v1
+        # API
+
+        event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
+
+        content = yield self.handler.on_invite_request(
+            origin, event, room_version=room_version,
+        )
         defer.returnValue((200, content))
 
 
@@ -1263,7 +1298,8 @@ FEDERATION_SERVLET_CLASSES = (
     FederationEventServlet,
     FederationSendJoinServlet,
     FederationSendLeaveServlet,
-    FederationInviteServlet,
+    FederationV1InviteServlet,
+    FederationV2InviteServlet,
     FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,

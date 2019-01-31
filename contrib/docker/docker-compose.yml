@@ -37,7 +37,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.frontend.rule=Host:my.matrix.Host
-      - traefik.port=8448
+      - traefik.port=8008
 
   db:
     image: docker.io/postgres:10-alpine

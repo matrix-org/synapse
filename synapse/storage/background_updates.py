@@ -240,7 +240,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         * An integer count of the number of items to update in this batch.
 
         The handler should return a deferred integer count of items updated.
-        The hander is responsible for updating the progress of the update.
+        The handler is responsible for updating the progress of the update.
 
         Args:
             update_name(str): The name of the update that this code handles.

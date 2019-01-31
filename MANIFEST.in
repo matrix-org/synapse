@@ -15,6 +15,7 @@ recursive-include docs *
 recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include synapse *.pyi
+recursive-include tests *.pem
 recursive-include tests *.py
 
 recursive-include synapse/res *
@@ -37,6 +38,7 @@ prune docker
 prune .circleci
 prune .coveragerc
 prune debian
+prune .codecov.yml
 
 exclude jenkins*
 recursive-exclude jenkins *.sh

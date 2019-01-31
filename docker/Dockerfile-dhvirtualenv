@@ -11,6 +11,35 @@
 
 # Get the distro we want to pull from as a dynamic build variable
 ARG distro=""
+
+###
+### Stage 0: build a dh-virtualenv
+###
+FROM ${distro} as builder
+
+RUN apt-get update -qq -o Acquire::Languages=none
+RUN env DEBIAN_FRONTEND=noninteractive apt-get install \
+        -yqq --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        devscripts \
+        equivs \
+        wget
+
+# fetch and unpack the package
+RUN wget -q -O /dh-virtuenv-1.1.tar.gz https://github.com/spotify/dh-virtualenv/archive/1.1.tar.gz
+RUN tar xvf /dh-virtuenv-1.1.tar.gz
+
+# install its build deps
+RUN cd dh-virtualenv-1.1/ \
+    && env DEBIAN_FRONTEND=noninteractive mk-build-deps -ri -t "apt-get -yqq --no-install-recommends"
+
+# build it
+RUN cd dh-virtualenv-1.1 && dpkg-buildpackage -us -uc -b
+
+###
+### Stage 1
+###
 FROM ${distro}
 
 # Install the build dependencies
@@ -21,15 +50,15 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         debhelper \
         devscripts \
         dh-systemd \
-        dh-virtualenv \
-        equivs \
         lsb-release \
         python3-dev \
         python3-pip \
         python3-setuptools \
         python3-venv \
-        sqlite3 \
-        wget
+        sqlite3
+
+COPY --from=builder /dh-virtualenv_1.1-1_all.deb /
+RUN apt-get install -yq /dh-virtualenv_1.1-1_all.deb
 
 WORKDIR /synapse/source
 ENTRYPOINT ["bash","/synapse/source/docker/build_debian.sh"]

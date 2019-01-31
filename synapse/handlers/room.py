@@ -123,9 +123,12 @@ class RoomCreationHandler(BaseHandler):
                     token_id=requester.access_token_id,
                 )
             )
-            yield self.auth.check_from_context(tombstone_event, tombstone_context)
+            old_room_version = yield self.store.get_room_version(old_room_id)
+            yield self.auth.check_from_context(
+                old_room_version, tombstone_event, tombstone_context,
+            )
 
-            yield self.clone_exiting_room(
+            yield self.clone_existing_room(
                 requester,
                 old_room_id=old_room_id,
                 new_room_id=new_room_id,
@@ -230,7 +233,7 @@ class RoomCreationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def clone_exiting_room(
+    def clone_existing_room(
             self, requester, old_room_id, new_room_id, new_room_version,
             tombstone_event_id,
     ):
@@ -262,6 +265,7 @@ class RoomCreationHandler(BaseHandler):
 
         initial_state = dict()
 
+        # Replicate relevant room events
         types_to_copy = (
             (EventTypes.JoinRules, ""),
             (EventTypes.Name, ""),
@@ -269,6 +273,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.RoomHistoryVisibility, ""),
             (EventTypes.GuestAccess, ""),
             (EventTypes.RoomAvatar, ""),
+            (EventTypes.Encryption, ""),
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(

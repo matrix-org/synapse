@@ -18,7 +18,7 @@ instructions that may be required are listed later in this document.
 
    .. code:: bash
 
-       pip install --upgrade --process-dependency-links matrix-synapse
+       pip install --upgrade matrix-synapse
 
        # restart synapse
        synctl restart
@@ -47,6 +47,38 @@ returned by the Client-Server API:
     # You may need to specify a port (eg, :8448) if your server is not
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
+
+Upgrading to v0.99.0
+====================
+
+In preparation for Synapse v1.0, you must update your TLS certificates from
+self-signed ones to verifiable ones signed by a trusted root CA.
+
+If you do not already have a certificate for your domain, the easiest way to get
+one is with Synapse's new ACME support, which will use the ACME protocol to
+provision a certificate automatically. By default, certificates will be obtained
+from the publicly trusted CA Let's Encrypt.
+
+For a sample configuration, please inspect the new ACME section in the example
+generated config by running the ``generate-config`` executable. For example::
+
+  ~/synapse/env3/bin/generate-config
+
+You will need to provide Let's Encrypt (or other ACME provider) access to your
+Synapse ACME challenge responder on port 80, at the domain of your homeserver.
+This requires you either change the port of the ACME listener provided by
+Synapse to a high port and reverse proxy to it, or use a tool like authbind to
+allow Synapse to listen on port 80 without root access. (Do not run Synapse with
+root permissions!)
+
+You will need to back up or delete your self signed TLS certificate
+(``example.com.tls.crt`` and ``example.com.tls.key``), Synapse's ACME
+implementation will not overwrite them.
+
+You may wish to use alternate methods such as Certbot to obtain a certificate
+from Let's Encrypt, depending on your server configuration. Of course, if you
+already have a valid certificate for your homeserver's domain, that can be
+placed in Synapse's config directory without the need for ACME.
 
 Upgrading to v0.34.0
 ====================

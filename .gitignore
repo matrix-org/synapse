@@ -12,6 +12,7 @@ dbs/
 dist/
 docs/build/
 *.egg-info
+pip-wheel-metadata/
 
 cmdclient_config.json
 homeserver*.db
@@ -25,9 +26,9 @@ homeserver*.pid
 *.tls.dh
 *.tls.key
 
-.coverage
-.coverage.*
-!.coverage.rc
+.coverage*
+coverage.*
+!.coveragerc
 htmlcov
 
 demo/*/*.db
