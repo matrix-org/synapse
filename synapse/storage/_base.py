@@ -770,7 +770,7 @@ class SQLBaseStore(object):
             keys = {x:y for x, y in zip(keys, keyv)}
             vals = {x:y for x, y in zip(values, valv)}
 
-            _simple_upsert_txn_emulated(txn, table, keys, vals)
+            self._simple_upsert_txn_emulated(txn, table, keys, vals)
 
 
     def _simple_upsert_many_txn_native_upsert(self, txn, table, keys, keyvalues, values, valuesvalues):

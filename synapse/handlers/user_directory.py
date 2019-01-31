@@ -464,7 +464,7 @@ class UserDirectoryHandler(object):
                     if user_id == other_user_id:
                         continue
 
-                    to_update.add((user_id, other_user_id))
+                    to_insert.add((user_id, other_user_id))
 
         # Next we need to update for every local user in the room
         for other_user_id in users_with_profile:

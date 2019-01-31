@@ -549,7 +549,7 @@ class UserDirectoryStore(SQLBaseStore):
             "get_users_in_share_dir_with_room_id", None, sql, room_id, user_id, user_id
         )
 
-        return public + private
+        defer.returnValue(public + private)
 
     @defer.inlineCallbacks
     def get_rooms_in_common_for_users(self, user_id, other_user_id):
