@@ -319,8 +319,15 @@ class UserDirectoryStore(SQLBaseStore):
             desc="get_users_in_dir_due_to_room",
         )
 
-        user_ids_share = yield self._simple_select_onecol(
-            table="users_who_share_rooms",
+        user_ids_share_pub = yield self._simple_select_onecol(
+            table="users_who_share_public_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="user_id",
+            desc="get_users_in_dir_due_to_room",
+        )
+
+        user_ids_share_priv = yield self._simple_select_onecol(
+            table="users_who_share_private_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_dir_due_to_room",
@@ -355,7 +362,7 @@ class UserDirectoryStore(SQLBaseStore):
         defer.returnValue([name for name, in rows])
 
     def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
-        """Insert entries into the users_who_share_rooms table. The first
+        """Insert entries into the users_who_share_*_rooms table. The first
         user should be a local user.
 
         Args:
@@ -364,18 +371,22 @@ class UserDirectoryStore(SQLBaseStore):
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
         def _add_users_who_share_room_txn(txn):
-            self._simple_insert_many_txn(
+
+            if share_private:
+                tbl = "users_who_share_private_rooms"
+            else:
+                tbl = "users_who_share_public_rooms"
+
+            self._simple_upsert_many_native_txn(
                 txn,
-                table="users_who_share_rooms",
-                values=[
-                    {
-                        "user_id": user_id,
-                        "other_user_id": other_user_id,
-                        "room_id": room_id,
-                        "share_private": share_private,
-                    }
+                table=tbl,
+                keys=["user_id", "other_user_id", "room_id"],
+                keyvalues=[
+                    (user_id, other_user_id, room_id)
                     for user_id, other_user_id in user_id_tuples
                 ],
+                values=(),
+                valuesvalues=(),
             )
             for user_id, other_user_id in user_id_tuples:
                 txn.call_after(
@@ -390,41 +401,6 @@ class UserDirectoryStore(SQLBaseStore):
             "add_users_who_share_room", _add_users_who_share_room_txn
         )
 
-    def update_users_who_share_room(self, room_id, share_private, user_id_sets):
-        """Updates entries in the users_who_share_rooms table. The first
-        user should be a local user.
-
-        Args:
-            room_id (str)
-            share_private (bool): Is the room private
-            user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
-        """
-        def _update_users_who_share_room_txn(txn):
-            sql = """
-                UPDATE users_who_share_rooms
-                SET room_id = ?, share_private = ?
-                WHERE user_id = ? AND other_user_id = ?
-            """
-            txn.executemany(
-                sql,
-                (
-                    (room_id, share_private, uid, oid)
-                    for uid, oid in user_id_sets
-                )
-            )
-            for user_id, other_user_id in user_id_sets:
-                txn.call_after(
-                    self.get_users_who_share_room_from_dir.invalidate,
-                    (user_id,),
-                )
-                txn.call_after(
-                    self.get_if_users_share_a_room.invalidate,
-                    (user_id, other_user_id),
-                )
-        return self.runInteraction(
-            "update_users_who_share_room", _update_users_who_share_room_txn
-        )
-
     def remove_user_who_share_room(self, user_id, other_user_id):
         """Deletes entries in the users_who_share_rooms table. The first
         user should be a local user.
@@ -437,7 +413,15 @@ class UserDirectoryStore(SQLBaseStore):
         def _remove_user_who_share_room_txn(txn):
             self._simple_delete_txn(
                 txn,
-                table="users_who_share_rooms",
+                table="users_who_share_private_rooms",
+                keyvalues={
+                    "user_id": user_id,
+                    "other_user_id": other_user_id,
+                },
+            )
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_public_rooms",
                 keyvalues={
                     "user_id": user_id,
                     "other_user_id": other_user_id,
@@ -456,7 +440,7 @@ class UserDirectoryStore(SQLBaseStore):
             "remove_user_who_share_room", _remove_user_who_share_room_txn
         )
 
-    @cached(max_entries=500000)
+    @cachedInlineCallbacks(max_entries=500000)
     def get_if_users_share_a_room(self, user_id, other_user_id):
         """Gets if users share a room.
 
@@ -468,16 +452,38 @@ class UserDirectoryStore(SQLBaseStore):
             bool|None: None if they don't share a room, otherwise whether they
             share a private room or not.
         """
-        return self._simple_select_one_onecol(
-            table="users_who_share_rooms",
+        private = yield self._simple_select_one_onecol(
+            table="users_who_share_private_rooms",
             keyvalues={
                 "user_id": user_id,
                 "other_user_id": other_user_id,
             },
-            retcol="share_private",
+            retcol="user_id",
             allow_none=True,
             desc="get_if_users_share_a_room",
         )
+
+        if private is not None:
+            defer.returnValue(True)
+
+        public = yield self._simple_select_one_onecol(
+            table="users_who_share_public_rooms",
+            keyvalues={
+                "user_id": user_id,
+                "other_user_id": other_user_id,
+            },
+            retcol="user_id",
+            allow_none=True,
+            desc="get_if_users_share_a_room",
+        )
+
+        if public is not None:
+            defer.returnValue(False)
+
+        defer.returnValue(None)
+
+
+
 
     @cachedInlineCallbacks(max_entries=500000, iterable=True)
     def get_users_who_share_room_from_dir(self, user_id):
@@ -487,37 +493,63 @@ class UserDirectoryStore(SQLBaseStore):
             user_id(str): Must be a local user
 
         Returns:
-            dict: user_id -> share_private mapping
+            list: user_id
         """
         rows = yield self._simple_select_list(
-            table="users_who_share_rooms",
+            table="users_who_share_private_rooms",
             keyvalues={
                 "user_id": user_id,
             },
-            retcols=("other_user_id", "share_private",),
+            retcols=("other_user_id",),
             desc="get_users_who_share_room_with_user",
         )
 
-        defer.returnValue({
-            row["other_user_id"]: row["share_private"]
-            for row in rows
-        })
+        pub_rows = yield self._simple_select_list(
+            table="users_who_share_public_rooms",
+            keyvalues={
+                "user_id": user_id,
+            },
+            retcols=("other_user_id",),
+            desc="get_users_who_share_room_with_user",
+        )
 
+        users = {}
+
+        for user in rows:
+            users.add(user["other_user_id"])
+
+        for user in pub_rows:
+            users.add(user["other_user_id"])
+
+        defer.returnValue(users)
+
+    @defer.inlineCallbacks
     def get_users_in_share_dir_with_room_id(self, user_id, room_id):
-        """Get all user tuples that are in the users_who_share_rooms due to the
-        given room_id.
+        """
+        Get all user tuples that are in the users_who_share_*_rooms
+        tables due to the given room_id.
 
         Returns:
             [(user_id, other_user_id)]: where one of the two will match the given
             user_id.
         """
         sql = """
-            SELECT user_id, other_user_id FROM users_who_share_rooms
+            SELECT user_id, other_user_id FROM users_who_share_public_rooms
             WHERE room_id = ? AND (user_id = ? OR other_user_id = ?)
         """
-        return self._execute(
+        public = yield self._execute(
             "get_users_in_share_dir_with_room_id", None, sql, room_id, user_id, user_id
         )
+
+        sql = """
+            SELECT user_id, other_user_id FROM users_who_share_private_rooms
+            WHERE room_id = ? AND (user_id = ? OR other_user_id = ?)
+        """
+        private = yield self._execute(
+            "get_users_in_share_dir_with_room_id", None, sql, room_id, user_id, user_id
+        )
+
+        return public + private
 
     @defer.inlineCallbacks
     def get_rooms_in_common_for_users(self, user_id, other_user_id):
@@ -552,7 +584,8 @@ class UserDirectoryStore(SQLBaseStore):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
             txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM users_who_share_rooms")
+            txn.execute("DELETE FROM users_who_share_public_rooms")
+            txn.execute("DELETE FROM users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
             txn.call_after(self.get_user_in_public_room.invalidate_all)
             txn.call_after(self.get_users_who_share_room_from_dir.invalidate_all)
@@ -678,8 +711,8 @@ class UserDirectoryStore(SQLBaseStore):
             join_clause = """
                 LEFT JOIN users_in_public_rooms AS p USING (user_id)
                 LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_rooms
-                    WHERE user_id = ? AND share_private
+                    SELECT other_user_id AS user_id FROM users_who_share_private_rooms
+                    WHERE user_id = ?
                 ) AS s USING (user_id)
             """
             join_args = (user_id,)

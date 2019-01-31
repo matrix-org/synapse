@@ -16,7 +16,9 @@ import logging
 import sys
 import threading
 import time
+import itertools
 
+from itertools import zip_longest
 from six import PY2, iteritems, iterkeys, itervalues
 from six.moves import builtins, intern, range
 
@@ -737,6 +739,62 @@ class SQLBaseStore(object):
             ", ".join(k + "=EXCLUDED." + k for k in values),
         )
         txn.execute(sql, list(allvalues.values()))
+
+    def _simple_upsert_many_emulated_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+
+
+        if not valuesvalues:
+            valuesvalues = [() * len(keyvalues)]
+
+        #def _simple_upsert_txn_emulated(
+        #self, txn, table, keyvalues, values, insertion_values={}, lock=True
+
+        for keyv, valv in zip(keyvalues, valuesvalues):
+
+            keys = {x:y for x, y in zip(keys, keyv)}
+            vals = {x:y for x, y in zip(values, valv)}
+
+            _simple_upsert_txn_emulated(txn, table, keys, vals)
+
+
+    def _simple_upsert_many_native_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+
+        allvalues = []
+        allvalues.extend(keys)
+        allvalues.extend(values)
+
+        if not valuesvalues:
+            valuesvalues = [() * len(keyvalues)]
+
+        if not values:
+            latter = "NOTHING"
+        else:
+            latter = "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in values),
+
+        sql = (
+            "INSERT INTO %s (%s) VALUES (%s) "
+            "ON CONFLICT (%s) DO %s"
+        ) % (
+            table,
+            ", ".join(k for k in allvalues),
+            ", ".join("?" for _ in allvalues),
+            ", ".join(keys),
+            latter
+        )
+
+        if isinstance(self.database_engine, PostgresEngine):
+            from psycopg2.extras import execute_batch
+            execute_batch(txn, sql, zip_longest(keyvalues, valuesvalues))
+
+        else:
+            x = zip_longest(keyvalues, valuesvalues)
+
+            for val in x:
+                end = []
+                for i in val:
+                    if i:
+                        end.extend(i)
+                txn.execute(sql, end)
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False, desc="_simple_select_one"):
