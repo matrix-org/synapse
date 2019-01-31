@@ -670,6 +670,9 @@ class SQLBaseStore(object):
         if lock:
             self.database_engine.lock_table(txn, table)
 
+        if not values:
+            values = keyvalues
+
         def _getwhere(key):
             # If the value we're passing in is None (aka NULL), we need to use
             # IS, not =, as NULL = NULL equals NULL (False).
