@@ -177,7 +177,7 @@ class EventsWorkerStore(SQLBaseStore):
             # Starting in room version v3, some redactions need to be rechecked if we
             # didn't have the redacted event at the time, so we recheck on read
             # instead.
-            if not allow_rejected and entry.event.type == EventTypes.Redaction:
+            if not allow_rejected and entry.event.type == EventTypes.Redaction and False:
                 if entry.event.internal_metadata.need_to_check_redaction():
                     orig = yield self.get_event(
                         entry.event.redacts,
