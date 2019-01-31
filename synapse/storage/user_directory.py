@@ -377,7 +377,7 @@ class UserDirectoryStore(SQLBaseStore):
             else:
                 tbl = "users_who_share_public_rooms"
 
-            self._simple_upsert_many_native_txn(
+            self._simple_upsert_many_txn(
                 txn,
                 table=tbl,
                 keys=["user_id", "other_user_id", "room_id"],

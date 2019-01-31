@@ -740,8 +740,24 @@ class SQLBaseStore(object):
         )
         txn.execute(sql, list(allvalues.values()))
 
-    def _simple_upsert_many_emulated_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+    def _simple_upsert_many_txn(self, txn, table, keys, keyvalues, values, valuevalues):
+        if (
+            self.database_engine.can_native_upsert
+            and table not in self._unsafe_to_upsert_tables
+        ):
+            return self._simple_upsert_many_txn_native_upsert(
+                txn,
+                table,
+                keys, keyvalues, values, valuevalues
+            )
+        else:
+            return self._simple_upsert_many_txn_emulated(
+                txn,
+                table,
+                keys, keyvalues, values, valuevalues
+            )
 
+    def _simple_upsert_many_txn_emulated(self, txn, table, keys, keyvalues, values, valuesvalues):
 
         if not valuesvalues:
             valuesvalues = [() * len(keyvalues)]
@@ -757,7 +773,7 @@ class SQLBaseStore(object):
             _simple_upsert_txn_emulated(txn, table, keys, vals)
 
 
-    def _simple_upsert_many_native_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+    def _simple_upsert_many_txn_native_upsert(self, txn, table, keys, keyvalues, values, valuesvalues):
 
         allvalues = []
         allvalues.extend(keys)
