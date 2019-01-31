@@ -269,11 +269,13 @@ class RoomCreationHandler(BaseHandler):
         old_room_create_event_ids = yield self.store.get_filtered_current_state_ids(
             old_room_id, StateFilter.from_types(((EventTypes.Create, ""),)),
         )
-        old_room_create_event_dict = yield self.store.get_events(old_room_create_event_ids.values())
+        old_room_create_event_dict = yield self.store.get_events(
+            old_room_create_event_ids.values(),
+        )
         old_room_create_event = list(old_room_create_event_dict.values())[0]
 
         # Check if the create event specified a non-federatable room
-        if old_room_create_event.content.get("m.federate", True) == False:
+        if not old_room_create_event.content.get("m.federate", True):
             # If so, mark the new room as non-federatable as well
             creation_content["m.federate"] = False
 
