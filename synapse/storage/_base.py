@@ -746,13 +746,13 @@ class SQLBaseStore(object):
             return self._simple_upsert_many_txn_native_upsert(
                 txn,
                 table,
-                keys, keyvalues, values, valuevalues
+                keys, keyvalues, values, valuesvalues
             )
         else:
             return self._simple_upsert_many_txn_emulated(
                 txn,
                 table,
-                keys, keyvalues, values, valuevalues
+                keys, keyvalues, values, valuesvalues
             )
 
     def _simple_upsert_many_txn_emulated(self, txn, table, keys, keyvalues, values, valuesvalues):
