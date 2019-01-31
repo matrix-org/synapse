@@ -895,13 +895,16 @@ class SyncHandler(object):
         Returns:
             Deferred(SyncResult)
         """
-        logger.info("Calculating sync response for %r", sync_config.user)
-
         # NB: The now_token gets changed by some of the generate_sync_* methods,
         # this is due to some of the underlying streams not supporting the ability
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = yield self.event_sources.get_current_token()
+
+        logger.info(
+            "Calculating sync response for %r between %s and %s",
+            sync_config.user, since_token, now_token,
+        )
 
         user_id = sync_config.user.to_string()
         app_service = self.store.get_app_service_by_user_id(user_id)
@@ -1390,6 +1393,12 @@ class SyncHandler(object):
         room_entries = []
         invited = []
         for room_id, events in iteritems(mem_change_events_by_room_id):
+            logger.info(
+                "Membership changes in %s: [%s]",
+                room_id,
+                ", ".join(("%s (%s)" % (e.event_id, e.membership) for e in events)),
+            )
+
             non_joins = [e for e in events if e.membership != Membership.JOIN]
             has_join = len(non_joins) != len(events)
 
