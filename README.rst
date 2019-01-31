@@ -333,12 +333,38 @@ https://developer.github.com/changes/2014-04-25-user-content-security for more d
 Platform-Specific Instructions
 ==============================
 
-Debian
-------
+Debian/Ubuntu
+-------------
 
-Matrix provides official Debian packages via apt from https://matrix.org/packages/debian/.
-Note that these packages do not include a client - choose one from
-https://matrix.org/docs/projects/try-matrix-now.html (or build your own with one of our SDKs :)
+Matrix.org packages
+~~~~~~~~~~~~~~~~~~~
+
+Matrix.org provides Debian/Ubuntu packages of the latest stable version of
+Synapse via https://matrix.org/packages/debian/. To use them::
+
+    sudo apt install -y lsb-release curl apt-transport-https
+    echo "deb https://matrix.org/packages/debian `lsb_release -cs` main" |
+        sudo tee /etc/apt/sources.list.d/matrix-org.list
+    curl "https://matrix.org/packages/debian/repo-key.asc" |
+        sudo apt-key add -
+    sudo apt update
+    sudo apt install matrix-synapse-py3
+
+Downstream Debian/Ubuntu packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For ``buster`` and ``sid``, Synapse is available in the Debian repositories and
+it should be possible to install it with simply::
+
+    sudo apt install matrix-synapse
+
+There is also a version of ``matrix-synapse`` in ``stretch-backports``. Please
+see the `Debian documentation on backports
+<https://backports.debian.org/Instructions/>`_ for information on how to use
+them.
+
+We do not recommend using the packages in downstream Ubuntu at this time, as
+they are old and suffer from known security vulnerabilities.
 
 Fedora
 ------
