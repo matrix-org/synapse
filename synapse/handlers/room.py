@@ -266,13 +266,7 @@ class RoomCreationHandler(BaseHandler):
         # Check if old room was non-federatable
 
         # Get old room's create event
-        old_room_create_event_ids = yield self.store.get_filtered_current_state_ids(
-            old_room_id, StateFilter.from_types(((EventTypes.Create, ""),)),
-        )
-        old_room_create_event_dict = yield self.store.get_events(
-            old_room_create_event_ids.values(),
-        )
-        old_room_create_event = list(old_room_create_event_dict.values())[0]
+        old_room_create_event = yield self.store.get_create_event_for_room(old_room_id)
 
         # Check if the create event specified a non-federatable room
         if not old_room_create_event.content.get("m.federate", True):

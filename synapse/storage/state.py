@@ -24,7 +24,6 @@ import attr
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import NotFoundError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine
@@ -428,13 +427,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         # for now we do this by looking at the create event. We may want to cache this
         # more intelligently in future.
-        state_ids = yield self.get_current_state_ids(room_id)
-        create_id = state_ids.get((EventTypes.Create, ""))
 
-        if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id))
-
-        create_event = yield self.get_event(create_id)
+        # Retrieve the room's create event
+        create_event = yield self.get_create_event_for_room(room_id)
         defer.returnValue(create_event.content.get("room_version", "1"))
 
     @defer.inlineCallbacks
@@ -448,6 +443,22 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             Deferred[unicode|None]: predecessor room id
         """
+        # Retrieve the room's create event
+        create_event = yield self.get_create_event_for_room(room_id)
+
+        # Return predecessor if present
+        defer.returnValue(create_event.content.get("predecessor", None))
+
+    @defer.inlineCallbacks
+    def get_create_event_for_room(self, room_id):
+        """Get the create state event for a room.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[EventBase|None]: The room creation event. None if can not be found
+        """
         state_ids = yield self.get_current_state_ids(room_id)
         create_id = state_ids.get((EventTypes.Create, ""))
 
@@ -455,11 +466,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         if not create_id:
             defer.returnValue(None)
 
-        # Retrieve the room's create event
+        # Retrieve the room's create event and return
         create_event = yield self.get_event(create_id)
-
-        # Return predecessor if present
-        defer.returnValue(create_event.content.get("predecessor", None))
+        defer.returnValue(create_event)
 
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
