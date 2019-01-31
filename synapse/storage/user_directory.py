@@ -335,7 +335,8 @@ class UserDirectoryStore(SQLBaseStore):
 
         user_ids = set(user_ids_dir)
         user_ids.update(user_ids_pub)
-        user_ids.update(user_ids_share)
+        user_ids.update(user_ids_share_pub)
+        user_ids.update(user_ids_share_priv)
 
         defer.returnValue(user_ids)
 

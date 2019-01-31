@@ -16,9 +16,7 @@ import logging
 import sys
 import threading
 import time
-import itertools
 
-from itertools import zip_longest
 from six import PY2, iteritems, iterkeys, itervalues
 from six.moves import builtins, intern, range
 
@@ -800,10 +798,10 @@ class SQLBaseStore(object):
 
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
-            execute_batch(txn, sql, zip_longest(keyvalues, valuesvalues))
+            execute_batch(txn, sql, zip(keyvalues, valuesvalues))
 
         else:
-            x = zip_longest(keyvalues, valuesvalues)
+            x = zip(keyvalues, valuesvalues)
 
             for val in x:
                 end = []
