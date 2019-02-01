@@ -1,0 +1,1 @@
+Update federation routing logic to check .well-known before SRV
