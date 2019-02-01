@@ -288,6 +288,14 @@ changing ``tls_certificate_path`` and ``tls_private_key_path`` in
 to read `Using a reverse proxy with Synapse`_ when doing so. Apart from port
 8448 using TLS, both ports are the same in the default configuration.
 
+Finally, once Synapse's is able to listen on port 80 for ACME challenge
+requests, it must be told to perform ACME provisioning by setting ``enabled``
+to true under the ``acme`` section in ``homeserver.yaml``::
+
+    acme:
+        enabled: true
+
+
 Registering a user
 ------------------
 
