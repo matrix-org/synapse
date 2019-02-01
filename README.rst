@@ -220,6 +220,11 @@ is configured to use TLS for `Federation`_ with a self-signed or verified
 certificate, but please be aware that a valid certificate will be required in
 Synapse v1.0.
 
+If you would like to use your own certificates, you can do so by changing
+``tls_certificate_path`` and ``tls_private_key_path`` in ``homeserver.yaml``;
+alternatively, you can use a reverse-proxy. Apart from port 8448 using TLS,
+both ports are the same in the default configuration.
+
 
 ACME setup
 ----------
@@ -261,13 +266,12 @@ Make sure to restart/reload your webserver after making changes.
 
 **Authbind**
 
-``authbind`` allows a program which does not not run as root to
-bind to low-numbered ports in a controlled way. The setup is simpler, but
-requires a webserver not to already be running on port 80. **This includes
-every time Synapse renews a certificate**, which may be cumbersome if you
-usually run a web server on port 80. Nevertheless, if you're sure port 80 is
-not being used for any other purpose then all that is necessary is the
-following:
+``authbind`` allows a program which does not run as root to bind to
+low-numbered ports in a controlled way. The setup is simpler, but requires a
+webserver not to already be running on port 80. **This includes every time
+Synapse renews a certificate**, which may be cumbersome if you usually run a
+web server on port 80. Nevertheless, if you're sure port 80 is not being used
+for any other purpose then all that is necessary is the following:
 
 Install ``authbind``. For example, on Debian/Ubuntu::
 
@@ -281,12 +285,6 @@ Allow ``authbind`` to bind port 80::
 When Synapse is started, use the following syntax::
 
     authbind --deep <synapse start command>
-
-If you would like to use your own certificates, you can do so by
-changing ``tls_certificate_path`` and ``tls_private_key_path`` in
-``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
-to read `Using a reverse proxy with Synapse`_ when doing so. Apart from port
-8448 using TLS, both ports are the same in the default configuration.
 
 Finally, once Synapse's is able to listen on port 80 for ACME challenge
 requests, it must be told to perform ACME provisioning by setting ``enabled``
@@ -725,10 +723,8 @@ port. Indeed, clients will use port 443 by default, whereas servers default to
 port 8448. Where these are different, we refer to the 'client port' and the
 'federation port'.
 
-The recommended setup is therefore to configure your reverse-proxy on port
-443 to port 8008 of synapse for client connections, and port 8448 for
-server-server connections. All Matrix endpoints begin with ``/_matrix``, so an
-example nginx configuration might look like::
+All Matrix endpoints begin with ``/_matrix``, so an example nginx
+configuration for forwarding client connections to Synapse might look like::
 
   server {
       listen 443 ssl;
