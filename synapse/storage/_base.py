@@ -85,6 +85,14 @@ class LoggingTransaction(object):
     def __iter__(self):
         return self.txn.__iter__()
 
+    def execute_batch(self, sql, args):
+        if isinstance(self.database_engine, PostgresEngine):
+            from psycopg2.extras import execute_batch
+            self._do_execute(execute_batch, self.txn, sql, args)
+        else:
+            for val in args:
+                self.execute(sql, val)
+
     def execute(self, sql, *args):
         self._do_execute(self.txn.execute, sql, *args)
 
@@ -799,19 +807,11 @@ class SQLBaseStore(object):
             latter
         )
 
-        if isinstance(self.database_engine, PostgresEngine):
-            from psycopg2.extras import execute_batch
-            execute_batch(txn, sql, zip(keyvalues, valuesvalues))
+        args = []
+        for i, x in enumerate(keyvalues):
+            args.append(x + valuesvalues[i])
 
-        else:
-            x = zip(keyvalues, valuesvalues)
-
-            for val in x:
-                end = []
-                for i in val:
-                    if i:
-                        end.extend(i)
-                txn.execute(sql, end)
+        return self.execute_batch(sql, args)
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False, desc="_simple_select_one"):
