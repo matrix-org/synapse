@@ -227,6 +227,85 @@ to read `Using a reverse proxy with Synapse`_ when doing so.
 Apart from port 8448 using TLS, both ports are the same in the default
 configuration.
 
+ACME setup
+----------
+
+Synapse requires valid TLS certificates for communication between servers
+(port ``8448`` by default) in addition to those that are client-facing (port
+``443``). Synapse **will provision server-to-server certificates
+automatically for you for free** through `Let's Encrypt
+<https://letsencrypt.org/>`_ if you tell it to.
+
+    Note: Synapse does not currently hot-renew Let's Encrypt certificates for
+    you, it only checks for certificates that need renewing on restart. This
+    functionality will be implemented promptly, but if in the meantime your
+    federation certificates expire, simply restarting Synapse should renew
+    them automatically.
+
+In order for Synapse to complete the ACME challenge to provision a
+certificate, it needs access to port 80. Typically listening on port 80 is
+only granted to applications running as root. There are thus two solutions to
+this problem.
+
+**Using a reverse proxy**
+
+A reverse proxy such as Apache or Nginx allows a single process (the web
+server) to listen on port 80 and redirect traffic to the appropriate program
+running on your server. It is the recommended method for setting up ACME as
+it allows you to use your existing webserver while also allowing Synapse to
+provision certificates as needed.
+
+For Nginx users, add the following line to your existing ``server`` block::
+
+    location /.well-known/acme-challenge {
+        proxy_pass http://localhost:8009/;
+    }
+
+For Apache, add the following to your existing webserver config::
+
+    ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-challenge
+
+Make sure to restart/reload your webserver after making changes.
+
+
+**Authbind**
+
+``authbind`` allows a program which does not or should not run as root to
+bind to low-numbered ports in a controlled way. The setup is simpler, but
+requires a webserver not to already be running on port 80. **This includes
+every time Synapse renews a certificate**, which may be cumbersome if you
+usually run a web server on port 80. Nevertheless, if you're sure port 80 is
+not being used for any other purpose then all that is necessary is the
+following:
+
+Install ``authbind``::
+
+    sudo apt-get install authbind
+
+Allow ``authbind`` to bind port 80::
+
+    sudo touch /etc/authbind/byport/80
+    sudo chmod 777 /etc/authbind/byport/80
+
+When Synapse is started (do not start it yet), use the following syntax::
+
+    # authbind syntax. don't start Synapse yet
+    authbind --deep <synapse start command>
+
+If using the `Systemd`_ service file above, you can change the following line
+from::
+
+    ExecStart=/home/matrix/matrix-synapse/bin/python -m synapse.app.homeserver
+
+to::
+
+    ExecStart=authbind --deep /home/matrix/matrix-synapse/bin/python -m synapse.app.homeserver
+
+
+If you would like to use your own certificates, specifying them in Synapse's
+config file is sufficient.
+
+
 Registering a user
 ------------------
 
