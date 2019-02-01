@@ -758,23 +758,23 @@ class SQLBaseStore(object):
                 keys, keyvalues, values, valuesvalues
             )
 
-    def _simple_upsert_many_txn_emulated(self, txn, table, keys, keyvalues, values, valuesvalues):
+    def _simple_upsert_many_txn_emulated(
+        self, txn, table, keys, keyvalues, values, valuesvalues
+    ):
 
         if not valuesvalues:
             valuesvalues = [() * len(keyvalues)]
 
-        #def _simple_upsert_txn_emulated(
-        #self, txn, table, keyvalues, values, insertion_values={}, lock=True
-
         for keyv, valv in zip(keyvalues, valuesvalues):
 
-            keys = {x:y for x, y in zip(keys, keyv)}
-            vals = {x:y for x, y in zip(values, valv)}
+            keys = {x: y for x, y in zip(keys, keyv)}
+            vals = {x: y for x, y in zip(values, valv)}
 
             self._simple_upsert_txn_emulated(txn, table, keys, vals)
 
-
-    def _simple_upsert_many_txn_native_upsert(self, txn, table, keys, keyvalues, values, valuesvalues):
+    def _simple_upsert_many_txn_native_upsert(
+        self, txn, table, keys, keyvalues, values, valuesvalues
+    ):
 
         allvalues = []
         allvalues.extend(keys)

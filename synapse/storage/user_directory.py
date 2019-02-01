@@ -483,9 +483,6 @@ class UserDirectoryStore(SQLBaseStore):
 
         defer.returnValue(None)
 
-
-
-
     @cachedInlineCallbacks(max_entries=500000, iterable=True)
     def get_users_who_share_room_from_dir(self, user_id):
         """Returns the set of users who share a room with `user_id`
