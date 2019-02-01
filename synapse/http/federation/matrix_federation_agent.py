@@ -30,8 +30,10 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
 
 from synapse.http.federation.srv_resolver import SrvResolver, pick_server_from_list
+from synapse.util import Clock
 from synapse.util.caches.ttlcache import TTLCache
 from synapse.util.logcontext import make_deferred_yieldable
+from synapse.util.metrics import Measure
 
 # period to cache .well-known results for by default
 WELL_KNOWN_DEFAULT_CACHE_PERIOD = 24 * 3600
@@ -45,6 +47,8 @@ WELL_KNOWN_INVALID_CACHE_PERIOD = 1 * 3600
 # cap for .well-known cache period
 WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
 
+# magic value to mark an invalid well-known
+INVALID_WELL_KNOWN = object()
 
 logger = logging.getLogger(__name__)
 well_known_cache = TTLCache('well-known')
@@ -79,6 +83,8 @@ class MatrixFederationAgent(object):
         _well_known_cache=well_known_cache,
     ):
         self._reactor = reactor
+        self._clock = Clock(reactor)
+
         self._tls_client_options_factory = tls_client_options_factory
         if _srv_resolver is None:
             _srv_resolver = SrvResolver()
@@ -99,6 +105,11 @@ class MatrixFederationAgent(object):
         )
         self._well_known_agent = _well_known_agent
 
+        # our cache of .well-known lookup results, mapping from server name
+        # to delegated name. The values can be:
+        #   `bytes`:     a valid server-name
+        #   `None`:      there is no .well-known here
+        #   INVALID_WELL_KNWOWN: the .well-known here is invalid
         self._well_known_cache = _well_known_cache
 
     @defer.inlineCallbacks
@@ -281,14 +292,35 @@ class MatrixFederationAgent(object):
                 None if there was no .well-known file.
         """
         try:
-            cached = self._well_known_cache[server_name]
-            defer.returnValue(cached)
+            result = self._well_known_cache[server_name]
         except KeyError:
-            pass
+            # TODO: should we linearise so that we don't end up doing two .well-known
+            # requests for the same server in parallel?
+            with Measure(self._clock, "get_well_known"):
+                result, cache_period = yield self._do_get_well_known(server_name)
 
-        # TODO: should we linearise so that we don't end up doing two .well-known requests
-        # for the same server in parallel?
+            if cache_period > 0:
+                self._well_known_cache.set(server_name, result, cache_period)
 
+        if result == INVALID_WELL_KNOWN:
+            raise Exception("invalid .well-known on this server")
+
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _do_get_well_known(self, server_name):
+        """Actually fetch and parse a .well-known, without checking the cache
+
+        Args:
+            server_name (bytes): name of the server, from the requested url
+
+        Returns:
+            Deferred[Tuple[bytes|None|object],int]:
+                result, cache period, where result is one of:
+                 - the new server name from the .well-known (as a `bytes`)
+                 - None if there was no .well-known file.
+                 - INVALID_WELL_KNOWN if the .well-known was invalid
+        """
         uri = b"https://%s/.well-known/matrix/server" % (server_name, )
         uri_str = uri.decode("ascii")
         logger.info("Fetching %s", uri_str)
@@ -306,9 +338,7 @@ class MatrixFederationAgent(object):
             # after startup
             cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
             cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
-
-            self._well_known_cache.set(server_name, None, cache_period)
-            defer.returnValue(None)
+            defer.returnValue((None, cache_period))
 
         try:
             parsed_body = json.loads(body.decode('utf-8'))
@@ -318,7 +348,10 @@ class MatrixFederationAgent(object):
             if "m.server" not in parsed_body:
                 raise Exception("Missing key 'm.server'")
         except Exception as e:
-            raise Exception("invalid .well-known response from %s: %s" % (uri_str, e,))
+            logger.info("invalid .well-known response from %s: %s", uri_str, e)
+            cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
+            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
+            defer.returnValue((INVALID_WELL_KNOWN, cache_period))
 
         result = parsed_body["m.server"].encode("ascii")
 
@@ -334,10 +367,7 @@ class MatrixFederationAgent(object):
         else:
             cache_period = min(cache_period, WELL_KNOWN_MAX_CACHE_PERIOD)
 
-        if cache_period > 0:
-            self._well_known_cache.set(server_name, result, cache_period)
-
-        defer.returnValue(result)
+        defer.returnValue((result, cache_period))
 
 
 @implementer(IStreamClientEndpoint)
