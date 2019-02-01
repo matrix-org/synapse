@@ -88,7 +88,7 @@ class LoggingTransaction(object):
     def execute_batch(self, sql, args):
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
-            self._do_execute(execute_batch, self.txn, sql, args)
+            self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
         else:
             for val in args:
                 self.execute(sql, val)
