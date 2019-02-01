@@ -47,9 +47,6 @@ WELL_KNOWN_INVALID_CACHE_PERIOD = 1 * 3600
 # cap for .well-known cache period
 WELL_KNOWN_MAX_CACHE_PERIOD = 48 * 3600
 
-# magic value to mark an invalid well-known
-INVALID_WELL_KNOWN = object()
-
 logger = logging.getLogger(__name__)
 well_known_cache = TTLCache('well-known')
 
@@ -108,8 +105,7 @@ class MatrixFederationAgent(object):
         # our cache of .well-known lookup results, mapping from server name
         # to delegated name. The values can be:
         #   `bytes`:     a valid server-name
-        #   `None`:      there is no .well-known here
-        #   INVALID_WELL_KNWOWN: the .well-known here is invalid
+        #   `None`:      there is no (valid) .well-known here
         self._well_known_cache = _well_known_cache
 
     @defer.inlineCallbacks
@@ -302,9 +298,6 @@ class MatrixFederationAgent(object):
             if cache_period > 0:
                 self._well_known_cache.set(server_name, result, cache_period)
 
-        if result == INVALID_WELL_KNOWN:
-            raise Exception("invalid .well-known on this server")
-
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -331,6 +324,13 @@ class MatrixFederationAgent(object):
             body = yield make_deferred_yieldable(readBody(response))
             if response.code != 200:
                 raise Exception("Non-200 response %s" % (response.code, ))
+
+            parsed_body = json.loads(body.decode('utf-8'))
+            logger.info("Response from .well-known: %s", parsed_body)
+            if not isinstance(parsed_body, dict):
+                raise Exception("not a dict")
+            if "m.server" not in parsed_body:
+                raise Exception("Missing key 'm.server'")
         except Exception as e:
             logger.info("Error fetching %s: %s", uri_str, e)
 
@@ -339,19 +339,6 @@ class MatrixFederationAgent(object):
             cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
             cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
             defer.returnValue((None, cache_period))
-
-        try:
-            parsed_body = json.loads(body.decode('utf-8'))
-            logger.info("Response from .well-known: %s", parsed_body)
-            if not isinstance(parsed_body, dict):
-                raise Exception("not a dict")
-            if "m.server" not in parsed_body:
-                raise Exception("Missing key 'm.server'")
-        except Exception as e:
-            logger.info("invalid .well-known response from %s: %s", uri_str, e)
-            cache_period = WELL_KNOWN_INVALID_CACHE_PERIOD
-            cache_period += random.uniform(0, WELL_KNOWN_DEFAULT_CACHE_PERIOD_JITTER)
-            defer.returnValue((INVALID_WELL_KNOWN, cache_period))
 
         result = parsed_body["m.server"].encode("ascii")
 
