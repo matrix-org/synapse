@@ -224,7 +224,7 @@ Synapse v1.0.
 ACME setup
 ----------
 
-Synapse v1.0 requires valid TLS certificates for communication between servers
+Synapse v1.0 will require valid TLS certificates for communication between servers
 (port ``8448`` by default) in addition to those that are client-facing (port
 ``443``). In the case that your `server_name` config variable is the same as
 the hostname that the client connects to, then the same certificate can be
