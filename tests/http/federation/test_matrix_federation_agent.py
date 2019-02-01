@@ -358,9 +358,8 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv",
-        )
+        # No SRV record lookup yet
+        self.mock_resolver.resolve_service.assert_not_called()
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
@@ -375,6 +374,11 @@ class MatrixFederationAgentTests(TestCase):
         # attemptdelay on the hostnameendpoint is 0.3, so  takes that long before the
         # .well-known request fails.
         self.reactor.pump((0.4,))
+
+        # now there should be a SRV lookup
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv",
+        )
 
         # we should fall back to a direct connection
         self.assertEqual(len(clients), 2)
@@ -403,8 +407,7 @@ class MatrixFederationAgentTests(TestCase):
         self.successResultOf(test_d)
 
     def test_get_well_known(self):
-        """Test the behaviour when the server name has no port and no SRV record, but
-        the .well-known redirects elsewhere
+        """Test the behaviour when the .well-known redirects elsewhere
         """
 
         self.mock_resolver.resolve_service.side_effect = lambda _: []
@@ -415,11 +418,6 @@ class MatrixFederationAgentTests(TestCase):
 
         # Nothing happened yet
         self.assertNoResult(test_d)
-
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv",
-        )
-        self.mock_resolver.resolve_service.reset_mock()
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
@@ -432,7 +430,7 @@ class MatrixFederationAgentTests(TestCase):
             client_factory, expected_sni=b"testserv", target_server=b"target-server",
         )
 
-        # there should be another SRV lookup
+        # there should be a SRV lookup
         self.mock_resolver.resolve_service.assert_called_once_with(
             b"_matrix._tcp.target-server",
         )
@@ -483,11 +481,6 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv",
-        )
-        self.mock_resolver.resolve_service.reset_mock()
-
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
@@ -529,7 +522,7 @@ class MatrixFederationAgentTests(TestCase):
 
         self.reactor.pump((0.1, ))
 
-        # there should be another SRV lookup
+        # there should be a SRV lookup
         self.mock_resolver.resolve_service.assert_called_once_with(
             b"_matrix._tcp.target-server",
         )
@@ -581,6 +574,7 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
+        # the request for a .well-known will have failed with a DNS lookup error.
         self.mock_resolver.resolve_service.assert_called_once_with(
             b"_matrix._tcp.testserv",
         )
@@ -613,11 +607,9 @@ class MatrixFederationAgentTests(TestCase):
         self.successResultOf(test_d)
 
     def test_get_well_known_srv(self):
-        """Test the behaviour when the server name has no port and no SRV record, but
-        the .well-known redirects to a place where there is a SRV.
+        """Test the behaviour when the .well-known redirects to a place where there
+        is a SRV.
         """
-
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["srvtarget"] = "5.6.7.8"
 
@@ -625,11 +617,6 @@ class MatrixFederationAgentTests(TestCase):
 
         # Nothing happened yet
         self.assertNoResult(test_d)
-
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.testserv",
-        )
-        self.mock_resolver.resolve_service.reset_mock()
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
@@ -646,7 +633,7 @@ class MatrixFederationAgentTests(TestCase):
             client_factory, expected_sni=b"testserv", target_server=b"target-server",
         )
 
-        # there should be another SRV lookup
+        # there should be a SRV lookup
         self.mock_resolver.resolve_service.assert_called_once_with(
             b"_matrix._tcp.target-server",
         )
@@ -691,9 +678,8 @@ class MatrixFederationAgentTests(TestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        self.mock_resolver.resolve_service.assert_called_once_with(
-            b"_matrix._tcp.xn--bcher-kva.com",
-        )
+        # No SRV record lookup yet
+        self.mock_resolver.resolve_service.assert_not_called()
 
         # there should be an attempt to connect on port 443 for the .well-known
         clients = self.reactor.tcpClients
@@ -708,6 +694,11 @@ class MatrixFederationAgentTests(TestCase):
         # attemptdelay on the hostnameendpoint is 0.3, so  takes that long before the
         # .well-known request fails.
         self.reactor.pump((0.4,))
+
+        # now there should have been a SRV lookup
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.xn--bcher-kva.com",
+        )
 
         # We should fall back to port 8448
         clients = self.reactor.tcpClients
