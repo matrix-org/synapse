@@ -245,13 +245,13 @@ this problem.
 
 **Using a reverse proxy**
 
-A reverse proxy such as Apache or Nginx allows a single process (the web
+A reverse proxy such as Apache or nginx allows a single process (the web
 server) to listen on port 80 and proxy traffic to the appropriate program
 running on your server. It is the recommended method for setting up ACME as
 it allows you to use your existing webserver while also allowing Synapse to
 provision certificates as needed.
 
-For Nginx users, add the following line to your existing ``server`` block::
+For nginx users, add the following line to your existing ``server`` block::
 
     location /.well-known/acme-challenge {
         proxy_pass http://localhost:8009/;
