@@ -1,3 +1,14 @@
+Synapse 0.99.0rc4 (2019-02-01)
+==============================
+
+Internal Changes
+----------------
+
+- Update federation routing logic to check .well-known before SRV ([\#4539](https://github.com/matrix-org/synapse/issues/4539))
+- Improve performance of handling servers with invalid .well-known ([\#4542](https://github.com/matrix-org/synapse/issues/4542))
+- Treat an invalid .well-known file the same as an absent one ([\#4544](https://github.com/matrix-org/synapse/issues/4544))
+
+
 Synapse 0.99.0rc3 (2019-01-31)
 ==============================
 
