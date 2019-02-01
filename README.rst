@@ -220,27 +220,18 @@ is configured to use TLS for `Federation`_ with a self-signed or verified
 certificate, but please be aware that a valid certificate will be required in
 Synapse v1.0.
 
-If you would like to do initial testing with a client without having to setup
-a reverse proxy, you can temporarly use another certificate. You can do so by
-changing ``tls_certificate_path`` and ``tls_private_key_path`` in
-``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
-to read `Using a reverse proxy with Synapse`_ when doing so. Apart from port
-8448 using TLS, both ports are the same in the default configuration.
 
 ACME setup
 ----------
 
 Synapse v1.0 requires valid TLS certificates for communication between servers
 (port ``8448`` by default) in addition to those that are client-facing (port
-``443``). Synapse v0.99.0+ **will provision server-to-server certificates
-automatically for you for free** through `Let's Encrypt
+``443``). In the case that your `server_name` config variable is the same as
+the hostname that the client connects to, then the same certificate can be
+used between client and federation ports without issue. Synapse v0.99.0+
+**will provision server-to-server certificates automatically for you for
+free** through `Let's Encrypt
 <https://letsencrypt.org/>`_ if you tell it to.
-
-    Note: Synapse does not currently hot-renew Let's Encrypt certificates for
-    you, it only checks for certificates that need renewing on restart. This
-    functionality will be implemented promptly, but if in the meantime your
-    federation certificates expire, simply restarting Synapse should renew
-    them automatically.
 
 In order for Synapse to complete the ACME challenge to provision a
 certificate, it needs access to port 80. Typically listening on port 80 is
@@ -250,7 +241,7 @@ this problem.
 **Using a reverse proxy**
 
 A reverse proxy such as Apache or Nginx allows a single process (the web
-server) to listen on port 80 and redirect traffic to the appropriate program
+server) to listen on port 80 and proxy traffic to the appropriate program
 running on your server. It is the recommended method for setting up ACME as
 it allows you to use your existing webserver while also allowing Synapse to
 provision certificates as needed.
@@ -278,7 +269,7 @@ usually run a web server on port 80. Nevertheless, if you're sure port 80 is
 not being used for any other purpose then all that is necessary is the
 following:
 
-Install ``authbind``::
+Install ``authbind``. For example, on Debian/Ubuntu::
 
     sudo apt-get install authbind
 
@@ -291,9 +282,11 @@ When Synapse is started, use the following syntax::
 
     authbind --deep <synapse start command>
 
-If you would like to use your own certificates, simply specify them in
-``homeserver.yaml``.
-
+If you would like to use your own certificates, you can do so by
+changing ``tls_certificate_path`` and ``tls_private_key_path`` in
+``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
+to read `Using a reverse proxy with Synapse`_ when doing so. Apart from port
+8448 using TLS, both ports are the same in the default configuration.
 
 Registering a user
 ------------------
@@ -622,7 +615,7 @@ you to run your server on a machine that might not have the same name as your
 domain name. For example, you might want to run your server at
 ``synapse.example.com``, but have your Matrix user-ids look like
 ``@user:example.com``. (A SRV record also allows you to change the port from
-the default 8448.
+the default 8448).
 
 To use a SRV record, first create your SRV record and publish it in DNS. This
 should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
@@ -767,8 +760,6 @@ recorded correctly.
 Having done so, you can then use ``https://matrix.example.com`` (instead of
 ``https://matrix.example.com:8448``) as the "Custom server" when `Connecting to
 Synapse from a client`_.
-
-Please see `ACME setup`_ for details on reverse-proxying the federation port.
 
 
 Identity Servers
