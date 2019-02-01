@@ -379,7 +379,7 @@ class LoggingHostnameEndpoint(object):
         self.ep = HostnameEndpoint(reactor, host, port, *args, **kwargs)
 
     def connect(self, protocol_factory):
-        logger.info("Connecting to %s:%i", self.host, self.port)
+        logger.info("Connecting to %s:%i", self.host.decode("ascii"), self.port)
         return self.ep.connect(protocol_factory)
 
 
