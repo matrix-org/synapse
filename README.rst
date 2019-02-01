@@ -212,6 +212,7 @@ key in the ``<server name>.signing.key`` file (the second word) to something
 different. See `the spec`__ for more information on key management.)
 
 .. __: `key_management`_
+
 The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
 configured without TLS; it should be behind a reverse proxy for TLS/SSL
 termination on port 443 which in turn should be used for clients. Port 8448
@@ -659,6 +660,8 @@ Troubleshooting
 You can use the federation tester to check if your homeserver is all set:
 ``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``
 If any of the attributes under "checks" is false, federation won't work.
+There is also a nicer interface available from a community member at
+`<https://neo.lain.haus/fed-tester>`_.
 
 The typical failure mode with federation is that when you try to join a room,
 it is rejected with "401: Unauthorized". Generally this means that other
@@ -667,8 +670,6 @@ complicated dance which requires connections in both directions).
 
 So, things to check are:
 
-* If you are trying to use a reverse-proxy, read `Reverse-proxying the
-  federation port`_.
 * If you are not using a SRV record, check that your ``server_name`` (the part
   of your user-id after the ``:``) matches your hostname, and that port 8448 on
   that hostname is reachable from outside your network.
