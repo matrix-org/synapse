@@ -210,11 +210,7 @@ class MatrixFederationAgent(object):
                 target_port=parsed_uri.port,
             ))
 
-        # try a SRV lookup
-        service_name = b"_matrix._tcp.%s" % (parsed_uri.host,)
-        server_list = yield self._srv_resolver.resolve_service(service_name)
-
-        if not server_list and lookup_well_known:
+        if lookup_well_known:
             # try a .well-known lookup
             well_known_server = yield self._get_well_known(parsed_uri.host)
 
@@ -249,6 +245,10 @@ class MatrixFederationAgent(object):
 
                 res = yield self._route_matrix_uri(new_uri, lookup_well_known=False)
                 defer.returnValue(res)
+
+        # try a SRV lookup
+        service_name = b"_matrix._tcp.%s" % (parsed_uri.host,)
+        server_list = yield self._srv_resolver.resolve_service(service_name)
 
         if not server_list:
             target_host = parsed_uri.host
