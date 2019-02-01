@@ -811,7 +811,7 @@ class SQLBaseStore(object):
         for i, x in enumerate(zip(keyvalues, valuesvalues)):
             args.append(x[0] + x[1])
 
-        return self.execute_batch(sql, args)
+        return txn.execute_batch(sql, args)
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False, desc="_simple_select_one"):
