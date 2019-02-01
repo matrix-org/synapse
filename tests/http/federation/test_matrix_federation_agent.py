@@ -124,7 +124,7 @@ class MatrixFederationAgentTests(TestCase):
                 _check_logcontext(context)
 
     def _handle_well_known_connection(
-        self, client_factory, expected_sni, target_server, response_headers={},
+        self, client_factory, expected_sni, content, response_headers={},
     ):
         """Handle an outgoing HTTPs connection: wire it up to a server, check that the
         request is for a .well-known, and send the response.
@@ -132,8 +132,7 @@ class MatrixFederationAgentTests(TestCase):
         Args:
             client_factory (IProtocolFactory): outgoing connection
             expected_sni (bytes): SNI that we expect the outgoing connection to send
-            target_server (bytes): target server that we should redirect to in the
-                .well-known response.
+            content (bytes): content to send back as the .well-known
         Returns:
             HTTPChannel: server impl
         """
@@ -145,10 +144,10 @@ class MatrixFederationAgentTests(TestCase):
         # check the .well-known request and send a response
         self.assertEqual(len(well_known_server.requests), 1)
         request = well_known_server.requests[0]
-        self._send_well_known_response(request, target_server, headers=response_headers)
+        self._send_well_known_response(request, content, headers=response_headers)
         return well_known_server
 
-    def _send_well_known_response(self, request, target_server, headers={}):
+    def _send_well_known_response(self, request, content, headers={}):
         """Check that an incoming request looks like a valid .well-known request, and
         send back the response.
         """
@@ -161,7 +160,7 @@ class MatrixFederationAgentTests(TestCase):
         # send back a response
         for k, v in headers.items():
             request.setHeader(k, v)
-        request.write(b'{ "m.server": "%s" }' % (target_server,))
+        request.write(content)
         request.finish()
 
         self.reactor.pump((0.1, ))
@@ -407,7 +406,7 @@ class MatrixFederationAgentTests(TestCase):
         self.successResultOf(test_d)
 
     def test_get_well_known(self):
-        """Test the behaviour when the .well-known redirects elsewhere
+        """Test the behaviour when the .well-known delegates elsewhere
         """
 
         self.mock_resolver.resolve_service.side_effect = lambda _: []
@@ -427,7 +426,8 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(port, 443)
 
         self._handle_well_known_connection(
-            client_factory, expected_sni=b"testserv", target_server=b"target-server",
+            client_factory, expected_sni=b"testserv",
+            content=b'{ "m.server": "target-server" }',
         )
 
         # there should be a SRV lookup
@@ -560,6 +560,64 @@ class MatrixFederationAgentTests(TestCase):
         self.well_known_cache.expire()
         self.assertNotIn(b"testserv", self.well_known_cache)
 
+    def test_get_invalid_well_known(self):
+        """
+        Test the behaviour when the server name has an *invalid* well-known (and no SRV)
+        """
+
+        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+
+        test_d = self._make_get_request(b"matrix://testserv/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # No SRV record lookup yet
+        self.mock_resolver.resolve_service.assert_not_called()
+
+        # there should be an attempt to connect on port 443 for the .well-known
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 443)
+
+        self._handle_well_known_connection(
+            client_factory, expected_sni=b"testserv", content=b'NOT JSON',
+        )
+
+        # now there should be a SRV lookup
+        self.mock_resolver.resolve_service.assert_called_once_with(
+            b"_matrix._tcp.testserv",
+        )
+
+        # we should fall back to a direct connection
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients.pop()
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 8448)
+
+        # make a test server, and wire up the client
+        http_server = self._make_connection(
+            client_factory,
+            expected_sni=b'testserv',
+        )
+
+        self.assertEqual(len(http_server.requests), 1)
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b'GET')
+        self.assertEqual(request.path, b'/foo/bar')
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b'host'),
+            [b'testserv'],
+        )
+
+        # finish the request
+        request.finish()
+        self.reactor.pump((0.1,))
+        self.successResultOf(test_d)
+
     def test_get_hostname_srv(self):
         """
         Test the behaviour when there is a single SRV record
@@ -630,7 +688,8 @@ class MatrixFederationAgentTests(TestCase):
         ]
 
         self._handle_well_known_connection(
-            client_factory, expected_sni=b"testserv", target_server=b"target-server",
+            client_factory, expected_sni=b"testserv",
+            content=b'{ "m.server": "target-server" }',
         )
 
         # there should be a SRV lookup
@@ -797,7 +856,7 @@ class MatrixFederationAgentTests(TestCase):
             client_factory,
             expected_sni=b"testserv",
             response_headers={b'Cache-Control': b'max-age=10'},
-            target_server=b"target-server",
+            content=b'{ "m.server": "target-server" }',
         )
 
         r = self.successResultOf(fetch_d)
@@ -825,7 +884,7 @@ class MatrixFederationAgentTests(TestCase):
         self._handle_well_known_connection(
             client_factory,
             expected_sni=b"testserv",
-            target_server=b"other-server",
+            content=b'{ "m.server": "other-server" }',
         )
 
         r = self.successResultOf(fetch_d)
