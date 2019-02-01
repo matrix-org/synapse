@@ -387,7 +387,7 @@ class UserDirectoryStore(SQLBaseStore):
                     for user_id, other_user_id in user_id_tuples
                 ],
                 values=(),
-                valuesvalues=(),
+                valuesvalues=None,
             )
             for user_id, other_user_id in user_id_tuples:
                 txn.call_after(

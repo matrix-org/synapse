@@ -808,8 +808,8 @@ class SQLBaseStore(object):
         )
 
         args = []
-        for i, x in enumerate(keyvalues):
-            args.append(x + valuesvalues[i])
+        for i, x in enumerate(zip(keyvalues, valuesvalues)):
+            args.append(x[0] + x[1])
 
         return self.execute_batch(sql, args)
 
