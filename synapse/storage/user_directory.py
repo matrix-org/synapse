@@ -394,10 +394,6 @@ class UserDirectoryStore(SQLBaseStore):
                     self.get_users_who_share_room_from_dir.invalidate,
                     (user_id,),
                 )
-                txn.call_after(
-                    self.get_if_users_share_a_room.invalidate,
-                    (user_id, other_user_id),
-                )
         return self.runInteraction(
             "add_users_who_share_room", _add_users_who_share_room_txn
         )
@@ -432,56 +428,10 @@ class UserDirectoryStore(SQLBaseStore):
                 self.get_users_who_share_room_from_dir.invalidate,
                 (user_id,),
             )
-            txn.call_after(
-                self.get_if_users_share_a_room.invalidate,
-                (user_id, other_user_id),
-            )
 
         return self.runInteraction(
             "remove_user_who_share_room", _remove_user_who_share_room_txn
         )
-
-    @cachedInlineCallbacks(max_entries=500000)
-    def get_if_users_share_a_room(self, user_id, other_user_id):
-        """Gets if users share a room.
-
-        Args:
-            user_id (str): Must be a local user_id
-            other_user_id (str)
-
-        Returns:
-            bool|None: None if they don't share a room, otherwise whether they
-            share a private room or not.
-        """
-        private = yield self._simple_select_one_onecol(
-            table="users_who_share_private_rooms",
-            keyvalues={
-                "user_id": user_id,
-                "other_user_id": other_user_id,
-            },
-            retcol="user_id",
-            allow_none=True,
-            desc="get_if_users_share_a_room",
-        )
-
-        if private is not None:
-            defer.returnValue(True)
-
-        public = yield self._simple_select_one_onecol(
-            table="users_who_share_public_rooms",
-            keyvalues={
-                "user_id": user_id,
-                "other_user_id": other_user_id,
-            },
-            retcol="user_id",
-            allow_none=True,
-            desc="get_if_users_share_a_room",
-        )
-
-        if public is not None:
-            defer.returnValue(False)
-
-        defer.returnValue(None)
 
     @cachedInlineCallbacks(max_entries=500000, iterable=True)
     def get_users_who_share_room_from_dir(self, user_id):
@@ -587,7 +537,6 @@ class UserDirectoryStore(SQLBaseStore):
             txn.call_after(self.get_user_in_directory.invalidate_all)
             txn.call_after(self.get_user_in_public_room.invalidate_all)
             txn.call_after(self.get_users_who_share_room_from_dir.invalidate_all)
-            txn.call_after(self.get_if_users_share_a_room.invalidate_all)
         return self.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
         )
