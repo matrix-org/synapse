@@ -261,7 +261,7 @@ Make sure to restart/reload your webserver after making changes.
 
 **Authbind**
 
-``authbind`` allows a program which does not or should not run as root to
+``authbind`` allows a program which does not not run as root to
 bind to low-numbered ports in a controlled way. The setup is simpler, but
 requires a webserver not to already be running on port 80. **This includes
 every time Synapse renews a certificate**, which may be cumbersome if you
