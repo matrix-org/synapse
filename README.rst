@@ -216,16 +216,83 @@ different. See `the spec`__ for more information on key management.)
 The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
 configured without TLS; it should be behind a reverse proxy for TLS/SSL
 termination on port 443 which in turn should be used for clients. Port 8448
-is configured to use TLS with a self-signed certificate. If you would like
-to do initial test with a client without having to setup a reverse proxy,
-you can temporarly use another certificate. (Note that a self-signed
-certificate is fine for `Federation`_). You can do so by changing
-``tls_certificate_path`` and ``tls_private_key_path``
-in ``homeserver.yaml``; alternatively, you can use a reverse-proxy, but be sure
-to read `Using a reverse proxy with Synapse`_ when doing so.
+is configured to use TLS for `Federation`_ with a self-signed or verified
+certificate, but please be aware that a valid certificate will be required in
+Synapse v1.0.
 
-Apart from port 8448 using TLS, both ports are the same in the default
-configuration.
+If you would like to use your own certificates, you can do so by changing
+``tls_certificate_path`` and ``tls_private_key_path`` in ``homeserver.yaml``;
+alternatively, you can use a reverse-proxy. Apart from port 8448 using TLS,
+both ports are the same in the default configuration.
+
+
+ACME setup
+----------
+
+Synapse v1.0 will require valid TLS certificates for communication between servers
+(port ``8448`` by default) in addition to those that are client-facing (port
+``443``). In the case that your `server_name` config variable is the same as
+the hostname that the client connects to, then the same certificate can be
+used between client and federation ports without issue. Synapse v0.99.0+
+**will provision server-to-server certificates automatically for you for
+free** through `Let's Encrypt
+<https://letsencrypt.org/>`_ if you tell it to.
+
+In order for Synapse to complete the ACME challenge to provision a
+certificate, it needs access to port 80. Typically listening on port 80 is
+only granted to applications running as root. There are thus two solutions to
+this problem.
+
+**Using a reverse proxy**
+
+A reverse proxy such as Apache or nginx allows a single process (the web
+server) to listen on port 80 and proxy traffic to the appropriate program
+running on your server. It is the recommended method for setting up ACME as
+it allows you to use your existing webserver while also allowing Synapse to
+provision certificates as needed.
+
+For nginx users, add the following line to your existing ``server`` block::
+
+    location /.well-known/acme-challenge {
+        proxy_pass http://localhost:8009/;
+    }
+
+For Apache, add the following to your existing webserver config::
+
+    ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-challenge
+
+Make sure to restart/reload your webserver after making changes.
+
+
+**Authbind**
+
+``authbind`` allows a program which does not run as root to bind to
+low-numbered ports in a controlled way. The setup is simpler, but requires a
+webserver not to already be running on port 80. **This includes every time
+Synapse renews a certificate**, which may be cumbersome if you usually run a
+web server on port 80. Nevertheless, if you're sure port 80 is not being used
+for any other purpose then all that is necessary is the following:
+
+Install ``authbind``. For example, on Debian/Ubuntu::
+
+    sudo apt-get install authbind
+
+Allow ``authbind`` to bind port 80::
+
+    sudo touch /etc/authbind/byport/80
+    sudo chmod 777 /etc/authbind/byport/80
+
+When Synapse is started, use the following syntax::
+
+    authbind --deep <synapse start command>
+
+Finally, once Synapse's is able to listen on port 80 for ACME challenge
+requests, it must be told to perform ACME provisioning by setting ``enabled``
+to true under the ``acme`` section in ``homeserver.yaml``::
+
+    acme:
+        enabled: true
+
 
 Registering a user
 ------------------
@@ -281,10 +348,11 @@ following the recommended setup, or ``https://localhost:8448`` - remember to spe
 port (``:8448``) if not ``:443`` unless you changed the configuration. (Leave the identity
 server as the default - see `Identity servers`_.)
 
-If using port 8448 you will run into errors until you accept the self-signed
-certificate. You can easily do this by going to ``https://localhost:8448``
+If using port 8448 you will run into errors if you are using a self-signed
+certificate. To overcome this, simply go to ``https://localhost:8448``
 directly with your browser and accept the presented certificate. You can then
-go back in your web client and proceed further.
+go back in your web client and proceed further. Valid federation certificates
+should not have this problem.
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
@@ -553,9 +621,7 @@ you to run your server on a machine that might not have the same name as your
 domain name. For example, you might want to run your server at
 ``synapse.example.com``, but have your Matrix user-ids look like
 ``@user:example.com``. (A SRV record also allows you to change the port from
-the default 8448. However, if you are thinking of using a reverse-proxy on the
-federation port, which is not recommended, be sure to read
-`Reverse-proxying the federation port`_ first.)
+the default 8448).
 
 To use a SRV record, first create your SRV record and publish it in DNS. This
 should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
@@ -593,6 +659,8 @@ Troubleshooting
 You can use the federation tester to check if your homeserver is all set:
 ``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``
 If any of the attributes under "checks" is false, federation won't work.
+There is also a nicer interface available from a community member at
+`<https://neo.lain.haus/fed-tester>`_.
 
 The typical failure mode with federation is that when you try to join a room,
 it is rejected with "401: Unauthorized". Generally this means that other
@@ -601,8 +669,6 @@ complicated dance which requires connections in both directions).
 
 So, things to check are:
 
-* If you are trying to use a reverse-proxy, read `Reverse-proxying the
-  federation port`_.
 * If you are not using a SRV record, check that your ``server_name`` (the part
   of your user-id after the ``:``) matches your hostname, and that port 8448 on
   that hostname is reachable from outside your network.
@@ -657,14 +723,8 @@ port. Indeed, clients will use port 443 by default, whereas servers default to
 port 8448. Where these are different, we refer to the 'client port' and the
 'federation port'.
 
-The next most important thing to know is that using a reverse-proxy on the
-federation port has a number of pitfalls. It is possible, but be sure to read
-`Reverse-proxying the federation port`_.
-
-The recommended setup is therefore to configure your reverse-proxy on port 443
-to port 8008 of synapse for client connections, but to also directly expose port
-8448 for server-server connections. All the Matrix endpoints begin ``/_matrix``,
-so an example nginx configuration might look like::
+All Matrix endpoints begin with ``/_matrix``, so an example nginx
+configuration for forwarding client connections to Synapse might look like::
 
   server {
       listen 443 ssl;
@@ -704,64 +764,6 @@ recorded correctly.
 Having done so, you can then use ``https://matrix.example.com`` (instead of
 ``https://matrix.example.com:8448``) as the "Custom server" when `Connecting to
 Synapse from a client`_.
-
-Reverse-proxying the federation port
-------------------------------------
-
-There are two issues to consider before using a reverse-proxy on the federation
-port:
-
-* Due to the way SSL certificates are managed in the Matrix federation protocol
-  (see `spec`__), Synapse needs to be configured with the path to the SSL
-  certificate, *even if you do not terminate SSL at Synapse*.
-
-  .. __: `key_management`_
-
-* Until v0.33.3, Synapse did not support SNI on the federation port
-  (`bug #1491 <https://github.com/matrix-org/synapse/issues/1491>`_). This bug
-  is now fixed, but means that federating with older servers can be unreliable
-  when using name-based virtual hosting.
-
-Furthermore, a number of the normal reasons for using a reverse-proxy do not
-apply:
-
-* Other servers will connect on port 8448 by default, so there is no need to
-  listen on port 443 (for federation, at least), which avoids the need for root
-  privileges and virtual hosting.
-
-* A self-signed SSL certificate is fine for federation, so there is no need to
-  automate renewals. (The certificate generated by ``--generate-config`` is
-  valid for 10 years.)
-
-If you want to set up a reverse-proxy on the federation port despite these
-caveats, you will need to do the following:
-
-* In ``homeserver.yaml``, set ``tls_certificate_path`` to the path to the SSL
-  certificate file used by your reverse-proxy, and set ``no_tls`` to ``True``.
-  (``tls_private_key_path`` will be ignored if ``no_tls`` is ``True``.)
-
-* In your reverse-proxy configuration:
-
-  * If there are other virtual hosts on the same port, make sure that the
-    *default* one uses the certificate configured above.
-
-  * Forward ``/_matrix`` to Synapse.
-
-* If your reverse-proxy is not listening on port 8448, publish a SRV record to
-  tell other servers how to find you. See `Setting up Federation`_.
-
-When updating the SSL certificate, just update the file pointed to by
-``tls_certificate_path`` and then restart Synapse. (You may like to use a symbolic link
-to help make this process atomic.)
-
-The most common mistake when setting up federation is not to tell Synapse about
-your SSL certificate. To check it, you can visit
-``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``.
-Unfortunately, there is no UI for this yet, but, you should see
-``"MatchingTLSFingerprint": true``. If not, check that
-``Certificates[0].SHA256Fingerprint`` (the fingerprint of the certificate
-presented by your reverse-proxy) matches ``Keys.tls_fingerprints[0].sha256``
-(the fingerprint of the certificate Synapse is using).
 
 
 Identity Servers
