@@ -190,7 +190,7 @@ class GroupCategoriesServlet(RestServlet):
     """Get all group categories
     """
     PATTERNS = client_v2_patterns(
-        "/groups/(?P<group_id>[^/]*)/categories/$"
+        "/groups/(?P<group_id>[^/]*)/categories$"
     )
 
     def __init__(self, hs):
