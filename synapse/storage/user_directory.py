@@ -86,6 +86,7 @@ class UserDirectoryStore(SQLBaseStore):
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
+
         if isinstance(self.database_engine, PostgresEngine):
             # We weight the loclpart most highly, then display name and finally
             # server name
@@ -109,7 +110,7 @@ class UserDirectoryStore(SQLBaseStore):
                 INSERT INTO user_directory_search(user_id, value)
                 VALUES (?,?)
             """
-            args = (
+            args = tuple(
                 (
                     user_id,
                     "%s %s" % (user_id, p.display_name,) if p.display_name else user_id
@@ -125,7 +126,7 @@ class UserDirectoryStore(SQLBaseStore):
             self._simple_insert_many_txn(
                 txn,
                 table="user_directory",
-                values=[
+                values=list([
                     {
                         "user_id": user_id,
                         "room_id": room_id,
@@ -133,7 +134,7 @@ class UserDirectoryStore(SQLBaseStore):
                         "avatar_url": profile.avatar_url,
                     }
                     for user_id, profile in iteritems(users_with_profile)
-                ]
+                ])
             )
             for user_id in users_with_profile:
                 txn.call_after(

@@ -771,10 +771,9 @@ class SQLBaseStore(object):
     ):
 
         if not valuesvalues:
-            valuesvalues = [() * len(keyvalues)]
+            valuesvalues = [() for x in range(len(keyvalues))]
 
         for keyv, valv in zip(keyvalues, valuesvalues):
-
             keys = {x: y for x, y in zip(keys, keyv)}
             vals = {x: y for x, y in zip(values, valv)}
 
@@ -789,7 +788,7 @@ class SQLBaseStore(object):
         allvalues.extend(values)
 
         if not valuesvalues:
-            valuesvalues = [() * len(keyvalues)]
+            valuesvalues = [[] for x in range(len(keyvalues))]
 
         if not values:
             latter = "NOTHING"
@@ -808,8 +807,9 @@ class SQLBaseStore(object):
         )
 
         args = []
-        for i, x in enumerate(zip(keyvalues, valuesvalues)):
-            args.append(x[0] + x[1])
+
+        for x, y in zip(keyvalues, valuesvalues):
+            args.append(tuple(x) + tuple(y))
 
         return txn.execute_batch(sql, args)
 
