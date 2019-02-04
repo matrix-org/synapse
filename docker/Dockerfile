@@ -1,3 +1,16 @@
+# Dockerfile to build the matrixdotorg/synapse docker images.
+#
+# To build the image, run `docker build` command from the root of the
+# synapse repository:
+#
+#    docker build -f docker/Dockerfile .
+#
+# There is an optional PYTHON_VERSION build argument which sets the
+# version of python to build against: for example:
+#
+#    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
+#
+
 ARG PYTHON_VERSION=2
 
 ###

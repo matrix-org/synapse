@@ -1,13 +1,12 @@
 # Synapse Docker
 
-This Docker image will run Synapse as a single process. It does not provide a
-database server or a TURN server, you should run these separately.
+This Docker image will run Synapse as a single process. By default it uses a
+sqlite database; for production use you should connect it to a separate
+postgres database.
+
+The image also does *not* provide a TURN server.
 
 ## Run
-
-We do not currently offer a `latest` image, as this has somewhat undefined
-semantics.  We instead release only tagged versions so upgrading between
-releases is entirely within your control.
 
 ### Using docker-compose (easier)
 
@@ -32,7 +31,7 @@ docker run \
     -v ${DATA_PATH}:/data \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \
     -e SYNAPSE_REPORT_STATS=yes \
-    docker.io/matrixdotorg/synapse:latest
+    matrixdotorg/synapse:latest
 ```
 
 ## Volumes
@@ -71,7 +70,7 @@ then customize it manually. No other environment variable is required.
 Otherwise, a dynamic configuration file will be used. The following environment
 variables are available for configuration:
 
-* ``SYNAPSE_SERVER_NAME`` (mandatory), the current server public hostname.
+* ``SYNAPSE_SERVER_NAME`` (mandatory), the server public hostname.
 * ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
 * ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
@@ -80,7 +79,6 @@ variables are available for configuration:
   the Synapse instance.
 * ``SYNAPSE_ALLOW_GUEST``, set this variable to allow guest joining this server.
 * ``SYNAPSE_EVENT_CACHE_SIZE``, the event cache size [default `10K`].
-* ``SYNAPSE_CACHE_FACTOR``, the cache factor [default `0.5`].
 * ``SYNAPSE_RECAPTCHA_PUBLIC_KEY``, set this variable to the recaptcha public
   key in order to enable recaptcha upon registration.
 * ``SYNAPSE_RECAPTCHA_PRIVATE_KEY``, set this variable to the recaptcha private
@@ -122,19 +120,3 @@ Mail server specific values (will not send emails if not set):
   any.
 * ``SYNAPSE_SMTP_PASSWORD``, password for authenticating against the mail
   server if any.
-
-## Build
-
-Build the docker image with the `docker build` command from the root of the
-synapse repository.
-
-```
-docker build -t docker.io/matrixdotorg/synapse . -f docker/Dockerfile
-```
-
-The `-t` option sets the image tag. Official images are tagged
-`matrixdotorg/synapse:<version>` where `<version>` is the same as the release
-tag in the synapse git repository.
-
-You may have a local Python wheel cache available, in which case copy the
-relevant packages in the ``cache/`` directory at the root of the project.
