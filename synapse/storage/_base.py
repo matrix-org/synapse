@@ -678,9 +678,6 @@ class SQLBaseStore(object):
         if lock:
             self.database_engine.lock_table(txn, table)
 
-        if not values:
-            values = keyvalues
-
         def _getwhere(key):
             # If the value we're passing in is None (aka NULL), we need to use
             # IS, not =, as NULL = NULL equals NULL (False).
@@ -689,17 +686,25 @@ class SQLBaseStore(object):
             else:
                 return "%s = ?" % (key,)
 
-        # First try to update.
-        sql = "UPDATE %s SET %s WHERE %s" % (
-            table,
-            ", ".join("%s = ?" % (k,) for k in values),
-            " AND ".join(_getwhere(k) for k in keyvalues)
-        )
+        if not values:
+            # Try and select.
+            sql = "SELECT 1 FROM %s WHERE %s" % (
+                table,
+                " AND ".join(_getwhere(k) for k in keyvalues)
+            )
+            sqlargs = list(keyvalues.values())
+        else:
+            # First try to update.
+            sql = "UPDATE %s SET %s WHERE %s" % (
+                table,
+                ", ".join("%s = ?" % (k,) for k in values),
+                " AND ".join(_getwhere(k) for k in keyvalues)
+            )
         sqlargs = list(values.values()) + list(keyvalues.values())
 
         txn.execute(sql, sqlargs)
         if txn.rowcount > 0:
-            # successfully updated at least one row.
+            # successfully updated/fetched at least one row.
             return False
 
         # We didn't update any rows so insert a new one
