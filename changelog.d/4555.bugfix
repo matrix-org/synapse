@@ -1,0 +1,2 @@
+Avoid redundant URL encoding of redirect URL for SSO login in the fallback login page.
+Fixes a regression introduced in 925a074a7373090b712a1da4788d181819878bd1.
