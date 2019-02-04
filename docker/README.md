@@ -1,22 +1,22 @@
 # Synapse Docker
 
-This Docker image will run Synapse as a single process. It does not provide a database
-server or a TURN server, you should run these separately.
+This Docker image will run Synapse as a single process. It does not provide a
+database server or a TURN server, you should run these separately.
 
 ## Run
 
-We do not currently offer a `latest` image, as this has somewhat undefined semantics.
-We instead release only tagged versions so upgrading between releases is entirely
-within your control.
+We do not currently offer a `latest` image, as this has somewhat undefined
+semantics.  We instead release only tagged versions so upgrading between
+releases is entirely within your control.
 
 ### Using docker-compose (easier)
 
-This image is designed to run either with an automatically generated configuration
-file or with a custom configuration that requires manual editing.
+This image is designed to run either with an automatically generated
+configuration file or with a custom configuration that requires manual editing.
 
 An easy way to make use of this image is via docker-compose. See the
-[contrib/docker](../contrib/docker)
-section of the synapse project for examples.
+[contrib/docker](../contrib/docker) section of the synapse project for
+examples.
 
 ### Without Compose (harder)
 
@@ -88,7 +88,8 @@ variables are available for configuration:
 * ``SYNAPSE_TURN_URIS``, set this variable to the coma-separated list of TURN
   uris to enable TURN for this homeserver.
 * ``SYNAPSE_TURN_SECRET``, set this to the TURN shared secret if required.
-* ``SYNAPSE_MAX_UPLOAD_SIZE``, set this variable to change the max upload size [default `10M`].
+* ``SYNAPSE_MAX_UPLOAD_SIZE``, set this variable to change the max upload size
+  [default `10M`].
 
 Shared secrets, that will be initialized to random values if not set:
 
@@ -99,27 +100,41 @@ Shared secrets, that will be initialized to random values if not set:
 
 Database specific values (will use SQLite if not set):
 
-* `POSTGRES_DB` - The database name for the synapse postgres database. [default: `synapse`]
-* `POSTGRES_HOST` - The host of the postgres database if you wish to use postgresql instead of sqlite3. [default: `db` which is useful when using a container on the same docker network in a compose file where the postgres service is called `db`]
-* `POSTGRES_PASSWORD` - The password for the synapse postgres database. **If this is set then postgres will be used instead of sqlite3.** [default: none] **NOTE**: You are highly encouraged to use postgresql! Please use the compose file to make it easier to deploy.
-* `POSTGRES_USER` - The user for the synapse postgres database. [default: `matrix`]
+* `POSTGRES_DB` - The database name for the synapse postgres
+  database. [default: `synapse`]
+* `POSTGRES_HOST` - The host of the postgres database if you wish to use
+  postgresql instead of sqlite3. [default: `db` which is useful when using a
+  container on the same docker network in a compose file where the postgres
+  service is called `db`]
+* `POSTGRES_PASSWORD` - The password for the synapse postgres database. **If
+  this is set then postgres will be used instead of sqlite3.** [default: none]
+  **NOTE**: You are highly encouraged to use postgresql! Please use the compose
+  file to make it easier to deploy.
+* `POSTGRES_USER` - The user for the synapse postgres database. [default:
+  `matrix`]
 
 Mail server specific values (will not send emails if not set):
 
 * ``SYNAPSE_SMTP_HOST``, hostname to the mail server.
-* ``SYNAPSE_SMTP_PORT``, TCP port for accessing the mail server [default ``25``].
-* ``SYNAPSE_SMTP_USER``, username for authenticating against the mail server if any.
-* ``SYNAPSE_SMTP_PASSWORD``, password for authenticating against the mail server if any.
+* ``SYNAPSE_SMTP_PORT``, TCP port for accessing the mail server [default
+  ``25``].
+* ``SYNAPSE_SMTP_USER``, username for authenticating against the mail server if
+  any.
+* ``SYNAPSE_SMTP_PASSWORD``, password for authenticating against the mail
+  server if any.
 
 ## Build
 
-Build the docker image with the `docker build` command from the root of the synapse repository.
+Build the docker image with the `docker build` command from the root of the
+synapse repository.
 
 ```
 docker build -t docker.io/matrixdotorg/synapse . -f docker/Dockerfile
 ```
 
-The `-t` option sets the image tag. Official images are tagged `matrixdotorg/synapse:<version>` where `<version>` is the same as the release tag in the synapse git repository.
+The `-t` option sets the image tag. Official images are tagged
+`matrixdotorg/synapse:<version>` where `<version>` is the same as the release
+tag in the synapse git repository.
 
-You may have a local Python wheel cache available, in which case copy the relevant
-packages in the ``cache/`` directory at the root of the project.
+You may have a local Python wheel cache available, in which case copy the
+relevant packages in the ``cache/`` directory at the root of the project.
