@@ -31,7 +31,10 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 
 # now install synapse and all of the python deps to /install.
 
-COPY . /synapse
+COPY synapse /synapse/synapse/
+COPY scripts /synapse/scripts/
+COPY MANIFEST.in README.rst setup.py synctl /synapse/
+
 RUN pip install --prefix="/install" --no-warn-script-location \
         /synapse[all]
 

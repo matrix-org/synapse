@@ -1,0 +1,1 @@
+Docker: only copy what we need to the build image
