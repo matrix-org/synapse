@@ -693,19 +693,23 @@ class SQLBaseStore(object):
                 " AND ".join(_getwhere(k) for k in keyvalues)
             )
             sqlargs = list(keyvalues.values())
+            txn.execute(sql, sqlargs)
+            if txn.fetchall():
+                # We have an existing record.
+                return False
         else:
             # First try to update.
             sql = "UPDATE %s SET %s WHERE %s" % (
                 table,
                 ", ".join("%s = ?" % (k,) for k in values),
                 " AND ".join(_getwhere(k) for k in keyvalues)
-            )
-        sqlargs = list(values.values()) + list(keyvalues.values())
+                )
+            sqlargs = list(values.values()) + list(keyvalues.values())
 
-        txn.execute(sql, sqlargs)
-        if txn.rowcount > 0:
-            # successfully updated/fetched at least one row.
-            return False
+            txn.execute(sql, sqlargs)
+            if txn.rowcount > 0:
+                # successfully updated at least one row.
+                return False
 
         # We didn't update any rows so insert a new one
         allvalues = {}
