@@ -1,15 +1,23 @@
 # ACME
 
-Synapse v1.0 requires that federation TLS certificates are verifiable by a
-trusted root CA. If you do not already have a valid certificate for your domain, the easiest
-way to get one is with Synapse's new ACME support, which will use the ACME
-protocol to provision a certificate automatically. By default, certificates
-will be obtained from the publicly trusted CA Let's Encrypt.
+Synapse v1.0 will require valid TLS certificates for communication between
+servers (port `8448` by default) in addition to those that are client-facing
+(port `443`). If you do not already have a valid certificate for your domain,
+the easiest way to get one is with Synapse's new ACME support, which will use
+the ACME protocol to provision a certificate automatically. Synapse v0.99.0+
+will provision server-to-server certificates automatically for you for free
+through [Let's Encrypt](https://letsencrypt.org/) if you tell it to.
+
+In the case that your `server_name` config variable is the same as
+the hostname that the client connects to, then the same certificate can be
+used between client and federation ports without issue. 
 
 For a sample configuration, please inspect the new ACME section in the example
-generated config by running the `generate-config` executable. For example::
+generated config by running the `generate-config` executable. For example:
 
-  ~/synapse/env3/bin/generate-config
+```
+~/synapse/env3/bin/generate-config
+```
 
 You will need to provide Let's Encrypt (or another ACME provider) access to
 your Synapse ACME challenge responder on port 80, at the domain of your
@@ -31,13 +39,6 @@ placed in Synapse's config directory without the need for any ACME setup.
 
 ## ACME setup
 
-Synapse v1.0 will require valid TLS certificates for communication between servers
-(port `8448` by default) in addition to those that are client-facing (port
-`443`). In the case that your `server_name` config variable is the same as
-the hostname that the client connects to, then the same certificate can be
-used between client and federation ports without issue. Synapse v0.99.0+
-**will provision server-to-server certificates automatically for you for
-free** through [Let's Encrypt](https://letsencrypt.org/) if you tell it to.
 
 In order for Synapse to complete the ACME challenge to provision a
 certificate, it needs access to port 80. Typically listening on port 80 is
@@ -96,6 +97,8 @@ When Synapse is started, use the following syntax::
 ```
 authbind --deep <synapse start command>
 ```
+
+## Config file editing
 
 Finally, once Synapse is able to listen on port 80 for ACME challenge
 requests, it must be told to perform ACME provisioning by setting `enabled`
