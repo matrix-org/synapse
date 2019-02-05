@@ -21,7 +21,7 @@ to federate with >= 1.0.0 servers.
 
 Full details on how to carry out this configuration change is given
 [below](#configuring-certificates-for-compatibility-with-synapse-100). A
-timeine and some frequently asked questions are also given below.
+timeline and some frequently asked questions are also given below.
 
 For more details and context on the release of the r0.1 Server/Server API and
 imminent Matrix 1.0 release, you can also see our
