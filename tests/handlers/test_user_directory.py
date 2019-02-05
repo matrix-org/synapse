@@ -15,9 +15,8 @@
 from mock import Mock
 
 from synapse.api.constants import UserTypes
+from synapse.rest.client.v1 import admin, login, room
 from synapse.storage.roommember import ProfileInfo
-
-from synapse.rest.client.v1 import login, admin, room
 
 from tests import unittest
 

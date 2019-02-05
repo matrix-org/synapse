@@ -640,7 +640,7 @@ class SQLBaseStore(object):
         """
         if (
             self.database_engine.can_native_upsert
-            and table not in self._unsafe_to_upsert_tables
+            and table not in self._unsafe_to_upsert_tables and False
         ):
             return self._simple_upsert_txn_native_upsert(
                 txn,
@@ -703,7 +703,7 @@ class SQLBaseStore(object):
                 table,
                 ", ".join("%s = ?" % (k,) for k in values),
                 " AND ".join(_getwhere(k) for k in keyvalues)
-                )
+            )
             sqlargs = list(values.values()) + list(keyvalues.values())
 
             txn.execute(sql, sqlargs)
