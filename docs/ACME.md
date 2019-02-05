@@ -2,7 +2,7 @@
 
 Synapse v1.0 requires that federation TLS certificates are verifiable by a
 trusted root CA. If you do not already have a valid certificate for your domain, the easiest
-way to get one is with Synapse's new ACME support, which will use the ACME
+way to get one is with Synapse's ACME support (new as of Synapse 0.99), which will use the ACME
 protocol to provision a certificate automatically. By default, certificates
 will be obtained from the publicly trusted CA Let's Encrypt.
 
