@@ -57,7 +57,7 @@ will need to replace any self-signed certificates with those verified by a
 root CA. Information on how to do so can be found at `the ACME docs
 <docs/ACME.md>`_.
 
-For more information on configuring TLS certificates see the `FAQ <https://github.com/matrix-org/synapse/blob/master/docs/MSC1711_certificates_FAQ.md>`_
+For more information on configuring TLS certificates see the `FAQ <docs/MSC1711_certificates_FAQ.md>`_.
 
 Upgrading to v0.34.0
 ====================
