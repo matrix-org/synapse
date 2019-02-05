@@ -57,8 +57,9 @@ configuration file there. Multiple application services are supported.
 Synapse requires a valid TLS certificate. You can do one of the following:
 
  * Provide your own certificate and key (as
-   `${DATA_PATH}/${SYNAPSE_SERVER_NAME}.crt|key`, or elsewhere by providing
-   an entire config as `${SYNAPSE_CONFIG_PATH}`).
+   `${DATA_PATH}/${SYNAPSE_SERVER_NAME}.crt` and
+   `${DATA_PATH}/${SYNAPSE_SERVER_NAME}.key`, or elsewhere by providing an
+   entire config as `${SYNAPSE_CONFIG_PATH}`).
 
  * Use a reverse proxy to terminate incoming TLS, and forward the plain http
    traffic to port 8008 in the container. In this case you should set `-e
