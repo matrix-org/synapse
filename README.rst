@@ -229,7 +229,7 @@ ACME setup
 ----------
 
 For details on having Synapse manage your federation TLS certificates
-automatically, please see `<docs/ACME.rst>`_.
+automatically, please see `<docs/ACME.md>`_.
 
 Registering a user
 ------------------
