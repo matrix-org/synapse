@@ -14,8 +14,8 @@ Synapse 0.99.0 makes it easy to configure TLS certificates and will
 interoperate with both >= 1.0.0 servers as well as existing servers yet to
 upgrade.
 
-It is critical that all admins upgrade to 0.99.0 and configure a valid TLS
-certificate. Admins will have 1 month to do so, after which 1.0.0 will be
+**It is critical that all admins upgrade to 0.99.0 and configure a valid TLS
+certificate.** Admins will have 1 month to do so, after which 1.0.0 will be
 released and those servers without a valid certificate will not longer be able
 to federate with >= 1.0.0 servers.
 
@@ -24,8 +24,8 @@ because you run it on behalf of someone who doesn't want to give you a TLS
 certificate for their domain, or simply because the matrix domain is hosted on
 a different server), then you can now create a /.well-known/matrix/server file
 on the matrix domain in order to delegate Matrix hosting to another domain.
- Admins who currently use SRV records to delegate a domain which they do not
-control TLS for will need to switch to using .well-known/matrix/server - though
+ Admins who currently use SRV records to delegate a domain **which they do not
+control TLS for** will need to switch to using .well-known/matrix/server - though
 they should retain their SRV record while the federation upgrades over the
 course of the month.  Other SRV records are unaffected.
 
@@ -55,7 +55,7 @@ what follows is a timeline and some frequently asked questions.
 
 ### Timeline
 
-5th Feb 2019  - Synapse 0.99.0 is released.
+**5th Feb 2019  - Synapse 0.99.0 is released.**
 
 All server admins are encouraged to upgrade.
 
@@ -73,7 +73,7 @@ Admins should upgrade and configure a valid CA cert. Homeservers that require a
 .well-known entry (see below), should retain their SRV record and use it
 alongside their .well-known record.
 
->= 5th March 2019  - Synapse 1.0.0 is released
+**>= 5th March 2019  - Synapse 1.0.0 is released**
 
 1.0.0 will land no sooner than 1 month after 0.99.0, leaving server admins one
 month after 5th February to upgrade to 0.99.0 and deploy their certificates. In
@@ -88,7 +88,7 @@ Upgrade as soon as you can in preparation for Synapse 1.0.0.
 
 ### How do I upgrade?
 
-Follow the upgrade notes here XXX
+Follow the upgrade notes here [UPGRADE.rst](https://github.com/matrix-org/synapse/blob/master/UPGRADE.rst)
 
 ### What will happen if I do not set up a valid federation certificate immediately?
 
@@ -116,7 +116,7 @@ valid TLS certificate for you via Let's Encrypt and no SRV record or
 This is the common case, although you can add an SRV record or
 .well-known/matrix/server URI for completeness if you wish.
 
-However, if your server does not listen on port 8448, or if your server_name
+**However**, if your server does not listen on port 8448, or if your server_name
 does not point to the host that your homeserver runs on, you will need to let
 other servers know how to find it.
 
