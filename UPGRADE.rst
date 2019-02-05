@@ -51,10 +51,10 @@ returned by the Client-Server API:
 Upgrading to v0.99.0
 ====================
 
-No special steps are required, but please be aware that you will need to
-replace any self-signed certificates with those verified by a root CA before
-Synapse v1.0 releases in roughly a month's time after v0.99.0. Information on
-how to do so can be found at `the ACME docs <docs/ACME.md>`_.
+Please be aware that, before Synapse v1.0 is released around March 2019, you
+will need to replace any self-signed certificates with those verified by a
+root CA. Information on how to do so can be found at `the ACME docs
+<docs/ACME.md>`_.
 
 Upgrading to v0.34.0
 ====================
