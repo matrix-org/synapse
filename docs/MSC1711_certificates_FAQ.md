@@ -123,9 +123,9 @@ other servers know how to find it.
 The easiest way to do this is with a .well-known/matrix/server URI on the
 webroot of the domain to advertise your server. For instance, if you ran
 "matrixhosting.com" and you were hosting a Matrix server for example.com, you
-would ask example.comto create a file at:
+would ask example.com to create a file at:
 
-`<https://example.com/.well-known/matrix/server>`
+`https://example.com/.well-known/matrix/server`
 
 with contents:
 
@@ -151,7 +151,9 @@ able to give Synapse a TLS certificate corresponding to your server name. For
 example, suppose you had the following SRV record, which directs matrix traffic
 for example.com to matrix.example.com:443:
 
+```
 _matrix._tcp.example.com. IN SRV 10 5 443 matrix.example.com
+```
 
 In this case, Synapse must be given a certificate for example.com - or be
 configured to acquire one from Let's Encrypt.
