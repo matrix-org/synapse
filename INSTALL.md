@@ -3,6 +3,8 @@
     * [Platform-Specific Instructions](#platform-specific-instructions)
     * [Troubleshooting Installation](#troubleshooting-installation)
   * [Prebuilt packages](#prebuilt-packages)
+* [Setting up Synapse](#setting-up-synapse)
+  * [TLS certificates](#tls-certificates)
 
 # Installing Synapse
 
@@ -18,28 +20,76 @@ System requirements:
 
 Synapse is written in Python but some of the libraries it uses are written in
 C. So before we can install Synapse itself we need a working C compiler and the
-header files for Python C extensions. See [Platform-Specific 
+header files for Python C extensions. See [Platform-Specific
 Instructions](#platform-specific-instructions) for information on installing
 these on various platforms.
 
-To install the Synapse homeserver run::
+To install the Synapse homeserver run:
 
-    mkdir -p ~/synapse
-    virtualenv -p python3 ~/synapse/env
-    source ~/synapse/env/bin/activate
-    pip install --upgrade pip
-    pip install --upgrade setuptools
-    pip install matrix-synapse[all]
+```sh
+mkdir -p ~/synapse
+virtualenv -p python3 ~/synapse/env
+source ~/synapse/env/bin/activate
+pip install --upgrade pip
+pip install --upgrade setuptools
+pip install matrix-synapse[all]
+```
 
-This installs Synapse, along with the libraries it uses, into a virtual
-environment under ``~/synapse/env``.  Feel free to pick a different directory
-if you prefer.
+This will download Synapse from [PyPI](https://pypi.org/project/matrix-synapse)
+and install it, along with the python libraries it uses, into a virtual environment
+under ``~/synapse/env``.  Feel free to pick a different directory if you
+prefer.
 
 This Synapse installation can then be later upgraded by using pip again with the
-update flag::
+update flag:
 
-    source ~/synapse/env/bin/activate
-    pip install -U matrix-synapse[all]
+```sh
+source ~/synapse/env/bin/activate
+pip install -U matrix-synapse[all]
+```
+
+Before you can start Synapse, you will need to generate a configuration
+file. To do this, run (in your virtualenv, as before)::
+
+```sh
+cd ~/synapse
+python -m synapse.app.homeserver \
+    --server-name my.domain.name \
+    --config-path homeserver.yaml \
+    --generate-config \
+    --report-stats=[yes|no]
+```
+
+... substituting an appropriate value for `--server-name`. The server name
+determines the "domain" part of user-ids for users on your server: these will
+all be of the format `@user:my.domain.name`. It also determines how other
+matrix servers will reach yours for Federation. For a test configuration,
+set this to the hostname of your server. For a more production-ready setup, you
+will probably want to specify your domain (`example.com`) rather than a
+matrix-specific hostname here (in the same way that your email address is
+probably `user@example.com` rather than `user@email.example.com`) - but
+doing so may require more advanced setup. - see [Setting up Federation](README.rst#setting-up-federation). Beware that the server name cannot be changed later.
+
+This command will generate you a config file that you can then customise, but it will
+also generate a set of keys for you. These keys will allow your Home Server to
+identify itself to other Home Servers, so don't lose or delete them. It would be
+wise to back them up somewhere safe. (If, for whatever reason, you do need to
+change your Home Server's keys, you may find that other Home Servers have the
+old key cached. If you update the signing key, you should change the name of the
+key in the `<server name>.signing.key` file (the second word) to something
+different. See the
+[spec](https://matrix.org/docs/spec/server_server/latest.html#retrieving-server-keys)
+for more information on key management.)
+
+You will need to give Synapse a TLS certficate before it will start - see [TLS
+certificates](#tls-certificates).
+
+To actually run your new homeserver, pick a working directory for Synapse to
+run (e.g. ``~/synapse``), and::
+
+    cd ~/synapse
+    source env/bin/activate
+    synctl start
 
 ### Platform-Specific Instructions
 
@@ -200,7 +250,6 @@ https://github.com/spantaleev/matrix-docker-ansible-deploy
 
 ### Debian/Ubuntu
 
-
 #### Matrix.org packages
 
 Matrix.org provides Debian/Ubuntu packages of the latest stable version of
@@ -291,3 +340,132 @@ Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Mo
 
 Robin Lambertz has packaged Synapse for NixOS at:
 https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-synapse.nix
+
+# Setting up Synapse
+
+Once you have installed synapse as above, you will need to configure it.
+
+## TLS certificates
+
+The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
+configured without TLS; it should be behind a reverse proxy for TLS/SSL
+termination on port 443 which in turn should be used for clients. Port 8448
+is configured to use TLS for Federation with a self-signed or verified
+certificate, but please be aware that a valid certificate will be required in
+Synapse v1.0.
+
+If you would like to use your own certificates, you can do so by changing
+`tls_certificate_path` and `tls_private_key_path` in `homeserver.yaml`;
+alternatively, you can use a reverse-proxy. Apart from port 8448 using TLS,
+both ports are the same in the default configuration.
+
+### ACME setup
+
+Synapse v1.0 will require valid TLS certificates for communication between servers
+(port `8448` by default) in addition to those that are client-facing (port
+`443`). In the case that your `server_name` config variable is the same as
+the hostname that the client connects to, then the same certificate can be
+used between client and federation ports without issue. Synapse v0.99.0+
+**will provision server-to-server certificates automatically for you for
+free** through [Let's Encrypt](https://letsencrypt.org/) if you tell it to.
+
+In order for Synapse to complete the ACME challenge to provision a
+certificate, it needs access to port 80. Typically listening on port 80 is
+only granted to applications running as root. There are thus two solutions to
+this problem.
+
+#### Using a reverse proxy
+
+A reverse proxy such as Apache or nginx allows a single process (the web
+server) to listen on port 80 and proxy traffic to the appropriate program
+running on your server. It is the recommended method for setting up ACME as
+it allows you to use your existing webserver while also allowing Synapse to
+provision certificates as needed.
+
+For nginx users, add the following line to your existing `server` block:
+
+```
+location /.well-known/acme-challenge {
+    proxy_pass http://localhost:8009/;
+}
+```
+
+For Apache, add the following to your existing webserver config::
+
+```
+ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-challenge
+```
+
+Make sure to restart/reload your webserver after making changes.
+
+
+#### Authbind
+
+`authbind` allows a program which does not run as root to bind to
+low-numbered ports in a controlled way. The setup is simpler, but requires a
+webserver not to already be running on port 80. **This includes every time
+Synapse renews a certificate**, which may be cumbersome if you usually run a
+web server on port 80. Nevertheless, if you're sure port 80 is not being used
+for any other purpose then all that is necessary is the following:
+
+Install `authbind`. For example, on Debian/Ubuntu:
+
+```sh
+sudo apt-get install authbind
+```
+
+Allow `authbind` to bind port 80:
+
+```sh
+sudo touch /etc/authbind/byport/80
+sudo chmod 777 /etc/authbind/byport/80
+```
+
+When Synapse is started, use the following syntax::
+
+```
+authbind --deep <synapse start command>
+```
+
+Finally, once Synapse is able to listen on port 80 for ACME challenge
+requests, it must be told to perform ACME provisioning by setting `enabled`
+to true under the `acme` section in `homeserver.yaml`:
+
+```
+acme:
+    enabled: true
+```
+
+## Setting up a TURN server
+
+For reliable VoIP calls to be routed via this homeserver, you MUST configure
+a TURN server.  See [docs/turn-howto.rst](docs/turn-howto.rst) for details.
+
+
+## Registering a user
+
+You will need at least one user on your server in order to use a Matrix
+client. Users can be registered either via a Matrix client, or via a
+commandline script.
+
+To get started, it is easiest to use the command line to register new
+users. This can be done as follows:
+
+
+```
+$ source ~/synapse/env/bin/activate
+$ synctl start # if not already running
+$ register_new_matrix_user -c homeserver.yaml https://localhost:8448
+New user localpart: erikj
+Password:
+Confirm password:
+Make admin [no]:
+Success!
+```
+
+This process uses a setting ``registration_shared_secret`` in
+``homeserver.yaml``, which is shared between Synapse itself and the
+``register_new_matrix_user`` script. It doesn't matter what it is (a random
+value is generated by ``--generate-config``), but it should be kept secret, as
+anyone with knowledge of it can register users on your server even if
+``enable_registration`` is ``false``.
