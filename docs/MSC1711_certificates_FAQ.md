@@ -228,7 +228,7 @@ find it easier to direct federation traffic to a reverse-proxy and manage their
 own TLS certificates, and this is a supported configuration.
 
 ### Do I still need to give my TLS certificates to Synapse if I am using a
-reverse-proxy?
+### reverse-proxy?
 
 Practically speaking, this is no longer necessary.
 
