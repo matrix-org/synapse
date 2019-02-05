@@ -34,8 +34,8 @@ Full upgrade notes can be found in
 What follows is a timeline and some frequently asked questions.
 
 For more details and context on the release of the r0.1 Server/Server API and
-imminent Matrix 1.0 release, you can also see our main talk from FOSDEM 2019:
-https://matrix.org/blog/2019/02/04/matrix-at-fosdem-2019/
+imminent Matrix 1.0 release, you can also see our
+[main talk from FOSDEM 2019](https://matrix.org/blog/2019/02/04/matrix-at-fosdem-2019/).
 
 ## Contents
 * Timeline
