@@ -1,1 +1,0 @@
-The matrixdotorg/synapse Docker images now use Python 3 by default.

@@ -27,4 +27,4 @@ try:
 except ImportError:
     pass
 
-__version__ = "0.99.0rc4"
+__version__ = "0.99.0"
