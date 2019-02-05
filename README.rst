@@ -377,24 +377,6 @@ an email address with your account, or send an invite to another user via their
 email address.
 
 
-URL Previews
-============
-
-Synapse 0.15.0 introduces a new API for previewing URLs at
-``/_matrix/media/r0/preview_url``.  This is disabled by default.  To turn it on
-you must enable the ``url_preview_enabled: True`` config parameter and
-explicitly specify the IP ranges that Synapse is not allowed to spider for
-previewing in the ``url_preview_ip_range_blacklist`` configuration parameter.
-This is critical from a security perspective to stop arbitrary Matrix users
-spidering 'internal' URLs on your network.  At the very least we recommend that
-your loopback and RFC1918 IP addresses are blacklisted.
-
-This also requires the optional lxml and netaddr python dependencies to be
-installed.  This in turn requires the libxml2 library to be available - on
-Debian/Ubuntu this means ``apt-get install libxml2-dev``, or equivalent for
-your OS.
-
-
 Password reset
 ==============
 
