@@ -5,20 +5,20 @@ Before upgrading check if any special steps are required to upgrade from the
 what you currently have installed to current version of synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then active that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/.synapse/`` then
+1. If synapse was installed in a virtualenv then activate that virtualenv before
+   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
    run:
 
    .. code:: bash
 
-       source ~/.synapse/bin/activate
+       source ~/synapse/env/bin/activate
 
 2. If synapse was installed using pip then upgrade to the latest version by
    running:
 
    .. code:: bash
 
-       pip install --upgrade matrix-synapse
+       pip install --upgrade matrix-synapse[all]
 
        # restart synapse
        synctl restart
@@ -31,8 +31,9 @@ instructions that may be required are listed later in this document.
 
        # Pull the latest version of the master branch.
        git pull
-       # Update the versions of synapse's python dependencies.
-       python synapse/python_dependencies.py | xargs pip install --upgrade
+
+       # Update synapse and its python dependencies.
+       pip install --upgrade .[all]
 
        # restart synapse
        ./synctl restart
