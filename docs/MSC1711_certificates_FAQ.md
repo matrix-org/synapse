@@ -1,4 +1,4 @@
-# MSC 1711 Certificates FAQ
+# MSC1711 Certificates FAQ
 
 The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
 supports the r0.1 release of the server to server specification, but is
@@ -165,11 +165,8 @@ You can do this with a `.well-known` file as follows:
 
 ### Synapse 0.99.0 has just been released, what do I need to do right now?
 
-Upgrade as soon as you can in preparation for Synapse 1.0.0.
-
-### How do I upgrade?
-
-Follow the upgrade notes here [UPGRADE.rst](https://github.com/matrix-org/synapse/blob/master/UPGRADE.rst)
+Upgrade as soon as you can in preparation for Synapse 1.0.0, and update your
+TLS certificates as [above](#configuring-certificates-for-compatibility-with-synapse-100).
 
 ### What will happen if I do not set up a valid federation certificate immediately?
 
@@ -186,39 +183,24 @@ homeserver will not be able to federate with any Synapse >= 1.0.0
 ### When do I need a SRV record or .well-known URI?
 
 If your homeserver listens on the default federation port (8448), and your
-server_name points to the host that your homeserver runs on, you do not need an
-SRV record or .well-known/matrix/server URI.\
-For instance, if you registered example.com and pointed its DNS A record at a
+`server_name` points to the host that your homeserver runs on, you do not need an
+SRV record or `.well-known/matrix/server` URI.
+
+For instance, if you registered `example.com` and pointed its DNS A record at a
 fresh Upcloud VPS or similar, you could install Synapse 0.99 on that host,
-giving it a server_name of example.com, and it would automatically generate a
+giving it a server_name of `example.com`, and it would automatically generate a
 valid TLS certificate for you via Let's Encrypt and no SRV record or
-.well-known URI would be needed.
+`.well-known` URI would be needed.
 
 This is the common case, although you can add an SRV record or
-.well-known/matrix/server URI for completeness if you wish.
+`.well-known/matrix/server` URI for completeness if you wish.
 
-**However**, if your server does not listen on port 8448, or if your server_name
+**However**, if your server does not listen on port 8448, or if your `server_name`
 does not point to the host that your homeserver runs on, you will need to let
 other servers know how to find it.
 
-The easiest way to do this is with a .well-known/matrix/server URI on the
-webroot of the domain to advertise your server. For instance, if you ran
-"matrixhosting.com" and you were hosting a Matrix server for `example.com`, you
-would ask `example.com` to create a file at
-`https://example.com/.well-known/matrix/server` with contents:
-
-```json
-{"m.server": "example.matrixhosting.com:8448"}
-```
-
-...which would tell servers trying to connect to example.com to instead connect
-to example.matrixhosting.com on port 8448. You would then configure Synapse
-with a server_name of "example.com", but generate a TLS certificate for
-example.matrixhosting.com.
-
-As an alternative, you can still use an SRV DNS record for the delegation, but
-this will require you to have a certificate for the matrix domain (example.com
-in this example). See "Can I still use an SRV record?".
+In this case, you should see ["If you do have an SRV record
+currently"](#if-you-do-have-an-srv-record-currently) above.
 
 ### Can I still use an SRV record?
 
@@ -244,13 +226,13 @@ also need to use a .well-known URI instead. However, see also "I have created a
 
 ### I have created a .well-known URI. Do I still need an SRV record?
 
-As of Synapse 0.99, Synapse will first check for the existence of a .well-known
-URL and follow any delegation it suggests. It will only then check for the
+As of Synapse 0.99, Synapse will first check for the existence of a `.well-known`
+URI and follow any delegation it suggests. It will only then check for the
 existence of an SRV record.
 
 That means that the SRV record will often be redundant. However, you should
 remember that there may still be older versions of Synapse in the federation
-which do not understand .well-known URIs, so if you removed your SRV record you
+which do not understand `.well-known` URIs, so if you removed your SRV record you
 would no longer be able to federate with them.
 
 It is therefore best to leave the SRV record in place for now. Synapse 0.34 and
@@ -332,5 +314,5 @@ where TLS is configured.
 ### How do I tell Synapse to reload my keys/certificates after I replace them?
 
 Synapse will reload the keys and certificates when it receives a SIGHUP - for
-example kill -HUP $(cat homeserver.pid). Alternatively, simply restart Synapse,
-though this will result in downtime while it restarts.
+example `kill -HUP $(cat homeserver.pid)`. Alternatively, simply restart
+Synapse, though this will result in downtime while it restarts.
