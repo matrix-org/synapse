@@ -39,13 +39,23 @@ placed in Synapse's config directory without the need for any ACME setup.
 
 ## ACME setup
 
+The main steps for enabling ACME support in short summary are:
+
+1. Allow Synapse to listen on port 80 with authbind, or forward it from a reverse-proxy.
+1. Set `acme:enabled` to `true` in homeserver.yaml.
+1. Move your old certificates (files `example.com.tls.crt` and `example.com.tls.key` out of the way if they currently exist at the paths specified in `homeserver.yaml`.
+1. Restart Synapse
+
+Detailed instructions for each step are provided below.
+
+### Listening on port 80
 
 In order for Synapse to complete the ACME challenge to provision a
 certificate, it needs access to port 80. Typically listening on port 80 is
 only granted to applications running as root. There are thus two solutions to
 this problem.
 
-### Using a reverse proxy
+#### Using a reverse proxy
 
 A reverse proxy such as Apache or nginx allows a single process (the web
 server) to listen on port 80 and proxy traffic to the appropriate program
@@ -70,7 +80,7 @@ ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-cha
 Make sure to restart/reload your webserver after making changes.
 
 
-### Authbind
+#### Authbind
 
 `authbind` allows a program which does not run as root to bind to
 low-numbered ports in a controlled way. The setup is simpler, but requires a
@@ -98,9 +108,9 @@ When Synapse is started, use the following syntax::
 authbind --deep <synapse start command>
 ```
 
-## Config file editing
+### Config file editing
 
-Finally, once Synapse is able to listen on port 80 for ACME challenge
+Once Synapse is able to listen on port 80 for ACME challenge
 requests, it must be told to perform ACME provisioning by setting `enabled`
 to true under the `acme` section in `homeserver.yaml`:
 
@@ -108,3 +118,9 @@ to true under the `acme` section in `homeserver.yaml`:
 acme:
     enabled: true
 ```
+
+### Starting synapse
+
+Ensure that the certificate paths specified in `homeserver.yaml` (`tls_certificate_path` and `tls_private_key_path`) do not currently point to any files. Synapse will not provision certificates if files exist, as it does not want to overwrite existing certificates.
+
+Finally, start/restart Synapse.
