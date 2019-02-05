@@ -225,6 +225,12 @@ If you would like to use your own certificates, you can do so by changing
 alternatively, you can use a reverse-proxy. Apart from port 8448 using TLS,
 both ports are the same in the default configuration.
 
+ACME setup
+----------
+
+For details on having Synapse manage your federation TLS certificates
+automatically, please see `<docs/ACME.rst>`_.
+
 Registering a user
 ------------------
 
