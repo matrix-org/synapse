@@ -2,8 +2,7 @@
 
 ## Installing from source
 
-(Prebuilt packages are available for some platforms - see [Prebuilt
-packages](#prebuilt packages).)
+(Prebuilt packages are available for some platforms - see [Prebuilt packages](#prebuilt-packages).)
 
 System requirements:
 
@@ -13,8 +12,7 @@ System requirements:
 
 Synapse is written in Python but some of the libraries it uses are written in
 C. So before we can install Synapse itself we need a working C compiler and the
-header files for Python C extensions. See [Platform-Specific
-Instructions][#platform-specific-instructions] for information on installing
+header files for Python C extensions. See [Platform-Specific Instructions][#platform-specific-instructions] for information on installing
 these on various platforms.
 
 To install the Synapse homeserver run::
