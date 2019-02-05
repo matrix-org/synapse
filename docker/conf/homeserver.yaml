@@ -2,10 +2,24 @@
 
 ## TLS ##
 
+{% if SYNAPSE_NO_TLS %}
+no_tls: True
+
+# workaround for https://github.com/matrix-org/synapse/issues/4554
+tls_certificate_path: "/conf/dummy.tls.crt"
+
+{% else %}
+
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
-no_tls: {{ "True" if SYNAPSE_NO_TLS else "False" }}
-tls_fingerprints: []
+
+{% if SYNAPSE_ACME %}
+acme:
+    enabled: true
+    port: 8009
+{% endif %}
+
+{% endif %}
 
 ## Server ##
 
