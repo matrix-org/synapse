@@ -69,6 +69,6 @@ COPY ./docker/conf /conf
 
 VOLUME ["/data"]
 
-EXPOSE 8008/tcp 8448/tcp
+EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]

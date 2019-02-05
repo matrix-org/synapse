@@ -52,6 +52,27 @@ In order to setup an application service, simply create an ``appservices``
 directory in the data volume and write the application service Yaml
 configuration file there. Multiple application services are supported.
 
+## TLS certificates
+
+Synapse requires a valid TLS certificate. You can do one of:
+
+ * Provide your own certificate and key (as
+   `${DATA_PATH}/${SYNAPSE_SERVER_NAME}.crt|key`, or elsewhere by providing
+   an entire config as `${SYNAPSE_CONFIG_PATH`).
+
+ * Use a reverse proxy to terminate incoming TLS, and forward the plain http
+   traffic to port 8008 in the container. In this case you should set `-e
+   SYNAPSE_NO_TLS=1`.
+
+ * Use the ACME (Let's Encrypt) support built into Synapse. This requires
+   `${SYNAPSE_SERVER_NAME}` port 80 to be forwarded to port 8009 in the
+   container, for example with `-p 80:8009`. To enable it in the docker
+   container, set `-e SYNAPSE_ACME=1`.
+
+If you don't do any of these, Synapse will fail to start with an error like:
+
+    synapse.config._base.ConfigError: Error accessing file '/data/<server_name>.tls.crt' (config for tls_certificate): No such file or directory
+
 ## Environment
 
 Unless you specify a custom path for the configuration file, a very generic
@@ -88,6 +109,7 @@ variables are available for configuration:
 * ``SYNAPSE_TURN_SECRET``, set this to the TURN shared secret if required.
 * ``SYNAPSE_MAX_UPLOAD_SIZE``, set this variable to change the max upload size
   [default `10M`].
+* ``SYNAPSE_ACME``: set this to enable the ACME certificate renewal support.
 
 Shared secrets, that will be initialized to random values if not set:
 
