@@ -1,3 +1,9 @@
+* [Installing Synapse](#installing-synapse)
+  * [Installing from source](#installing-from-source)
+    * [Platform-Specific Instructions](#platform-specific-instructions)
+    * [Troubleshooting Installation](#troubleshooting-installation)
+  * [Prebuilt packages](#prebuilt-packages)
+
 # Installing Synapse
 
 ## Installing from source
