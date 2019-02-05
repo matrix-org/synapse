@@ -134,6 +134,12 @@ create the account. Your name will take the form of::
 As when logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
 
+ACME setup
+----------
+
+For details on having Synapse manage your federation TLS certificates
+automatically, please see `<docs/ACME.md>`_.
+
 
 Security Note
 =============
