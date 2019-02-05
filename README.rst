@@ -84,13 +84,6 @@ Synapse Installation
 For details on how to install synapse, see `<INSTALL.md>`_.
 
 
-To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. ``~/synapse``), and::
-
-    cd ~/synapse
-    source env/bin/activate
-    synctl start
-
 Connecting to Synapse from a client
 ===================================
 
@@ -135,7 +128,7 @@ As when logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
 
 ACME setup
-----------
+==========
 
 For details on having Synapse manage your federation TLS certificates
 automatically, please see `<docs/ACME.md>`_.
