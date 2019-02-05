@@ -15,18 +15,25 @@
 
 import gc
 import logging
+import signal
 import sys
+import traceback
 
 import psutil
 from daemonize import Daemonize
 
 from twisted.internet import error, reactor
+from twisted.protocols.tls import TLSMemoryBIOFactory
 
 from synapse.app import check_bind_error
+from synapse.crypto import context_factory
 from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
 
 logger = logging.getLogger(__name__)
+
+_sighup_callbacks = []
+register_sighup = _sighup_callbacks.append
 
 
 def start_worker_reactor(appname, config):
@@ -189,3 +196,57 @@ def listen_ssl(
 
     logger.info("Synapse now listening on port %d (TLS)", port)
     return r
+
+
+def refresh_certificate(hs):
+    """
+    Refresh the TLS certificates that Synapse is using by re-reading them from
+    disk and updating the TLS context factories to use them.
+    """
+    logging.info("Loading certificate from disk...")
+    hs.config.read_certificate_from_disk()
+    hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
+    hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+        hs.config
+    )
+    logging.info("Certificate loaded.")
+
+    if hs._listening_services:
+        logging.info("Updating context factories...")
+        for i in hs._listening_services:
+            if isinstance(i.factory, TLSMemoryBIOFactory):
+                i.factory = TLSMemoryBIOFactory(
+                    hs.tls_server_context_factory,
+                    False,
+                    i.factory.wrappedFactory
+                )
+        logging.info("Context factories updated.")
+
+
+def start(hs, listeners=None):
+    """
+    Start a Synapse server or worker.
+    """
+    try:
+        # Set up the SIGHUP machinery.
+        if hasattr(signal, "SIGHUP"):
+            def handle_sighup(*args, **kwargs):
+                for i in _sighup_callbacks:
+                    i(hs)
+
+            signal.signal(signal.SIGHUP, handle_sighup)
+
+            register_sighup(refresh_certificate)
+
+        # Load the certificate from disk.
+        refresh_certificate(hs)
+
+        # It is now safe to start your Synapse.
+        hs.start_listening(listeners)
+        hs.get_datastore().start_profiling()
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
+        reactor = hs.get_reactor()
+        if reactor.running:
+            reactor.stop()
+        sys.exit(1)

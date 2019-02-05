@@ -196,6 +196,7 @@ class HomeServer(object):
         self._reactor = reactor
         self.hostname = hostname
         self._building = {}
+        self._listening_services = []
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
