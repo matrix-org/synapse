@@ -30,8 +30,12 @@ they should retain their SRV record while the federation upgrades over the
 course of the month.  Other SRV records are unaffected.
 
 Full upgrade notes can be found in
-[UPGRADE.rst](https://github.com/matrix-org/synapse/blob/master/UPGRADE.rst),
-what follows is a timeline and some frequently asked questions.
+[UPGRADE.rst](https://github.com/matrix-org/synapse/blob/master/UPGRADE.rst).
+What follows is a timeline and some frequently asked questions.
+
+For more details and context on the release of the r0.1 Server/Server API and
+imminent Matrix 1.0 release, you can also see our main talk from FOSDEM 2019:
+https://matrix.org/blog/2019/02/04/matrix-at-fosdem-2019/
 
 ## Contents
 * Timeline
