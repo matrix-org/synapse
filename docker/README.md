@@ -69,7 +69,7 @@ Synapse requires a valid TLS certificate. You can do one of the following:
    container, for example with `-p 80:8009`. To enable it in the docker
    container, set `-e SYNAPSE_ACME=1`.
 
-If you don't do any of these, Synapse will fail to start with an error like:
+If you don't do any of these, Synapse will fail to start with an error similar to:
 
     synapse.config._base.ConfigError: Error accessing file '/data/<server_name>.tls.crt' (config for tls_certificate): No such file or directory
 
