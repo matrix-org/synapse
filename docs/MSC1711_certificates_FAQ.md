@@ -19,19 +19,9 @@ certificate.** Admins will have 1 month to do so, after which 1.0.0 will be
 released and those servers without a valid certificate will not longer be able
 to federate with >= 1.0.0 servers.
 
-If you are unable to generate a valid TLS certificate for your server (e.g.
-because you run it on behalf of someone who doesn't want to give you a TLS
-certificate for their domain, or simply because the matrix domain is hosted on
-a different server), then you can now create a /.well-known/matrix/server file
-on the matrix domain in order to delegate Matrix hosting to another domain.
- Admins who currently use SRV records to delegate a domain **which they do not
-control TLS for** will need to switch to using .well-known/matrix/server - though
-they should retain their SRV record while the federation upgrades over the
-course of the month.  Other SRV records are unaffected.
-
-Full upgrade notes can be found in
-[UPGRADE.rst](https://github.com/matrix-org/synapse/blob/master/UPGRADE.rst).
-What follows is a timeline and some frequently asked questions.
+Full details on how to carry out this configuration change is given
+[below](#configuring-certificates-for-compatibility-with-synapse-100). A
+timeline and some frequently asked questions are also given below.
 
 For more details and context on the release of the r0.1 Server/Server API and
 imminent Matrix 1.0 release, you can also see our
@@ -39,25 +29,26 @@ imminent Matrix 1.0 release, you can also see our
 
 ## Contents
 * Timeline
-* Synapse 0.99.0 has just been released, what do I need to do right now?
-* How do I upgrade?
-* What will happen if I do not set up a valid federation certificate
-  immediately?
-* What will happen if I do nothing at all?
-* When do I need a SRV record or .well-known URI?
-* Can I still use an SRV record?
-* I have created a .well-known URI. Do I still need an SRV record?
-* It used to work just fine, why are you breaking everything?
-* Can I manage my own certificates rather than having Synapse renew
-  certificates itself?
-* Do you still recommend against using a reverse-proxy on the federation port?
-* Do I still need to give my TLS certificates to Synapse if I am using a
-  reverse-proxy?
-* Do I need the same certificate for the client and federation port?
-* How do I tell Synapse to reload my keys/certificates after I replace them?
+* Configuring certificates for compatibility with Synapse 1.0
+* FAQ
+  * Synapse 0.99.0 has just been released, what do I need to do right now?
+  * How do I upgrade?
+  * What will happen if I do not set up a valid federation certificate
+    immediately?
+  * What will happen if I do nothing at all?
+  * When do I need a SRV record or .well-known URI?
+  * Can I still use an SRV record?
+  * I have created a .well-known URI. Do I still need an SRV record?
+  * It used to work just fine, why are you breaking everything?
+  * Can I manage my own certificates rather than having Synapse renew
+    certificates itself?
+  * Do you still recommend against using a reverse-proxy on the federation port?
+  * Do I still need to give my TLS certificates to Synapse if I am using a
+    reverse-proxy?
+  * Do I need the same certificate for the client and federation port?
+  * How do I tell Synapse to reload my keys/certificates after I replace them?
 
-
-### Timeline
+## Timeline
 
 **5th Feb 2019  - Synapse 0.99.0 is released.**
 
@@ -82,9 +73,95 @@ alongside their .well-known record.
 1.0.0 will land no sooner than 1 month after 0.99.0, leaving server admins one
 month after 5th February to upgrade to 0.99.0 and deploy their certificates. In
 accordance with the the [S2S spec](https://matrix.org/docs/spec/server_server/r0.1.0.html)
-1.0.0 will enforce federation checks. This means that any homeserver without a
+1.0.0 will enforce certificate validity. This means that any homeserver without a
 valid certificate after this point will no longer be able to federate with
 1.0.0 servers.
+
+
+## Configuring certificates for compatibility with Synapse 1.0.0
+
+### If you do not currently have an SRV record
+
+In this case, your `server_name` points to the host where your Synapse is
+running. There is no need to create a `.well-known` URI or an SRV record, but
+you will need to give Synapse a valid, signed, certificate.
+
+The easiest way to do that is with Synapse's built-in ACME (Let's Encrypt)
+support. Full details are in [ACME.md](./ACME.md) but, in a nutshell:
+
+ 1. Allow Synapse to listen on port 80 with `authbind`, or forward it from a
+    reverse proxy.
+ 2. Enable acme support in `homeserver.yaml`.
+ 3. Move your old certificates out of the way.
+ 4. Restart Synapse.
+
+### If you do have an SRV record currently
+
+If you are using an SRV record, your matrix domain (`server_name`) may not
+point to the same host that your Synapse is running on (the 'target
+domain'). (If it does, you can follow the recommendation above; otherwise, read
+on.)
+
+Let's assume that your `server_name` is `example.com`, and your Synapse is
+hosted at a target domain of `customer.example.net`. Currently you should have
+an SRV record which looks like:
+
+```
+_matrix._tcp.example.com. IN SRV 10 5 443 customer.example.net.
+```
+
+In this situation, you have two choices for how to proceed:
+
+#### Option 1: give Synapse a certificate for your matrix domain
+
+Synapse 1.0 will expect your server to present a TLS certificate for your
+`server_name` (`example.com` in the above example). You can achieve this by
+doing one of the following:
+
+ * Acquire a certificate for the `server_name` yourself (for example, using
+   `certbot`), and give it and the key to Synapse via `tls_certificate_path`
+   and `tls_private_key_path`, or:
+
+ * Use Synapse's [ACME support](./ACME.md), and forward port 80 on the
+   `server_name` domain to your Synapse instance, or:
+
+ * Set up a reverse-proxy on port 8448 on the `server_name` domain, which
+   forwards to Synapse. Once it is set up, you can remove the SRV record.
+
+#### Option 2: add a .well-known file to delegate your matrix traffic
+
+This will allow you to keep Synapse on a separate domain, without having to
+give it a certificate for the matrix domain.
+
+You can do this with a `.well-known` file as follows:
+
+ 1. Keep the SRV record in place - it is needed for backwards compatibility
+    with Synapse 0.34 and earlier.
+
+ 2. Give synapse a certificate corresponding to the target domain
+    (`customer.example.net` in the above example). Currently Synapse's ACME
+    support [does not support
+    this](https://github.com/matrix-org/synapse/issues/4552), so you will have
+    to acquire a certificate yourself and give it to Synapse via
+    `tls_certificate_path` and `tls_private_key_path`.
+
+ 3. Restart Synapse to ensure the new certificate is loaded.
+
+ 4. Arrange for a `.well-known` file at
+    `https://<server_name>/.well-known/matrix/server` with contents:
+
+    ```json
+    {"m.server": "<target domain>:<port>"}
+    ```
+
+    In the above example, `https://example.com/.well-known/matrix/server`
+    should have the contents:
+
+    ```json
+	{"m.server": "customer.example.net:443"}
+    ```
+
+## FAQ
 
 ### Synapse 0.99.0 has just been released, what do I need to do right now?
 
@@ -126,14 +203,13 @@ other servers know how to find it.
 
 The easiest way to do this is with a .well-known/matrix/server URI on the
 webroot of the domain to advertise your server. For instance, if you ran
-"matrixhosting.com" and you were hosting a Matrix server for example.com, you
-would ask example.com to create a file at:
+"matrixhosting.com" and you were hosting a Matrix server for `example.com`, you
+would ask `example.com` to create a file at
+`https://example.com/.well-known/matrix/server` with contents:
 
-`https://example.com/.well-known/matrix/server`
-
-with contents:
-
-`{"m.server": "example.matrixhosting.com:8448"}`
+```json
+{"m.server": "example.matrixhosting.com:8448"}
+```
 
 ...which would tell servers trying to connect to example.com to instead connect
 to example.matrixhosting.com on port 8448. You would then configure Synapse
@@ -231,7 +307,7 @@ We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse-proxy and manage their
 own TLS certificates, and this is a supported configuration.
 
-### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?
+### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?
 
 Practically speaking, this is no longer necessary.
 
