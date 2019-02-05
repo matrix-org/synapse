@@ -80,8 +80,6 @@ from Let's Encrypt, depending on your server configuration. Of course, if you
 already have a valid certificate for your homeserver's domain, that can be
 placed in Synapse's config directory without the need for ACME.
 
-For more details, the `TLS upgrade FAQ <https://github.com/matrix-org/synapse/blob/master/docs/MSC_1711_Certificates_FAQ>`_
-
 Upgrading to v0.34.0
 ====================
 
