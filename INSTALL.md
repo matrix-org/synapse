@@ -40,7 +40,7 @@ pip install matrix-synapse[all]
 
 This will download Synapse from [PyPI](https://pypi.org/project/matrix-synapse)
 and install it, along with the python libraries it uses, into a virtual environment
-under ``~/synapse/env``.  Feel free to pick a different directory if you
+under `~/synapse/env`.  Feel free to pick a different directory if you
 prefer.
 
 This Synapse installation can then be later upgraded by using pip again with the
@@ -88,7 +88,7 @@ You will need to give Synapse a TLS certficate before it will start - see [TLS
 certificates](#tls-certificates).
 
 To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. ``~/synapse``), and::
+run (e.g. `~/synapse`), and::
 
     cd ~/synapse
     source env/bin/activate
@@ -197,19 +197,19 @@ may need to manually upgrade it::
 
     sudo pip install --upgrade pip
 
-Installing may fail with ``Could not find any downloads that satisfy the requirement pymacaroons-pynacl (from matrix-synapse==0.12.0)``.
+Installing may fail with `Could not find any downloads that satisfy the requirement pymacaroons-pynacl (from matrix-synapse==0.12.0)`.
 You can fix this by manually upgrading pip and virtualenv::
 
     sudo pip install --upgrade virtualenv
 
-You can next rerun ``virtualenv -p python3 synapse`` to update the virtual env.
+You can next rerun `virtualenv -p python3 synapse` to update the virtual env.
 
-Installing may fail during installing virtualenv with ``InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.``
+Installing may fail during installing virtualenv with `InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.`
 You can fix this  by manually installing ndg-httpsclient::
 
     pip install --upgrade ndg-httpsclient
 
-Installing may fail with ``mock requires setuptools>=17.1. Aborting installation``.
+Installing may fail with `mock requires setuptools>=17.1. Aborting installation`.
 You can fix this by upgrading setuptools::
 
     pip install --upgrade setuptools
@@ -355,89 +355,12 @@ configured without TLS; it should be behind a reverse proxy for TLS/SSL
 termination on port 443 which in turn should be used for clients. Port 8448
 is configured to use TLS for Federation with a self-signed or verified
 certificate, but please be aware that a valid certificate will be required in
-Synapse v1.0.
+Synapse v1.0. Instructions for having Synapse automatically provision and renew federation certificates through ACME can be found at [ACME.md](docs/ACME.md).
 
 If you would like to use your own certificates, you can do so by changing
 `tls_certificate_path` and `tls_private_key_path` in `homeserver.yaml`;
 alternatively, you can use a reverse-proxy. Apart from port 8448 using TLS,
 both ports are the same in the default configuration.
-
-### ACME setup
-
-Synapse v1.0 will require valid TLS certificates for communication between servers
-(port `8448` by default) in addition to those that are client-facing (port
-`443`). In the case that your `server_name` config variable is the same as
-the hostname that the client connects to, then the same certificate can be
-used between client and federation ports without issue. Synapse v0.99.0+
-**will provision server-to-server certificates automatically for you for
-free** through [Let's Encrypt](https://letsencrypt.org/) if you tell it to.
-
-In order for Synapse to complete the ACME challenge to provision a
-certificate, it needs access to port 80. Typically listening on port 80 is
-only granted to applications running as root. There are thus two solutions to
-this problem.
-
-#### Using a reverse proxy
-
-A reverse proxy such as Apache or nginx allows a single process (the web
-server) to listen on port 80 and proxy traffic to the appropriate program
-running on your server. It is the recommended method for setting up ACME as
-it allows you to use your existing webserver while also allowing Synapse to
-provision certificates as needed.
-
-For nginx users, add the following line to your existing `server` block:
-
-```
-location /.well-known/acme-challenge {
-    proxy_pass http://localhost:8009/;
-}
-```
-
-For Apache, add the following to your existing webserver config::
-
-```
-ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-challenge
-```
-
-Make sure to restart/reload your webserver after making changes.
-
-
-#### Authbind
-
-`authbind` allows a program which does not run as root to bind to
-low-numbered ports in a controlled way. The setup is simpler, but requires a
-webserver not to already be running on port 80. **This includes every time
-Synapse renews a certificate**, which may be cumbersome if you usually run a
-web server on port 80. Nevertheless, if you're sure port 80 is not being used
-for any other purpose then all that is necessary is the following:
-
-Install `authbind`. For example, on Debian/Ubuntu:
-
-```
-sudo apt-get install authbind
-```
-
-Allow `authbind` to bind port 80:
-
-```
-sudo touch /etc/authbind/byport/80
-sudo chmod 777 /etc/authbind/byport/80
-```
-
-When Synapse is started, use the following syntax::
-
-```
-authbind --deep <synapse start command>
-```
-
-Finally, once Synapse is able to listen on port 80 for ACME challenge
-requests, it must be told to perform ACME provisioning by setting `enabled`
-to true under the `acme` section in `homeserver.yaml`:
-
-```
-acme:
-    enabled: true
-```
 
 ## Registering a user
 
@@ -459,12 +382,12 @@ Make admin [no]:
 Success!
 ```
 
-This process uses a setting ``registration_shared_secret`` in
-``homeserver.yaml``, which is shared between Synapse itself and the
-``register_new_matrix_user`` script. It doesn't matter what it is (a random
-value is generated by ``--generate-config``), but it should be kept secret, as
+This process uses a setting `registration_shared_secret` in
+`homeserver.yaml`, which is shared between Synapse itself and the
+`register_new_matrix_user` script. It doesn't matter what it is (a random
+value is generated by `--generate-config`), but it should be kept secret, as
 anyone with knowledge of it can register users on your server even if
-``enable_registration`` is ``false``.
+`enable_registration` is `false`.
 
 ## Setting up a TURN server
 
@@ -474,14 +397,14 @@ a TURN server.  See [docs/turn-howto.rst](docs/turn-howto.rst) for details.
 ## URL previews
 
 Synapse includes support for previewing URLs, which is disabled by default.  To
-turn it on you must enable the ``url_preview_enabled: True`` config parameter
+turn it on you must enable the `url_preview_enabled: True` config parameter
 and explicitly specify the IP ranges that Synapse is not allowed to spider for
-previewing in the ``url_preview_ip_range_blacklist`` configuration parameter.
+previewing in the `url_preview_ip_range_blacklist` configuration parameter.
 This is critical from a security perspective to stop arbitrary Matrix users
 spidering 'internal' URLs on your network.  At the very least we recommend that
 your loopback and RFC1918 IP addresses are blacklisted.
 
 This also requires the optional lxml and netaddr python dependencies to be
 installed.  This in turn requires the libxml2 library to be available - on
-Debian/Ubuntu this means ``apt-get install libxml2-dev``, or equivalent for
+Debian/Ubuntu this means `apt-get install libxml2-dev`, or equivalent for
 your OS.
