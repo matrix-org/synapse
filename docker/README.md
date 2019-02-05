@@ -54,7 +54,7 @@ configuration file there. Multiple application services are supported.
 
 ## TLS certificates
 
-Synapse requires a valid TLS certificate. You can do one of:
+Synapse requires a valid TLS certificate. You can do one of the following:
 
  * Provide your own certificate and key (as
    `${DATA_PATH}/${SYNAPSE_SERVER_NAME}.crt|key`, or elsewhere by providing
