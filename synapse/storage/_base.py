@@ -759,6 +759,18 @@ class SQLBaseStore(object):
         txn.execute(sql, list(allvalues.values()))
 
     def _simple_upsert_many_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+        """
+        Upsert, many times.
+
+        Args:
+            table (str): The table to upsert into
+            keys (list[str]): The key column names.
+            keyvalues (list[list]): A list of each row's key column values.
+            values (list[str]): The value column names.
+            valuesvalues (list[list]): A list of each row's value column values.
+        Returns:
+            None
+        """
         if (
             self.database_engine.can_native_upsert
             and table not in self._unsafe_to_upsert_tables
@@ -783,10 +795,10 @@ class SQLBaseStore(object):
             valuesvalues = [() for x in range(len(keyvalues))]
 
         for keyv, valv in zip(keyvalues, valuesvalues):
-            keys = {x: y for x, y in zip(keys, keyv)}
-            vals = {x: y for x, y in zip(values, valv)}
+            _keys = {x: y for x, y in zip(keys, keyv)}
+            _vals = {x: y for x, y in zip(values, valv)}
 
-            self._simple_upsert_txn_emulated(txn, table, keys, vals)
+            self._simple_upsert_txn_emulated(txn, table, _keys, _vals)
 
     def _simple_upsert_many_txn_native_upsert(
         self, txn, table, keys, keyvalues, values, valuesvalues
