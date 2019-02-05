@@ -640,7 +640,7 @@ class SQLBaseStore(object):
         """
         if (
             self.database_engine.can_native_upsert
-            and table not in self._unsafe_to_upsert_tables and False
+            and table not in self._unsafe_to_upsert_tables
         ):
             return self._simple_upsert_txn_native_upsert(
                 txn,
