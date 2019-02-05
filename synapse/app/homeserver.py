@@ -17,7 +17,6 @@
 import gc
 import logging
 import os
-import signal
 import sys
 import traceback
 
@@ -328,19 +327,10 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    sighup_callbacks = []
     synapse.config.logger.setup_logging(
         config,
-        use_worker_options=False,
-        register_sighup=sighup_callbacks.append
+        use_worker_options=False
     )
-
-    def handle_sighup(*args, **kwargs):
-        for i in sighup_callbacks:
-            i(*args, **kwargs)
-
-    if hasattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, handle_sighup)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -399,8 +389,6 @@ def setup(config_options):
                     i.factory.wrappedFactory
                 )
         logging.info("Context factories updated.")
-
-    sighup_callbacks.append(refresh_certificate)
 
     @defer.inlineCallbacks
     def start():
