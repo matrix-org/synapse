@@ -12,7 +12,8 @@ System requirements:
 
 Synapse is written in Python but some of the libraries it uses are written in
 C. So before we can install Synapse itself we need a working C compiler and the
-header files for Python C extensions. See [Platform-Specific Instructions][#platform-specific-instructions] for information on installing
+header files for Python C extensions. See [Platform-Specific 
+Instructions](#platform-specific-instructions) for information on installing
 these on various platforms.
 
 To install the Synapse homeserver run::
@@ -176,7 +177,7 @@ for a number of platforms.
 
 There is an offical synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse which can be used with
-the docker-compose file available at `contrib/docker <contrib/docker>`_. Further information on
+the docker-compose file available at [contrib/docker](contrib/docker). Further information on
 this including configuration options is available in the README on
 hub.docker.com.
 
