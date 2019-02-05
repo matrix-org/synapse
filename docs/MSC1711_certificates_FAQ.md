@@ -19,19 +19,9 @@ certificate.** Admins will have 1 month to do so, after which 1.0.0 will be
 released and those servers without a valid certificate will not longer be able
 to federate with >= 1.0.0 servers.
 
-If you are unable to generate a valid TLS certificate for your server (e.g.
-because you run it on behalf of someone who doesn't want to give you a TLS
-certificate for their domain, or simply because the matrix domain is hosted on
-a different server), then you can now create a /.well-known/matrix/server file
-on the matrix domain in order to delegate Matrix hosting to another domain.
- Admins who currently use SRV records to delegate a domain **which they do not
-control TLS for** will need to switch to using .well-known/matrix/server - though
-they should retain their SRV record while the federation upgrades over the
-course of the month.  Other SRV records are unaffected.
-
-Full upgrade notes can be found in
-[UPGRADE.rst](https://github.com/matrix-org/synapse/blob/master/UPGRADE.rst).
-What follows is a timeline and some frequently asked questions.
+Full details on how to carry out this configuration change is given
+[below](#configuring-certificates-for-compatibility-with-synapse-100). A
+timeine and some frequently asked questions are also given below.
 
 For more details and context on the release of the r0.1 Server/Server API and
 imminent Matrix 1.0 release, you can also see our
