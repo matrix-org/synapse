@@ -26,7 +26,7 @@ these on various platforms.
 
 To install the Synapse homeserver run:
 
-```sh
+```
 mkdir -p ~/synapse
 virtualenv -p python3 ~/synapse/env
 source ~/synapse/env/bin/activate
@@ -43,7 +43,7 @@ prefer.
 This Synapse installation can then be later upgraded by using pip again with the
 update flag:
 
-```sh
+```
 source ~/synapse/env/bin/activate
 pip install -U matrix-synapse[all]
 ```
@@ -51,7 +51,7 @@ pip install -U matrix-synapse[all]
 Before you can start Synapse, you will need to generate a configuration
 file. To do this, run (in your virtualenv, as before)::
 
-```sh
+```
 cd ~/synapse
 python -m synapse.app.homeserver \
     --server-name my.domain.name \
@@ -97,7 +97,7 @@ run (e.g. ``~/synapse``), and::
 
 Installing prerequisites on Ubuntu or Debian:
 
-```sh
+```
 sudo apt-get install build-essential python3-dev libffi-dev \
                      python-pip python-setuptools sqlite3 \
                      libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
@@ -107,7 +107,7 @@ sudo apt-get install build-essential python3-dev libffi-dev \
 
 Installing prerequisites on ArchLinux:
 
-```sh
+```
 sudo pacman -S base-devel python python-pip \
                python-setuptools python-virtualenv sqlite3
 ```
@@ -116,7 +116,7 @@ sudo pacman -S base-devel python python-pip \
 
 Installing prerequisites on CentOS 7 or Fedora 25:
 
-```sh
+```
 sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
                  python-virtualenv libffi-devel openssl-devel
@@ -127,7 +127,7 @@ sudo yum groupinstall "Development Tools"
 
 Installing prerequisites on Mac OS X:
 
-```sh
+```
 xcode-select --install
 sudo easy_install pip
 sudo pip install virtualenv
@@ -138,7 +138,7 @@ brew install pkg-config libffi
 
 Installing prerequisites on openSUSE:
 
-```sh
+```
 sudo zypper in -t pattern devel_basis
 sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
                python-devel libffi-devel libopenssl-devel libjpeg62-devel
@@ -148,7 +148,7 @@ sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
 
 Installing prerequisites on OpenBSD:
 
-```sh
+```
 doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
               libxslt jpeg
 ```
@@ -255,7 +255,7 @@ https://github.com/spantaleev/matrix-docker-ansible-deploy
 Matrix.org provides Debian/Ubuntu packages of the latest stable version of
 Synapse via https://matrix.org/packages/debian/. To use them:
 
-```sh
+```
 sudo apt install -y lsb-release curl apt-transport-https
 echo "deb https://matrix.org/packages/debian `lsb_release -cs` main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
@@ -270,7 +270,7 @@ sudo apt install matrix-synapse-py3
 For `buster` and `sid`, Synapse is available in the Debian repositories and
 it should be possible to install it with simply:
 
-```sh
+```
     sudo apt install matrix-synapse
 ```
 
@@ -286,7 +286,7 @@ they are old and suffer from known security vulnerabilities.
 
 Synapse is in the Fedora repositories as `matrix-synapse`:
 
-```sh
+```
 sudo dnf install matrix-synapse
 ```
 
@@ -297,7 +297,7 @@ https://obs.infoserver.lv/project/monitor/matrix-synapse
 
 Synapse is in the OpenSUSE repositories as `matrix-synapse`:
 
-```sh
+```
 sudo zypper install matrix-synapse
 ```
 
@@ -314,7 +314,7 @@ the necessary dependencies.
 
 pip may be outdated (6.0.7-1 and needs to be upgraded to 6.0.8-1 ):
 
-```sh
+```
 sudo pip install --upgrade pip
 ```
 
@@ -323,7 +323,7 @@ ELFCLASS32 (x64 Systems), you may need to reinstall py-bcrypt to correctly
 compile it under the right architecture. (This should not be needed if
 installing under virtualenv):
 
-```sh
+```
 sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
@@ -410,13 +410,13 @@ for any other purpose then all that is necessary is the following:
 
 Install `authbind`. For example, on Debian/Ubuntu:
 
-```sh
+```
 sudo apt-get install authbind
 ```
 
 Allow `authbind` to bind port 80:
 
-```sh
+```
 sudo touch /etc/authbind/byport/80
 sudo chmod 777 /etc/authbind/byport/80
 ```
