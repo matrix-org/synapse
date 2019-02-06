@@ -263,8 +263,8 @@ sudo apt install -y lsb-release curl apt-transport-https
 echo "deb https://matrix.org/packages/debian `lsb_release -cs` main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
 curl -s "https://matrix.org/packages/debian/repo-key.asc" |
-    sudo gpg -q --import --import-options import-show --primary-keyring \
-    /etc/apt/trusted.gpg.d/matrix-org-packages.gpg -
+    sudo tee /etc/apt/trusted.gpg.d/matrix-org_packages.asc |
+    gpg -q -n --import --import-options import-show -
 ```
 
 Verify the output of the downloaded repository key matches:
