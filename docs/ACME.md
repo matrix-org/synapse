@@ -112,12 +112,22 @@ authbind --deep <synapse start command>
 
 Once Synapse is able to listen on port 80 for ACME challenge requests, either
 directly or reverse-proxied to a higher port such as `8009`, we can enable
-functionality in the config:
+functionality in the config.
+
+For the reverse-proxy method:
 
 ```
 acme:
     enabled: true
-    port: 8009 # or 80 if using authbind
+    port: 8009
+```
+
+For the `authbind` method:
+
+```
+acme:
+    enabled: true
+    port: 80
 ```
 
 ### Starting synapse
