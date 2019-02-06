@@ -262,8 +262,24 @@ Synapse via https://matrix.org/packages/debian/. To use them:
 sudo apt install -y lsb-release curl apt-transport-https
 echo "deb https://matrix.org/packages/debian `lsb_release -cs` main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
-curl "https://matrix.org/packages/debian/repo-key.asc" |
-    sudo apt-key add -
+curl -s "https://matrix.org/packages/debian/repo-key.asc" |
+    sudo gpg -q --import --import-options import-show --primary-keyring \
+    /etc/apt/trusted.gpg.d/matrix-org-packages.gpg -
+```
+
+Verify the output of the downloaded repository key matches:
+
+```
+pub   rsa4096 2015-06-11 [SC]
+      C35EB17E1EAE708E6603A9B3AD0592FE47F0DF61
+uid                      matrix.org (Debian signing key) <packages@matrix.org>
+sub   rsa4096 2015-06-11 [E]
+
+```
+
+If the fingerprint is a match, proceed to install the Synapse package:
+
+```
 sudo apt update
 sudo apt install matrix-synapse-py3
 ```
