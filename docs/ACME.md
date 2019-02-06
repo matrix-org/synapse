@@ -41,8 +41,8 @@ placed in Synapse's config directory without the need for any ACME setup.
 
 The main steps for enabling ACME support in short summary are:
 
-1. Allow Synapse to listen on port 80 with authbind, or forward it from a reverse-proxy.
-1. Set `acme:enabled` to `true` in homeserver.yaml.
+1. Allow Synapse to listen on port 80 with `authbind`, or forward it to port `8009` from a reverse-proxy.
+1. Set `acme:enabled` to `true` and `acme:port` to the appropriate port (`8009` for reverse-proxy, `80` for listening directly with `authbind`) in homeserver.yaml.
 1. Move your old certificates (files `example.com.tls.crt` and `example.com.tls.key` out of the way if they currently exist at the paths specified in `homeserver.yaml`.
 1. Restart Synapse
 
@@ -110,13 +110,14 @@ authbind --deep <synapse start command>
 
 ### Config file editing
 
-Once Synapse is able to listen on port 80 for ACME challenge
-requests, it must be told to perform ACME provisioning by setting `enabled`
-to true under the `acme` section in `homeserver.yaml`:
+Once Synapse is able to listen on port 80 for ACME challenge requests, either
+directly or reverse-proxied to a higher port such as `8009`, we can enable
+functionality in the config:
 
 ```
 acme:
     enabled: true
+    port: 8009 # or 80 if using authbind
 ```
 
 ### Starting synapse
