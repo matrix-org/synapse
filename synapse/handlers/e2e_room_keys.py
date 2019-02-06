@@ -267,7 +267,7 @@ class E2eRoomKeysHandler(object):
             version(str): Optional; if None gives the most recent version
                 otherwise a historical one.
         Raises:
-            StoreError: code 404 if the requested backup version doesn't exist
+            NotFoundError: if the requested backup version doesn't exist
         Returns:
             A deferred of a info dict that gives the info about the new version.
 
@@ -279,7 +279,13 @@ class E2eRoomKeysHandler(object):
         """
 
         with (yield self._upload_linearizer.queue(user_id)):
-            res = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+            try:
+                res = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
             defer.returnValue(res)
 
     @defer.inlineCallbacks
@@ -290,8 +296,14 @@ class E2eRoomKeysHandler(object):
             user_id(str): the user whose current backup version we're deleting
             version(str): the version id of the backup being deleted
         Raises:
-            StoreError: code 404 if this backup version doesn't exist
+            NotFoundError: if this backup version doesn't exist
         """
 
         with (yield self._upload_linearizer.queue(user_id)):
-            yield self.store.delete_e2e_room_keys_version(user_id, version)
+            try:
+                yield self.store.delete_e2e_room_keys_version(user_id, version)
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
