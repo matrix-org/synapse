@@ -298,6 +298,27 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             "create_e2e_room_keys_version_txn", _create_e2e_room_keys_version_txn
         )
 
+    def update_e2e_room_keys_version(self, user_id, version, info):
+        """Update a given backup version
+
+        Args:
+            user_id(str): the user whose backup version we're updating
+            version(str): the version ID of the backup version we're updating
+            info(dict): the new backup version info to store
+        """
+
+        return self._simple_update(
+            table="e2e_room_keys_versions",
+            keyvalues={
+                "user_id": user_id,
+                "version": version,
+            },
+            updatevalues={
+                "auth_data": json.dumps(info["auth_data"]),
+            },
+            desc="update_e2e_room_keys_version"
+        )
+
     def delete_e2e_room_keys_version(self, user_id, version=None):
         """Delete a given backup version of the user's room keys.
         Doesn't delete their actual key data.
