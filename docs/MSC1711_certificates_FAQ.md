@@ -107,7 +107,7 @@ hosted at a target domain of `customer.example.net`. Currently you should have
 an SRV record which looks like:
 
 ```
-_matrix._tcp.example.com. IN SRV 10 5 443 customer.example.net.
+_matrix._tcp.example.com. IN SRV 10 5 8448 customer.example.net.
 ```
 
 In this situation, you have two choices for how to proceed:
@@ -158,7 +158,7 @@ You can do this with a `.well-known` file as follows:
     should have the contents:
 
     ```json
-	{"m.server": "customer.example.net:443"}
+	{"m.server": "customer.example.net:8448"}
     ```
 
 ## FAQ
