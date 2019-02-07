@@ -24,7 +24,7 @@ from synapse.api.errors import (
     NotFoundError,
     RoomKeysVersionError,
     StoreError,
-    SynapseError
+    SynapseError,
 )
 from synapse.util.async_helpers import Linearizer
 
