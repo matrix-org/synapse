@@ -112,7 +112,7 @@ _matrix._tcp.example.com. IN SRV 10 5 8000 customer.example.net.
 
 In this situation, you have three choices for how to proceed:
 
-#### Option 1: give Synapse (or a reverse-proxy) a certificate for your matrix domain
+#### Option 1: give Synapse a certificate for your matrix domain
 
 Synapse 1.0 will expect your server to present a TLS certificate for your
 `server_name` (`example.com` in the above example). You can achieve this by
@@ -123,8 +123,7 @@ doing one of the following:
    and `tls_private_key_path`, or:
 
  * Use Synapse's [ACME support](./ACME.md), and forward port 80 on the
-   `server_name` domain to your Synapse instance, or:
-
+   `server_name` domain to your Synapse instance.
 
 ### Option 2: run Synapse behind a reverse proxy
 
@@ -132,7 +131,6 @@ If you have an existing reverse proxy set up with correct TLS certificates for
 your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).
-
 
 #### Option 3: add a .well-known file to delegate your matrix traffic
 
