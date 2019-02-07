@@ -79,7 +79,7 @@ ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-cha
 
 Make sure to restart/reload your webserver after making changes.
 
-Finally, make the relevant changes in `homeserver.yaml` to enable ACME support:
+Now make the relevant changes in `homeserver.yaml` to enable ACME support:
 
 ```
 acme:
@@ -121,10 +121,9 @@ Make the relevant changes in `homeserver.yaml` to enable ACME support:
 ```
 acme:
     enabled: true
-    port: 80
 ```
 
-### Starting synapse
+### (Re)starting synapse
 
 Ensure that the certificate paths specified in `homeserver.yaml` (`tls_certificate_path` and `tls_private_key_path`) do not currently point to any files. Synapse will not provision certificates if files exist, as it does not want to overwrite existing certificates.
 
