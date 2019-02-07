@@ -19,8 +19,13 @@ from six import iteritems
 
 from twisted.internet import defer
 
-from synapse.api.errors import Codes, NotFoundError, RoomKeysVersionError, \
-    StoreError, SynapseError
+from synapse.api.errors import (
+    Codes,
+    NotFoundError,
+    RoomKeysVersionError,
+    StoreError,
+    SynapseError
+)
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
