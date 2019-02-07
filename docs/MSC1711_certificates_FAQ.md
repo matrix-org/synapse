@@ -112,7 +112,7 @@ _matrix._tcp.example.com. IN SRV 10 5 443 customer.example.net.
 
 In this situation, you have two choices for how to proceed:
 
-#### Option 1: give Synapse a certificate for your matrix domain
+#### Option 1: give Synapse (or a reverse-proxy) a certificate for your matrix domain
 
 Synapse 1.0 will expect your server to present a TLS certificate for your
 `server_name` (`example.com` in the above example). You can achieve this by
