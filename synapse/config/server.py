@@ -24,6 +24,14 @@ from ._base import Config, ConfigError
 
 logger = logging.Logger(__name__)
 
+# by default, we attempt to listen on both '::' *and* '0.0.0.0' because some OSes
+# (windows? old linux? those where net.ipv6.bindv6only is set?) will only listen
+# on IPv6 when ':' is set.
+#
+# We later check for errors when binding to 0.0.0.0 and ignore them if :: is also in
+# in the list.
+DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
+
 
 class ServerConfig(Config):
 
@@ -122,12 +130,12 @@ class ServerConfig(Config):
 
         for listener in self.listeners:
             bind_address = listener.pop("bind_address", None)
-            bind_addresses = listener.setdefault("bind_addresses", [])
+            bind_addresses = listener.setdefault(
+                "bind_addresses", list(DEFAULT_BIND_ADDRESSES)
+            )
 
             if bind_address:
                 bind_addresses.append(bind_address)
-            elif not bind_addresses:
-                bind_addresses.append('')
 
         if not self.web_client_location:
             _warn_if_webclient_configured(self.listeners)
@@ -295,61 +303,90 @@ class ServerConfig(Config):
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
+        #
+        # Options for each listener include:
+        #
+        #   port: the TCP port to bind to
+        #
+        #   bind_addresses: a list of local addresses to listen on. The default is
+        #       'all local interfaces'.
+        #
+        #   type: the type of listener. Normally 'http', but other valid options are:
+        #       'manhole' (see docs/manhole.md),
+        #       'metrics' (see docs/metrics-howto.rst),
+        #       'replication' (see docs/workers.rst).
+        #
+        #   tls: set to true to enable TLS for this listener. Will use the TLS
+        #       key/cert specified in tls_private_key_path / tls_certificate_path.
+        #
+        #   x_forwarded: Only valid for an 'http' listener. Set to true to use the
+        #       X-Forwarded-For header as the client IP. Useful when Synapse is
+        #       behind a reverse-proxy.
+        #
+        #   resources: Only valid for an 'http' listener. A list of resources to host
+        #       on this port. Options for each resource are:
+        #
+        #       names: a list of names of HTTP resources. See below for a list of
+        #           valid resource names.
+        #
+        #       compress: set to true to enable HTTP comression for this resource.
+        #
+        #   additional_resources: Only valid for an 'http' listener. A map of
+        #        additional endpoints which should be loaded via dynamic modules.
+        #
+        # Valid resource names are:
+        #
+        #   client: the client-server API (/_matrix/client). Also implies 'media' and
+        #       'static'.
+        #
+        #   consent: user consent forms (/_matrix/consent). See
+        #       docs/consent_tracking.md.
+        #
+        #   federation: the server-server API (/_matrix/federation). Also implies
+        #       'media', 'keys'.
+        #
+        #   keys: the key discovery API (/_matrix/keys).
+        #
+        #   media: the media API (/_matrix/media).
+        #
+        #   metrics: the metrics interface. See docs/metrics-howto.rst.
+        #
+        #   replication: the HTTP replication API (/_synapse/replication). See
+        #       docs/workers.rst.
+        #
+        #   static: static resources under synapse/static (/_matrix/static). (Mostly
+        #       useful for 'fallback authentication'.)
+        #
+        #   webclient: A web client. Requires web_client_location to be set.
+        #
         listeners:
-          # Main HTTPS listener
+          # Main HTTPS listener.
           # For when matrix traffic is sent directly to synapse.
-          -
-            # The port to listen for HTTPS requests on.
-            port: %(bind_port)s
-
-            # Local addresses to listen on.
-            # On Linux and Mac OS, `::` will listen on all IPv4 and IPv6
-            # addresses by default. For most other OSes, this will only listen
-            # on IPv6.
-            bind_addresses:
-              - '::'
-              - '0.0.0.0'
-
-            # This is a 'http' listener, allows us to specify 'resources'.
+          - port: %(bind_port)s
             type: http
-
             tls: true
-
-            # Use the X-Forwarded-For (XFF) header as the client IP and not the
-            # actual client IP.
-            x_forwarded: false
 
             # List of HTTP resources to serve on this listener.
             resources:
-              -
-                # List of resources to host on this listener.
-                names:
-                  - client       # The client-server APIs, both v1 and v2
-                  # - webclient  # A web client. Requires web_client_location to be set.
-
-                # Should synapse compress HTTP responses to clients that support it?
-                # This should be disabled if running synapse behind a load balancer
-                # that can do automatic compression.
+              - names: [client]
                 compress: true
-
-              - names: [federation]  # Federation APIs
+              - names: [federation]
                 compress: false
 
-            # optional list of additional endpoints which can be loaded via
-            # dynamic modules
+            # example addional_resources:
+            #
             # additional_resources:
             #   "/_matrix/my/custom/endpoint":
             #     module: my_module.CustomRequestHandler
             #     config: {}
 
-          # Unsecure HTTP listener,
-          # For when matrix traffic passes through loadbalancer that unwraps TLS.
+          # Unsecure HTTP listener
+          # For when matrix traffic passes through a reverse-proxy that unwraps TLS.
           - port: %(unsecure_port)s
             tls: false
-            bind_addresses: ['::', '0.0.0.0']
+            bind_addresses: ['127.0.0.1']
             type: http
-
-            x_forwarded: false
+            x_forwarded: true
 
             resources:
               - names: [client]
