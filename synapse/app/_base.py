@@ -23,7 +23,6 @@ import psutil
 from daemonize import Daemonize
 
 from twisted.internet import error, reactor
-from twisted.protocols.tls import TLSMemoryBIOFactory
 
 from synapse.app import check_bind_error
 from synapse.crypto import context_factory
@@ -33,6 +32,7 @@ from synapse.util.rlimit import change_resource_limit
 logger = logging.getLogger(__name__)
 
 _sighup_callbacks = []
+
 
 def register_sighup(func):
     """
@@ -219,6 +219,7 @@ def refresh_certificate(hs):
         hs.config
     )
     logging.info("Certificate loaded.")
+
 
 def start(hs, listeners=None):
     """
