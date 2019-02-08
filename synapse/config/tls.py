@@ -47,10 +47,7 @@ class TlsConfig(Config):
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
         self._original_tls_fingerprints = config.get("tls_fingerprints", [])
 
-        if not isinstance(self._original_tls_fingerprints, list):
-            logger.warning(
-                "tls_fingerprints config option is not a list! Replacing with a blank list."
-            )
+        if self._original_tls_fingerprints is None:
             self._original_tls_fingerprints = []
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
