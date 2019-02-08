@@ -5,20 +5,20 @@ Before upgrading check if any special steps are required to upgrade from the
 what you currently have installed to current version of synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then active that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/.synapse/`` then
+1. If synapse was installed in a virtualenv then activate that virtualenv before
+   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
    run:
 
    .. code:: bash
 
-       source ~/.synapse/bin/activate
+       source ~/synapse/env/bin/activate
 
 2. If synapse was installed using pip then upgrade to the latest version by
    running:
 
    .. code:: bash
 
-       pip install --upgrade matrix-synapse
+       pip install --upgrade matrix-synapse[all]
 
        # restart synapse
        synctl restart
@@ -31,8 +31,9 @@ instructions that may be required are listed later in this document.
 
        # Pull the latest version of the master branch.
        git pull
-       # Update the versions of synapse's python dependencies.
-       python synapse/python_dependencies.py | xargs pip install --upgrade
+
+       # Update synapse and its python dependencies.
+       pip install --upgrade .[all]
 
        # restart synapse
        ./synctl restart
@@ -51,34 +52,12 @@ returned by the Client-Server API:
 Upgrading to v0.99.0
 ====================
 
-In preparation for Synapse v1.0, you must update your TLS certificates from
-self-signed ones to verifiable ones signed by a trusted root CA.
+Please be aware that, before Synapse v1.0 is released around March 2019, you
+will need to replace any self-signed certificates with those verified by a
+root CA. Information on how to do so can be found at `the ACME docs
+<docs/ACME.md>`_.
 
-If you do not already have a certificate for your domain, the easiest way to get
-one is with Synapse's new ACME support, which will use the ACME protocol to
-provision a certificate automatically. By default, certificates will be obtained
-from the publicly trusted CA Let's Encrypt.
-
-For a sample configuration, please inspect the new ACME section in the example
-generated config by running the ``generate-config`` executable. For example::
-
-  ~/synapse/env3/bin/generate-config
-
-You will need to provide Let's Encrypt (or other ACME provider) access to your
-Synapse ACME challenge responder on port 80, at the domain of your homeserver.
-This requires you either change the port of the ACME listener provided by
-Synapse to a high port and reverse proxy to it, or use a tool like authbind to
-allow Synapse to listen on port 80 without root access. (Do not run Synapse with
-root permissions!)
-
-You will need to back up or delete your self signed TLS certificate
-(``example.com.tls.crt`` and ``example.com.tls.key``), Synapse's ACME
-implementation will not overwrite them.
-
-You may wish to use alternate methods such as Certbot to obtain a certificate
-from Let's Encrypt, depending on your server configuration. Of course, if you
-already have a valid certificate for your homeserver's domain, that can be
-placed in Synapse's config directory without the need for ACME.
+For more information on configuring TLS certificates see the `FAQ <docs/MSC1711_certificates_FAQ.md>`_.
 
 Upgrading to v0.34.0
 ====================

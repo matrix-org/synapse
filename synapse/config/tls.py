@@ -37,7 +37,7 @@ class TlsConfig(Config):
 
         self.acme_enabled = acme_config.get("enabled", False)
         self.acme_url = acme_config.get(
-            "url", "https://acme-v01.api.letsencrypt.org/directory"
+            "url", u"https://acme-v01.api.letsencrypt.org/directory"
         )
         self.acme_port = acme_config.get("port", 80)
         self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
@@ -199,10 +199,10 @@ class TlsConfig(Config):
 
         # If your server runs behind a reverse-proxy which terminates TLS connections
         # (for both client and federation connections), it may be useful to disable
-        # All TLS support for incoming connections. Setting no_tls to False will
+        # All TLS support for incoming connections. Setting no_tls to True will
         # do so (and avoid the need to give synapse a TLS private key).
         #
-        # no_tls: False
+        # no_tls: True
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
