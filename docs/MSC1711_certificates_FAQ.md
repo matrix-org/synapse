@@ -125,7 +125,7 @@ doing one of the following:
  * Use Synapse's [ACME support](./ACME.md), and forward port 80 on the
    `server_name` domain to your Synapse instance.
 
-### Option 2: run Synapse behind a reverse proxy
+#### Option 2: run Synapse behind a reverse proxy
 
 If you have an existing reverse proxy set up with correct TLS certificates for
 your domain, you can simply route all traffic through the reverse proxy by
