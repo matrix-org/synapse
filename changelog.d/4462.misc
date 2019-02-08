@@ -1,0 +1,1 @@
+Change the user directory state query to use a filtered call to the db instead of a generic one.

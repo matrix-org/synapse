@@ -232,7 +232,6 @@ def refresh_certificate(hs):
                 )
         logging.info("Context factories updated.")
 
-
 def start(hs, listeners=None):
     """
     Start a Synapse server or worker.

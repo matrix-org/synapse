@@ -237,10 +237,10 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self, ign):
+    def start_listening(self, listeners):
         config = self.get_config()
 
-        for listener in config.listeners:
+        for listener in listeners:
             if listener["type"] == "http":
                 self._listening_services.extend(
                     self._listener_http(config, listener)
@@ -422,7 +422,7 @@ def setup(config_options):
                     24 * 60 * 60 * 1000
                 )
 
-            _base.start(hs)
+            _base.start(hs, config.listeners)
 
             hs.get_pusherpool().start()
             hs.get_datastore().start_doing_background_updates()
