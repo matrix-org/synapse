@@ -108,10 +108,7 @@ class TlsConfig(Config):
                 )
             )
 
-        if not self.no_tls:
-            self.tls_private_key = self.read_tls_private_key(self.tls_private_key_file)
-
-        self.tls_fingerprints = list(self._original_tls_fingerprints)
+        self.tls_private_key = self.read_tls_private_key(self.tls_private_key_file)
 
         # Check that our own certificate is included in the list of fingerprints
         # and include it if it is not.

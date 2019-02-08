@@ -203,12 +203,17 @@ def refresh_certificate(hs):
     Refresh the TLS certificates that Synapse is using by re-reading them from
     disk and updating the TLS context factories to use them.
     """
-    logging.info("Loading certificate from disk...")
-    hs.config.read_certificate_from_disk()
-    hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
     hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
         hs.config
     )
+
+    if hs.config.no_tls == True:
+        logging.info("Serving TLS is disabled, not lpa")
+        return
+
+    logging.info("Loading certificate from disk...")
+    hs.config.read_certificate_from_disk()
+    hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
     logging.info("Certificate loaded.")
 
     if hs._listening_services:
