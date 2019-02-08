@@ -33,7 +33,16 @@ from synapse.util.rlimit import change_resource_limit
 logger = logging.getLogger(__name__)
 
 _sighup_callbacks = []
-register_sighup = _sighup_callbacks.append
+
+def register_sighup(func):
+    """
+    Register a function to be called when a SIGHUP occurs.
+
+    Args:
+        func (function): Function to be called when sent a SIGHUP signal.
+            Will be called with a single argument, the homeserver.
+    """
+    _sighup_callbacks.append(func)
 
 
 def start_worker_reactor(appname, config):
@@ -211,21 +220,13 @@ def refresh_certificate(hs):
     )
     logging.info("Certificate loaded.")
 
-    if hs._listening_services:
-        logging.info("Updating context factories...")
-        for i in hs._listening_services:
-            if isinstance(i.factory, TLSMemoryBIOFactory):
-                i.factory = TLSMemoryBIOFactory(
-                    hs.tls_server_context_factory,
-                    False,
-                    i.factory.wrappedFactory
-                )
-        logging.info("Context factories updated.")
-
-
 def start(hs, listeners=None):
     """
     Start a Synapse server or worker.
+
+    Args:
+        hs (synapse.server.HomeServer)
+        listeners (list[dict]): Listener configuration ('listeners' in homeserver.yaml)
     """
     try:
         # Set up the SIGHUP machinery.
