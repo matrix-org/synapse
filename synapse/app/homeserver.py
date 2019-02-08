@@ -239,6 +239,8 @@ class SynapseHomeServer(HomeServer):
         return resources
 
     def start_listening(self, listeners):
+        config = self.get_config()
+
         for listener in listeners:
             if listener["type"] == "http":
                 self._listening_services.extend(
