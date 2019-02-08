@@ -327,20 +327,35 @@ class E2eRoomKeysHandler(object):
         Returns:
             A deferred of an empty dict.
         """
-        try:
-            old_info = yield self.store.get_e2e_room_keys_version_info(user_id, version)
-        except StoreError as e:
-            if e.code == 404:
-                raise NotFoundError("Unknown backup version")
-            else:
-                raise
-        if old_info["algorithm"] != version_info["algorithm"]:
+        if "version" not in version_info:
             raise SynapseError(
                 400,
-                "Algorithm does not match",
+                "Missing version in body",
+                Codes.MISSING_PARAM
+            )
+        if version_info["version"] != version:
+            raise SynapseError(
+                400,
+                "Version in body does not match",
                 Codes.INVALID_PARAM
             )
+        with (yield self._upload_linearizer.queue(user_id)):
+            try:
+                old_info = yield self.store.get_e2e_room_keys_version_info(
+                    user_id, version
+                )
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
+            if old_info["algorithm"] != version_info["algorithm"]:
+                raise SynapseError(
+                    400,
+                    "Algorithm does not match",
+                    Codes.INVALID_PARAM
+                )
 
-        yield self.store.update_e2e_room_keys_version(user_id, version, version_info)
+            yield self.store.update_e2e_room_keys_version(user_id, version, version_info)
 
-        defer.returnValue({})
+            defer.returnValue({})

@@ -394,7 +394,8 @@ class RoomKeysVersionServlet(RestServlet):
                 "signatures": {
                     "ed25519:something": "hijklmnop"
                 }
-            }
+            },
+            "version": "42"
         }
 
         HTTP/1.1 200 OK
