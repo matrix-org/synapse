@@ -107,10 +107,10 @@ hosted at a target domain of `customer.example.net`. Currently you should have
 an SRV record which looks like:
 
 ```
-_matrix._tcp.example.com. IN SRV 10 5 443 customer.example.net.
+_matrix._tcp.example.com. IN SRV 10 5 8000 customer.example.net.
 ```
 
-In this situation, you have two choices for how to proceed:
+In this situation, you have three choices for how to proceed:
 
 #### Option 1: give Synapse a certificate for your matrix domain
 
@@ -123,12 +123,16 @@ doing one of the following:
    and `tls_private_key_path`, or:
 
  * Use Synapse's [ACME support](./ACME.md), and forward port 80 on the
-   `server_name` domain to your Synapse instance, or:
+   `server_name` domain to your Synapse instance.
 
- * Set up a reverse-proxy on port 8448 on the `server_name` domain, which
-   forwards to Synapse. Once it is set up, you can remove the SRV record.
+### Option 2: run Synapse behind a reverse proxy
 
-#### Option 2: add a .well-known file to delegate your matrix traffic
+If you have an existing reverse proxy set up with correct TLS certificates for
+your domain, you can simply route all traffic through the reverse proxy by
+updating the SRV record appropriately (or removing it, if the proxy listens on
+8448).
+
+#### Option 3: add a .well-known file to delegate your matrix traffic
 
 This will allow you to keep Synapse on a separate domain, without having to
 give it a certificate for the matrix domain.
@@ -151,15 +155,25 @@ You can do this with a `.well-known` file as follows:
     `https://<server_name>/.well-known/matrix/server` with contents:
 
     ```json
-    {"m.server": "<target domain>:<port>"}
+    {"m.server": "<target server name>"}
     ```
 
-    In the above example, `https://example.com/.well-known/matrix/server`
-    should have the contents:
+    where the target server name is resolved as usual (i.e. SRV lookup, falling
+    back to talking to port 8448).
 
-    ```json
-	{"m.server": "customer.example.net:443"}
-    ```
+    In the above example, where synapse is listening on port 8000,
+    `https://example.com/.well-known/matrix/server` should have `m.server` set to one of:
+
+    1. `customer.example.net` ─ with a SRV record on
+       `_matrix._tcp.customer.example.com` pointing to port 8000, or:
+
+    2. `customer.example.net` ─ updating synapse to listen on the default port
+       8448, or:
+
+    3. `customer.example.net:8000` ─ ensuring that if there is a reverse proxy
+       on `customer.example.net:8000` it correctly handles HTTP requests with
+       Host header set to `customer.example.net:8000`.
+
 
 ## FAQ
 

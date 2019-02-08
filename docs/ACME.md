@@ -41,10 +41,10 @@ placed in Synapse's config directory without the need for any ACME setup.
 
 The main steps for enabling ACME support in short summary are:
 
-1. Allow Synapse to listen on port 80 with authbind, or forward it from a reverse-proxy.
-1. Set `acme:enabled` to `true` in homeserver.yaml.
+1. Allow Synapse to listen for incoming ACME challenges.
+1. Enable ACME support in `homeserver.yaml`.
 1. Move your old certificates (files `example.com.tls.crt` and `example.com.tls.key` out of the way if they currently exist at the paths specified in `homeserver.yaml`.
-1. Restart Synapse
+1. Restart Synapse.
 
 Detailed instructions for each step are provided below.
 
@@ -71,13 +71,21 @@ location /.well-known/acme-challenge {
 }
 ```
 
-For Apache, add the following to your existing webserver config::
+For Apache, add the following to your existing webserver config:
 
 ```
 ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-challenge
 ```
 
 Make sure to restart/reload your webserver after making changes.
+
+Now make the relevant changes in `homeserver.yaml` to enable ACME support:
+
+```
+acme:
+    enabled: true
+    port: 8009
+```
 
 
 #### Authbind
@@ -102,24 +110,20 @@ sudo touch /etc/authbind/byport/80
 sudo chmod 777 /etc/authbind/byport/80
 ```
 
-When Synapse is started, use the following syntax::
+When Synapse is started, use the following syntax:
 
 ```
 authbind --deep <synapse start command>
 ```
 
-### Config file editing
-
-Once Synapse is able to listen on port 80 for ACME challenge
-requests, it must be told to perform ACME provisioning by setting `enabled`
-to true under the `acme` section in `homeserver.yaml`:
+Make the relevant changes in `homeserver.yaml` to enable ACME support:
 
 ```
 acme:
     enabled: true
 ```
 
-### Starting synapse
+### (Re)starting synapse
 
 Ensure that the certificate paths specified in `homeserver.yaml` (`tls_certificate_path` and `tls_private_key_path`) do not currently point to any files. Synapse will not provision certificates if files exist, as it does not want to overwrite existing certificates.
 
