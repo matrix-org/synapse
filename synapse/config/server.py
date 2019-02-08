@@ -25,8 +25,8 @@ from ._base import Config, ConfigError
 logger = logging.Logger(__name__)
 
 # by default, we attempt to listen on both '::' *and* '0.0.0.0' because some OSes
-# (windows? old linux? those where net.ipv6.bindv6only is set?) will only listen
-# on IPv6 when ':' is set.
+# (Windows, macOS, other BSD/Linux where net.ipv6.bindv6only is set) will only listen
+# on IPv6 when '::' is set.
 #
 # We later check for errors when binding to 0.0.0.0 and ignore them if :: is also in
 # in the list.
@@ -384,7 +384,7 @@ class ServerConfig(Config):
           # For when matrix traffic passes through a reverse-proxy that unwraps TLS.
           - port: %(unsecure_port)s
             tls: false
-            bind_addresses: ['127.0.0.1']
+            bind_addresses: ['::1', '127.0.0.1']
             type: http
             x_forwarded: true
 
