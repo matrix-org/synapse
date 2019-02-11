@@ -132,6 +132,9 @@ your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).
 
+See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+reverse proxy.
+
 #### Option 3: add a .well-known file to delegate your matrix traffic
 
 This will allow you to keep Synapse on a separate domain, without having to
