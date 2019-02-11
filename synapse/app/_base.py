@@ -218,7 +218,7 @@ def refresh_certificate(hs):
     )
 
     if hs.config.no_tls == True:
-        logging.info("Serving TLS is disabled, not lpa")
+        logging.info("Serving TLS is disabled, not loading certificates.")
         return
 
     logging.info("Loading certificate from disk...")
