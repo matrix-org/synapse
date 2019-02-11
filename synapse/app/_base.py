@@ -213,13 +213,11 @@ def refresh_certificate(hs):
     Refresh the TLS certificates that Synapse is using by re-reading them from
     disk and updating the TLS context factories to use them.
     """
-    logging.info("Loading certificate from disk...")
     hs.config.read_certificate_from_disk()
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
-    logging.info("Certificate loaded.")
 
     if hs._listening_services:
-        logging.info("Updating context factories...")
+        logger.info("Updating context factories...")
         for i in hs._listening_services:
             # When you listenSSL, it doesn't make an SSL port but a TCP one with
             # a TLS wrapping factory around the factory you actually want to get
@@ -234,7 +232,7 @@ def refresh_certificate(hs):
                     False,
                     i.factory.wrappedFactory
                 )
-        logging.info("Context factories updated.")
+        logger.info("Context factories updated.")
 
 
 def start(hs, listeners=None):
