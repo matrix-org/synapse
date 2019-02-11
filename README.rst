@@ -263,6 +263,8 @@ So, things to check are:
   (it should be ``_matrix._tcp.<server_name>``), and that the port and hostname
   it specifies are reachable from outside your network.
 
+.. TODO: add a note about forgetting ``nocanon`` on a reverse-proxy config
+
 Running a Demo Federation of Synapses
 -------------------------------------
 
