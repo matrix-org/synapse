@@ -112,6 +112,8 @@ class HomeServer(object):
 
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
+        _listening_services (list[twisted.internet.tcp.Port]): TCP ports that
+            we are listening on to provide HTTP services.
     """
 
     __metaclass__ = abc.ABCMeta
@@ -196,6 +198,7 @@ class HomeServer(object):
         self._reactor = reactor
         self.hostname = hostname
         self._building = {}
+        self._listening_services = []
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()

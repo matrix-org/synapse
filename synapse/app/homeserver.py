@@ -83,7 +83,6 @@ def gz_wrap(r):
 
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
-    _listening_services = []
 
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
@@ -377,41 +376,72 @@ def setup(config_options):
     hs.setup()
 
     @defer.inlineCallbacks
+    def do_acme():
+        """
+        Reprovision an ACME certificate, if it's required.
+
+        Returns:
+            Deferred[bool]: Whether the cert has been updated.
+        """
+        acme = hs.get_acme_handler()
+
+        # Check how long the certificate is active for.
+        cert_days_remaining = hs.config.is_disk_cert_valid(
+            allow_self_signed=False
+        )
+
+        # We want to reprovision if cert_days_remaining is None (meaning no
+        # certificate exists), or the days remaining number it returns
+        # is less than our re-registration threshold.
+        provision = False
+
+        if (cert_days_remaining is None):
+            provision = True
+
+        if cert_days_remaining > hs.config.acme_reprovision_threshold:
+            provision = True
+
+        if provision:
+            yield acme.provision_certificate()
+
+        defer.returnValue(provision)
+
+    @defer.inlineCallbacks
+    def reprovision_acme():
+        """
+        Provision a certificate from ACME, if required, and reload the TLS
+        certificate if it's renewed.
+        """
+        reprovisioned = yield do_acme()
+        if reprovisioned:
+            _base.refresh_certificate(hs)
+
+    @defer.inlineCallbacks
     def start():
         try:
-            # Check if the certificate is still valid.
-            cert_days_remaining = hs.config.is_disk_cert_valid()
-
+            # Run the ACME provisioning code, if it's enabled.
             if hs.config.acme_enabled:
-                # If ACME is enabled, we might need to provision a certificate
-                # before starting.
                 acme = hs.get_acme_handler()
-
                 # Start up the webservices which we will respond to ACME
-                # challenges with.
+                # challenges with, and then provision.
                 yield acme.start_listening()
+                yield do_acme()
 
-                # We want to reprovision if cert_days_remaining is None (meaning no
-                # certificate exists), or the days remaining number it returns
-                # is less than our re-registration threshold.
-                if (cert_days_remaining is None) or (
-                    not cert_days_remaining > hs.config.acme_reprovision_threshold
-                ):
-                    yield acme.provision_certificate()
+                # Check if it needs to be reprovisioned every day.
+                hs.get_clock().looping_call(
+                    reprovision_acme,
+                    24 * 60 * 60 * 1000
+                )
 
             _base.start(hs, config.listeners)
 
             hs.get_pusherpool().start()
             hs.get_datastore().start_doing_background_updates()
-        except Exception as e:
-            # If a DeferredList failed (like in listening on the ACME listener),
-            # we need to print the subfailure explicitly.
-            if isinstance(e, defer.FirstError):
-                e.subFailure.printTraceback(sys.stderr)
-                sys.exit(1)
-
-            # Something else went wrong when starting. Print it and bail out.
+        except Exception:
+            # Print the exception and bail out.
             traceback.print_exc(file=sys.stderr)
+            if reactor.running:
+                reactor.stop()
             sys.exit(1)
 
     reactor.callWhenRunning(start)
@@ -420,7 +450,8 @@ def setup(config_options):
 
 
 class SynapseService(service.Service):
-    """A twisted Service class that will start synapse. Used to run synapse
+    """
+    A twisted Service class that will start synapse. Used to run synapse
     via twistd and a .tac.
     """
     def __init__(self, config):

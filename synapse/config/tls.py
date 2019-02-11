@@ -64,9 +64,13 @@ class TlsConfig(Config):
         self.tls_certificate = None
         self.tls_private_key = None
 
-    def is_disk_cert_valid(self):
+    def is_disk_cert_valid(self, allow_self_signed=True):
         """
         Is the certificate we have on disk valid, and if so, for how long?
+
+        Args:
+            allow_self_signed (bool): Should we allow the certificate we
+                read to be self signed?
 
         Returns:
             int: Days remaining of certificate validity.
@@ -87,6 +91,12 @@ class TlsConfig(Config):
         except Exception:
             logger.exception("Failed to parse existing certificate off disk!")
             raise
+
+        if not allow_self_signed:
+            if tls_certificate.get_subject() == tls_certificate.get_issuer():
+                raise ValueError(
+                    "TLS Certificate is self signed, and this is not permitted"
+                )
 
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(
