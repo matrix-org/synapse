@@ -217,7 +217,7 @@ def refresh_certificate(hs):
         hs.config
     )
 
-    if hs.config.no_tls == True:
+    if hs.config.no_tls:
         logging.info("Serving TLS is disabled, not loading certificates.")
         return
 

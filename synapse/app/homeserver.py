@@ -92,7 +92,8 @@ class SynapseHomeServer(HomeServer):
 
         if tls and config.no_tls:
             logger.info(
-                "Listener on port %i has TLS enabled, but no_tls is set, skipping" % (port,)
+                "Listener on port %i has TLS enabled, but no_tls is set, skipping",
+                port,
             )
             return
 
