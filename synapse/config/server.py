@@ -130,12 +130,15 @@ class ServerConfig(Config):
 
         for listener in self.listeners:
             bind_address = listener.pop("bind_address", None)
-            bind_addresses = listener.setdefault(
-                "bind_addresses", list(DEFAULT_BIND_ADDRESSES)
-            )
+            bind_addresses = listener.setdefault("bind_addresses", [])
 
+            # if bind_address was specified, add it to the list of addresses
             if bind_address:
                 bind_addresses.append(bind_address)
+
+            # if we still have an empty list of addresses, use the default list
+            if not bind_addresses:
+                bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
 
         if not self.web_client_location:
             _warn_if_webclient_configured(self.listeners)
