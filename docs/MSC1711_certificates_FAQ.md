@@ -42,9 +42,9 @@ imminent Matrix 1.0 release, you can also see our
   * It used to work just fine, why are you breaking everything?
   * Can I manage my own certificates rather than having Synapse renew
     certificates itself?
-  * Do you still recommend against using a reverse-proxy on the federation port?
+  * Do you still recommend against using a reverse proxy on the federation port?
   * Do I still need to give my TLS certificates to Synapse if I am using a
-    reverse-proxy?
+    reverse proxy?
   * Do I need the same certificate for the client and federation port?
   * How do I tell Synapse to reload my keys/certificates after I replace them?
 
@@ -131,6 +131,9 @@ If you have an existing reverse proxy set up with correct TLS certificates for
 your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).
+
+See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+reverse proxy.
 
 #### Option 3: add a .well-known file to delegate your matrix traffic
 
@@ -297,17 +300,20 @@ attempt to obtain certificates from Let's Encrypt if you configure it to do
 so.The only requirement is that there is a valid TLS cert present for
 federation end points.
 
-### Do you still recommend against using a reverse-proxy on the federation port?
+### Do you still recommend against using a reverse proxy on the federation port?
 
 We no longer actively recommend against using a reverse proxy. Many admins will
-find it easier to direct federation traffic to a reverse-proxy and manage their
+find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.
+
+See [reverse_proxy.rst](reverse_proxy.rst) for information on setting up a
+reverse proxy.
 
 ### Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?
 
 Practically speaking, this is no longer necessary.
 
-If you are using a reverse-proxy for all of your TLS traffic, then you can set
+If you are using a reverse proxy for all of your TLS traffic, then you can set
 `no_tls: True`. In that case, the only reason Synapse needs the certificate is
 to populate a legacy 'tls_fingerprints' field in the federation API. This is
 ignored by Synapse 0.99.0 and later, and the only time pre-0.99 Synapses will
@@ -321,9 +327,9 @@ this, you can give it any TLS certificate at all. This will be fixed soon.
 
 ### Do I need the same certificate for the client and federation port?
 
-No. There is nothing stopping you doing so, particularly if you are using a
-reverse-proxy. However, Synapse will use the same certificate on any ports
-where TLS is configured.
+No. There is nothing stopping you from using different certificates,
+particularly if you are using a reverse proxy. However, Synapse will use the
+same certificate on any ports where TLS is configured.
 
 ### How do I tell Synapse to reload my keys/certificates after I replace them?
 
