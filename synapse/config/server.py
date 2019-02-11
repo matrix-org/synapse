@@ -335,6 +335,11 @@ class ServerConfig(Config):
               - names: [federation]  # Federation APIs
                 compress: false
 
+              # # If federation is disabled synapse can still expose the open ID endpoint
+              # # to allow integrations to authenticate users
+              # - names: [openid]
+              #   compress: false
+
             # optional list of additional endpoints which can be loaded via
             # dynamic modules
             # additional_resources:
@@ -356,6 +361,10 @@ class ServerConfig(Config):
                 compress: true
               - names: [federation]
                 compress: false
+              # # If federation is disabled synapse can still expose the open ID endpoint
+              # # to allow integrations to authenticate users
+              # - names: [openid]
+              #   compress: false
 
           # Turn on the twisted ssh manhole service on localhost on the given
           # port.
@@ -480,6 +489,7 @@ KNOWN_RESOURCES = (
     'keys',
     'media',
     'metrics',
+    'openid',
     'replication',
     'static',
     'webclient',
