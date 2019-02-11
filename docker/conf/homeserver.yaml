@@ -2,13 +2,7 @@
 
 ## TLS ##
 
-{% if SYNAPSE_NO_TLS %}
-no_tls: True
-
-# workaround for https://github.com/matrix-org/synapse/issues/4554
-tls_certificate_path: "/conf/dummy.tls.crt"
-
-{% else %}
+{% if not SYNAPSE_NO_TLS %}
 
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
