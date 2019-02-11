@@ -111,7 +111,7 @@ class TlsConfig(Config):
         """
         self.tls_certificate = self.read_tls_certificate()
 
-        if not self.no_tls:
+        if self.has_tls_listener():
             self.tls_private_key = self.read_tls_private_key()
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
