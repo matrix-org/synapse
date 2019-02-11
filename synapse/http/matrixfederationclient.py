@@ -44,7 +44,6 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.crypto import context_factory
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
@@ -169,13 +168,11 @@ class MatrixFederationHttpClient(object):
             requests.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs, tls_client_options_factory):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
         reactor = hs.get_reactor()
-
-        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(hs.config)
 
         self.agent = MatrixFederationAgent(
             hs.get_reactor(),
