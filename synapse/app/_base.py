@@ -213,12 +213,13 @@ def refresh_certificate(hs):
     Refresh the TLS certificates that Synapse is using by re-reading them from
     disk and updating the TLS context factories to use them.
     """
-    hs.config.read_certificate_from_disk()
 
     if not hs.config.has_tls_listener():
-        # nothing else to do here
+        # attempt to reload the certs for the good of the tls_fingerprints
+        hs.config.read_certificate_from_disk(require_cert_and_key=False)
         return
 
+    hs.config.read_certificate_from_disk(require_cert_and_key=True)
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
 
     if hs._listening_services:

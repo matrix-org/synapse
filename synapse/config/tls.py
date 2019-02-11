@@ -23,7 +23,7 @@ from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
 
-from synapse.config._base import Config
+from synapse.config._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,19 @@ class TlsConfig(Config):
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
+
+        if self.has_tls_listener():
+            if not self.tls_certificate_file:
+                raise ConfigError(
+                    "tls_certificate_path must be specified if TLS-enabled listeners are "
+                    "configured."
+                )
+            if not self.tls_private_key_file:
+                raise ConfigError(
+                    "tls_certificate_path must be specified if TLS-enabled listeners are "
+                    "configured."
+                )
+
         self._original_tls_fingerprints = config.get("tls_fingerprints", [])
 
         if self._original_tls_fingerprints is None:
@@ -105,26 +118,40 @@ class TlsConfig(Config):
         days_remaining = (expires_on - now).days
         return days_remaining
 
-    def read_certificate_from_disk(self):
+    def read_certificate_from_disk(self, require_cert_and_key):
         """
-        Read the certificates from disk.
-        """
-        self.tls_certificate = self.read_tls_certificate()
+        Read the certificates and private key from disk.
 
-        if not self.no_tls:
+        Args:
+            require_cert_and_key (bool): set to True to throw an error if the certificate
+                and key file are not given
+        """
+        if require_cert_and_key:
             self.tls_private_key = self.read_tls_private_key()
+            self.tls_certificate = self.read_tls_certificate()
+        elif self.tls_certificate_file:
+            # we only need the certificate for the tls_fingerprints. Reload it if we
+            # can, but it's not a fatal error if we can't.
+            try:
+                self.tls_certificate = self.read_tls_certificate()
+            except Exception as e:
+                logger.info(
+                    "Unable to read TLS certificate (%s). Ignoring as no "
+                    "tls listeners enabled.", e,
+                )
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
 
-        # Check that our own certificate is included in the list of fingerprints
-        # and include it if it is not.
-        x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1, self.tls_certificate
-        )
-        sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
-        sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
-        if sha256_fingerprint not in sha256_fingerprints:
-            self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
+        if self.tls_certificate:
+            # Check that our own certificate is included in the list of fingerprints
+            # and include it if it is not.
+            x509_certificate_bytes = crypto.dump_certificate(
+                crypto.FILETYPE_ASN1, self.tls_certificate
+            )
+            sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
+            sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
+            if sha256_fingerprint not in sha256_fingerprints:
+                self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)

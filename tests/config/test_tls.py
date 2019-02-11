@@ -61,7 +61,7 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
 
         t = TlsConfig()
         t.read_config(config)
-        t.read_certificate_from_disk()
+        t.read_certificate_from_disk(require_cert_and_key=True)
 
         warnings = self.flushWarnings()
         self.assertEqual(len(warnings), 1)
