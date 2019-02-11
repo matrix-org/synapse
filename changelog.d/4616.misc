@@ -1,0 +1,1 @@
+Fail cleanly if listener config lacks a 'port'

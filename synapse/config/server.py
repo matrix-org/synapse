@@ -129,6 +129,11 @@ class ServerConfig(Config):
         self.listeners = config.get("listeners", [])
 
         for listener in self.listeners:
+            if not isinstance(listener.get("port", None), int):
+                raise ConfigError(
+                    "Listener configuration is lacking a valid 'port' option"
+                )
+
             bind_address = listener.pop("bind_address", None)
             bind_addresses = listener.setdefault("bind_addresses", [])
 
