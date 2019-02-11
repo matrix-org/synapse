@@ -215,7 +215,7 @@ def refresh_certificate(hs):
     """
     hs.config.read_certificate_from_disk()
 
-    if hs.config.no_tls:
+    if not hs.config.has_tls_listener():
         # nothing else to do here
         return
 

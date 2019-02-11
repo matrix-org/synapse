@@ -51,7 +51,6 @@ class TlsConfig(Config):
             self._original_tls_fingerprints = []
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
-        self.no_tls = config.get("no_tls", False)
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -141,6 +140,8 @@ class TlsConfig(Config):
 
         return (
             """\
+        ## TLS ##
+
         # PEM-encoded X509 certificate for TLS.
         # This certificate, as of Synapse 1.0, will need to be a valid and verifiable
         # certificate, signed by a recognised Certificate Authority.
@@ -200,13 +201,6 @@ class TlsConfig(Config):
             # How many days remaining on a certificate before it is renewed.
             #
             # reprovision_threshold: 30
-
-        # If your server runs behind a reverse-proxy which terminates TLS connections
-        # (for both client and federation connections), it may be useful to disable
-        # All TLS support for incoming connections. Setting no_tls to True will
-        # do so (and avoid the need to give synapse a TLS private key).
-        #
-        # no_tls: True
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that

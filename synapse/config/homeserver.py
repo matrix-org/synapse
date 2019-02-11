@@ -42,7 +42,7 @@ from .voip import VoipConfig
 from .workers import WorkerConfig
 
 
-class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
+class HomeServerConfig(ServerConfig, TlsConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
                        AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
