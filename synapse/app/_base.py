@@ -214,6 +214,11 @@ def refresh_certificate(hs):
     disk and updating the TLS context factories to use them.
     """
     hs.config.read_certificate_from_disk()
+
+    if hs.config.no_tls:
+        # nothing else to do here
+        return
+
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
 
     if hs._listening_services:
