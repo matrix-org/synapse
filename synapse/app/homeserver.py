@@ -27,7 +27,6 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
-from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -48,7 +47,6 @@ from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
-from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
@@ -241,10 +239,10 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self):
+    def start_listening(self, listeners):
         config = self.get_config()
 
-        for listener in config.listeners:
+        for listener in listeners:
             if listener["type"] == "http":
                 self._listening_services.extend(
                     self._listener_http(config, listener)
@@ -368,29 +366,6 @@ def setup(config_options):
 
     hs.setup()
 
-    def refresh_certificate(*args):
-        """
-        Refresh the TLS certificates that Synapse is using by re-reading them
-        from disk and updating the TLS context factories to use them.
-        """
-        logging.info("Reloading certificate from disk...")
-        hs.config.read_certificate_from_disk()
-        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-            config
-        )
-        logging.info("Certificate reloaded.")
-
-        logging.info("Updating context factories...")
-        for i in hs._listening_services:
-            if isinstance(i.factory, TLSMemoryBIOFactory):
-                i.factory = TLSMemoryBIOFactory(
-                    hs.tls_server_context_factory,
-                    False,
-                    i.factory.wrappedFactory
-                )
-        logging.info("Context factories updated.")
-
     @defer.inlineCallbacks
     def start():
         try:
@@ -414,18 +389,9 @@ def setup(config_options):
                 ):
                     yield acme.provision_certificate()
 
-            # Read the certificate from disk and build the context factories for
-            # TLS.
-            hs.config.read_certificate_from_disk()
-            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-                config
-            )
+            _base.start(hs, config.listeners)
 
-            # It is now safe to start your Synapse.
-            hs.start_listening()
             hs.get_pusherpool().start()
-            hs.get_datastore().start_profiling()
             hs.get_datastore().start_doing_background_updates()
         except Exception as e:
             # If a DeferredList failed (like in listening on the ACME listener),
