@@ -1,1 +1,1 @@
-Synapse can now automatically provision TLS certificates via ACME (the protocol used by CAs like Let's Encrypt).
+Synapse's ACME support will now correctly reprovision a certificate that approaches its expiry while Synapse is running.
