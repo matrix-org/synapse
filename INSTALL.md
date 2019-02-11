@@ -359,8 +359,9 @@ Synapse v1.0. Instructions for having Synapse automatically provision and renew 
 
 If you would like to use your own certificates, you can do so by changing
 `tls_certificate_path` and `tls_private_key_path` in `homeserver.yaml`;
-alternatively, you can use a reverse-proxy. Apart from port 8448 using TLS,
-both ports are the same in the default configuration.
+alternatively, you can use a reverse proxy.  See
+[docs/reverse_proxy.rst](docs/reverse_proxy.rst) for information on configuring
+a reverse proxy.
 
 ## Registering a user
 

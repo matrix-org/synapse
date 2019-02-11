@@ -229,7 +229,14 @@ def refresh_certificate(hs):
     if hs._listening_services:
         logging.info("Updating context factories...")
         for i in hs._listening_services:
+            # When you listenSSL, it doesn't make an SSL port but a TCP one with
+            # a TLS wrapping factory around the factory you actually want to get
+            # requests. This factory attribute is public but missing from
+            # Twisted's documentation.
             if isinstance(i.factory, TLSMemoryBIOFactory):
+                # We want to replace TLS factories with a new one, with the new
+                # TLS configuration. We do this by reaching in and pulling out
+                # the wrappedFactory, and then re-wrapping it.
                 i.factory = TLSMemoryBIOFactory(
                     hs.tls_server_context_factory,
                     False,
