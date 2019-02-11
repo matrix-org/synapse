@@ -25,7 +25,7 @@ Let's assume that we expect clients to connect to our server at
 ``https://matrix.example.com``, and other servers to connect at
 ``https://example.com:8448``. Here are some example configurations:
 
- * nginx::
+* nginx::
 
       server {
           listen 443 ssl;
@@ -49,7 +49,7 @@ Let's assume that we expect clients to connect to our server at
           }
       }
 
- * Caddy::
+* Caddy::
 
       matrix.example.com {
         proxy /_matrix http://localhost:8008 {
@@ -63,7 +63,7 @@ Let's assume that we expect clients to connect to our server at
         }
       }
 
-  * Apache (note the ``nocanon`` options here!)::
+* Apache (note the ``nocanon`` options here!)::
 
       <VirtualHost *:443>
           SSLEngine on
