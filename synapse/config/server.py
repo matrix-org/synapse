@@ -343,13 +343,15 @@ class ServerConfig(Config):
         #       docs/consent_tracking.md.
         #
         #   federation: the server-server API (/_matrix/federation). Also implies
-        #       'media', 'keys'.
+        #       'media', 'keys', 'openid'
         #
         #   keys: the key discovery API (/_matrix/keys).
         #
         #   media: the media API (/_matrix/media).
         #
         #   metrics: the metrics interface. See docs/metrics-howto.rst.
+        #
+        #   openid: OpenID authentication.
         #
         #   replication: the HTTP replication API (/_synapse/replication). See
         #       docs/workers.rst.
@@ -517,6 +519,7 @@ KNOWN_RESOURCES = (
     'keys',
     'media',
     'metrics',
+    'openid',
     'replication',
     'static',
     'webclient',
