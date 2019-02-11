@@ -216,9 +216,6 @@ def refresh_certificate(hs):
     logging.info("Loading certificate from disk...")
     hs.config.read_certificate_from_disk()
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
-    hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-        hs.config
-    )
     logging.info("Certificate loaded.")
 
     if hs._listening_services:

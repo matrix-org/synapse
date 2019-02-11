@@ -43,13 +43,11 @@ def check_logcontext(context):
 
 class FederationClientTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-
         hs = self.setup_test_homeserver(reactor=reactor, clock=clock)
-        hs.tls_client_options_factory = None
         return hs
 
     def prepare(self, reactor, clock, homeserver):
-        self.cl = MatrixFederationHttpClient(self.hs)
+        self.cl = MatrixFederationHttpClient(self.hs, None)
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
     def test_client_get(self):
