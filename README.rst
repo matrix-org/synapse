@@ -290,7 +290,6 @@ The advantages of Postgres include:
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.rst <docs/postgres.rst>`_.
 
-
 .. _reverse-proxy:
 
 Using a reverse proxy with Synapse
@@ -304,54 +303,7 @@ It is recommended to put a reverse proxy such as
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
-The most important thing to know here is that Matrix clients and other Matrix
-servers do not necessarily need to connect to your server via the same
-port. Indeed, clients will use port 443 by default, whereas servers default to
-port 8448. Where these are different, we refer to the 'client port' and the
-'federation port'.
-
-All Matrix endpoints begin with ``/_matrix``, so an example nginx
-configuration for forwarding client connections to Synapse might look like::
-
-  server {
-      listen 443 ssl;
-      listen [::]:443 ssl;
-      server_name matrix.example.com;
-
-      location /_matrix {
-          proxy_pass http://localhost:8008;
-          proxy_set_header X-Forwarded-For $remote_addr;
-      }
-  }
-
-an example Caddy configuration might look like::
-
-    matrix.example.com {
-      proxy /_matrix http://localhost:8008 {
-        transparent
-      }
-    }
-
-and an example Apache configuration might look like::
-
-    <VirtualHost *:443>
-        SSLEngine on
-        ServerName matrix.example.com;
-
-        <Location /_matrix>
-            ProxyPass http://127.0.0.1:8008/_matrix nocanon
-            ProxyPassReverse http://127.0.0.1:8008/_matrix
-        </Location>
-    </VirtualHost>
-
-You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
-for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
-recorded correctly.
-
-Having done so, you can then use ``https://matrix.example.com`` (instead of
-``https://matrix.example.com:8448``) as the "Custom server" when `Connecting to
-Synapse from a client`_.
-
+For information on configuring one, see `<docs/reverse_proxy.rst>`_.
 
 Identity Servers
 ================
