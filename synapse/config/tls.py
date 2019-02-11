@@ -25,7 +25,7 @@ from OpenSSL import crypto
 
 from synapse.config._base import Config
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
@@ -110,20 +110,10 @@ class TlsConfig(Config):
         """
         Read the certificates from disk.
         """
-        self.tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
-
-        # Check if it is self-signed, and issue a warning if so.
-        if self.tls_certificate.get_issuer() == self.tls_certificate.get_subject():
-            warnings.warn(
-                (
-                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
-                    "Please either provide a valid certificate, or use Synapse's ACME "
-                    "support to provision one."
-                )
-            )
+        self.tls_certificate = self.read_tls_certificate()
 
         if not self.no_tls:
-            self.tls_private_key = self.read_tls_private_key(self.tls_private_key_file)
+            self.tls_private_key = self.read_tls_private_key()
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
 
@@ -250,10 +240,38 @@ class TlsConfig(Config):
             % locals()
         )
 
-    def read_tls_certificate(self, cert_path):
-        cert_pem = self.read_file(cert_path, "tls_certificate")
-        return crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+    def read_tls_certificate(self):
+        """Reads the TLS certificate from the configured file, and returns it
 
-    def read_tls_private_key(self, private_key_path):
-        private_key_pem = self.read_file(private_key_path, "tls_private_key")
+        Also checks if it is self-signed, and warns if so
+
+        Returns:
+            OpenSSL.crypto.X509: the certificate
+        """
+        cert_path = self.tls_certificate_file
+        logger.info("Loading TLS certificate from %s", cert_path)
+        cert_pem = self.read_file(cert_path, "tls_certificate_path")
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+
+        # Check if it is self-signed, and issue a warning if so.
+        if cert.get_issuer() == cert.get_subject():
+            warnings.warn(
+                (
+                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
+                    "Please either provide a valid certificate, or use Synapse's ACME "
+                    "support to provision one."
+                )
+            )
+
+        return cert
+
+    def read_tls_private_key(self):
+        """Reads the TLS private key from the configured file, and returns it
+
+        Returns:
+            OpenSSL.crypto.PKey: the private key
+        """
+        private_key_path = self.tls_private_key_file
+        logger.info("Loading TLS key from %s", private_key_path)
+        private_key_pem = self.read_file(private_key_path, "tls_private_key_path")
         return crypto.load_privatekey(crypto.FILETYPE_PEM, private_key_pem)
