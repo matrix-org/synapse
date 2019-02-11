@@ -45,7 +45,11 @@ class TlsConfig(Config):
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
-        self._original_tls_fingerprints = config["tls_fingerprints"]
+        self._original_tls_fingerprints = config.get("tls_fingerprints", [])
+
+        if self._original_tls_fingerprints is None:
+            self._original_tls_fingerprints = []
+
         self.tls_fingerprints = list(self._original_tls_fingerprints)
         self.no_tls = config.get("no_tls", False)
 

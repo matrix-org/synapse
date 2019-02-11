@@ -100,6 +100,10 @@ class SynapseHomeServer(HomeServer):
         resources = {}
         for res in listener_config["resources"]:
             for name in res["names"]:
+                if name == "openid" and "federation" in res["names"]:
+                    # Skip loading openid resource if federation is defined
+                    # since federation resource will include openid
+                    continue
                 resources.update(self._configure_named_resource(
                     name, res.get("compress", False),
                 ))
@@ -135,6 +139,7 @@ class SynapseHomeServer(HomeServer):
                     self.version_string,
                 ),
                 self.tls_server_context_factory,
+                reactor=self.get_reactor(),
             )
 
         else:
@@ -147,7 +152,8 @@ class SynapseHomeServer(HomeServer):
                     listener_config,
                     root_resource,
                     self.version_string,
-                )
+                ),
+                reactor=self.get_reactor(),
             )
 
     def _configure_named_resource(self, name, compress=False):
@@ -192,6 +198,11 @@ class SynapseHomeServer(HomeServer):
         if name == "federation":
             resources.update({
                 FEDERATION_PREFIX: TransportLayerServer(self),
+            })
+
+        if name == "openid":
+            resources.update({
+                FEDERATION_PREFIX: TransportLayerServer(self, servlet_groups=["openid"]),
             })
 
         if name in ["static", "client"]:
