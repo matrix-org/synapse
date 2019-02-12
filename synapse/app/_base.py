@@ -279,6 +279,12 @@ def start(hs, listeners=None):
 
 
 def setup_sentry_io(hs):
+    """Enable sentry.io integration, if enabled in configuration
+
+    Args:
+        hs (synapse.server.HomeServer)
+    """
+
     if not hs.config.sentry_enabled:
         return
 
@@ -287,6 +293,8 @@ def setup_sentry_io(hs):
         dsn=hs.config.sentry_dsn,
         release=get_version_string(synapse),
     )
+
+    # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:
         scope.set_tag("matrix_server_name", hs.config.server_name)
 
