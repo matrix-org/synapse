@@ -23,12 +23,20 @@ class MetricsConfig(Config):
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
+        self.sentry_enabled = "sentry" in config
+        if self.sentry_enabled:
+            self.sentry_dsn = config["sentry"]["dsn"]
+
     def default_config(self, report_stats=None, **kwargs):
         res = """\
         ## Metrics ###
 
         # Enable collection and rendering of performance metrics
         enable_metrics: False
+
+        # Enable sentry.io integration
+        #sentry:
+        #    dsn: "..."
         """
 
         if report_stats is None:
