@@ -13,7 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
+
+MISSING_SENTRY = (
+    """Missing sentry_sdk library. This is required for enable sentry.io
+    integration.
+
+    Install by running:
+        pip install sentry_sdk
+    """
+)
 
 
 class MetricsConfig(Config):
@@ -25,6 +34,11 @@ class MetricsConfig(Config):
 
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
+            try:
+                import sentry_sdk  # noqa F401
+            except ImportError:
+                raise ConfigError(MISSING_SENTRY)
+
             self.sentry_dsn = config["sentry"]["dsn"]
 
     def default_config(self, report_stats=None, **kwargs):
