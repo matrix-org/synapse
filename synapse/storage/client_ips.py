@@ -124,7 +124,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         def user_ips_analyze(txn):
             txn.execute("ANALYZE user_ips")
 
-        end_last_seen = yield self.runInteraction(
+        yield self.runInteraction(
             "user_ips_analyze", user_ips_analyze
         )
 
