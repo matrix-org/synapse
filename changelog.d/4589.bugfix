@@ -1,1 +1,0 @@
-Synapse is now tolerant of the tls_fingerprints option being None or not specified.

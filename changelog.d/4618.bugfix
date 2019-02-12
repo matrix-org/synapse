@@ -1,1 +1,0 @@
-Fix failure to start when not TLS certificate was given even if TLS was disabled.

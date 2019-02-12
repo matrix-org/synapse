@@ -1,1 +1,0 @@
-Reject federation transactions if they include more than 50 PDUs or 100 EDUs.
