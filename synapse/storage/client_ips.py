@@ -66,6 +66,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         )
 
         self.register_background_update_handler(
+            "user_ips_analyze",
+            self._analyze_user_ip,
+        )
+
+        self.register_background_update_handler(
             "user_ips_remove_dupes",
             self._remove_user_ip_dupes,
         )
@@ -106,6 +111,25 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         yield self.runWithConnection(f)
         yield self._end_background_update("user_ips_drop_nonunique_index")
+        defer.returnValue(1)
+
+    @defer.inlineCallbacks
+    def _analyze_user_ip(self, progress, batch_size):
+        # Background update to analyze user_ips table before we run the
+        # deduplication background update. The table may not have been analyzed
+        # for ages due to the table locks.
+        #
+        # This will lock out the naive upserts to user_ips while it happens, but
+        # the analyze should be quick (28GB table takes ~10s)
+        def user_ips_analyze(txn):
+            txn.execute("ANALYZE user_ips")
+
+        end_last_seen = yield self.runInteraction(
+            "user_ips_analyze", user_ips_analyze
+        )
+
+        yield self._end_background_update("user_ips_analyze")
+
         defer.returnValue(1)
 
     @defer.inlineCallbacks
