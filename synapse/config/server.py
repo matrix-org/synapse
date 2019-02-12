@@ -387,28 +387,24 @@ class ServerConfig(Config):
         #   webclient: A web client. Requires web_client_location to be set.
         #
         listeners:
-          # Main HTTPS listener.
-          # For when matrix traffic is sent directly to synapse.
-          - port: %(bind_port)s
-            type: http
-            tls: true
+          # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
+          #
+          # Disabled by default. To enable it, uncomment the following. (Note that you
+          # will also need to give Synapse a TLS key and certificate: see the TLS section
+          # below.)
+          #
+          # - port: %(bind_port)s
+          #   type: http
+          #   tls: true
+          #   resources:
+          #     - names: [client, federation]
 
-            # List of HTTP resources to serve on this listener.
-            resources:
-              - names: [client]
-                compress: true
-              - names: [federation]
-                compress: false
-
-            # example addional_resources:
-            #
-            # additional_resources:
-            #   "/_matrix/my/custom/endpoint":
-            #     module: my_module.CustomRequestHandler
-            #     config: {}
-
-          # Unsecure HTTP listener
-          # For when matrix traffic passes through a reverse-proxy that unwraps TLS.
+          # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+          # that unwraps TLS.
+          #
+          # If you plan to use a reverse proxy, please see
+          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+          #
           - port: %(unsecure_port)s
             tls: false
             bind_addresses: ['::1', '127.0.0.1']
@@ -416,17 +412,21 @@ class ServerConfig(Config):
             x_forwarded: true
 
             resources:
-              - names: [client]
-                compress: true
-              - names: [federation]
+              - names: [client, federation]
                 compress: false
+
+            # example additonal_resources:
+            #
+            # additional_resources:
+            #   "/_matrix/my/custom/endpoint":
+            #     module: my_module.CustomRequestHandler
+            #     config: {}
 
           # Turn on the twisted ssh manhole service on localhost on the given
           # port.
           # - port: 9000
           #   bind_addresses: ['::1', '127.0.0.1']
           #   type: manhole
-
 
         # Homeserver blocking
         #

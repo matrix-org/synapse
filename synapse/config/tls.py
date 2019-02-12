@@ -176,10 +176,10 @@ class TlsConfig(Config):
         # See 'ACME support' below to enable auto-provisioning this certificate via
         # Let's Encrypt.
         #
-        tls_certificate_path: "%(tls_certificate_path)s"
+        # tls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM-encoded private key for TLS
-        tls_private_key_path: "%(tls_private_key_path)s"
+        # tls_private_key_path: "%(tls_private_key_path)s"
 
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.
@@ -204,7 +204,7 @@ class TlsConfig(Config):
         #
         acme:
             # ACME support is disabled by default. Uncomment the following line
-            # to enable it.
+            # (and tls_certificate_path and tls_private_key_path above) to enable it.
             #
             # enabled: true
 
