@@ -93,12 +93,14 @@ Unless you are running a test instance of Synapse on your local machine, in
 general, you will need to enable TLS support before you can successfully
 connect from a client: see `<INSTALL.md#tls-certificates>`_.
 
-The easiest client to get started with is probably the one at
-https://riot.im/app/#/login. You will need to change the server you are logging
-into from ``matrix.org`` and instead specify a Homeserver URL of
-``https://<server_name>:8448`` (or just ``https://<server_name>`` if you are
-using a reverse proxy). (Leave the identity server as the default - see
-`Identity servers`_.)
+An easy way to get started is to login or register via Riot at 
+https://riot.im/app/#/login or https://riot.im/app/#/register respectively. 
+You will need to change the server you are logging into from ``matrix.org``
+and instead specify a Homeserver URL of ``https://<server_name>:8448`` 
+(or just ``https://<server_name>`` if you are using a reverse proxy). 
+(Leave the identity server as the default - see `Identity servers`_.) 
+If you prefer to use another client, refer to our 
+`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
