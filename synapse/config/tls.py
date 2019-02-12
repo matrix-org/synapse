@@ -25,7 +25,7 @@ from OpenSSL import crypto
 
 from synapse.config._base import Config
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
@@ -51,7 +51,6 @@ class TlsConfig(Config):
             self._original_tls_fingerprints = []
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
-        self.no_tls = config.get("no_tls", False)
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -110,20 +109,10 @@ class TlsConfig(Config):
         """
         Read the certificates from disk.
         """
-        self.tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
+        self.tls_certificate = self.read_tls_certificate()
 
-        # Check if it is self-signed, and issue a warning if so.
-        if self.tls_certificate.get_issuer() == self.tls_certificate.get_subject():
-            warnings.warn(
-                (
-                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
-                    "Please either provide a valid certificate, or use Synapse's ACME "
-                    "support to provision one."
-                )
-            )
-
-        if not self.no_tls:
-            self.tls_private_key = self.read_tls_private_key(self.tls_private_key_file)
+        if self.has_tls_listener():
+            self.tls_private_key = self.read_tls_private_key()
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
 
@@ -151,6 +140,8 @@ class TlsConfig(Config):
 
         return (
             """\
+        ## TLS ##
+
         # PEM-encoded X509 certificate for TLS.
         # This certificate, as of Synapse 1.0, will need to be a valid and verifiable
         # certificate, signed by a recognised Certificate Authority.
@@ -211,13 +202,6 @@ class TlsConfig(Config):
             #
             # reprovision_threshold: 30
 
-        # If your server runs behind a reverse-proxy which terminates TLS connections
-        # (for both client and federation connections), it may be useful to disable
-        # All TLS support for incoming connections. Setting no_tls to True will
-        # do so (and avoid the need to give synapse a TLS private key).
-        #
-        # no_tls: True
-
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
         # make HTTPS requests to this server will check that the TLS
@@ -250,10 +234,38 @@ class TlsConfig(Config):
             % locals()
         )
 
-    def read_tls_certificate(self, cert_path):
-        cert_pem = self.read_file(cert_path, "tls_certificate")
-        return crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+    def read_tls_certificate(self):
+        """Reads the TLS certificate from the configured file, and returns it
 
-    def read_tls_private_key(self, private_key_path):
-        private_key_pem = self.read_file(private_key_path, "tls_private_key")
+        Also checks if it is self-signed, and warns if so
+
+        Returns:
+            OpenSSL.crypto.X509: the certificate
+        """
+        cert_path = self.tls_certificate_file
+        logger.info("Loading TLS certificate from %s", cert_path)
+        cert_pem = self.read_file(cert_path, "tls_certificate_path")
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+
+        # Check if it is self-signed, and issue a warning if so.
+        if cert.get_issuer() == cert.get_subject():
+            warnings.warn(
+                (
+                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
+                    "Please either provide a valid certificate, or use Synapse's ACME "
+                    "support to provision one."
+                )
+            )
+
+        return cert
+
+    def read_tls_private_key(self):
+        """Reads the TLS private key from the configured file, and returns it
+
+        Returns:
+            OpenSSL.crypto.PKey: the private key
+        """
+        private_key_path = self.tls_private_key_file
+        logger.info("Loading TLS key from %s", private_key_path)
+        private_key_pem = self.read_file(private_key_path, "tls_private_key_path")
         return crypto.load_privatekey(crypto.FILETYPE_PEM, private_key_pem)

@@ -126,9 +126,22 @@ class ServerConfig(Config):
                 self.public_baseurl += '/'
         self.start_pushers = config.get("start_pushers", True)
 
-        self.listeners = config.get("listeners", [])
+        self.listeners = []
+        for listener in config.get("listeners", []):
+            if not isinstance(listener.get("port", None), int):
+                raise ConfigError(
+                    "Listener configuration is lacking a valid 'port' option"
+                )
 
-        for listener in self.listeners:
+            if listener.setdefault("tls", False):
+                # no_tls is not really supported any more, but let's grandfather it in
+                # here.
+                if config.get("no_tls", False):
+                    logger.info(
+                        "Ignoring TLS-enabled listener on port %i due to no_tls"
+                    )
+                    continue
+
             bind_address = listener.pop("bind_address", None)
             bind_addresses = listener.setdefault("bind_addresses", [])
 
@@ -140,6 +153,8 @@ class ServerConfig(Config):
             if not bind_addresses:
                 bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
 
+            self.listeners.append(listener)
+
         if not self.web_client_location:
             _warn_if_webclient_configured(self.listeners)
 
@@ -147,6 +162,9 @@ class ServerConfig(Config):
 
         bind_port = config.get("bind_port")
         if bind_port:
+            if config.get("no_tls", False):
+                raise ConfigError("no_tls is incompatible with bind_port")
+
             self.listeners = []
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
@@ -193,6 +211,7 @@ class ServerConfig(Config):
                 "port": manhole,
                 "bind_addresses": ["127.0.0.1"],
                 "type": "manhole",
+                "tls": False,
             })
 
         metrics_port = config.get("metrics_port")
@@ -217,6 +236,9 @@ class ServerConfig(Config):
             })
 
         _check_resource_config(self.listeners)
+
+    def has_tls_listener(self):
+        return any(l["tls"] for l in self.listeners)
 
     def default_config(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
