@@ -537,6 +537,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
         new_events = [
             event for event, ctx in event_contexts
             if not event.internal_metadata.is_outlier() and not ctx.rejected
+            and not event.internal_metadata.is_soft_failed()
         ]
 
         # start with the existing forward extremities
