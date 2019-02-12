@@ -284,6 +284,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.GuestAccess, ""),
             (EventTypes.RoomAvatar, ""),
             (EventTypes.Encryption, ""),
+            (EventTypes.ServerACL, ""),
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(
