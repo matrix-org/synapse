@@ -19,12 +19,12 @@ Bugfixes
 
 - Copy over room federation ability on room upgrade. ([\#4530](https://github.com/matrix-org/synapse/issues/4530))
 - Fix noisy "twisted.internet.task.TaskStopped" errors in logs ([\#4546](https://github.com/matrix-org/synapse/issues/4546))
-- Synapse is now tolerant of the tls_fingerprints option being None or not specified. ([\#4589](https://github.com/matrix-org/synapse/issues/4589))
+- Synapse is now tolerant of the `tls_fingerprints` option being None or not specified. ([\#4589](https://github.com/matrix-org/synapse/issues/4589))
 - Fix 'no unique or exclusion constraint' error ([\#4591](https://github.com/matrix-org/synapse/issues/4591))
 - Transfer Server ACLs on room upgrade. ([\#4608](https://github.com/matrix-org/synapse/issues/4608))
 - Fix failure to start when not TLS certificate was given even if TLS was disabled. ([\#4618](https://github.com/matrix-org/synapse/issues/4618))
-- fix self-signed cert notice from generate-config. ([\#4625](https://github.com/matrix-org/synapse/issues/4625))
-- Fix performance of 'user_ips' table deduplication background update ([\#4626](https://github.com/matrix-org/synapse/issues/4626), [\#4627](https://github.com/matrix-org/synapse/issues/4627))
+- Fix self-signed cert notice from generate-config. ([\#4625](https://github.com/matrix-org/synapse/issues/4625))
+- Fix performance of `user_ips` table deduplication background update ([\#4626](https://github.com/matrix-org/synapse/issues/4626), [\#4627](https://github.com/matrix-org/synapse/issues/4627))
 
 
 Internal Changes
@@ -38,7 +38,7 @@ Internal Changes
 - Update MSC1711 FAQ to calrify .well-known usage ([\#4584](https://github.com/matrix-org/synapse/issues/4584))
 - Clean up default listener configuration ([\#4586](https://github.com/matrix-org/synapse/issues/4586))
 - Clarifications for reverse proxy docs ([\#4607](https://github.com/matrix-org/synapse/issues/4607))
-- Move ClientTLSOptionsFactory init out of refresh_certificates ([\#4611](https://github.com/matrix-org/synapse/issues/4611))
+- Move ClientTLSOptionsFactory init out of `refresh_certificates` ([\#4611](https://github.com/matrix-org/synapse/issues/4611))
 - Fail cleanly if listener config lacks a 'port' ([\#4616](https://github.com/matrix-org/synapse/issues/4616))
 - Remove redundant entries from docker config ([\#4619](https://github.com/matrix-org/synapse/issues/4619))
 - README updates ([\#4621](https://github.com/matrix-org/synapse/issues/4621))
