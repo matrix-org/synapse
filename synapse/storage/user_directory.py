@@ -602,7 +602,7 @@ class UserDirectoryStore(SQLBaseStore):
                 ) AS s USING (user_id)
             """
             join_args = (user_id, user_id)
-            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL) AND user_id != ?"
+            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL) AND s.user_id != ?"
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
