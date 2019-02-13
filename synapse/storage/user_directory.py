@@ -399,14 +399,14 @@ class UserDirectoryStore(SQLBaseStore):
         """
         rows = yield self._simple_select_onecol(
             table="users_who_share_private_rooms",
-            keyvalues={"other_user_id": user_id},
+            keyvalues={"user_id": user_id},
             retcol="other_user_id",
             desc="get_users_who_share_room_with_user",
         )
 
         pub_rows = yield self._simple_select_onecol(
             table="users_who_share_public_rooms",
-            keyvalues={"other_user_id": user_id},
+            keyvalues={"user_id": user_id},
             retcol="other_user_id",
             desc="get_users_who_share_room_with_user",
         )
