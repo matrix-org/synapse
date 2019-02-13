@@ -162,7 +162,7 @@ def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
     Create a TCP socket for a port and several addresses
 
     Returns:
-        list of twisted.internet.tcp.Port listening for TLS connections
+        list[twisted.internet.tcp.Port]: listening for TCP connections
     """
     r = []
     for address in bind_addresses:
