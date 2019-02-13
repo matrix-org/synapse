@@ -28,7 +28,7 @@ from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 
-from twisted.internet import defer, protocol
+from twisted.internet import defer, protocol, task
 from twisted.internet.error import DNSLookupError
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
@@ -168,7 +168,7 @@ class MatrixFederationHttpClient(object):
             requests.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs, tls_client_options_factory):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
@@ -176,7 +176,7 @@ class MatrixFederationHttpClient(object):
 
         self.agent = MatrixFederationAgent(
             hs.get_reactor(),
-            hs.tls_client_options_factory,
+            tls_client_options_factory,
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
@@ -286,7 +286,7 @@ class MatrixFederationHttpClient(object):
                             json,
                         )
                         data = encode_canonical_json(json)
-                        producer = FileBodyProducer(
+                        producer = QuieterFileBodyProducer(
                             BytesIO(data),
                             cooperator=self._cooperator,
                         )
@@ -839,3 +839,16 @@ def encode_query_args(args):
     query_bytes = urllib.parse.urlencode(encoded_args, True)
 
     return query_bytes.encode('utf8')
+
+
+class QuieterFileBodyProducer(FileBodyProducer):
+    """Wrapper for FileBodyProducer that avoids CRITICAL errors when the connection drops.
+
+    Workaround for https://github.com/matrix-org/synapse/issues/4003 /
+    https://twistedmatrix.com/trac/ticket/6528
+    """
+    def stopProducing(self):
+        try:
+            FileBodyProducer.stopProducing(self)
+        except task.TaskStopped:
+            pass

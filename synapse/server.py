@@ -31,6 +31,7 @@ from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
+from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
@@ -112,6 +113,8 @@ class HomeServer(object):
 
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
+        _listening_services (list[twisted.internet.tcp.Port]): TCP ports that
+            we are listening on to provide HTTP services.
     """
 
     __metaclass__ = abc.ABCMeta
@@ -196,6 +199,7 @@ class HomeServer(object):
         self._reactor = reactor
         self.hostname = hostname
         self._building = {}
+        self._listening_services = []
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
@@ -364,7 +368,10 @@ class HomeServer(object):
         return PusherPool(self)
 
     def build_http_client(self):
-        return MatrixFederationHttpClient(self)
+        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            self.config
+        )
+        return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     def build_db_pool(self):
         name = self.db_config["name"]

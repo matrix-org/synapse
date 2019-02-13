@@ -20,6 +20,11 @@ from synapse.config.tls import TlsConfig
 from tests.unittest import TestCase
 
 
+class TestConfig(TlsConfig):
+    def has_tls_listener(self):
+        return False
+
+
 class TLSConfigTests(TestCase):
 
     def test_warn_self_signed(self):
@@ -55,13 +60,12 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
 
         config = {
             "tls_certificate_path": os.path.join(config_dir, "cert.pem"),
-            "no_tls": True,
             "tls_fingerprints": []
         }
 
-        t = TlsConfig()
+        t = TestConfig()
         t.read_config(config)
-        t.read_certificate_from_disk()
+        t.read_certificate_from_disk(require_cert_and_key=False)
 
         warnings = self.flushWarnings()
         self.assertEqual(len(warnings), 1)

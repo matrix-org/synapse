@@ -26,9 +26,8 @@ Configuration
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. Note that this includes
-requests made to the federation port. The caveats regarding running a
-reverse-proxy on the federation port still apply (see
-https://github.com/matrix-org/synapse/blob/master/README.rst#reverse-proxying-the-federation-port).
+requests made to the federation port. See `<reverse_proxy.rst>`_ for
+information on setting up a reverse proxy.
 
 To enable workers, you need to add two replication listeners to the master
 synapse, e.g.::

@@ -15,7 +15,6 @@
 import logging
 import logging.config
 import os
-import signal
 import sys
 from string import Template
 
@@ -24,6 +23,7 @@ import yaml
 from twisted.logger import STDLibLogObserver, globalLogBeginner
 
 import synapse
+from synapse.app import _base as appbase
 from synapse.util.logcontext import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
@@ -127,7 +127,7 @@ class LoggingConfig(Config):
                 )
 
 
-def setup_logging(config, use_worker_options=False, register_sighup=None):
+def setup_logging(config, use_worker_options=False):
     """ Set up python logging
 
     Args:
@@ -140,12 +140,6 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
         register_sighup (func | None): Function to call to register a
             sighup handler.
     """
-    if not register_sighup:
-        if getattr(signal, "SIGHUP"):
-            register_sighup = lambda x: signal.signal(signal.SIGHUP, x)
-        else:
-            register_sighup = lambda x: None
-
     log_config = (config.worker_log_config if use_worker_options
                   else config.log_config)
     log_file = (config.worker_log_file if use_worker_options
@@ -187,7 +181,7 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
         else:
             handler = logging.StreamHandler()
 
-            def sighup(signum, stack):
+            def sighup(*args):
                 pass
 
         handler.setFormatter(formatter)
@@ -200,14 +194,14 @@ def setup_logging(config, use_worker_options=False, register_sighup=None):
             with open(log_config, 'r') as f:
                 logging.config.dictConfig(yaml.load(f))
 
-        def sighup(signum, stack):
+        def sighup(*args):
             # it might be better to use a file watcher or something for this.
             load_log_config()
             logging.info("Reloaded log config from %s due to SIGHUP", log_config)
 
         load_log_config()
 
-    register_sighup(sighup)
+    appbase.register_sighup(sighup)
 
     # make sure that the first thing we log is a thing we can grep backwards
     # for
