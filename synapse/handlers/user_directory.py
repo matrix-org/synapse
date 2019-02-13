@@ -216,8 +216,6 @@ class UserDirectoryHandler(object):
 
         self.initially_handled_users = None
         self.initially_handled_users_in_public = None
-        self.initially_handled_users_share = None
-        self.initially_handled_users_share_private_room = None
 
         yield self.store.update_user_directory_stream_pos(new_pos)
 

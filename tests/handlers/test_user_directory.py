@@ -123,3 +123,86 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # We get NO search results when searching for user2 by user3.
         s = self.get_success(self.handler.search_users(u3, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
+
+    def _compress_shared(self, shared):
+        """
+        Compress a list of users who share rooms dicts to a list of tuples.
+        """
+        r = set()
+        for i in shared:
+            r.add((i["user_id"], i["other_user_id"], i["room_id"]))
+        return r
+
+    def test_initial(self):
+        """
+        A user can be searched for only by people that are either in a public
+        room, or that share a private chat.
+        """
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
+        u2 = self.register_user("user2", "pass")
+        u2_token = self.login(u2, "pass")
+        u3 = self.register_user("user3", "pass")
+        u3_token = self.login(u3, "pass")
+
+        room = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
+        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        private_room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
+        self.helper.invite(private_room, src=u1, targ=u3, tok=u1_token)
+        self.helper.join(private_room, user=u3, tok=u3_token)
+
+        self.get_success(self.store.update_user_directory_stream_pos(None))
+        self.get_success(self.store.delete_all_from_user_dir())
+
+        shares_public = self.get_success(
+            self.store._simple_select_list(
+                "users_who_share_public_rooms", None, ["user_id", "other_user_id"]
+            )
+        )
+        shares_private = self.get_success(
+            self.store._simple_select_list(
+                "users_who_share_private_rooms", None, ["user_id", "other_user_id"]
+            )
+        )
+
+        self.assertEqual(shares_private, [])
+        self.assertEqual(shares_public, [])
+
+        # Reset the handled users caches
+        self.handler.initially_handled_users = set()
+        self.handler.initially_handled_users_in_public = set()
+
+        d = self.handler._do_initial_spam()
+
+        for i in range(10):
+            self.pump(1)
+
+        r = self.get_success(d)
+
+        shares_public = self.get_success(
+            self.store._simple_select_list(
+                "users_who_share_public_rooms",
+                None,
+                ["user_id", "other_user_id", "room_id"],
+            )
+        )
+        shares_private = self.get_success(
+            self.store._simple_select_list(
+                "users_who_share_private_rooms",
+                None,
+                ["user_id", "other_user_id", "room_id"],
+            )
+        )
+
+        # User 1 and User 2 share public rooms
+        self.assertEqual(
+            self._compress_shared(shares_public), set([(u1, u2, room), (u2, u1, room)])
+        )
+
+        # User 1 and User 3 share private rooms
+        self.assertEqual(
+            self._compress_shared(shares_private),
+            set([(u1, u3, private_room), (u3, u1, private_room)]),
+        )
