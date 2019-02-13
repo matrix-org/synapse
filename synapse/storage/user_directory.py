@@ -410,7 +410,7 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
         users = set(pub_rows)
-        users = users.update(rows)
+        users.update(rows)
 
         # Remove the user themselves from this list.
         users.discard(user_id)
