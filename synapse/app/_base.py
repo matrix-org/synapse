@@ -162,21 +162,23 @@ def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
     Create a TCP socket for a port and several addresses
 
     Returns:
-        list (empty)
+        list of twisted.internet.tcp.Port listening for TLS connections
     """
+    r = []
     for address in bind_addresses:
         try:
-            reactor.listenTCP(
-                port,
-                factory,
-                backlog,
-                address
+            r.append(
+                reactor.listenTCP(
+                    port,
+                    factory,
+                    backlog,
+                    address
+                )
             )
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
 
-    logger.info("Synapse now listening on TCP port %d", port)
-    return []
+    return r
 
 
 def listen_ssl(
@@ -203,7 +205,6 @@ def listen_ssl(
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
 
-    logger.info("Synapse now listening on port %d (TLS)", port)
     return r
 
 
@@ -229,6 +230,10 @@ def refresh_certificate(hs):
             # requests. This factory attribute is public but missing from
             # Twisted's documentation.
             if isinstance(i.factory, TLSMemoryBIOFactory):
+                addr = i.getHost()
+                logger.info(
+                    "Replacing TLS context factory on [%s]:%i", addr.host, addr.port,
+                )
                 # We want to replace TLS factories with a new one, with the new
                 # TLS configuration. We do this by reaching in and pulling out
                 # the wrappedFactory, and then re-wrapping it.

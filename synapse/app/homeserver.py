@@ -121,7 +121,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            return listen_ssl(
+            ports = listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -134,9 +134,10 @@ class SynapseHomeServer(HomeServer):
                 self.tls_server_context_factory,
                 reactor=self.get_reactor(),
             )
+            logger.info("Synapse now listening on TCP port %d (TLS)", port)
 
         else:
-            return listen_tcp(
+            ports = listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -148,6 +149,9 @@ class SynapseHomeServer(HomeServer):
                 ),
                 reactor=self.get_reactor(),
             )
+            logger.info("Synapse now listening on TCP port %d", port)
+
+        return ports
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
