@@ -266,14 +266,14 @@ class SynapseHomeServer(HomeServer):
                     )
                 )
             elif listener["type"] == "replication":
-                bind_addresses = listener["bind_addresses"]
-                for address in bind_addresses:
-                    factory = ReplicationStreamProtocolFactory(self)
-                    server_listener = reactor.listenTCP(
-                        listener["port"], factory, interface=address
-                    )
+                services = listen_tcp(
+                    listener["bind_addresses"],
+                    listener["port"],
+                    ReplicationStreamProtocolFactory(self),
+                )
+                for s in services:
                     reactor.addSystemEventTrigger(
-                        "before", "shutdown", server_listener.stopListening,
+                        "before", "shutdown", s.stopListening,
                     )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
