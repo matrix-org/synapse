@@ -233,7 +233,16 @@ class FederationServer(FederationBase):
         )
 
         if hasattr(transaction, "edus"):
-            for edu in (Edu(**x) for x in transaction.edus):
+            logger.info("Got edus: %s", transaction.edus)
+
+            edus = []
+            for x in transaction.edus:
+                try:
+                    edus.append(Edu(**x))
+                except Exception:
+                    logger.exception("Failed to handle EDU: %s", x)
+
+            for edu in edus:
                 yield self.received_edu(
                     origin,
                     edu.edu_type,
