@@ -130,17 +130,15 @@ class UserDirectoryStore(SQLBaseStore):
             self._simple_insert_many_txn(
                 txn,
                 table="user_directory",
-                values=list(
-                    [
-                        {
-                            "user_id": user_id,
-                            "room_id": room_id,
-                            "display_name": profile.display_name,
-                            "avatar_url": profile.avatar_url,
-                        }
-                        for user_id, profile in iteritems(users_with_profile)
-                    ]
-                ),
+                values=[
+                    {
+                        "user_id": user_id,
+                        "room_id": room_id,
+                        "display_name": profile.display_name,
+                        "avatar_url": profile.avatar_url,
+                    }
+                    for user_id, profile in iteritems(users_with_profile)
+                ],
             )
             for user_id in users_with_profile:
                 txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
