@@ -597,14 +597,13 @@ class UserDirectoryStore(SQLBaseStore):
             join_clause = """
                 LEFT JOIN (
                     SELECT other_user_id AS user_id FROM users_who_share_public_rooms
-                ) AS p USING (user_id)
-                LEFT JOIN (
+                    UNION
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
                     WHERE user_id = ? AND other_user_id != ?
-                ) AS s USING (user_id)
+                ) AS p USING (user_id)
             """
             join_args = (user_id, user_id)
-            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
+            where_clause = "p.user_id IS NOT NULL"
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
@@ -615,7 +614,7 @@ class UserDirectoryStore(SQLBaseStore):
             # The array of numbers are the weights for the various part of the
             # search: (domain, _, display name, localpart)
             sql = """
-                SELECT DISTINCT user_id, display_name, avatar_url
+                SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
                 %s
@@ -623,7 +622,7 @@ class UserDirectoryStore(SQLBaseStore):
                     %s
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
-                    (CASE WHEN user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
+                    (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
                     * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
                     * (
@@ -653,7 +652,7 @@ class UserDirectoryStore(SQLBaseStore):
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
-                SELECT DISTINCT user_id, display_name, avatar_url
+                SELECT d.user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
                 %s
