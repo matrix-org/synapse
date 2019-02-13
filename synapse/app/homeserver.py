@@ -121,7 +121,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            return listen_ssl(
+            ports = listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -134,9 +134,10 @@ class SynapseHomeServer(HomeServer):
                 self.tls_server_context_factory,
                 reactor=self.get_reactor(),
             )
+            logger.info("Synapse now listening on TCP port %d (TLS)", port)
 
         else:
-            return listen_tcp(
+            ports = listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -148,6 +149,9 @@ class SynapseHomeServer(HomeServer):
                 ),
                 reactor=self.get_reactor(),
             )
+            logger.info("Synapse now listening on TCP port %d", port)
+
+        return ports
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
@@ -262,14 +266,14 @@ class SynapseHomeServer(HomeServer):
                     )
                 )
             elif listener["type"] == "replication":
-                bind_addresses = listener["bind_addresses"]
-                for address in bind_addresses:
-                    factory = ReplicationStreamProtocolFactory(self)
-                    server_listener = reactor.listenTCP(
-                        listener["port"], factory, interface=address
-                    )
+                services = listen_tcp(
+                    listener["bind_addresses"],
+                    listener["port"],
+                    ReplicationStreamProtocolFactory(self),
+                )
+                for s in services:
                     reactor.addSystemEventTrigger(
-                        "before", "shutdown", server_listener.stopListening,
+                        "before", "shutdown", s.stopListening,
                     )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:

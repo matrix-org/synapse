@@ -1,0 +1,1 @@
+Fix errors when using default bind_addresses with replication/metrics listeners.
