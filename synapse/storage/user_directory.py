@@ -395,32 +395,27 @@ class UserDirectoryStore(SQLBaseStore):
         Returns:
             list: user_id
         """
-        rows = yield self._simple_select_list(
+        rows = yield self._simple_select_onecol(
             table="users_who_share_private_rooms",
             keyvalues={"user_id": user_id},
-            retcols=("other_user_id",),
+            retcol="other_user_id",
             desc="get_users_who_share_room_with_user",
         )
 
-        pub_rows = yield self._simple_select_list(
+        pub_rows = yield self._simple_select_onecol(
             table="users_who_share_public_rooms",
             keyvalues={"user_id": user_id},
-            retcols=("other_user_id",),
+            retcol="other_user_id",
             desc="get_users_who_share_room_with_user",
         )
 
-        users = {}
+        users = set(pub_rows)
+        users = users.update(rows)
 
-        for user in rows:
-            users.add(user["other_user_id"])
-
-        for user in pub_rows:
-            users.add(user["other_user_id"])
-
-        # Since users share a room with themselves, remove them
+        # Remove the user themselves from this list.
         users.discard(user_id)
 
-        defer.returnValue(users)
+        defer.returnValue(list(users))
 
     @defer.inlineCallbacks
     def get_users_in_share_dir_with_room_id(self, user_id, room_id):
