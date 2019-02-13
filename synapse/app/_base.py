@@ -153,9 +153,8 @@ def listen_metrics(bind_addresses, port):
     from prometheus_client import start_http_server
 
     for host in bind_addresses:
-        reactor.callInThread(start_http_server, int(port),
-                             addr=host, registry=RegistryProxy)
-        logger.info("Metrics now reporting on %s:%d", host, port)
+        logger.info("Starting metrics listener on %s:%d", host, port)
+        start_http_server(port, addr=host, registry=RegistryProxy)
 
 
 def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
