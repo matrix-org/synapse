@@ -1,3 +1,12 @@
+Synapse 0.99.1rc2 (2019-02-13)
+==============================
+
+Bugfixes
+--------
+
+- Fix errors when using default bind_addresses with replication/metrics listeners. ([\#4636](https://github.com/matrix-org/synapse/issues/4636))
+
+
 Synapse 0.99.1rc1 (2019-02-12)
 ==============================
 
