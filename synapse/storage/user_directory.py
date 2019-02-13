@@ -260,29 +260,21 @@ class UserDirectoryStore(SQLBaseStore):
         """Get all user_ids that are in the room directory because they're
         in the given room_id
         """
-        user_ids_dir = yield self._simple_select_onecol(
-            table="user_directory",
-            keyvalues={"room_id": room_id},
-            retcol="user_id",
-            desc="get_users_in_dir_due_to_room",
-        )
-
         user_ids_share_pub = yield self._simple_select_onecol(
             table="users_who_share_public_rooms",
             keyvalues={"room_id": room_id},
-            retcol="user_id",
+            retcol="other_user_id",
             desc="get_users_in_dir_due_to_room",
         )
 
         user_ids_share_priv = yield self._simple_select_onecol(
             table="users_who_share_private_rooms",
             keyvalues={"room_id": room_id},
-            retcol="user_id",
+            retcol="other_user_id",
             desc="get_users_in_dir_due_to_room",
         )
 
-        user_ids = set(user_ids_dir)
-        user_ids.update(user_ids_share_pub)
+        user_ids = set(user_ids_share_pub)
         user_ids.update(user_ids_share_priv)
 
         defer.returnValue(user_ids)
