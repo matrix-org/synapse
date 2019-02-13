@@ -92,10 +92,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.store.register(user_id=r_user_id, token="123", password_hash=None)
         )
         self.store.remove_from_user_dir = Mock()
-        self.store.remove_from_user_in_public_room = Mock()
         self.get_success(self.handler.handle_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
-        self.store.remove_from_user_in_public_room.assert_called_once_with(r_user_id)
 
     def test_private_room(self):
         """
@@ -110,10 +108,20 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # We do not add users to the directory until they join a room.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
 
         room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
         self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room, user=u2, tok=u2_token)
+
+        # Check we have populated the database correctly.
+        shares_public = self.get_users_who_share_public_rooms()
+        shares_private = self.get_users_who_share_private_rooms()
+
+        self.assertEqual(shares_public, [])
+        self.assertEqual(
+            self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
+        )
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -127,12 +135,33 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
 
+        # User 2 then leaves.
+        self.helper.leave(room, user=u2, tok=u2_token)
+
+        # Check we have removed the values.
+        shares_public = self.get_users_who_share_public_rooms()
+        shares_private = self.get_users_who_share_private_rooms()
+
+        self.assertEqual(shares_public, [])
+        self.assertEqual(self._compress_shared(shares_private), set())
+
+        # User1 now gets no search results for any of the other users.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+        s = self.get_success(self.handler.search_users(u1, "user3", 10))
+        self.assertEqual(len(s["results"]), 0)
+
     def _compress_shared(self, shared):
         """
         Compress a list of users who share rooms dicts to a list of tuples.
         """
         r = set()
         for i in shared:
+            # Ignore users sharing a room with themselves
+            if i["user_id"] == i["other_user_id"]:
+                continue
+
             r.add((i["user_id"], i["other_user_id"], i["room_id"]))
         return r
 
@@ -198,17 +227,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         shares_public = self.get_users_who_share_public_rooms()
         shares_private = self.get_users_who_share_private_rooms()
-        in_public_room = self.get_success(
-            self.store.get_users_in_public_due_to_room(room)
-        )
 
         # User 1 and User 2 share public rooms
         self.assertEqual(
             self._compress_shared(shares_public), set([(u1, u2, room), (u2, u1, room)])
         )
-
-        # User 1 and User 2 are in the same public room
-        self.assertEqual(set(in_public_room), set([u1, u2]))
 
         # User 1 and User 3 share private rooms
         self.assertEqual(
