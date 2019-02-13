@@ -15,6 +15,7 @@
 import datetime
 import logging
 import string
+import json
 
 from six import itervalues
 
@@ -42,6 +43,8 @@ from .persistence import TransactionActions
 from .units import Edu, Transaction
 
 logger = logging.getLogger(__name__)
+
+pdu_logger = logging.getLogger("synapse.federation.pdu_destination_logger")
 
 sent_pdus_destination_dist_count = Counter(
     "synapse_federation_client_sent_pdu_destinations:count", ""
@@ -260,6 +263,15 @@ class TransactionQueue(object):
         destinations = set(destinations)
         destinations.discard(self.server_name)
         logger.debug("Sending to: %s", str(destinations))
+
+        pdu_logger.info(
+            "SendingPDU",
+            extra={
+                "event_id": pdu.event_id, "room_id": pdu.room_id,
+                "destinations": json.dumps(list(destinations)),
+                "server": self.server_name,
+            },
+        )
 
         if not destinations:
             return
