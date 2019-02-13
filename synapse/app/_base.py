@@ -269,7 +269,7 @@ def start(hs, listeners=None):
         hs.start_listening(listeners)
         hs.get_datastore().start_profiling()
 
-        setup_sentry_io(hs)
+        setup_sentry(hs)
     except Exception:
         traceback.print_exc(file=sys.stderr)
         reactor = hs.get_reactor()
@@ -278,8 +278,8 @@ def start(hs, listeners=None):
         sys.exit(1)
 
 
-def setup_sentry_io(hs):
-    """Enable sentry.io integration, if enabled in configuration
+def setup_sentry(hs):
+    """Enable sentry integration, if enabled in configuration
 
     Args:
         hs (synapse.server.HomeServer)

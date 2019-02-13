@@ -1,1 +1,1 @@
-Add basic optional sentry.io integration
+Add basic optional sentry integration

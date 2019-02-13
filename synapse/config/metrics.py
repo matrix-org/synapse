@@ -16,7 +16,7 @@
 from ._base import Config, ConfigError
 
 MISSING_SENTRY = (
-    """Missing sentry_sdk library. This is required for enable sentry.io
+    """Missing sentry_sdk library. This is required for enable sentry
     integration.
 
     Install by running:
@@ -48,7 +48,12 @@ class MetricsConfig(Config):
         # Enable collection and rendering of performance metrics
         enable_metrics: False
 
-        # Enable sentry.io integration
+        # Enable sentry integration
+        # NOTE: While attempts are made to ensure that the logs don't contain
+        # any sensitive information, this cannot be guaranteed. By enabling
+        # this option the sentry server may therefore receive sensitive
+        # information, and it in turn may then diseminate sensitive information
+        # through insecure notification channels if so configured.
         #sentry:
         #    dsn: "..."
         """
