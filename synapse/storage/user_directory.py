@@ -595,17 +595,14 @@ class UserDirectoryStore(SQLBaseStore):
             where_clause = "1=1"
         else:
             join_clause = """
-                LEFT JOIN (
-                    SELECT user_id FROM users_who_share_public_rooms
-                    WHERE user_id != ?
-                ) AS p USING (user_id)
+                LEFT JOIN users_who_share_public_rooms as p USING (user_id)
                 LEFT JOIN (
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
-                    WHERE user_id = ?
+                    WHERE user_id = ? AND other_user_id != ?
                 ) AS s USING (user_id)
             """
             join_args = (user_id, user_id)
-            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
+            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL) AND p.user_id != ?"
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
