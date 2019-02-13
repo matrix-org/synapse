@@ -151,7 +151,11 @@ class ServerConfig(Config):
 
             # if we still have an empty list of addresses, use the default list
             if not bind_addresses:
-                bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
+                if listener['type'] == 'metrics':
+                    # the metrics listener doesn't support IPv6
+                    bind_addresses.append('0.0.0.0')
+                else:
+                    bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
 
             self.listeners.append(listener)
 
