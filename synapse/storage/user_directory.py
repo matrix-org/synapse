@@ -595,7 +595,9 @@ class UserDirectoryStore(SQLBaseStore):
             where_clause = "1=1"
         else:
             join_clause = """
-                LEFT JOIN users_who_share_public_rooms as p USING (user_id)
+                LEFT JOIN (
+                    SELECT other_user_id AS user_id FROM users_who_share_public_rooms
+                ) AS p USING (user_id)
                 LEFT JOIN (
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
                     WHERE user_id = ? AND other_user_id != ?
