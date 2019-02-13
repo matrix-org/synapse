@@ -623,7 +623,7 @@ class UserDirectoryStore(SQLBaseStore):
                     %s
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
-                    (CASE WHEN s.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
+                    (CASE WHEN user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
                     * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
                     * (
