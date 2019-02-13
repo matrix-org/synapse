@@ -319,6 +319,8 @@ class UserDirectoryHandler(object):
                         user_ids = yield self.store.get_users_in_dir_due_to_room(
                             room_id
                         )
+                        logger.info(user_ids)
+
                         for user_id in user_ids:
                             yield self._handle_remove_user(room_id, user_id)
                         return
@@ -490,8 +492,6 @@ class UserDirectoryHandler(object):
 
         # Are they still in a room with members? If not, remove them entirely.
         users_in_room_with = yield self.store.get_users_who_share_room_from_dir(user_id)
-
-        logger.info(users_in_room_with)
 
         if len(users_in_room_with) == 0:
             yield self.store.remove_from_user_dir(user_id)

@@ -251,6 +251,16 @@ class UserDirectoryStore(SQLBaseStore):
                 table="users_who_share_public_rooms",
                 keyvalues={"other_user_id": user_id},
             )
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_private_rooms",
+                keyvalues={"user_id": user_id},
+            )
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_private_rooms",
+                keyvalues={"other_user_id": user_id},
+            )
             txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
         return self.runInteraction("remove_from_user_dir", _remove_from_user_dir_txn)
