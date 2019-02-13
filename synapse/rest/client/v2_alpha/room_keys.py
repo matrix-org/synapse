@@ -380,6 +380,40 @@ class RoomKeysVersionServlet(RestServlet):
         )
         defer.returnValue((200, {}))
 
+    @defer.inlineCallbacks
+    def on_PUT(self, request, version):
+        """
+        Update the information about a given version of the user's room_keys backup.
+
+        POST /room_keys/version/12345 HTTP/1.1
+        Content-Type: application/json
+        {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": {
+                "public_key": "abcdefg",
+                "signatures": {
+                    "ed25519:something": "hijklmnop"
+                }
+            },
+            "version": "42"
+        }
+
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        {}
+        """
+        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        user_id = requester.user.to_string()
+        info = parse_json_object_from_request(request)
+
+        if version is None:
+            raise SynapseError(400, "No version specified to update", Codes.MISSING_PARAM)
+
+        yield self.e2e_room_keys_handler.update_version(
+            user_id, version, info
+        )
+        defer.returnValue((200, {}))
+
 
 def register_servlets(hs, http_server):
     RoomKeysServlet(hs).register(http_server)

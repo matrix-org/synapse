@@ -168,7 +168,7 @@ class MatrixFederationHttpClient(object):
             requests.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs, tls_client_options_factory):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
@@ -176,7 +176,7 @@ class MatrixFederationHttpClient(object):
 
         self.agent = MatrixFederationAgent(
             hs.get_reactor(),
-            hs.tls_client_options_factory,
+            tls_client_options_factory,
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()

@@ -22,6 +22,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -31,12 +32,19 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryStore(SQLBaseStore):
-    @cachedInlineCallbacks(cache_context=True)
-    def is_room_world_readable_or_publicly_joinable(self, room_id, cache_context):
+    @defer.inlineCallbacks
+    def is_room_world_readable_or_publicly_joinable(self, room_id):
         """Check if the room is either world_readable or publically joinable
         """
-        current_state_ids = yield self.get_current_state_ids(
-            room_id, on_invalidate=cache_context.invalidate
+
+        # Create a state filter that only queries join and history state event
+        types_to_filter = (
+            (EventTypes.JoinRules, ""),
+            (EventTypes.RoomHistoryVisibility, ""),
+        )
+
+        current_state_ids = yield self.get_filtered_current_state_ids(
+            room_id, StateFilter.from_types(types_to_filter),
         )
 
         join_rules_id = current_state_ids.get((EventTypes.JoinRules, ""))
