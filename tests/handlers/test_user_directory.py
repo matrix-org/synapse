@@ -108,8 +108,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         u2_token = self.login(u2, "pass")
         u3 = self.register_user("user3", "pass")
 
-        # NOTE: Implementation detail. We do not add users to the directory
-        # until they join a room.
+        # We do not add users to the directory until they join a room.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
 
         room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
@@ -124,6 +123,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u3, "user2", 10))
         self.assertEqual(len(s["results"]), 0)
 
+        # We get NO search results when searching for user3 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user3", 10))
+        self.assertEqual(len(s["results"]), 0)
+
     def _compress_shared(self, shared):
         """
         Compress a list of users who share rooms dicts to a list of tuples.
@@ -133,10 +136,27 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             r.add((i["user_id"], i["other_user_id"], i["room_id"]))
         return r
 
+    def get_users_who_share_public_rooms(self):
+        return self.get_success(
+            self.store._simple_select_list(
+                "users_who_share_public_rooms",
+                None,
+                ["user_id", "other_user_id", "room_id"],
+            )
+        )
+
+    def get_users_who_share_private_rooms(self):
+        return self.get_success(
+            self.store._simple_select_list(
+                "users_who_share_private_rooms",
+                None,
+                ["user_id", "other_user_id", "room_id"],
+            )
+        )
+
     def test_initial(self):
         """
-        A user can be searched for only by people that are either in a public
-        room, or that share a private chat.
+        The user directory's initial handler correctly updates the search tables.
         """
         u1 = self.register_user("user1", "pass")
         u1_token = self.login(u1, "pass")
@@ -156,16 +176,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.update_user_directory_stream_pos(None))
         self.get_success(self.store.delete_all_from_user_dir())
 
-        shares_public = self.get_success(
-            self.store._simple_select_list(
-                "users_who_share_public_rooms", None, ["user_id", "other_user_id"]
-            )
-        )
-        shares_private = self.get_success(
-            self.store._simple_select_list(
-                "users_who_share_private_rooms", None, ["user_id", "other_user_id"]
-            )
-        )
+        shares_public = self.get_users_who_share_public_rooms()
+        shares_private = self.get_users_who_share_private_rooms()
 
         self.assertEqual(shares_private, [])
         self.assertEqual(shares_public, [])
@@ -174,26 +186,20 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.handler.initially_handled_users = set()
         self.handler.initially_handled_users_in_public = set()
 
+        # Do the initial handler
         d = self.handler._do_initial_spam()
 
+        # This takes a while, so pump it a bunch of times to get through the
+        # sleep delays
         for i in range(10):
             self.pump(1)
 
-        r = self.get_success(d)
+        self.get_success(d)
 
-        shares_public = self.get_success(
-            self.store._simple_select_list(
-                "users_who_share_public_rooms",
-                None,
-                ["user_id", "other_user_id", "room_id"],
-            )
-        )
-        shares_private = self.get_success(
-            self.store._simple_select_list(
-                "users_who_share_private_rooms",
-                None,
-                ["user_id", "other_user_id", "room_id"],
-            )
+        shares_public = self.get_users_who_share_public_rooms()
+        shares_private = self.get_users_who_share_private_rooms()
+        in_public_room = self.get_success(
+            self.store.get_users_in_public_due_to_room(room)
         )
 
         # User 1 and User 2 share public rooms
@@ -201,8 +207,51 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self._compress_shared(shares_public), set([(u1, u2, room), (u2, u1, room)])
         )
 
+        # User 1 and User 2 are in the same public room
+        self.assertEqual(set(in_public_room), set([u1, u2]))
+
         # User 1 and User 3 share private rooms
         self.assertEqual(
             self._compress_shared(shares_private),
             set([(u1, u3, private_room), (u3, u1, private_room)]),
         )
+
+    def test_initial_profile(self):
+        """
+
+        """
+        self.hs.config.user_directory_search_all_users = True
+
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
+        u2 = self.register_user("user2", "pass")
+        u2_token = self.login(u2, "pass")
+        u3 = self.register_user("user3", "pass")
+
+        # User 1 and User 2 join a room. User 3 never does.
+        room = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
+        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        self.get_success(self.store.update_user_directory_stream_pos(None))
+        self.get_success(self.store.delete_all_from_user_dir())
+
+        # Reset the handled users caches
+        self.handler.initially_handled_users = set()
+        self.handler.initially_handled_users_in_public = set()
+
+        # Configure the
+
+        d = self.handler._do_initial_spam()
+
+        # This takes a while, so pump it a bunch of times to get through the
+        # sleep delays
+        for i in range(10):
+            self.pump(1)
+
+        self.get_success(d)
+
+        # Despite not sharing a room, search_all_users means we get a search
+        # result.
+        s = self.get_success(self.handler.search_users(u1, u3, 10))
+        self.assertEqual(len(s["results"]), 1)
