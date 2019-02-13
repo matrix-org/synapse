@@ -593,16 +593,13 @@ class UserDirectoryStore(SQLBaseStore):
             where_clause = "1=1"
         else:
             join_clause = """
-                LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_public_rooms
-                    WHERE user_id = ?
-                ) AS p USING (user_id)
+                LEFT JOIN users_who_share_public_rooms as p USING (user_id)
                 LEFT JOIN (
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
                     WHERE user_id = ?
                 ) AS s USING (user_id)
             """
-            join_args = (user_id, user_id)
+            join_args = (user_id,)
             where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
 
         if isinstance(self.database_engine, PostgresEngine):
@@ -614,7 +611,7 @@ class UserDirectoryStore(SQLBaseStore):
             # The array of numbers are the weights for the various part of the
             # search: (domain, _, display name, localpart)
             sql = """
-                SELECT d.user_id AS user_id, display_name, avatar_url
+                SELECT DISTINCT d.user_id AS user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
                 %s
@@ -652,7 +649,7 @@ class UserDirectoryStore(SQLBaseStore):
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
-                SELECT d.user_id AS user_id, display_name, avatar_url
+                SELECT DISTINCT d.user_id AS user_id, display_name, avatar_url
                 FROM user_directory_search
                 INNER JOIN user_directory AS d USING (user_id)
                 %s
