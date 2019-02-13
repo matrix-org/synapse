@@ -153,9 +153,8 @@ def listen_metrics(bind_addresses, port):
     from prometheus_client import start_http_server
 
     for host in bind_addresses:
-        reactor.callInThread(start_http_server, int(port),
-                             addr=host, registry=RegistryProxy)
-        logger.info("Metrics now reporting on %s:%d", host, port)
+        logger.info("Starting metrics listener on %s:%d", host, port)
+        start_http_server(port, addr=host, registry=RegistryProxy)
 
 
 def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
@@ -163,21 +162,23 @@ def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
     Create a TCP socket for a port and several addresses
 
     Returns:
-        list (empty)
+        list[twisted.internet.tcp.Port]: listening for TCP connections
     """
+    r = []
     for address in bind_addresses:
         try:
-            reactor.listenTCP(
-                port,
-                factory,
-                backlog,
-                address
+            r.append(
+                reactor.listenTCP(
+                    port,
+                    factory,
+                    backlog,
+                    address
+                )
             )
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
 
-    logger.info("Synapse now listening on TCP port %d", port)
-    return []
+    return r
 
 
 def listen_ssl(
@@ -204,7 +205,6 @@ def listen_ssl(
         except error.CannotListenError as e:
             check_bind_error(e, address, bind_addresses)
 
-    logger.info("Synapse now listening on port %d (TLS)", port)
     return r
 
 
@@ -230,6 +230,10 @@ def refresh_certificate(hs):
             # requests. This factory attribute is public but missing from
             # Twisted's documentation.
             if isinstance(i.factory, TLSMemoryBIOFactory):
+                addr = i.getHost()
+                logger.info(
+                    "Replacing TLS context factory on [%s]:%i", addr.host, addr.port,
+                )
                 # We want to replace TLS factories with a new one, with the new
                 # TLS configuration. We do this by reaching in and pulling out
                 # the wrappedFactory, and then re-wrapping it.
