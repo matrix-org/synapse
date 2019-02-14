@@ -112,7 +112,12 @@ thumbnail_sizes:
   height: 600
   method: scale
 
+{% if SYNAPSE_URL_PREVIEW_ENABLED %}
+url_preview_enabled: True
+{% else %}
 url_preview_enabled: False
+{% endif %}
+
 max_spider_size: "10M"
 
 ## Captcha ##
