@@ -18,7 +18,6 @@ import gc
 import logging
 import os
 import sys
-import traceback
 
 from six import iteritems
 
@@ -27,6 +26,7 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
+from twisted.python.failure import Failure
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -438,7 +438,11 @@ def setup(config_options):
             hs.get_datastore().start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.
-            traceback.print_exc(file=sys.stderr)
+            print("Error during startup:", file=sys.stderr)
+
+            # this gives better tracebacks than traceback.print_exc()
+            Failure().printTraceback(file=sys.stderr)
+
             if reactor.running:
                 reactor.stop()
             sys.exit(1)
