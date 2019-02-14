@@ -100,6 +100,14 @@ class LoggingTransaction(object):
     def __iter__(self):
         return self.txn.__iter__()
 
+    def execute_batch(self, sql, args):
+        if isinstance(self.database_engine, PostgresEngine):
+            from psycopg2.extras import execute_batch
+            self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
+        else:
+            for val in args:
+                self.execute(sql, val)
+
     def execute(self, sql, *args):
         self._do_execute(self.txn.execute, sql, *args)
 
@@ -693,18 +701,30 @@ class SQLBaseStore(object):
             else:
                 return "%s = ?" % (key,)
 
-        # First try to update.
-        sql = "UPDATE %s SET %s WHERE %s" % (
-            table,
-            ", ".join("%s = ?" % (k,) for k in values),
-            " AND ".join(_getwhere(k) for k in keyvalues)
-        )
-        sqlargs = list(values.values()) + list(keyvalues.values())
+        if not values:
+            # Try and select.
+            sql = "SELECT 1 FROM %s WHERE %s" % (
+                table,
+                " AND ".join(_getwhere(k) for k in keyvalues)
+            )
+            sqlargs = list(keyvalues.values())
+            txn.execute(sql, sqlargs)
+            if txn.fetchall():
+                # We have an existing record.
+                return False
+        else:
+            # First try to update.
+            sql = "UPDATE %s SET %s WHERE %s" % (
+                table,
+                ", ".join("%s = ?" % (k,) for k in values),
+                " AND ".join(_getwhere(k) for k in keyvalues)
+            )
+            sqlargs = list(values.values()) + list(keyvalues.values())
 
-        txn.execute(sql, sqlargs)
-        if txn.rowcount > 0:
-            # successfully updated at least one row.
-            return False
+            txn.execute(sql, sqlargs)
+            if txn.rowcount > 0:
+                # successfully updated at least one row.
+                return False
 
         # We didn't update any rows so insert a new one
         allvalues = {}
@@ -752,6 +772,82 @@ class SQLBaseStore(object):
             ", ".join(k + "=EXCLUDED." + k for k in values),
         )
         txn.execute(sql, list(allvalues.values()))
+
+    def _simple_upsert_many_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+        """
+        Upsert, many times.
+
+        Args:
+            table (str): The table to upsert into
+            keys (list[str]): The key column names.
+            keyvalues (list[list]): A list of each row's key column values.
+            values (list[str]): The value column names.
+            valuesvalues (list[list]): A list of each row's value column values.
+        Returns:
+            None
+        """
+        if (
+            self.database_engine.can_native_upsert
+            and table not in self._unsafe_to_upsert_tables
+        ):
+            return self._simple_upsert_many_txn_native_upsert(
+                txn,
+                table,
+                keys, keyvalues, values, valuesvalues
+            )
+        else:
+            return self._simple_upsert_many_txn_emulated(
+                txn,
+                table,
+                keys, keyvalues, values, valuesvalues
+            )
+
+    def _simple_upsert_many_txn_emulated(
+        self, txn, table, keys, keyvalues, values, valuesvalues
+    ):
+
+        if not valuesvalues:
+            valuesvalues = [() for x in range(len(keyvalues))]
+
+        for keyv, valv in zip(keyvalues, valuesvalues):
+            _keys = {x: y for x, y in zip(keys, keyv)}
+            _vals = {x: y for x, y in zip(values, valv)}
+
+            self._simple_upsert_txn_emulated(txn, table, _keys, _vals)
+
+    def _simple_upsert_many_txn_native_upsert(
+        self, txn, table, keys, keyvalues, values, valuesvalues
+    ):
+
+        allvalues = []
+        allvalues.extend(keys)
+        allvalues.extend(values)
+
+        if not valuesvalues:
+            valuesvalues = [[] for x in range(len(keyvalues))]
+
+        if not values:
+            latter = "NOTHING"
+        else:
+            latter = "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in values),
+
+        sql = (
+            "INSERT INTO %s (%s) VALUES (%s) "
+            "ON CONFLICT (%s) DO %s"
+        ) % (
+            table,
+            ", ".join(k for k in allvalues),
+            ", ".join("?" for _ in allvalues),
+            ", ".join(keys),
+            latter
+        )
+
+        args = []
+
+        for x, y in zip(keyvalues, valuesvalues):
+            args.append(tuple(x) + tuple(y))
+
+        return txn.execute_batch(sql, args)
 
     def _simple_select_one(self, table, keyvalues, retcols,
                            allow_none=False, desc="_simple_select_one"):
