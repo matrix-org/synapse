@@ -59,6 +59,7 @@ class WellKnownResource(Resource):
         self._well_known_builder = WellKnownBuilder(hs)
 
     def render_GET(self, request):
+	set_cors_headers(request)
         r = self._well_known_builder.get_well_known()
         if not r:
             request.setResponseCode(404)
