@@ -1,3 +1,13 @@
+Synapse 0.99.1.1 (2019-02-14)
+=============================
+
+Bugfixes
+--------
+
+- Fix "TypeError: '>' not supported" when starting without an existing certificate.
+  Fix a bug where an existing certificate would be reprovisoned every day. ([\#4648](https://github.com/matrix-org/synapse/issues/4648))
+
+
 Synapse 0.99.1 (2019-02-14)
 ===========================
 
