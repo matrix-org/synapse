@@ -242,3 +242,5 @@ def setup_logging(config, use_worker_options=False):
         [_log],
         redirectStandardIO=not config.no_redirect_stdio,
     )
+    if not config.no_redirect_stdio:
+        print("Redirected stdout/stderr to logs")

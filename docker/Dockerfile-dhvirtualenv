@@ -58,7 +58,11 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         sqlite3
 
 COPY --from=builder /dh-virtualenv_1.1-1_all.deb /
-RUN apt-get install -yq /dh-virtualenv_1.1-1_all.deb
+
+# install dhvirtualenv. Update the apt cache again first, in case we got a
+# cached cache from docker the first time.
+RUN apt-get update -qq -o Acquire::Languages=none \
+    && apt-get install -yq /dh-virtualenv_1.1-1_all.deb
 
 WORKDIR /synapse/source
 ENTRYPOINT ["bash","/synapse/source/docker/build_debian.sh"]
