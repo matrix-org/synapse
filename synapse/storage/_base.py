@@ -846,18 +846,18 @@ class SQLBaseStore(object):
         if not value_values:
             value_values = [[] for x in range(len(key_values))]
 
-        if not values_names:
+        if not value_names:
             latter = "NOTHING"
         else:
             latter = (
-                "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in value_names),
+                "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in value_names)
             )
 
-        sql = ("INSERT INTO %s (%s) VALUES (%s) " "ON CONFLICT (%s) DO %s") % (
+        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s" % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
-            ", ".join(keys),
+            ", ".join(key_names),
             latter,
         )
 
