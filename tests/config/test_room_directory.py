@@ -138,3 +138,9 @@ class RoomDirectoryConfigTestCase(unittest.TestCase):
             room_id="!test-deny",
             aliases=[],
         ))
+
+        self.assertTrue(rd_config.is_publishing_room_allowed(
+            user_id="@test:example.com",
+            room_id="!test",
+            aliases=["#unofficial_st:example.com", "#blah:example.com"],
+        ))

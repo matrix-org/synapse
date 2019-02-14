@@ -58,7 +58,11 @@ class RoomDirectoryConfig(Config):
         # which rooms can be published in the public room list.
         #
         # The format of this option is the same as that for
-        # `alias_creation_rules`
+        # `alias_creation_rules`.
+        #
+        # If the room has one or more aliases associated with it, the rules are
+        # run against each alias. If there are no aliases then only rules with
+        # `alias: *` match.
         room_list_publication_rules:
             - user_id: "*"    # Matches against the user publishing the room
               alias: "*"      # Matches against any current local or canonical
@@ -156,11 +160,19 @@ class _RoomDirectoryRule(object):
 
         # If we are not given any aliases then this rule only matches if the
         # alias glob matches all aliases
-        if not aliases and not self._alias_matches_all:
-            return False
+        matched = False
+        if not aliases:
+            if not self._alias_matches_all:
+                return False
+        else:
+            # Otherwise, we just need one alias to match
+            matched = False
+            for alias in aliases:
+                if self._alias_regex.match(alias):
+                    matched = True
+                    break
 
-        for alias in aliases:
-            if not self._alias_regex.match(alias):
+            if not matched:
                 return False
 
         if not self._room_id_regex.match(room_id):
