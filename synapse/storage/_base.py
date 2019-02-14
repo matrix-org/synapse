@@ -773,16 +773,16 @@ class SQLBaseStore(object):
         )
         txn.execute(sql, list(allvalues.values()))
 
-    def _simple_upsert_many_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+    def _simple_upsert_many_txn(self, txn, table, key_names, key_values, value_names, value_values):
         """
         Upsert, many times.
 
         Args:
             table (str): The table to upsert into
-            keys (list[str]): The key column names.
-            keyvalues (list[list]): A list of each row's key column values.
-            values (list[str]): The value column names.
-            valuesvalues (list[list]): A list of each row's value column values.
+            key_names (list[str]): The key column names.
+            key_values (list[list]): A list of each row's key column values.
+            value_names (list[str]): The value column names.
+            value_values (list[list]): A list of each row's value column values.
         Returns:
             None
         """
@@ -793,43 +793,65 @@ class SQLBaseStore(object):
             return self._simple_upsert_many_txn_native_upsert(
                 txn,
                 table,
-                keys, keyvalues, values, valuesvalues
+                key_names, key_values, value_names, value_values
             )
         else:
             return self._simple_upsert_many_txn_emulated(
                 txn,
                 table,
-                keys, keyvalues, values, valuesvalues
+                key_names, key_values, value_names, value_values
             )
 
     def _simple_upsert_many_txn_emulated(
-        self, txn, table, keys, keyvalues, values, valuesvalues
+        self, txn, table, key_names, key_values, value_names, value_values
     ):
+        """
+        Upsert, many times, but without native UPSERT support or batching.
 
-        if not valuesvalues:
-            valuesvalues = [() for x in range(len(keyvalues))]
+        Args:
+            table (str): The table to upsert into
+            key_names (list[str]): The key column names.
+            key_values (list[list]): A list of each row's key column values.
+            value_names (list[str]): The value column names.
+            value_values (list[list]): A list of each row's value column values.
+        Returns:
+            None
+        """
+        if not value_values:
+            value_values = [() for x in range(len(key_values))]
 
-        for keyv, valv in zip(keyvalues, valuesvalues):
-            _keys = {x: y for x, y in zip(keys, keyv)}
-            _vals = {x: y for x, y in zip(values, valv)}
+        for keyv, valv in zip(key_values, value_values):
+            _keys = {x: y for x, y in zip(key_names, keyv)}
+            _vals = {x: y for x, y in zip(value_names, valv)}
 
             self._simple_upsert_txn_emulated(txn, table, _keys, _vals)
 
     def _simple_upsert_many_txn_native_upsert(
-        self, txn, table, keys, keyvalues, values, valuesvalues
+        self, txn, table, key_names, key_values, value_names, value_values
     ):
+        """
+        Upsert, many times, using batching where possible.
 
+        Args:
+            table (str): The table to upsert into
+            key_names (list[str]): The key column names.
+            key_values (list[list]): A list of each row's key column values.
+            value_names (list[str]): The value column names.
+            value_values (list[list]): A list of each row's value column values.
+        Returns:
+            None
+        """
         allvalues = []
-        allvalues.extend(keys)
-        allvalues.extend(values)
+        allvalues.extend(key_names)
+        allvalues.extend(value_names)
 
-        if not valuesvalues:
-            valuesvalues = [[] for x in range(len(keyvalues))]
+        if not value_values:
+            value_values = [[] for x in range(len(key_values))]
 
-        if not values:
+        if not values_names:
             latter = "NOTHING"
         else:
-            latter = "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in values),
+            latter = "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in value_names),
 
         sql = (
             "INSERT INTO %s (%s) VALUES (%s) "
@@ -844,7 +866,7 @@ class SQLBaseStore(object):
 
         args = []
 
-        for x, y in zip(keyvalues, valuesvalues):
+        for x, y in zip(key_values, value_values):
             args.append(tuple(x) + tuple(y))
 
         return txn.execute_batch(sql, args)
