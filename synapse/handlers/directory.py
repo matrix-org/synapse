@@ -417,22 +417,22 @@ class DirectoryHandler(BaseHandler):
 
         yield self.auth.check_can_change_room_list(room_id, requester.user)
 
-        room_aliases = yield self.store.get_aliases_for_room(room_id)
-        canonical_alias = yield self.store.get_canonical_alias_for_room(room_id)
-        if canonical_alias:
-            room_aliases.append(canonical_alias)
-
         making_public = visibility == "public"
+        if making_public:
+            room_aliases = yield self.store.get_aliases_for_room(room_id)
+            canonical_alias = yield self.store.get_canonical_alias_for_room(room_id)
+            if canonical_alias:
+                room_aliases.append(canonical_alias)
 
-        if making_public and not self.config.is_publishing_room_allowed(
-            user_id, room_id, room_aliases,
-        ):
-            # Lets just return a generic message, as there may be all sorts of
-            # reasons why we said no. TODO: Allow configurable error messages
-            # per alias creation rule?
-            raise SynapseError(
-                403, "Not allowed to publish room",
-            )
+            if not self.config.is_publishing_room_allowed(
+                user_id, room_id, room_aliases,
+            ):
+                # Lets just return a generic message, as there may be all sorts of
+                # reasons why we said no. TODO: Allow configurable error messages
+                # per alias creation rule?
+                raise SynapseError(
+                    403, "Not allowed to publish room",
+                )
 
         yield self.store.set_room_is_public(room_id, making_public)
 
