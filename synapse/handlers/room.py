@@ -285,6 +285,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.RoomAvatar, ""),
             (EventTypes.Encryption, ""),
             (EventTypes.ServerACL, ""),
+            (EventTypes.Member, None),
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(
@@ -296,6 +297,19 @@ class RoomCreationHandler(BaseHandler):
         for k, old_event_id in iteritems(old_room_state_ids):
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
+
+                # Only transfer ban membership events
+                if ("membership" in old_event.content and
+                        old_event.content["membership"] == "ban"):
+                    yield self.room_member_handler.update_membership(
+                        requester,
+                        UserID.from_string(old_event['state_key']),
+                        room_id,
+                        "ban",
+                        ratelimit=False,
+                        content=old_event.content,
+                    )
+
                 initial_state[k] = old_event.content
 
         yield self._send_events_for_new_room(
