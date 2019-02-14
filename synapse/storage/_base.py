@@ -773,7 +773,9 @@ class SQLBaseStore(object):
         )
         txn.execute(sql, list(allvalues.values()))
 
-    def _simple_upsert_many_txn(self, txn, table, key_names, key_values, value_names, value_values):
+    def _simple_upsert_many_txn(
+        self, txn, table, key_names, key_values, value_names, value_values
+    ):
         """
         Upsert, many times.
 
@@ -791,15 +793,11 @@ class SQLBaseStore(object):
             and table not in self._unsafe_to_upsert_tables
         ):
             return self._simple_upsert_many_txn_native_upsert(
-                txn,
-                table,
-                key_names, key_values, value_names, value_values
+                txn, table, key_names, key_values, value_names, value_values
             )
         else:
             return self._simple_upsert_many_txn_emulated(
-                txn,
-                table,
-                key_names, key_values, value_names, value_values
+                txn, table, key_names, key_values, value_names, value_values
             )
 
     def _simple_upsert_many_txn_emulated(
@@ -851,17 +849,16 @@ class SQLBaseStore(object):
         if not values_names:
             latter = "NOTHING"
         else:
-            latter = "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in value_names),
+            latter = (
+                "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in value_names),
+            )
 
-        sql = (
-            "INSERT INTO %s (%s) VALUES (%s) "
-            "ON CONFLICT (%s) DO %s"
-        ) % (
+        sql = ("INSERT INTO %s (%s) VALUES (%s) " "ON CONFLICT (%s) DO %s") % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
             ", ".join(keys),
-            latter
+            latter,
         )
 
         args = []
