@@ -1,5 +1,5 @@
-Synapse 0.99.1rc1 (2019-02-12)
-==============================
+Synapse 0.99.1 (2019-02-14)
+===========================
 
 Features
 --------
@@ -10,7 +10,7 @@ Features
 - Add ability to update backup versions ([\#4580](https://github.com/matrix-org/synapse/issues/4580))
 - Allow the "unavailable" presence status for /sync.
   This change makes Synapse compliant with r0.4.0 of the Client-Server specification. ([\#4592](https://github.com/matrix-org/synapse/issues/4592))
-- There is no longer any need to specify `no_tls`: it is inferred from the absence of TLS listeners ([\#4613](https://github.com/matrix-org/synapse/issues/4613), [\#4615](https://github.com/matrix-org/synapse/issues/4615), [\#4617](https://github.com/matrix-org/synapse/issues/4617))
+- There is no longer any need to specify `no_tls`: it is inferred from the absence of TLS listeners ([\#4613](https://github.com/matrix-org/synapse/issues/4613), [\#4615](https://github.com/matrix-org/synapse/issues/4615), [\#4617](https://github.com/matrix-org/synapse/issues/4617), [\#4636](https://github.com/matrix-org/synapse/issues/4636))
 - The default configuration no longer requires TLS certificates. ([\#4614](https://github.com/matrix-org/synapse/issues/4614))
 
 
