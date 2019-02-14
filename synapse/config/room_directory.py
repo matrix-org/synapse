@@ -23,8 +23,15 @@ class RoomDirectoryConfig(Config):
         alias_creation_rules = config["alias_creation_rules"]
 
         self._alias_creation_rules = [
-            _AliasRule(rule)
+            _RoomDirectoryRule("alias_creation_rules", rule)
             for rule in alias_creation_rules
+        ]
+
+        room_list_publication_rules = config["room_list_publication_rules"]
+
+        self._room_list_publication_rules = [
+            _RoomDirectoryRule("room_list_publication_rules", rule)
+            for rule in room_list_publication_rules
         ]
 
     def default_config(self, config_dir_path, server_name, **kwargs):
@@ -33,60 +40,104 @@ class RoomDirectoryConfig(Config):
         # on this server.
         #
         # The format of this option is a list of rules that contain globs that
-        # match against user_id and the new alias (fully qualified with server
-        # name). The action in the first rule that matches is taken, which can
-        # currently either be "allow" or "deny".
+        # match against user_id, room_id and the new alias (fully qualified with
+        # server name). The action in the first rule that matches is taken,
+        # which can currently either be "allow" or "deny".
+        #
+        # Missing user_id/room_id/alias fields default to "*".
         #
         # If no rules match the request is denied.
         alias_creation_rules:
             - user_id: "*"
-              alias: "*"
+              alias: "*"      # This matches alias being created
+              room_id: "*"
+              action: allow
+
+        # The `room_list_publication_rules` option control who and what can be
+        # published in the public room list.
+        #
+        # The format of this option is the same as that for
+        # `alias_creation_rules`
+        room_list_publication_rules:
+            - user_id: "*"
+              alias: "*"      # This matches any local or canonical alias
+                              # associated with the room
+              room_id: "*"
               action: allow
         """
 
-    def is_alias_creation_allowed(self, user_id, alias):
+    def is_alias_creation_allowed(self, user_id, room_id, alias):
         """Checks if the given user is allowed to create the given alias
 
         Args:
             user_id (str)
+            room_id (str)
             alias (str)
 
         Returns:
             boolean: True if user is allowed to crate the alias
         """
         for rule in self._alias_creation_rules:
-            if rule.matches(user_id, alias):
+            if rule.matches(user_id, room_id, [alias]):
+                return rule.action == "allow"
+
+        return False
+
+    def is_publishing_room_allowed(self, user_id, room_id, aliases):
+        """Checks if the given user is allowed to publish the room
+
+        Args:
+            user_id (str)
+            room_id (str)
+            aliases (list[str]): any local aliases associated with the room
+
+        Returns:
+            boolean: True if user can publish room
+        """
+        for rule in self._room_list_publication_rules:
+            if rule.matches(user_id, room_id, aliases):
                 return rule.action == "allow"
 
         return False
 
 
-class _AliasRule(object):
-    def __init__(self, rule):
+class _RoomDirectoryRule(object):
+    """Helper class to test whether a room directory action is allowed, like
+    creating an alias or publishing a room.
+    """
+
+    def __init__(self, option_name, rule):
         action = rule["action"]
-        user_id = rule["user_id"]
-        alias = rule["alias"]
+        user_id = rule.get("user_id", "*")
+        room_id = rule.get("room_id", "*")
+        alias = rule.get("alias", "*")
 
         if action in ("allow", "deny"):
             self.action = action
         else:
             raise ConfigError(
-                "alias_creation_rules rules can only have action of 'allow'"
-                " or 'deny'"
+                "%s rules can only have action of 'allow'"
+                " or 'deny'" % (option_name,)
             )
+
+        self._alias_matches_all = alias == "*"
 
         try:
             self._user_id_regex = glob_to_regex(user_id)
             self._alias_regex = glob_to_regex(alias)
+            self._room_id_regex = glob_to_regex(room_id)
         except Exception as e:
             raise ConfigError("Failed to parse glob into regex: %s", e)
 
-    def matches(self, user_id, alias):
-        """Tests if this rule matches the given user_id and alias.
+    def matches(self, user_id, room_id, aliases):
+        """Tests if this rule matches the given user_id, room_id and aliases.
 
         Args:
             user_id (str)
-            alias (str)
+            room_id (str)
+            aliases (list[str]): The associated aliases to the room. Will be a
+                single element for testing alias creation, and can be empty for
+                testing room publishing.
 
         Returns:
             boolean
@@ -96,7 +147,16 @@ class _AliasRule(object):
         if not self._user_id_regex.match(user_id):
             return False
 
-        if not self._alias_regex.match(alias):
+        # If we are not given any aliases then this rule only matches if the
+        # alias glob matches all aliases
+        if not aliases and not self._alias_matches_all:
+            return False
+
+        for alias in aliases:
+            if not self._alias_regex.match(alias):
+                return False
+
+        if not self._room_id_regex.match(room_id):
             return False
 
         return True

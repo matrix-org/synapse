@@ -548,6 +548,31 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             _get_filtered_current_state_ids_txn,
         )
 
+    @defer.inlineCallbacks
+    def get_canonical_alias_for_room(self, room_id):
+        """Get canonical alias for room, if any
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[str|None]: The canonical alias, if any
+        """
+
+        state = yield self.get_filtered_current_state_ids(room_id, StateFilter.from_types(
+            [(EventTypes.CanonicalAlias, "")]
+        ))
+
+        event_id = state.get((EventTypes.CanonicalAlias, ""))
+        if not event_id:
+            return
+
+        event = yield self.get_event(event_id, allow_none=True)
+        if not event:
+            return
+
+        defer.returnValue(event.content.get("canonical_alias"))
+
     @cached(max_entries=10000, iterable=True)
     def get_state_group_delta(self, state_group):
         """Given a state group try to return a previous group and a delta between

@@ -121,6 +121,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
                 "action": "allow",
             }
         ]
+        config["room_list_publication_rules"] = []
 
         rd_config = RoomDirectoryConfig()
         rd_config.read_config(config)
