@@ -263,6 +263,16 @@ class RoomCreationHandler(BaseHandler):
             }
         }
 
+        # Check if old room was non-federatable
+
+        # Get old room's create event
+        old_room_create_event = yield self.store.get_create_event_for_room(old_room_id)
+
+        # Check if the create event specified a non-federatable room
+        if not old_room_create_event.content.get("m.federate", True):
+            # If so, mark the new room as non-federatable as well
+            creation_content["m.federate"] = False
+
         initial_state = dict()
 
         # Replicate relevant room events
@@ -274,6 +284,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.GuestAccess, ""),
             (EventTypes.RoomAvatar, ""),
             (EventTypes.Encryption, ""),
+            (EventTypes.ServerACL, ""),
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(

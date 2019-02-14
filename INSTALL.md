@@ -350,17 +350,34 @@ Once you have installed synapse as above, you will need to configure it.
 
 ## TLS certificates
 
-The default configuration exposes two HTTP ports: 8008 and 8448. Port 8008 is
-configured without TLS; it should be behind a reverse proxy for TLS/SSL
-termination on port 443 which in turn should be used for clients. Port 8448
-is configured to use TLS for Federation with a self-signed or verified
-certificate, but please be aware that a valid certificate will be required in
-Synapse v1.0. Instructions for having Synapse automatically provision and renew federation certificates through ACME can be found at [ACME.md](docs/ACME.md).
+The default configuration exposes a single HTTP port: http://localhost:8008. It
+is suitable for local testing, but for any practical use, you will either need
+to enable a reverse proxy, or configure Synapse to expose an HTTPS port.
 
-If you would like to use your own certificates, you can do so by changing
-`tls_certificate_path` and `tls_private_key_path` in `homeserver.yaml`;
-alternatively, you can use a reverse-proxy. Apart from port 8448 using TLS,
-both ports are the same in the default configuration.
+For information on using a reverse proxy, see
+[docs/reverse_proxy.rst](docs/reverse_proxy.rst).
+
+To configure Synapse to expose an HTTPS port, you will need to edit
+`homeserver.yaml`.
+
+First, under the `listeners` section, uncomment the configuration for the
+TLS-enabled listener. (Remove the hash sign (`#`) and space at the start of
+each line). The relevant lines are like this:
+
+```
+  - port: 8448
+    type: http
+    tls: true
+    resources:
+      - names: [client, federation]
+```
+
+You will also need to uncomment the `tls_certificate_path` and
+`tls_private_key_path` lines under the `TLS` section. You can either point
+these settings at an existing certificate and key, or you can enable Synapse's
+built-in ACME (Let's Encrypt) support.  Instructions for having Synapse
+automatically provision and renew federation certificates through ACME can be
+found at [ACME.md](docs/ACME.md).
 
 ## Registering a user
 
@@ -374,7 +391,7 @@ users. This can be done as follows:
 ```
 $ source ~/synapse/env/bin/activate
 $ synctl start # if not already running
-$ register_new_matrix_user -c homeserver.yaml https://localhost:8448
+$ register_new_matrix_user -c homeserver.yaml http://localhost:8008
 New user localpart: erikj
 Password:
 Confirm password:

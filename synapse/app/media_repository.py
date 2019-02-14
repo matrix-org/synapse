@@ -26,7 +26,6 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.crypto import context_factory
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
 from synapse.metrics.resource import METRICS_PREFIX, MetricsResource
@@ -160,17 +159,7 @@ def start(config_options):
     )
 
     ss.setup()
-
-    def start():
-        ss.config.read_certificate_from_disk()
-        ss.tls_server_context_factory = context_factory.ServerContextFactory(config)
-        ss.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-            config
-        )
-        ss.start_listening(config.worker_listeners)
-        ss.get_datastore().start_profiling()
-
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-media-repository", config)
 

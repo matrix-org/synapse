@@ -445,12 +445,7 @@ def start(config_options):
     )
 
     ss.setup()
-    ss.start_listening(config.worker_listeners)
-
-    def start():
-        ss.get_datastore().start_profiling()
-
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-synchrotron", config)
 

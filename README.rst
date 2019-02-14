@@ -26,7 +26,6 @@ via IRC bridge at irc://irc.freenode.net/matrix.
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
 
-
 About Matrix
 ============
 
@@ -88,18 +87,20 @@ Connecting to Synapse from a client
 ===================================
 
 The easiest way to try out your new Synapse installation is by connecting to it
-from a web client. The easiest option is probably the one at
-https://riot.im/app. You will need to specify a "Custom server" when you log on
-or register: set this to ``https://domain.tld`` if you setup a reverse proxy
-following the recommended setup, or ``https://localhost:8448`` - remember to specify the
-port (``:8448``) if not ``:443`` unless you changed the configuration. (Leave the identity
-server as the default - see `Identity servers`_.)
+from a web client.
 
-If using port 8448 you will run into errors if you are using a self-signed
-certificate. To overcome this, simply go to ``https://localhost:8448``
-directly with your browser and accept the presented certificate. You can then
-go back in your web client and proceed further. Valid federation certificates
-should not have this problem.
+Unless you are running a test instance of Synapse on your local machine, in
+general, you will need to enable TLS support before you can successfully
+connect from a client: see `<INSTALL.md#tls-certificates>`_.
+
+An easy way to get started is to login or register via Riot at 
+https://riot.im/app/#/login or https://riot.im/app/#/register respectively. 
+You will need to change the server you are logging into from ``matrix.org``
+and instead specify a Homeserver URL of ``https://<server_name>:8448`` 
+(or just ``https://<server_name>`` if you are using a reverse proxy). 
+(Leave the identity server as the default - see `Identity servers`_.) 
+If you prefer to use another client, refer to our 
+`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
 If all goes well you should at least be able to log in, create a room, and
 start sending messages.
@@ -174,8 +175,29 @@ Separately, Synapse may leak file handles if inbound HTTP requests get stuck
 during processing - e.g. blocked behind a lock or talking to a remote server etc.
 This is best diagnosed by matching up the 'Received request' and 'Processed request'
 log lines and looking for any 'Processed request' lines which take more than
-a few seconds to execute.  Please let us know at #matrix-dev:matrix.org if
+a few seconds to execute.  Please let us know at #synapse:matrix.org if
 you see this failure mode so we can help debug it, however.
+
+Help!! Synapse eats all my RAM!
+-------------------------------
+
+Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests.  We'll improve this in future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+variable.  The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained enviroments, or increased if performance starts to
+degrade.
+
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall amount, and especially in terms of giving back RAM
+to the OS. To use it, the library must simply be put in the LD_PRELOAD
+environment variable when launching Synapse. On Debian, this can be done
+by installing the ``libjemalloc1`` package and adding this line to
+``/etc/default/matrix-synapse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 
 Upgrading an existing Synapse
@@ -196,12 +218,12 @@ Federation is the process by which users on different servers can participate
 in the same room. For this to work, those other servers must be able to contact
 yours to send messages.
 
-The ``server_name`` in your
-``homeserver.yaml`` file determines the way that other servers will reach
-yours. By default, they will treat it as a hostname and try to connect to
-port 8448. This is easy to set up and will work with the default configuration,
-provided you set the ``server_name`` to match your machine's public DNS
-hostname.
+The ``server_name`` in your ``homeserver.yaml`` file determines the way that
+other servers will reach yours. By default, they will treat it as a hostname
+and try to connect to port 8448. This is easy to set up and will work with the
+default configuration, provided you set the ``server_name`` to match your
+machine's public DNS hostname, and give Synapse a TLS certificate which is
+valid for your ``server_name``.
 
 For a more flexible configuration, you can set up a DNS SRV record. This allows
 you to run your server on a machine that might not have the same name as your
@@ -243,11 +265,8 @@ largest boxes pause for thought.)
 Troubleshooting
 ---------------
 
-You can use the federation tester to check if your homeserver is all set:
-``https://matrix.org/federationtester/api/report?server_name=<your_server_name>``
-If any of the attributes under "checks" is false, federation won't work.
-There is also a nicer interface available from a community member at
-`<https://neo.lain.haus/fed-tester>`_.
+You can use the `federation tester <https://matrix.org/federationtester>`_ to
+check if your homeserver is all set.
 
 The typical failure mode with federation is that when you try to join a room,
 it is rejected with "401: Unauthorized". Generally this means that other
@@ -262,6 +281,11 @@ So, things to check are:
 * If you *are* using a SRV record, check that it matches your ``server_name``
   (it should be ``_matrix._tcp.<server_name>``), and that the port and hostname
   it specifies are reachable from outside your network.
+
+Another common problem is that people on other servers can't join rooms that
+you invite them to. This can be caused by an incorrectly-configured reverse
+proxy: see `<docs/reverse_proxy.rst>`_ for instructions on how to correctly
+configure a reverse proxy.
 
 Running a Demo Federation of Synapses
 -------------------------------------
@@ -290,7 +314,6 @@ The advantages of Postgres include:
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.rst <docs/postgres.rst>`_.
 
-
 .. _reverse-proxy:
 
 Using a reverse proxy with Synapse
@@ -304,54 +327,7 @@ It is recommended to put a reverse proxy such as
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
-The most important thing to know here is that Matrix clients and other Matrix
-servers do not necessarily need to connect to your server via the same
-port. Indeed, clients will use port 443 by default, whereas servers default to
-port 8448. Where these are different, we refer to the 'client port' and the
-'federation port'.
-
-All Matrix endpoints begin with ``/_matrix``, so an example nginx
-configuration for forwarding client connections to Synapse might look like::
-
-  server {
-      listen 443 ssl;
-      listen [::]:443 ssl;
-      server_name matrix.example.com;
-
-      location /_matrix {
-          proxy_pass http://localhost:8008;
-          proxy_set_header X-Forwarded-For $remote_addr;
-      }
-  }
-
-an example Caddy configuration might look like::
-
-    matrix.example.com {
-      proxy /_matrix http://localhost:8008 {
-        transparent
-      }
-    }
-
-and an example Apache configuration might look like::
-
-    <VirtualHost *:443>
-        SSLEngine on
-        ServerName matrix.example.com;
-
-        <Location /_matrix>
-            ProxyPass http://127.0.0.1:8008/_matrix nocanon
-            ProxyPassReverse http://127.0.0.1:8008/_matrix
-        </Location>
-    </VirtualHost>
-
-You will also want to set ``bind_addresses: ['127.0.0.1']`` and ``x_forwarded: true``
-for port 8008 in ``homeserver.yaml`` to ensure that client IP addresses are
-recorded correctly.
-
-Having done so, you can then use ``https://matrix.example.com`` (instead of
-``https://matrix.example.com:8448``) as the "Custom server" when `Connecting to
-Synapse from a client`_.
-
+For information on configuring one, see `<docs/reverse_proxy.rst>`_.
 
 Identity Servers
 ================
@@ -409,7 +385,7 @@ Synapse Development
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
-`Installing from source`_.
+`Installing from source <INSTALL.md#installing-from-source>`_.
 
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::
@@ -420,7 +396,7 @@ directory of your choice::
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    virtualenv -p python2.7 env
+    virtualenv -p python3 env
     source env/bin/activate
     python -m pip install -e .[all]
 
@@ -462,25 +438,3 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
-
-
-Help!! Synapse eats all my RAM!
-===============================
-
-Synapse's architecture is quite RAM hungry currently - we deliberately
-cache a lot of recent room data and metadata in RAM in order to speed up
-common requests.  We'll improve this in future, but for now the easiest
-way to either reduce the RAM usage (at the risk of slowing things down)
-is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
-variable.  The default is 0.5, which can be decreased to reduce RAM usage
-in memory constrained enviroments, or increased if performance starts to
-degrade.
-
-Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
-improvement in overall amount, and especially in terms of giving back RAM
-to the OS. To use it, the library must simply be put in the LD_PRELOAD
-environment variable when launching Synapse. On Debian, this can be done
-by installing the ``libjemalloc1`` package and adding this line to
-``/etc/default/matrix-synapse``::
-
-    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1

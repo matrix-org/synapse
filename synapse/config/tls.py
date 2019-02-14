@@ -23,9 +23,9 @@ from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
 
-from synapse.config._base import Config
+from synapse.config._base import Config, ConfigError
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class TlsConfig(Config):
@@ -45,9 +45,25 @@ class TlsConfig(Config):
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
-        self._original_tls_fingerprints = config["tls_fingerprints"]
+
+        if self.has_tls_listener():
+            if not self.tls_certificate_file:
+                raise ConfigError(
+                    "tls_certificate_path must be specified if TLS-enabled listeners are "
+                    "configured."
+                )
+            if not self.tls_private_key_file:
+                raise ConfigError(
+                    "tls_certificate_path must be specified if TLS-enabled listeners are "
+                    "configured."
+                )
+
+        self._original_tls_fingerprints = config.get("tls_fingerprints", [])
+
+        if self._original_tls_fingerprints is None:
+            self._original_tls_fingerprints = []
+
         self.tls_fingerprints = list(self._original_tls_fingerprints)
-        self.no_tls = config.get("no_tls", False)
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -60,9 +76,13 @@ class TlsConfig(Config):
         self.tls_certificate = None
         self.tls_private_key = None
 
-    def is_disk_cert_valid(self):
+    def is_disk_cert_valid(self, allow_self_signed=True):
         """
         Is the certificate we have on disk valid, and if so, for how long?
+
+        Args:
+            allow_self_signed (bool): Should we allow the certificate we
+                read to be self signed?
 
         Returns:
             int: Days remaining of certificate validity.
@@ -84,6 +104,12 @@ class TlsConfig(Config):
             logger.exception("Failed to parse existing certificate off disk!")
             raise
 
+        if not allow_self_signed:
+            if tls_certificate.get_subject() == tls_certificate.get_issuer():
+                raise ValueError(
+                    "TLS Certificate is self signed, and this is not permitted"
+                )
+
         # YYYYMMDDhhmmssZ -- in UTC
         expires_on = datetime.strptime(
             tls_certificate.get_notAfter().decode('ascii'), "%Y%m%d%H%M%SZ"
@@ -92,36 +118,40 @@ class TlsConfig(Config):
         days_remaining = (expires_on - now).days
         return days_remaining
 
-    def read_certificate_from_disk(self):
+    def read_certificate_from_disk(self, require_cert_and_key):
         """
-        Read the certificates from disk.
-        """
-        self.tls_certificate = self.read_tls_certificate(self.tls_certificate_file)
+        Read the certificates and private key from disk.
 
-        # Check if it is self-signed, and issue a warning if so.
-        if self.tls_certificate.get_issuer() == self.tls_certificate.get_subject():
-            warnings.warn(
-                (
-                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
-                    "Please either provide a valid certificate, or use Synapse's ACME "
-                    "support to provision one."
+        Args:
+            require_cert_and_key (bool): set to True to throw an error if the certificate
+                and key file are not given
+        """
+        if require_cert_and_key:
+            self.tls_private_key = self.read_tls_private_key()
+            self.tls_certificate = self.read_tls_certificate()
+        elif self.tls_certificate_file:
+            # we only need the certificate for the tls_fingerprints. Reload it if we
+            # can, but it's not a fatal error if we can't.
+            try:
+                self.tls_certificate = self.read_tls_certificate()
+            except Exception as e:
+                logger.info(
+                    "Unable to read TLS certificate (%s). Ignoring as no "
+                    "tls listeners enabled.", e,
                 )
-            )
-
-        if not self.no_tls:
-            self.tls_private_key = self.read_tls_private_key(self.tls_private_key_file)
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
 
-        # Check that our own certificate is included in the list of fingerprints
-        # and include it if it is not.
-        x509_certificate_bytes = crypto.dump_certificate(
-            crypto.FILETYPE_ASN1, self.tls_certificate
-        )
-        sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
-        sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
-        if sha256_fingerprint not in sha256_fingerprints:
-            self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
+        if self.tls_certificate:
+            # Check that our own certificate is included in the list of fingerprints
+            # and include it if it is not.
+            x509_certificate_bytes = crypto.dump_certificate(
+                crypto.FILETYPE_ASN1, self.tls_certificate
+            )
+            sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
+            sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
+            if sha256_fingerprint not in sha256_fingerprints:
+                self.tls_fingerprints.append({u"sha256": sha256_fingerprint})
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -137,6 +167,8 @@ class TlsConfig(Config):
 
         return (
             """\
+        ## TLS ##
+
         # PEM-encoded X509 certificate for TLS.
         # This certificate, as of Synapse 1.0, will need to be a valid and verifiable
         # certificate, signed by a recognised Certificate Authority.
@@ -144,10 +176,10 @@ class TlsConfig(Config):
         # See 'ACME support' below to enable auto-provisioning this certificate via
         # Let's Encrypt.
         #
-        tls_certificate_path: "%(tls_certificate_path)s"
+        # tls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM-encoded private key for TLS
-        tls_private_key_path: "%(tls_private_key_path)s"
+        # tls_private_key_path: "%(tls_private_key_path)s"
 
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.
@@ -172,7 +204,7 @@ class TlsConfig(Config):
         #
         acme:
             # ACME support is disabled by default. Uncomment the following line
-            # to enable it.
+            # (and tls_certificate_path and tls_private_key_path above) to enable it.
             #
             # enabled: true
 
@@ -196,13 +228,6 @@ class TlsConfig(Config):
             # How many days remaining on a certificate before it is renewed.
             #
             # reprovision_threshold: 30
-
-        # If your server runs behind a reverse-proxy which terminates TLS connections
-        # (for both client and federation connections), it may be useful to disable
-        # All TLS support for incoming connections. Setting no_tls to True will
-        # do so (and avoid the need to give synapse a TLS private key).
-        #
-        # no_tls: True
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
@@ -236,10 +261,38 @@ class TlsConfig(Config):
             % locals()
         )
 
-    def read_tls_certificate(self, cert_path):
-        cert_pem = self.read_file(cert_path, "tls_certificate")
-        return crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+    def read_tls_certificate(self):
+        """Reads the TLS certificate from the configured file, and returns it
 
-    def read_tls_private_key(self, private_key_path):
-        private_key_pem = self.read_file(private_key_path, "tls_private_key")
+        Also checks if it is self-signed, and warns if so
+
+        Returns:
+            OpenSSL.crypto.X509: the certificate
+        """
+        cert_path = self.tls_certificate_file
+        logger.info("Loading TLS certificate from %s", cert_path)
+        cert_pem = self.read_file(cert_path, "tls_certificate_path")
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+
+        # Check if it is self-signed, and issue a warning if so.
+        if cert.get_issuer() == cert.get_subject():
+            warnings.warn(
+                (
+                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
+                    "Please either provide a valid certificate, or use Synapse's ACME "
+                    "support to provision one."
+                )
+            )
+
+        return cert
+
+    def read_tls_private_key(self):
+        """Reads the TLS private key from the configured file, and returns it
+
+        Returns:
+            OpenSSL.crypto.PKey: the private key
+        """
+        private_key_path = self.tls_private_key_file
+        logger.info("Loading TLS key from %s", private_key_path)
+        private_key_pem = self.read_file(private_key_path, "tls_private_key_path")
         return crypto.load_privatekey(crypto.FILETYPE_PEM, private_key_pem)
