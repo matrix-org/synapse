@@ -321,34 +321,34 @@ class UpsertManyTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.storage = hs.get_datastore()
 
-        self.table_name = "table_" + hs.get_secrets().token_hex()
+        self.table_name = "table_" + hs.get_secrets().token_hex(6)
         self.get_success(
-            self.storage._execute(
+            self.storage.runInteraction(
                 "create",
-                None,
-                "CREATE TABLE %s (id INTEGER, user TEXT, value TEXT)"
+                lambda x, *a: x.execute(*a),
+                "CREATE TABLE %s (id INTEGER, username TEXT, value TEXT)"
                 % (self.table_name,),
             )
         )
         self.get_success(
-            self.storage._execute(
+            self.storage.runInteraction(
                 "index",
-                None,
-                "CREATE UNIQUE INDEX %s_index ON %s(id, user)"
+                lambda x, *a: x.execute(*a),
+                "CREATE UNIQUE INDEX %sindex ON %s(id, username)"
                 % (self.table_name, self.table_name),
             )
         )
 
     def _dump_to_tuple(self, res):
         for i in res:
-            yield (i["id"], i["user"], i["value"])
+            yield (i["id"], i["username"], i["value"])
 
     def test_upsert_many(self):
         """
         Upsert_many will perform the upsert operation across a batch of data.
         """
         # Add some data to an empty table
-        key_names = ["id", "user"]
+        key_names = ["id", "username"]
         value_names = ["value"]
         key_values = [[1, "user1"], [2, "user2"]]
         value_values = [["hello"], ["there"]]
@@ -367,7 +367,9 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         res = self.get_success(
-            self.storage._simple_select_list(self.table_name, None, ["id, user, value"])
+            self.storage._simple_select_list(
+                self.table_name, None, ["id, username, value"]
+            )
         )
         self.assertEqual(
             set(self._dump_to_tuple(res)),
@@ -392,7 +394,9 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         res = self.get_success(
-            self.storage._simple_select_list(self.table_name, None, ["id, user, value"])
+            self.storage._simple_select_list(
+                self.table_name, None, ["id, username, value"]
+            )
         )
         self.assertEqual(
             set(self._dump_to_tuple(res)),
