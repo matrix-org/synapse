@@ -48,20 +48,21 @@ class RoomDirectoryConfig(Config):
         #
         # If no rules match the request is denied.
         alias_creation_rules:
-            - user_id: "*"
-              alias: "*"      # This matches alias being created
-              room_id: "*"
+            - user_id: "*"    # Matches agaisnt the creator of the alias
+              alias: "*"      # Matches against the alias being created
+              room_id: "*"    # Matches against the room ID the alias is being
+                              # pointed at
               action: allow
 
-        # The `room_list_publication_rules` option control who and what can be
-        # published in the public room list.
+        # The `room_list_publication_rules` option controls who can publish and
+        # which rooms can be published in the public room list.
         #
         # The format of this option is the same as that for
         # `alias_creation_rules`
         room_list_publication_rules:
-            - user_id: "*"
-              alias: "*"      # This matches any local or canonical alias
-                              # associated with the room
+            - user_id: "*"    # Matches against the user publishing the room
+              alias: "*"      # Matches against any current local or canonical
+                              # aliases associated with the room
               room_id: "*"
               action: allow
         """
@@ -107,6 +108,12 @@ class _RoomDirectoryRule(object):
     """
 
     def __init__(self, option_name, rule):
+        """
+        Args:
+            option_name (str): Name of the config option this rule belongs to
+            rule (dict): The rule as specified in the config
+        """
+
         action = rule["action"]
         user_id = rule.get("user_id", "*")
         room_id = rule.get("room_id", "*")
