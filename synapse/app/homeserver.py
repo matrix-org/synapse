@@ -394,10 +394,10 @@ def setup(config_options):
         # is less than our re-registration threshold.
         provision = False
 
-        if (cert_days_remaining is None):
-            provision = True
-
-        if cert_days_remaining > hs.config.acme_reprovision_threshold:
+        if (
+            cert_days_remaining is None or
+            cert_days_remaining < hs.config.acme_reprovision_threshold
+        ):
             provision = True
 
         if provision:

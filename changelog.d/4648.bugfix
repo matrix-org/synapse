@@ -1,0 +1,2 @@
+Fix "TypeError: '>' not supported" when starting without an existing certificate.
+Fix a bug where an existing certificate would be reprovisoned every day.
