@@ -60,9 +60,9 @@ class RoomDirectoryConfig(Config):
         # The format of this option is the same as that for
         # `alias_creation_rules`.
         #
-        # If the room has one or more aliases associated with it, the rules are
-        # run against each alias. If there are no aliases then only rules with
-        # `alias: *` match.
+        # If the room has one or more aliases associated with it, only one of
+        # the aliases needs to match the alias rule. If there are no aliases
+        # then only rules with `alias: *` match.
         room_list_publication_rules:
             - user_id: "*"    # Matches against the user publishing the room
               alias: "*"      # Matches against any current local or canonical
