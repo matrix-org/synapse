@@ -25,8 +25,11 @@ from twisted.python.filepath import FilePath
 from twisted.python.url import URL
 from twisted.web import server, static
 from twisted.web.resource import Resource
+from twisted.web.client import URI
 
 from synapse.app import check_bind_error
+from synapse.crypto.context_factory import ClientTLSOptionsFactory
+from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 
 logger = logging.getLogger(__name__)
 
@@ -123,15 +126,31 @@ class AcmeHandler(object):
     @defer.inlineCallbacks
     def provision_certificate(self):
 
-        logger.warning("Reprovisioning %s", self.hs.hostname)
+        # Retrieve .well-known if it's in use. We do so through the federation
+        # agent, because that's where the .well-known logic lives.
+        agent = MatrixFederationAgent(
+            tls_client_options_factory=ClientTLSOptionsFactory(None),
+            reactor=self.reactor,
+        )
+        delegated = yield agent._get_well_known(bytes(self.hs.hostname,"ascii"))
+
+        # If .well-known is in use, use the delegated hostname instead of the
+        # homeserver's server_name.
+        if delegated:
+            cert_name = delegated.decode("ascii")
+            logger.info(".well-known is in use, provisionning %s instead of %s", cert_name, self.hs.hostname)
+        else:
+            cert_name = self.hs.hostname
+
+        logger.warning("Reprovisioning %s", cert_name)
 
         try:
-            yield self._issuer.issue_cert(self.hs.hostname)
+            yield self._issuer.issue_cert(cert_name)
         except Exception:
             logger.exception("Fail!")
             raise
-        logger.warning("Reprovisioned %s, saving.", self.hs.hostname)
-        cert_chain = self._store.certs[self.hs.hostname]
+        logger.warning("Reprovisioned %s, saving.", cert_name)
+        cert_chain = self._store.certs[cert_name]
 
         try:
             with open(self.hs.config.tls_private_key_file, "wb") as private_key_file:
