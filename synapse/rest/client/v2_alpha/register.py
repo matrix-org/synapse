@@ -33,6 +33,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.replication.http.device import CheckDeviceRegisteredServlet
 from synapse.replication.http.registration import (
     RegistrationUserCacheInvalidationServlet,
 )
@@ -193,12 +194,19 @@ class RegisterRestServlet(RestServlet):
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
         self.room_member_handler = hs.get_room_member_handler()
-        self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
-        self._invalidate_caches_client = (
-            RegistrationUserCacheInvalidationServlet.make_client(hs)
-        )
+        if self.hs.config.worker_app:
+
+            self._invalidate_caches_client = (
+                RegistrationUserCacheInvalidationServlet.make_client(hs)
+            )
+            self._device_check_registered_client = (
+                CheckDeviceRegisteredServlet.make_client(hs)
+            )
+        else:
+            self.device_handler = hs.get_device_handler()
+
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -664,6 +672,17 @@ class RegisterRestServlet(RestServlet):
             })
         defer.returnValue(result)
 
+    def _check_device_registered(self, user_id, device_id, initial_display_name):
+
+        if self.hs.config.worker_app:
+            return self._device_check_registered_client(
+                user_id, device_id, initial_display_name
+            )
+        else:
+            return self.device_handler.check_device_registered(
+                user_id, device_id, initial_display_name
+            )
+
     def _register_device(self, user_id, params):
         """Register a device for a user.
 
@@ -680,7 +699,7 @@ class RegisterRestServlet(RestServlet):
         # register the user's device
         device_id = params.get("device_id")
         initial_display_name = params.get("initial_device_display_name")
-        return self.device_handler.check_device_registered(
+        return self._check_device_registered(
             user_id, device_id, initial_display_name
         )
 
@@ -697,7 +716,7 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        yield self.device_handler.check_device_registered(
+        yield self._check_device_registered(
             user_id, device_id, initial_display_name
         )
 
