@@ -17,12 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.events import event_type_from_format_version
-from synapse.events.snapshot import EventContext
-from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.types import Requester, UserID
-from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
 

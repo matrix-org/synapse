@@ -481,7 +481,7 @@ class RegisterRestServlet(RestServlet):
         )
 
         if self.hs.config.worker_app:
-            self._invalidate_caches_client(registered_user_id)
+            self._invalidate_caches_client(user_id)
 
         defer.returnValue((yield self._create_registration_details(user_id, body)))
 
