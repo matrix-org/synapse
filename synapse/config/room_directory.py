@@ -177,24 +177,22 @@ class _RoomDirectoryRule(object):
         if not self._user_id_regex.match(user_id):
             return False
 
-        # If we are not given any aliases then this rule only matches if the
-        # alias glob matches all aliases
-        matched = False
-        if not aliases:
-            if not self._alias_matches_all:
-                return False
-        else:
-            # Otherwise, we just need one alias to match
-            matched = False
-            for alias in aliases:
-                if self._alias_regex.match(alias):
-                    matched = True
-                    break
-
-            if not matched:
-                return False
-
         if not self._room_id_regex.match(room_id):
             return False
 
-        return True
+        # We only have alias checks left, so we can short circuit if the alias
+        # rule matches everything.
+        if self._alias_matches_all:
+            return True
+
+        # If we are not given any aliases then this rule only matches if the
+        # alias glob matches all aliases, which we checked above.
+        if not aliases:
+            return False
+
+        # Otherwise, we just need one alias to match
+        for alias in aliases:
+            if self._alias_regex.match(alias):
+                return True
+
+        return False
