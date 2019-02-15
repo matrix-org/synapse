@@ -55,7 +55,7 @@ class CheckDeviceRegisteredServlet(ReplicationEndpoint):
         try:
             device_id = yield self.device_handler.check_device_registered(user_id, device_id)
         except Exception as e:
-            defer.returnValue((400, str(e))
+            defer.returnValue((400, str(e)))
 
         defer.returnValue((200, {"device_id": device_id}))
 

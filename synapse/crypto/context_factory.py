@@ -128,10 +128,11 @@ class ClientTLSOptionsFactory(object):
 
     def __init__(self, config):
         # We don't use config options yet
+        self._options = CertificateOptions(verify=False)
         pass
 
     def get_options(self, host):
         return ClientTLSOptions(
             host,
-            CertificateOptions(verify=False).getContext()
+            self._options.getContext()
         )

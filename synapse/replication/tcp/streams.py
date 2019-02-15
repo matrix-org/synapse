@@ -265,8 +265,8 @@ class PresenceStream(Stream):
         store = hs.get_datastore()
         presence_handler = hs.get_presence_handler()
 
-        self.current_token = store.get_current_presence_token
-        self.update_function = presence_handler.get_all_presence_updates
+        self.current_token = lambda: 0
+        self.update_function = lambda _a, _b: []
 
         super(PresenceStream, self).__init__(hs)
 
