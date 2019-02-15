@@ -672,16 +672,19 @@ class RegisterRestServlet(RestServlet):
             })
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
     def _check_device_registered(self, user_id, device_id, initial_display_name):
 
         if self.hs.config.worker_app:
-            return self._device_check_registered_client(
-                user_id, device_id, initial_display_name
-            )["device_id"]
-        else:
-            return self.device_handler.check_device_registered(
+            r = yield self._device_check_registered_client(
                 user_id, device_id, initial_display_name
             )
+            defer.returnValue(r["device_id"])
+        else:
+            r = yield self.device_handler.check_device_registered(
+                user_id, device_id, initial_display_name
+            )
+            defer.returnValue(r)
 
     def _register_device(self, user_id, params):
         """Register a device for a user.
