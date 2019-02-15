@@ -131,13 +131,16 @@ class AcmeHandler(object):
             tls_client_options_factory=ClientTLSOptionsFactory(None),
             reactor=self.reactor,
         )
-        delegated = yield agent._get_well_known(bytes(self.hs.hostname,"ascii"))
+        delegated = yield agent._get_well_known(bytes(self.hs.hostname, "ascii"))
 
         # If .well-known is in use, use the delegated hostname instead of the
         # homeserver's server_name.
         if delegated:
             cert_name = delegated.decode("ascii")
-            logger.info(".well-known is in use, provisionning %s instead of %s", cert_name, self.hs.hostname)
+            logger.info(
+                ".well-known is in use, provisionning %s instead of %s",
+                cert_name, self.hs.hostname,
+            )
         else:
             cert_name = self.hs.hostname
 
