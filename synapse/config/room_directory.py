@@ -20,19 +20,37 @@ from ._base import Config, ConfigError
 
 class RoomDirectoryConfig(Config):
     def read_config(self, config):
-        alias_creation_rules = config["alias_creation_rules"]
+        alias_creation_rules = config.get("alias_creation_rules")
 
-        self._alias_creation_rules = [
-            _RoomDirectoryRule("alias_creation_rules", rule)
-            for rule in alias_creation_rules
-        ]
+        if alias_creation_rules is not None:
+            self._alias_creation_rules = [
+                _RoomDirectoryRule("alias_creation_rules", rule)
+                for rule in alias_creation_rules
+            ]
+        else:
+            self._alias_creation_rules = [
+                _RoomDirectoryRule(
+                    "alias_creation_rules", {
+                        "action": "allow",
+                    }
+                )
+            ]
 
-        room_list_publication_rules = config["room_list_publication_rules"]
+        room_list_publication_rules = config.get("room_list_publication_rules")
 
-        self._room_list_publication_rules = [
-            _RoomDirectoryRule("room_list_publication_rules", rule)
-            for rule in room_list_publication_rules
-        ]
+        if room_list_publication_rules is not None:
+            self._room_list_publication_rules = [
+                _RoomDirectoryRule("room_list_publication_rules", rule)
+                for rule in room_list_publication_rules
+            ]
+        else:
+            self._room_list_publication_rules = [
+                _RoomDirectoryRule(
+                    "room_list_publication_rules", {
+                        "action": "allow",
+                    }
+                )
+            ]
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
@@ -56,11 +74,13 @@ class RoomDirectoryConfig(Config):
         #   room_id: Matches against the room ID the alias is being pointed at
         #   action: Whether to "allow" or "deny" the request if the rule matches
         #
-        alias_creation_rules:
-            - user_id: "*"
-              alias: "*"
-              room_id: "*"
-              action: allow
+        # The default is:
+        #
+        # alias_creation_rules:
+        #     - user_id: "*"
+        #       alias: "*"
+        #       room_id: "*"
+        #       action: allow
 
         # The `room_list_publication_rules` option controls who can publish and
         # which rooms can be published in the public room list.
@@ -83,11 +103,13 @@ class RoomDirectoryConfig(Config):
         #            associated with the room
         #   action: Whether to "allow" or "deny" the request if the rule matches
         #
-        room_list_publication_rules:
-            - user_id: "*"
-              alias: "*"
-              room_id: "*"
-              action: allow
+        # The default is:
+        #
+        # room_list_publication_rules:
+        #     - user_id: "*"
+        #       alias: "*"
+        #       room_id: "*"
+        #       action: allow
         """
 
     def is_alias_creation_allowed(self, user_id, room_id, alias):
