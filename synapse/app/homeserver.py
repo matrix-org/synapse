@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+
 import gc
 import logging
 import os
 import sys
-import traceback
 
 from six import iteritems
 
@@ -27,6 +29,7 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
+from twisted.python.failure import Failure
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -394,10 +397,10 @@ def setup(config_options):
         # is less than our re-registration threshold.
         provision = False
 
-        if (cert_days_remaining is None):
-            provision = True
-
-        if cert_days_remaining > hs.config.acme_reprovision_threshold:
+        if (
+            cert_days_remaining is None or
+            cert_days_remaining < hs.config.acme_reprovision_threshold
+        ):
             provision = True
 
         if provision:
@@ -438,7 +441,11 @@ def setup(config_options):
             hs.get_datastore().start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.
-            traceback.print_exc(file=sys.stderr)
+            print("Error during startup:", file=sys.stderr)
+
+            # this gives better tracebacks than traceback.print_exc()
+            Failure().printTraceback(file=sys.stderr)
+
             if reactor.running:
                 reactor.stop()
             sys.exit(1)

@@ -1,3 +1,19 @@
+matrix-synapse-py3 (0.99.1.1) stable; urgency=medium
+
+  * New synapse release 0.99.1.1
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 14 Feb 2019 17:19:44 +0000
+
+matrix-synapse-py3 (0.99.1) stable; urgency=medium
+
+  [ Damjan Georgievski ]
+  * Added ExecReload= in service unit file to send a HUP signal
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.1
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 14 Feb 2019 14:12:26 +0000
+
 matrix-synapse-py3 (0.99.0) stable; urgency=medium
 
   * New synapse release 0.99.0
