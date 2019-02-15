@@ -677,7 +677,7 @@ class RegisterRestServlet(RestServlet):
         if self.hs.config.worker_app:
             return self._device_check_registered_client(
                 user_id, device_id, initial_display_name
-            )
+            )["device_id"]
         else:
             return self.device_handler.check_device_registered(
                 user_id, device_id, initial_display_name
