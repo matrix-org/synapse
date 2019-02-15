@@ -24,6 +24,7 @@ from twisted.internet import defer
 
 import synapse
 import synapse.types
+from synapse.replication.http.registration import RegistrationUserCacheInvalidationServlet
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
 from synapse.config.server import is_threepid_reserved
@@ -193,6 +194,10 @@ class RegisterRestServlet(RestServlet):
         self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
+        self._invalidate_caches_client = (
+            RegistrationUserCacheInvalidationServlet.make_client(hs)
+        )
+
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -266,6 +271,9 @@ class RegisterRestServlet(RestServlet):
 
         # == Shared Secret Registration == (e.g. create new user scripts)
         if 'mac' in body:
+            if self.hs.config.worker_app:
+                raise SynapseError(403, "Not available at this endpoint")
+
             # FIXME: Should we really be determining if this is shared secret
             # auth based purely on the 'mac' key?
             result = yield self._do_shared_secret_registration(
@@ -455,6 +463,9 @@ class RegisterRestServlet(RestServlet):
                 registered_user_id, self.hs.config.user_consent_version,
             )
             yield self.registration_handler.post_consent_actions(registered_user_id)
+
+        if self.hs.config.worker_app:
+            self._invalidate_caches_client(registered_user_id)
 
         defer.returnValue((200, return_dict))
 
