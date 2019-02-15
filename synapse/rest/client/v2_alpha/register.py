@@ -24,7 +24,6 @@ from twisted.internet import defer
 
 import synapse
 import synapse.types
-from synapse.replication.http.registration import RegistrationUserCacheInvalidationServlet
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
 from synapse.config.server import is_threepid_reserved
@@ -33,6 +32,9 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
     parse_string,
+)
+from synapse.replication.http.registration import (
+    RegistrationUserCacheInvalidationServlet,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter

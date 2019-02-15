@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.http.server import JsonResource
-from synapse.replication.http import federation, membership, send_event, registration
+from synapse.replication.http import federation, membership, registration, send_event
 
 REPLICATION_PREFIX = "/_synapse/replication"
 
