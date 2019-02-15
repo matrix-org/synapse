@@ -46,12 +46,20 @@ class RoomDirectoryConfig(Config):
         #
         # Missing user_id/room_id/alias fields default to "*".
         #
-        # If no rules match the request is denied.
+        # If no rules match the request is denied. An empty list means no one
+        # can create aliases.
+        #
+        # Options for the rules include:
+        #
+        #   user_id: Matches against the creator of the alias
+        #   alias: Matches against the alias being created
+        #   room_id: Matches against the room ID the alias is being pointed at
+        #   action: Whether to "allow" or "deny" the request if the rule matches
+        #
         alias_creation_rules:
-            - user_id: "*"    # Matches agaisnt the creator of the alias
-              alias: "*"      # Matches against the alias being created
-              room_id: "*"    # Matches against the room ID the alias is being
-                              # pointed at
+            - user_id: "*"
+              alias: "*"
+              room_id: "*"
               action: allow
 
         # The `room_list_publication_rules` option controls who can publish and
@@ -63,10 +71,21 @@ class RoomDirectoryConfig(Config):
         # If the room has one or more aliases associated with it, only one of
         # the aliases needs to match the alias rule. If there are no aliases
         # then only rules with `alias: *` match.
+        #
+        # If no rules match the request is denied. An empty list means no one
+        # can publish rooms.
+        #
+        # Options for the rules include:
+        #
+        #   user_id: Matches agaisnt the creator of the alias
+        #   room_id: Matches against the room ID being published
+        #   alias: Matches against any current local or canonical aliases
+        #            associated with the room
+        #   action: Whether to "allow" or "deny" the request if the rule matches
+        #
         room_list_publication_rules:
-            - user_id: "*"    # Matches against the user publishing the room
-              alias: "*"      # Matches against any current local or canonical
-                              # aliases associated with the room
+            - user_id: "*"
+              alias: "*"
               room_id: "*"
               action: allow
         """
