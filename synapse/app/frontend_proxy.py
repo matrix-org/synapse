@@ -39,8 +39,12 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.client.v1.base import ClientV1RestServlet, client_path_patterns
 from synapse.rest.client.v2_alpha._base import client_v2_patterns
+from synapse.rest.client.v2_alpha.register import (
+    register_servlets as register_registration_servlets,
+)
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
+from synapse.storage.registration import RegistrationStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.logcontext import LoggingContext
 from synapse.util.manhole import manhole
@@ -141,6 +145,7 @@ class FrontendProxySlavedStore(
     SlavedClientIpStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
+    RegistrationStore,
     BaseSlavedStore,
 ):
     pass
@@ -161,6 +166,7 @@ class FrontendProxyServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
                     KeyUploadServlet(self).register(resource)
+                    register_registration_servlets(self, resource)
 
                     # If presence is disabled, use the stub servlet that does
                     # not allow sending presence

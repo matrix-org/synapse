@@ -479,6 +479,10 @@ class RegisterRestServlet(RestServlet):
         user_id = yield self.registration_handler.appservice_register(
             username, as_token
         )
+
+        if self.hs.config.worker_app:
+            self._invalidate_caches_client(registered_user_id)
+
         defer.returnValue((yield self._create_registration_details(user_id, body)))
 
     @defer.inlineCallbacks
