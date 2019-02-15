@@ -25,7 +25,6 @@ from twisted.python.filepath import FilePath
 from twisted.python.url import URL
 from twisted.web import server, static
 from twisted.web.resource import Resource
-from twisted.web.client import URI
 
 from synapse.app import check_bind_error
 from synapse.crypto.context_factory import ClientTLSOptionsFactory
