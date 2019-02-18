@@ -317,7 +317,9 @@ class RoomCreationHandler(BaseHandler):
         )
 
         # map from event_id to BaseEvent
-        old_room_member_state_events = yield self.store.get_events(old_room_member_state_ids.values())
+        old_room_member_state_events = yield self.store.get_events(
+            old_room_member_state_ids.values(),
+        )
         for k, old_event in iteritems(old_room_member_state_events):
             # Only transfer ban events
             if ("membership" in old_event.content and
