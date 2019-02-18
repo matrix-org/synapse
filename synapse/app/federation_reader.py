@@ -40,6 +40,7 @@ from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
+from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
@@ -62,6 +63,7 @@ class FederationReaderSlavedStore(
     SlavedReceiptsStore,
     SlavedEventStore,
     SlavedKeyStore,
+    SlavedRegistrationStore,
     RoomStore,
     DirectoryStore,
     SlavedTransactionStore,
