@@ -27,6 +27,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.client import CaptchaServerHttpClient
+from synapse.replication.http.register import ReplicationRegisterServlet
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
 from synapse.util.threepids import check_3pid_allowed
@@ -60,6 +61,9 @@ class RegistrationHandler(BaseHandler):
             name="_generate_user_id_linearizer",
         )
         self._server_notices_mxid = hs.config.server_notices_mxid
+
+        if hs.config.worker_app:
+            self._register_client = ReplicationRegisterServlet.make_client(hs)
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
@@ -185,7 +189,7 @@ class RegistrationHandler(BaseHandler):
             token = None
             if generate_token:
                 token = self.macaroon_gen.generate_access_token(user_id)
-            yield self.store.register(
+            yield self._register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -217,7 +221,7 @@ class RegistrationHandler(BaseHandler):
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
-                    yield self.store.register(
+                    yield self._register_with_store(
                         user_id=user_id,
                         token=token,
                         password_hash=password_hash,
@@ -316,7 +320,7 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
-        yield self.store.register(
+        yield self._register_with_store(
             user_id=user_id,
             password_hash="",
             appservice_id=service_id,
@@ -494,7 +498,7 @@ class RegistrationHandler(BaseHandler):
         token = self.macaroon_gen.generate_access_token(user_id)
 
         if need_register:
-            yield self.store.register(
+            yield self._register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -573,3 +577,54 @@ class RegistrationHandler(BaseHandler):
             action="join",
             ratelimit=False,
         )
+
+    def _register_with_store(self, user_id, token=None, password_hash=None,
+                             was_guest=False, make_guest=False, appservice_id=None,
+                             create_profile_with_displayname=None, admin=False,
+                             user_type=None):
+        """Register user in the datastore.
+
+        Args:
+            user_id (str): The desired user ID to register.
+            token (str): The desired access token to use for this user. If this
+                is not None, the given access token is associated with the user
+                id.
+            password_hash (str|None): Optional. The password hash for this user.
+            was_guest (bool): Optional. Whether this is a guest account being
+                upgraded to a non-guest account.
+            make_guest (boolean): True if the the new user should be guest,
+                false to add a regular user account.
+            appservice_id (str|None): The ID of the appservice registering the user.
+            create_profile_with_displayname (unicode|None): Optionally create a
+                profile for the user, setting their displayname to the given value
+            admin (boolean): is an admin user?
+            user_type (str|None): type of user. One of the values from
+                api.constants.UserTypes, or None for a normal user.
+
+        Returns:
+            Deferred
+        """
+        if self.hs.config.worker_app:
+            return self._register_client(
+                user_id=user_id,
+                token=token,
+                password_hash=password_hash,
+                was_guest=was_guest,
+                make_guest=make_guest,
+                appservice_id=appservice_id,
+                create_profile_with_displayname=create_profile_with_displayname,
+                admin=admin,
+                user_type=user_type,
+            )
+        else:
+            return self.store.register(
+                user_id=user_id,
+                token=token,
+                password_hash=password_hash,
+                was_guest=was_guest,
+                make_guest=make_guest,
+                appservice_id=appservice_id,
+                create_profile_with_displayname=create_profile_with_displayname,
+                admin=admin,
+                user_type=user_type,
+            )
