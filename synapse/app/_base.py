@@ -25,10 +25,12 @@ from daemonize import Daemonize
 from twisted.internet import error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
+import synapse
 from synapse.app import check_bind_error
 from synapse.crypto import context_factory
 from synapse.util import PreserveLoggingContext
 from synapse.util.rlimit import change_resource_limit
+from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
@@ -270,9 +272,37 @@ def start(hs, listeners=None):
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
         hs.get_datastore().start_profiling()
+
+        setup_sentry(hs)
     except Exception:
         traceback.print_exc(file=sys.stderr)
         reactor = hs.get_reactor()
         if reactor.running:
             reactor.stop()
         sys.exit(1)
+
+
+def setup_sentry(hs):
+    """Enable sentry integration, if enabled in configuration
+
+    Args:
+        hs (synapse.server.HomeServer)
+    """
+
+    if not hs.config.sentry_enabled:
+        return
+
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=hs.config.sentry_dsn,
+        release=get_version_string(synapse),
+    )
+
+    # We set some default tags that give some context to this instance
+    with sentry_sdk.configure_scope() as scope:
+        scope.set_tag("matrix_server_name", hs.config.server_name)
+
+        app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
+        name = hs.config.worker_name if hs.config.worker_name else "master"
+        scope.set_tag("worker_app", app)
+        scope.set_tag("worker_name", name)
