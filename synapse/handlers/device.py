@@ -20,7 +20,11 @@ from twisted.internet import defer
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
-from synapse.api.errors import FederationDeniedError, RequestSendFailed
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    RequestSendFailed,
+)
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
