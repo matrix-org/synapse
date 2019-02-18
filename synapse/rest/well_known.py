@@ -17,6 +17,7 @@ import json
 import logging
 
 from twisted.web.resource import Resource
+from synapse.http.server import set_cors_headers
 
 logger = logging.getLogger(__name__)
 
