@@ -1,1 +1,1 @@
-Allow registration to be handled by a worker instance.
+Allow registration and login to be handled by a worker instance.
