@@ -294,21 +294,14 @@ class RoomCreationHandler(BaseHandler):
         # map from event_id to BaseEvent
         old_room_state_events = yield self.store.get_events(old_room_state_ids.values())
 
+        member_events = []
         for k, old_event_id in iteritems(old_room_state_ids):
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
-
-                # Only transfer ban membership events
-                if ("membership" in old_event.content and
-                        old_event.content["membership"] == "ban"):
-                    yield self.room_member_handler.update_membership(
-                        requester,
-                        UserID.from_string(old_event['state_key']),
-                        room_id,
-                        "ban",
-                        ratelimit=False,
-                        content=old_event.content,
-                    )
+                # Do membership events later
+                if ("membership" in old_event.content):
+                    member_events.append(old_event)
+                    continue
 
                 initial_state[k] = old_event.content
 
@@ -324,6 +317,21 @@ class RoomCreationHandler(BaseHandler):
             initial_state=initial_state,
             creation_content=creation_content,
         )
+
+        # Transfer membership events
+        for old_event in member_events:
+            # Only transfer ban events
+            logger.info("Event type: " + str(old_event.content))
+            if ("membership" in old_event.content and
+                    old_event.content["membership"] == "ban"):
+                yield self.room_member_handler.update_membership(
+                    requester,
+                    UserID.from_string(old_event['state_key']),
+                    new_room_id,
+                    "ban",
+                    ratelimit=False,
+                    content=old_event.content,
+                )
 
         # XXX invites/joins
         # XXX 3pid invites
