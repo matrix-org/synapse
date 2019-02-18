@@ -16,7 +16,7 @@
 from ._base import Config, ConfigError
 
 MISSING_SENTRY = (
-    """Missing sentry_sdk library. This is required for enable sentry
+    """Missing sentry_sdk library. This is required to enable sentry
     integration.
 
     Install by running:
