@@ -27,6 +27,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.client import CaptchaServerHttpClient
+from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import ReplicationRegisterServlet
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
@@ -64,6 +65,11 @@ class RegistrationHandler(BaseHandler):
 
         if hs.config.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
+            self._register_device_client = (
+                RegisterDeviceReplicationServlet.make_client(hs)
+            )
+        else:
+            self.device_handler = hs.get_device_handler()
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
@@ -159,7 +165,7 @@ class RegistrationHandler(BaseHandler):
         yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:
-            password_hash = yield self.auth_handler().hash(password)
+            password_hash = yield self._auth_handler.hash(password)
 
         if localpart:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
@@ -516,9 +522,6 @@ class RegistrationHandler(BaseHandler):
 
         defer.returnValue((user_id, token))
 
-    def auth_handler(self):
-        return self.hs.get_auth_handler()
-
     @defer.inlineCallbacks
     def get_or_register_3pid_guest(self, medium, address, inviter_user_id):
         """Get a guest access token for a 3PID, creating a guest account if
@@ -628,3 +631,43 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
             )
+
+    @defer.inlineCallbacks
+    def register_device(self, user_id, device_id, initial_display_name,
+                        is_guest=False):
+        """Register a device for a user and generate an access token.
+
+        Args:
+            user_id (str): full canonical @user:id
+            device_id (str|None): The device ID to check, or None to generate
+                a new one.
+            initial_display_name (str|None): An optional display name for the
+                device.
+            is_guest (bool): Whether this is a guest account
+
+        Returns:
+            defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
+        """
+
+        if self.hs.config.worker_app:
+            r = yield self._register_device_client(
+                user_id=user_id,
+                device_id=device_id,
+                initial_display_name=initial_display_name,
+                is_guest=is_guest,
+            )
+            defer.returnValue((r["device_id"], r["access_token"]))
+        else:
+            device_id = yield self.device_handler.check_device_registered(
+                user_id, device_id, initial_display_name
+            )
+            if is_guest:
+                access_token = self.macaroon_gen.generate_access_token(
+                    user_id, ["guest = true"]
+                )
+            else:
+                access_token = yield self._auth_handler.get_access_token_for_user_id(
+                    user_id, device_id=device_id,
+                )
+
+            defer.returnValue((device_id, access_token))

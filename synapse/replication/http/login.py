@@ -35,9 +35,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
 
     def __init__(self, hs):
         super(RegisterDeviceReplicationServlet, self).__init__(hs)
-        self.auth_handler = hs.get_auth_handler()
-        self.device_handler = hs.get_device_handler()
-        self.macaroon_gen = hs.get_macaroon_generator()
+        self.registration_handler = hs.get_handlers().registration_handler
 
     @staticmethod
     def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
@@ -62,18 +60,9 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         initial_display_name = content["initial_display_name"]
         is_guest = content["is_guest"]
 
-        device_id = yield self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name,
+        device_id, access_token = yield self.registration_handler.register_device(
+            user_id, device_id, initial_display_name, is_guest,
         )
-
-        if is_guest:
-            access_token = self.macaroon_gen.generate_access_token(
-                user_id, ["guest = true"]
-            )
-        else:
-            access_token = yield self.auth_handler.get_access_token_for_user_id(
-                user_id, device_id=device_id,
-            )
 
         defer.returnValue((200, {
             "device_id": device_id,
