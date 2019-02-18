@@ -16,11 +16,8 @@
 from ._base import Config, ConfigError
 
 MISSING_SENTRY = (
-    """Missing sentry_sdk library. This is required to enable sentry
+    """Missing sentry-sdk library. This is required to enable sentry
     integration.
-
-    Install by running:
-        pip install sentry_sdk
     """
 )
 
@@ -39,7 +36,11 @@ class MetricsConfig(Config):
             except ImportError:
                 raise ConfigError(MISSING_SENTRY)
 
-            self.sentry_dsn = config["sentry"]["dsn"]
+            self.sentry_dsn = config["sentry"].get("dsn")
+            if not self.sentry_dsn:
+                raise ConfigError(
+                    "sentry.dsn field is required when sentry integration is enabled",
+                )
 
     def default_config(self, report_stats=None, **kwargs):
         res = """\
