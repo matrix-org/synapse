@@ -223,6 +223,12 @@ following regular expressions::
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
 
+Additionally, the following REST endpoints can be handled, but all requests must
+be routed to the same instance::
+
+    ^/_matrix/client/(api/v1|r0|unstable)/register$
+
+
 ``synapse.app.user_dir``
 ~~~~~~~~~~~~~~~~~~~~~~~~
 

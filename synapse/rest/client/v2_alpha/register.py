@@ -665,7 +665,7 @@ class RegisterRestServlet(RestServlet):
                 device.
             is_guest (bool): Whether this is a guest account
         Returns:
-            defer.Deferred[(str, str)]: Tuple of device ID and access token
+            defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
         """
         if self.hs.config.worker_app:
             r = yield self._register_device_client(
