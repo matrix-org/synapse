@@ -138,7 +138,7 @@ class AcmeHandler(object):
         if delegated:
             cert_name = delegated.decode("ascii")
             logger.info(
-                ".well-known is in use, provisionning %s instead of %s",
+                ".well-known is in use, provisioning %s instead of %s",
                 cert_name, self.hs.hostname,
             )
         else:
