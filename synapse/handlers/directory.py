@@ -112,7 +112,9 @@ class DirectoryHandler(BaseHandler):
                     403, "This user is not permitted to create this alias",
                 )
 
-            if not self.config.is_alias_creation_allowed(user_id, room_alias.to_string()):
+            if not self.config.is_alias_creation_allowed(
+                user_id, room_id, room_alias.to_string(),
+            ):
                 # Lets just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?
@@ -395,9 +397,9 @@ class DirectoryHandler(BaseHandler):
         room_id (str)
         visibility (str): "public" or "private"
         """
-        if not self.spam_checker.user_may_publish_room(
-            requester.user.to_string(), room_id
-        ):
+        user_id = requester.user.to_string()
+
+        if not self.spam_checker.user_may_publish_room(user_id, room_id):
             raise AuthError(
                 403,
                 "This user is not permitted to publish rooms to the room list"
@@ -415,7 +417,24 @@ class DirectoryHandler(BaseHandler):
 
         yield self.auth.check_can_change_room_list(room_id, requester.user)
 
-        yield self.store.set_room_is_public(room_id, visibility == "public")
+        making_public = visibility == "public"
+        if making_public:
+            room_aliases = yield self.store.get_aliases_for_room(room_id)
+            canonical_alias = yield self.store.get_canonical_alias_for_room(room_id)
+            if canonical_alias:
+                room_aliases.append(canonical_alias)
+
+            if not self.config.is_publishing_room_allowed(
+                user_id, room_id, room_aliases,
+            ):
+                # Lets just return a generic message, as there may be all sorts of
+                # reasons why we said no. TODO: Allow configurable error messages
+                # per alias creation rule?
+                raise SynapseError(
+                    403, "Not allowed to publish room",
+                )
+
+        yield self.store.set_room_is_public(room_id, making_public)
 
     @defer.inlineCallbacks
     def edit_published_appservice_room_list(self, appservice_id, network_id,
