@@ -42,6 +42,7 @@ class TlsConfig(Config):
         self.acme_port = acme_config.get("port", 80)
         self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
+        self.acme_domain = acme_config.get("domain", config.get("server_name"))
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
@@ -228,6 +229,12 @@ class TlsConfig(Config):
             # How many days remaining on a certificate before it is renewed.
             #
             # reprovision_threshold: 30
+
+            # What domain the certificate should be for. Only useful if
+            # delegation via a /.well-known/matrix/server file is being used.
+            # Defaults to the server_name configuration parameter.
+            #
+            # domain: matrix.example.com
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
