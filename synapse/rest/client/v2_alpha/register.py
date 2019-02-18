@@ -78,7 +78,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if not (yield check_3pid_allowed(self.hs, "email", body['email'])):
             raise SynapseError(
                 403,
-                "Your email domain is not authorized to register on this server",
+                "Your email is not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
 
