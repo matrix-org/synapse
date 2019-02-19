@@ -358,26 +358,25 @@ For information on using a reverse proxy, see
 [docs/reverse_proxy.rst](docs/reverse_proxy.rst).
 
 To configure Synapse to expose an HTTPS port, you will need to edit
-`homeserver.yaml`.
+`homeserver.yaml`, as follows:
 
-First, under the `listeners` section, uncomment the configuration for the
-TLS-enabled listener. (Remove the hash sign (`#`) and space at the start of
-each line). The relevant lines are like this:
+* First, under the `listeners` section, uncomment the configuration for the
+  TLS-enabled listener. (Remove the hash sign (`#`) at the start of
+  each line). The relevant lines are like this:
 
-```
-  - port: 8448
-    type: http
-    tls: true
-    resources:
-      - names: [client, federation]
-```
-
-You will also need to uncomment the `tls_certificate_path` and
-`tls_private_key_path` lines under the `TLS` section. You can either point
-these settings at an existing certificate and key, or you can enable Synapse's
-built-in ACME (Let's Encrypt) support.  Instructions for having Synapse
-automatically provision and renew federation certificates through ACME can be
-found at [ACME.md](docs/ACME.md).
+  ```
+    - port: 8448
+      type: http
+      tls: true
+      resources:
+        - names: [client, federation]
+  ```
+* You will also need to uncomment the `tls_certificate_path` and
+  `tls_private_key_path` lines under the `TLS` section. You can either
+  point these settings at an existing certificate and key, or you can
+  enable Synapse's built-in ACME (Let's Encrypt) support.  Instructions
+  for having Synapse automatically provision and renew federation 
+  certificates through ACME can be found at [ACME.md](docs/ACME.md).
 
 ## Registering a user
 
