@@ -86,7 +86,7 @@ matrix:
 
 install:
   # this just logs the postgres version we will be testing against (if any)
-  - psql -At -U postgres -c 'select version();'
+  - psql -At -U postgres -c 'select version();' || true
 
   - pip install tox
   
