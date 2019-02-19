@@ -56,6 +56,7 @@ class AcmeHandler(object):
     def __init__(self, hs):
         self.hs = hs
         self.reactor = hs.get_reactor()
+        self._acme_domain = hs.config.acme_domain
 
     @defer.inlineCallbacks
     def start_listening(self):
@@ -123,15 +124,15 @@ class AcmeHandler(object):
     @defer.inlineCallbacks
     def provision_certificate(self):
 
-        logger.warning("Reprovisioning %s", self.hs.hostname)
+        logger.warning("Reprovisioning %s", self._acme_domain)
 
         try:
-            yield self._issuer.issue_cert(self.hs.hostname)
+            yield self._issuer.issue_cert(self._acme_domain)
         except Exception:
             logger.exception("Fail!")
             raise
-        logger.warning("Reprovisioned %s, saving.", self.hs.hostname)
-        cert_chain = self._store.certs[self.hs.hostname]
+        logger.warning("Reprovisioned %s, saving.", self._acme_domain)
+        cert_chain = self._store.certs[self._acme_domain]
 
         try:
             with open(self.hs.config.tls_private_key_file, "wb") as private_key_file:
