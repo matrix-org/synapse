@@ -240,3 +240,8 @@ However, there are times when a number of caches need to be invalidated at the
 same time with the same key. To reduce traffic we batch those invalidations into
 a single poke by defining a special cache name that workers understand to mean
 to expand to invalidate the correct caches.
+
+Currently the special cache names are declared in ``synapse/storage/_base.py``
+and are:
+
+1. ``cs_cache_fake`` ─ invalidates caches that depend on the current state

@@ -1201,7 +1201,7 @@ class SQLBaseStore(object):
         Args:
             txn
             room_id (str): Room where state changed
-            members_changed (Iterable[str]): The user_ids of members that have changed
+            members_changed (iterable[str]): The user_ids of members that have changed
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
 
@@ -1216,7 +1216,8 @@ class SQLBaseStore(object):
 
         Args:
             room_id (str): Room where state changed
-            members_changed (set[str]): The user_ids of members that have changed
+            members_changed (iterable[str]): The user_ids of members that have
+                changed
         """
         for member in members_changed:
             self.get_rooms_for_user_with_stream_ordering.invalidate((member,))
