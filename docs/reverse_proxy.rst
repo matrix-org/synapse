@@ -91,15 +91,11 @@ Let's assume that we expect clients to connect to our server at
         bind 0.0.0.0:443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
         bind :::443 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
         
-        # A standard website
-        acl www hdr(host) -i www.example.com
-        use_backend www if www
-        
-        # Matrix-Synapse
+        # Matrix client traffic
         acl matrix hdr(host) -i matrix.example.com
         use_backend matrix if matrix
         
-      frontend matrix-synapse
+      frontend matrix-federation
         bind 0.0.0.0:8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
         bind :::8448 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
         default_backend matrix
