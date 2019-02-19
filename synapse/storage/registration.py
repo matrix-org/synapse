@@ -254,6 +254,47 @@ class RegistrationWorkerStore(SQLBaseStore):
             defer.returnValue(ret["guest_access_token"])
         defer.returnValue(None)
 
+    @defer.inlineCallbacks
+    def get_user_id_by_threepid(self, medium, address):
+        """Returns user id from threepid
+
+        Args:
+            medium (str): threepid medium e.g. email
+            address (str): threepid address e.g. me@example.com
+
+        Returns:
+            Deferred[str|None]: user id or None if no user id/threepid mapping exists
+        """
+        user_id = yield self.runInteraction(
+            "get_user_id_by_threepid", self.get_user_id_by_threepid_txn,
+            medium, address
+        )
+        defer.returnValue(user_id)
+
+    def get_user_id_by_threepid_txn(self, txn, medium, address):
+        """Returns user id from threepid
+
+        Args:
+            txn (cursor):
+            medium (str): threepid medium e.g. email
+            address (str): threepid address e.g. me@example.com
+
+        Returns:
+            str|None: user id or None if no user id/threepid mapping exists
+        """
+        ret = self._simple_select_one_txn(
+            txn,
+            "user_threepids",
+            {
+                "medium": medium,
+                "address": address
+            },
+            ['user_id'], True
+        )
+        if ret:
+            return ret['user_id']
+        return None
+
 
 class RegistrationStore(RegistrationWorkerStore,
                         background_updates.BackgroundUpdateStore):
@@ -612,47 +653,6 @@ class RegistrationStore(RegistrationWorkerStore,
             'user_get_threepids'
         )
         defer.returnValue(ret)
-
-    @defer.inlineCallbacks
-    def get_user_id_by_threepid(self, medium, address):
-        """Returns user id from threepid
-
-        Args:
-            medium (str): threepid medium e.g. email
-            address (str): threepid address e.g. me@example.com
-
-        Returns:
-            Deferred[str|None]: user id or None if no user id/threepid mapping exists
-        """
-        user_id = yield self.runInteraction(
-            "get_user_id_by_threepid", self.get_user_id_by_threepid_txn,
-            medium, address
-        )
-        defer.returnValue(user_id)
-
-    def get_user_id_by_threepid_txn(self, txn, medium, address):
-        """Returns user id from threepid
-
-        Args:
-            txn (cursor):
-            medium (str): threepid medium e.g. email
-            address (str): threepid address e.g. me@example.com
-
-        Returns:
-            str|None: user id or None if no user id/threepid mapping exists
-        """
-        ret = self._simple_select_one_txn(
-            txn,
-            "user_threepids",
-            {
-                "medium": medium,
-                "address": address
-            },
-            ['user_id'], True
-        )
-        if ret:
-            return ret['user_id']
-        return None
 
     def user_delete_threepid(self, user_id, medium, address):
         return self._simple_delete(
