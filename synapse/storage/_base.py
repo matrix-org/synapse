@@ -702,7 +702,9 @@ class SQLBaseStore(object):
                 return "%s = ?" % (key,)
 
         if not values:
-            # Try and select.
+            # If `values` is empty, then all of the values we care about are in
+            # the unique key, so there is nothing to UPDATE. We can just do a
+            # SELECT instead to see if it exists.
             sql = "SELECT 1 FROM %s WHERE %s" % (
                 table,
                 " AND ".join(_getwhere(k) for k in keyvalues)
@@ -726,7 +728,7 @@ class SQLBaseStore(object):
                 # successfully updated at least one row.
                 return False
 
-        # We didn't update any rows so insert a new one
+        # We didn't find any existing rows, so insert a new one
         allvalues = {}
         allvalues.update(keyvalues)
         allvalues.update(values)
@@ -783,7 +785,8 @@ class SQLBaseStore(object):
             table (str): The table to upsert into
             key_names (list[str]): The key column names.
             key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names.
+            value_names (list[str]): The value column names. If empty, no
+                values will be used, even if value_values is provided.
             value_values (list[list]): A list of each row's value column values.
         Returns:
             None
@@ -810,12 +813,15 @@ class SQLBaseStore(object):
             table (str): The table to upsert into
             key_names (list[str]): The key column names.
             key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names.
+            value_names (list[str]): The value column names. If empty, no
+                values will be used, even if value_values is provided.
             value_values (list[list]): A list of each row's value column values.
         Returns:
             None
         """
-        if not value_values:
+        # No value columns, therefore make a blank list so that the following
+        # zip() works correctly.
+        if not value_names:
             value_values = [() for x in range(len(key_values))]
 
         for keyv, valv in zip(key_values, value_values):
@@ -834,7 +840,8 @@ class SQLBaseStore(object):
             table (str): The table to upsert into
             key_names (list[str]): The key column names.
             key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names.
+            value_names (list[str]): The value column names. If empty, no
+                values will be used, even if value_values is provided.
             value_values (list[list]): A list of each row's value column values.
         Returns:
             None
@@ -843,11 +850,11 @@ class SQLBaseStore(object):
         allvalues.extend(key_names)
         allvalues.extend(value_names)
 
-        if not value_values:
-            value_values = [[] for x in range(len(key_values))]
-
         if not value_names:
+            # No value columns, therefore make a blank list so that the
+            # following zip() works correctly.
             latter = "NOTHING"
+            value_values = [() for x in range(len(key_values))]
         else:
             latter = (
                 "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in value_names)
