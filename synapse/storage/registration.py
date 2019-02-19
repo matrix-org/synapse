@@ -146,7 +146,6 @@ class RegistrationStore(RegistrationWorkerStore,
     def __init__(self, db_conn, hs):
         super(RegistrationStore, self).__init__(db_conn, hs)
 
-        self.hs = hs
         self.clock = hs.get_clock()
 
         self.register_background_index_update(
@@ -322,12 +321,10 @@ class RegistrationStore(RegistrationWorkerStore,
                 (user_id_obj.localpart, create_profile_with_displayname)
             )
 
-        # Don't invalidate here, it will be done through replication to the worker.
-        if not self.hs.config.worker_app:
-            self._invalidate_cache_and_stream(
-                txn, self.get_user_by_id, (user_id,)
-            )
-            txn.call_after(self.is_guest.invalidate, (user_id,))
+        self._invalidate_cache_and_stream(
+            txn, self.get_user_by_id, (user_id,)
+        )
+        txn.call_after(self.is_guest.invalidate, (user_id,))
 
     def get_users_by_id_case_insensitive(self, user_id):
         """Gets users that match user_id case insensitively.

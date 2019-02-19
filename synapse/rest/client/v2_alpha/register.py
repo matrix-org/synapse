@@ -33,9 +33,6 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.replication.http.registration import (
-    RegistrationUserCacheInvalidationServlet,
-)
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.threepids import check_3pid_allowed
@@ -196,10 +193,6 @@ class RegisterRestServlet(RestServlet):
         self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
-        self._invalidate_caches_client = (
-            RegistrationUserCacheInvalidationServlet.make_client(hs)
-        )
-
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -273,9 +266,6 @@ class RegisterRestServlet(RestServlet):
 
         # == Shared Secret Registration == (e.g. create new user scripts)
         if 'mac' in body:
-            if self.hs.config.worker_app:
-                raise SynapseError(403, "Not available at this endpoint")
-
             # FIXME: Should we really be determining if this is shared secret
             # auth based purely on the 'mac' key?
             result = yield self._do_shared_secret_registration(
@@ -466,9 +456,6 @@ class RegisterRestServlet(RestServlet):
             )
             yield self.registration_handler.post_consent_actions(registered_user_id)
 
-        if self.hs.config.worker_app:
-            yield self._invalidate_caches_client(registered_user_id)
-
         defer.returnValue((200, return_dict))
 
     def on_OPTIONS(self, _):
@@ -479,10 +466,6 @@ class RegisterRestServlet(RestServlet):
         user_id = yield self.registration_handler.appservice_register(
             username, as_token
         )
-
-        if self.hs.config.worker_app:
-            yield self._invalidate_caches_client(user_id)
-
         defer.returnValue((yield self._create_registration_details(user_id, body)))
 
     @defer.inlineCallbacks
