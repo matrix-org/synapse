@@ -979,30 +979,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                 if ev_type == EventTypes.Member
             )
 
-            for member in members_changed:
-                self._invalidate_cache_and_stream(
-                    txn, self.get_rooms_for_user_with_stream_ordering, (member,)
-                )
-
-            for host in set(get_domain_from_id(u) for u in members_changed):
-                self._invalidate_cache_and_stream(
-                    txn, self.is_host_joined, (room_id, host)
-                )
-                self._invalidate_cache_and_stream(
-                    txn, self.was_host_joined, (room_id, host)
-                )
-
-            self._invalidate_cache_and_stream(
-                txn, self.get_users_in_room, (room_id,)
-            )
-
-            self._invalidate_cache_and_stream(
-                txn, self.get_room_summary, (room_id,)
-            )
-
-            self._invalidate_cache_and_stream(
-                txn, self.get_current_state_ids, (room_id,)
-            )
+            self._invalidate_state_caches_and_stream(txn, room_id, members_changed)
 
     def _update_forward_extremities_txn(self, txn, new_forward_extremities,
                                         max_stream_order):
