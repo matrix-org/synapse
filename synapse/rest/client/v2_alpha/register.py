@@ -145,7 +145,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         """
         super(UsernameAvailabilityRestServlet, self).__init__()
         self.hs = hs
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
             # Time window of 2s
@@ -187,7 +187,7 @@ class RegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.identity_handler = hs.get_handlers().identity_handler
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()

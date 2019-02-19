@@ -64,6 +64,7 @@ from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
+from synapse.handlers.register import RegistrationHandler
 from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
@@ -181,6 +182,7 @@ class HomeServer(object):
         'pagination_handler',
         'room_context_handler',
         'sendmail',
+        'registration_handler',
     ]
 
     # This is overridden in derived application classes
@@ -480,6 +482,9 @@ class HomeServer(object):
 
     def build_room_context_handler(self):
         return RoomContextHandler(self)
+
+    def build_registration_handler(self):
+        return RegistrationHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
