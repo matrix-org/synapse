@@ -31,7 +31,10 @@ from synapse.config.server import is_threepid_reserved
 from synapse.http.client import CaptchaServerHttpClient
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
-from synapse.replication.http.register import ReplicationRegisterServlet
+from synapse.replication.http.register import (
+    ReplicationPostRegisterActionsServlet,
+    ReplicationRegisterServlet,
+)
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
 from synapse.util.threepids import check_3pid_allowed
@@ -71,6 +74,9 @@ class RegistrationHandler(BaseHandler):
             self._register_client = ReplicationRegisterServlet.make_client(hs)
             self._register_device_client = (
                 RegisterDeviceReplicationServlet.make_client(hs)
+            )
+            self._post_registration_client = (
+                ReplicationPostRegisterActionsServlet.make_client(hs)
             )
         else:
             self.device_handler = hs.get_device_handler()
@@ -691,6 +697,16 @@ class RegistrationHandler(BaseHandler):
             bind_msisdn (bool): Whether to bind the msisdn with the identity
                 server
         """
+        if self.hs.config.worker_app:
+            yield self._post_registration_client(
+                user_id=user_id,
+                auth_result=auth_result,
+                access_token=access_token,
+                bind_email=bind_email,
+                bind_msisdn=bind_msisdn,
+            )
+            return
+
         if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
             threepid = auth_result[LoginType.EMAIL_IDENTITY]
             # Necessary due to auth checks prior to the threepid being
