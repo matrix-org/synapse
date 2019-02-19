@@ -846,9 +846,9 @@ class SQLBaseStore(object):
         Returns:
             None
         """
-        allvalues = []
-        allvalues.extend(key_names)
-        allvalues.extend(value_names)
+        allnames = []
+        allnames.extend(key_names)
+        allnames.extend(value_names)
 
         if not value_names:
             # No value columns, therefore make a blank list so that the
@@ -862,8 +862,8 @@ class SQLBaseStore(object):
 
         sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s" % (
             table,
-            ", ".join(k for k in allvalues),
-            ", ".join("?" for _ in allvalues),
+            ", ".join(k for k in allnames),
+            ", ".join("?" for _ in allnames),
             ", ".join(key_names),
             latter,
         )
