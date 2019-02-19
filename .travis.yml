@@ -31,7 +31,7 @@ matrix:
   fast_finish: true
   include:
   - name: "pep8"
-    python: 3.6
+    python: 3.7
     env: TOX_ENV="pep8,check_isort,packaging"
 
   - name: "py2.7 / sqlite"
@@ -54,30 +54,30 @@ matrix:
     python: 3.5
     env: TOX_ENV=py35,codecov TRIAL_FLAGS="-j 2"
 
-  - name: "py3.6 / sqlite"
-    python: 3.6
-    env: TOX_ENV=py36,codecov TRIAL_FLAGS="-j 2"
+  - name: "py3.7 / sqlite"
+    python: 3.7
+    env: TOX_ENV=py37,codecov TRIAL_FLAGS="-j 2"
 
-  - name: "py3.6 / postgres9.4"
-    python: 3.6
+  - name: "py3.7 / postgres9.4"
+    python: 3.7
     addons:
       postgresql: "9.4"
-    env: TOX_ENV=py36-postgres TRIAL_FLAGS="-j 4"
+    env: TOX_ENV=py37-postgres TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
-  - name: "py3.6 / postgres9.5"
-    python: 3.6
+  - name: "py3.7 / postgres9.5"
+    python: 3.7
     addons:
       postgresql: "9.5"
-    env: TOX_ENV=py36-postgres,codecov TRIAL_FLAGS="-j 4"
+    env: TOX_ENV=py37-postgres,codecov TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
   - # we only need to check for the newsfragment if it's a PR build
     if: type = pull_request
     name: "check-newsfragment"
-    python: 3.6
+    python: 3.7
     env: TOX_ENV=check-newsfragment
     script:
       - git remote set-branches --add origin develop
