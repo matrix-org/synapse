@@ -190,7 +190,6 @@ class RegisterRestServlet(RestServlet):
         self.registration_handler = hs.get_handlers().registration_handler
         self.identity_handler = hs.get_handlers().identity_handler
         self.room_member_handler = hs.get_room_member_handler()
-        self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
     @interactive_auth_handler
@@ -633,12 +632,10 @@ class RegisterRestServlet(RestServlet):
             "home_server": self.hs.hostname,
         }
         if not params.get("inhibit_login", False):
-            device_id = yield self._register_device(user_id, params)
-
-            access_token = (
-                yield self.auth_handler.get_access_token_for_user_id(
-                    user_id, device_id=device_id,
-                )
+            device_id = params.get("device_id")
+            initial_display_name = params.get("initial_device_display_name")
+            device_id, access_token = yield self.registration_handler.register_device(
+                user_id, device_id, initial_display_name, is_guest=False,
             )
 
             result.update({
@@ -646,26 +643,6 @@ class RegisterRestServlet(RestServlet):
                 "device_id": device_id,
             })
         defer.returnValue(result)
-
-    def _register_device(self, user_id, params):
-        """Register a device for a user.
-
-        This is called after the user's credentials have been validated, but
-        before the access token has been issued.
-
-        Args:
-            (str) user_id: full canonical @user:id
-            (object) params: registration parameters, from which we pull
-                device_id and initial_device_name
-        Returns:
-            defer.Deferred: (str) device_id
-        """
-        # register the user's device
-        device_id = params.get("device_id")
-        initial_display_name = params.get("initial_device_display_name")
-        return self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
-        )
 
     @defer.inlineCallbacks
     def _do_guest_registration(self, params):
@@ -680,13 +657,10 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        yield self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
+        device_id, access_token = yield self.registration_handler.register_device(
+            user_id, device_id, initial_display_name, is_guest=True,
         )
 
-        access_token = self.macaroon_gen.generate_access_token(
-            user_id, ["guest = true"]
-        )
         defer.returnValue((200, {
             "user_id": user_id,
             "device_id": device_id,

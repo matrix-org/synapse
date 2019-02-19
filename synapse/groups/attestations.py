@@ -42,7 +42,7 @@ from signedjson.sign import sign_json
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import RequestSendFailed, SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
 from synapse.util.logcontext import run_in_background
@@ -190,6 +190,11 @@ class GroupAttestionRenewer(object):
 
                 yield self.store.update_attestation_renewal(
                     group_id, user_id, attestation
+                )
+            except RequestSendFailed as e:
+                logger.warning(
+                    "Failed to renew attestation of %r in %r: %s",
+                    user_id, group_id, e,
                 )
             except Exception:
                 logger.exception("Error renewing attestation of %r in %r",
