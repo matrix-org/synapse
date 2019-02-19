@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import logging
 import sys
 import threading
@@ -1204,8 +1205,7 @@ class SQLBaseStore(object):
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
 
-        keys = [room_id]
-        keys.extend(members_changed)
+        keys = itertools.chain([room_id], members_changed)
         self._send_invalidation_to_replication(
             txn, _CURRENT_STATE_CACHE_NAME, keys,
         )
