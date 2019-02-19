@@ -1199,8 +1199,8 @@ class SQLBaseStore(object):
 
         Args:
             txn
-            room_id (str): Room were state changed
-            members_changed (set[str]): The user_ids of members that have changed
+            room_id (str): Room where state changed
+            members_changed (Iterable[str]): The user_ids of members that have changed
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
 
@@ -1215,7 +1215,7 @@ class SQLBaseStore(object):
         not stream invalidations down replication.
 
         Args:
-            room_id (str): Room were state changed
+            room_id (str): Room where state changed
             members_changed (set[str]): The user_ids of members that have changed
         """
         for member in members_changed:
@@ -1237,7 +1237,7 @@ class SQLBaseStore(object):
         Args:
             txn
             cache_name (str)
-            keys (list[str])
+            keys (iterable[str])
         """
 
         if isinstance(self.database_engine, PostgresEngine):
