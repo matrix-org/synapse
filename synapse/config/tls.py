@@ -230,9 +230,17 @@ class TlsConfig(Config):
             #
             # reprovision_threshold: 30
 
-            # What domain the certificate should be for. Only useful if
-            # delegation via a /.well-known/matrix/server file is being used.
-            # Defaults to the server_name configuration parameter.
+            # The domain that the certificate should be for. Normally this
+            # should be the same as your Matrix domain (i.e., 'server_name'), but,
+            # by putting a file at 'https://<server_name>/.well-known/matrix/server',
+            # you can delegate incoming traffic to another server. If you do that,
+            # you should give the target of the delegation here.
+            #
+            # For example: if your 'server_name' is 'example.com', but
+            # 'https://example.com/.well-known/matrix/server' delegates to
+            # 'matrix.example.com', you should put 'matrix.example.com' here.
+            #
+            # If not set, defaults to your 'server_name'.
             #
             # domain: matrix.example.com
 
