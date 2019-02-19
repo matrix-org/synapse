@@ -31,7 +31,7 @@ matrix:
   fast_finish: true
   include:
   - name: "pep8"
-    python: 3.7
+    python: 3.6
     env: TOX_ENV="pep8,check_isort,packaging"
 
   - name: "py2.7 / sqlite"
@@ -77,7 +77,7 @@ matrix:
   - # we only need to check for the newsfragment if it's a PR build
     if: type = pull_request
     name: "check-newsfragment"
-    python: 3.7
+    python: 3.6
     env: TOX_ENV=check-newsfragment
     script:
       - git remote set-branches --add origin develop
