@@ -620,13 +620,13 @@ class PresenceHandler(object):
             users=[UserID.from_string(u) for u in users_to_states]
         )
 
-    def _push_to_remotes(self, states):
+    def _push_to_remotes(self, states, servers=None):
         """Sends state updates to remote servers.
 
         Args:
             states (list(UserPresenceState))
         """
-        self.federation.send_presence(states)
+        self.federation.send_presence(states, servers)
 
     @defer.inlineCallbacks
     def incoming_presence(self, origin, content):
@@ -752,7 +752,7 @@ class PresenceHandler(object):
 
     @defer.inlineCallbacks
     def user_joined_room(self, user, room_id):
-        """Called (via the distributor) when a user joins a room. This funciton
+        """Called (via the distributor) when a user joins a room. This function
         sends presence updates to servers, either:
             1. the joining user is a local user and we send their presence to
                all servers in the room.
@@ -767,13 +767,14 @@ class PresenceHandler(object):
             state = yield self.current_state_for_user(user.to_string())
 
             self._push_to_remotes([state])
-        else:
+        else: # is remote
+            remoteHost = get_domain_from_id(user.to_string())
             user_ids = yield self.store.get_users_in_room(room_id)
             user_ids = list(filter(self.is_mine_id, user_ids))
 
             states = yield self.current_state_for_users(user_ids)
 
-            self._push_to_remotes(list(states.values()))
+            self._push_to_remotes(list(states.values()), [remoteHost])
 
     @defer.inlineCallbacks
     def get_presence_list(self, observer_user, accepted=None):

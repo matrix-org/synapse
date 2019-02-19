@@ -279,7 +279,7 @@ class TransactionQueue(object):
 
     @logcontext.preserve_fn  # the caller should not yield on this
     @defer.inlineCallbacks
-    def send_presence(self, states):
+    def send_presence(self, states, servers=None):
         """Send the new presence states to the appropriate destinations.
 
         This actually queues up the presence states ready for sending and
@@ -287,9 +287,21 @@ class TransactionQueue(object):
 
         Args:
             states (list(UserPresenceState))
+            servers [String] | None
         """
         if not self.hs.config.use_presence:
             # No-op if presence is disabled.
+            return
+
+        if servers is not None:
+            for destination in servers:
+                logger.info("Sending targetted presence to %s", destination)
+                self.pending_presence_by_dest.setdefault(
+                    destination, {}
+                ).update({
+                    state.user_id: state for state in states
+                })
+                self._attempt_new_transaction(destination)
             return
 
         # First we queue up the new presence by user ID, so multiple presence
