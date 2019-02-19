@@ -10,6 +10,5 @@ worker_listeners:
       resources:
           - names: [federation]
 
-worker_daemonize: true
-worker_pid_file: /etc/matrix-synapse/pid/federation_reader.pid
+worker_daemonize: false
 worker_log_config: /etc/matrix-synapse/federation-reader-log.yaml
