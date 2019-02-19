@@ -38,10 +38,12 @@ class AppServiceConfig(Config):
     def default_config(cls, **kwargs):
         return """\
         # A list of application service config file to use
+        #
         app_service_config_files: []
 
         # Whether or not to track application service IP addresses. Implicitly
         # enables MAU tracking for application service users.
+        #
         track_appservice_user_ips: False
         """
 

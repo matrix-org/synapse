@@ -286,19 +286,20 @@ class ServerConfig(Config):
         #
         # This setting requires the affinity package to be installed!
         #
-        # cpu_affinity: 0xFFFFFFFF
+        #cpu_affinity: 0xFFFFFFFF
 
         # The path to the web client which will be served at /_matrix/client/
         # if 'webclient' is configured under the 'listeners' configuration.
         #
-        # web_client_location: "/path/to/web/root"
+        #web_client_location: "/path/to/web/root"
 
         # The public-facing base URL that clients use to access this HS
         # (not including _matrix/...). This is the same URL a user would
         # enter into the 'custom HS URL' field on their client. If you
         # use synapse with a reverse proxy, this should be the URL to reach
         # synapse via the proxy.
-        # public_baseurl: https://example.com/
+        #
+        #public_baseurl: https://example.com/
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
@@ -309,15 +310,25 @@ class ServerConfig(Config):
         use_presence: true
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
-        # gc_thresholds: [700, 10, 10]
+        #
+        #gc_thresholds: [700, 10, 10]
 
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is -1, means no upper limit.
-        # filter_timeline_limit: 5000
+        #
+        #filter_timeline_limit: 5000
 
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
-        # block_non_admin_invites: True
+        #
+        #block_non_admin_invites: True
+
+        # Room searching
+        #
+        # If disabled, new messages will not be indexed for searching and users
+        # will receive errors when searching for messages. Defaults to enabled.
+        #
+        #enable_search: false
 
         # Restrict federation to the following whitelist of domains.
         # N.B. we recommend also firewalling your federation listener to limit
@@ -325,7 +336,7 @@ class ServerConfig(Config):
         # purely on this application-layer restriction.  If not specified, the
         # default is to whitelist everything.
         #
-        # federation_domain_whitelist:
+        #federation_domain_whitelist:
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com
@@ -397,11 +408,11 @@ class ServerConfig(Config):
           # will also need to give Synapse a TLS key and certificate: see the TLS section
           # below.)
           #
-          # - port: %(bind_port)s
-          #   type: http
-          #   tls: true
-          #   resources:
-          #     - names: [client, federation]
+          #- port: %(bind_port)s
+          #  type: http
+          #  tls: true
+          #  resources:
+          #    - names: [client, federation]
 
           # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
           # that unwraps TLS.
@@ -421,52 +432,49 @@ class ServerConfig(Config):
 
             # example additonal_resources:
             #
-            # additional_resources:
-            #   "/_matrix/my/custom/endpoint":
-            #     module: my_module.CustomRequestHandler
-            #     config: {}
+            #additional_resources:
+            #  "/_matrix/my/custom/endpoint":
+            #    module: my_module.CustomRequestHandler
+            #    config: {}
 
           # Turn on the twisted ssh manhole service on localhost on the given
           # port.
-          # - port: 9000
-          #   bind_addresses: ['::1', '127.0.0.1']
-          #   type: manhole
+          #
+          #- port: 9000
+          #  bind_addresses: ['::1', '127.0.0.1']
+          #  type: manhole
 
-        # Homeserver blocking
-        #
+
+        ## Homeserver blocking ##
+
         # How to reach the server admin, used in ResourceLimitError
-        # admin_contact: 'mailto:admin@server.com'
         #
-        # Global block config
+        #admin_contact: 'mailto:admin@server.com'
+
+        # Global blocking
         #
-        # hs_disabled: False
-        # hs_disabled_message: 'Human readable reason for why the HS is blocked'
-        # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
-        #
+        #hs_disabled: False
+        #hs_disabled_message: 'Human readable reason for why the HS is blocked'
+        #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
+
         # Monthly Active User Blocking
         #
-        # Enables monthly active user checking
-        # limit_usage_by_mau: False
-        # max_mau_value: 50
-        # mau_trial_days: 2
-        #
+        #limit_usage_by_mau: False
+        #max_mau_value: 50
+        #mau_trial_days: 2
+
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau
         # is true, this is implied to be true.
-        # mau_stats_only: False
         #
+        #mau_stats_only: False
+
         # Sometimes the server admin will want to ensure certain accounts are
         # never blocked by mau checking. These accounts are specified here.
         #
-        # mau_limit_reserved_threepids:
-        # - medium: 'email'
-        #   address: 'reserved_user@example.com'
-        #
-        # Room searching
-        #
-        # If disabled, new messages will not be indexed for searching and users
-        # will receive errors when searching for messages. Defaults to enabled.
-        # enable_search: true
+        #mau_limit_reserved_threepids:
+        #  - medium: 'email'
+        #    address: 'reserved_user@example.com'
         """ % locals()
 
     def read_arguments(self, args):

@@ -46,8 +46,8 @@ class JWTConfig(Config):
         return """\
         # The JWT needs to contain a globally unique "sub" (subject) claim.
         #
-        # jwt_config:
-        #    enabled: true
-        #    secret: "a secret"
-        #    algorithm: "HS256"
+        #jwt_config:
+        #   enabled: true
+        #   secret: "a secret"
+        #   algorithm: "HS256"
         """
