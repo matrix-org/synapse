@@ -20,7 +20,11 @@ from twisted.internet import defer
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
-from synapse.api.errors import FederationDeniedError
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    RequestSendFailed,
+)
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
@@ -504,13 +508,13 @@ class DeviceListEduUpdater(object):
                 origin = get_domain_from_id(user_id)
                 try:
                     result = yield self.federation.query_user_devices(origin, user_id)
-                except NotRetryingDestination:
+                except (
+                    NotRetryingDestination, RequestSendFailed, HttpResponseException,
+                ):
                     # TODO: Remember that we are now out of sync and try again
                     # later
                     logger.warn(
-                        "Failed to handle device list update for %s,"
-                        " we're not retrying the remote",
-                        user_id,
+                        "Failed to handle device list update for %s", user_id,
                     )
                     # We abort on exceptions rather than accepting the update
                     # as otherwise synapse will 'forget' that its device list

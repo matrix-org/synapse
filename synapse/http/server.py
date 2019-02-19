@@ -106,10 +106,10 @@ def wrap_json_request_handler(h):
             # trace.
             f = failure.Failure()
             logger.error(
-                "Failed handle request via %r: %r: %s",
-                h,
+                "Failed handle request via %r: %r",
+                request.request_metrics.name,
                 request,
-                f.getTraceback().rstrip(),
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
             # Only respond with an error response if we haven't already started
             # writing, otherwise lets just kill the connection
