@@ -33,6 +33,7 @@ class ApiConfig(Config):
         ## API Configuration ##
 
         # A list of event types that will be included in the room_invite_state
+        #
         room_invite_state_types:
             - "{JoinRules}"
             - "{CanonicalAlias}"

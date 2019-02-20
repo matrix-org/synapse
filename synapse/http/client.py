@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from io import BytesIO
 
 from six import text_type
 from six.moves import urllib
@@ -39,7 +40,11 @@ from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
-from synapse.http import cancelled_to_request_timed_out_error, redact_uri
+from synapse.http import (
+    QuieterFileBodyProducer,
+    cancelled_to_request_timed_out_error,
+    redact_uri,
+)
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.logcontext import make_deferred_yieldable
@@ -246,7 +251,7 @@ class SimpleHttpClient(object):
             )
 
     @defer.inlineCallbacks
-    def request(self, method, uri, data=b'', headers=None):
+    def request(self, method, uri, data=None, headers=None):
         """
         Args:
             method (str): HTTP method to use.
@@ -265,11 +270,15 @@ class SimpleHttpClient(object):
         logger.info("Sending request %s %s", method, redact_uri(uri))
 
         try:
+            body_producer = None
+            if data is not None:
+                body_producer = QuieterFileBodyProducer(BytesIO(data))
+
             request_deferred = treq.request(
                 method,
                 uri,
                 agent=self.agent,
-                data=data,
+                data=body_producer,
                 headers=headers,
                 **self._extra_treq_args
             )

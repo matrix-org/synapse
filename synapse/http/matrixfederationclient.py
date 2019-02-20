@@ -28,11 +28,10 @@ from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
 
-from twisted.internet import defer, protocol, task
+from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import FileBodyProducer
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
@@ -44,6 +43,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.http import QuieterFileBodyProducer
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
@@ -839,16 +839,3 @@ def encode_query_args(args):
     query_bytes = urllib.parse.urlencode(encoded_args, True)
 
     return query_bytes.encode('utf8')
-
-
-class QuieterFileBodyProducer(FileBodyProducer):
-    """Wrapper for FileBodyProducer that avoids CRITICAL errors when the connection drops.
-
-    Workaround for https://github.com/matrix-org/synapse/issues/4003 /
-    https://twistedmatrix.com/trac/ticket/6528
-    """
-    def stopProducing(self):
-        try:
-            FileBodyProducer.stopProducing(self)
-        except task.TaskStopped:
-            pass
