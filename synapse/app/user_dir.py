@@ -26,7 +26,6 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.crypto import context_factory
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
@@ -94,10 +93,7 @@ class UserDirectorySlaveStore(
 
 
 class UserDirectoryServer(HomeServer):
-    def setup(self):
-        logger.info("Setting up.")
-        self.datastore = UserDirectorySlaveStore(self.get_db_conn(), self)
-        logger.info("Finished setting up.")
+    DATASTORE_CLASS = UserDirectorySlaveStore
 
     def _listen_http(self, listener_config):
         port = listener_config["port"]
@@ -169,8 +165,9 @@ class UserDirectoryReplicationHandler(ReplicationClientHandler):
         super(UserDirectoryReplicationHandler, self).__init__(hs.get_datastore())
         self.user_directory = hs.get_user_directory_handler()
 
+    @defer.inlineCallbacks
     def on_rdata(self, stream_name, token, rows):
-        super(UserDirectoryReplicationHandler, self).on_rdata(
+        yield super(UserDirectoryReplicationHandler, self).on_rdata(
             stream_name, token, rows
         )
         if stream_name == "current_state_deltas":
@@ -190,7 +187,7 @@ def start(config_options):
             "Synapse user directory", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + e.message + "\n")
+        sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
     assert config.worker_app == "synapse.app.user_dir"
@@ -213,25 +210,16 @@ def start(config_options):
     # Force the pushers to start since they will be disabled in the main config
     config.update_user_directory = True
 
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-
-    ps = UserDirectoryServer(
+    ss = UserDirectoryServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 
-    ps.setup()
-    ps.start_listening(config.worker_listeners)
-
-    def start():
-        ps.get_datastore().start_profiling()
-        ps.get_state_handler().start_caching()
-
-    reactor.callWhenRunning(start)
+    ss.setup()
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-user-dir", config)
 

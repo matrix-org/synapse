@@ -19,24 +19,18 @@ import json
 
 from mock import Mock
 
-from synapse.http.server import JsonResource
+from synapse.api.constants import UserTypes
 from synapse.rest.client.v1.admin import register_servlets
-from synapse.util import Clock
 
 from tests import unittest
-from tests.server import (
-    ThreadedMemoryReactorClock,
-    make_request,
-    render,
-    setup_test_homeserver,
-)
 
 
-class UserRegisterTestCase(unittest.TestCase):
-    def setUp(self):
+class UserRegisterTestCase(unittest.HomeserverTestCase):
 
-        self.clock = ThreadedMemoryReactorClock()
-        self.hs_clock = Clock(self.clock)
+    servlets = [register_servlets]
+
+    def make_homeserver(self, reactor, clock):
+
         self.url = "/_matrix/client/r0/admin/register"
 
         self.registration_handler = Mock()
@@ -50,17 +44,14 @@ class UserRegisterTestCase(unittest.TestCase):
 
         self.secrets = Mock()
 
-        self.hs = setup_test_homeserver(
-            http_client=None, clock=self.hs_clock, reactor=self.clock
-        )
+        self.hs = self.setup_test_homeserver()
 
         self.hs.config.registration_shared_secret = u"shared"
 
         self.hs.get_media_repository = Mock()
         self.hs.get_deactivate_account_handler = Mock()
 
-        self.resource = JsonResource(self.hs)
-        register_servlets(self.hs, self.resource)
+        return self.hs
 
     def test_disabled(self):
         """
@@ -69,8 +60,8 @@ class UserRegisterTestCase(unittest.TestCase):
         """
         self.hs.config.registration_shared_secret = None
 
-        request, channel = make_request("POST", self.url, b'{}')
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, b'{}')
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
@@ -87,8 +78,8 @@ class UserRegisterTestCase(unittest.TestCase):
 
         self.hs.get_secrets = Mock(return_value=secrets)
 
-        request, channel = make_request("GET", self.url)
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
 
         self.assertEqual(channel.json_body, {"nonce": "abcd"})
 
@@ -97,25 +88,25 @@ class UserRegisterTestCase(unittest.TestCase):
         Calling GET on the endpoint will return a randomised nonce, which will
         only last for SALT_TIMEOUT (60s).
         """
-        request, channel = make_request("GET", self.url)
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
         nonce = channel.json_body["nonce"]
 
         # 59 seconds
-        self.clock.advance(59)
+        self.reactor.advance(59)
 
         body = json.dumps({"nonce": nonce})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('username must be specified', channel.json_body["error"])
 
         # 61 seconds
-        self.clock.advance(2)
+        self.reactor.advance(2)
 
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('unrecognised nonce', channel.json_body["error"])
@@ -124,8 +115,8 @@ class UserRegisterTestCase(unittest.TestCase):
         """
         Only the provided nonce can be used, as it's checked in the MAC.
         """
-        request, channel = make_request("GET", self.url)
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
@@ -140,9 +131,9 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        )
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("HMAC incorrect", channel.json_body["error"])
@@ -152,12 +143,14 @@ class UserRegisterTestCase(unittest.TestCase):
         When the correct nonce is provided, and the right key is provided, the
         user is registered.
         """
-        request, channel = make_request("GET", self.url)
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
+        want_mac.update(
+            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin\x00support"
+        )
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -166,11 +159,12 @@ class UserRegisterTestCase(unittest.TestCase):
                 "username": "bob",
                 "password": "abc123",
                 "admin": True,
+                "user_type": UserTypes.SUPPORT,
                 "mac": want_mac,
             }
-        ).encode('utf8')
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        )
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["user_id"])
@@ -179,12 +173,14 @@ class UserRegisterTestCase(unittest.TestCase):
         """
         A valid unrecognised nonce.
         """
-        request, channel = make_request("GET", self.url)
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
+        want_mac.update(
+            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin"
+        )
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -195,16 +191,16 @@ class UserRegisterTestCase(unittest.TestCase):
                 "admin": True,
                 "mac": want_mac,
             }
-        ).encode('utf8')
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        )
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["user_id"])
 
         # Now, try and reuse it
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('unrecognised nonce', channel.json_body["error"])
@@ -212,12 +208,13 @@ class UserRegisterTestCase(unittest.TestCase):
     def test_missing_parts(self):
         """
         Synapse will complain if you don't give nonce, username, password, and
-        mac.  Admin is optional.  Additional checks are done for length and
-        type.
+        mac.  Admin and user_types are optional.  Additional checks are done for length
+        and type.
         """
+
         def nonce():
-            request, channel = make_request("GET", self.url)
-            render(request, self.resource, self.clock)
+            request, channel = self.make_request("GET", self.url)
+            self.render(request)
             return channel.json_body["nonce"]
 
         #
@@ -226,8 +223,8 @@ class UserRegisterTestCase(unittest.TestCase):
 
         # Must be present
         body = json.dumps({})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('nonce must be specified', channel.json_body["error"])
@@ -238,68 +235,87 @@ class UserRegisterTestCase(unittest.TestCase):
 
         # Must be present
         body = json.dumps({"nonce": nonce()})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('username must be specified', channel.json_body["error"])
 
         # Must be a string
         body = json.dumps({"nonce": nonce(), "username": 1234})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid username', channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": b"abcd\x00"})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        body = json.dumps({"nonce": nonce(), "username": u"abcd\u0000"})
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid username', channel.json_body["error"])
 
         # Must not have null bytes
         body = json.dumps({"nonce": nonce(), "username": "a" * 1000})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid username', channel.json_body["error"])
 
         #
-        # Username checks
+        # Password checks
         #
 
         # Must be present
         body = json.dumps({"nonce": nonce(), "username": "a"})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('password must be specified', channel.json_body["error"])
 
         # Must be a string
         body = json.dumps({"nonce": nonce(), "username": "a", "password": 1234})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid password', channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": "a", "password": b"abcd\x00"})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        body = json.dumps(
+            {"nonce": nonce(), "username": "a", "password": u"abcd\u0000"}
+        )
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid password', channel.json_body["error"])
 
         # Super long
         body = json.dumps({"nonce": nonce(), "username": "a", "password": "A" * 1000})
-        request, channel = make_request("POST", self.url, body.encode('utf8'))
-        render(request, self.resource, self.clock)
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid password', channel.json_body["error"])
+
+        #
+        # user_type check
+        #
+
+        # Invalid user_type
+        body = json.dumps({
+            "nonce": nonce(),
+            "username": "a",
+            "password": "1234",
+            "user_type": "invalid"}
+        )
+        request, channel = self.make_request("POST", self.url, body.encode('utf8'))
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual('Invalid user type', channel.json_body["error"])

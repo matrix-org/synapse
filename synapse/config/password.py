@@ -28,6 +28,7 @@ class PasswordConfig(Config):
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable password for login.
+        #
         password_config:
            enabled: true
            # Uncomment and change to a secret random string for extra security.

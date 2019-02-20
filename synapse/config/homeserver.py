@@ -21,7 +21,7 @@ from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
 from .groups import GroupsConfig
-from .jwt import JWTConfig
+from .jwt_config import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
@@ -31,7 +31,8 @@ from .push import PushConfig
 from .ratelimiting import RatelimitConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
-from .saml2 import SAML2Config
+from .room_directory import RoomDirectoryConfig
+from .saml2_config import SAML2Config
 from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig
@@ -41,7 +42,7 @@ from .voip import VoipConfig
 from .workers import WorkerConfig
 
 
-class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
+class HomeServerConfig(ServerConfig, TlsConfig, DatabaseConfig, LoggingConfig,
                        RatelimitConfig, ContentRepositoryConfig, CaptchaConfig,
                        VoipConfig, RegistrationConfig, MetricsConfig, ApiConfig,
                        AppServiceConfig, KeyConfig, SAML2Config, CasConfig,
@@ -49,13 +50,6 @@ class HomeServerConfig(TlsConfig, ServerConfig, DatabaseConfig, LoggingConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
                        SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
                        ConsentConfig,
-                       ServerNoticesConfig,
+                       ServerNoticesConfig, RoomDirectoryConfig,
                        ):
     pass
-
-
-if __name__ == '__main__':
-    import sys
-    sys.stdout.write(
-        HomeServerConfig().generate_config(sys.argv[1], sys.argv[2], True)[0]
-    )

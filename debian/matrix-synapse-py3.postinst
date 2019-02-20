@@ -1,0 +1,39 @@
+#!/bin/sh -e
+
+. /usr/share/debconf/confmodule
+
+CONFIGFILE_SERVERNAME="/etc/matrix-synapse/conf.d/server_name.yaml"
+CONFIGFILE_REPORTSTATS="/etc/matrix-synapse/conf.d/report_stats.yaml"
+USER="matrix-synapse"
+
+case "$1" in
+  configure|reconfigure)
+    # Set server name in config file
+    mkdir -p "/etc/matrix-synapse/conf.d/"
+    db_get matrix-synapse/server-name
+
+    if [ "$RET" ]; then
+        echo "server_name: $RET" > $CONFIGFILE_SERVERNAME
+    fi
+
+    db_get matrix-synapse/report-stats
+    if [ "$RET" ]; then
+        echo "report_stats: $RET" > $CONFIGFILE_REPORTSTATS
+    fi
+
+    if ! getent passwd $USER >/dev/null; then
+      adduser --quiet --system --no-create-home --home /var/lib/matrix-synapse $USER
+    fi
+
+    for DIR in /var/lib/matrix-synapse /var/log/matrix-synapse /etc/matrix-synapse; do
+      if ! dpkg-statoverride --list --quiet $DIR >/dev/null; then
+        dpkg-statoverride --force --quiet --update --add $USER nogroup 0755 $DIR
+      fi
+    done
+
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

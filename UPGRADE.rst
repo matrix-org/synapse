@@ -5,20 +5,20 @@ Before upgrading check if any special steps are required to upgrade from the
 what you currently have installed to current version of synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then active that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/.synapse/`` then
+1. If synapse was installed in a virtualenv then activate that virtualenv before
+   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
    run:
 
    .. code:: bash
 
-       source ~/.synapse/bin/activate
+       source ~/synapse/env/bin/activate
 
 2. If synapse was installed using pip then upgrade to the latest version by
    running:
 
    .. code:: bash
 
-       pip install --upgrade --process-dependency-links https://github.com/matrix-org/synapse/tarball/master
+       pip install --upgrade matrix-synapse[all]
 
        # restart synapse
        synctl restart
@@ -31,14 +31,15 @@ instructions that may be required are listed later in this document.
 
        # Pull the latest version of the master branch.
        git pull
-       # Update the versions of synapse's python dependencies.
-       python synapse/python_dependencies.py | xargs pip install --upgrade
+
+       # Update synapse and its python dependencies.
+       pip install --upgrade .[all]
 
        # restart synapse
        ./synctl restart
 
 
-To check whether your update was sucessful, you can check the Server header
+To check whether your update was successful, you can check the Server header
 returned by the Client-Server API:
 
 .. code:: bash
@@ -48,11 +49,114 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
-Upgrading to $NEXT_VERSION
+Upgrading to v0.99.0
+====================
+
+Please be aware that, before Synapse v1.0 is released around March 2019, you
+will need to replace any self-signed certificates with those verified by a
+root CA. Information on how to do so can be found at `the ACME docs
+<docs/ACME.md>`_.
+
+For more information on configuring TLS certificates see the `FAQ <docs/MSC1711_certificates_FAQ.md>`_.
+
+Upgrading to v0.34.0
+====================
+
+1. This release is the first to fully support Python 3. Synapse will now run on
+   Python versions 3.5, or 3.6 (as well as 2.7). We recommend switching to
+   Python 3, as it has been shown to give performance improvements.
+
+   For users who have installed Synapse into a virtualenv, we recommend doing
+   this by creating a new virtualenv. For example::
+
+       virtualenv -p python3 ~/synapse/env3
+       source ~/synapse/env3/bin/activate
+       pip install matrix-synapse
+
+   You can then start synapse as normal, having activated the new virtualenv::
+
+       cd ~/synapse
+       source env3/bin/activate
+       synctl start
+
+   Users who have installed from distribution packages should see the relevant
+   package documentation. See below for notes on Debian packages.
+
+   * When upgrading to Python 3, you **must** make sure that your log files are
+     configured as UTF-8, by adding ``encoding: utf8`` to the
+     ``RotatingFileHandler`` configuration (if you have one) in your
+     ``<server>.log.config`` file. For example, if your ``log.config`` file
+     contains::
+
+       handlers:
+         file:
+           class: logging.handlers.RotatingFileHandler
+           formatter: precise
+           filename: homeserver.log
+           maxBytes: 104857600
+           backupCount: 10
+           filters: [context]
+         console:
+           class: logging.StreamHandler
+           formatter: precise
+           filters: [context]
+
+     Then you should update this to be::
+
+       handlers:
+         file:
+           class: logging.handlers.RotatingFileHandler
+           formatter: precise
+           filename: homeserver.log
+           maxBytes: 104857600
+           backupCount: 10
+           filters: [context]
+           encoding: utf8
+         console:
+           class: logging.StreamHandler
+           formatter: precise
+           filters: [context]
+
+     There is no need to revert this change if downgrading to Python 2.
+
+   We are also making available Debian packages which will run Synapse on
+   Python 3. You can switch to these packages with ``apt-get install
+   matrix-synapse-py3``, however, please read `debian/NEWS
+   <https://github.com/matrix-org/synapse/blob/release-v0.34.0/debian/NEWS>`_
+   before doing so. The existing ``matrix-synapse`` packages will continue to
+   use Python 2 for the time being.
+
+2. This release removes the ``riot.im`` from the default list of trusted
+   identity servers.
+
+   If ``riot.im`` is in your homeserver's list of
+   ``trusted_third_party_id_servers``, you should remove it. It was added in
+   case a hypothetical future identity server was put there. If you don't
+   remove it, users may be unable to deactivate their accounts.
+
+3. This release no longer installs the (unmaintained) Matrix Console web client
+   as part of the default installation. It is possible to re-enable it by
+   installing it separately and setting the ``web_client_location`` config
+   option, but please consider switching to another client.
+
+Upgrading to v0.33.7
+====================
+
+This release removes the example email notification templates from
+``res/templates`` (they are now internal to the python package). This should
+only affect you if you (a) deploy your Synapse instance from a git checkout or
+a github snapshot URL, and (b) have email notifications enabled.
+
+If you have email notifications enabled, you should ensure that
+``email.template_dir`` is either configured to point at a directory where you
+have installed customised templates, or leave it unset to use the default
+templates.
+
+Upgrading to v0.27.3
 ====================
 
 This release expands the anonymous usage stats sent if the opt-in
-``report_stats`` configuration is set to ``true``. We now capture RSS memory 
+``report_stats`` configuration is set to ``true``. We now capture RSS memory
 and cpu use at a very coarse level. This requires administrators to install
 the optional ``psutil`` python module.
 

@@ -67,12 +67,8 @@ class CacheTestCase(unittest.TestCase):
         self.assertIsNone(cache.get("key2", None))
 
         # both callbacks should have been callbacked
-        self.assertTrue(
-            callback_record[0], "Invalidation callback for key1 not called",
-        )
-        self.assertTrue(
-            callback_record[1], "Invalidation callback for key2 not called",
-        )
+        self.assertTrue(callback_record[0], "Invalidation callback for key1 not called")
+        self.assertTrue(callback_record[1], "Invalidation callback for key2 not called")
 
         # letting the other lookup complete should do nothing
         d1.callback("result1")
@@ -168,8 +164,7 @@ class DescriptorTestCase(unittest.TestCase):
             with logcontext.LoggingContext() as c1:
                 c1.name = "c1"
                 r = yield obj.fn(1)
-                self.assertEqual(logcontext.LoggingContext.current_context(),
-                                 c1)
+                self.assertEqual(logcontext.LoggingContext.current_context(), c1)
             defer.returnValue(r)
 
         def check_result(r):
@@ -179,14 +174,18 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(logcontext.LoggingContext.current_context(),
-                         logcontext.LoggingContext.sentinel)
+        self.assertEqual(
+            logcontext.LoggingContext.current_context(),
+            logcontext.LoggingContext.sentinel,
+        )
         d1.addCallback(check_result)
 
         # and another
         d2 = do_lookup()
-        self.assertEqual(logcontext.LoggingContext.current_context(),
-                         logcontext.LoggingContext.sentinel)
+        self.assertEqual(
+            logcontext.LoggingContext.current_context(),
+            logcontext.LoggingContext.sentinel,
+        )
         d2.addCallback(check_result)
 
         # let the lookup complete
@@ -224,15 +223,16 @@ class DescriptorTestCase(unittest.TestCase):
                 except SynapseError:
                     pass
 
-                self.assertEqual(logcontext.LoggingContext.current_context(),
-                                 c1)
+                self.assertEqual(logcontext.LoggingContext.current_context(), c1)
 
         obj = Cls()
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(logcontext.LoggingContext.current_context(),
-                         logcontext.LoggingContext.sentinel)
+        self.assertEqual(
+            logcontext.LoggingContext.current_context(),
+            logcontext.LoggingContext.sentinel,
+        )
 
         return d1
 
@@ -288,14 +288,10 @@ class CachedListDescriptorTestCase(unittest.TestCase):
 
             @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
             def list_fn(self, args1, arg2):
-                assert (
-                    logcontext.LoggingContext.current_context().request == "c1"
-                )
+                assert logcontext.LoggingContext.current_context().request == "c1"
                 # we want this to behave like an asynchronous function
                 yield run_on_reactor()
-                assert (
-                    logcontext.LoggingContext.current_context().request == "c1"
-                )
+                assert logcontext.LoggingContext.current_context().request == "c1"
                 defer.returnValue(self.mock(args1, arg2))
 
         with logcontext.LoggingContext() as c1:
@@ -308,10 +304,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
                 logcontext.LoggingContext.sentinel,
             )
             r = yield d1
-            self.assertEqual(
-                logcontext.LoggingContext.current_context(),
-                c1
-            )
+            self.assertEqual(logcontext.LoggingContext.current_context(), c1)
             obj.mock.assert_called_once_with([10, 20], 2)
             self.assertEqual(r, {10: 'fish', 20: 'chips'})
             obj.mock.reset_mock()
@@ -337,6 +330,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_invalidate(self):
         """Make sure that invalidation callbacks are called."""
+
         class Cls(object):
             def __init__(self):
                 self.mock = mock.Mock()

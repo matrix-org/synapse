@@ -22,7 +22,7 @@ import bcrypt
 import pymacaroons
 from canonicaljson import json
 
-from twisted.internet import defer, threads
+from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
 import synapse.util.stringutils as stringutils
@@ -37,8 +37,8 @@ from synapse.api.errors import (
 )
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
+from synapse.util import logcontext
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.logcontext import make_deferred_yieldable
 
 from ._base import BaseHandler
 
@@ -59,6 +59,7 @@ class AuthHandler(BaseHandler):
             LoginType.EMAIL_IDENTITY: self._check_email_identity,
             LoginType.MSISDN: self._check_msisdn,
             LoginType.DUMMY: self._check_dummy_auth,
+            LoginType.TERMS: self._check_terms_auth,
         }
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
@@ -431,6 +432,9 @@ class AuthHandler(BaseHandler):
     def _check_dummy_auth(self, authdict, _):
         return defer.succeed(True)
 
+    def _check_terms_auth(self, authdict, _):
+        return defer.succeed(True)
+
     @defer.inlineCallbacks
     def _check_threepid(self, medium, authdict):
         if 'threepid_creds' not in authdict:
@@ -462,6 +466,22 @@ class AuthHandler(BaseHandler):
     def _get_params_recaptcha(self):
         return {"public_key": self.hs.config.recaptcha_public_key}
 
+    def _get_params_terms(self):
+        return {
+            "policies": {
+                "privacy_policy": {
+                    "version": self.hs.config.user_consent_version,
+                    "en": {
+                        "name": self.hs.config.user_consent_policy_name,
+                        "url": "%s_matrix/consent?v=%s" % (
+                            self.hs.config.public_baseurl,
+                            self.hs.config.user_consent_version,
+                        ),
+                    },
+                },
+            },
+        }
+
     def _auth_dict_for_flows(self, flows, session):
         public_flows = []
         for f in flows:
@@ -469,6 +489,7 @@ class AuthHandler(BaseHandler):
 
         get_params = {
             LoginType.RECAPTCHA: self._get_params_recaptcha,
+            LoginType.TERMS: self._get_params_terms,
         }
 
         params = {}
@@ -520,7 +541,7 @@ class AuthHandler(BaseHandler):
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
         access_token = yield self.issue_access_token(user_id, device_id)
-        yield self._check_mau_limits()
+        yield self.auth.check_auth_blocking(user_id)
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -542,10 +563,10 @@ class AuthHandler(BaseHandler):
         insensitively, but return None if there are multiple inexact matches.
 
         Args:
-            (str) user_id: complete @user:id
+            (unicode|bytes) user_id: complete @user:id
 
         Returns:
-            defer.Deferred: (str) canonical_user_id, or None if zero or
+            defer.Deferred: (unicode) canonical_user_id, or None if zero or
             multiple matches
         """
         res = yield self._find_user_id_and_pwd_hash(user_id)
@@ -734,7 +755,6 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
-        yield self._check_mau_limits()
         auth_api = self.hs.get_auth()
         user_id = None
         try:
@@ -743,6 +763,7 @@ class AuthHandler(BaseHandler):
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+        yield self.auth.check_auth_blocking(user_id)
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
@@ -828,12 +849,26 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def delete_threepid(self, user_id, medium, address):
+        """Attempts to unbind the 3pid on the identity servers and deletes it
+        from the local database.
+
+        Args:
+            user_id (str)
+            medium (str)
+            address (str)
+
+        Returns:
+            Deferred[bool]: Returns True if successfully unbound the 3pid on
+            the identity server, False if identity server doesn't support the
+            unbind API.
+        """
+
         # 'Canonicalise' email addresses as per above
         if medium == 'email':
             address = address.lower()
 
         identity_handler = self.hs.get_handlers().identity_handler
-        yield identity_handler.unbind_threepid(
+        result = yield identity_handler.try_unbind_threepid(
             user_id,
             {
                 'medium': medium,
@@ -841,10 +876,10 @@ class AuthHandler(BaseHandler):
             },
         )
 
-        ret = yield self.store.user_delete_threepid(
+        yield self.store.user_delete_threepid(
             user_id, medium, address,
         )
-        defer.returnValue(ret)
+        defer.returnValue(result)
 
     def _save_session(self, session):
         # TODO: Persistent storage
@@ -870,55 +905,34 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode('ascii')
 
-        return make_deferred_yieldable(
-            threads.deferToThreadPool(
-                self.hs.get_reactor(), self.hs.get_reactor().getThreadPool(), _do_hash
-            ),
-        )
+        return logcontext.defer_to_thread(self.hs.get_reactor(), _do_hash)
 
     def validate_hash(self, password, stored_hash):
         """Validates that self.hash(password) == stored_hash.
 
         Args:
             password (unicode): Password to hash.
-            stored_hash (unicode): Expected hash value.
+            stored_hash (bytes): Expected hash value.
 
         Returns:
             Deferred(bool): Whether self.hash(password) == stored_hash.
         """
-
         def _do_validate_hash():
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.checkpw(
                 pw.encode('utf8') + self.hs.config.password_pepper.encode("utf8"),
-                stored_hash.encode('utf8')
+                stored_hash
             )
 
         if stored_hash:
-            return make_deferred_yieldable(
-                threads.deferToThreadPool(
-                    self.hs.get_reactor(),
-                    self.hs.get_reactor().getThreadPool(),
-                    _do_validate_hash,
-                ),
-            )
+            if not isinstance(stored_hash, bytes):
+                stored_hash = stored_hash.encode('ascii')
+
+            return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
-
-    @defer.inlineCallbacks
-    def _check_mau_limits(self):
-        """
-        Ensure that if mau blocking is enabled that invalid users cannot
-        log in.
-        """
-        if self.hs.config.limit_usage_by_mau is True:
-            current_mau = yield self.store.count_monthly_users()
-            if current_mau >= self.hs.config.max_mau_value:
-                raise AuthError(
-                    403, "MAU Limit Exceeded", errcode=Codes.MAU_LIMIT_EXCEEDED
-                )
 
 
 @attr.s
@@ -940,6 +954,15 @@ class MacaroonGenerator(object):
         return macaroon.serialize()
 
     def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
+        """
+
+        Args:
+            user_id (unicode):
+            duration_in_ms (int):
+
+        Returns:
+            unicode
+        """
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
         now = self.hs.get_clock().time_msec()

@@ -1,1 +1,0 @@
-Catch failures saving metrics captured by Measure, and instead log the faulty metrics information for further analysis.

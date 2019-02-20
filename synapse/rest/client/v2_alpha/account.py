@@ -53,7 +53,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Your email domain is not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
@@ -89,7 +91,9 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Account phone numbers are not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
@@ -209,10 +213,17 @@ class DeactivateAccountRestServlet(RestServlet):
         yield self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request),
         )
-        yield self._deactivate_account_handler.deactivate_account(
+        result = yield self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase,
         )
-        defer.returnValue((200, {}))
+        if result:
+            id_server_unbind_result = "success"
+        else:
+            id_server_unbind_result = "no-support"
+
+        defer.returnValue((200, {
+            "id_server_unbind_result": id_server_unbind_result,
+        }))
 
 
 class EmailThreepidRequestTokenRestServlet(RestServlet):
@@ -234,7 +245,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Your email domain is not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
@@ -269,7 +282,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Account phone numbers are not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
@@ -364,7 +379,7 @@ class ThreepidDeleteRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         try:
-            yield self.auth_handler.delete_threepid(
+            ret = yield self.auth_handler.delete_threepid(
                 user_id, body['medium'], body['address']
             )
         except Exception:
@@ -374,7 +389,14 @@ class ThreepidDeleteRestServlet(RestServlet):
             logger.exception("Failed to remove threepid")
             raise SynapseError(500, "Failed to remove threepid")
 
-        defer.returnValue((200, {}))
+        if ret:
+            id_server_unbind_result = "success"
+        else:
+            id_server_unbind_result = "no-support"
+
+        defer.returnValue((200, {
+            "id_server_unbind_result": id_server_unbind_result,
+        }))
 
 
 class WhoamiRestServlet(RestServlet):

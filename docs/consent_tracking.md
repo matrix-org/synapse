@@ -31,7 +31,7 @@ Note that the templates must be stored under a name giving the language of the
 template - currently this must always be `en` (for "English");
 internationalisation support is intended for the future.
 
-The template for the policy itself should be versioned and named according to 
+The template for the policy itself should be versioned and named according to
 the version: for example `1.0.html`. The version of the policy which the user
 has agreed to is stored in the database.
 
@@ -85,6 +85,37 @@ Once this is complete, and the server has been restarted, try visiting
 an error "Missing string query parameter 'u'". It is now possible to manually
 construct URIs where users can give their consent.
 
+### Enabling consent tracking at registration
+
+1. Add the following to your configuration:
+
+   ```yaml
+   user_consent:
+     require_at_registration: true
+     policy_name: "Privacy Policy" # or whatever you'd like to call the policy
+   ```
+
+2. In your consent templates, make use of the `public_version` variable to
+   see if an unauthenticated user is viewing the page. This is typically
+   wrapped around the form that would be used to actually agree to the document:
+
+   ```
+   {% if not public_version %}
+     <!-- The variables used here are only provided when the 'u' param is given to the homeserver -->
+     <form method="post" action="consent">
+       <input type="hidden" name="v" value="{{version}}"/>
+       <input type="hidden" name="u" value="{{user}}"/>
+       <input type="hidden" name="h" value="{{userhmac}}"/>
+       <input type="submit" value="Sure thing!"/>
+     </form>
+   {% endif %}
+   ```
+
+3. Restart Synapse to apply the changes.
+
+Visiting `https://<server>/_matrix/consent` should now give you a view of the privacy
+document. This is what users will be able to see when registering for accounts.
+
 ### Constructing the consent URI
 
 It may be useful to manually construct the "consent URI" for a given user - for
@@ -104,6 +135,12 @@ query parameters:
 
    This should result in a URI which looks something like:
    `https://<server>/_matrix/consent?u=<user>&h=68a152465a4d...`.
+
+
+Note that not providing a `u` parameter will be interpreted as wanting to view
+the document from an unauthenticated perspective, such as prior to registration.
+Therefore, the `h` parameter is not required in this scenario. To enable this
+behaviour, set `require_at_registration` to `true` in your `user_consent` config.
 
 
 Sending users a server notice asking them to agree to the policy

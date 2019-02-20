@@ -21,8 +21,9 @@ import re
 from twisted.internet import defer
 
 import synapse
+from synapse.api.constants import RoomVersions
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
-from synapse.api.urls import FEDERATION_PREFIX as PREFIX
+from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
@@ -42,9 +43,20 @@ logger = logging.getLogger(__name__)
 class TransportLayerServer(JsonResource):
     """Handles incoming federation HTTP requests"""
 
-    def __init__(self, hs):
+    def __init__(self, hs, servlet_groups=None):
+        """Initialize the TransportLayerServer
+
+        Will by default register all servlets. For custom behaviour, pass in
+        a list of servlet_groups to register.
+
+        Args:
+            hs (synapse.server.HomeServer): homeserver
+            servlet_groups (list[str], optional): List of servlet groups to register.
+                Defaults to ``DEFAULT_SERVLET_GROUPS``.
+        """
         self.hs = hs
         self.clock = hs.get_clock()
+        self.servlet_groups = servlet_groups
 
         super(TransportLayerServer, self).__init__(hs, canonical_json=False)
 
@@ -66,6 +78,7 @@ class TransportLayerServer(JsonResource):
             resource=self,
             ratelimiter=self.ratelimiter,
             authenticator=self.authenticator,
+            servlet_groups=self.servlet_groups,
         )
 
 
@@ -90,8 +103,8 @@ class Authenticator(object):
     @defer.inlineCallbacks
     def authenticate_request(self, request, content):
         json_request = {
-            "method": request.method,
-            "uri": request.uri,
+            "method": request.method.decode('ascii'),
+            "uri": request.uri.decode('ascii'),
             "destination": self.server_name,
             "signatures": {},
         }
@@ -190,7 +203,44 @@ def _parse_auth_header(header_bytes):
 
 
 class BaseFederationServlet(object):
+    """Abstract base class for federation servlet classes.
+
+    The servlet object should have a PATH attribute which takes the form of a regexp to
+    match against the request path (excluding the /federation/v1 prefix).
+
+    The servlet should also implement one or more of on_GET, on_POST, on_PUT, to match
+    the appropriate HTTP method. These methods have the signature:
+
+        on_<METHOD>(self, origin, content, query, **kwargs)
+
+        With arguments:
+
+            origin (unicode|None): The authenticated server_name of the calling server,
+                unless REQUIRE_AUTH is set to False and authentication failed.
+
+            content (unicode|None): decoded json body of the request. None if the
+                request was a GET.
+
+            query (dict[bytes, list[bytes]]): Query params from the request. url-decoded
+                (ie, '+' and '%xx' are decoded) but note that it is *not* utf8-decoded
+                yet.
+
+            **kwargs (dict[unicode, unicode]): the dict mapping keys to path
+                components as specified in the path match regexp.
+
+        Returns:
+            Deferred[(int, object)|None]: either (response code, response object) to
+                 return a JSON response, or None if the request has already been handled.
+
+        Raises:
+            SynapseError: to return an error code
+
+            Exception: other exceptions will be caught, logged, and a 500 will be
+                returned.
+    """
     REQUIRE_AUTH = True
+
+    PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
 
     def __init__(self, handler, authenticator, ratelimiter, server_name):
         self.handler = handler
@@ -204,8 +254,20 @@ class BaseFederationServlet(object):
         @defer.inlineCallbacks
         @functools.wraps(func)
         def new_func(request, *args, **kwargs):
+            """ A callback which can be passed to HttpServer.RegisterPaths
+
+            Args:
+                request (twisted.web.http.Request):
+                *args: unused?
+                **kwargs (dict[unicode, unicode]): the dict mapping keys to path
+                    components as specified in the path match regexp.
+
+            Returns:
+                Deferred[(int, object)|None]: (response code, response object) as returned
+                    by the callback method. None if the request has already been handled.
+            """
             content = None
-            if request.method in ["PUT", "POST"]:
+            if request.method in [b"PUT", b"POST"]:
                 # TODO: Handle other method types? other content types?
                 content = parse_json_object_from_request(request)
 
@@ -214,10 +276,10 @@ class BaseFederationServlet(object):
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
-                    logger.exception("authenticate_request failed")
+                    logger.warn("authenticate_request failed: missing authentication")
                     raise
-            except Exception:
-                logger.exception("authenticate_request failed")
+            except Exception as e:
+                logger.warn("authenticate_request failed: %s", e)
                 raise
 
             if origin:
@@ -239,7 +301,7 @@ class BaseFederationServlet(object):
         return new_func
 
     def register(self, server):
-        pattern = re.compile("^" + PREFIX + self.PATH + "$")
+        pattern = re.compile("^" + self.PREFIX + self.PATH + "$")
 
         for method in ("GET", "PUT", "POST"):
             code = getattr(self, "on_%s" % (method), None)
@@ -306,21 +368,13 @@ class FederationSendServlet(BaseFederationServlet):
 
         try:
             code, response = yield self.handler.on_incoming_transaction(
-                transaction_data
+                origin, transaction_data,
             )
         except Exception:
             logger.exception("on_incoming_transaction failed")
             raise
 
         defer.returnValue((code, response))
-
-
-class FederationPullServlet(BaseFederationServlet):
-    PATH = "/pull/"
-
-    # This is for when someone asks us for everything since version X
-    def on_GET(self, origin, content, query):
-        return self.handler.on_pull_request(query["origin"][0], query["v"])
 
 
 class FederationEventServlet(BaseFederationServlet):
@@ -339,7 +393,7 @@ class FederationStateServlet(BaseFederationServlet):
         return self.handler.on_context_state_request(
             origin,
             context,
-            query.get("event_id", [None])[0],
+            parse_string_from_args(query, "event_id", None),
         )
 
 
@@ -350,7 +404,7 @@ class FederationStateIdsServlet(BaseFederationServlet):
         return self.handler.on_state_ids_request(
             origin,
             room_id,
-            query.get("event_id", [None])[0],
+            parse_string_from_args(query, "event_id", None),
         )
 
 
@@ -358,13 +412,11 @@ class FederationBackfillServlet(BaseFederationServlet):
     PATH = "/backfill/(?P<context>[^/]*)/"
 
     def on_GET(self, origin, content, query, context):
-        versions = query["v"]
-        limits = query["limit"]
+        versions = [x.decode('ascii') for x in query[b"v"]]
+        limit = parse_integer_from_args(query, "limit", None)
 
-        if not limits:
+        if not limit:
             return defer.succeed((400, {"error": "Did not include limit param"}))
-
-        limit = int(limits[-1])
 
         return self.handler.on_backfill_request(origin, context, versions, limit)
 
@@ -376,7 +428,7 @@ class FederationQueryServlet(BaseFederationServlet):
     def on_GET(self, origin, content, query, query_type):
         return self.handler.on_query_request(
             query_type,
-            {k: v[0].decode("utf-8") for k, v in query.items()}
+            {k.decode('utf8'): v[0].decode("utf-8") for k, v in query.items()}
         )
 
 
@@ -384,9 +436,31 @@ class FederationMakeJoinServlet(BaseFederationServlet):
     PATH = "/make_join/(?P<context>[^/]*)/(?P<user_id>[^/]*)"
 
     @defer.inlineCallbacks
-    def on_GET(self, origin, content, query, context, user_id):
+    def on_GET(self, origin, _content, query, context, user_id):
+        """
+        Args:
+            origin (unicode): The authenticated server_name of the calling server
+
+            _content (None): (GETs don't have bodies)
+
+            query (dict[bytes, list[bytes]]): Query params from the request.
+
+            **kwargs (dict[unicode, unicode]): the dict mapping keys to path
+                components as specified in the path match regexp.
+
+        Returns:
+            Deferred[(int, object)|None]: either (response code, response object) to
+                 return a JSON response, or None if the request has already been handled.
+        """
+        versions = query.get(b'ver')
+        if versions is not None:
+            supported_versions = [v.decode("utf-8") for v in versions]
+        else:
+            supported_versions = ["1"]
+
         content = yield self.handler.on_make_join_request(
             origin, context, user_id,
+            supported_versions=supported_versions,
         )
         defer.returnValue((200, content))
 
@@ -407,7 +481,7 @@ class FederationSendLeaveServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, room_id, event_id):
-        content = yield self.handler.on_send_leave_request(origin, content)
+        content = yield self.handler.on_send_leave_request(origin, content, room_id)
         defer.returnValue((200, content))
 
 
@@ -425,18 +499,50 @@ class FederationSendJoinServlet(BaseFederationServlet):
     def on_PUT(self, origin, content, query, context, event_id):
         # TODO(paul): assert that context/event_id parsed from path actually
         #   match those given in content
-        content = yield self.handler.on_send_join_request(origin, content)
+        content = yield self.handler.on_send_join_request(origin, content, context)
         defer.returnValue((200, content))
 
 
-class FederationInviteServlet(BaseFederationServlet):
+class FederationV1InviteServlet(BaseFederationServlet):
     PATH = "/invite/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+
+    @defer.inlineCallbacks
+    def on_PUT(self, origin, content, query, context, event_id):
+        # We don't get a room version, so we have to assume its EITHER v1 or
+        # v2. This is "fine" as the only difference between V1 and V2 is the
+        # state resolution algorithm, and we don't use that for processing
+        # invites
+        content = yield self.handler.on_invite_request(
+            origin, content, room_version=RoomVersions.V1,
+        )
+
+        # V1 federation API is defined to return a content of `[200, {...}]`
+        # due to a historical bug.
+        defer.returnValue((200, (200, content)))
+
+
+class FederationV2InviteServlet(BaseFederationServlet):
+    PATH = "/invite/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+
+    PREFIX = FEDERATION_V2_PREFIX
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, context, event_id):
         # TODO(paul): assert that context/event_id parsed from path actually
         #   match those given in content
-        content = yield self.handler.on_invite_request(origin, content)
+
+        room_version = content["room_version"]
+        event = content["event"]
+        invite_room_state = content["invite_room_state"]
+
+        # Synapse expects invite_room_state to be in unsigned, as it is in v1
+        # API
+
+        event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
+
+        content = yield self.handler.on_invite_request(
+            origin, event, room_version=room_version,
+        )
         defer.returnValue((200, content))
 
 
@@ -493,7 +599,6 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, room_id):
         limit = int(content.get("limit", 10))
-        min_depth = int(content.get("min_depth", 0))
         earliest_events = content.get("earliest_events", [])
         latest_events = content.get("latest_events", [])
 
@@ -502,7 +607,6 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
             room_id=room_id,
             earliest_events=earliest_events,
             latest_events=latest_events,
-            min_depth=min_depth,
             limit=limit,
         )
 
@@ -561,14 +665,14 @@ class OpenIdUserInfo(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
-        token = query.get("access_token", [None])[0]
+        token = query.get(b"access_token", [None])[0]
         if token is None:
             defer.returnValue((401, {
                 "errcode": "M_MISSING_TOKEN", "error": "Access Token required"
             }))
             return
 
-        user_id = yield self.handler.on_openid_userinfo(token)
+        user_id = yield self.handler.on_openid_userinfo(token.decode('ascii'))
 
         if user_id is None:
             defer.returnValue((401, {
@@ -1196,7 +1300,6 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
 
 FEDERATION_SERVLET_CLASSES = (
     FederationSendServlet,
-    FederationPullServlet,
     FederationEventServlet,
     FederationStateServlet,
     FederationStateIdsServlet,
@@ -1207,7 +1310,8 @@ FEDERATION_SERVLET_CLASSES = (
     FederationEventServlet,
     FederationSendJoinServlet,
     FederationSendLeaveServlet,
-    FederationInviteServlet,
+    FederationV1InviteServlet,
+    FederationV2InviteServlet,
     FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,
@@ -1216,10 +1320,12 @@ FEDERATION_SERVLET_CLASSES = (
     FederationClientKeysClaimServlet,
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,
-    OpenIdUserInfo,
     FederationVersionServlet,
 )
 
+OPENID_SERVLET_CLASSES = (
+    OpenIdUserInfo,
+)
 
 ROOM_LIST_CLASSES = (
     PublicRoomList,
@@ -1258,44 +1364,83 @@ GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )
 
+DEFAULT_SERVLET_GROUPS = (
+    "federation",
+    "room_list",
+    "group_server",
+    "group_local",
+    "group_attestation",
+    "openid",
+)
 
-def register_servlets(hs, resource, authenticator, ratelimiter):
-    for servletclass in FEDERATION_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_federation_server(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
 
-    for servletclass in ROOM_LIST_CLASSES:
-        servletclass(
-            handler=hs.get_room_list_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=None):
+    """Initialize and register servlet classes.
 
-    for servletclass in GROUP_SERVER_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_server_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    Will by default register all servlets. For custom behaviour, pass in
+    a list of servlet_groups to register.
 
-    for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_local_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    Args:
+        hs (synapse.server.HomeServer): homeserver
+        resource (TransportLayerServer): resource class to register to
+        authenticator (Authenticator): authenticator to use
+        ratelimiter (util.ratelimitutils.FederationRateLimiter): ratelimiter to use
+        servlet_groups (list[str], optional): List of servlet groups to register.
+            Defaults to ``DEFAULT_SERVLET_GROUPS``.
+    """
+    if not servlet_groups:
+        servlet_groups = DEFAULT_SERVLET_GROUPS
 
-    for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_attestation_renewer(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    if "federation" in servlet_groups:
+        for servletclass in FEDERATION_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_federation_server(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "openid" in servlet_groups:
+        for servletclass in OPENID_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_federation_server(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "room_list" in servlet_groups:
+        for servletclass in ROOM_LIST_CLASSES:
+            servletclass(
+                handler=hs.get_room_list_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_server" in servlet_groups:
+        for servletclass in GROUP_SERVER_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_server_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_local" in servlet_groups:
+        for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_local_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_attestation" in servlet_groups:
+        for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_attestation_renewer(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)

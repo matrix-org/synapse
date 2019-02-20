@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util.async import Linearizer
+from synapse.util.async_helpers import Linearizer
 
 from ._base import BaseHandler
 

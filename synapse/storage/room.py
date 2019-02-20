@@ -41,6 +41,22 @@ RatelimitOverride = collections.namedtuple(
 
 
 class RoomWorkerStore(SQLBaseStore):
+    def get_room(self, room_id):
+        """Retrieve a room.
+
+        Args:
+            room_id (str): The ID of the room to retrieve.
+        Returns:
+            A dict containing the room information, or None if the room is unknown.
+        """
+        return self._simple_select_one(
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            retcols=("room_id", "is_public", "creator"),
+            desc="get_room",
+            allow_none=True,
+        )
+
     def get_public_room_ids(self):
         return self._simple_select_onecol(
             table="rooms",
@@ -170,6 +186,35 @@ class RoomWorkerStore(SQLBaseStore):
             desc="is_room_blocked",
         )
 
+    @cachedInlineCallbacks(max_entries=10000)
+    def get_ratelimit_for_user(self, user_id):
+        """Check if there are any overrides for ratelimiting for the given
+        user
+
+        Args:
+            user_id (str)
+
+        Returns:
+            RatelimitOverride if there is an override, else None. If the contents
+            of RatelimitOverride are None or 0 then ratelimitng has been
+            disabled for that user entirely.
+        """
+        row = yield self._simple_select_one(
+            table="ratelimit_override",
+            keyvalues={"user_id": user_id},
+            retcols=("messages_per_second", "burst_count"),
+            allow_none=True,
+            desc="get_ratelimit_for_user",
+        )
+
+        if row:
+            defer.returnValue(RatelimitOverride(
+                messages_per_second=row["messages_per_second"],
+                burst_count=row["burst_count"],
+            ))
+        else:
+            defer.returnValue(None)
+
 
 class RoomStore(RoomWorkerStore, SearchStore):
 
@@ -214,22 +259,6 @@ class RoomStore(RoomWorkerStore, SearchStore):
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
-
-    def get_room(self, room_id):
-        """Retrieve a room.
-
-        Args:
-            room_id (str): The ID of the room to retrieve.
-        Returns:
-            A namedtuple containing the room information, or an empty list.
-        """
-        return self._simple_select_one(
-            table="rooms",
-            keyvalues={"room_id": room_id},
-            retcols=("room_id", "is_public", "creator"),
-            desc="get_room",
-            allow_none=True,
-        )
 
     @defer.inlineCallbacks
     def set_room_is_public(self, room_id, is_public):
@@ -468,35 +497,6 @@ class RoomStore(RoomWorkerStore, SearchStore):
         return self.runInteraction(
             "get_all_new_public_rooms", get_all_new_public_rooms
         )
-
-    @cachedInlineCallbacks(max_entries=10000)
-    def get_ratelimit_for_user(self, user_id):
-        """Check if there are any overrides for ratelimiting for the given
-        user
-
-        Args:
-            user_id (str)
-
-        Returns:
-            RatelimitOverride if there is an override, else None. If the contents
-            of RatelimitOverride are None or 0 then ratelimitng has been
-            disabled for that user entirely.
-        """
-        row = yield self._simple_select_one(
-            table="ratelimit_override",
-            keyvalues={"user_id": user_id},
-            retcols=("messages_per_second", "burst_count"),
-            allow_none=True,
-            desc="get_ratelimit_for_user",
-        )
-
-        if row:
-            defer.returnValue(RatelimitOverride(
-                messages_per_second=row["messages_per_second"],
-                burst_count=row["burst_count"],
-            ))
-        else:
-            defer.returnValue(None)
 
     @defer.inlineCallbacks
     def block_room(self, room_id, user_id):
