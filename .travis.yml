@@ -89,7 +89,7 @@ install:
   - psql -At -U postgres -c 'select version();' || true
 
   - pip install tox
-  
+
   # if we don't have python3.6 in this environment, travis unhelpfully gives us
   # a `python3.6` on our path which does nothing but spit out a warning. Tox
   # tries to run it (even if we're not running a py36 env), so the build logs
