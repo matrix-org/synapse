@@ -1,4 +1,4 @@
-sudo: false
+dist: xenial
 language: python
 
 cache:
@@ -12,9 +12,6 @@ cache:
     #
     - $HOME/.cache/pip/wheels
 
-addons:
-  postgresql: "9.5"
-
 # don't clone the whole repo history, one commit will do
 git:
   depth: 1
@@ -25,6 +22,7 @@ branches:
     - master
     - develop
     - /^release-v/
+    - rav/pg95
 
 # When running the tox environments that call Twisted Trial, we can pass the -j
 # flag to run the tests concurrently. We set this to 2 for CPU bound tests
@@ -32,36 +30,53 @@ branches:
 matrix:
   fast_finish: true
   include:
-  - python: 2.7
-    env: TOX_ENV=packaging
+  - name: "pep8"
+    python: 3.6
+    env: TOX_ENV="pep8,check_isort,packaging"
 
-  - python: 3.6
-    env: TOX_ENV="pep8,check_isort"
-
-  - python: 2.7
+  - name: "py2.7 / sqlite"
+    python: 2.7
     env: TOX_ENV=py27,codecov TRIAL_FLAGS="-j 2"
 
-  - python: 2.7
+  - name: "py2.7 / sqlite / olddeps"
+    python: 2.7
     env: TOX_ENV=py27-old TRIAL_FLAGS="-j 2"
 
-  - python: 2.7
+  - name: "py2.7 / postgres9.5"
+    python: 2.7
+    addons:
+      postgresql: "9.5"
     env: TOX_ENV=py27-postgres,codecov TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
-  - python: 3.5
+  - name: "py3.5 / sqlite"
+    python: 3.5
     env: TOX_ENV=py35,codecov TRIAL_FLAGS="-j 2"
 
-  - python: 3.6
-    env: TOX_ENV=py36,codecov TRIAL_FLAGS="-j 2"
+  - name: "py3.7 / sqlite"
+    python: 3.7
+    env: TOX_ENV=py37,codecov TRIAL_FLAGS="-j 2"
 
-  - python: 3.6
-    env: TOX_ENV=py36-postgres,codecov TRIAL_FLAGS="-j 4"
+  - name: "py3.7 / postgres9.4"
+    python: 3.7
+    addons:
+      postgresql: "9.4"
+    env: TOX_ENV=py37-postgres TRIAL_FLAGS="-j 4"
+    services:
+      - postgresql
+
+  - name: "py3.7 / postgres9.5"
+    python: 3.7
+    addons:
+      postgresql: "9.5"
+    env: TOX_ENV=py37-postgres,codecov TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
   - # we only need to check for the newsfragment if it's a PR build
     if: type = pull_request
+    name: "check-newsfragment"
     python: 3.6
     env: TOX_ENV=check-newsfragment
     script:
@@ -70,6 +85,9 @@ matrix:
       - tox -e $TOX_ENV
 
 install:
+  # this just logs the postgres version we will be testing against (if any)
+  - psql -At -U postgres -c 'select version();' || true
+
   - pip install tox
 
   # if we don't have python3.6 in this environment, travis unhelpfully gives us

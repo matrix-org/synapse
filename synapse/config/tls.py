@@ -42,6 +42,7 @@ class TlsConfig(Config):
         self.acme_port = acme_config.get("port", 80)
         self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
+        self.acme_domain = acme_config.get("domain", config.get("server_name"))
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
@@ -228,6 +229,20 @@ class TlsConfig(Config):
             # How many days remaining on a certificate before it is renewed.
             #
             # reprovision_threshold: 30
+
+            # The domain that the certificate should be for. Normally this
+            # should be the same as your Matrix domain (i.e., 'server_name'), but,
+            # by putting a file at 'https://<server_name>/.well-known/matrix/server',
+            # you can delegate incoming traffic to another server. If you do that,
+            # you should give the target of the delegation here.
+            #
+            # For example: if your 'server_name' is 'example.com', but
+            # 'https://example.com/.well-known/matrix/server' delegates to
+            # 'matrix.example.com', you should put 'matrix.example.com' here.
+            #
+            # If not set, defaults to your 'server_name'.
+            #
+            # domain: matrix.example.com
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
