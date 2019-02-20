@@ -59,6 +59,8 @@ class MetricsConfig(Config):
         #
         #sentry:
         #    dsn: "..."
+
+        # Whether or not to report anonymized homeserver usage statistics.
         """
 
         if report_stats is None:

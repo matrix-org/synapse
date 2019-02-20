@@ -33,7 +33,6 @@ from synapse.metrics import (
     event_processing_loop_counter,
     event_processing_loop_room_count,
     events_processed_counter,
-    sent_edus_counter,
     sent_transactions_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -47,10 +46,24 @@ from .units import Edu, Transaction
 logger = logging.getLogger(__name__)
 
 sent_pdus_destination_dist_count = Counter(
-    "synapse_federation_client_sent_pdu_destinations:count", ""
+    "synapse_federation_client_sent_pdu_destinations:count",
+    "Number of PDUs queued for sending to one or more destinations",
 )
+
 sent_pdus_destination_dist_total = Counter(
     "synapse_federation_client_sent_pdu_destinations:total", ""
+    "Total number of PDUs queued for sending across all destinations",
+)
+
+sent_edus_counter = Counter(
+    "synapse_federation_client_sent_edus",
+    "Total number of EDUs successfully sent",
+)
+
+sent_edus_by_type = Counter(
+    "synapse_federation_client_sent_edus_by_type",
+    "Number of sent EDUs successfully sent, by event type",
+    ["type"],
 )
 
 
@@ -360,8 +373,6 @@ class TransactionQueue(object):
             logger.info("Not sending EDU to ourselves")
             return
 
-        sent_edus_counter.inc()
-
         if key:
             self.pending_edus_keyed_by_dest.setdefault(
                 destination, {}
@@ -496,6 +507,9 @@ class TransactionQueue(object):
                 )
                 if success:
                     sent_transactions_counter.inc()
+                    sent_edus_counter.inc(len(pending_edus))
+                    for edu in pending_edus:
+                        sent_edus_by_type.labels(edu.edu_type).inc()
                     # Remove the acknowledged device messages from the database
                     # Only bother if we actually sent some device messages
                     if device_message_edus:
