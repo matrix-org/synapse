@@ -333,10 +333,10 @@ class HttpPusher(object):
             defer.returnValue([])
         try:
             resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
-        except Exception:
-            logger.warn(
-                "Failed to push event %s to %s",
-                event.event_id, self.name, exc_info=True,
+        except Exception as e:
+            logger.warning(
+                "Failed to push event %s to %s: %s %s",
+                event.event_id, self.name, type(e), e,
             )
             defer.returnValue(False)
         rejected = []
@@ -367,10 +367,10 @@ class HttpPusher(object):
         }
         try:
             resp = yield self.http_client.post_json_get_json(self.url, d)
-        except Exception:
-            logger.warn(
-                "Failed to send badge count to %s",
-                self.name, exc_info=True,
+        except Exception as e:
+            logger.warning(
+                "Failed to send badge count to %s: %s %s",
+                self.name, type(e), e,
             )
             defer.returnValue(False)
         rejected = []
