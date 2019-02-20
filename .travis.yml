@@ -1,4 +1,4 @@
-sudo: false
+dist: xenial
 language: python
 
 cache:
@@ -54,23 +54,23 @@ matrix:
     python: 3.5
     env: TOX_ENV=py35,codecov TRIAL_FLAGS="-j 2"
 
-  - name: "py3.6 / sqlite"
-    python: 3.6
-    env: TOX_ENV=py36,codecov TRIAL_FLAGS="-j 2"
+  - name: "py3.7 / sqlite"
+    python: 3.7
+    env: TOX_ENV=py37,codecov TRIAL_FLAGS="-j 2"
 
-  - name: "py3.6 / postgres9.4"
-    python: 3.6
+  - name: "py3.7 / postgres9.4"
+    python: 3.7
     addons:
       postgresql: "9.4"
-    env: TOX_ENV=py36-postgres TRIAL_FLAGS="-j 4"
+    env: TOX_ENV=py37-postgres TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
-  - name: "py3.6 / postgres9.5"
-    python: 3.6
+  - name: "py3.7 / postgres9.5"
+    python: 3.7
     addons:
       postgresql: "9.5"
-    env: TOX_ENV=py36-postgres,codecov TRIAL_FLAGS="-j 4"
+    env: TOX_ENV=py37-postgres,codecov TRIAL_FLAGS="-j 4"
     services:
       - postgresql
 
@@ -86,7 +86,7 @@ matrix:
 
 install:
   # this just logs the postgres version we will be testing against (if any)
-  - psql -At -U postgres -c 'select version();'
+  - psql -At -U postgres -c 'select version();' || true
 
   - pip install tox
   

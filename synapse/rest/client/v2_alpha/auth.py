@@ -129,7 +129,7 @@ class AuthRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
 
     def on_GET(self, request, stagetype):
         session = parse_string(request, "session")

@@ -48,7 +48,7 @@ class RegistrationTestCase(unittest.TestCase):
             generate_access_token=Mock(return_value='secret')
         )
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
-        self.handler = self.hs.get_handlers().registration_handler
+        self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
         self.hs.config.max_mau_value = 50
         self.lots_of_users = 100
