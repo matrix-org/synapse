@@ -30,7 +30,7 @@ use github's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
-We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI 
+We use `CircleCI <https://circleci.com/gh/matrix-org>`_ and `Travis CI
 <https://travis-ci.org/matrix-org/synapse>`_ for continuous integration. All
 pull requests to synapse get automatically tested by Travis and CircleCI.
 If your change breaks the build, this will be shown in GitHub, so please
@@ -74,16 +74,39 @@ entry. These are managed by Towncrier
 To create a changelog entry, make a new file in the ``changelog.d``
 file named in the format of ``PRnumber.type``. The type can be
 one of ``feature``, ``bugfix``, ``removal`` (also used for
-deprecations), or ``misc`` (for internal-only changes). The content of
-the file is your changelog entry, which can contain Markdown
-formatting. Adding credits to the changelog is encouraged, we value
-your contributions and would like to have you shouted out in the
-release notes!
+deprecations), or ``misc`` (for internal-only changes).
+
+The content of the file is your changelog entry, which can contain Markdown
+formatting. The entry should end with a full stop ('.') for consistency.
+
+Adding credits to the changelog is encouraged, we value your
+contributions and would like to have you shouted out in the release notes!
 
 For example, a fix in PR #1234 would have its changelog entry in
 ``changelog.d/1234.bugfix``, and contain content like "The security levels of
 Florbs are now validated when recieved over federation. Contributed by Jane
-Matrix".
+Matrix.".
+
+Debian changelog
+----------------
+
+Changes which affect the debian packaging files (in ``debian``) are an
+exception.
+
+In this case, you will need to add an entry to the debian changelog for the
+next release. For this, run the following command::
+
+  dch
+
+This will make up a new version number (if there isn't already an unreleased
+version in flight), and open an editor where you can add a new changelog entry.
+(Our release process will ensure that the version number and maintainer name is
+corrected for the release.)
+
+If your change affects both the debian packaging *and* files outside the debian
+directory, you will need both a regular newsfragment *and* an entry in the
+debian changelog. (Though typically such changes should be submitted as two
+separate pull requests.)
 
 Attribution
 ~~~~~~~~~~~
