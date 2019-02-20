@@ -83,6 +83,7 @@ class LoggingConfig(Config):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return """
         # A yaml python logging config file
+        #
         log_config: "%(log_config)s"
         """ % locals()
 

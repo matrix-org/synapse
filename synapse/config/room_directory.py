@@ -76,11 +76,11 @@ class RoomDirectoryConfig(Config):
         #
         # The default is:
         #
-        # alias_creation_rules:
-        #     - user_id: "*"
-        #       alias: "*"
-        #       room_id: "*"
-        #       action: allow
+        #alias_creation_rules:
+        #  - user_id: "*"
+        #    alias: "*"
+        #    room_id: "*"
+        #    action: allow
 
         # The `room_list_publication_rules` option controls who can publish and
         # which rooms can be published in the public room list.
@@ -105,11 +105,11 @@ class RoomDirectoryConfig(Config):
         #
         # The default is:
         #
-        # room_list_publication_rules:
-        #     - user_id: "*"
-        #       alias: "*"
-        #       room_id: "*"
-        #       action: allow
+        #room_list_publication_rules:
+        #  - user_id: "*"
+        #    alias: "*"
+        #    room_id: "*"
+        #    action: allow
         """
 
     def is_alias_creation_allowed(self, user_id, room_id, alias):

@@ -54,20 +54,20 @@ DEFAULT_CONFIG = """\
 # for an account. Has no effect unless `require_at_registration` is enabled.
 # Defaults to "Privacy Policy".
 #
-# user_consent:
-#   template_dir: res/templates/privacy
-#   version: 1.0
-#   server_notice_content:
-#     msgtype: m.text
-#     body: >-
-#       To continue using this homeserver you must review and agree to the
-#       terms and conditions at %(consent_uri)s
-#   send_server_notice_to_guests: True
-#   block_events_error: >-
-#     To continue using this homeserver you must review and agree to the
-#     terms and conditions at %(consent_uri)s
-#   require_at_registration: False
-#   policy_name: Privacy Policy
+#user_consent:
+#  template_dir: res/templates/privacy
+#  version: 1.0
+#  server_notice_content:
+#    msgtype: m.text
+#    body: >-
+#      To continue using this homeserver you must review and agree to the
+#      terms and conditions at %(consent_uri)s
+#  send_server_notice_to_guests: True
+#  block_events_error: >-
+#    To continue using this homeserver you must review and agree to the
+#    terms and conditions at %(consent_uri)s
+#  require_at_registration: False
+#  policy_name: Privacy Policy
 #
 """
 

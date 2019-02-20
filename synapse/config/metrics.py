@@ -47,6 +47,7 @@ class MetricsConfig(Config):
         ## Metrics ###
 
         # Enable collection and rendering of performance metrics
+        #
         enable_metrics: False
 
         # Enable sentry integration
@@ -55,6 +56,7 @@ class MetricsConfig(Config):
         # this option the sentry server may therefore receive sensitive
         # information, and it in turn may then diseminate sensitive information
         # through insecure notification channels if so configured.
+        #
         #sentry:
         #    dsn: "..."
         """
