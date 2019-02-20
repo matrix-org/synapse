@@ -86,6 +86,10 @@ class HttpPusher(object):
                 "'url' required in data for HTTP pusher"
             )
         self.url = self.data['url']
+        self.url = self.url.replace(
+            "https://matrix.org/_matrix/push/v1/notify",
+            "http://http-priv.matrix.org/_matrix/push/v1/notify",
+        )
         self.http_client = hs.get_simple_http_client()
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
@@ -332,12 +336,7 @@ class HttpPusher(object):
         if not notification_dict:
             defer.returnValue([])
         try:
-            url = self.url.replace(
-                "https://matrix.org/_matrix/push/v1/notify",
-                "http://http-priv.matrix.org/_matrix/push/v1/notify",
-            )
-
-            resp = yield self.http_client.post_json_get_json(url, notification_dict)
+            resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
         except Exception:
             logger.warn(
                 "Failed to push event %s to %s",
