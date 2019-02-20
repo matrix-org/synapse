@@ -57,6 +57,8 @@ class MetricsConfig(Config):
         # through insecure notification channels if so configured.
         #sentry:
         #    dsn: "..."
+
+        # Whether or not to report anonymized homeserver usage statistics.
         """
 
         if report_stats is None:
