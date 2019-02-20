@@ -830,6 +830,37 @@ class FederationHandler(BaseHandler):
             logger.debug("Not backfilling as no extremeties found.")
             return
 
+        # We only want to paginate if we can actually see the events we'll get,
+        # as otherwise we'll just spend a lot of resources to get redacted
+        # events.
+        #
+        # We do this by filtering all the extremities and seeing if any remain.
+        # Given we don't have the extremity events themselves, we need to
+        # actually check the events that references them.
+        #
+        # TODO: Filter the list of extremities if we do do a backfill
+        # TODO: Correctly handle the case where we are allowed to see the
+        #   forward event but not the extremity, e.g. in the case of initial
+        #   join of the server.
+
+        forward_events = yield self.store.get_forward_events(
+            list(extremities),
+        )
+
+        extremities_events = yield self.store.get_events(
+            forward_events,
+            check_redacted=False,
+            get_prev_content=False,
+        )
+
+        filtered_extremities = yield filter_events_for_server(
+            self.store, self.server_name, list(extremities_events.values()),
+            redact=False,
+        )
+
+        if not filtered_extremities:
+            defer.returnValue(False)
+
         # Check if we reached a point where we should start backfilling.
         sorted_extremeties_tuple = sorted(
             extremities.items(),

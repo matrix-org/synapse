@@ -216,7 +216,20 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
 
 
 @defer.inlineCallbacks
-def filter_events_for_server(store, server_name, events):
+def filter_events_for_server(store, server_name, events, redact=True):
+    """Filter a list of events based on whether given server is allowed to
+    see them.
+
+    Args:
+        store (DataStore)
+        server_name (str)
+        events (iterable[FrozenEvent])
+        redact (bool): Whether to return a redacted version of the event, or
+            to filter them out entirely.
+
+    Returns
+        Deferred[list[FrozenEvent]]
+    """
     # Whatever else we do, we need to check for senders which have requested
     # erasure of their data.
     erased_senders = yield store.are_users_erased(
@@ -231,7 +244,10 @@ def filter_events_for_server(store, server_name, events):
                 "Sender of %s has been erased, redacting",
                 event.event_id,
             )
-            return prune_event(event)
+            if redact:
+                return prune_event(event)
+            else:
+                return None
 
         # state will be None if we decided we didn't need to filter by
         # room membership.
@@ -265,7 +281,10 @@ def filter_events_for_server(store, server_name, events):
                             return event
                 else:
                     # server has no users in the room: redact
-                    return prune_event(event)
+                    if redact:
+                        return prune_event(event)
+                    else:
+                        return None
 
         return event
 
@@ -361,7 +380,8 @@ def filter_events_for_server(store, server_name, events):
         for e_id, key_to_eid in iteritems(event_to_state_ids)
     }
 
-    defer.returnValue([
+    to_return = (
         redact_disallowed(e, event_to_state[e.event_id])
         for e in events
-    ])
+    )
+    defer.returnValue([e for e in to_return if e is not None])
