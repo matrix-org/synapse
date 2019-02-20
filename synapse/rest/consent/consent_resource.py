@@ -89,7 +89,7 @@ class ConsentResource(Resource):
 
         self.hs = hs
         self.store = hs.get_datastore()
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
 
         # this is required by the request_handler wrapper
         self.clock = hs.get_clock()

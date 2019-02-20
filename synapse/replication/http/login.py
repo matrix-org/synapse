@@ -35,7 +35,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
 
     def __init__(self, hs):
         super(RegisterDeviceReplicationServlet, self).__init__(hs)
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
     def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
