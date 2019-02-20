@@ -191,7 +191,7 @@ class ReplicationRegister3PIDGuestRestServlet(ReplicationEndpoint):
     def __init__(self, hs):
         super(ReplicationRegister3PIDGuestRestServlet, self).__init__(hs)
 
-        self.registeration_handler = hs.get_handlers().registration_handler
+        self.registeration_handler = hs.get_registration_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 
@@ -251,7 +251,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
     def __init__(self, hs):
         super(ReplicationUserJoinedLeftRoomRestServlet, self).__init__(hs)
 
-        self.registeration_handler = hs.get_handlers().registration_handler
+        self.registeration_handler = hs.get_registration_handler()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.distributor = hs.get_distributor()

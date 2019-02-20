@@ -94,7 +94,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.jwt_algorithm = hs.config.jwt_algorithm
         self.cas_enabled = hs.config.cas_enabled
         self.auth_handler = self.hs.get_auth_handler()
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
 
@@ -434,7 +434,7 @@ class SSOAuthHandler(object):
     def __init__(self, hs):
         self._hostname = hs.hostname
         self._auth_handler = hs.get_auth_handler()
-        self._registration_handler = hs.get_handlers().registration_handler
+        self._registration_handler = hs.get_registration_handler()
         self._macaroon_gen = hs.get_macaroon_generator()
 
     @defer.inlineCallbacks

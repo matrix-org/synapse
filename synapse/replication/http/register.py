@@ -87,5 +87,60 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         defer.returnValue((200, {}))
 
 
+class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
+    """Run any post registration actions
+    """
+
+    NAME = "post_register"
+    PATH_ARGS = ("user_id",)
+
+    def __init__(self, hs):
+        super(ReplicationPostRegisterActionsServlet, self).__init__(hs)
+        self.store = hs.get_datastore()
+        self.registration_handler = hs.get_registration_handler()
+
+    @staticmethod
+    def _serialize_payload(user_id, auth_result, access_token, bind_email,
+                           bind_msisdn):
+        """
+        Args:
+            user_id (str): The user ID that consented
+            auth_result (dict): The authenticated credentials of the newly
+                registered user.
+            access_token (str|None): The access token of the newly logged in
+                device, or None if `inhibit_login` enabled.
+            bind_email (bool): Whether to bind the email with the identity
+                server
+            bind_msisdn (bool): Whether to bind the msisdn with the identity
+                server
+        """
+        return {
+            "auth_result": auth_result,
+            "access_token": access_token,
+            "bind_email": bind_email,
+            "bind_msisdn": bind_msisdn,
+        }
+
+    @defer.inlineCallbacks
+    def _handle_request(self, request, user_id):
+        content = parse_json_object_from_request(request)
+
+        auth_result = content["auth_result"]
+        access_token = content["access_token"]
+        bind_email = content["bind_email"]
+        bind_msisdn = content["bind_msisdn"]
+
+        yield self.registration_handler.post_registration_actions(
+            user_id=user_id,
+            auth_result=auth_result,
+            access_token=access_token,
+            bind_email=bind_email,
+            bind_msisdn=bind_msisdn,
+        )
+
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     ReplicationRegisterServlet(hs).register(http_server)
+    ReplicationPostRegisterActionsServlet(hs).register(http_server)
