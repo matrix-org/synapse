@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,7 +56,10 @@ class Codes(object):
     SERVER_NOT_TRUSTED = "M_SERVER_NOT_TRUSTED"
     CONSENT_NOT_GIVEN = "M_CONSENT_NOT_GIVEN"
     CANNOT_LEAVE_SERVER_NOTICE_ROOM = "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM"
-    MAU_LIMIT_EXCEEDED = "M_MAU_LIMIT_EXCEEDED"
+    RESOURCE_LIMIT_EXCEEDED = "M_RESOURCE_LIMIT_EXCEEDED"
+    UNSUPPORTED_ROOM_VERSION = "M_UNSUPPORTED_ROOM_VERSION"
+    INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
+    WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
 
 
 class CodeMessageException(RuntimeError):
@@ -228,6 +232,30 @@ class AuthError(SynapseError):
         super(AuthError, self).__init__(*args, **kwargs)
 
 
+class ResourceLimitError(SynapseError):
+    """
+    Any error raised when there is a problem with resource usage.
+    For instance, the monthly active user limit for the server has been exceeded
+    """
+    def __init__(
+        self, code, msg,
+        errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+        admin_contact=None,
+        limit_type=None,
+    ):
+        self.admin_contact = admin_contact
+        self.limit_type = limit_type
+        super(ResourceLimitError, self).__init__(code, msg, errcode=errcode)
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            admin_contact=self.admin_contact,
+            limit_type=self.limit_type
+        )
+
+
 class EventSizeError(SynapseError):
     """An error raised when an event is too big."""
 
@@ -283,6 +311,59 @@ class LimitExceededError(SynapseError):
             self.errcode,
             retry_after_ms=self.retry_after_ms,
         )
+
+
+class RoomKeysVersionError(SynapseError):
+    """A client has tried to upload to a non-current version of the room_keys store
+    """
+    def __init__(self, current_version):
+        """
+        Args:
+            current_version (str): the current version of the store they should have used
+        """
+        super(RoomKeysVersionError, self).__init__(
+            403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION
+        )
+        self.current_version = current_version
+
+
+class IncompatibleRoomVersionError(SynapseError):
+    """A server is trying to join a room whose version it does not support."""
+
+    def __init__(self, room_version):
+        super(IncompatibleRoomVersionError, self).__init__(
+            code=400,
+            msg="Your homeserver does not support the features required to "
+                "join this room",
+            errcode=Codes.INCOMPATIBLE_ROOM_VERSION,
+        )
+
+        self._room_version = room_version
+
+    def error_dict(self):
+        return cs_error(
+            self.msg,
+            self.errcode,
+            room_version=self._room_version,
+        )
+
+
+class RequestSendFailed(RuntimeError):
+    """Sending a HTTP request over federation failed due to not being able to
+    talk to the remote server for some reason.
+
+    This exception is used to differentiate "expected" errors that arise due to
+    networking (e.g. DNS failures, connection timeouts etc), versus unexpected
+    errors (like programming errors).
+    """
+    def __init__(self, inner_exception, can_retry):
+        super(RequestSendFailed, self).__init__(
+            "Failed to send request: %s: %s" % (
+                type(inner_exception).__name__, inner_exception,
+            )
+        )
+        self.inner_exception = inner_exception
+        self.can_retry = can_retry
 
 
 def cs_error(msg, code=Codes.UNKNOWN, **kwargs):

@@ -169,7 +169,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
             messages_json_for_user = {}
-            devices = messages_by_device.keys()
+            devices = list(messages_by_device.keys())
             if len(devices) == 1 and devices[0] == "*":
                 # Handle wildcard device_ids.
                 sql = (

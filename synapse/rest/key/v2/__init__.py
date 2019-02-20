@@ -22,5 +22,5 @@ from .remote_key_resource import RemoteKey
 class KeyApiV2Resource(Resource):
     def __init__(self, hs):
         Resource.__init__(self)
-        self.putChild("server", LocalKey(hs))
-        self.putChild("query", RemoteKey(hs))
+        self.putChild(b"server", LocalKey(hs))
+        self.putChild(b"query", RemoteKey(hs))

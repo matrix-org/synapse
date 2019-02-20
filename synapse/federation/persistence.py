@@ -36,7 +36,7 @@ class TransactionActions(object):
         self.store = datastore
 
     @log_function
-    def have_responded(self, transaction):
+    def have_responded(self, origin, transaction):
         """ Have we already responded to a transaction with the same id and
         origin?
 
@@ -50,11 +50,11 @@ class TransactionActions(object):
                                "transaction_id")
 
         return self.store.get_received_txn_response(
-            transaction.transaction_id, transaction.origin
+            transaction.transaction_id, origin
         )
 
     @log_function
-    def set_response(self, transaction, code, response):
+    def set_response(self, origin, transaction, code, response):
         """ Persist how we responded to a transaction.
 
         Returns:
@@ -66,7 +66,7 @@ class TransactionActions(object):
 
         return self.store.set_received_txn_response(
             transaction.transaction_id,
-            transaction.origin,
+            origin,
             code,
             response,
         )

@@ -20,7 +20,14 @@ import string
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, CodeMessageException, Codes, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    CodeMessageException,
+    Codes,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+)
 from synapse.types import RoomAlias, UserID, get_domain_from_id
 
 from ._base import BaseHandler
@@ -36,6 +43,7 @@ class DirectoryHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.config = hs.config
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -49,8 +57,8 @@ class DirectoryHandler(BaseHandler):
         # general association creation for both human users and app services
 
         for wchar in string.whitespace:
-                if wchar in room_alias.localpart:
-                    raise SynapseError(400, "Invalid characters in room alias")
+            if wchar in room_alias.localpart:
+                raise SynapseError(400, "Invalid characters in room alias")
 
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
@@ -73,43 +81,98 @@ class DirectoryHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def create_association(self, user_id, room_alias, room_id, servers=None):
-        # association creation for human users
-        # TODO(erikj): Do user auth.
+    def create_association(self, requester, room_alias, room_id, servers=None,
+                           send_event=True):
+        """Attempt to create a new alias
 
-        if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
-            raise SynapseError(
-                403, "This user is not permitted to create this alias",
-            )
+        Args:
+            requester (Requester)
+            room_alias (RoomAlias)
+            room_id (str)
+            servers (list[str]|None): List of servers that others servers
+                should try and join via
+            send_event (bool): Whether to send an updated m.room.aliases event
 
-        can_create = yield self.can_modify_alias(
-            room_alias,
-            user_id=user_id
-        )
-        if not can_create:
-            raise SynapseError(
-                400, "This alias is reserved by an application service.",
-                errcode=Codes.EXCLUSIVE
+        Returns:
+            Deferred
+        """
+
+        user_id = requester.user.to_string()
+
+        service = requester.app_service
+        if service:
+            if not service.is_interested_in_alias(room_alias.to_string()):
+                raise SynapseError(
+                    400, "This application service has not reserved"
+                    " this kind of alias.", errcode=Codes.EXCLUSIVE
+                )
+        else:
+            if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
+                raise AuthError(
+                    403, "This user is not permitted to create this alias",
+                )
+
+            if not self.config.is_alias_creation_allowed(
+                user_id, room_id, room_alias.to_string(),
+            ):
+                # Lets just return a generic message, as there may be all sorts of
+                # reasons why we said no. TODO: Allow configurable error messages
+                # per alias creation rule?
+                raise SynapseError(
+                    403, "Not allowed to create alias",
+                )
+
+            can_create = yield self.can_modify_alias(
+                room_alias,
+                user_id=user_id
             )
+            if not can_create:
+                raise AuthError(
+                    400, "This alias is reserved by an application service.",
+                    errcode=Codes.EXCLUSIVE
+                )
+
         yield self._create_association(room_alias, room_id, servers, creator=user_id)
-
-    @defer.inlineCallbacks
-    def create_appservice_association(self, service, room_alias, room_id,
-                                      servers=None):
-        if not service.is_interested_in_alias(room_alias.to_string()):
-            raise SynapseError(
-                400, "This application service has not reserved"
-                " this kind of alias.", errcode=Codes.EXCLUSIVE
+        if send_event:
+            yield self.send_room_alias_update_event(
+                requester,
+                room_id
             )
 
-        # association creation for app services
-        yield self._create_association(room_alias, room_id, servers)
-
     @defer.inlineCallbacks
-    def delete_association(self, requester, user_id, room_alias):
-        # association deletion for human users
+    def delete_association(self, requester, room_alias, send_event=True):
+        """Remove an alias from the directory
 
-        can_delete = yield self._user_can_delete_alias(room_alias, user_id)
+        (this is only meant for human users; AS users should call
+        delete_appservice_association)
+
+        Args:
+            requester (Requester):
+            room_alias (RoomAlias):
+            send_event (bool): Whether to send an updated m.room.aliases event.
+                Note that, if we delete the canonical alias, we will always attempt
+                to send an m.room.canonical_alias event
+
+        Returns:
+            Deferred[unicode]: room id that the alias used to point to
+
+        Raises:
+            NotFoundError: if the alias doesn't exist
+
+            AuthError: if the user doesn't have perms to delete the alias (ie, the user
+                is neither the creator of the alias, nor a server admin.
+
+            SynapseError: if the alias belongs to an AS
+        """
+        user_id = requester.user.to_string()
+
+        try:
+            can_delete = yield self._user_can_delete_alias(room_alias, user_id)
+        except StoreError as e:
+            if e.code == 404:
+                raise NotFoundError("Unknown room alias")
+            raise
+
         if not can_delete:
             raise AuthError(
                 403, "You don't have permission to delete the alias.",
@@ -128,11 +191,11 @@ class DirectoryHandler(BaseHandler):
         room_id = yield self._delete_association(room_alias)
 
         try:
-            yield self.send_room_alias_update_event(
-                requester,
-                requester.user.to_string(),
-                room_id
-            )
+            if send_event:
+                yield self.send_room_alias_update_event(
+                    requester,
+                    room_id
+                )
 
             yield self._update_canonical_alias(
                 requester,
@@ -248,7 +311,7 @@ class DirectoryHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def send_room_alias_update_event(self, requester, user_id, room_id):
+    def send_room_alias_update_event(self, requester, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
         yield self.event_creation_handler.create_and_send_nonmember_event(
@@ -257,7 +320,7 @@ class DirectoryHandler(BaseHandler):
                 "type": EventTypes.Aliases,
                 "state_key": self.hs.hostname,
                 "room_id": room_id,
-                "sender": user_id,
+                "sender": requester.user.to_string(),
                 "content": {"aliases": aliases},
             },
             ratelimit=False
@@ -320,7 +383,7 @@ class DirectoryHandler(BaseHandler):
     def _user_can_delete_alias(self, alias, user_id):
         creator = yield self.store.get_room_alias_creator(alias.to_string())
 
-        if creator and creator == user_id:
+        if creator is not None and creator == user_id:
             defer.returnValue(True)
 
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
@@ -334,9 +397,9 @@ class DirectoryHandler(BaseHandler):
         room_id (str)
         visibility (str): "public" or "private"
         """
-        if not self.spam_checker.user_may_publish_room(
-            requester.user.to_string(), room_id
-        ):
+        user_id = requester.user.to_string()
+
+        if not self.spam_checker.user_may_publish_room(user_id, room_id):
             raise AuthError(
                 403,
                 "This user is not permitted to publish rooms to the room list"
@@ -354,7 +417,24 @@ class DirectoryHandler(BaseHandler):
 
         yield self.auth.check_can_change_room_list(room_id, requester.user)
 
-        yield self.store.set_room_is_public(room_id, visibility == "public")
+        making_public = visibility == "public"
+        if making_public:
+            room_aliases = yield self.store.get_aliases_for_room(room_id)
+            canonical_alias = yield self.store.get_canonical_alias_for_room(room_id)
+            if canonical_alias:
+                room_aliases.append(canonical_alias)
+
+            if not self.config.is_publishing_room_allowed(
+                user_id, room_id, room_aliases,
+            ):
+                # Lets just return a generic message, as there may be all sorts of
+                # reasons why we said no. TODO: Allow configurable error messages
+                # per alias creation rule?
+                raise SynapseError(
+                    403, "Not allowed to publish room",
+                )
+
+        yield self.store.set_room_is_public(room_id, making_public)
 
     @defer.inlineCallbacks
     def edit_published_appservice_room_list(self, appservice_id, network_id,

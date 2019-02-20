@@ -1,7 +1,15 @@
 #! /usr/bin/python
 
+from __future__ import print_function
+
+import argparse
 import ast
+import os
+import re
+import sys
+
 import yaml
+
 
 class DefinitionVisitor(ast.NodeVisitor):
     def __init__(self):
@@ -42,15 +50,18 @@ def non_empty(defs):
     functions = {name: non_empty(f) for name, f in defs['def'].items()}
     classes = {name: non_empty(f) for name, f in defs['class'].items()}
     result = {}
-    if functions: result['def'] = functions
-    if classes: result['class'] = classes
+    if functions:
+        result['def'] = functions
+    if classes:
+        result['class'] = classes
     names = defs['names']
     uses = []
     for name in names.get('Load', ()):
         if name not in names.get('Param', ()) and name not in names.get('Store', ()):
             uses.append(name)
     uses.extend(defs['attrs'])
-    if uses: result['uses'] = uses
+    if uses:
+        result['uses'] = uses
     result['names'] = names
     result['attrs'] = defs['attrs']
     return result
@@ -95,7 +106,6 @@ def used_names(prefix, item, defs, names):
 
 
 if __name__ == '__main__':
-    import sys, os, argparse, re
 
     parser = argparse.ArgumentParser(description='Find definitions.')
     parser.add_argument(
@@ -105,24 +115,28 @@ if __name__ == '__main__':
         "--ignore", action="append", metavar="REGEXP", help="Ignore a pattern"
     )
     parser.add_argument(
-        "--pattern", action="append", metavar="REGEXP",
-        help="Search for a pattern"
+        "--pattern", action="append", metavar="REGEXP", help="Search for a pattern"
     )
     parser.add_argument(
-        "directories", nargs='+', metavar="DIR",
-        help="Directories to search for definitions"
+        "directories",
+        nargs='+',
+        metavar="DIR",
+        help="Directories to search for definitions",
     )
     parser.add_argument(
-        "--referrers", default=0, type=int,
-        help="Include referrers up to the given depth"
+        "--referrers",
+        default=0,
+        type=int,
+        help="Include referrers up to the given depth",
     )
     parser.add_argument(
-        "--referred", default=0, type=int,
-        help="Include referred down to the given depth"
+        "--referred",
+        default=0,
+        type=int,
+        help="Include referred down to the given depth",
     )
     parser.add_argument(
-        "--format", default="yaml",
-        help="Output format, one of 'yaml' or 'dot'"
+        "--format", default="yaml", help="Output format, one of 'yaml' or 'dot'"
     )
     args = parser.parse_args()
 
@@ -162,7 +176,7 @@ if __name__ == '__main__':
             for used_by in entry.get("used", ()):
                 referrers.add(used_by)
         for name, definition in names.items():
-            if not name in referrers:
+            if name not in referrers:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
                 continue
@@ -176,7 +190,7 @@ if __name__ == '__main__':
             for uses in entry.get("uses", ()):
                 referred.add(uses)
         for name, definition in names.items():
-            if not name in referred:
+            if name not in referred:
                 continue
             if ignore and any(pattern.match(name) for pattern in ignore):
                 continue
@@ -185,12 +199,12 @@ if __name__ == '__main__':
     if args.format == 'yaml':
         yaml.dump(result, sys.stdout, default_flow_style=False)
     elif args.format == 'dot':
-        print "digraph {"
+        print("digraph {")
         for name, entry in result.items():
-            print name
+            print(name)
             for used_by in entry.get("used", ()):
                 if used_by in result:
-                    print used_by, "->", name
-        print "}"
+                    print(used_by, "->", name)
+        print("}")
     else:
         raise ValueError("Unknown format %r" % (args.format))

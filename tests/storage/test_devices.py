@@ -28,68 +28,64 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver()
+        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
 
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def test_store_new_device(self):
-        yield self.store.store_device(
-            "user_id", "device_id", "display_name"
-        )
+        yield self.store.store_device("user_id", "device_id", "display_name")
 
         res = yield self.store.get_device("user_id", "device_id")
-        self.assertDictContainsSubset({
-            "user_id": "user_id",
-            "device_id": "device_id",
-            "display_name": "display_name",
-        }, res)
+        self.assertDictContainsSubset(
+            {
+                "user_id": "user_id",
+                "device_id": "device_id",
+                "display_name": "display_name",
+            },
+            res,
+        )
 
     @defer.inlineCallbacks
     def test_get_devices_by_user(self):
-        yield self.store.store_device(
-            "user_id", "device1", "display_name 1"
-        )
-        yield self.store.store_device(
-            "user_id", "device2", "display_name 2"
-        )
-        yield self.store.store_device(
-            "user_id2", "device3", "display_name 3"
-        )
+        yield self.store.store_device("user_id", "device1", "display_name 1")
+        yield self.store.store_device("user_id", "device2", "display_name 2")
+        yield self.store.store_device("user_id2", "device3", "display_name 3")
 
         res = yield self.store.get_devices_by_user("user_id")
         self.assertEqual(2, len(res.keys()))
-        self.assertDictContainsSubset({
-            "user_id": "user_id",
-            "device_id": "device1",
-            "display_name": "display_name 1",
-        }, res["device1"])
-        self.assertDictContainsSubset({
-            "user_id": "user_id",
-            "device_id": "device2",
-            "display_name": "display_name 2",
-        }, res["device2"])
+        self.assertDictContainsSubset(
+            {
+                "user_id": "user_id",
+                "device_id": "device1",
+                "display_name": "display_name 1",
+            },
+            res["device1"],
+        )
+        self.assertDictContainsSubset(
+            {
+                "user_id": "user_id",
+                "device_id": "device2",
+                "display_name": "display_name 2",
+            },
+            res["device2"],
+        )
 
     @defer.inlineCallbacks
     def test_update_device(self):
-        yield self.store.store_device(
-            "user_id", "device_id", "display_name 1"
-        )
+        yield self.store.store_device("user_id", "device_id", "display_name 1")
 
         res = yield self.store.get_device("user_id", "device_id")
         self.assertEqual("display_name 1", res["display_name"])
 
         # do a no-op first
-        yield self.store.update_device(
-            "user_id", "device_id",
-        )
+        yield self.store.update_device("user_id", "device_id")
         res = yield self.store.get_device("user_id", "device_id")
         self.assertEqual("display_name 1", res["display_name"])
 
         # do the update
         yield self.store.update_device(
-            "user_id", "device_id",
-            new_display_name="display_name 2",
+            "user_id", "device_id", new_display_name="display_name 2"
         )
 
         # check it worked
@@ -100,7 +96,6 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
     def test_update_unknown_device(self):
         with self.assertRaises(synapse.api.errors.StoreError) as cm:
             yield self.store.update_device(
-                "user_id", "unknown_device_id",
-                new_display_name="display_name 2",
+                "user_id", "unknown_device_id", new_display_name="display_name 2"
             )
         self.assertEqual(404, cm.exception.code)

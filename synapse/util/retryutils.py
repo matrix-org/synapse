@@ -188,7 +188,7 @@ class RetryDestinationLimiter(object):
             else:
                 self.retry_interval = self.min_retry_interval
 
-            logger.debug(
+            logger.info(
                 "Connection to %s was unsuccessful (%s(%s)); backoff now %i",
                 self.destination, exc_type, exc_val, self.retry_interval
             )

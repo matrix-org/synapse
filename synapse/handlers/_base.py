@@ -167,4 +167,4 @@ class BaseHandler(object):
                     ratelimit=False,
                 )
             except Exception as e:
-                logger.warn("Error kicking guest user: %s" % (e,))
+                logger.exception("Error kicking guest user: %s" % (e,))

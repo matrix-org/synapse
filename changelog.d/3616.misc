@@ -1,1 +1,0 @@
-Update the /send_leave path registration to use event_id rather than a transaction ID.

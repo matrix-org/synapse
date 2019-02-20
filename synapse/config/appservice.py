@@ -33,11 +33,16 @@ class AppServiceConfig(Config):
     def read_config(self, config):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
+        self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
     def default_config(cls, **kwargs):
         return """\
         # A list of application service config file to use
         app_service_config_files: []
+
+        # Whether or not to track application service IP addresses. Implicitly
+        # enables MAU tracking for application service users.
+        track_appservice_user_ips: False
         """
 
 

@@ -79,7 +79,7 @@ class ModuleApi(object):
         Returns:
             Deferred: a 2-tuple of (user_id, access_token)
         """
-        reg = self.hs.get_handlers().registration_handler
+        reg = self.hs.get_registration_handler()
         return reg.register(localpart=localpart)
 
     @defer.inlineCallbacks

@@ -38,16 +38,35 @@ class PostgresEngine(object):
         return sql.replace("?", "%s")
 
     def on_new_connection(self, db_conn):
+
+        # Get the version of PostgreSQL that we're using. As per the psycopg2
+        # docs: The number is formed by converting the major, minor, and
+        # revision numbers into two-decimal-digit numbers and appending them
+        # together. For example, version 8.1.5 will be returned as 80105
+        self._version = db_conn.server_version
+
         db_conn.set_isolation_level(
             self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         )
+
+        # Set the bytea output to escape, vs the default of hex
+        cursor = db_conn.cursor()
+        cursor.execute("SET bytea_output TO escape")
+
         # Asynchronous commit, don't wait for the server to call fsync before
         # ending the transaction.
         # https://www.postgresql.org/docs/current/static/wal-async-commit.html
         if not self.synchronous_commit:
-            cursor = db_conn.cursor()
             cursor.execute("SET synchronous_commit TO OFF")
-            cursor.close()
+
+        cursor.close()
+
+    @property
+    def can_native_upsert(self):
+        """
+        Can we use native UPSERTs? This requires PostgreSQL 9.5+.
+        """
+        return self._version >= 90500
 
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):

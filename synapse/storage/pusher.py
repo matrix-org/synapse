@@ -15,7 +15,8 @@
 # limitations under the License.
 
 import logging
-import types
+
+import six
 
 from canonicaljson import encode_canonical_json, json
 
@@ -27,6 +28,11 @@ from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
+if six.PY2:
+    db_binary_type = six.moves.builtins.buffer
+else:
+    db_binary_type = memoryview
+
 
 class PusherWorkerStore(SQLBaseStore):
     def _decode_pushers_rows(self, rows):
@@ -34,18 +40,18 @@ class PusherWorkerStore(SQLBaseStore):
             dataJson = r['data']
             r['data'] = None
             try:
-                if isinstance(dataJson, types.BufferType):
+                if isinstance(dataJson, db_binary_type):
                     dataJson = str(dataJson).decode("UTF8")
 
                 r['data'] = json.loads(dataJson)
             except Exception as e:
                 logger.warn(
                     "Invalid JSON in data for pusher %d: %s, %s",
-                    r['id'], dataJson, e.message,
+                    r['id'], dataJson, e.args[0],
                 )
                 pass
 
-            if isinstance(r['pushkey'], types.BufferType):
+            if isinstance(r['pushkey'], db_binary_type):
                 r['pushkey'] = str(r['pushkey']).decode("UTF8")
 
         return rows
@@ -209,7 +215,7 @@ class PusherStore(PusherWorkerStore):
         with self._pushers_id_gen.get_next() as stream_id:
             # no need to lock because `pushers` has a unique key on
             # (app_id, pushkey, user_name) so _simple_upsert will retry
-            newly_inserted = yield self._simple_upsert(
+            yield self._simple_upsert(
                 table="pushers",
                 keyvalues={
                     "app_id": app_id,
@@ -232,7 +238,12 @@ class PusherStore(PusherWorkerStore):
                 lock=False,
             )
 
-            if newly_inserted:
+            user_has_pusher = self.get_if_user_has_pusher.cache.get(
+                (user_id,), None, update_metrics=False
+            )
+
+            if user_has_pusher is not True:
+                # invalidate, since we the user might not have had a pusher before
                 yield self.runInteraction(
                     "add_pusher",
                     self._invalidate_cache_and_stream,

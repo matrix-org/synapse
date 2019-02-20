@@ -38,4 +38,4 @@ else:
             return os.urandom(nbytes)
 
         def token_hex(self, nbytes=32):
-            return binascii.hexlify(self.token_bytes(nbytes))
+            return binascii.hexlify(self.token_bytes(nbytes)).decode('ascii')

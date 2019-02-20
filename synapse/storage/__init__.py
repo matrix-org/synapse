@@ -14,11 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
+import calendar
 import logging
 import time
-
-from dateutil import tz
 
 from synapse.api.constants import PresenceState
 from synapse.storage.devices import DeviceStore
@@ -30,6 +28,7 @@ from .appservice import ApplicationServiceStore, ApplicationServiceTransactionSt
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .directory import DirectoryStore
+from .e2e_room_keys import EndToEndRoomKeyStore
 from .end_to_end_keys import EndToEndKeyStore
 from .engines import PostgresEngine
 from .event_federation import EventFederationStore
@@ -39,6 +38,7 @@ from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
 from .media_repository import MediaRepositoryStore
+from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
@@ -76,6 +76,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 ApplicationServiceTransactionStore,
                 ReceiptsStore,
                 EndToEndKeyStore,
+                EndToEndRoomKeyStore,
                 SearchStore,
                 TagsStore,
                 AccountDataStore,
@@ -87,6 +88,7 @@ class DataStore(RoomMemberStore, RoomStore,
                 UserDirectoryStore,
                 GroupServerStore,
                 UserErasureStore,
+                MonthlyActiveUsersStore,
                 ):
 
     def __init__(self, db_conn, hs):
@@ -94,7 +96,6 @@ class DataStore(RoomMemberStore, RoomStore,
         self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
 
-        self.db_conn = db_conn
         self._stream_id_gen = StreamIdGenerator(
             db_conn, "events", "stream_ordering",
             extra_tables=[("local_invites", "stream_id")]
@@ -116,7 +117,6 @@ class DataStore(RoomMemberStore, RoomStore,
             db_conn, "device_lists_stream", "stream_id",
         )
 
-        self._transaction_id_gen = IdGenerator(db_conn, "sent_transactions", "id")
         self._access_tokens_id_gen = IdGenerator(db_conn, "access_tokens", "id")
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
@@ -267,31 +267,6 @@ class DataStore(RoomMemberStore, RoomStore,
 
         return self.runInteraction("count_users", _count_users)
 
-    def count_monthly_users(self):
-        """Counts the number of users who used this homeserver in the last 30 days
-
-        This method should be refactored with count_daily_users - the only
-        reason not to is waiting on definition of mau
-
-        Returns:
-            Defered[int]
-        """
-        def _count_monthly_users(txn):
-            thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
-            sql = """
-                SELECT COALESCE(count(*), 0) FROM (
-                    SELECT user_id FROM user_ips
-                    WHERE last_seen > ?
-                    GROUP BY user_id
-                ) u
-            """
-
-            txn.execute(sql, (thirty_days_ago,))
-            count, = txn.fetchone()
-            return count
-
-        return self.runInteraction("count_monthly_users", _count_monthly_users)
-
     def count_r30_users(self):
         """
         Counts the number of 30 day retained users, defined as:-
@@ -342,7 +317,7 @@ class DataStore(RoomMemberStore, RoomStore,
                               thirty_days_ago_in_secs))
 
             for row in txn:
-                if row[0] is 'unknown':
+                if row[0] == 'unknown':
                     pass
                 results[row[0]] = row[1]
 
@@ -380,10 +355,11 @@ class DataStore(RoomMemberStore, RoomStore,
         """
         Returns millisecond unixtime for start of UTC day.
         """
-        now = datetime.datetime.utcnow()
-        today_start = datetime.datetime(now.year, now.month,
-                                        now.day, tzinfo=tz.tzutc())
-        return int(time.mktime(today_start.timetuple())) * 1000
+        now = time.gmtime()
+        today_start = calendar.timegm((
+            now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0,
+        ))
+        return today_start * 1000
 
     def generate_user_daily_visits(self):
         """

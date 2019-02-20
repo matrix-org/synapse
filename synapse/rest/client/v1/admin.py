@@ -23,7 +23,7 @@ from six.moves import http_client
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     assert_params_in_dict,
@@ -101,7 +101,7 @@ class UserRegisterServlet(ClientV1RestServlet):
 
         nonce = self.hs.get_secrets().token_hex(64)
         self.nonces[nonce] = int(self.reactor.seconds())
-        return (200, {"nonce": nonce.encode('ascii')})
+        return (200, {"nonce": nonce})
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -158,22 +158,33 @@ class UserRegisterServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Invalid password")
 
         admin = body.get("admin", None)
+        user_type = body.get("user_type", None)
+
+        if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
+            raise SynapseError(400, "Invalid user type")
+
         got_mac = body["mac"]
 
         want_mac = hmac.new(
             key=self.hs.config.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
-        want_mac.update(nonce)
+        want_mac.update(nonce.encode('utf8'))
         want_mac.update(b"\x00")
         want_mac.update(username)
         want_mac.update(b"\x00")
         want_mac.update(password)
         want_mac.update(b"\x00")
         want_mac.update(b"admin" if admin else b"notadmin")
+        if user_type:
+            want_mac.update(b"\x00")
+            want_mac.update(user_type.encode('utf8'))
         want_mac = want_mac.hexdigest()
 
-        if not hmac.compare_digest(want_mac, got_mac.encode('ascii')):
+        if not hmac.compare_digest(
+                want_mac.encode('ascii'),
+                got_mac.encode('ascii')
+        ):
             raise SynapseError(403, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
@@ -186,6 +197,7 @@ class UserRegisterServlet(ClientV1RestServlet):
             password=body["password"],
             admin=bool(admin),
             generate_token=False,
+            user_type=user_type,
         )
 
         result = yield register._create_registration_details(user_id, body)
@@ -391,10 +403,17 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         if not is_admin:
             raise AuthError(403, "You are not a server admin")
 
-        yield self._deactivate_account_handler.deactivate_account(
+        result = yield self._deactivate_account_handler.deactivate_account(
             target_user_id, erase,
         )
-        defer.returnValue((200, {}))
+        if result:
+            id_server_unbind_result = "success"
+        else:
+            id_server_unbind_result = "no-support"
+
+        defer.returnValue((200, {
+            "id_server_unbind_result": id_server_unbind_result,
+        }))
 
 
 class ShutdownRoomRestServlet(ClientV1RestServlet):

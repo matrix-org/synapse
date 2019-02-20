@@ -59,7 +59,7 @@ class PushersRestServlet(ClientV1RestServlet):
         ]
 
         for p in pushers:
-            for k, v in p.items():
+            for k, v in list(p.items()):
                 if k not in allowed_keys:
                     del p[k]
 
@@ -126,7 +126,7 @@ class PushersSetRestServlet(ClientV1RestServlet):
                 profile_tag=content.get('profile_tag', ""),
             )
         except PusherConfigException as pce:
-            raise SynapseError(400, "Config Error: " + pce.message,
+            raise SynapseError(400, "Config Error: " + str(pce),
                                errcode=Codes.MISSING_PARAM)
 
         self.notifier.on_new_replication_data()
@@ -142,7 +142,7 @@ class PushersRemoveRestServlet(RestServlet):
     To allow pusher to be delete by clicking a link (ie. GET request)
     """
     PATTERNS = client_path_patterns("/pushers/remove$")
-    SUCCESS_HTML = "<html><body>You have been unsubscribed</body><html>"
+    SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):
         super(PushersRemoveRestServlet, self).__init__()

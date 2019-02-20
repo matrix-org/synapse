@@ -14,13 +14,13 @@
 # limitations under the License.
 from six import iteritems
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cached
 
-from ._base import SQLBaseStore
+from ._base import SQLBaseStore, db_to_json
 
 
 class EndToEndKeyStore(SQLBaseStore):
@@ -40,7 +40,10 @@ class EndToEndKeyStore(SQLBaseStore):
                 allow_none=True,
             )
 
-            new_key_json = encode_canonical_json(device_keys)
+            # In py3 we need old_key_json to match new_key_json type. The DB
+            # returns unicode while encode_canonical_json returns bytes.
+            new_key_json = encode_canonical_json(device_keys).decode("utf-8")
+
             if old_key_json == new_key_json:
                 return False
 
@@ -90,7 +93,7 @@ class EndToEndKeyStore(SQLBaseStore):
 
         for user_id, device_keys in iteritems(results):
             for device_id, device_info in iteritems(device_keys):
-                device_info["keys"] = json.loads(device_info.pop("key_json"))
+                device_info["keys"] = db_to_json(device_info.pop("key_json"))
 
         defer.returnValue(results)
 

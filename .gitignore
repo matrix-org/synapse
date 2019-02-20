@@ -1,29 +1,34 @@
 *.pyc
 .*.swp
 *~
+*.lock
 
 .DS_Store
 _trial_temp/
+_trial_temp*/
 logs/
 dbs/
 *.egg
 dist/
 docs/build/
 *.egg-info
+pip-wheel-metadata/
 
 cmdclient_config.json
 homeserver*.db
 homeserver*.log
 homeserver*.log.*
 homeserver*.pid
-homeserver*.yaml
+/homeserver*.yaml
 
 *.signing.key
 *.tls.crt
 *.tls.dh
 *.tls.key
 
-.coverage
+.coverage*
+coverage.*
+!.coveragerc
 htmlcov
 
 demo/*/*.db
@@ -44,6 +49,7 @@ media_store/
 build/
 venv/
 venv*/
+*venv/
 
 localhost-800*/
 static/client/register/register_config.js
@@ -54,3 +60,5 @@ env/
 
 .vscode/
 .ropeproject/
+*.deb
+/debs

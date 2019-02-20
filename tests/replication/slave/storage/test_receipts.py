@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 
 from ._base import BaseSlavedStoreTestCase
@@ -27,13 +25,10 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
 
     STORE_TYPE = SlavedReceiptsStore
 
-    @defer.inlineCallbacks
     def test_receipt(self):
-        yield self.check("get_receipts_for_user", [USER_ID, "m.read"], {})
-        yield self.master_store.insert_receipt(
-            ROOM_ID, "m.read", USER_ID, [EVENT_ID], {}
+        self.check("get_receipts_for_user", [USER_ID, "m.read"], {})
+        self.get_success(
+            self.master_store.insert_receipt(ROOM_ID, "m.read", USER_ID, [EVENT_ID], {})
         )
-        yield self.replicate()
-        yield self.check("get_receipts_for_user", [USER_ID, "m.read"], {
-            ROOM_ID: EVENT_ID
-        })
+        self.replicate()
+        self.check("get_receipts_for_user", [USER_ID, "m.read"], {ROOM_ID: EVENT_ID})

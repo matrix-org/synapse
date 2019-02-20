@@ -15,9 +15,9 @@
 
 import logging
 import os
-import urllib
 
-from six.moves.urllib import parse as urlparse
+from six import PY3
+from six.moves import urllib
 
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
@@ -35,35 +35,35 @@ def parse_media_id(request):
         # This allows users to append e.g. /test.png to the URL. Useful for
         # clients that parse the URL to see content type.
         server_name, media_id = request.postpath[:2]
+
+        if isinstance(server_name, bytes):
+            server_name = server_name.decode('utf-8')
+            media_id = media_id.decode('utf8')
+
         file_name = None
         if len(request.postpath) > 2:
             try:
-                file_name = urlparse.unquote(request.postpath[-1]).decode("utf-8")
+                file_name = urllib.parse.unquote(request.postpath[-1].decode("utf-8"))
             except UnicodeDecodeError:
                 pass
         return server_name, media_id, file_name
     except Exception:
         raise SynapseError(
-            404,
-            "Invalid media id token %r" % (request.postpath,),
-            Codes.UNKNOWN,
+            404, "Invalid media id token %r" % (request.postpath,), Codes.UNKNOWN
         )
 
 
 def respond_404(request):
     respond_with_json(
-        request, 404,
-        cs_error(
-            "Not found %r" % (request.postpath,),
-            code=Codes.NOT_FOUND,
-        ),
-        send_cors=True
+        request,
+        404,
+        cs_error("Not found %r" % (request.postpath,), code=Codes.NOT_FOUND),
+        send_cors=True,
     )
 
 
 @defer.inlineCallbacks
-def respond_with_file(request, media_type, file_path,
-                      file_size=None, upload_name=None):
+def respond_with_file(request, media_type, file_path, file_size=None, upload_name=None):
     logger.debug("Responding with %r", file_path)
 
     if os.path.isfile(file_path):
@@ -93,35 +93,26 @@ def add_file_headers(request, media_type, file_size, upload_name):
         file_size (int): Size in bytes of the media, if known.
         upload_name (str): The name of the requested file, if any.
     """
+
+    def _quote(x):
+        return urllib.parse.quote(x.encode("utf-8"))
+
     request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
     if upload_name:
         if is_ascii(upload_name):
-            request.setHeader(
-                b"Content-Disposition",
-                b"inline; filename=%s" % (
-                    urllib.quote(upload_name.encode("utf-8")),
-                ),
-            )
+            disposition = "inline; filename=%s" % (_quote(upload_name),)
         else:
-            request.setHeader(
-                b"Content-Disposition",
-                b"inline; filename*=utf-8''%s" % (
-                    urllib.quote(upload_name.encode("utf-8")),
-                ),
-            )
+            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
+
+        request.setHeader(b"Content-Disposition", disposition.encode('ascii'))
 
     # cache for at least a day.
     # XXX: we might want to turn this off for data we don't want to
     # recommend caching as it's sensitive or private - or at least
     # select private. don't bother setting Expires as all our
     # clients are smart enough to be happy with Cache-Control
-    request.setHeader(
-        b"Cache-Control", b"public,max-age=86400,s-maxage=86400"
-    )
-
-    request.setHeader(
-        b"Content-Length", b"%d" % (file_size,)
-    )
+    request.setHeader(b"Cache-Control", b"public,max-age=86400,s-maxage=86400")
+    request.setHeader(b"Content-Length", b"%d" % (file_size,))
 
 
 @defer.inlineCallbacks
@@ -153,6 +144,7 @@ class Responder(object):
     Responder is a context manager which *must* be used, so that any resources
     held can be cleaned up.
     """
+
     def write_to_consumer(self, consumer):
         """Stream response into consumer
 
@@ -186,9 +178,18 @@ class FileInfo(object):
         thumbnail_method (str)
         thumbnail_type (str): Content type of thumbnail, e.g. image/png
     """
-    def __init__(self, server_name, file_id, url_cache=False,
-                 thumbnail=False, thumbnail_width=None, thumbnail_height=None,
-                 thumbnail_method=None, thumbnail_type=None):
+
+    def __init__(
+        self,
+        server_name,
+        file_id,
+        url_cache=False,
+        thumbnail=False,
+        thumbnail_width=None,
+        thumbnail_height=None,
+        thumbnail_method=None,
+        thumbnail_type=None,
+    ):
         self.server_name = server_name
         self.file_id = file_id
         self.url_cache = url_cache
@@ -197,3 +198,74 @@ class FileInfo(object):
         self.thumbnail_height = thumbnail_height
         self.thumbnail_method = thumbnail_method
         self.thumbnail_type = thumbnail_type
+
+
+def get_filename_from_headers(headers):
+    """
+    Get the filename of the downloaded file by inspecting the
+    Content-Disposition HTTP header.
+
+    Args:
+        headers (twisted.web.http_headers.Headers): The HTTP
+            request headers.
+
+    Returns:
+        A Unicode string of the filename, or None.
+    """
+    content_disposition = headers.get(b"Content-Disposition", [b''])
+
+    # No header, bail out.
+    if not content_disposition[0]:
+        return
+
+    # dict of unicode: bytes, corresponding to the key value sections of the
+    # Content-Disposition header.
+    params = {}
+    parts = content_disposition[0].split(b";")
+    for i in parts:
+        # Split into key-value pairs, if able
+        # We don't care about things like `inline`, so throw it out
+        if b"=" not in i:
+            continue
+
+        key, value = i.strip().split(b"=")
+        params[key.decode('ascii')] = value
+
+    upload_name = None
+
+    # First check if there is a valid UTF-8 filename
+    upload_name_utf8 = params.get("filename*", None)
+    if upload_name_utf8:
+        if upload_name_utf8.lower().startswith(b"utf-8''"):
+            upload_name_utf8 = upload_name_utf8[7:]
+            # We have a filename*= section. This MUST be ASCII, and any UTF-8
+            # bytes are %-quoted.
+            if PY3:
+                try:
+                    # Once it is decoded, we can then unquote the %-encoded
+                    # parts strictly into a unicode string.
+                    upload_name = urllib.parse.unquote(
+                        upload_name_utf8.decode('ascii'), errors="strict"
+                    )
+                except UnicodeDecodeError:
+                    # Incorrect UTF-8.
+                    pass
+            else:
+                # On Python 2, we first unquote the %-encoded parts and then
+                # decode it strictly using UTF-8.
+                try:
+                    upload_name = urllib.parse.unquote(upload_name_utf8).decode('utf8')
+                except UnicodeDecodeError:
+                    pass
+
+    # If there isn't check for an ascii name.
+    if not upload_name:
+        upload_name_ascii = params.get("filename", None)
+        if upload_name_ascii and is_ascii(upload_name_ascii):
+            # Make sure there's no %-quoted bytes. If there is, reject it as
+            # non-valid ASCII.
+            if b"%" not in upload_name_ascii:
+                upload_name = upload_name_ascii.decode('ascii')
+
+    # This may be None here, indicating we did not find a matching name.
+    return upload_name

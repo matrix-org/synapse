@@ -36,9 +36,7 @@ class MockPerspectiveServer(object):
 
     def get_verify_keys(self):
         vk = signedjson.key.get_verify_key(self.key)
-        return {
-            "%s:%s" % (vk.alg, vk.version): vk,
-        }
+        return {"%s:%s" % (vk.alg, vk.version): vk}
 
     def get_signed_key(self, server_name, verify_key):
         key_id = "%s:%s" % (verify_key.alg, verify_key.version)
@@ -47,10 +45,8 @@ class MockPerspectiveServer(object):
             "old_verify_keys": {},
             "valid_until_ts": time.time() * 1000 + 3600,
             "verify_keys": {
-                key_id: {
-                    "key": signedjson.key.encode_verify_key_base64(verify_key)
-                }
-            }
+                key_id: {"key": signedjson.key.encode_verify_key_base64(verify_key)}
+            },
         }
         signedjson.sign.sign_json(res, self.server_name, self.key)
         return res
@@ -62,24 +58,26 @@ class KeyringTestCase(unittest.TestCase):
         self.mock_perspective_server = MockPerspectiveServer()
         self.http_client = Mock()
         self.hs = yield utils.setup_test_homeserver(
-            handlers=None,
-            http_client=self.http_client,
+            self.addCleanup, handlers=None, http_client=self.http_client
         )
-        self.hs.config.perspectives = {
-            self.mock_perspective_server.server_name:
-                self.mock_perspective_server.get_verify_keys()
-        }
+        keys = self.mock_perspective_server.get_verify_keys()
+        self.hs.config.perspectives = {self.mock_perspective_server.server_name: keys}
+
+    def assert_sentinel_context(self):
+        if LoggingContext.current_context() != LoggingContext.sentinel:
+            self.fail(
+                "Expected sentinel context but got %s" % (
+                    LoggingContext.current_context(),
+                )
+            )
 
     def check_context(self, _, expected):
         self.assertEquals(
-            getattr(LoggingContext.current_context(), "request", None),
-            expected
+            getattr(LoggingContext.current_context(), "request", None), expected
         )
 
     @defer.inlineCallbacks
     def test_wait_for_previous_lookups(self):
-        sentinel_context = LoggingContext.current_context()
-
         kr = keyring.Keyring(self.hs)
 
         lookup_1_deferred = defer.Deferred()
@@ -89,8 +87,7 @@ class KeyringTestCase(unittest.TestCase):
             context_one.request = "one"
 
             wait_1_deferred = kr.wait_for_previous_lookups(
-                ["server1"],
-                {"server1": lookup_1_deferred},
+                ["server1"], {"server1": lookup_1_deferred}
             )
 
             # there were no previous lookups, so the deferred should be ready
@@ -105,12 +102,13 @@ class KeyringTestCase(unittest.TestCase):
             # set off another wait. It should block because the first lookup
             # hasn't yet completed.
             wait_2_deferred = kr.wait_for_previous_lookups(
-                ["server1"],
-                {"server1": lookup_2_deferred},
+                ["server1"], {"server1": lookup_2_deferred}
             )
             self.assertFalse(wait_2_deferred.called)
+
             # ... so we should have reset the LoggingContext.
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assert_sentinel_context()
+
             wait_2_deferred.addBoth(self.check_context, "two")
 
             # let the first lookup complete (in the sentinel context)
@@ -132,21 +130,19 @@ class KeyringTestCase(unittest.TestCase):
         persp_resp = {
             "server_keys": [
                 self.mock_perspective_server.get_signed_key(
-                    "server10",
-                    signedjson.key.get_verify_key(key1)
-                ),
+                    "server10", signedjson.key.get_verify_key(key1)
+                )
             ]
         }
         persp_deferred = defer.Deferred()
 
         @defer.inlineCallbacks
         def get_perspectives(**kwargs):
-            self.assertEquals(
-                LoggingContext.current_context().request, "11",
-            )
+            self.assertEquals(LoggingContext.current_context().request, "11")
             with logcontext.PreserveLoggingContext():
                 yield persp_deferred
             defer.returnValue(persp_resp)
+
         self.http_client.post_json.side_effect = get_perspectives
 
         with LoggingContext("11") as context_11:
@@ -154,9 +150,7 @@ class KeyringTestCase(unittest.TestCase):
 
             # start off a first set of lookups
             res_deferreds = kr.verify_json_objects_for_server(
-                [("server10", json1),
-                 ("server11", {})
-                 ]
+                [("server10", json1), ("server11", {})]
             )
 
             # the unsigned json should be rejected pretty quickly
@@ -172,7 +166,7 @@ class KeyringTestCase(unittest.TestCase):
 
             # wait a tick for it to send the request to the perspectives server
             # (it first tries the datastore)
-            yield clock.sleep(1)   # XXX find out why this takes so long!
+            yield clock.sleep(1)  # XXX find out why this takes so long!
             self.http_client.post_json.assert_called_once()
 
             self.assertIs(LoggingContext.current_context(), context_11)
@@ -186,7 +180,7 @@ class KeyringTestCase(unittest.TestCase):
                 self.http_client.post_json.return_value = defer.Deferred()
 
                 res_deferreds_2 = kr.verify_json_objects_for_server(
-                    [("server10", json1)],
+                    [("server10", json1)]
                 )
                 yield clock.sleep(1)
                 self.http_client.post_json.assert_not_called()
@@ -207,13 +201,10 @@ class KeyringTestCase(unittest.TestCase):
 
         key1 = signedjson.key.generate_signing_key(1)
         yield self.hs.datastore.store_server_verify_key(
-            "server9", "", time.time() * 1000,
-            signedjson.key.get_verify_key(key1),
+            "server9", "", time.time() * 1000, signedjson.key.get_verify_key(key1)
         )
         json1 = {}
         signedjson.sign.sign_json(json1, "server9", key1)
-
-        sentinel_context = LoggingContext.current_context()
 
         with LoggingContext("one") as context_one:
             context_one.request = "one"
@@ -228,7 +219,7 @@ class KeyringTestCase(unittest.TestCase):
 
             defer = kr.verify_json_for_server("server9", json1)
             self.assertFalse(defer.called)
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assert_sentinel_context()
             yield defer
 
             self.assertIs(LoggingContext.current_context(), context_one)
