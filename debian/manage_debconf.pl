@@ -119,7 +119,6 @@ if (not $cmd) {
 }
 
 my @files = (
-    "homeserver.fred.yaml",
     "/etc/matrix-synapse/homeserver.yaml",
     glob("/etc/matrix-synapse/conf.d/*.yaml"),
 );
