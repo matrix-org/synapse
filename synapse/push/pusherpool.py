@@ -140,6 +140,10 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_id, max_stream_id):
+        if not self.pushers:
+            # nothing to do here.
+            return
+
         try:
             users_affected = yield self.store.get_push_action_users_in_range(
                 min_stream_id, max_stream_id
