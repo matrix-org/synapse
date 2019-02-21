@@ -48,8 +48,8 @@ http_badges_processed_counter = Counter(
 )
 
 http_badges_failed_counter = Counter(
-    "synapse_http_httppusher_badge_updates_processed",
-    "Number of badge updates successfully sent",
+    "synapse_http_httppusher_badge_updates_failed",
+    "Number of badge updates which failed",
 )
 
 
