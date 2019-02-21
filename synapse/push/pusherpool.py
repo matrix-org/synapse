@@ -155,6 +155,10 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
+        if not self.pushers:
+            # nothing to do here.
+            return
+
         try:
             # Need to subtract 1 from the minimum because the lower bound here
             # is not inclusive
