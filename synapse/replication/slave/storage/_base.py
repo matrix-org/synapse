@@ -59,12 +59,7 @@ class BaseSlavedStore(SQLBaseStore):
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)
                 else:
-                    try:
-                        getattr(self, row.cache_func).invalidate(tuple(row.keys))
-                    except AttributeError:
-                        # We probably haven't pulled in the cache in this worker,
-                        # which is fine.
-                        pass
+                    self._attempt_to_invalidate_cache(row.cache_func, tuple(row.keys))
 
     def _invalidate_cache_and_stream(self, txn, cache_func, keys):
         txn.call_after(cache_func.invalidate, keys)
