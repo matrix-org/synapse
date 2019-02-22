@@ -113,7 +113,7 @@ class GroupsServerHandler(object):
             room_id = room_entry["room_id"]
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
-                room_id, len(joined_users),
+                room_id, True, len(joined_users),
                 with_alias=False, allow_private=True,
             )
             entry = dict(entry)  # so we don't change whats cached
@@ -544,7 +544,7 @@ class GroupsServerHandler(object):
 
             joined_users = yield self.store.get_users_in_room(room_id)
             entry = yield self.room_list_handler.generate_room_entry(
-                room_id, len(joined_users),
+                room_id, True, len(joined_users),
                 with_alias=False, allow_private=True,
             )
 
