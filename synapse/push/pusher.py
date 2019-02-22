@@ -56,7 +56,7 @@ class PusherFactory(object):
         f = self.pusher_types.get(kind, None)
         if not f:
             return None
-        logger.info("creating %s pusher for %r", kind, pusherdict)
+        logger.debug("creating %s pusher for %r", kind, pusherdict)
         return f(self.hs, pusherdict)
 
     def _create_email_pusher(self, _hs, pusherdict):

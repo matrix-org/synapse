@@ -97,6 +97,11 @@ class HttpPusher(object):
             pusherdict['pushkey'],
         )
 
+        if self.data is None:
+            raise PusherConfigException(
+                "data can not be null for HTTP pusher"
+            )
+
         if 'url' not in self.data:
             raise PusherConfigException(
                 "'url' required in data for HTTP pusher"

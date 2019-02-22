@@ -19,6 +19,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.push import PusherConfigException
 from synapse.push.pusher import PusherFactory
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,15 @@ class PusherPool:
         """
         try:
             p = self.pusher_factory.create_pusher(pusherdict)
+        except PusherConfigException as e:
+            logger.warning(
+                "Pusher incorrectly configured user=%s, appid=%s, pushkey=%s: %s",
+                pusherdict.get('user_name'),
+                pusherdict.get('app_id'),
+                pusherdict.get('pushkey'),
+                e,
+            )
+            return
         except Exception:
             logger.exception("Couldn't start a pusher: caught Exception")
             return
