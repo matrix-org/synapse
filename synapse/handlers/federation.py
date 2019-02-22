@@ -772,8 +772,11 @@ class FederationHandler(BaseHandler):
 
         ev_infos = []
         for a in auth_events.values():
-            if a.event_id in seen_events:
+            # We only want to persist auth events as outliers that we haven't
+            # seen and aren't about to persist as part of the backfilled chunk.
+            if a.event_id in seen_events or a.event_id in event_map:
                 continue
+
             a.internal_metadata.outlier = True
             ev_infos.append({
                 "event": a,
