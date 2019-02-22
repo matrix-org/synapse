@@ -51,7 +51,8 @@ class RoomListHandler(BaseHandler):
 
     def get_local_public_room_list(self, limit=None, since_token=None,
                                    search_filter=None,
-                                   network_tuple=EMPTY_THIRD_PARTY_ID,):
+                                   network_tuple=EMPTY_THIRD_PARTY_ID,
+                                   from_federation=False):
         """Generate a local public room list.
 
         There are multiple different lists: the main one plus one per third
@@ -82,13 +83,15 @@ class RoomListHandler(BaseHandler):
         return self.response_cache.wrap(
             key,
             self._get_public_room_list,
-            limit, since_token, network_tuple=network_tuple,
+            limit, since_token,
+            network_tuple=network_tuple, from_federation=from_federation,
         )
 
     @defer.inlineCallbacks
     def _get_public_room_list(self, limit=None, since_token=None,
                               search_filter=None,
-                              network_tuple=EMPTY_THIRD_PARTY_ID,):
+                              network_tuple=EMPTY_THIRD_PARTY_ID,
+                              from_federation=False,):
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -208,7 +211,8 @@ class RoomListHandler(BaseHandler):
             yield concurrently_execute(
                 lambda r: self._append_room_entry_to_chunk(
                     r, rooms_to_num_joined[r],
-                    chunk, limit, search_filter
+                    chunk, limit, search_filter,
+                    from_federation=from_federation,
                 ),
                 batch, 5,
             )
@@ -279,7 +283,7 @@ class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _append_room_entry_to_chunk(self, room_id, num_joined_users, chunk, limit,
-                                    search_filter):
+                                    search_filter, from_federation=False):
         """Generate the entry for a room in the public room list and append it
         to the `chunk` if it matches the search filter
         """
@@ -287,16 +291,19 @@ class RoomListHandler(BaseHandler):
             # We've already got enough, so lets just drop it.
             return
 
-        result = yield self.generate_room_entry(room_id, num_joined_users,
-            allow_federated=self.config.allow_non_federated_in_public_rooms)
+        if from_federation:
+            result = yield self.generate_room_entry(room_id,
+                self.config.allow_non_federated_in_public_rooms,
+                num_joined_users)
+        else:
+            result = yield self.generate_room_entry(room_id, True, num_joined_users)
 
         if result and _matches_room_entry(result, search_filter):
             chunk.append(result)
 
-    @cachedInlineCallbacks(num_args=1, cache_context=True)
-    def generate_room_entry(self, room_id, num_joined_users, cache_context,
-                            with_alias=True, allow_private=False,
-                            allow_federated=True):
+    @cachedInlineCallbacks(num_args=2, cache_context=True)
+    def generate_room_entry(self, room_id, allow_federated, num_joined_users, 
+                            cache_context, with_alias=True, allow_private=False):
         """Returns the entry for a room
         """
         result = {
