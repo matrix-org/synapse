@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 @defer.inlineCallbacks
 def check_3pid_allowed(hs, medium, address):
-    """Checks whether a given format of 3PID is allowed to be used on this HS
+    """Checks whether a given 3PID is allowed to be used on this HS
 
     Args:
         hs (synapse.server.HomeServer): server
@@ -38,10 +38,18 @@ def check_3pid_allowed(hs, medium, address):
         data = yield hs.get_simple_http_client().get_json(
             "https://%s%s" % (
                 hs.config.check_is_for_allowed_local_3pids,
-                "/_matrix/identity/api/v1/info"
+                "/_matrix/identity/api/v1/internal-info"
             ),
             {'medium': medium, 'address': address}
         )
+
+        # Assume false if invalid response
+        if 'hs' not in data:
+            defer.returnValue(False)
+
+        if data.get('requires_invite', False) and data.get('invited', False) == False:
+            # Requires an invite but hasn't been invited
+            defer.returnValue(False)
         if hs.config.allow_invited_3pids and data.get('invited'):
             defer.returnValue(True)
         else:
