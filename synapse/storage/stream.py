@@ -191,6 +191,21 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
     @defer.inlineCallbacks
     def get_room_events_stream_for_rooms(self, room_ids, from_key, to_key, limit=0,
                                          order='DESC'):
+        """
+
+        Args:
+            room_ids:
+            from_key:
+            to_key:
+            limit:
+            order:
+
+        Returns:
+            Deferred[dict[str,tuple[list[FrozenEvent], str]]]
+                A map from room id to a tuple containing:
+                    - list of recent events in the room
+                    - stream ordering key for the start of the chunk of events returned.
+        """
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
 
         room_ids = yield self._events_stream_cache.get_entities_changed(
