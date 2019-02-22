@@ -32,9 +32,25 @@ if six.PY3:
 
 logger = logging.getLogger(__name__)
 
-http_push_processed_counter = Counter("synapse_http_httppusher_http_pushes_processed", "")
+http_push_processed_counter = Counter(
+    "synapse_http_httppusher_http_pushes_processed",
+    "Number of push notifications successfully sent",
+)
 
-http_push_failed_counter = Counter("synapse_http_httppusher_http_pushes_failed", "")
+http_push_failed_counter = Counter(
+    "synapse_http_httppusher_http_pushes_failed",
+    "Number of push notifications which failed",
+)
+
+http_badges_processed_counter = Counter(
+    "synapse_http_httppusher_badge_updates_processed",
+    "Number of badge updates successfully sent",
+)
+
+http_badges_failed_counter = Counter(
+    "synapse_http_httppusher_badge_updates_failed",
+    "Number of badge updates which failed",
+)
 
 
 class HttpPusher(object):
@@ -80,6 +96,11 @@ class HttpPusher(object):
             pusherdict['app_id'],
             pusherdict['pushkey'],
         )
+
+        if self.data is None:
+            raise PusherConfigException(
+                "data can not be null for HTTP pusher"
+            )
 
         if 'url' not in self.data:
             raise PusherConfigException(
@@ -350,6 +371,10 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _send_badge(self, badge):
+        """
+        Args:
+            badge (int): number of unread messages
+        """
         logger.info("Sending updated badge count %d to %s", badge, self.name)
         d = {
             'notification': {
@@ -370,14 +395,11 @@ class HttpPusher(object):
             }
         }
         try:
-            resp = yield self.http_client.post_json_get_json(self.url, d)
+            yield self.http_client.post_json_get_json(self.url, d)
+            http_badges_processed_counter.inc()
         except Exception as e:
             logger.warning(
                 "Failed to send badge count to %s: %s %s",
                 self.name, type(e), e,
             )
-            defer.returnValue(False)
-        rejected = []
-        if 'rejected' in resp:
-            rejected = resp['rejected']
-        defer.returnValue(rejected)
+            http_badges_failed_counter.inc()

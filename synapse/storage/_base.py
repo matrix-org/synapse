@@ -1342,15 +1342,43 @@ class SQLBaseStore(object):
                 changed
         """
         for member in members_changed:
-            self.get_rooms_for_user_with_stream_ordering.invalidate((member,))
+            self._attempt_to_invalidate_cache(
+                "get_rooms_for_user_with_stream_ordering", (member,),
+            )
 
         for host in set(get_domain_from_id(u) for u in members_changed):
-            self.is_host_joined.invalidate((room_id, host))
-            self.was_host_joined.invalidate((room_id, host))
+            self._attempt_to_invalidate_cache(
+                "is_host_joined", (room_id, host,),
+            )
+            self._attempt_to_invalidate_cache(
+                "was_host_joined", (room_id, host,),
+            )
 
-        self.get_users_in_room.invalidate((room_id,))
-        self.get_room_summary.invalidate((room_id,))
-        self.get_current_state_ids.invalidate((room_id,))
+        self._attempt_to_invalidate_cache(
+            "get_users_in_room", (room_id,),
+        )
+        self._attempt_to_invalidate_cache(
+            "get_room_summary", (room_id,),
+        )
+        self._attempt_to_invalidate_cache(
+            "get_current_state_ids", (room_id,),
+        )
+
+    def _attempt_to_invalidate_cache(self, cache_name, key):
+        """Attempts to invalidate the cache of the given name, ignoring if the
+        cache doesn't exist. Mainly used for invalidating caches on workers,
+        where they may not have the cache.
+
+        Args:
+            cache_name (str)
+            key (tuple)
+        """
+        try:
+            getattr(self, cache_name).invalidate(key)
+        except AttributeError:
+            # We probably haven't pulled in the cache in this worker,
+            # which is fine.
+            pass
 
     def _send_invalidation_to_replication(self, txn, cache_name, keys):
         """Notifies replication that given cache has been invalidated.
