@@ -231,6 +231,7 @@ class PusherPool:
                 pusherdict.get('pushkey'),
                 e,
             )
+            return
         except Exception:
             logger.exception("Couldn't start a pusher: caught Exception")
             return
