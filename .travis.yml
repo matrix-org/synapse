@@ -78,11 +78,7 @@ matrix:
     if: type = pull_request
     name: "check-newsfragment"
     python: 3.6
-    env: TOX_ENV=check-newsfragment
-    script:
-      - git remote set-branches --add origin develop
-      - git fetch origin develop
-      - tox -e $TOX_ENV
+    script: scripts-dev/check-newsfragment
 
 install:
   # this just logs the postgres version we will be testing against (if any)
