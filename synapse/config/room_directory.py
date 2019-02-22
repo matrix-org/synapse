@@ -27,6 +27,10 @@ class RoomDirectoryConfig(Config):
             for rule in alias_creation_rules
         ]
 
+        self.allow_non_federated_in_public_rooms = config.get(
+            "allow_non_federated_in_public_rooms", True,
+        )
+
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # The `alias_creation` option controls who's allowed to create aliases
@@ -42,6 +46,13 @@ class RoomDirectoryConfig(Config):
             - user_id: "*"
               alias: "*"
               action: allow
+
+        # Specify whether rooms that only allow local users to join should be
+        # shown in the federation public room directory.
+        # 
+        # Note that this does not affect the room directory shown to users on
+        # this homeserver, only those on other homeservers.
+        #allow_non_federated_in_public_rooms: True
         """
 
     def is_alias_creation_allowed(self, user_id, alias):
