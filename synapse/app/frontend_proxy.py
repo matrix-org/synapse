@@ -21,7 +21,7 @@ from twisted.web.resource import NoResource
 
 import synapse
 from synapse import events
-from synapse.api.errors import SynapseError
+from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
@@ -66,10 +66,15 @@ class PresenceStatusStubServlet(ClientV1RestServlet):
         headers = {
             "Authorization": auth_headers,
         }
-        result = yield self.http_client.get_json(
-            self.main_uri + request.uri.decode('ascii'),
-            headers=headers,
-        )
+
+        try:
+            result = yield self.http_client.get_json(
+                self.main_uri + request.uri.decode('ascii'),
+                headers=headers,
+            )
+        except HttpResponseException as e:
+            raise e.to_synapse_error()
+
         defer.returnValue((200, result))
 
     @defer.inlineCallbacks
