@@ -389,15 +389,18 @@ class TransactionQueue(object):
         else:
             self.pending_edus_by_dest.setdefault(destination, []).append(edu)
 
+        if destination not in self.edu_tx_time_by_dest:
+            txtime = self.clock.time() + EDU_BATCH_TIME * 1000
+            self.edu_tx_time_by_dest[destination] = txtime
+
         if destination in self.edu_tx_task_by_dest:
             # we already have a job queued to send EDUs to this destination
             return
 
         def send_edus():
             del self.edu_tx_task_by_dest[destination]
-            self._send_new_transaction(destination)
+            self._attempt_new_transaction(destination)
 
-        self.edu_tx_time_by_dest = self.clock.time() + EDU_BATCH_TIME * 1000
         self.edu_tx_task_by_dest[destination] = self.clock.call_later(
             EDU_BATCH_TIME, send_edus,
         )
