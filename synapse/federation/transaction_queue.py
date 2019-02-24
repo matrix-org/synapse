@@ -380,7 +380,9 @@ class TransactionQueue(object):
         else:
             self.pending_edus_by_dest.setdefault(destination, []).append(edu)
 
-        self._attempt_new_transaction(destination)
+        # this is a bit of a hack, but we delay starting the transmission loop
+        # in an effort to batch up outgoing EDUs a bit.
+        self.clock.call_later(5.0, self._attempt_new_transaction, destination)
 
     def send_device_messages(self, destination):
         if destination == self.server_name:
