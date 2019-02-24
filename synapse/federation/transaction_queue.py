@@ -484,9 +484,9 @@ class TransactionQueue(object):
 
                 # if we have PDUs to send, we may as well send EDUs too. Otherwise,
                 # we only send EDUs if their delay is up
-                if pending_pdus or (
-                    destination in self.edu_tx_time_by_dest
-                    and self.clock.time() > self.edu_tx_time_by_dest[destination]
+                if destination in self.edu_tx_time_by_dest and (
+                    pending_pdus or
+                    self.clock.time() > self.edu_tx_time_by_dest[destination]
                 ):
                     del self.edu_tx_time_by_dest[destination]
 
