@@ -34,8 +34,9 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self.hs = hs
         self.reserved_users = ()
         # Do not add more reserved users than the total allowable number
-        self._initialise_reserved_users(
-            dbconn.cursor(),
+        self._new_transaction(
+            dbconn, "initialise_mau_threepids", [], [],
+            self._initialise_reserved_users,
             hs.config.mau_limits_reserved_threepids[:self.hs.config.max_mau_value],
         )
 
@@ -54,9 +55,12 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 txn,
                 tp["medium"], tp["address"]
             )
+
             if user_id:
-                self.upsert_monthly_active_user_txn(txn, user_id)
-                reserved_user_list.append(user_id)
+                is_support = self.is_support_user_txn(txn, user_id)
+                if not is_support:
+                    self.upsert_monthly_active_user_txn(txn, user_id)
+                    reserved_user_list.append(user_id)
             else:
                 logger.warning(
                     "mau limit reserved threepid %s not found in db" % tp
@@ -96,37 +100,38 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
             txn.execute(sql, query_args)
 
-            # If MAU user count still exceeds the MAU threshold, then delete on
-            # a least recently active basis.
-            # Note it is not possible to write this query using OFFSET due to
-            # incompatibilities in how sqlite and postgres support the feature.
-            # sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be present
-            # While Postgres does not require 'LIMIT', but also does not support
-            # negative LIMIT values. So there is no way to write it that both can
-            # support
-            safe_guard = self.hs.config.max_mau_value - len(self.reserved_users)
-            # Must be greater than zero for postgres
-            safe_guard = safe_guard if safe_guard > 0 else 0
-            query_args = [safe_guard]
+            if self.hs.config.limit_usage_by_mau:
+                # If MAU user count still exceeds the MAU threshold, then delete on
+                # a least recently active basis.
+                # Note it is not possible to write this query using OFFSET due to
+                # incompatibilities in how sqlite and postgres support the feature.
+                # sqlite requires 'LIMIT -1 OFFSET ?', the LIMIT must be present
+                # While Postgres does not require 'LIMIT', but also does not support
+                # negative LIMIT values. So there is no way to write it that both can
+                # support
+                safe_guard = self.hs.config.max_mau_value - len(self.reserved_users)
+                # Must be greater than zero for postgres
+                safe_guard = safe_guard if safe_guard > 0 else 0
+                query_args = [safe_guard]
 
-            base_sql = """
-                DELETE FROM monthly_active_users
-                WHERE user_id NOT IN (
-                    SELECT user_id FROM monthly_active_users
-                    ORDER BY timestamp DESC
-                    LIMIT ?
+                base_sql = """
+                    DELETE FROM monthly_active_users
+                    WHERE user_id NOT IN (
+                        SELECT user_id FROM monthly_active_users
+                        ORDER BY timestamp DESC
+                        LIMIT ?
+                        )
+                    """
+                # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
+                # when len(reserved_users) == 0. Works fine on sqlite.
+                if len(self.reserved_users) > 0:
+                    query_args.extend(self.reserved_users)
+                    sql = base_sql + """ AND user_id NOT IN ({})""".format(
+                        ','.join(questionmarks)
                     )
-                """
-            # Need if/else since 'AND user_id NOT IN ({})' fails on Postgres
-            # when len(reserved_users) == 0. Works fine on sqlite.
-            if len(self.reserved_users) > 0:
-                query_args.extend(self.reserved_users)
-                sql = base_sql + """ AND user_id NOT IN ({})""".format(
-                    ','.join(questionmarks)
-                )
-            else:
-                sql = base_sql
-            txn.execute(sql, query_args)
+                else:
+                    sql = base_sql
+                txn.execute(sql, query_args)
 
         yield self.runInteraction("reap_monthly_active_users", _reap_users)
         # It seems poor to invalidate the whole cache, Postgres supports
@@ -180,14 +185,32 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Args:
             user_id (str): user to add/update
         """
-        is_insert = yield self.runInteraction(
+        # Support user never to be included in MAU stats. Note I can't easily call this
+        # from upsert_monthly_active_user_txn because then I need a _txn form of
+        # is_support_user which is complicated because I want to cache the result.
+        # Therefore I call it here and ignore the case where
+        # upsert_monthly_active_user_txn is called directly from
+        # _initialise_reserved_users reasoning that it would be very strange to
+        #  include a support user in this context.
+
+        is_support = yield self.is_support_user(user_id)
+        if is_support:
+            return
+
+        yield self.runInteraction(
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn,
             user_id
         )
 
-        if is_insert:
-            self.user_last_seen_monthly_active.invalidate((user_id,))
+        user_in_mau = self.user_last_seen_monthly_active.cache.get(
+            (user_id,),
+            None,
+            update_metrics=False
+        )
+        if user_in_mau is None:
             self.get_monthly_active_count.invalidate(())
+
+        self.user_last_seen_monthly_active.invalidate((user_id,))
 
     def upsert_monthly_active_user_txn(self, txn, user_id):
         """Updates or inserts monthly active user member
@@ -198,6 +221,16 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         in a database thread rather than the main thread, and we can't call
         txn.call_after because txn may not be a LoggingTransaction.
 
+        We consciously do not call is_support_txn from this method because it
+        is not possible to cache the response. is_support_txn will be false in
+        almost all cases, so it seems reasonable to call it only for
+        upsert_monthly_active_user and to call is_support_txn manually
+        for cases where upsert_monthly_active_user_txn is called directly,
+        like _initialise_reserved_users
+
+        In short, don't call this method with support users. (Support users
+        should not appear in the MAU stats).
+
         Args:
             txn (cursor):
             user_id (str): user to add/update
@@ -206,6 +239,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             bool: True if a new entry was created, False if an
             existing one was updated.
         """
+
         # Am consciously deciding to lock the table on the basis that is ought
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
@@ -252,8 +286,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Args:
             user_id(str): the user_id to query
         """
-
-        if self.hs.config.limit_usage_by_mau:
+        if self.hs.config.limit_usage_by_mau or self.hs.config.mau_stats_only:
             # Trial users and guests should not be included as part of MAU group
             is_guest = yield self.is_guest(user_id)
             if is_guest:
@@ -271,8 +304,14 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             # but only update if we have not previously seen the user for
             # LAST_SEEN_GRANULARITY ms
             if last_seen_timestamp is None:
-                count = yield self.get_monthly_active_count()
-                if count < self.hs.config.max_mau_value:
+                # In the case where mau_stats_only is True and limit_usage_by_mau is
+                # False, there is no point in checking get_monthly_active_count - it
+                # adds no value and will break the logic if max_mau_value is exceeded.
+                if not self.hs.config.limit_usage_by_mau:
                     yield self.upsert_monthly_active_user(user_id)
+                else:
+                    count = yield self.get_monthly_active_count()
+                    if count < self.hs.config.max_mau_value:
+                        yield self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 yield self.upsert_monthly_active_user(user_id)

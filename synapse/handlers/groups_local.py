@@ -20,7 +20,7 @@ from six import iteritems
 
 from twisted.internet import defer
 
-from synapse.api.errors import HttpResponseException, SynapseError
+from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.types import get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -46,13 +46,19 @@ def _create_rerouter(func_name):
             # when the remote end responds with things like 403 Not
             # In Group, we can communicate that to the client instead
             # of a 500.
-            def h(failure):
+            def http_response_errback(failure):
                 failure.trap(HttpResponseException)
                 e = failure.value
                 if e.code == 403:
                     raise e.to_synapse_error()
                 return failure
-            d.addErrback(h)
+
+            def request_failed_errback(failure):
+                failure.trap(RequestSendFailed)
+                raise SynapseError(502, "Failed to contact group server")
+
+            d.addErrback(http_response_errback)
+            d.addErrback(request_failed_errback)
             return d
     return f
 

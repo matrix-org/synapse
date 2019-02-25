@@ -47,9 +47,8 @@ if mode == "generate":
 
 # In normal mode, generate missing keys if any, then run synapse
 else:
-    # Parse the configuration file
     if "SYNAPSE_CONFIG_PATH" in environ:
-        args += ["--config-path", environ["SYNAPSE_CONFIG_PATH"]]
+        config_path = environ["SYNAPSE_CONFIG_PATH"]
     else:
         check_arguments(environ, ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"))
         generate_secrets(environ, {
@@ -58,10 +57,21 @@ else:
         })
         environ["SYNAPSE_APPSERVICES"] = glob.glob("/data/appservices/*.yaml")
         if not os.path.exists("/compiled"): os.mkdir("/compiled")
-        convert("/conf/homeserver.yaml", "/compiled/homeserver.yaml", environ)
+
+        config_path = "/compiled/homeserver.yaml"
+
+        convert("/conf/homeserver.yaml", config_path, environ)
         convert("/conf/log.config", "/compiled/log.config", environ)
         subprocess.check_output(["chown", "-R", ownership, "/data"])
-        args += ["--config-path", "/compiled/homeserver.yaml"]
+
+
+    args += [
+        "--config-path", config_path,
+
+        # tell synapse to put any generated keys in /data rather than /compiled
+        "--keys-directory", "/data",
+    ]
+
     # Generate missing keys and start synapse
     subprocess.check_output(args + ["--generate-keys"])
     os.execv("/sbin/su-exec", ["su-exec", ownership] + args)

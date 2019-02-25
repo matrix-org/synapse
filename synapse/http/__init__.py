@@ -15,8 +15,10 @@
 # limitations under the License.
 import re
 
+from twisted.internet import task
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
+from twisted.web.client import FileBodyProducer
 
 from synapse.api.errors import SynapseError
 
@@ -47,3 +49,16 @@ def redact_uri(uri):
         r'\1<redacted>\3',
         uri
     )
+
+
+class QuieterFileBodyProducer(FileBodyProducer):
+    """Wrapper for FileBodyProducer that avoids CRITICAL errors when the connection drops.
+
+    Workaround for https://github.com/matrix-org/synapse/issues/4003 /
+    https://twistedmatrix.com/trac/ticket/6528
+    """
+    def stopProducing(self):
+        try:
+            FileBodyProducer.stopProducing(self)
+        except task.TaskStopped:
+            pass

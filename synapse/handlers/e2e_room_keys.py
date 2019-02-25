@@ -19,7 +19,13 @@ from six import iteritems
 
 from twisted.internet import defer
 
-from synapse.api.errors import RoomKeysVersionError, StoreError, SynapseError
+from synapse.api.errors import (
+    Codes,
+    NotFoundError,
+    RoomKeysVersionError,
+    StoreError,
+    SynapseError,
+)
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
@@ -55,6 +61,8 @@ class E2eRoomKeysHandler(object):
             room_id(string): room ID to get keys for, for None to get keys for all rooms
             session_id(string): session ID to get keys for, for None to get keys for all
                 sessions
+        Raises:
+            NotFoundError: if the backup version does not exist
         Returns:
             A deferred list of dicts giving the session_data and message metadata for
             these room keys.
@@ -63,12 +71,18 @@ class E2eRoomKeysHandler(object):
         # we deliberately take the lock to get keys so that changing the version
         # works atomically
         with (yield self._upload_linearizer.queue(user_id)):
+            # make sure the backup version exists
+            try:
+                yield self.store.get_e2e_room_keys_version_info(user_id, version)
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
+
             results = yield self.store.get_e2e_room_keys(
                 user_id, version, room_id, session_id
             )
-
-            if results['rooms'] == {}:
-                raise SynapseError(404, "No room_keys found")
 
             defer.returnValue(results)
 
@@ -120,7 +134,7 @@ class E2eRoomKeysHandler(object):
         }
 
         Raises:
-            SynapseError: with code 404 if there are no versions defined
+            NotFoundError: if there are no versions defined
             RoomKeysVersionError: if the uploaded version is not the current version
         """
 
@@ -134,7 +148,7 @@ class E2eRoomKeysHandler(object):
                 version_info = yield self.store.get_e2e_room_keys_version_info(user_id)
             except StoreError as e:
                 if e.code == 404:
-                    raise SynapseError(404, "Version '%s' not found" % (version,))
+                    raise NotFoundError("Version '%s' not found" % (version,))
                 else:
                     raise
 
@@ -148,7 +162,7 @@ class E2eRoomKeysHandler(object):
                     raise RoomKeysVersionError(current_version=version_info['version'])
                 except StoreError as e:
                     if e.code == 404:
-                        raise SynapseError(404, "Version '%s' not found" % (version,))
+                        raise NotFoundError("Version '%s' not found" % (version,))
                     else:
                         raise
 
@@ -259,7 +273,7 @@ class E2eRoomKeysHandler(object):
             version(str): Optional; if None gives the most recent version
                 otherwise a historical one.
         Raises:
-            StoreError: code 404 if the requested backup version doesn't exist
+            NotFoundError: if the requested backup version doesn't exist
         Returns:
             A deferred of a info dict that gives the info about the new version.
 
@@ -271,7 +285,13 @@ class E2eRoomKeysHandler(object):
         """
 
         with (yield self._upload_linearizer.queue(user_id)):
-            res = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+            try:
+                res = yield self.store.get_e2e_room_keys_version_info(user_id, version)
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
             defer.returnValue(res)
 
     @defer.inlineCallbacks
@@ -282,8 +302,60 @@ class E2eRoomKeysHandler(object):
             user_id(str): the user whose current backup version we're deleting
             version(str): the version id of the backup being deleted
         Raises:
-            StoreError: code 404 if this backup version doesn't exist
+            NotFoundError: if this backup version doesn't exist
         """
 
         with (yield self._upload_linearizer.queue(user_id)):
-            yield self.store.delete_e2e_room_keys_version(user_id, version)
+            try:
+                yield self.store.delete_e2e_room_keys_version(user_id, version)
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
+
+    @defer.inlineCallbacks
+    def update_version(self, user_id, version, version_info):
+        """Update the info about a given version of the user's backup
+
+        Args:
+            user_id(str): the user whose current backup version we're updating
+            version(str): the backup version we're updating
+            version_info(dict): the new information about the backup
+        Raises:
+            NotFoundError: if the requested backup version doesn't exist
+        Returns:
+            A deferred of an empty dict.
+        """
+        if "version" not in version_info:
+            raise SynapseError(
+                400,
+                "Missing version in body",
+                Codes.MISSING_PARAM
+            )
+        if version_info["version"] != version:
+            raise SynapseError(
+                400,
+                "Version in body does not match",
+                Codes.INVALID_PARAM
+            )
+        with (yield self._upload_linearizer.queue(user_id)):
+            try:
+                old_info = yield self.store.get_e2e_room_keys_version_info(
+                    user_id, version
+                )
+            except StoreError as e:
+                if e.code == 404:
+                    raise NotFoundError("Unknown backup version")
+                else:
+                    raise
+            if old_info["algorithm"] != version_info["algorithm"]:
+                raise SynapseError(
+                    400,
+                    "Algorithm does not match",
+                    Codes.INVALID_PARAM
+                )
+
+            yield self.store.update_e2e_room_keys_version(user_id, version, version_info)
+
+            defer.returnValue({})

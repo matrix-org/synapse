@@ -89,7 +89,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(RoomStateEventRestServlet, self).__init__(hs)
         self.handlers = hs.get_handlers()
-        self.event_creation_hander = hs.get_event_creation_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.message_handler = hs.get_message_handler()
 
@@ -172,7 +172,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 content=content,
             )
         else:
-            event = yield self.event_creation_hander.create_and_send_nonmember_event(
+            event = yield self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 event_dict,
                 txn_id=txn_id,
@@ -189,7 +189,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(RoomSendEventRestServlet, self).__init__(hs)
-        self.event_creation_hander = hs.get_event_creation_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
     def register(self, http_server):
         # /rooms/$roomid/send/$event_type[/$txn_id]
@@ -211,7 +211,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
         if b'ts' in request.args and requester.app_service:
             event_dict['origin_server_ts'] = parse_integer(request, "ts", 0)
 
-        event = yield self.event_creation_hander.create_and_send_nonmember_event(
+        event = yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             event_dict,
             txn_id=txn_id,
