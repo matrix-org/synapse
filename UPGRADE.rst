@@ -39,7 +39,7 @@ instructions that may be required are listed later in this document.
        ./synctl restart
 
 
-To check whether your update was sucessful, you can check the Server header
+To check whether your update was successful, you can check the Server header
 returned by the Client-Server API:
 
 .. code:: bash

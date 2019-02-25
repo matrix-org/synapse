@@ -18,6 +18,8 @@ import logging
 
 from twisted.web.resource import Resource
 
+from synapse.http.server import set_cors_headers
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,6 +61,7 @@ class WellKnownResource(Resource):
         self._well_known_builder = WellKnownBuilder(hs)
 
     def render_GET(self, request):
+        set_cors_headers(request)
         r = self._well_known_builder.get_well_known()
         if not r:
             request.setResponseCode(404)

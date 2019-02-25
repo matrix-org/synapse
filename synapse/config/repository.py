@@ -180,29 +180,34 @@ class ContentRepositoryConfig(Config):
         uploads_path = os.path.join(data_dir_path, "uploads")
         return r"""
         # Directory where uploaded images and attachments are stored.
+        #
         media_store_path: "%(media_store)s"
 
         # Media storage providers allow media to be stored in different
         # locations.
-        # media_storage_providers:
-        # - module: file_system
-        #   # Whether to write new local files.
-        #   store_local: false
-        #   # Whether to write new remote media
-        #   store_remote: false
-        #   # Whether to block upload requests waiting for write to this
-        #   # provider to complete
-        #   store_synchronous: false
-        #   config:
-        #     directory: /mnt/some/other/directory
+        #
+        #media_storage_providers:
+        #  - module: file_system
+        #    # Whether to write new local files.
+        #    store_local: false
+        #    # Whether to write new remote media
+        #    store_remote: false
+        #    # Whether to block upload requests waiting for write to this
+        #    # provider to complete
+        #    store_synchronous: false
+        #    config:
+        #       directory: /mnt/some/other/directory
 
         # Directory where in-progress uploads are stored.
+        #
         uploads_path: "%(uploads_path)s"
 
         # The largest allowed upload size in bytes
+        #
         max_upload_size: "10M"
 
         # Maximum number of pixels that will be thumbnailed
+        #
         max_image_pixels: "32M"
 
         # Whether to generate new thumbnails on the fly to precisely match
@@ -210,9 +215,11 @@ class ContentRepositoryConfig(Config):
         # a new resolution is requested by the client the server will
         # generate a new thumbnail. If false the server will pick a thumbnail
         # from a precalculated list.
+        #
         dynamic_thumbnails: false
 
-        # List of thumbnail to precalculate when an image is uploaded.
+        # List of thumbnails to precalculate when an image is uploaded.
+        #
         thumbnail_sizes:
         - width: 32
           height: 32
@@ -233,6 +240,7 @@ class ContentRepositoryConfig(Config):
         # Is the preview URL API enabled?  If enabled, you *must* specify
         # an explicit url_preview_ip_range_blacklist of IPs that the spider is
         # denied from accessing.
+        #
         url_preview_enabled: False
 
         # List of IP address CIDR ranges that the URL preview spider is denied
@@ -243,16 +251,16 @@ class ContentRepositoryConfig(Config):
         # synapse to issue arbitrary GET requests to your internal services,
         # causing serious security issues.
         #
-        # url_preview_ip_range_blacklist:
-        # - '127.0.0.0/8'
-        # - '10.0.0.0/8'
-        # - '172.16.0.0/12'
-        # - '192.168.0.0/16'
-        # - '100.64.0.0/10'
-        # - '169.254.0.0/16'
-        # - '::1/128'
-        # - 'fe80::/64'
-        # - 'fc00::/7'
+        #url_preview_ip_range_blacklist:
+        #  - '127.0.0.0/8'
+        #  - '10.0.0.0/8'
+        #  - '172.16.0.0/12'
+        #  - '192.168.0.0/16'
+        #  - '100.64.0.0/10'
+        #  - '169.254.0.0/16'
+        #  - '::1/128'
+        #  - 'fe80::/64'
+        #  - 'fc00::/7'
         #
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.
@@ -260,8 +268,8 @@ class ContentRepositoryConfig(Config):
         # target IP ranges - e.g. for enabling URL previews for a specific private
         # website only visible in your network.
         #
-        # url_preview_ip_range_whitelist:
-        # - '192.168.1.1'
+        #url_preview_ip_range_whitelist:
+        #   - '192.168.1.1'
 
         # Optional list of URL matches that the URL preview spider is
         # denied from accessing.  You should use url_preview_ip_range_blacklist
@@ -279,26 +287,25 @@ class ContentRepositoryConfig(Config):
         # specified component matches for a given list item succeed, the URL is
         # blacklisted.
         #
-        # url_preview_url_blacklist:
-        # # blacklist any URL with a username in its URI
-        # - username: '*'
+        #url_preview_url_blacklist:
+        #  # blacklist any URL with a username in its URI
+        #  - username: '*'
         #
-        # # blacklist all *.google.com URLs
-        # - netloc: 'google.com'
-        # - netloc: '*.google.com'
+        #  # blacklist all *.google.com URLs
+        #  - netloc: 'google.com'
+        #  - netloc: '*.google.com'
         #
-        # # blacklist all plain HTTP URLs
-        # - scheme: 'http'
+        #  # blacklist all plain HTTP URLs
+        #  - scheme: 'http'
         #
-        # # blacklist http(s)://www.acme.com/foo
-        # - netloc: 'www.acme.com'
-        #   path: '/foo'
+        #  # blacklist http(s)://www.acme.com/foo
+        #  - netloc: 'www.acme.com'
+        #    path: '/foo'
         #
-        # # blacklist any URL with a literal IPv4 address
-        # - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
+        #  # blacklist any URL with a literal IPv4 address
+        #  - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 
         # The largest allowed URL preview spidering size in bytes
         max_spider_size: "10M"
-
 
         """ % locals()

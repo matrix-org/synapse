@@ -311,6 +311,28 @@ class RoomCreationHandler(BaseHandler):
             creation_content=creation_content,
         )
 
+        # Transfer membership events
+        old_room_member_state_ids = yield self.store.get_filtered_current_state_ids(
+            old_room_id, StateFilter.from_types([(EventTypes.Member, None)]),
+        )
+
+        # map from event_id to BaseEvent
+        old_room_member_state_events = yield self.store.get_events(
+            old_room_member_state_ids.values(),
+        )
+        for k, old_event in iteritems(old_room_member_state_events):
+            # Only transfer ban events
+            if ("membership" in old_event.content and
+                    old_event.content["membership"] == "ban"):
+                yield self.room_member_handler.update_membership(
+                    requester,
+                    UserID.from_string(old_event['state_key']),
+                    new_room_id,
+                    "ban",
+                    ratelimit=False,
+                    content=old_event.content,
+                )
+
         # XXX invites/joins
         # XXX 3pid invites
 

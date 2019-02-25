@@ -145,7 +145,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         """
         super(UsernameAvailabilityRestServlet, self).__init__()
         self.hs = hs
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
             # Time window of 2s
@@ -187,10 +187,9 @@ class RegisterRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.auth_handler = hs.get_auth_handler()
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.identity_handler = hs.get_handlers().identity_handler
         self.room_member_handler = hs.get_room_member_handler()
-        self.device_handler = hs.get_device_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
 
     @interactive_auth_handler
@@ -390,8 +389,7 @@ class RegisterRestServlet(RestServlet):
                 registered_user_id
             )
             # don't re-register the threepids
-            add_email = False
-            add_msisdn = False
+            registered = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
             assert_params_in_dict(params, ["password"])
@@ -428,33 +426,20 @@ class RegisterRestServlet(RestServlet):
                 session_id, "registered_user_id", registered_user_id
             )
 
-            add_email = True
-            add_msisdn = True
+            registered = True
 
         return_dict = yield self._create_registration_details(
             registered_user_id, params
         )
 
-        if add_email and auth_result and LoginType.EMAIL_IDENTITY in auth_result:
-            threepid = auth_result[LoginType.EMAIL_IDENTITY]
-            yield self._register_email_threepid(
-                registered_user_id, threepid, return_dict["access_token"],
-                params.get("bind_email")
+        if registered:
+            yield self.registration_handler.post_registration_actions(
+                user_id=registered_user_id,
+                auth_result=auth_result,
+                access_token=return_dict.get("access_token"),
+                bind_email=params.get("bind_email"),
+                bind_msisdn=params.get("bind_msisdn"),
             )
-
-        if add_msisdn and auth_result and LoginType.MSISDN in auth_result:
-            threepid = auth_result[LoginType.MSISDN]
-            yield self._register_msisdn_threepid(
-                registered_user_id, threepid, return_dict["access_token"],
-                params.get("bind_msisdn")
-            )
-
-        if auth_result and LoginType.TERMS in auth_result:
-            logger.info("%s has consented to the privacy policy" % registered_user_id)
-            yield self.store.user_set_consent_version(
-                registered_user_id, self.hs.config.user_consent_version,
-            )
-            yield self.registration_handler.post_consent_actions(registered_user_id)
 
         defer.returnValue((200, return_dict))
 
@@ -507,115 +492,6 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _register_email_threepid(self, user_id, threepid, token, bind_email):
-        """Add an email address as a 3pid identifier
-
-        Also adds an email pusher for the email address, if configured in the
-        HS config
-
-        Also optionally binds emails to the given user_id on the identity server
-
-        Args:
-            user_id (str): id of user
-            threepid (object): m.login.email.identity auth response
-            token (str): access_token for the user
-            bind_email (bool): true if the client requested the email to be
-                bound at the identity server
-        Returns:
-            defer.Deferred:
-        """
-        reqd = ('medium', 'address', 'validated_at')
-        if any(x not in threepid for x in reqd):
-            # This will only happen if the ID server returns a malformed response
-            logger.info("Can't add incomplete 3pid")
-            return
-
-        yield self.auth_handler.add_threepid(
-            user_id,
-            threepid['medium'],
-            threepid['address'],
-            threepid['validated_at'],
-        )
-
-        # And we add an email pusher for them by default, but only
-        # if email notifications are enabled (so people don't start
-        # getting mail spam where they weren't before if email
-        # notifs are set up on a home server)
-        if (self.hs.config.email_enable_notifs and
-                self.hs.config.email_notif_for_new_users):
-            # Pull the ID of the access token back out of the db
-            # It would really make more sense for this to be passed
-            # up when the access token is saved, but that's quite an
-            # invasive change I'd rather do separately.
-            user_tuple = yield self.store.get_user_by_access_token(
-                token
-            )
-            token_id = user_tuple["token_id"]
-
-            yield self.hs.get_pusherpool().add_pusher(
-                user_id=user_id,
-                access_token=token_id,
-                kind="email",
-                app_id="m.email",
-                app_display_name="Email Notifications",
-                device_display_name=threepid["address"],
-                pushkey=threepid["address"],
-                lang=None,  # We don't know a user's language here
-                data={},
-            )
-
-        if bind_email:
-            logger.info("bind_email specified: binding")
-            logger.debug("Binding emails %s to %s" % (
-                threepid, user_id
-            ))
-            yield self.identity_handler.bind_threepid(
-                threepid['threepid_creds'], user_id
-            )
-        else:
-            logger.info("bind_email not specified: not binding email")
-
-    @defer.inlineCallbacks
-    def _register_msisdn_threepid(self, user_id, threepid, token, bind_msisdn):
-        """Add a phone number as a 3pid identifier
-
-        Also optionally binds msisdn to the given user_id on the identity server
-
-        Args:
-            user_id (str): id of user
-            threepid (object): m.login.msisdn auth response
-            token (str): access_token for the user
-            bind_email (bool): true if the client requested the email to be
-                bound at the identity server
-        Returns:
-            defer.Deferred:
-        """
-        try:
-            assert_params_in_dict(threepid, ['medium', 'address', 'validated_at'])
-        except SynapseError as ex:
-            if ex.errcode == Codes.MISSING_PARAM:
-                # This will only happen if the ID server returns a malformed response
-                logger.info("Can't add incomplete 3pid")
-                defer.returnValue(None)
-            raise
-
-        yield self.auth_handler.add_threepid(
-            user_id,
-            threepid['medium'],
-            threepid['address'],
-            threepid['validated_at'],
-        )
-
-        if bind_msisdn:
-            logger.info("bind_msisdn specified: binding")
-            logger.debug("Binding msisdn %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(
-                threepid['threepid_creds'], user_id
-            )
-        else:
-            logger.info("bind_msisdn not specified: not binding msisdn")
-
-    @defer.inlineCallbacks
     def _create_registration_details(self, user_id, params):
         """Complete registration of newly-registered user
 
@@ -633,12 +509,10 @@ class RegisterRestServlet(RestServlet):
             "home_server": self.hs.hostname,
         }
         if not params.get("inhibit_login", False):
-            device_id = yield self._register_device(user_id, params)
-
-            access_token = (
-                yield self.auth_handler.get_access_token_for_user_id(
-                    user_id, device_id=device_id,
-                )
+            device_id = params.get("device_id")
+            initial_display_name = params.get("initial_device_display_name")
+            device_id, access_token = yield self.registration_handler.register_device(
+                user_id, device_id, initial_display_name, is_guest=False,
             )
 
             result.update({
@@ -646,26 +520,6 @@ class RegisterRestServlet(RestServlet):
                 "device_id": device_id,
             })
         defer.returnValue(result)
-
-    def _register_device(self, user_id, params):
-        """Register a device for a user.
-
-        This is called after the user's credentials have been validated, but
-        before the access token has been issued.
-
-        Args:
-            (str) user_id: full canonical @user:id
-            (object) params: registration parameters, from which we pull
-                device_id and initial_device_name
-        Returns:
-            defer.Deferred: (str) device_id
-        """
-        # register the user's device
-        device_id = params.get("device_id")
-        initial_display_name = params.get("initial_device_display_name")
-        return self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
-        )
 
     @defer.inlineCallbacks
     def _do_guest_registration(self, params):
@@ -680,13 +534,10 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        yield self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
+        device_id, access_token = yield self.registration_handler.register_device(
+            user_id, device_id, initial_display_name, is_guest=True,
         )
 
-        access_token = self.macaroon_gen.generate_access_token(
-            user_id, ["guest = true"]
-        )
         defer.returnValue((200, {
             "user_id": user_id,
             "device_id": device_id,

@@ -67,44 +67,43 @@ class SAML2Config(Config):
         return """
         # Enable SAML2 for registration and login. Uses pysaml2.
         #
-        # saml2_config:
+        # `sp_config` is the configuration for the pysaml2 Service Provider.
+        # See pysaml2 docs for format of config.
         #
-        #   # The following is the configuration for the pysaml2 Service Provider.
-        #   # See pysaml2 docs for format of config.
-        #   #
-        #   # Default values will be used for the 'entityid' and 'service' settings,
-        #   # so it is not normally necessary to specify them unless you need to
-        #   # override them.
+        # Default values will be used for the 'entityid' and 'service' settings,
+        # so it is not normally necessary to specify them unless you need to
+        # override them.
         #
-        #   sp_config:
-        #     # point this to the IdP's metadata. You can use either a local file or
-        #     # (preferably) a URL.
-        #     metadata:
-        #       # local: ["saml2/idp.xml"]
-        #       remote:
-        #         - url: https://our_idp/metadata.xml
+        #saml2_config:
+        #  sp_config:
+        #    # point this to the IdP's metadata. You can use either a local file or
+        #    # (preferably) a URL.
+        #    metadata:
+        #      #local: ["saml2/idp.xml"]
+        #      remote:
+        #        - url: https://our_idp/metadata.xml
         #
-        #     # The following is just used to generate our metadata xml, and you
-        #     # may well not need it, depending on your setup. Alternatively you
-        #     # may need a whole lot more detail - see the pysaml2 docs!
+        #    # The rest of sp_config is just used to generate our metadata xml, and you
+        #    # may well not need it, depending on your setup. Alternatively you
+        #    # may need a whole lot more detail - see the pysaml2 docs!
         #
-        #     description: ["My awesome SP", "en"]
-        #     name: ["Test SP", "en"]
+        #    description: ["My awesome SP", "en"]
+        #    name: ["Test SP", "en"]
         #
-        #     organization:
-        #       name: Example com
-        #       display_name:
-        #         - ["Example co", "en"]
-        #       url: "http://example.com"
+        #    organization:
+        #      name: Example com
+        #      display_name:
+        #        - ["Example co", "en"]
+        #      url: "http://example.com"
         #
-        #     contact_person:
-        #       - given_name: Bob
-        #         sur_name: "the Sysadmin"
-        #         email_address": ["admin@example.com"]
-        #         contact_type": technical
+        #    contact_person:
+        #      - given_name: Bob
+        #        sur_name: "the Sysadmin"
+        #        email_address": ["admin@example.com"]
+        #        contact_type": technical
         #
-        #   # Instead of putting the config inline as above, you can specify a
-        #   # separate pysaml2 configuration file:
-        #   #
-        #   # config_path: "%(config_dir_path)s/sp_conf.py"
+        #  # Instead of putting the config inline as above, you can specify a
+        #  # separate pysaml2 configuration file:
+        #  #
+        #  config_path: "%(config_dir_path)s/sp_conf.py"
         """ % {"config_dir_path": config_dir_path}

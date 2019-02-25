@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import logging
 import sys
 import threading
@@ -28,6 +29,7 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.types import get_domain_from_id
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
@@ -63,6 +65,10 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "device_lists_remote_cache": "device_lists_remote_cache_unique_idx",
     "event_search": "event_search_event_id_idx",
 }
+
+# This is a special cache name we use to batch multiple invalidations of caches
+# based on the current state when notifying workers over replication.
+_CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 
 
 class LoggingTransaction(object):
@@ -702,7 +708,9 @@ class SQLBaseStore(object):
                 return "%s = ?" % (key,)
 
         if not values:
-            # Try and select.
+            # If `values` is empty, then all of the values we care about are in
+            # the unique key, so there is nothing to UPDATE. We can just do a
+            # SELECT instead to see if it exists.
             sql = "SELECT 1 FROM %s WHERE %s" % (
                 table,
                 " AND ".join(_getwhere(k) for k in keyvalues)
@@ -726,7 +734,7 @@ class SQLBaseStore(object):
                 # successfully updated at least one row.
                 return False
 
-        # We didn't update any rows so insert a new one
+        # We didn't find any existing rows, so insert a new one
         allvalues = {}
         allvalues.update(keyvalues)
         allvalues.update(values)
@@ -773,16 +781,19 @@ class SQLBaseStore(object):
         )
         txn.execute(sql, list(allvalues.values()))
 
-    def _simple_upsert_many_txn(self, txn, table, keys, keyvalues, values, valuesvalues):
+    def _simple_upsert_many_txn(
+        self, txn, table, key_names, key_values, value_names, value_values
+    ):
         """
         Upsert, many times.
 
         Args:
             table (str): The table to upsert into
-            keys (list[str]): The key column names.
-            keyvalues (list[list]): A list of each row's key column values.
-            values (list[str]): The value column names.
-            valuesvalues (list[list]): A list of each row's value column values.
+            key_names (list[str]): The key column names.
+            key_values (list[list]): A list of each row's key column values.
+            value_names (list[str]): The value column names. If empty, no
+                values will be used, even if value_values is provided.
+            value_values (list[list]): A list of each row's value column values.
         Returns:
             None
         """
@@ -791,60 +802,81 @@ class SQLBaseStore(object):
             and table not in self._unsafe_to_upsert_tables
         ):
             return self._simple_upsert_many_txn_native_upsert(
-                txn,
-                table,
-                keys, keyvalues, values, valuesvalues
+                txn, table, key_names, key_values, value_names, value_values
             )
         else:
             return self._simple_upsert_many_txn_emulated(
-                txn,
-                table,
-                keys, keyvalues, values, valuesvalues
+                txn, table, key_names, key_values, value_names, value_values
             )
 
     def _simple_upsert_many_txn_emulated(
-        self, txn, table, keys, keyvalues, values, valuesvalues
+        self, txn, table, key_names, key_values, value_names, value_values
     ):
+        """
+        Upsert, many times, but without native UPSERT support or batching.
 
-        if not valuesvalues:
-            valuesvalues = [() for x in range(len(keyvalues))]
+        Args:
+            table (str): The table to upsert into
+            key_names (list[str]): The key column names.
+            key_values (list[list]): A list of each row's key column values.
+            value_names (list[str]): The value column names. If empty, no
+                values will be used, even if value_values is provided.
+            value_values (list[list]): A list of each row's value column values.
+        Returns:
+            None
+        """
+        # No value columns, therefore make a blank list so that the following
+        # zip() works correctly.
+        if not value_names:
+            value_values = [() for x in range(len(key_values))]
 
-        for keyv, valv in zip(keyvalues, valuesvalues):
-            _keys = {x: y for x, y in zip(keys, keyv)}
-            _vals = {x: y for x, y in zip(values, valv)}
+        for keyv, valv in zip(key_values, value_values):
+            _keys = {x: y for x, y in zip(key_names, keyv)}
+            _vals = {x: y for x, y in zip(value_names, valv)}
 
             self._simple_upsert_txn_emulated(txn, table, _keys, _vals)
 
     def _simple_upsert_many_txn_native_upsert(
-        self, txn, table, keys, keyvalues, values, valuesvalues
+        self, txn, table, key_names, key_values, value_names, value_values
     ):
+        """
+        Upsert, many times, using batching where possible.
 
-        allvalues = []
-        allvalues.extend(keys)
-        allvalues.extend(values)
+        Args:
+            table (str): The table to upsert into
+            key_names (list[str]): The key column names.
+            key_values (list[list]): A list of each row's key column values.
+            value_names (list[str]): The value column names. If empty, no
+                values will be used, even if value_values is provided.
+            value_values (list[list]): A list of each row's value column values.
+        Returns:
+            None
+        """
+        allnames = []
+        allnames.extend(key_names)
+        allnames.extend(value_names)
 
-        if not valuesvalues:
-            valuesvalues = [[] for x in range(len(keyvalues))]
-
-        if not values:
+        if not value_names:
+            # No value columns, therefore make a blank list so that the
+            # following zip() works correctly.
             latter = "NOTHING"
+            value_values = [() for x in range(len(key_values))]
         else:
-            latter = "UPDATE SET" + ", ".join(k + "=EXCLUDED." + k for k in values),
+            latter = (
+                "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in value_names)
+            )
 
-        sql = (
-            "INSERT INTO %s (%s) VALUES (%s) "
-            "ON CONFLICT (%s) DO %s"
-        ) % (
+        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s" % (
             table,
-            ", ".join(k for k in allvalues),
-            ", ".join("?" for _ in allvalues),
-            ", ".join(keys),
-            latter
+            ", ".join(k for k in allnames),
+            ", ".join("?" for _ in allnames),
+            ", ".join(key_names),
+            latter,
         )
 
         args = []
 
-        for x, y in zip(keyvalues, valuesvalues):
+        for x, y in zip(key_values, value_values):
             args.append(tuple(x) + tuple(y))
 
         return txn.execute_batch(sql, args)
@@ -1280,6 +1312,56 @@ class SQLBaseStore(object):
         be invalidated.
         """
         txn.call_after(cache_func.invalidate, keys)
+        self._send_invalidation_to_replication(txn, cache_func.__name__, keys)
+
+    def _invalidate_state_caches_and_stream(self, txn, room_id, members_changed):
+        """Special case invalidation of caches based on current state.
+
+        We special case this so that we can batch the cache invalidations into a
+        single replication poke.
+
+        Args:
+            txn
+            room_id (str): Room where state changed
+            members_changed (iterable[str]): The user_ids of members that have changed
+        """
+        txn.call_after(self._invalidate_state_caches, room_id, members_changed)
+
+        keys = itertools.chain([room_id], members_changed)
+        self._send_invalidation_to_replication(
+            txn, _CURRENT_STATE_CACHE_NAME, keys,
+        )
+
+    def _invalidate_state_caches(self, room_id, members_changed):
+        """Invalidates caches that are based on the current state, but does
+        not stream invalidations down replication.
+
+        Args:
+            room_id (str): Room where state changed
+            members_changed (iterable[str]): The user_ids of members that have
+                changed
+        """
+        for member in members_changed:
+            self.get_rooms_for_user_with_stream_ordering.invalidate((member,))
+
+        for host in set(get_domain_from_id(u) for u in members_changed):
+            self.is_host_joined.invalidate((room_id, host))
+            self.was_host_joined.invalidate((room_id, host))
+
+        self.get_users_in_room.invalidate((room_id,))
+        self.get_room_summary.invalidate((room_id,))
+        self.get_current_state_ids.invalidate((room_id,))
+
+    def _send_invalidation_to_replication(self, txn, cache_name, keys):
+        """Notifies replication that given cache has been invalidated.
+
+        Note that this does *not* invalidate the cache locally.
+
+        Args:
+            txn
+            cache_name (str)
+            keys (iterable[str])
+        """
 
         if isinstance(self.database_engine, PostgresEngine):
             # get_next() returns a context manager which is designed to wrap
@@ -1297,7 +1379,7 @@ class SQLBaseStore(object):
                 table="cache_invalidation_stream",
                 values={
                     "stream_id": stream_id,
-                    "cache_func": cache_func.__name__,
+                    "cache_func": cache_name,
                     "keys": list(keys),
                     "invalidation_ts": self.clock.time_msec(),
                 }

@@ -40,6 +40,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.client.v1.login import LoginRestServlet
 from synapse.rest.client.v1.room import (
     JoinedRoomMemberListRestServlet,
     PublicRoomListRestServlet,
@@ -47,6 +48,7 @@ from synapse.rest.client.v1.room import (
     RoomMemberListRestServlet,
     RoomStateRestServlet,
 )
+from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
@@ -92,6 +94,8 @@ class ClientReaderServer(HomeServer):
                     JoinedRoomMemberListRestServlet(self).register(resource)
                     RoomStateRestServlet(self).register(resource)
                     RoomEventContextServlet(self).register(resource)
+                    RegisterRestServlet(self).register(resource)
+                    LoginRestServlet(self).register(resource)
 
                     resources.update({
                         "/_matrix/client/r0": resource,

@@ -42,6 +42,7 @@ class TlsConfig(Config):
         self.acme_port = acme_config.get("port", 80)
         self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
+        self.acme_domain = acme_config.get("domain", config.get("server_name"))
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
@@ -176,10 +177,11 @@ class TlsConfig(Config):
         # See 'ACME support' below to enable auto-provisioning this certificate via
         # Let's Encrypt.
         #
-        # tls_certificate_path: "%(tls_certificate_path)s"
+        #tls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM-encoded private key for TLS
-        # tls_private_key_path: "%(tls_private_key_path)s"
+        #
+        #tls_private_key_path: "%(tls_private_key_path)s"
 
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.
@@ -206,28 +208,42 @@ class TlsConfig(Config):
             # ACME support is disabled by default. Uncomment the following line
             # (and tls_certificate_path and tls_private_key_path above) to enable it.
             #
-            # enabled: true
+            #enabled: true
 
             # Endpoint to use to request certificates. If you only want to test,
             # use Let's Encrypt's staging url:
             #     https://acme-staging.api.letsencrypt.org/directory
             #
-            # url: https://acme-v01.api.letsencrypt.org/directory
+            #url: https://acme-v01.api.letsencrypt.org/directory
 
             # Port number to listen on for the HTTP-01 challenge. Change this if
             # you are forwarding connections through Apache/Nginx/etc.
             #
-            # port: 80
+            #port: 80
 
             # Local addresses to listen on for incoming connections.
             # Again, you may want to change this if you are forwarding connections
             # through Apache/Nginx/etc.
             #
-            # bind_addresses: ['::', '0.0.0.0']
+            #bind_addresses: ['::', '0.0.0.0']
 
             # How many days remaining on a certificate before it is renewed.
             #
-            # reprovision_threshold: 30
+            #reprovision_threshold: 30
+
+            # The domain that the certificate should be for. Normally this
+            # should be the same as your Matrix domain (i.e., 'server_name'), but,
+            # by putting a file at 'https://<server_name>/.well-known/matrix/server',
+            # you can delegate incoming traffic to another server. If you do that,
+            # you should give the target of the delegation here.
+            #
+            # For example: if your 'server_name' is 'example.com', but
+            # 'https://example.com/.well-known/matrix/server' delegates to
+            # 'matrix.example.com', you should put 'matrix.example.com' here.
+            #
+            # If not set, defaults to your 'server_name'.
+            #
+            #domain: matrix.example.com
 
         # List of allowed TLS fingerprints for this server to publish along
         # with the signing keys for this server. Other matrix servers that
@@ -254,8 +270,7 @@ class TlsConfig(Config):
         #   openssl x509 -outform DER | openssl sha256 -binary | base64 | tr -d '='
         # or by checking matrix.org/federationtester/api/report?server_name=$host
         #
-        tls_fingerprints: []
-        # tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
+        #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
         """
             % locals()

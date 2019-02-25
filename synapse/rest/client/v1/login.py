@@ -94,7 +94,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.jwt_algorithm = hs.config.jwt_algorithm
         self.cas_enabled = hs.config.cas_enabled
         self.auth_handler = self.hs.get_auth_handler()
-        self.device_handler = self.hs.get_device_handler()
+        self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
 
@@ -220,11 +220,10 @@ class LoginRestServlet(ClientV1RestServlet):
             login_submission,
         )
 
-        device_id = yield self._register_device(
-            canonical_user_id, login_submission,
-        )
-        access_token = yield auth_handler.get_access_token_for_user_id(
-            canonical_user_id, device_id,
+        device_id = login_submission.get("device_id")
+        initial_display_name = login_submission.get("initial_device_display_name")
+        device_id, access_token = yield self.registration_handler.register_device(
+            canonical_user_id, device_id, initial_display_name,
         )
 
         result = {
@@ -246,10 +245,13 @@ class LoginRestServlet(ClientV1RestServlet):
         user_id = (
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
-        device_id = yield self._register_device(user_id, login_submission)
-        access_token = yield auth_handler.get_access_token_for_user_id(
-            user_id, device_id,
+
+        device_id = login_submission.get("device_id")
+        initial_display_name = login_submission.get("initial_device_display_name")
+        device_id, access_token = yield self.registration_handler.register_device(
+            user_id, device_id, initial_display_name,
         )
+
         result = {
             "user_id": user_id,  # may have changed
             "access_token": access_token,
@@ -286,11 +288,10 @@ class LoginRestServlet(ClientV1RestServlet):
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if registered_user_id:
-            device_id = yield self._register_device(
-                registered_user_id, login_submission
-            )
-            access_token = yield auth_handler.get_access_token_for_user_id(
-                registered_user_id, device_id,
+            device_id = login_submission.get("device_id")
+            initial_display_name = login_submission.get("initial_device_display_name")
+            device_id, access_token = yield self.registration_handler.register_device(
+                registered_user_id, device_id, initial_display_name,
             )
 
             result = {
@@ -299,12 +300,16 @@ class LoginRestServlet(ClientV1RestServlet):
                 "home_server": self.hs.hostname,
             }
         else:
-            # TODO: we should probably check that the register isn't going
-            # to fonx/change our user_id before registering the device
-            device_id = yield self._register_device(user_id, login_submission)
             user_id, access_token = (
                 yield self.handlers.registration_handler.register(localpart=user)
             )
+
+            device_id = login_submission.get("device_id")
+            initial_display_name = login_submission.get("initial_device_display_name")
+            device_id, access_token = yield self.registration_handler.register_device(
+                registered_user_id, device_id, initial_display_name,
+            )
+
             result = {
                 "user_id": user_id,  # may have changed
                 "access_token": access_token,
@@ -312,26 +317,6 @@ class LoginRestServlet(ClientV1RestServlet):
             }
 
         defer.returnValue(result)
-
-    def _register_device(self, user_id, login_submission):
-        """Register a device for a user.
-
-        This is called after the user's credentials have been validated, but
-        before the access token has been issued.
-
-        Args:
-            (str) user_id: full canonical @user:id
-            (object) login_submission: dictionary supplied to /login call, from
-               which we pull device_id and initial_device_name
-        Returns:
-            defer.Deferred: (str) device_id
-        """
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get(
-            "initial_device_display_name")
-        return self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
-        )
 
 
 class CasRedirectServlet(RestServlet):
@@ -449,7 +434,7 @@ class SSOAuthHandler(object):
     def __init__(self, hs):
         self._hostname = hs.hostname
         self._auth_handler = hs.get_auth_handler()
-        self._registration_handler = hs.get_handlers().registration_handler
+        self._registration_handler = hs.get_registration_handler()
         self._macaroon_gen = hs.get_macaroon_generator()
 
     @defer.inlineCallbacks

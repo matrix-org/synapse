@@ -70,28 +70,29 @@ class RegistrationConfig(Config):
 
         # The user must provide all of the below types of 3PID when registering.
         #
-        # registrations_require_3pid:
-        #     - email
-        #     - msisdn
+        #registrations_require_3pid:
+        #  - email
+        #  - msisdn
 
         # Explicitly disable asking for MSISDNs from the registration
         # flow (overrides registrations_require_3pid if MSISDNs are set as required)
         #
-        # disable_msisdn_registration = True
+        #disable_msisdn_registration: True
 
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
         #
-        # allowed_local_3pids:
-        #     - medium: email
-        #       pattern: '.*@matrix\\.org'
-        #     - medium: email
-        #       pattern: '.*@vector\\.im'
-        #     - medium: msisdn
-        #       pattern: '\\+44'
+        #allowed_local_3pids:
+        #  - medium: email
+        #    pattern: '.*@matrix\\.org'
+        #  - medium: email
+        #    pattern: '.*@vector\\.im'
+        #  - medium: msisdn
+        #    pattern: '\\+44'
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
+        #
         %(registration_shared_secret)s
 
         # Set the number of bcrypt rounds used to generate password hash.
@@ -99,11 +100,13 @@ class RegistrationConfig(Config):
         # The default number is 12 (which equates to 2^12 rounds).
         # N.B. that increasing this will exponentially increase the time required
         # to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
+        #
         bcrypt_rounds: 12
 
         # Allows users to register as guests without a password/email/etc, and
         # participate in rooms hosted on this server which have been made
         # accessible to anonymous users.
+        #
         allow_guest_access: False
 
         # The identity server which we suggest that clients should use when users log
@@ -112,27 +115,30 @@ class RegistrationConfig(Config):
         # (By default, no suggestion is made, so it is left up to the client.
         # This setting is ignored unless public_baseurl is also set.)
         #
-        # default_identity_server: https://matrix.org
+        #default_identity_server: https://matrix.org
 
         # The list of identity servers trusted to verify third party
         # identifiers by this server.
         #
         # Also defines the ID server which will be called when an account is
         # deactivated (one will be picked arbitrarily).
+        #
         trusted_third_party_id_servers:
-            - matrix.org
-            - vector.im
+          - matrix.org
+          - vector.im
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
+        #
         #auto_join_rooms:
-        #    - "#example:example.com"
+        #  - "#example:example.com"
 
         # Where auto_join_rooms are specified, setting this flag ensures that the
         # the rooms exist by creating them when the first user on the
         # homeserver registers.
         # Setting to false means that if the rooms are not manually created,
         # users cannot be auto-joined since they do not exist.
+        #
         autocreate_auto_join_rooms: true
         """ % locals()
 

@@ -83,6 +83,7 @@ class LoggingConfig(Config):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return """
         # A yaml python logging config file
+        #
         log_config: "%(log_config)s"
         """ % locals()
 
@@ -242,3 +243,5 @@ def setup_logging(config, use_worker_options=False):
         [_log],
         redirectStandardIO=not config.no_redirect_stdio,
     )
+    if not config.no_redirect_stdio:
+        print("Redirected stdout/stderr to logs")
