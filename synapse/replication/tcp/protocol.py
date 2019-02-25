@@ -52,6 +52,7 @@ indicate which side is sending, these are *not* included on the wire::
 import fcntl
 import logging
 import struct
+import traceback
 from collections import defaultdict
 
 from six import iteritems, iterkeys
@@ -323,6 +324,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         we or the remote has closed the connection)
         """
         logger.info("[%s] Stop producing", self.id())
+        # debug for #4733
+        logger.info("Traceback: %s", "".join(traceback.format_stack()))
         self.on_connection_closed()
 
     def connectionLost(self, reason):
