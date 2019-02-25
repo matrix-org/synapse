@@ -302,9 +302,22 @@ class RoomListHandler(BaseHandler):
             chunk.append(result)
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
-    def generate_room_entry(self, room_id, allow_federated, num_joined_users, 
+    def generate_room_entry(self, room_id, allow_non_federated, num_joined_users,
                             cache_context, with_alias=True, allow_private=False):
         """Returns the entry for a room
+
+        Args:
+            room_id (str): The room's ID.
+            allow_non_federated (bool): Whether rooms with federation
+            disabled should be shown.
+            num_joined_users (int): Number of users in the room.
+            cache_context: Information for cached responses.
+            with_alias (bool): Whether to return the room's aliases in the result.
+            allow_private (bool): Whether invite-only rooms should be shown.
+
+        Returns:
+            Deferred[dict|None]: Returns a room entry as a dictionary, or None if this
+            room was determined not to be shown publicly.
         """
         result = {
             "room_id": room_id,
@@ -342,7 +355,7 @@ class RoomListHandler(BaseHandler):
             if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
                 defer.returnValue(None)
 
-        if not allow_federated:
+        if not allow_non_federated:
             # Disallow non-federated from appearing
             create_event = current_state.get((EventTypes.Create, ""))
             if create_event:
