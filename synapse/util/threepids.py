@@ -47,7 +47,7 @@ def check_3pid_allowed(hs, medium, address):
         if 'hs' not in data:
             defer.returnValue(False)
 
-        if data.get('requires_invite', False) and data.get('invited', False) == False:
+        if data.get('requires_invite', False) and not data.get('invited', False):
             # Requires an invite but hasn't been invited
             defer.returnValue(False)
         if hs.config.allow_invited_3pids and data.get('invited'):
