@@ -393,7 +393,7 @@ class FederationStateServlet(BaseFederationServlet):
         return self.handler.on_context_state_request(
             origin,
             context,
-            parse_string_from_args(query, "event_id", None),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 
