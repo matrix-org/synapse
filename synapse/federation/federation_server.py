@@ -239,8 +239,9 @@ class FederationServer(FederationBase):
                         f = failure.Failure()
                         pdu_results[event_id] = {"error": str(e)}
                         logger.error(
-                            "Failed to handle PDU %s: %s",
-                            event_id, f.getTraceback().rstrip(),
+                            "Failed to handle PDU %s",
+                            event_id,
+                            exc_info=(f.type, f.value, f.getTracebackObject()),
                         )
 
         yield concurrently_execute(

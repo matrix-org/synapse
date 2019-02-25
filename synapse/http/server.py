@@ -169,18 +169,18 @@ def _return_html_error(f, request):
             )
         else:
             logger.error(
-                "Failed handle request %r: %s",
+                "Failed handle request %r",
                 request,
-                f.getTraceback().rstrip(),
+                exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
         code = http_client.INTERNAL_SERVER_ERROR
         msg = "Internal server error"
 
         logger.error(
-            "Failed handle request %r: %s",
+            "Failed handle request %r",
             request,
-            f.getTraceback().rstrip(),
+            exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
     body = HTML_ERROR_TEMPLATE.format(
