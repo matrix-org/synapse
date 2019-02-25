@@ -641,8 +641,8 @@ class RegistrationHandler(BaseHandler):
 
                 allowed, time_allowed = self.ratelimiter.send_message(
                     address, time_now_s=time_now,
-                    msg_rate_hz=self.hs.config.rc_messages_per_second,
-                    burst_count=self.hs.config.rc_message_burst_count,
+                    msg_rate_hz=self.hs.config.rc_auth_requests_per_second,
+                    burst_count=self.hs.config.rc_auth_request_burst_count,
                 )
 
                 if not allowed:

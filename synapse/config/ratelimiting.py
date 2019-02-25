@@ -18,6 +18,9 @@ from ._base import Config
 class RatelimitConfig(Config):
 
     def read_config(self, config):
+        self.rc_auth_requests_per_second = config.get(["rc_auth_requests_per_second"], 0.2)
+        self.rc_auth_request_burst_count = config.get(["rc_auth_request_burst_count"], 10.0)
+
         self.rc_messages_per_second = config["rc_messages_per_second"]
         self.rc_message_burst_count = config["rc_message_burst_count"]
 
@@ -30,6 +33,16 @@ class RatelimitConfig(Config):
     def default_config(self, **kwargs):
         return """\
         ## Ratelimiting ##
+
+        # Number of requests a client can send per second to an authentication
+        # endpoint
+        #
+        rc_auth_requests_per_second: 0.2
+
+        # Number of requests a client can send to an authentication
+        # endpoint before being throttled
+        #
+        rc_auth_request_burst_count: 10.0
 
         # Number of messages a client can send per second
         #
