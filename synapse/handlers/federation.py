@@ -804,7 +804,7 @@ class FederationHandler(BaseHandler):
             # For paranoia we ensure that these events are marked as
             # non-outliers
             ev = event_map[e_id]
-            ev.internal_metadata.outlier = False
+            assert(not event.internal_metadata.is_outlier())
 
             ev_infos.append({
                 "event": ev,
@@ -830,7 +830,7 @@ class FederationHandler(BaseHandler):
 
             # For paranoia we ensure that these events are marked as
             # non-outliers
-            event.internal_metadata.outlier = False
+            assert(not event.internal_metadata.is_outlier())
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.
