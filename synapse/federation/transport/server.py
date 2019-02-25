@@ -404,7 +404,7 @@ class FederationStateIdsServlet(BaseFederationServlet):
         return self.handler.on_state_ids_request(
             origin,
             room_id,
-            parse_string_from_args(query, "event_id", None),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 
