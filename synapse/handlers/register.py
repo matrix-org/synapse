@@ -26,6 +26,7 @@ from synapse.api.errors import (
     InvalidCaptchaError,
     RegistrationError,
     SynapseError,
+    LimitExceededError,
 )
 from synapse.config.server import is_threepid_reserved
 from synapse.http.client import CaptchaServerHttpClient
@@ -60,6 +61,7 @@ class RegistrationHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
         self.identity_handler = self.hs.get_handlers().identity_handler
+        self.ratelimiter = hs.get_ratelimiter()
 
         self._next_generated_user_id = None
 
@@ -149,6 +151,7 @@ class RegistrationHandler(BaseHandler):
         threepid=None,
         user_type=None,
         default_display_name=None,
+        address=None,
     ):
         """Registers a new client on the server.
 
@@ -215,6 +218,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=default_display_name,
                 admin=admin,
                 user_type=user_type,
+                address=address,
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -244,6 +248,7 @@ class RegistrationHandler(BaseHandler):
                         password_hash=password_hash,
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
+                        address=address,
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
@@ -593,7 +598,7 @@ class RegistrationHandler(BaseHandler):
     def _register_with_store(self, user_id, token=None, password_hash=None,
                              was_guest=False, make_guest=False, appservice_id=None,
                              create_profile_with_displayname=None, admin=False,
-                             user_type=None):
+                             user_type=None, address=None):
         """Register user in the datastore.
 
         Args:
@@ -627,8 +632,24 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=create_profile_with_displayname,
                 admin=admin,
                 user_type=user_type,
+                address=address,
             )
         else:
+            # Don't rate limit for app services
+            if appservice_id is None and address is not None:
+                time_now = self.clock.time()
+
+                allowed, time_allowed = self.ratelimiter.send_message(
+                    address, time_now_s=time_now,
+                    msg_rate_hz=self.hs.config.rc_messages_per_second,
+                    burst_count=self.hs.config.rc_message_burst_count,
+                )
+
+                if not allowed:
+                    raise LimitExceededError(
+                        retry_after_ms=int(1000 * (time_allowed - time_now)),
+                    )
+
             return self.store.register(
                 user_id=user_id,
                 token=token,

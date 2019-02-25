@@ -23,10 +23,11 @@ class Ratelimiter(object):
     def __init__(self):
         self.message_counts = collections.OrderedDict()
 
-    def send_message(self, user_id, time_now_s, msg_rate_hz, burst_count, update=True):
+    def send_message(self, key, time_now_s, msg_rate_hz, burst_count, update=True):
         """Can the user send a message?
         Args:
-            user_id: The user sending a message.
+            key: The key we should use when rate limiting. Can be a user ID
+                (when sending events), an IP address, etc.
             time_now_s: The time now.
             msg_rate_hz: The long term number of messages a user can send in a
                 second.
@@ -41,7 +42,7 @@ class Ratelimiter(object):
         """
         self.prune_message_counts(time_now_s)
         message_count, time_start, _ignored = self.message_counts.get(
-            user_id, (0., time_now_s, None),
+            key, (0., time_now_s, None),
         )
         time_delta = time_now_s - time_start
         sent_count = message_count - time_delta * msg_rate_hz
@@ -56,7 +57,7 @@ class Ratelimiter(object):
             message_count += 1
 
         if update:
-            self.message_counts[user_id] = (
+            self.message_counts[key] = (
                 message_count, time_start, msg_rate_hz
             )
 
@@ -72,12 +73,12 @@ class Ratelimiter(object):
         return allowed, time_allowed
 
     def prune_message_counts(self, time_now_s):
-        for user_id in list(self.message_counts.keys()):
+        for key in list(self.message_counts.keys()):
             message_count, time_start, msg_rate_hz = (
-                self.message_counts[user_id]
+                self.message_counts[key]
             )
             time_delta = time_now_s - time_start
             if message_count - time_delta * msg_rate_hz > 0:
                 break
             else:
-                del self.message_counts[user_id]
+                del self.message_counts[key]
