@@ -24,7 +24,7 @@ class Ratelimiter(object):
         self.message_counts = collections.OrderedDict()
 
     def can_do_action(self, key, time_now_s, rate_hz, burst_count, update=True):
-        """Can the user send a message?
+        """Can the entity (e.g. user or IP address) perform the action?
         Args:
             key: The key we should use when rate limiting. Can be a user ID
                 (when sending events), an IP address, etc.
