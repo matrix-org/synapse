@@ -136,8 +136,9 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
     def test_POST_ratelimiting(self):
-        for i in range(0,6):
-            request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        for i in range(0, 6):
+            url = self.url + b"?kind=guest"
+            request, channel = self.make_request(b"POST", url, b"{}")
             self.render(request)
 
             if i == 5:
