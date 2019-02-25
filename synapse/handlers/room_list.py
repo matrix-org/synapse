@@ -300,24 +300,24 @@ class RoomListHandler(BaseHandler):
             # We've already got enough, so lets just drop it.
             return
 
-        if from_federation:
-            result = yield self.generate_room_entry(room_id,
-                self.config.allow_non_federated_in_public_rooms,
-                num_joined_users)
-        else:
-            result = yield self.generate_room_entry(room_id, True, num_joined_users)
+        result = yield self.generate_room_entry(room_id,
+            num_joined_users)
 
-        if result and _matches_room_entry(result, search_filter):
+        if from_federation and not self.config.allow_non_federated_in_public_rooms:
+            if result["m.federate"] = False:
+                # This is a non-federating room and the config has chosen not
+                # to show these rooms to other servers
+                chunk.append(None)
+        else if result and _matches_room_entry(result, search_filter):
             chunk.append(result)
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
-    def generate_room_entry(self, room_id, allow_non_federated, num_joined_users,
+    def generate_room_entry(self, room_id, num_joined_users,
                             cache_context, with_alias=True, allow_private=False):
         """Returns the entry for a room
 
         Args:
             room_id (str): The room's ID.
-            allow_non_federated (bool): Whether rooms with federation
             disabled should be shown.
             num_joined_users (int): Number of users in the room.
             cache_context: Information for cached responses.
@@ -364,13 +364,9 @@ class RoomListHandler(BaseHandler):
             if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
                 defer.returnValue(None)
 
-        if not allow_non_federated:
-            # Disallow non-federated from appearing
-            create_event = current_state.get((EventTypes.Create, ""))
-            if create_event:
-                federate = create_event.content.get("m.federate", True)
-                if federate == False:
-                    defer.returnValue(None)
+        # Return whether this room is open to federation users or not
+        create_event = current_state.get((EventTypes.Create, ""))
+        result["m.federate"] = create_event.content.get("m.federate", True)
 
         if with_alias:
             aliases = yield self.store.get_aliases_for_room(
