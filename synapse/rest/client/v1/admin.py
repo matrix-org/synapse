@@ -198,7 +198,6 @@ class UserRegisterServlet(ClientV1RestServlet):
             admin=bool(admin),
             generate_token=False,
             user_type=user_type,
-            address=client_addr,
         )
 
         result = yield register._create_registration_details(user_id, body)
