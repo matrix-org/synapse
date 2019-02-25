@@ -450,11 +450,11 @@ class Keyring(object):
                 long_retries=True,
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
-            raise raise_from(
+            raise_from(
                 KeyLookupError("Failed to connect to remote server"), e,
             )
         except HttpResponseException as e:
-            raise raise_from(
+            raise_from(
                 KeyLookupError("Remote server returned an error"), e,
             )
 
@@ -530,11 +530,11 @@ class Keyring(object):
                     ignore_backoff=True,
                 )
             except (NotRetryingDestination, RequestSendFailed) as e:
-                raise raise_from(
+                raise_from(
                     KeyLookupError("Failed to connect to remote server"), e,
                 )
             except HttpResponseException as e:
-                raise raise_from(
+                raise_from(
                     KeyLookupError("Remote server returned an error"), e,
                 )
 
