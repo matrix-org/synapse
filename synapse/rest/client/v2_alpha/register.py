@@ -203,9 +203,9 @@ class RegisterRestServlet(RestServlet):
 
         time_now = self.clock.time()
 
-        allowed, time_allowed = self.ratelimiter.send_message(
+        allowed, time_allowed = self.ratelimiter.can_do_action(
             client_addr, time_now_s=time_now,
-            msg_rate_hz=self.hs.config.rc_auth_requests_per_second,
+            rate_hz=self.hs.config.rc_auth_requests_per_second,
             burst_count=self.hs.config.rc_auth_request_burst_count,
             update=False,
         )

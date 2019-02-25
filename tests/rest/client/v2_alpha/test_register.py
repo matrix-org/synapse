@@ -140,7 +140,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
             self.render(request)
 
-            if i is 5:
+            if i == 5:
                 self.assertEquals(channel.result["code"], b"429", channel.result)
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:

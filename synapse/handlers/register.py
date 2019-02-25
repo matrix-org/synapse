@@ -623,6 +623,21 @@ class RegistrationHandler(BaseHandler):
         Returns:
             Deferred
         """
+        # Don't rate limit for app services
+        if appservice_id is None and address is not None:
+            time_now = self.clock.time()
+
+            allowed, time_allowed = self.ratelimiter.can_do_action(
+                address, time_now_s=time_now,
+                rate_hz=self.hs.config.rc_auth_requests_per_second,
+                burst_count=self.hs.config.rc_auth_request_burst_count,
+            )
+
+            if not allowed:
+                raise LimitExceededError(
+                    retry_after_ms=int(1000 * (time_allowed - time_now)),
+                )
+
         if self.hs.config.worker_app:
             return self._register_client(
                 user_id=user_id,
@@ -637,21 +652,6 @@ class RegistrationHandler(BaseHandler):
                 address=address,
             )
         else:
-            # Don't rate limit for app services
-            if appservice_id is None and address is not None:
-                time_now = self.clock.time()
-
-                allowed, time_allowed = self.ratelimiter.send_message(
-                    address, time_now_s=time_now,
-                    msg_rate_hz=self.hs.config.rc_auth_requests_per_second,
-                    burst_count=self.hs.config.rc_auth_request_burst_count,
-                )
-
-                if not allowed:
-                    raise LimitExceededError(
-                        retry_after_ms=int(1000 * (time_allowed - time_now)),
-                    )
-
             return self.store.register(
                 user_id=user_id,
                 token=token,
