@@ -242,6 +242,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def send_error(self, error_string, *args):
         """Send an error to remote and close the connection.
         """
+        logger.error("[%s] Sending error: %s", self.id(), error_string % args)
         self.send_command(ErrorCommand(error_string % args))
         self.close()
 
