@@ -133,8 +133,15 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
 
     logger.debug("Responding to media request with responder %s")
     add_file_headers(request, media_type, file_size, upload_name)
-    with responder:
-        yield responder.write_to_consumer(request)
+    try:
+        with responder:
+            yield responder.write_to_consumer(request)
+    except Exception as e:
+        # The majority of the time this will be due to the client having gone
+        # away. Unfortunately, Twisted simply throws a generic exception at us
+        # in that case.
+        logger.warning("Failed to write to consumer: %s %s", type(e), e)
+
     finish_request(request)
 
 
