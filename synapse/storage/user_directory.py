@@ -331,13 +331,13 @@ class UserDirectoryStore(SQLBaseStore):
             self._simple_upsert_many_txn(
                 txn,
                 table=tbl,
-                keys=["user_id", "other_user_id", "room_id"],
-                keyvalues=[
+                key_names=["user_id", "other_user_id", "room_id"],
+                key_values=[
                     (user_id, other_user_id, room_id)
                     for user_id, other_user_id in user_id_tuples
                 ],
-                values=(),
-                valuesvalues=None,
+                value_names=(),
+                value_values=None,
             )
             for user_id, other_user_id in user_id_tuples:
                 txn.call_after(
