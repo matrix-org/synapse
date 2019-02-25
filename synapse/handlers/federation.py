@@ -782,6 +782,7 @@ class FederationHandler(BaseHandler):
         # auth chain. Caution must therefore be taken to ensure that they are
         # not accidentally marked as outliers.
 
+        # Step 1a: persist auth events that *don't* appear in the chunk
         ev_infos = []
         for a in auth_events.values():
             # We only want to persist auth events as outliers that we haven't
@@ -800,6 +801,8 @@ class FederationHandler(BaseHandler):
                 }
             })
 
+        # Step 1b: persist the events in the chunk we fetched state for (i.e.
+        # the backwards extremities) as non-outliers.
         for e_id in events_to_state:
             # For paranoia we ensure that these events are marked as
             # non-outliers
@@ -822,6 +825,7 @@ class FederationHandler(BaseHandler):
             backfilled=True,
         )
 
+        # Step 2: Persist the rest of the events in the chunk one by one
         events.sort(key=lambda e: e.depth)
 
         for event in events:
