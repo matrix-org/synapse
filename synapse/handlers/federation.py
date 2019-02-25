@@ -770,6 +770,18 @@ class FederationHandler(BaseHandler):
             set(auth_events.keys()) | set(state_events.keys())
         )
 
+        # We now have a chunk of events plus associated state and auth chain to
+        # persist. We do the persistence in two steps:
+        #   1. Auth events and state get persisted as outliers, plus the
+        #      backward extremities get persisted (as non-outliers).
+        #   2. The rest of the events in the chunk get persisted one by one, as
+        #      each one depends on the previous event for its state.
+        #
+        # The important thing is that events in the chunk get persisted as
+        # non-outliers, including when those events are also in the state or
+        # auth chain. Caution must therefore be taken to ensure that they are
+        # not accidentally marked as outliers.
+
         ev_infos = []
         for a in auth_events.values():
             # We only want to persist auth events as outliers that we haven't
@@ -789,13 +801,18 @@ class FederationHandler(BaseHandler):
             })
 
         for e_id in events_to_state:
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            ev = event_map[e_id]
+            ev.internal_metadata.outlier = False
+
             ev_infos.append({
-                "event": event_map[e_id],
+                "event": ev,
                 "state": events_to_state[e_id],
                 "auth_events": {
                     (auth_events[a_id].type, auth_events[a_id].state_key):
                     auth_events[a_id]
-                    for a_id in event_map[e_id].auth_event_ids()
+                    for a_id in ev.auth_event_ids()
                     if a_id in auth_events
                 }
             })
@@ -810,6 +827,10 @@ class FederationHandler(BaseHandler):
         for event in events:
             if event in events_to_state:
                 continue
+
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            event.internal_metadata.outlier = False
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.
