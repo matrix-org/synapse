@@ -308,7 +308,7 @@ class RoomListHandler(BaseHandler):
                 # This is a non-federating room and the config has chosen not
                 # to show these rooms to other servers
                 chunk.append(None)
-        else if result and _matches_room_entry(result, search_filter):
+        elif result and _matches_room_entry(result, search_filter):
             chunk.append(result)
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
