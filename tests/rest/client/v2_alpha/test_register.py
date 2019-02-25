@@ -5,6 +5,7 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client.v2_alpha.register import register_servlets
 
 from tests import unittest
+from tests.utils import MockClock
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
@@ -16,6 +17,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.url = b"/_matrix/client/r0/register"
 
         self.hs = self.setup_test_homeserver()
+        self.hs.clock = MockClock()
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
@@ -130,3 +132,26 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
+
+    def test_POST_ratelimiting(self):
+        self.hs.config.rc_message_burst_count = 5
+        self.hs.config.rc_messages_per_second = 0.2
+
+        retry_after_ms = 0
+
+        for i in range(0,6):
+            request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+            self.render(request)
+
+            if i is 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.hs.clock.advance_time_msec(retry_after_ms)
+
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
