@@ -965,6 +965,15 @@ class SyncHandler(object):
 
         yield self._generate_sync_entry_for_groups(sync_result_builder)
 
+        # debug for https://github.com/matrix-org/synapse/issues/4422
+        for joined_room in sync_result_builder.joined:
+            room_id = joined_room.room_id
+            if room_id in newly_joined_rooms:
+                logger.info(
+                    "Sync result for newly joined room %s: %r",
+                    room_id, joined_room,
+                )
+
         defer.returnValue(SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
@@ -1522,30 +1531,39 @@ class SyncHandler(object):
         for room_id in sync_result_builder.joined_room_ids:
             room_entry = room_to_events.get(room_id, None)
 
+            newly_joined = room_id in newly_joined_rooms
             if room_entry:
                 events, start_key = room_entry
 
                 prev_batch_token = now_token.copy_and_replace("room_key", start_key)
 
-                room_entries.append(RoomSyncResultBuilder(
+                entry = RoomSyncResultBuilder(
                     room_id=room_id,
                     rtype="joined",
                     events=events,
-                    newly_joined=room_id in newly_joined_rooms,
+                    newly_joined=newly_joined,
                     full_state=False,
-                    since_token=None if room_id in newly_joined_rooms else since_token,
+                    since_token=None if newly_joined else since_token,
                     upto_token=prev_batch_token,
-                ))
+                )
             else:
-                room_entries.append(RoomSyncResultBuilder(
+                entry = RoomSyncResultBuilder(
                     room_id=room_id,
                     rtype="joined",
                     events=[],
-                    newly_joined=room_id in newly_joined_rooms,
+                    newly_joined=newly_joined,
                     full_state=False,
                     since_token=since_token,
                     upto_token=since_token,
-                ))
+                )
+
+            if newly_joined:
+                # debugging for https://github.com/matrix-org/synapse/issues/4422
+                logger.info(
+                    "RoomSyncResultBuilder events for newly joined room %s: %r",
+                    room_id, entry.events,
+                )
+            room_entries.append(entry)
 
         defer.returnValue((room_entries, invited, newly_joined_rooms, newly_left_rooms))
 
@@ -1665,6 +1683,13 @@ class SyncHandler(object):
             recents=events,
             newly_joined_room=newly_joined,
         )
+
+        if newly_joined:
+            # debug for https://github.com/matrix-org/synapse/issues/4422
+            logger.info(
+                "Timeline events after filtering in newly-joined room %s: %r",
+                room_id, batch,
+            )
 
         # When we join the room (or the client requests full_state), we should
         # send down any existing tags. Usually the user won't have tags in a
@@ -1897,7 +1922,12 @@ def _calculate_state(
 
 
 class SyncResultBuilder(object):
-    "Used to help build up a new SyncResult for a user"
+    """Used to help build up a new SyncResult for a user
+
+    Attributes:
+        joined (list[JoinedSyncResult]):
+        archived (list[ArchivedSyncResult]):
+    """
     def __init__(self, sync_config, full_state, since_token, now_token,
                  joined_room_ids):
         """
@@ -1906,6 +1936,7 @@ class SyncResultBuilder(object):
             full_state(bool): The full_state flag as specified by user
             since_token(StreamToken): The token supplied by user, or None.
             now_token(StreamToken): The token to sync up to.
+
         """
         self.sync_config = sync_config
         self.full_state = full_state
@@ -1933,7 +1964,7 @@ class RoomSyncResultBuilder(object):
         Args:
             room_id(str)
             rtype(str): One of `"joined"` or `"archived"`
-            events(list): List of events to include in the room, (more events
+            events(list[FrozenEvent]): List of events to include in the room (more events
                 may be added when generating result).
             newly_joined(bool): If the user has newly joined the room
             full_state(bool): Whether the full state should be sent in result
