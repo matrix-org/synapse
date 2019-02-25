@@ -170,6 +170,7 @@ class RegistrationHandler(BaseHandler):
               api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
+            address (str|None): the IP address used to perform the regitration.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -617,6 +618,7 @@ class RegistrationHandler(BaseHandler):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
+            address (str|None): the IP address used to perform the regitration.
 
         Returns:
             Deferred

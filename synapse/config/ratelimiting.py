@@ -37,12 +37,12 @@ class RatelimitConfig(Config):
         # Number of requests a client can send per second to an authentication
         # endpoint
         #
-        rc_auth_requests_per_second: 0.2
+        #rc_auth_requests_per_second: 0.2
 
         # Number of requests a client can send to an authentication
         # endpoint before being throttled
         #
-        rc_auth_request_burst_count: 10.0
+        #rc_auth_request_burst_count: 10.0
 
         # Number of messages a client can send per second
         #

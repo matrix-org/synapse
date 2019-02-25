@@ -57,6 +57,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
+            address (str|None): the IP address used to perform the regitration.
         """
         return {
             "token": token,
