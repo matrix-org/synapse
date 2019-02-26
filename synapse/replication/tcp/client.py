@@ -39,7 +39,7 @@ class ReplicationClientFactory(ReconnectingClientFactory):
     Accepts a handler that will be called when new data is available or data
     is required.
     """
-    maxDelay = 5  # Try at least once every N seconds
+    maxDelay = 30  # Try at least once every N seconds
 
     def __init__(self, hs, client_name, handler):
         self.client_name = client_name
