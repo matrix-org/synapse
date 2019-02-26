@@ -136,7 +136,11 @@ class PaginationHandler(object):
             logger.info("[purge] complete")
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
         except Exception:
-            logger.error("[purge] failed: %s", Failure().getTraceback().rstrip())
+            f = Failure()
+            logger.error(
+                "[purge] failed",
+                exc_info=(f.type, f.value, f.getTracebackObject()),
+            )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
         finally:
             self._purges_in_progress_by_room.discard(room_id)

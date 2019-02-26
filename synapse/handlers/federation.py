@@ -770,10 +770,26 @@ class FederationHandler(BaseHandler):
             set(auth_events.keys()) | set(state_events.keys())
         )
 
+        # We now have a chunk of events plus associated state and auth chain to
+        # persist. We do the persistence in two steps:
+        #   1. Auth events and state get persisted as outliers, plus the
+        #      backward extremities get persisted (as non-outliers).
+        #   2. The rest of the events in the chunk get persisted one by one, as
+        #      each one depends on the previous event for its state.
+        #
+        # The important thing is that events in the chunk get persisted as
+        # non-outliers, including when those events are also in the state or
+        # auth chain. Caution must therefore be taken to ensure that they are
+        # not accidentally marked as outliers.
+
+        # Step 1a: persist auth events that *don't* appear in the chunk
         ev_infos = []
         for a in auth_events.values():
-            if a.event_id in seen_events:
+            # We only want to persist auth events as outliers that we haven't
+            # seen and aren't about to persist as part of the backfilled chunk.
+            if a.event_id in seen_events or a.event_id in event_map:
                 continue
+
             a.internal_metadata.outlier = True
             ev_infos.append({
                 "event": a,
@@ -785,14 +801,21 @@ class FederationHandler(BaseHandler):
                 }
             })
 
+        # Step 1b: persist the events in the chunk we fetched state for (i.e.
+        # the backwards extremities) as non-outliers.
         for e_id in events_to_state:
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            ev = event_map[e_id]
+            assert(not ev.internal_metadata.is_outlier())
+
             ev_infos.append({
-                "event": event_map[e_id],
+                "event": ev,
                 "state": events_to_state[e_id],
                 "auth_events": {
                     (auth_events[a_id].type, auth_events[a_id].state_key):
                     auth_events[a_id]
-                    for a_id in event_map[e_id].auth_event_ids()
+                    for a_id in ev.auth_event_ids()
                     if a_id in auth_events
                 }
             })
@@ -802,11 +825,16 @@ class FederationHandler(BaseHandler):
             backfilled=True,
         )
 
+        # Step 2: Persist the rest of the events in the chunk one by one
         events.sort(key=lambda e: e.depth)
 
         for event in events:
             if event in events_to_state:
                 continue
+
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            assert(not event.internal_metadata.is_outlier())
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.

@@ -25,9 +25,10 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
+    Codes,
     FederationError,
     IncompatibleRoomVersionError,
     NotFoundError,
@@ -239,8 +240,9 @@ class FederationServer(FederationBase):
                         f = failure.Failure()
                         pdu_results[event_id] = {"error": str(e)}
                         logger.error(
-                            "Failed to handle PDU %s: %s",
-                            event_id, f.getTraceback().rstrip(),
+                            "Failed to handle PDU %s",
+                            event_id,
+                            exc_info=(f.type, f.value, f.getTracebackObject()),
                         )
 
         yield concurrently_execute(
@@ -386,6 +388,13 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content, room_version):
+        if room_version not in KNOWN_ROOM_VERSIONS:
+            raise SynapseError(
+                400,
+                "Homeserver does not support this room version",
+                Codes.UNSUPPORTED_ROOM_VERSION,
+            )
+
         format_ver = room_version_to_event_format(room_version)
 
         pdu = event_from_pdu_json(content, format_ver)
