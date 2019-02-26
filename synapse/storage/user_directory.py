@@ -420,34 +420,6 @@ class UserDirectoryStore(SQLBaseStore):
         defer.returnValue(list(users))
 
     @defer.inlineCallbacks
-    def get_users_in_share_dir_with_room_id(self, user_id, room_id):
-        """
-        Get all user tuples that are in the users_who_share_*_rooms
-        tables due to the given room_id.
-
-        Returns:
-            [(user_id, other_user_id)]: where one of the two will match the given
-            user_id.
-        """
-        sql = """
-            SELECT user_id, other_user_id FROM users_who_share_public_rooms
-            WHERE room_id = ? AND (user_id = ? OR other_user_id = ?)
-        """
-        public = yield self._execute(
-            "get_users_in_share_dir_with_room_id", None, sql, room_id, user_id, user_id
-        )
-
-        sql = """
-            SELECT user_id, other_user_id FROM users_who_share_private_rooms
-            WHERE room_id = ? AND (user_id = ? OR other_user_id = ?)
-        """
-        private = yield self._execute(
-            "get_users_in_share_dir_with_room_id", None, sql, room_id, user_id, user_id
-        )
-
-        defer.returnValue(public + private)
-
-    @defer.inlineCallbacks
     def get_rooms_in_common_for_users(self, user_id, other_user_id):
         """Given two user_ids find out the list of rooms they share.
         """
