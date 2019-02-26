@@ -268,7 +268,17 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         if "\n" in string:
             raise Exception("Unexpected newline in command: %r", string)
 
-        self.sendLine(string.encode("utf-8"))
+        encoded_string = string.encode("utf-8")
+
+        if len(encoded_string) > self.MAX_LENGTH:
+            raise Exception(
+                "Failed to send command %s as too long (%d > %d)" % (
+                    cmd.NAME,
+                    len(encoded_string), self.MAX_LENGTH,
+                )
+            )
+
+        self.sendLine(encoded_string)
 
         self.last_sent_command = self.clock.time_msec()
 
@@ -360,6 +370,11 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
     def id(self):
         return "%s-%s" % (self.name, self.conn_id)
+
+    def lineLengthExceeded(self, line):
+        """Called when we receive a line that is above the maximum line length
+        """
+        self.send_error("Line length exceeded")
 
 
 class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
