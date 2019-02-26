@@ -6,7 +6,8 @@
 set -e
 
 # make sure that origin/develop is up to date
-git fetch origin develop
+git remote set-branches --add origin develop
+git fetch --depth=1 origin develop
 
 UPSTREAM=origin/develop
 
