@@ -18,9 +18,6 @@ from ._base import Config
 class RatelimitConfig(Config):
 
     def read_config(self, config):
-        self.rc_auth_requests_per_second = config.get("rc_auth_requests_per_second", 0.2)
-        self.rc_auth_request_burst_count = config.get("rc_auth_request_burst_count", 10)
-
         self.rc_messages_per_second = config["rc_messages_per_second"]
         self.rc_message_burst_count = config["rc_message_burst_count"]
 
