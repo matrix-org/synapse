@@ -54,6 +54,9 @@ class RegistrationConfig(Config):
             config.get("disable_msisdn_registration", False)
         )
 
+        self.rc_registration_requests_per_second = config.get("rc_registration_requests_per_second", 0.17)
+        self.rc_registration_request_burst_count = config.get("rc_registration_request_burst_count", 3)
+
     def default_config(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
@@ -140,6 +143,17 @@ class RegistrationConfig(Config):
         # users cannot be auto-joined since they do not exist.
         #
         autocreate_auto_join_rooms: true
+
+        # Number of registration requests a client can send per second.
+        # Defaults to 1/minute (0.17).
+        #
+        #rc_registration_requests_per_second: 0.17
+
+        # Number of registration requests a client can send before being
+        # throttled.
+        # Defaults to 3.
+        #
+        #rc_registration_request_burst_count: 3.0
         """ % locals()
 
     def add_arguments(self, parser):

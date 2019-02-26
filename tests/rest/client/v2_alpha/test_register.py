@@ -21,8 +21,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
         self.hs.config.enable_registration_captcha = False
-        self.hs.config.rc_auth_request_burst_count = 5
-        self.hs.config.rc_auth_requests_per_second = 0.2
 
         return self.hs
 
@@ -135,6 +133,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
     def test_POST_ratelimiting(self):
+        self.hs.config.rc_registration_request_burst_count = 5
+
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
             request, channel = self.make_request(b"POST", url, b"{}")
