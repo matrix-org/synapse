@@ -327,13 +327,15 @@ class RoomListHandler(BaseHandler):
             return
 
         result = yield self.generate_room_entry(room_id, num_joined_users)
+        if not result:
+            return
 
-        if from_federation:
-            if not result or result["m.federate"] is False:
-                # This is a non-federating room and the config has chosen not
-                # to show these rooms to other servers
-                return
-        elif result and _matches_room_entry(result, search_filter):
+        if from_federation and result["m.federate"] is False:
+            # This is a room that other servers cannot join. Do not show them
+            # this room.
+            return
+
+        if _matches_room_entry(result, search_filter):
             chunk.append(result)
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
