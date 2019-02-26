@@ -312,9 +312,9 @@ class RoomListHandler(BaseHandler):
         if _matches_room_entry(result, search_filter):
             chunk.append(result)
 
-    @cachedInlineCallbacks(num_args=2, cache_context=True)
-    def generate_room_entry(self, room_id, num_joined_users,
-                            cache_context, with_alias=True, allow_private=False):
+    @cachedInlineCallbacks(num_args=1, cache_context=True)
+    def generate_room_entry(self, room_id, num_joined_users, cache_context,
+                            with_alias=True, allow_private=False):
         """Returns the entry for a room
 
         Args:
