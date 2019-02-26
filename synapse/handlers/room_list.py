@@ -330,11 +330,10 @@ class RoomListHandler(BaseHandler):
         if not result:
             return
 
-        if from_federation:
-            if "m.federate" in result and not result["m.federate"]:
-                # This is a room that other servers cannot join. Do not show them
-                # this room.
-                return
+        if from_federation and not result.get("m.federate", True):
+            # This is a room that other servers cannot join. Do not show them
+            # this room.
+            return
 
         if _matches_room_entry(result, search_filter):
             chunk.append(result)
