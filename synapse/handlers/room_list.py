@@ -328,7 +328,7 @@ class RoomListHandler(BaseHandler):
 
         result = yield self.generate_room_entry(room_id, num_joined_users)
 
-        if from_federation and not self.config.allow_non_federated_in_public_rooms:
+        if from_federation:
             if not result or result["m.federate"] is False:
                 # This is a non-federating room and the config has chosen not
                 # to show these rooms to other servers
