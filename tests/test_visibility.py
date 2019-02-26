@@ -17,6 +17,7 @@ import logging
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
+from synapse.api.constants import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
 
@@ -124,6 +125,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     def inject_visibility(self, user_id, visibility):
         content = {"history_visibility": visibility}
         builder = self.event_builder_factory.new(
+            RoomVersions.V1,
             {
                 "type": "m.room.history_visibility",
                 "sender": user_id,
@@ -144,6 +146,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         content = {"membership": membership}
         content.update(extra_content)
         builder = self.event_builder_factory.new(
+            RoomVersions.V1,
             {
                 "type": "m.room.member",
                 "sender": user_id,
@@ -163,8 +166,9 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
         if content is None:
-            content = {"body": "testytest"}
+            content = {"body": "testytest", "msgtype": "m.text"}
         builder = self.event_builder_factory.new(
+            RoomVersions.V1,
             {
                 "type": "m.room.message",
                 "sender": user_id,

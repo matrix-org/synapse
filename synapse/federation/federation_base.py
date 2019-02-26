@@ -20,10 +20,10 @@ import six
 from twisted.internet import defer
 from twisted.internet.defer import DeferredList
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership, RoomVersions
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.event_signing import check_event_content_hash
-from synapse.events import FrozenEvent
+from synapse.events import event_type_from_format_version
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
 from synapse.types import get_domain_from_id
@@ -43,8 +43,8 @@ class FederationBase(object):
         self._clock = hs.get_clock()
 
     @defer.inlineCallbacks
-    def _check_sigs_and_hash_and_fetch(self, origin, pdus, outlier=False,
-                                       include_none=False):
+    def _check_sigs_and_hash_and_fetch(self, origin, pdus, room_version,
+                                       outlier=False, include_none=False):
         """Takes a list of PDUs and checks the signatures and hashs of each
         one. If a PDU fails its signature check then we check if we have it in
         the database and if not then request if from the originating server of
@@ -56,13 +56,17 @@ class FederationBase(object):
         a new list.
 
         Args:
+            origin (str)
             pdu (list)
-            outlier (bool)
+            room_version (str)
+            outlier (bool): Whether the events are outliers or not
+            include_none (str): Whether to include None in the returned list
+                for events that have failed their checks
 
         Returns:
             Deferred : A list of PDUs that have valid signatures and hashes.
         """
-        deferreds = self._check_sigs_and_hashes(pdus)
+        deferreds = self._check_sigs_and_hashes(room_version, pdus)
 
         @defer.inlineCallbacks
         def handle_check_result(pdu, deferred):
@@ -84,6 +88,7 @@ class FederationBase(object):
                     res = yield self.get_pdu(
                         destinations=[pdu.origin],
                         event_id=pdu.event_id,
+                        room_version=room_version,
                         outlier=outlier,
                         timeout=10000,
                     )
@@ -116,16 +121,17 @@ class FederationBase(object):
         else:
             defer.returnValue([p for p in valid_pdus if p])
 
-    def _check_sigs_and_hash(self, pdu):
+    def _check_sigs_and_hash(self, room_version, pdu):
         return logcontext.make_deferred_yieldable(
-            self._check_sigs_and_hashes([pdu])[0],
+            self._check_sigs_and_hashes(room_version, [pdu])[0],
         )
 
-    def _check_sigs_and_hashes(self, pdus):
+    def _check_sigs_and_hashes(self, room_version, pdus):
         """Checks that each of the received events is correctly signed by the
         sending server.
 
         Args:
+            room_version (str): The room version of the PDUs
             pdus (list[FrozenEvent]): the events to be checked
 
         Returns:
@@ -136,7 +142,7 @@ class FederationBase(object):
               * throws a SynapseError if the signature check failed.
             The deferreds run their callbacks in the sentinel logcontext.
         """
-        deferreds = _check_sigs_on_pdus(self.keyring, pdus)
+        deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
 
         ctx = logcontext.LoggingContext.current_context()
 
@@ -198,16 +204,17 @@ class FederationBase(object):
 
 
 class PduToCheckSig(namedtuple("PduToCheckSig", [
-    "pdu", "redacted_pdu_json", "event_id_domain", "sender_domain", "deferreds",
+    "pdu", "redacted_pdu_json", "sender_domain", "deferreds",
 ])):
     pass
 
 
-def _check_sigs_on_pdus(keyring, pdus):
+def _check_sigs_on_pdus(keyring, room_version, pdus):
     """Check that the given events are correctly signed
 
     Args:
         keyring (synapse.crypto.Keyring): keyring object to do the checks
+        room_version (str): the room version of the PDUs
         pdus (Collection[EventBase]): the events to be checked
 
     Returns:
@@ -220,9 +227,7 @@ def _check_sigs_on_pdus(keyring, pdus):
 
     # we want to check that the event is signed by:
     #
-    # (a) the server which created the event_id
-    #
-    # (b) the sender's server.
+    # (a) the sender's server
     #
     #     - except in the case of invites created from a 3pid invite, which are exempt
     #     from this check, because the sender has to match that of the original 3pid
@@ -236,34 +241,26 @@ def _check_sigs_on_pdus(keyring, pdus):
     #     and signatures are *supposed* to be valid whether or not an event has been
     #     redacted. But this isn't the worst of the ways that 3pid invites are broken.
     #
+    # (b) for V1 and V2 rooms, the server which created the event_id
+    #
     # let's start by getting the domain for each pdu, and flattening the event back
     # to JSON.
+
     pdus_to_check = [
         PduToCheckSig(
             pdu=p,
             redacted_pdu_json=prune_event(p).get_pdu_json(),
-            event_id_domain=get_domain_from_id(p.event_id),
             sender_domain=get_domain_from_id(p.sender),
             deferreds=[],
         )
         for p in pdus
     ]
 
-    # first make sure that the event is signed by the event_id's domain
-    deferreds = keyring.verify_json_objects_for_server([
-        (p.event_id_domain, p.redacted_pdu_json)
-        for p in pdus_to_check
-    ])
-
-    for p, d in zip(pdus_to_check, deferreds):
-        p.deferreds.append(d)
-
-    # now let's look for events where the sender's domain is different to the
-    # event id's domain (normally only the case for joins/leaves), and add additional
-    # checks.
+    # First we check that the sender event is signed by the sender's domain
+    # (except if its a 3pid invite, in which case it may be sent by any server)
     pdus_to_check_sender = [
         p for p in pdus_to_check
-        if p.sender_domain != p.event_id_domain and not _is_invite_via_3pid(p.pdu)
+        if not _is_invite_via_3pid(p.pdu)
     ]
 
     more_deferreds = keyring.verify_json_objects_for_server([
@@ -274,19 +271,43 @@ def _check_sigs_on_pdus(keyring, pdus):
     for p, d in zip(pdus_to_check_sender, more_deferreds):
         p.deferreds.append(d)
 
+    # now let's look for events where the sender's domain is different to the
+    # event id's domain (normally only the case for joins/leaves), and add additional
+    # checks. Only do this if the room version has a concept of event ID domain
+    if room_version in (
+        RoomVersions.V1, RoomVersions.V2, RoomVersions.STATE_V2_TEST,
+    ):
+        pdus_to_check_event_id = [
+            p for p in pdus_to_check
+            if p.sender_domain != get_domain_from_id(p.pdu.event_id)
+        ]
+
+        more_deferreds = keyring.verify_json_objects_for_server([
+            (get_domain_from_id(p.pdu.event_id), p.redacted_pdu_json)
+            for p in pdus_to_check_event_id
+        ])
+
+        for p, d in zip(pdus_to_check_event_id, more_deferreds):
+            p.deferreds.append(d)
+    elif room_version in (RoomVersions.V3,):
+        pass  # No further checks needed, as event IDs are hashes here
+    else:
+        raise RuntimeError("Unrecognized room version %s" % (room_version,))
+
     # replace lists of deferreds with single Deferreds
     return [_flatten_deferred_list(p.deferreds) for p in pdus_to_check]
 
 
 def _flatten_deferred_list(deferreds):
-    """Given a list of one or more deferreds, either return the single deferred, or
-    combine into a DeferredList.
+    """Given a list of deferreds, either return the single deferred,
+    combine into a DeferredList, or return an already resolved deferred.
     """
     if len(deferreds) > 1:
         return DeferredList(deferreds, fireOnOneErrback=True, consumeErrors=True)
-    else:
-        assert len(deferreds) == 1
+    elif len(deferreds) == 1:
         return deferreds[0]
+    else:
+        return defer.succeed(None)
 
 
 def _is_invite_via_3pid(event):
@@ -297,11 +318,12 @@ def _is_invite_via_3pid(event):
     )
 
 
-def event_from_pdu_json(pdu_json, outlier=False):
+def event_from_pdu_json(pdu_json, event_format_version, outlier=False):
     """Construct a FrozenEvent from an event json received over federation
 
     Args:
         pdu_json (object): pdu as received over federation
+        event_format_version (int): The event format version
         outlier (bool): True to mark this event as an outlier
 
     Returns:
@@ -313,7 +335,7 @@ def event_from_pdu_json(pdu_json, outlier=False):
     """
     # we could probably enforce a bunch of other fields here (room_id, sender,
     # origin, etc etc)
-    assert_params_in_dict(pdu_json, ('event_id', 'type', 'depth'))
+    assert_params_in_dict(pdu_json, ('type', 'depth'))
 
     depth = pdu_json['depth']
     if not isinstance(depth, six.integer_types):
@@ -325,8 +347,8 @@ def event_from_pdu_json(pdu_json, outlier=False):
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
-    event = FrozenEvent(
-        pdu_json
+    event = event_type_from_format_version(event_format_version)(
+        pdu_json,
     )
 
     event.internal_metadata.outlier = outlier

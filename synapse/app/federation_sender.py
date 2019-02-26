@@ -25,7 +25,6 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.crypto import context_factory
 from synapse.federation import send_queue
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
@@ -183,26 +182,17 @@ def start(config_options):
     # Force the pushers to start since they will be disabled in the main config
     config.send_federation = True
 
-    tls_server_context_factory = context_factory.ServerContextFactory(config)
-    tls_client_options_factory = context_factory.ClientTLSOptionsFactory(config)
-
-    ps = FederationSenderServer(
+    ss = FederationSenderServer(
         config.server_name,
         db_config=config.database_config,
-        tls_server_context_factory=tls_server_context_factory,
-        tls_client_options_factory=tls_client_options_factory,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
 
-    ps.setup()
-    ps.start_listening(config.worker_listeners)
+    ss.setup()
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
-    def start():
-        ps.get_datastore().start_profiling()
-
-    reactor.callWhenRunning(start)
     _base.start_worker_reactor("synapse-federation-sender", config)
 
 

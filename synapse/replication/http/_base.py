@@ -127,7 +127,10 @@ class ReplicationEndpoint(object):
         def send_request(**kwargs):
             data = yield cls._serialize_payload(**kwargs)
 
-            url_args = [urllib.parse.quote(kwargs[name]) for name in cls.PATH_ARGS]
+            url_args = [
+                urllib.parse.quote(kwargs[name], safe='')
+                for name in cls.PATH_ARGS
+            ]
 
             if cls.CACHE:
                 txn_id = random_string(10)

@@ -53,6 +53,7 @@ BOOLEAN_COLUMNS = {
     "group_summary_users": ["is_public"],
     "group_roles": ["is_public"],
     "local_group_membership": ["is_publicised", "is_admin"],
+    "e2e_room_keys": ["is_verified"],
 }
 
 

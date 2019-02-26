@@ -226,7 +226,15 @@ class SynchrotronPresence(object):
 class SynchrotronTyping(object):
     def __init__(self, hs):
         self._latest_room_serial = 0
+        self._reset()
+
+    def _reset(self):
+        """
+        Reset the typing handler's data caches.
+        """
+        # map room IDs to serial numbers
         self._room_serials = {}
+        # map room IDs to sets of users currently typing
         self._room_typing = {}
 
     def stream_positions(self):
@@ -236,6 +244,12 @@ class SynchrotronTyping(object):
         return {"typing": self._latest_room_serial}
 
     def process_replication_rows(self, token, rows):
+        if self._latest_room_serial > token:
+            # The master has gone backwards. To prevent inconsistent data, just
+            # clear everything.
+            self._reset()
+
+        # Set the latest serial token to whatever the server gave us.
         self._latest_room_serial = token
 
         for row in rows:
@@ -431,12 +445,7 @@ def start(config_options):
     )
 
     ss.setup()
-    ss.start_listening(config.worker_listeners)
-
-    def start():
-        ss.get_datastore().start_profiling()
-
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-synchrotron", config)
 

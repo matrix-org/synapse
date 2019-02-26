@@ -126,6 +126,78 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         })
 
     @defer.inlineCallbacks
+    def test_update_version(self):
+        """Check that we can update versions.
+        """
+        version = yield self.handler.create_version(self.local_user, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "first_version_auth_data",
+        })
+        self.assertEqual(version, "1")
+
+        res = yield self.handler.update_version(self.local_user, version, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "revised_first_version_auth_data",
+            "version": version
+        })
+        self.assertDictEqual(res, {})
+
+        # check we can retrieve it as the current version
+        res = yield self.handler.get_version_info(self.local_user)
+        self.assertDictEqual(res, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "revised_first_version_auth_data",
+            "version": version
+        })
+
+    @defer.inlineCallbacks
+    def test_update_missing_version(self):
+        """Check that we get a 404 on updating nonexistent versions
+        """
+        res = None
+        try:
+            yield self.handler.update_version(self.local_user, "1", {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data",
+                "version": "1"
+            })
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 404)
+
+    @defer.inlineCallbacks
+    def test_update_bad_version(self):
+        """Check that we get a 400 if the version in the body is missing or
+        doesn't match
+        """
+        version = yield self.handler.create_version(self.local_user, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "first_version_auth_data",
+        })
+        self.assertEqual(version, "1")
+
+        res = None
+        try:
+            yield self.handler.update_version(self.local_user, version, {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data"
+            })
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 400)
+
+        res = None
+        try:
+            yield self.handler.update_version(self.local_user, version, {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data",
+                "version": "incorrect"
+            })
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 400)
+
+    @defer.inlineCallbacks
     def test_delete_missing_version(self):
         """Check that we get a 404 on deleting nonexistent versions
         """
@@ -169,8 +241,8 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         self.assertEqual(res, 404)
 
     @defer.inlineCallbacks
-    def test_get_missing_room_keys(self):
-        """Check that we get a 404 on querying missing room_keys
+    def test_get_missing_backup(self):
+        """Check that we get a 404 on querying missing backup
         """
         res = None
         try:
@@ -179,19 +251,20 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
             res = e.code
         self.assertEqual(res, 404)
 
-        # check we also get a 404 even if the version is valid
+    @defer.inlineCallbacks
+    def test_get_missing_room_keys(self):
+        """Check we get an empty response from an empty backup
+        """
         version = yield self.handler.create_version(self.local_user, {
             "algorithm": "m.megolm_backup.v1",
             "auth_data": "first_version_auth_data",
         })
         self.assertEqual(version, "1")
 
-        res = None
-        try:
-            yield self.handler.get_room_keys(self.local_user, version)
-        except errors.SynapseError as e:
-            res = e.code
-        self.assertEqual(res, 404)
+        res = yield self.handler.get_room_keys(self.local_user, version)
+        self.assertDictEqual(res, {
+            "rooms": {}
+        })
 
     # TODO: test the locking semantics when uploading room_keys,
     # although this is probably best done in sytest
@@ -345,17 +418,15 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         # check for bulk-delete
         yield self.handler.upload_room_keys(self.local_user, version, room_keys)
         yield self.handler.delete_room_keys(self.local_user, version)
-        res = None
-        try:
-            yield self.handler.get_room_keys(
-                self.local_user,
-                version,
-                room_id="!abc:matrix.org",
-                session_id="c0ff33",
-            )
-        except errors.SynapseError as e:
-            res = e.code
-        self.assertEqual(res, 404)
+        res = yield self.handler.get_room_keys(
+            self.local_user,
+            version,
+            room_id="!abc:matrix.org",
+            session_id="c0ff33",
+        )
+        self.assertDictEqual(res, {
+            "rooms": {}
+        })
 
         # check for bulk-delete per room
         yield self.handler.upload_room_keys(self.local_user, version, room_keys)
@@ -364,17 +435,15 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
             version,
             room_id="!abc:matrix.org",
         )
-        res = None
-        try:
-            yield self.handler.get_room_keys(
-                self.local_user,
-                version,
-                room_id="!abc:matrix.org",
-                session_id="c0ff33",
-            )
-        except errors.SynapseError as e:
-            res = e.code
-        self.assertEqual(res, 404)
+        res = yield self.handler.get_room_keys(
+            self.local_user,
+            version,
+            room_id="!abc:matrix.org",
+            session_id="c0ff33",
+        )
+        self.assertDictEqual(res, {
+            "rooms": {}
+        })
 
         # check for bulk-delete per session
         yield self.handler.upload_room_keys(self.local_user, version, room_keys)
@@ -384,14 +453,12 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
             room_id="!abc:matrix.org",
             session_id="c0ff33",
         )
-        res = None
-        try:
-            yield self.handler.get_room_keys(
-                self.local_user,
-                version,
-                room_id="!abc:matrix.org",
-                session_id="c0ff33",
-            )
-        except errors.SynapseError as e:
-            res = e.code
-        self.assertEqual(res, 404)
+        res = yield self.handler.get_room_keys(
+            self.local_user,
+            version,
+            room_id="!abc:matrix.org",
+            session_id="c0ff33",
+        )
+        self.assertDictEqual(res, {
+            "rooms": {}
+        })

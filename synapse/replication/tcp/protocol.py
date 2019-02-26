@@ -656,7 +656,7 @@ tcp_inbound_commands = LaterGauge(
     "",
     ["command", "name"],
     lambda: {
-        (k[0], p.name,): count
+        (k, p.name,): count
         for p in connected_connections
         for k, count in iteritems(p.inbound_commands_counter)
     },
@@ -667,7 +667,7 @@ tcp_outbound_commands = LaterGauge(
     "",
     ["command", "name"],
     lambda: {
-        (k[0], p.name,): count
+        (k, p.name,): count
         for p in connected_connections
         for k, count in iteritems(p.outbound_commands_counter)
     },

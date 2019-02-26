@@ -1,0 +1,98 @@
+.\" generated with Ronn/v0.7.3
+.\" http://github.com/rtomayko/ronn/tree/0.7.3
+.
+.TH "SYNAPSE_PORT_DB" "1" "February 2017" "" ""
+.
+.SH "NAME"
+\fBsynapse_port_db\fR \- A script to port an existing synapse SQLite database to a new PostgreSQL database\.
+.
+.SH "SYNOPSIS"
+\fBsynapse_port_db\fR [\-v] \-\-sqlite\-database=\fIdbfile\fR \-\-postgres\-config=\fIyamlconfig\fR [\-\-curses] [\-\-batch\-size=\fIbatch\-size\fR]
+.
+.SH "DESCRIPTION"
+\fBsynapse_port_db\fR ports an existing synapse SQLite database to a new PostgreSQL database\.
+.
+.P
+SQLite database is specified with \fB\-\-sqlite\-database\fR option and PostgreSQL configuration required to connect to PostgreSQL database is provided using \fB\-\-postgres\-config\fR configuration\. The configuration is specified in YAML format\.
+.
+.SH "OPTIONS"
+.
+.TP
+\fB\-v\fR
+Print log messages in \fBdebug\fR level instead of \fBinfo\fR level\.
+.
+.TP
+\fB\-\-sqlite\-database\fR
+The snapshot of the SQLite database file\. This must not be currently used by a running synapse server\.
+.
+.TP
+\fB\-\-postgres\-config\fR
+The database config file for the PostgreSQL database\.
+.
+.TP
+\fB\-\-curses\fR
+Display a curses based progress UI\.
+.
+.SH "CONFIG FILE"
+The postgres configuration file must be a valid YAML file with the following options\.
+.
+.IP "\(bu" 4
+\fBdatabase\fR: Database configuration section\. This section header can be ignored and the options below may be specified as top level keys\.
+.
+.IP "\(bu" 4
+\fBname\fR: Connector to use when connecting to the database\. This value must be \fBpsycopg2\fR\.
+.
+.IP "\(bu" 4
+\fBargs\fR: DB API 2\.0 compatible arguments to send to the \fBpsycopg2\fR module\.
+.
+.IP "\(bu" 4
+\fBdbname\fR \- the database name
+.
+.IP "\(bu" 4
+\fBuser\fR \- user name used to authenticate
+.
+.IP "\(bu" 4
+\fBpassword\fR \- password used to authenticate
+.
+.IP "\(bu" 4
+\fBhost\fR \- database host address (defaults to UNIX socket if not provided)
+.
+.IP "\(bu" 4
+\fBport\fR \- connection port number (defaults to 5432 if not provided)
+.
+.IP "" 0
+
+.
+.IP "\(bu" 4
+\fBsynchronous_commit\fR: Optional\. Default is True\. If the value is \fBFalse\fR, enable asynchronous commit and don\'t wait for the server to call fsync before ending the transaction\. See: https://www\.postgresql\.org/docs/current/static/wal\-async\-commit\.html
+.
+.IP "" 0
+
+.
+.IP "" 0
+.
+.P
+Following example illustrates the configuration file format\.
+.
+.IP "" 4
+.
+.nf
+
+database:
+  name: psycopg2
+  args:
+    dbname: synapsedb
+    user: synapseuser
+    password: ORohmi9Eet=ohphi
+    host: localhost
+  synchronous_commit: false
+.
+.fi
+.
+.IP "" 0
+.
+.SH "COPYRIGHT"
+This man page was written by Sunil Mohan Adapa <\fIsunil@medhas\.org\fR> for Debian GNU/Linux distribution\.
+.
+.SH "SEE ALSO"
+synctl(1), hash_password(1), register_new_matrix_user(1)

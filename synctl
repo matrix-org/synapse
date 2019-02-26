@@ -156,7 +156,9 @@ def main():
         write(
             "No config file found\n"
             "To generate a config file, run '%s -c %s --generate-config"
-            " --server-name=<server name>'\n" % (" ".join(SYNAPSE), options.configfile),
+            " --server-name=<server name> --report-stats=<yes/no>'\n" % (
+                " ".join(SYNAPSE), options.configfile,
+            ),
             stream=sys.stderr,
         )
         sys.exit(1)
