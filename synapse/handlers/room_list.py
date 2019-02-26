@@ -97,7 +97,23 @@ class RoomListHandler(BaseHandler):
     def _get_public_room_list(self, limit=None, since_token=None,
                               search_filter=None,
                               network_tuple=EMPTY_THIRD_PARTY_ID,
-                              from_federation=False, timeout=None,):
+                              from_federation=False,
+                              timeout=None,):
+        """Generate a public room list.
+
+        Args:
+            limit (int): Maximum amount of rooms to return.
+            since_token (str)
+            search_filter (dict): Dictionary to filter rooms by.
+            network_tuple (ThirdPartyInstanceID): Which public list to use.
+                This can be (None, None) to indicate the main list, or a particular
+                appservice and network id to use an appservice specific one.
+                Setting to None returns all public rooms across all lists.
+            from_federation (bool): Whether this request originated from a
+                federating server or a client. Used for room filtering.
+            timeout (int): Amount of seconds to wait for a response before
+                timing out.
+        """
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -295,19 +311,28 @@ class RoomListHandler(BaseHandler):
                                     search_filter, from_federation=False):
         """Generate the entry for a room in the public room list and append it
         to the `chunk` if it matches the search filter
+
+        Args:
+            room_id (str): The ID of the room.
+            num_joined_users (int): The number of joined users in the room.
+            chunk (list)
+            limit (int): Maximum amount of rooms to display. Function will
+                return if length of chunk is greater than limit + 1.
+            search_filter (dict)
+            from_federation (bool): Whether this request originated from a
+                federating server or a client. Used for room filtering.
         """
         if limit and len(chunk) > limit + 1:
             # We've already got enough, so lets just drop it.
             return
 
-        result = yield self.generate_room_entry(room_id,
-            num_joined_users)
+        result = yield self.generate_room_entry(room_id, num_joined_users)
 
         if from_federation and not self.config.allow_non_federated_in_public_rooms:
-            if result["m.federate"] == False:
+            if result["m.federate"] is False:
                 # This is a non-federating room and the config has chosen not
                 # to show these rooms to other servers
-                chunk.append(None)
+                return
         elif result and _matches_room_entry(result, search_filter):
             chunk.append(result)
 
@@ -318,7 +343,6 @@ class RoomListHandler(BaseHandler):
 
         Args:
             room_id (str): The room's ID.
-            disabled should be shown.
             num_joined_users (int): Number of users in the room.
             cache_context: Information for cached responses.
             with_alias (bool): Whether to return the room's aliases in the result.
