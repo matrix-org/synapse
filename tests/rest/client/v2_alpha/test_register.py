@@ -17,7 +17,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.url = b"/_matrix/client/r0/register"
 
         self.hs = self.setup_test_homeserver()
-        self.hs.clock = MockClock()
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
@@ -147,7 +146,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.hs.clock.advance_time_msec(retry_after_ms)
+        self.reactor.advance(retry_after_ms / 1000)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
