@@ -59,9 +59,9 @@ class RoomListHandler(BaseHandler):
         party network. A client can ask for a specific list or to return all.
 
         Args:
-            limit (int)
-            since_token (str)
-            search_filter (dict)
+            limit (int|None)
+            since_token (str|None)
+            search_filter (dict|None)
             network_tuple (ThirdPartyInstanceID): Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
@@ -102,16 +102,16 @@ class RoomListHandler(BaseHandler):
         """Generate a public room list.
 
         Args:
-            limit (int): Maximum amount of rooms to return.
-            since_token (str)
-            search_filter (dict): Dictionary to filter rooms by.
+            limit (int|None): Maximum amount of rooms to return.
+            since_token (str|None)
+            search_filter (dict|None): Dictionary to filter rooms by.
             network_tuple (ThirdPartyInstanceID): Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
             from_federation (bool): Whether this request originated from a
                 federating server or a client. Used for room filtering.
-            timeout (int): Amount of seconds to wait for a response before
+            timeout (int|None): Amount of seconds to wait for a response before
                 timing out.
         """
         if since_token and since_token != "END":
@@ -316,9 +316,9 @@ class RoomListHandler(BaseHandler):
             room_id (str): The ID of the room.
             num_joined_users (int): The number of joined users in the room.
             chunk (list)
-            limit (int): Maximum amount of rooms to display. Function will
+            limit (int|None): Maximum amount of rooms to display. Function will
                 return if length of chunk is greater than limit + 1.
-            search_filter (dict)
+            search_filter (dict|None)
             from_federation (bool): Whether this request originated from a
                 federating server or a client. Used for room filtering.
         """
@@ -330,7 +330,8 @@ class RoomListHandler(BaseHandler):
         if not result:
             return
 
-        if from_federation and result["m.federate"] is False:
+        if from_federation:
+            if "m.federate" in result and not result["m.federate"]:
             # This is a room that other servers cannot join. Do not show them
             # this room.
             return
