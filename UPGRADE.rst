@@ -191,12 +191,12 @@ Upgrading to v0.9.0
 
 Application services have had a breaking API change in this version.
 
-They can no longer register themselves with a home server using the AS HTTP API. This
-decision was made because a compromised application service with free reign to register
-any regex in effect grants full read/write access to the home server if a regex of ``.*``
-is used. An attack where a compromised AS re-registers itself with ``.*`` was deemed too
-big of a security risk to ignore, and so the ability to register with the HS remotely has
-been removed.
+They can no longer register themselves with a home server using the AS HTTP API.
+This decision was made because a compromised application service with free reign
+to register any regex in effect grants full read/write access to the home server
+if a regex of ``.*`` is used. An attack where a compromised AS re-registers
+itself with ``.*`` was deemed too big of a security risk to ignore, and so the
+ability to register with the HS remotely has been removed.
 
 It has been replaced by specifying a list of application service registrations in
 ``homeserver.yaml``::

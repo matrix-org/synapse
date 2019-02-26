@@ -15,6 +15,9 @@
 
 DROP TABLE users_who_share_rooms;
 
+-- This is no longer used because it's duplicated by the users_who_share_public_rooms
+DROP TABLE users_in_public_rooms;
+
 -- Table keeping track of who shares a room with who. We only keep track
 -- of this for local users, so `user_id` is local users only (but we do keep track
 -- of which remote users share a room)
