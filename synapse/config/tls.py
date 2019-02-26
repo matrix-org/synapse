@@ -19,6 +19,8 @@ import warnings
 from datetime import datetime
 from hashlib import sha256
 
+import six
+
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
@@ -36,9 +38,11 @@ class TlsConfig(Config):
             acme_config = {}
 
         self.acme_enabled = acme_config.get("enabled", False)
-        self.acme_url = acme_config.get(
+
+        # hyperlink complains on py2 if this is not a Unicode
+        self.acme_url = six.text_type(acme_config.get(
             "url", u"https://acme-v01.api.letsencrypt.org/directory"
-        )
+        ))
         self.acme_port = acme_config.get("port", 80)
         self.acme_bind_addresses = acme_config.get("bind_addresses", ['::', '0.0.0.0'])
         self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
@@ -55,7 +59,7 @@ class TlsConfig(Config):
                 )
             if not self.tls_private_key_file:
                 raise ConfigError(
-                    "tls_certificate_path must be specified if TLS-enabled listeners are "
+                    "tls_private_key_path must be specified if TLS-enabled listeners are "
                     "configured."
                 )
 

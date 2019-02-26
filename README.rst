@@ -199,6 +199,8 @@ by installing the ``libjemalloc1`` package and adding this line to
 
     LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
+This can make a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.
 
 Upgrading an existing Synapse
 =============================

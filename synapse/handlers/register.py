@@ -460,7 +460,7 @@ class RegistrationHandler(BaseHandler):
         lines = response.split('\n')
         json = {
             "valid": lines[0] == 'true',
-            "error_url": "http://www.google.com/recaptcha/api/challenge?" +
+            "error_url": "http://www.recaptcha.net/recaptcha/api/challenge?" +
                          "error=%s" % lines[1]
         }
         defer.returnValue(json)
@@ -471,7 +471,7 @@ class RegistrationHandler(BaseHandler):
         Used only by c/s api v1
         """
         data = yield self.captcha_client.post_urlencoded_get_raw(
-            "http://www.google.com:80/recaptcha/api/verify",
+            "http://www.recaptcha.net:80/recaptcha/api/verify",
             args={
                 'privatekey': private_key,
                 'remoteip': ip_addr,

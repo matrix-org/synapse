@@ -47,5 +47,5 @@ class CaptchaConfig(Config):
         #captcha_bypass_secret: "YOUR_SECRET_HERE"
 
         # The API endpoint to use for verifying m.login.recaptcha responses.
-        recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+        recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
         """
