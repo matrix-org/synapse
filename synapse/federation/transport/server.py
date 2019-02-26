@@ -736,8 +736,7 @@ class PublicRoomList(BaseFederationServlet):
 
         data = yield self.handler.get_local_public_room_list(
             limit, since_token,
-            network_tuple=network_tuple,
-            from_federation=True,
+            network_tuple=network_tuple
         )
         defer.returnValue((200, data))
 
