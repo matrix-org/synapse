@@ -54,8 +54,11 @@ class SlavedPresenceStore(BaseSlavedStore):
 
     def stream_positions(self):
         result = super(SlavedPresenceStore, self).stream_positions()
-        position = self._presence_id_gen.get_current_token()
-        result["presence"] = position
+
+        if self.hs.config.use_presence:
+            position = self._presence_id_gen.get_current_token()
+            result["presence"] = position
+
         return result
 
     def process_replication_rows(self, stream_name, token, rows):
