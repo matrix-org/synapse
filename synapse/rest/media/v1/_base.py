@@ -270,7 +270,7 @@ def _parse_header(line):
     Cargo-culted from `cgi`, but works on bytes rather than strings.
     """
     parts = _parseparam(b';' + line)
-    key = parts.__next__()
+    key = next(parts)
     pdict = {}
     for p in parts:
         i = p.find(b'=')
