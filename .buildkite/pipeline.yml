@@ -65,3 +65,13 @@ steps:
       - docker#v3.0.1:
           image: "python:3.7"
           propagate-environment: true
+
+  - label: ":python: Python 2.7 / PostgreSQL 9.4"
+    command:
+      - "python -m pip install tox"
+      - "tox -e py27-postgres,codecov"
+    plugins:
+      - docker-compose#v2.1.0:
+          run: testenv
+          config:
+            - .buildkite/docker-compose.py27.pg94.yaml

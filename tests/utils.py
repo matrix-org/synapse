@@ -46,6 +46,8 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 USE_POSTGRES_FOR_TESTS = os.environ.get("SYNAPSE_POSTGRES", False)
 LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", "postgres")
+POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", "localhost")
+POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
 
@@ -58,6 +60,8 @@ def setupdb():
             "args": {
                 "database": POSTGRES_BASE_DB,
                 "user": POSTGRES_USER,
+                "host": POSTGRES_HOST,
+                "password": POSTGRES_PASSWORD,
                 "cp_min": 1,
                 "cp_max": 5,
             },
@@ -66,7 +70,9 @@ def setupdb():
         config.password_providers = []
         config.database_config = pgconfig
         db_engine = create_engine(pgconfig)
-        db_conn = db_engine.module.connect(user=POSTGRES_USER)
+        db_conn = db_engine.module.connect(
+            user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+        )
         db_conn.autocommit = True
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
@@ -76,7 +82,10 @@ def setupdb():
 
         # Set up in the db
         db_conn = db_engine.module.connect(
-            database=POSTGRES_BASE_DB, user=POSTGRES_USER
+            database=POSTGRES_BASE_DB,
+            user=POSTGRES_USER,
+            host=POSTGRES_HOST,
+            password=POSTGRES_PASSWORD,
         )
         cur = db_conn.cursor()
         _get_or_create_schema_state(cur, db_engine)
@@ -86,7 +95,9 @@ def setupdb():
         db_conn.close()
 
         def _cleanup():
-            db_conn = db_engine.module.connect(user=POSTGRES_USER)
+            db_conn = db_engine.module.connect(
+                user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+            )
             db_conn.autocommit = True
             cur = db_conn.cursor()
             cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
@@ -203,7 +214,14 @@ def setup_test_homeserver(
 
         config.database_config = {
             "name": "psycopg2",
-            "args": {"database": test_db, "cp_min": 1, "cp_max": 5},
+            "args": {
+                "database": test_db,
+                "host": POSTGRES_HOST,
+                "password": POSTGRES_PASSWORD,
+                "user": POSTGRES_USER,
+                "cp_min": 1,
+                "cp_max": 5,
+            },
         }
     else:
         config.database_config = {
@@ -217,7 +235,10 @@ def setup_test_homeserver(
     # the template database we generate in setupdb()
     if datastore is None and isinstance(db_engine, PostgresEngine):
         db_conn = db_engine.module.connect(
-            database=POSTGRES_BASE_DB, user=POSTGRES_USER
+            database=POSTGRES_BASE_DB,
+            user=POSTGRES_USER,
+            host=POSTGRES_HOST,
+            password=POSTGRES_PASSWORD,
         )
         db_conn.autocommit = True
         cur = db_conn.cursor()
@@ -267,7 +288,10 @@ def setup_test_homeserver(
 
                 # Drop the test database
                 db_conn = db_engine.module.connect(
-                    database=POSTGRES_BASE_DB, user=POSTGRES_USER
+                    database=POSTGRES_BASE_DB,
+                    user=POSTGRES_USER,
+                    host=POSTGRES_HOST,
+                    password=POSTGRES_PASSWORD,
                 )
                 db_conn.autocommit = True
                 cur = db_conn.cursor()
@@ -486,7 +510,7 @@ class MockClock(object):
         return t
 
     def looping_call(self, function, interval):
-        self.loopers.append([function, interval / 1000., self.now])
+        self.loopers.append([function, interval / 1000.0, self.now])
 
     def cancel_call_later(self, timer, ignore_errs=False):
         if timer[2]:
@@ -522,7 +546,7 @@ class MockClock(object):
                 looped[2] = self.now
 
     def advance_time_msec(self, ms):
-        self.advance_time(ms / 1000.)
+        self.advance_time(ms / 1000.0)
 
     def time_bound_deferred(self, d, *args, **kwargs):
         # We don't bother timing things out for now.
@@ -631,7 +655,7 @@ def create_room(hs, room_id, creator_id):
             "sender": creator_id,
             "room_id": room_id,
             "content": {},
-        }
+        },
     )
 
     event, context = yield event_creation_handler.create_new_client_event(builder)
