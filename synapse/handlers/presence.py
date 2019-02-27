@@ -22,40 +22,44 @@ The methods that define policy are:
     - should_notify
 """
 
-from twisted.internet import defer, reactor
+import logging
 from contextlib import contextmanager
 
-from synapse.api.errors import SynapseError
-from synapse.api.constants import PresenceState
-from synapse.storage.presence import UserPresenceState
+from six import iteritems, itervalues
 
+from prometheus_client import Counter
+
+from twisted.internet import defer
+
+from synapse.api.constants import PresenceState
+from synapse.api.errors import SynapseError
+from synapse.metrics import LaterGauge
+from synapse.storage.presence import UserPresenceState
+from synapse.types import UserID, get_domain_from_id
+from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import cachedInlineCallbacks
-from synapse.util.logcontext import preserve_fn
+from synapse.util.logcontext import run_in_background
 from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
-from synapse.types import UserID, get_domain_from_id
-import synapse.metrics
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
 
-notified_presence_counter = metrics.register_counter("notified_presence")
-federation_presence_out_counter = metrics.register_counter("federation_presence_out")
-presence_updates_counter = metrics.register_counter("presence_updates")
-timers_fired_counter = metrics.register_counter("timers_fired")
-federation_presence_counter = metrics.register_counter("federation_presence")
-bump_active_time_counter = metrics.register_counter("bump_active_time")
+notified_presence_counter = Counter("synapse_handler_presence_notified_presence", "")
+federation_presence_out_counter = Counter(
+    "synapse_handler_presence_federation_presence_out", "")
+presence_updates_counter = Counter("synapse_handler_presence_presence_updates", "")
+timers_fired_counter = Counter("synapse_handler_presence_timers_fired", "")
+federation_presence_counter = Counter("synapse_handler_presence_federation_presence", "")
+bump_active_time_counter = Counter("synapse_handler_presence_bump_active_time", "")
 
-get_updates_counter = metrics.register_counter("get_updates", labels=["type"])
+get_updates_counter = Counter("synapse_handler_presence_get_updates", "", ["type"])
 
-notify_reason_counter = metrics.register_counter("notify_reason", labels=["reason"])
-state_transition_counter = metrics.register_counter(
-    "state_transition", labels=["from", "to"]
+notify_reason_counter = Counter(
+    "synapse_handler_presence_notify_reason", "", ["reason"])
+state_transition_counter = Counter(
+    "synapse_handler_presence_state_transition", "", ["from", "to"]
 )
 
 
@@ -86,35 +90,41 @@ assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 class PresenceHandler(object):
 
     def __init__(self, hs):
+        """
+
+        Args:
+            hs (synapse.server.HomeServer):
+        """
+        self.hs = hs
         self.is_mine = hs.is_mine
         self.is_mine_id = hs.is_mine_id
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
-        self.replication = hs.get_replication_layer()
         self.federation = hs.get_federation_sender()
-
         self.state = hs.get_state_handler()
 
-        self.replication.register_edu_handler(
+        federation_registry = hs.get_federation_registry()
+
+        federation_registry.register_edu_handler(
             "m.presence", self.incoming_presence
         )
-        self.replication.register_edu_handler(
+        federation_registry.register_edu_handler(
             "m.presence_invite",
             lambda origin, content: self.invite_presence(
                 observed_user=UserID.from_string(content["observed_user"]),
                 observer_user=UserID.from_string(content["observer_user"]),
             )
         )
-        self.replication.register_edu_handler(
+        federation_registry.register_edu_handler(
             "m.presence_accept",
             lambda origin, content: self.accept_presence(
                 observed_user=UserID.from_string(content["observed_user"]),
                 observer_user=UserID.from_string(content["observer_user"]),
             )
         )
-        self.replication.register_edu_handler(
+        federation_registry.register_edu_handler(
             "m.presence_deny",
             lambda origin, content: self.deny_presence(
                 observed_user=UserID.from_string(content["observed_user"]),
@@ -135,8 +145,9 @@ class PresenceHandler(object):
             for state in active_presence
         }
 
-        metrics.register_callback(
-            "user_to_current_state_size", lambda: len(self.user_to_current_state)
+        LaterGauge(
+            "synapse_handlers_presence_user_to_current_state_size", "", [],
+            lambda: len(self.user_to_current_state)
         )
 
         now = self.clock.time_msec()
@@ -168,7 +179,7 @@ class PresenceHandler(object):
         # have not yet been persisted
         self.unpersisted_users_changes = set()
 
-        reactor.addSystemEventTrigger("before", "shutdown", self._on_shutdown)
+        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self._on_shutdown)
 
         self.serial_to_user = {}
         self._next_serial = 1
@@ -187,6 +198,7 @@ class PresenceHandler(object):
         # process_id to millisecond timestamp last updated.
         self.external_process_to_current_syncs = {}
         self.external_process_last_updated_ms = {}
+        self.external_sync_linearizer = Linearizer(name="external_sync_linearizer")
 
         # Start a LoopingCall in 30s that fires every 5s.
         # The initial delay is to allow disconnected clients a chance to
@@ -205,7 +217,8 @@ class PresenceHandler(object):
             60 * 1000,
         )
 
-        metrics.register_callback("wheel_timer_size", lambda: len(self.wheel_timer))
+        LaterGauge("synapse_handlers_presence_wheel_timer_size", "", [],
+                   lambda: len(self.wheel_timer))
 
     @defer.inlineCallbacks
     def _on_shutdown(self):
@@ -218,6 +231,10 @@ class PresenceHandler(object):
         earlier than they should when synapse is restarted. This affect of this
         is some spurious presence changes that will self-correct.
         """
+        # If the DB pool has already terminated, don't try updating
+        if not self.hs.get_db_pool().running:
+            return
+
         logger.info(
             "Performing _on_shutdown. Persisting %d unpersisted changes",
             len(self.user_to_current_state)
@@ -250,6 +267,14 @@ class PresenceHandler(object):
             ])
 
         logger.info("Finished _persist_unpersisted_changes")
+
+    @defer.inlineCallbacks
+    def _update_states_and_catch_exception(self, new_states):
+        try:
+            res = yield self._update_states(new_states)
+            defer.returnValue(res)
+        except Exception:
+            logger.exception("Error updating presence")
 
     @defer.inlineCallbacks
     def _update_states(self, new_states):
@@ -300,11 +325,11 @@ class PresenceHandler(object):
 
             # TODO: We should probably ensure there are no races hereafter
 
-            presence_updates_counter.inc_by(len(new_states))
+            presence_updates_counter.inc(len(new_states))
 
             if to_notify:
-                notified_presence_counter.inc_by(len(to_notify))
-                yield self._persist_and_notify(to_notify.values())
+                notified_presence_counter.inc(len(to_notify))
+                yield self._persist_and_notify(list(to_notify.values()))
 
             self.unpersisted_users_changes |= set(s.user_id for s in new_states)
             self.unpersisted_users_changes -= set(to_notify.keys())
@@ -314,13 +339,9 @@ class PresenceHandler(object):
                 if user_id not in to_notify
             }
             if to_federation_ping:
-                federation_presence_out_counter.inc_by(len(to_federation_ping))
+                federation_presence_out_counter.inc(len(to_federation_ping))
 
-                _, _, hosts_to_states = yield self._get_interested_parties(
-                    to_federation_ping.values()
-                )
-
-                self._push_to_remotes(hosts_to_states)
+                self._push_to_remotes(to_federation_ping.values())
 
     def _handle_timeouts(self):
         """Checks the presence of users that have timed out and updates as
@@ -356,7 +377,7 @@ class PresenceHandler(object):
                     for user_id in users_to_check
                 ]
 
-                timers_fired_counter.inc_by(len(states))
+                timers_fired_counter.inc(len(states))
 
                 changes = handle_timeouts(
                     states,
@@ -365,8 +386,8 @@ class PresenceHandler(object):
                     now=now,
                 )
 
-            preserve_fn(self._update_states)(changes)
-        except:
+            run_in_background(self._update_states_and_catch_exception, changes)
+        except Exception:
             logger.exception("Exception in _handle_timeouts loop")
 
     @defer.inlineCallbacks
@@ -374,6 +395,10 @@ class PresenceHandler(object):
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
+        # If presence is disabled, no-op
+        if not self.hs.config.use_presence:
+            return
+
         user_id = user.to_string()
 
         bump_active_time_counter.inc()
@@ -403,6 +428,11 @@ class PresenceHandler(object):
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
         """
+        # Override if it should affect the user's presence, if presence is
+        # disabled.
+        if not self.hs.config.use_presence:
+            affect_presence = False
+
         if affect_presence:
             curr_sync = self.user_to_num_current_syncs.get(user_id, 0)
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
@@ -423,20 +453,23 @@ class PresenceHandler(object):
 
         @defer.inlineCallbacks
         def _end():
-            if affect_presence:
+            try:
                 self.user_to_num_current_syncs[user_id] -= 1
 
                 prev_state = yield self.current_state_for_user(user_id)
                 yield self._update_states([prev_state.copy_and_replace(
                     last_user_sync_ts=self.clock.time_msec(),
                 )])
+            except Exception:
+                logger.exception("Error updating presence after sync")
 
         @contextmanager
         def _user_syncing():
             try:
                 yield
             finally:
-                preserve_fn(_end)()
+                if affect_presence:
+                    run_in_background(_end)
 
         defer.returnValue(_user_syncing())
 
@@ -445,68 +478,83 @@ class PresenceHandler(object):
         Returns:
             set(str): A set of user_id strings.
         """
-        syncing_user_ids = {
-            user_id for user_id, count in self.user_to_num_current_syncs.items()
-            if count
-        }
-        for user_ids in self.external_process_to_current_syncs.values():
-            syncing_user_ids.update(user_ids)
-        return syncing_user_ids
+        if self.hs.config.use_presence:
+            syncing_user_ids = {
+                user_id for user_id, count in self.user_to_num_current_syncs.items()
+                if count
+            }
+            for user_ids in self.external_process_to_current_syncs.values():
+                syncing_user_ids.update(user_ids)
+            return syncing_user_ids
+        else:
+            return set()
 
     @defer.inlineCallbacks
-    def update_external_syncs(self, process_id, syncing_user_ids):
-        """Update the syncing users for an external process
+    def update_external_syncs_row(self, process_id, user_id, is_syncing, sync_time_msec):
+        """Update the syncing users for an external process as a delta.
 
         Args:
-            process_id(str): An identifier for the process the users are
+            process_id (str): An identifier for the process the users are
                 syncing against. This allows synapse to process updates
                 as user start and stop syncing against a given process.
-            syncing_user_ids(set(str)): The set of user_ids that are
-                currently syncing on that server.
+            user_id (str): The user who has started or stopped syncing
+            is_syncing (bool): Whether or not the user is now syncing
+            sync_time_msec(int): Time in ms when the user was last syncing
         """
+        with (yield self.external_sync_linearizer.queue(process_id)):
+            prev_state = yield self.current_state_for_user(user_id)
 
-        # Grab the previous list of user_ids that were syncing on that process
-        prev_syncing_user_ids = (
-            self.external_process_to_current_syncs.get(process_id, set())
-        )
-        # Grab the current presence state for both the users that are syncing
-        # now and the users that were syncing before this update.
-        prev_states = yield self.current_state_for_users(
-            syncing_user_ids | prev_syncing_user_ids
-        )
-        updates = []
-        time_now_ms = self.clock.time_msec()
+            process_presence = self.external_process_to_current_syncs.setdefault(
+                process_id, set()
+            )
 
-        # For each new user that is syncing check if we need to mark them as
-        # being online.
-        for new_user_id in syncing_user_ids - prev_syncing_user_ids:
-            prev_state = prev_states[new_user_id]
-            if prev_state.state == PresenceState.OFFLINE:
+            updates = []
+            if is_syncing and user_id not in process_presence:
+                if prev_state.state == PresenceState.OFFLINE:
+                    updates.append(prev_state.copy_and_replace(
+                        state=PresenceState.ONLINE,
+                        last_active_ts=sync_time_msec,
+                        last_user_sync_ts=sync_time_msec,
+                    ))
+                else:
+                    updates.append(prev_state.copy_and_replace(
+                        last_user_sync_ts=sync_time_msec,
+                    ))
+                process_presence.add(user_id)
+            elif user_id in process_presence:
                 updates.append(prev_state.copy_and_replace(
-                    state=PresenceState.ONLINE,
-                    last_active_ts=time_now_ms,
-                    last_user_sync_ts=time_now_ms,
-                ))
-            else:
-                updates.append(prev_state.copy_and_replace(
-                    last_user_sync_ts=time_now_ms,
+                    last_user_sync_ts=sync_time_msec,
                 ))
 
-        # For each user that is still syncing or stopped syncing update the
-        # last sync time so that we will correctly apply the grace period when
-        # they stop syncing.
-        for old_user_id in prev_syncing_user_ids:
-            prev_state = prev_states[old_user_id]
-            updates.append(prev_state.copy_and_replace(
-                last_user_sync_ts=time_now_ms,
-            ))
+            if not is_syncing:
+                process_presence.discard(user_id)
 
-        yield self._update_states(updates)
+            if updates:
+                yield self._update_states(updates)
 
-        # Update the last updated time for the process. We expire the entries
-        # if we don't receive an update in the given timeframe.
-        self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
-        self.external_process_to_current_syncs[process_id] = syncing_user_ids
+            self.external_process_last_updated_ms[process_id] = self.clock.time_msec()
+
+    @defer.inlineCallbacks
+    def update_external_syncs_clear(self, process_id):
+        """Marks all users that had been marked as syncing by a given process
+        as offline.
+
+        Used when the process has stopped/disappeared.
+        """
+        with (yield self.external_sync_linearizer.queue(process_id)):
+            process_presence = self.external_process_to_current_syncs.pop(
+                process_id, set()
+            )
+            prev_states = yield self.current_state_for_users(process_presence)
+            time_now_ms = self.clock.time_msec()
+
+            yield self._update_states([
+                prev_state.copy_and_replace(
+                    last_user_sync_ts=time_now_ms,
+                )
+                for prev_state in itervalues(prev_states)
+            ])
+            self.external_process_last_updated_ms.pop(process_id, None)
 
     @defer.inlineCallbacks
     def current_state_for_user(self, user_id):
@@ -527,14 +575,14 @@ class PresenceHandler(object):
             for user_id in user_ids
         }
 
-        missing = [user_id for user_id, state in states.items() if not state]
+        missing = [user_id for user_id, state in iteritems(states) if not state]
         if missing:
             # There are things not in our in memory cache. Lets pull them out of
             # the database.
             res = yield self.store.get_presence_for_users(missing)
             states.update(res)
 
-            missing = [user_id for user_id, state in states.items() if not state]
+            missing = [user_id for user_id, state in iteritems(states) if not state]
             if missing:
                 new = {
                     user_id: UserPresenceState.default(user_id)
@@ -546,88 +594,39 @@ class PresenceHandler(object):
         defer.returnValue(states)
 
     @defer.inlineCallbacks
-    def _get_interested_parties(self, states, calculate_remote_hosts=True):
-        """Given a list of states return which entities (rooms, users, servers)
-        are interested in the given states.
-
-        Returns:
-            3-tuple: `(room_ids_to_states, users_to_states, hosts_to_states)`,
-            with each item being a dict of `entity_name` -> `[UserPresenceState]`
-        """
-        room_ids_to_states = {}
-        users_to_states = {}
-        for state in states:
-            room_ids = yield self.store.get_rooms_for_user(state.user_id)
-            for room_id in room_ids:
-                room_ids_to_states.setdefault(room_id, []).append(state)
-
-            plist = yield self.store.get_presence_list_observers_accepted(state.user_id)
-            for u in plist:
-                users_to_states.setdefault(u, []).append(state)
-
-            # Always notify self
-            users_to_states.setdefault(state.user_id, []).append(state)
-
-        hosts_to_states = {}
-        if calculate_remote_hosts:
-            for room_id, states in room_ids_to_states.items():
-                local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
-                if not local_states:
-                    continue
-
-                hosts = yield self.store.get_hosts_in_room(room_id)
-
-                for host in hosts:
-                    hosts_to_states.setdefault(host, []).extend(local_states)
-
-        for user_id, states in users_to_states.items():
-            local_states = filter(lambda s: self.is_mine_id(s.user_id), states)
-            if not local_states:
-                continue
-
-            host = get_domain_from_id(user_id)
-            hosts_to_states.setdefault(host, []).extend(local_states)
-
-        # TODO: de-dup hosts_to_states, as a single host might have multiple
-        # of same presence
-
-        defer.returnValue((room_ids_to_states, users_to_states, hosts_to_states))
-
-    @defer.inlineCallbacks
     def _persist_and_notify(self, states):
         """Persist states in the database, poke the notifier and send to
         interested remote servers
         """
         stream_id, max_token = yield self.store.update_presence(states)
 
-        parties = yield self._get_interested_parties(states)
-        room_ids_to_states, users_to_states, hosts_to_states = parties
+        parties = yield get_interested_parties(self.store, states)
+        room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
             "presence_key", stream_id, rooms=room_ids_to_states.keys(),
-            users=[UserID.from_string(u) for u in users_to_states.keys()]
+            users=[UserID.from_string(u) for u in users_to_states]
         )
 
-        self._push_to_remotes(hosts_to_states)
+        self._push_to_remotes(states)
 
     @defer.inlineCallbacks
     def notify_for_states(self, state, stream_id):
-        parties = yield self._get_interested_parties([state])
-        room_ids_to_states, users_to_states, hosts_to_states = parties
+        parties = yield get_interested_parties(self.store, [state])
+        room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
             "presence_key", stream_id, rooms=room_ids_to_states.keys(),
-            users=[UserID.from_string(u) for u in users_to_states.keys()]
+            users=[UserID.from_string(u) for u in users_to_states]
         )
 
-    def _push_to_remotes(self, hosts_to_states):
+    def _push_to_remotes(self, states):
         """Sends state updates to remote servers.
 
         Args:
-            hosts_to_states (dict): Mapping `server_name` -> `[UserPresenceState]`
+            states (list(UserPresenceState))
         """
-        for host, states in hosts_to_states.items():
-            self.federation.send_presence(host, states)
+        self.federation.send_presence(states)
 
     @defer.inlineCallbacks
     def incoming_presence(self, origin, content):
@@ -679,7 +678,7 @@ class PresenceHandler(object):
             updates.append(prev_state.copy_and_replace(**new_fields))
 
         if updates:
-            federation_presence_counter.inc_by(len(updates))
+            federation_presence_counter.inc(len(updates))
             yield self._update_states(updates)
 
     @defer.inlineCallbacks
@@ -704,7 +703,7 @@ class PresenceHandler(object):
         """
 
         updates = yield self.current_state_for_users(target_user_ids)
-        updates = updates.values()
+        updates = list(updates.values())
 
         for user_id in set(target_user_ids) - set(u.user_id for u in updates):
             updates.append(UserPresenceState.default(user_id))
@@ -764,18 +763,17 @@ class PresenceHandler(object):
         # don't need to send to local clients here, as that is done as part
         # of the event stream/sync.
         # TODO: Only send to servers not already in the room.
-        user_ids = yield self.store.get_users_in_room(room_id)
         if self.is_mine(user):
             state = yield self.current_state_for_user(user.to_string())
 
-            hosts = set(get_domain_from_id(u) for u in user_ids)
-            self._push_to_remotes({host: (state,) for host in hosts})
+            self._push_to_remotes([state])
         else:
-            user_ids = filter(self.is_mine_id, user_ids)
+            user_ids = yield self.store.get_users_in_room(room_id)
+            user_ids = list(filter(self.is_mine_id, user_ids))
 
             states = yield self.current_state_for_users(user_ids)
 
-            self._push_to_remotes({user.domain: states.values()})
+            self._push_to_remotes(list(states.values()))
 
     @defer.inlineCallbacks
     def get_presence_list(self, observer_user, accepted=None):
@@ -955,28 +953,28 @@ def should_notify(old_state, new_state):
         return False
 
     if old_state.status_msg != new_state.status_msg:
-        notify_reason_counter.inc("status_msg_change")
+        notify_reason_counter.labels("status_msg_change").inc()
         return True
 
     if old_state.state != new_state.state:
-        notify_reason_counter.inc("state_change")
-        state_transition_counter.inc(old_state.state, new_state.state)
+        notify_reason_counter.labels("state_change").inc()
+        state_transition_counter.labels(old_state.state, new_state.state).inc()
         return True
 
     if old_state.state == PresenceState.ONLINE:
         if new_state.currently_active != old_state.currently_active:
-            notify_reason_counter.inc("current_active_change")
+            notify_reason_counter.labels("current_active_change").inc()
             return True
 
         if new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
             # Only notify about last active bumps if we're not currently acive
             if not new_state.currently_active:
-                notify_reason_counter.inc("last_active_change_online")
+                notify_reason_counter.labels("last_active_change_online").inc()
                 return True
 
     elif new_state.last_active_ts - old_state.last_active_ts > LAST_ACTIVE_GRANULARITY:
         # Always notify for a transition where last active gets bumped.
-        notify_reason_counter.inc("last_active_change_not_online")
+        notify_reason_counter.labels("last_active_change_not_online").inc()
         return True
 
     return False
@@ -1050,14 +1048,14 @@ class PresenceEventSource(object):
             if changed is not None and len(changed) < 500:
                 # For small deltas, its quicker to get all changes and then
                 # work out if we share a room or they're in our presence list
-                get_updates_counter.inc("stream")
+                get_updates_counter.labels("stream").inc()
                 for other_user_id in changed:
                     if other_user_id in users_interested_in:
                         user_ids_changed.add(other_user_id)
             else:
                 # Too many possible updates. Find all users we can see and check
                 # if any of them have changed.
-                get_updates_counter.inc("full")
+                get_updates_counter.labels("full").inc()
 
                 if from_key:
                     user_ids_changed = stream_change_cache.get_entities_changed(
@@ -1069,10 +1067,10 @@ class PresenceEventSource(object):
             updates = yield presence.current_state_for_users(user_ids_changed)
 
         if include_offline:
-            defer.returnValue((updates.values(), max_token))
+            defer.returnValue((list(updates.values()), max_token))
         else:
             defer.returnValue(([
-                s for s in updates.itervalues()
+                s for s in itervalues(updates)
                 if s.state != PresenceState.OFFLINE
             ], max_token))
 
@@ -1130,7 +1128,7 @@ def handle_timeouts(user_states, is_mine_fn, syncing_user_ids, now):
         if new_state:
             changes[state.user_id] = new_state
 
-    return changes.values()
+    return list(changes.values())
 
 
 def handle_timeout(state, is_mine, syncing_user_ids, now):
@@ -1184,7 +1182,7 @@ def handle_timeout(state, is_mine, syncing_user_ids, now):
                 )
                 changed = True
     else:
-        # We expect to be poked occaisonally by the other side.
+        # We expect to be poked occasionally by the other side.
         # This is to protect against forgetful/buggy servers, so that
         # no one gets stuck online forever.
         if now - state.last_federation_update_ts > FEDERATION_TIMEOUT:
@@ -1275,3 +1273,66 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
         persist_and_notify = True
 
     return new_state, persist_and_notify, federation_ping
+
+
+@defer.inlineCallbacks
+def get_interested_parties(store, states):
+    """Given a list of states return which entities (rooms, users)
+    are interested in the given states.
+
+    Args:
+        states (list(UserPresenceState))
+
+    Returns:
+        2-tuple: `(room_ids_to_states, users_to_states)`,
+        with each item being a dict of `entity_name` -> `[UserPresenceState]`
+    """
+    room_ids_to_states = {}
+    users_to_states = {}
+    for state in states:
+        room_ids = yield store.get_rooms_for_user(state.user_id)
+        for room_id in room_ids:
+            room_ids_to_states.setdefault(room_id, []).append(state)
+
+        plist = yield store.get_presence_list_observers_accepted(state.user_id)
+        for u in plist:
+            users_to_states.setdefault(u, []).append(state)
+
+        # Always notify self
+        users_to_states.setdefault(state.user_id, []).append(state)
+
+    defer.returnValue((room_ids_to_states, users_to_states))
+
+
+@defer.inlineCallbacks
+def get_interested_remotes(store, states, state_handler):
+    """Given a list of presence states figure out which remote servers
+    should be sent which.
+
+    All the presence states should be for local users only.
+
+    Args:
+        store (DataStore)
+        states (list(UserPresenceState))
+
+    Returns:
+        Deferred list of ([destinations], [UserPresenceState]), where for
+        each row the list of UserPresenceState should be sent to each
+        destination
+    """
+    hosts_and_states = []
+
+    # First we look up the rooms each user is in (as well as any explicit
+    # subscriptions), then for each distinct room we look up the remote
+    # hosts in those rooms.
+    room_ids_to_states, users_to_states = yield get_interested_parties(store, states)
+
+    for room_id, states in iteritems(room_ids_to_states):
+        hosts = yield state_handler.get_current_hosts_in_room(room_id)
+        hosts_and_states.append((hosts, states))
+
+    for user_id, states in iteritems(users_to_states):
+        host = get_domain_from_id(user_id)
+        hosts_and_states.append(([host], states))
+
+    defer.returnValue(hosts_and_states)

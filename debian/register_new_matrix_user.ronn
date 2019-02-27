@@ -1,0 +1,61 @@
+register_new_matrix_user(1) -- Used to register new users with a given home server when registration has been disabled
+======================================================================================================================
+
+## SYNOPSIS
+
+`register_new_matrix_user` options...
+
+## DESCRIPTION
+
+**register_new_matrix_user** registers new users with a given home server when
+registration has been disabled. For this to work, the home server must be
+configured with the 'registration_shared_secret' option set.
+
+This accepts the user credentials like the username, password, is user an
+admin or not and registers the user onto the homeserver database. Also,
+a YAML file containing the shared secret can be provided. If not, the
+shared secret can be provided via the command line.
+
+By default it assumes the home server URL to be `https://localhost:8448`.
+This can be changed via the `server_url` command line option.
+
+## FILES
+
+A sample YAML file accepted by `register_new_matrix_user` is described below:
+
+    registration_shared_secret: "s3cr3t"
+
+## OPTIONS
+
+  * `-u`, `--user`:
+    Local part of the new user. Will prompt if omitted.
+
+  * `-p`, `--password`:
+    New password for user. Will prompt if omitted. Supplying the password
+    on the command line is not recommended. Use the STDIN instead.
+
+  * `-a`, `--admin`:
+    Register new user as an admin. Will prompt if omitted.
+
+  * `-c`, `--config`:
+    Path to server config file containing the shared secret.
+
+  * `-k`, `--shared-secret`:
+    Shared secret as defined in server config file. This is an optional
+    parameter as it can be also supplied via the YAML file.
+
+  * `server_url`:
+    URL of the home server. Defaults to 'https://localhost:8448'.
+
+## EXAMPLES
+
+    $ register_new_matrix_user -u user1 -p p@ssword -a -c config.yaml
+
+## COPYRIGHT
+
+This man page was written by Rahul De <<rahulde@swecha.net>>
+for Debian GNU/Linux distribution.
+
+## SEE ALSO
+
+synctl(1), synapse_port_db(1), hash_password(1)

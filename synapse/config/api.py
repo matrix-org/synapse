@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
-
 from synapse.api.constants import EventTypes
+
+from ._base import Config
 
 
 class ApiConfig(Config):
@@ -24,6 +24,7 @@ class ApiConfig(Config):
             EventTypes.JoinRules,
             EventTypes.CanonicalAlias,
             EventTypes.RoomAvatar,
+            EventTypes.RoomEncryption,
             EventTypes.Name,
         ])
 
@@ -32,9 +33,11 @@ class ApiConfig(Config):
         ## API Configuration ##
 
         # A list of event types that will be included in the room_invite_state
+        #
         room_invite_state_types:
             - "{JoinRules}"
             - "{CanonicalAlias}"
             - "{RoomAvatar}"
+            - "{RoomEncryption}"
             - "{Name}"
         """.format(**vars(EventTypes))

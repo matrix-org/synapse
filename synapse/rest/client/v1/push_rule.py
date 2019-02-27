@@ -16,16 +16,18 @@
 from twisted.internet import defer
 
 from synapse.api.errors import (
-    SynapseError, UnrecognizedRequestError, NotFoundError, StoreError
+    NotFoundError,
+    StoreError,
+    SynapseError,
+    UnrecognizedRequestError,
 )
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.storage.push_rule import (
-    InconsistentRuleException, RuleNotFoundException
-)
-from synapse.push.clientformat import format_push_rules_for_user
+from synapse.http.servlet import parse_json_value_from_request, parse_string
 from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
-from synapse.http.servlet import parse_json_value_from_request
+from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 class PushRuleRestServlet(ClientV1RestServlet):
@@ -40,11 +42,11 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request):
-        spec = _rule_spec_from_path(request.postpath)
+        spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
         requester = yield self.auth.get_user_by_req(request)
 
@@ -71,15 +73,15 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 content,
             )
         except InvalidRuleException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
-        before = request.args.get("before", None)
+        before = parse_string(request, "before")
         if before:
-            before = _namespaced_rule_id(spec, before[0])
+            before = _namespaced_rule_id(spec, before)
 
-        after = request.args.get("after", None)
+        after = parse_string(request, "after")
         if after:
-            after = _namespaced_rule_id(spec, after[0])
+            after = _namespaced_rule_id(spec, after)
 
         try:
             yield self.store.add_push_rule(
@@ -93,15 +95,15 @@ class PushRuleRestServlet(ClientV1RestServlet):
             )
             self.notify_user(user_id)
         except InconsistentRuleException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
         except RuleNotFoundException as e:
-            raise SynapseError(400, e.message)
+            raise SynapseError(400, str(e))
 
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
     def on_DELETE(self, request):
-        spec = _rule_spec_from_path(request.postpath)
+        spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
@@ -132,7 +134,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         rules = format_push_rules_for_user(requester.user, rules)
 
-        path = request.postpath[1:]
+        path = [x.decode('utf8') for x in request.postpath][1:]
 
         if path == []:
             # we're a reference impl: pedantry is our job.
@@ -143,8 +145,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         if path[0] == '':
             defer.returnValue((200, rules))
         elif path[0] == 'global':
-            path = path[1:]
-            result = _filter_ruleset_with_path(rules['global'], path)
+            result = _filter_ruleset_with_path(rules['global'], path[1:])
             defer.returnValue((200, result))
         else:
             raise UnrecognizedRequestError()
@@ -188,6 +189,18 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
 
 def _rule_spec_from_path(path):
+    """Turn a sequence of path components into a rule spec
+
+    Args:
+        path (sequence[unicode]): the URL path components.
+
+    Returns:
+        dict: rule spec dict, containing scope/template/rule_id entries,
+            and possibly attr.
+
+    Raises:
+        UnrecognizedRequestError if the path components cannot be parsed.
+    """
     if len(path) < 2:
         raise UnrecognizedRequestError()
     if path[0] != 'pushrules':

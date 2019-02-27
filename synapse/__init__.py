@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018-9 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,4 +17,14 @@
 """ This is a reference implementation of a Matrix home server.
 """
 
-__version__ = "0.19.3"
+try:
+    from twisted.internet import protocol
+    from twisted.internet.protocol import Factory
+    from twisted.names.dns import DNSDatagramProtocol
+    protocol.Factory.noisy = False
+    Factory.noisy = False
+    DNSDatagramProtocol.noisy = False
+except ImportError:
+    pass
+
+__version__ = "0.99.2rc1"

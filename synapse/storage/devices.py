@@ -13,21 +13,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import ujson as json
+
+from six import iteritems, itervalues
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-from ._base import SQLBaseStore
-from synapse.util.caches.descriptors import cached, cachedList, cachedInlineCallbacks
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 
+from ._base import Cache, db_to_json
 
 logger = logging.getLogger(__name__)
 
+DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES = (
+    "drop_device_list_streams_non_unique_indexes"
+)
 
-class DeviceStore(SQLBaseStore):
-    def __init__(self, hs):
-        super(DeviceStore, self).__init__(hs)
+
+class DeviceStore(BackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+        super(DeviceStore, self).__init__(db_conn, hs)
+
+        # Map of (user_id, device_id) -> bool. If there is an entry that implies
+        # the device exists.
+        self.device_id_exists_cache = Cache(
+            name="device_id_exists",
+            keylen=2,
+            max_entries=10000,
+        )
 
         self._clock.looping_call(
             self._prune_old_outbound_device_pokes, 60 * 60 * 1000
@@ -38,6 +55,30 @@ class DeviceStore(SQLBaseStore):
             index_name="device_lists_stream_user_id",
             table="device_lists_stream",
             columns=["user_id", "device_id"],
+        )
+
+        # create a unique index on device_lists_remote_cache
+        self.register_background_index_update(
+            "device_lists_remote_cache_unique_idx",
+            index_name="device_lists_remote_cache_unique_id",
+            table="device_lists_remote_cache",
+            columns=["user_id", "device_id"],
+            unique=True,
+        )
+
+        # And one on device_lists_remote_extremeties
+        self.register_background_index_update(
+            "device_lists_remote_extremeties_unique_idx",
+            index_name="device_lists_remote_extremeties_unique_idx",
+            table="device_lists_remote_extremeties",
+            columns=["user_id"],
+            unique=True,
+        )
+
+        # once they complete, we can remove the old non-unique indexes.
+        self.register_background_update_handler(
+            DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES,
+            self._drop_device_list_streams_non_unique_indexes,
         )
 
     @defer.inlineCallbacks
@@ -54,6 +95,10 @@ class DeviceStore(SQLBaseStore):
             defer.Deferred: boolean whether the device was inserted or an
                 existing device existed with that ID.
         """
+        key = (user_id, device_id)
+        if self.device_id_exists_cache.get(key, None):
+            defer.returnValue(False)
+
         try:
             inserted = yield self._simple_insert(
                 "devices",
@@ -65,6 +110,7 @@ class DeviceStore(SQLBaseStore):
                 desc="store_device",
                 or_ignore=True,
             )
+            self.device_id_exists_cache.prefill(key, True)
             defer.returnValue(inserted)
         except Exception as e:
             logger.error("store_device with device_id=%s(%r) user_id=%s(%r)"
@@ -93,6 +139,7 @@ class DeviceStore(SQLBaseStore):
             desc="get_device",
         )
 
+    @defer.inlineCallbacks
     def delete_device(self, user_id, device_id):
         """Delete a device.
 
@@ -102,12 +149,15 @@ class DeviceStore(SQLBaseStore):
         Returns:
             defer.Deferred
         """
-        return self._simple_delete_one(
+        yield self._simple_delete_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id},
             desc="delete_device",
         )
 
+        self.device_id_exists_cache.invalidate((user_id, device_id))
+
+    @defer.inlineCallbacks
     def delete_devices(self, user_id, device_ids):
         """Deletes several devices.
 
@@ -117,13 +167,15 @@ class DeviceStore(SQLBaseStore):
         Returns:
             defer.Deferred
         """
-        return self._simple_delete_many(
+        yield self._simple_delete_many(
             table="devices",
             column="device_id",
             iterable=device_ids,
             keyvalues={"user_id": user_id},
             desc="delete_devices",
         )
+        for device_id in device_ids:
+            self.device_id_exists_cache.invalidate((user_id, device_id))
 
     def update_device(self, user_id, device_id, new_display_name=None):
         """Update a device.
@@ -216,7 +268,19 @@ class DeviceStore(SQLBaseStore):
 
     def update_remote_device_list_cache_entry(self, user_id, device_id, content,
                                               stream_id):
-        """Updates a single user's device in the cache.
+        """Updates a single device in the cache of a remote user's devicelist.
+
+        Note: assumes that we are the only thread that can be updating this user's
+        device list.
+
+        Args:
+            user_id (str): User to update device list for
+            device_id (str): ID of decivice being updated
+            content (dict): new data on this device
+            stream_id (int): the version of the device list
+
+        Returns:
+            Deferred[None]
         """
         return self.runInteraction(
             "update_remote_device_list_cache_entry",
@@ -226,17 +290,35 @@ class DeviceStore(SQLBaseStore):
 
     def _update_remote_device_list_cache_entry_txn(self, txn, user_id, device_id,
                                                    content, stream_id):
-        self._simple_upsert_txn(
-            txn,
-            table="device_lists_remote_cache",
-            keyvalues={
-                "user_id": user_id,
-                "device_id": device_id,
-            },
-            values={
-                "content": json.dumps(content),
-            }
-        )
+        if content.get("deleted"):
+            self._simple_delete_txn(
+                txn,
+                table="device_lists_remote_cache",
+                keyvalues={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                },
+            )
+
+            txn.call_after(
+                self.device_id_exists_cache.invalidate, (user_id, device_id,)
+            )
+        else:
+            self._simple_upsert_txn(
+                txn,
+                table="device_lists_remote_cache",
+                keyvalues={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                },
+                values={
+                    "content": json.dumps(content),
+                },
+
+                # we don't need to lock, because we assume we are the only thread
+                # updating this user's devices.
+                lock=False,
+            )
 
         txn.call_after(self._get_cached_user_device.invalidate, (user_id, device_id,))
         txn.call_after(self._get_cached_devices_for_user.invalidate, (user_id,))
@@ -252,11 +334,26 @@ class DeviceStore(SQLBaseStore):
             },
             values={
                 "stream_id": stream_id,
-            }
+            },
+
+            # again, we can assume we are the only thread updating this user's
+            # extremity.
+            lock=False,
         )
 
     def update_remote_device_list_cache(self, user_id, devices, stream_id):
-        """Replace the cache of the remote user's devices.
+        """Replace the entire cache of the remote user's devices.
+
+        Note: assumes that we are the only thread that can be updating this user's
+        device list.
+
+        Args:
+            user_id (str): User to update device list for
+            devices (list[dict]): list of device objects supplied over federation
+            stream_id (int): the version of the device list
+
+        Returns:
+            Deferred[None]
         """
         return self.runInteraction(
             "update_remote_device_list_cache",
@@ -301,7 +398,11 @@ class DeviceStore(SQLBaseStore):
             },
             values={
                 "stream_id": stream_id,
-            }
+            },
+
+            # we don't need to lock, because we can assume we are the only thread
+            # updating this user's extremity.
+            lock=False,
         )
 
     def get_devices_by_remote(self, destination, from_stream_id):
@@ -341,26 +442,26 @@ class DeviceStore(SQLBaseStore):
             return (now_stream_id, [])
 
         if len(query_map) >= 20:
-            now_stream_id = max(stream_id for stream_id in query_map.itervalues())
+            now_stream_id = max(stream_id for stream_id in itervalues(query_map))
 
         devices = self._get_e2e_device_keys_txn(
-            txn, query_map.keys(), include_all_devices=True
+            txn, query_map.keys(), include_all_devices=True, include_deleted_devices=True
         )
 
         prev_sent_id_sql = """
             SELECT coalesce(max(stream_id), 0) as stream_id
-            FROM device_lists_outbound_pokes
+            FROM device_lists_outbound_last_success
             WHERE destination = ? AND user_id = ? AND stream_id <= ?
         """
 
         results = []
-        for user_id, user_devices in devices.iteritems():
+        for user_id, user_devices in iteritems(devices):
             # The prev_id for the first row is always the last row before
             # `from_stream_id`
             txn.execute(prev_sent_id_sql, (destination, user_id, from_stream_id))
             rows = txn.fetchall()
             prev_id = rows[0][0]
-            for device_id, device in user_devices.iteritems():
+            for device_id, device in iteritems(user_devices):
                 stream_id = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
@@ -371,12 +472,15 @@ class DeviceStore(SQLBaseStore):
 
                 prev_id = stream_id
 
-                key_json = device.get("key_json", None)
-                if key_json:
-                    result["keys"] = json.loads(key_json)
-                device_display_name = device.get("device_display_name", None)
-                if device_display_name:
-                    result["device_display_name"] = device_display_name
+                if device is not None:
+                    key_json = device.get("key_json", None)
+                    if key_json:
+                        result["keys"] = db_to_json(key_json)
+                    device_display_name = device.get("device_display_name", None)
+                    if device_display_name:
+                        result["device_display_name"] = device_display_name
+                else:
+                    result["deleted"] = True
 
                 results.append(result)
 
@@ -426,7 +530,7 @@ class DeviceStore(SQLBaseStore):
             retcol="content",
             desc="_get_cached_user_device",
         )
-        defer.returnValue(json.loads(content))
+        defer.returnValue(db_to_json(content))
 
     @cachedInlineCallbacks()
     def _get_cached_devices_for_user(self, user_id):
@@ -439,7 +543,7 @@ class DeviceStore(SQLBaseStore):
             desc="_get_cached_devices_for_user",
         )
         defer.returnValue({
-            device["device_id"]: json.loads(device["content"])
+            device["device_id"]: db_to_json(device["content"])
             for device in devices
         })
 
@@ -464,14 +568,14 @@ class DeviceStore(SQLBaseStore):
         if devices:
             user_devices = devices[user_id]
             results = []
-            for device_id, device in user_devices.iteritems():
+            for device_id, device in iteritems(user_devices):
                 result = {
                     "device_id": device_id,
                 }
 
                 key_json = device.get("key_json", None)
                 if key_json:
-                    result["keys"] = json.loads(key_json)
+                    result["keys"] = db_to_json(key_json)
                 device_display_name = device.get("device_display_name", None)
                 if device_display_name:
                     result["device_display_name"] = device_display_name
@@ -491,32 +595,43 @@ class DeviceStore(SQLBaseStore):
         )
 
     def _mark_as_sent_devices_by_remote_txn(self, txn, destination, stream_id):
-        # First we DELETE all rows such that only the latest row for each
-        # (destination, user_id is left. We do this by selecting first and
-        # deleting.
+        # We update the device_lists_outbound_last_success with the successfully
+        # poked users. We do the join to see which users need to be inserted and
+        # which updated.
         sql = """
-            SELECT user_id, coalesce(max(stream_id), 0) FROM device_lists_outbound_pokes
-            WHERE destination = ? AND stream_id <= ?
+            SELECT user_id, coalesce(max(o.stream_id), 0), (max(s.stream_id) IS NOT NULL)
+            FROM device_lists_outbound_pokes as o
+            LEFT JOIN device_lists_outbound_last_success as s
+                USING (destination, user_id)
+            WHERE destination = ? AND o.stream_id <= ?
             GROUP BY user_id
-            HAVING count(*) > 1
         """
         txn.execute(sql, (destination, stream_id,))
         rows = txn.fetchall()
 
         sql = """
-            DELETE FROM device_lists_outbound_pokes
-            WHERE destination = ? AND user_id = ? AND stream_id < ?
+            UPDATE device_lists_outbound_last_success
+            SET stream_id = ?
+            WHERE destination = ? AND user_id = ?
         """
         txn.executemany(
-            sql, ((destination, row[0], row[1],) for row in rows)
+            sql, ((row[1], destination, row[0],) for row in rows if row[2])
         )
 
-        # Mark everything that is left as sent
         sql = """
-            UPDATE device_lists_outbound_pokes SET sent = ?
+            INSERT INTO device_lists_outbound_last_success
+            (destination, user_id, stream_id) VALUES (?, ?, ?)
+        """
+        txn.executemany(
+            sql, ((destination, row[0], row[1],) for row in rows if not row[2])
+        )
+
+        # Delete all sent outbound pokes
+        sql = """
+            DELETE FROM device_lists_outbound_pokes
             WHERE destination = ? AND stream_id <= ?
         """
-        txn.execute(sql, (True, destination, stream_id,))
+        txn.execute(sql, (destination, stream_id,))
 
     @defer.inlineCallbacks
     def get_user_whose_devices_changed(self, from_key):
@@ -533,19 +648,23 @@ class DeviceStore(SQLBaseStore):
         rows = yield self._execute("get_user_whose_devices_changed", None, sql, from_key)
         defer.returnValue(set(row[0] for row in rows))
 
-    def get_all_device_list_changes_for_remotes(self, from_key):
+    def get_all_device_list_changes_for_remotes(self, from_key, to_key):
         """Return a list of `(stream_id, user_id, destination)` which is the
         combined list of changes to devices, and which destinations need to be
         poked. `destination` may be None if no destinations need to be poked.
         """
+        # We do a group by here as there can be a large number of duplicate
+        # entries, since we throw away device IDs.
         sql = """
-            SELECT stream_id, user_id, destination FROM device_lists_stream
+            SELECT MAX(stream_id) AS stream_id, user_id, destination
+            FROM device_lists_stream
             LEFT JOIN device_lists_outbound_pokes USING (stream_id, user_id, device_id)
-            WHERE stream_id > ?
+            WHERE ? < stream_id AND stream_id <= ?
+            GROUP BY user_id, destination
         """
         return self._execute(
             "get_all_device_list_changes_for_remotes", None,
-            sql, from_key,
+            sql, from_key, to_key
         )
 
     @defer.inlineCallbacks
@@ -651,8 +770,35 @@ class DeviceStore(SQLBaseStore):
                 )
             )
 
+            # Since we've deleted unsent deltas, we need to remove the entry
+            # of last successful sent so that the prev_ids are correctly set.
+            sql = """
+                DELETE FROM device_lists_outbound_last_success
+                WHERE destination = ? AND user_id = ?
+            """
+            txn.executemany(sql, ((row[0], row[1]) for row in rows))
+
             logger.info("Pruned %d device list outbound pokes", txn.rowcount)
 
-        return self.runInteraction(
-            "_prune_old_outbound_device_pokes", _prune_txn
+        return run_as_background_process(
+            "prune_old_outbound_device_pokes",
+            self.runInteraction,
+            "_prune_old_outbound_device_pokes",
+            _prune_txn,
         )
+
+    @defer.inlineCallbacks
+    def _drop_device_list_streams_non_unique_indexes(self, progress, batch_size):
+        def f(conn):
+            txn = conn.cursor()
+            txn.execute(
+                "DROP INDEX IF EXISTS device_lists_remote_cache_id"
+            )
+            txn.execute(
+                "DROP INDEX IF EXISTS device_lists_remote_extremeties_id"
+            )
+            txn.close()
+
+        yield self.runWithConnection(f)
+        yield self._end_background_update(DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES)
+        defer.returnValue(1)

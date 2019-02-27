@@ -1,19 +1,27 @@
 Using Postgres
 --------------
 
+Postgres version 9.4 or later is known to work.
+
 Set up database
 ===============
 
-The PostgreSQL database used *must* have the correct encoding set, otherwise
+Assuming your PostgreSQL database user is called ``postgres``, create a user
+``synapse_user`` with::
+
+   su - postgres
+   createuser --pwprompt synapse_user
+
+The PostgreSQL database used *must* have the correct encoding set, otherwise it
 would not be able to store UTF8 strings. To create a database with the correct
 encoding use, e.g.::
 
- CREATE DATABASE synapse
-  ENCODING 'UTF8'
-  LC_COLLATE='C'
-  LC_CTYPE='C'
-  template=template0
-  OWNER synapse_user;
+   CREATE DATABASE synapse
+    ENCODING 'UTF8'
+    LC_COLLATE='C'
+    LC_CTYPE='C'
+    template=template0
+    OWNER synapse_user;
 
 This would create an appropriate database named ``synapse`` owned by the
 ``synapse_user`` user (which must already exist).
@@ -44,8 +52,8 @@ As with Debian/Ubuntu, postgres support depends on the postgres python connector
 Synapse config
 ==============
 
-When you are ready to start using PostgreSQL, add the following line to your
-config file::
+When you are ready to start using PostgreSQL, edit the ``database`` section in
+your config file to match the following lines::
 
     database:
         name: psycopg2
@@ -94,9 +102,12 @@ complete, restart synapse.  For instance::
     cp homeserver.db homeserver.db.snapshot
     ./synctl start
 
-Assuming your new config file (as described in the section *Synapse config*)
-is named ``homeserver-postgres.yaml`` and the SQLite snapshot is at
-``homeserver.db.snapshot`` then simply run::
+Copy the old config file into a new config file::
+
+    cp homeserver.yaml homeserver-postgres.yaml
+
+Edit the database section as described in the section *Synapse config* above
+and with the SQLite snapshot located at ``homeserver.db.snapshot`` simply run::
 
     synapse_port_db --sqlite-database homeserver.db.snapshot \
         --postgres-config homeserver-postgres.yaml
@@ -115,6 +126,11 @@ run::
         --postgres-config homeserver-postgres.yaml
 
 Once that has completed, change the synapse config to point at the PostgreSQL
-database configuration file ``homeserver-postgres.yaml`` (i.e. rename it to 
-``homeserver.yaml``) and restart synapse. Synapse should now be running against
-PostgreSQL.
+database configuration file ``homeserver-postgres.yaml``::
+
+    ./synctl stop
+    mv homeserver.yaml homeserver-old-sqlite.yaml 
+    mv homeserver-postgres.yaml homeserver.yaml 
+    ./synctl start
+
+Synapse should now be running against PostgreSQL.

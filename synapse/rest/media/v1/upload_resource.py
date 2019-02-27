@@ -13,16 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import respond_with_json, request_handler
+import logging
+
+from twisted.internet import defer
+from twisted.web.resource import Resource
+from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import SynapseError
-
-from twisted.web.server import NOT_DONE_YET
-from twisted.internet import defer
-
-from twisted.web.resource import Resource
-
-import logging
+from synapse.http.server import respond_with_json, wrap_json_request_handler
+from synapse.http.servlet import parse_string
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,6 @@ class UploadResource(Resource):
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
         self.max_upload_size = hs.config.max_upload_size
-        self.version_string = hs.version_string
         self.clock = hs.get_clock()
 
     def render_POST(self, request):
@@ -51,13 +49,13 @@ class UploadResource(Resource):
         respond_with_json(request, 200, {}, send_cors=True)
         return NOT_DONE_YET
 
-    @request_handler()
+    @wrap_json_request_handler
     @defer.inlineCallbacks
     def _async_render_POST(self, request):
         requester = yield self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
-        content_length = request.getHeader("Content-Length")
+        content_length = request.getHeader(b"Content-Length").decode('ascii')
         if content_length is None:
             raise SynapseError(
                 msg="Request must specify a Content-Length", code=400
@@ -68,10 +66,10 @@ class UploadResource(Resource):
                 code=413,
             )
 
-        upload_name = request.args.get("filename", None)
+        upload_name = parse_string(request, b"filename", encoding=None)
         if upload_name:
             try:
-                upload_name = upload_name[0].decode('UTF-8')
+                upload_name = upload_name.decode('utf8')
             except UnicodeDecodeError:
                 raise SynapseError(
                     msg="Invalid UTF-8 filename parameter: %r" % (upload_name),
@@ -80,20 +78,20 @@ class UploadResource(Resource):
 
         headers = request.requestHeaders
 
-        if headers.hasHeader("Content-Type"):
-            media_type = headers.getRawHeaders("Content-Type")[0]
+        if headers.hasHeader(b"Content-Type"):
+            media_type = headers.getRawHeaders(b"Content-Type")[0].decode('ascii')
         else:
             raise SynapseError(
                 msg="Upload request missing 'Content-Type'",
                 code=400,
             )
 
-        # if headers.hasHeader("Content-Disposition"):
-        #     disposition = headers.getRawHeaders("Content-Disposition")[0]
+        # if headers.hasHeader(b"Content-Disposition"):
+        #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]
         # TODO(markjh): parse content-dispostion
 
         content_uri = yield self.media_repo.create_content(
-            media_type, upload_name, request.content.read(),
+            media_type, upload_name, request.content,
             content_length, requester.user
         )
 

@@ -12,16 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from ._base import BaseHandler
+import logging
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import PreserveLoggingContext
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
 
-import logging
-
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +32,7 @@ class ReceiptsHandler(BaseHandler):
         self.store = hs.get_datastore()
         self.hs = hs
         self.federation = hs.get_federation_sender()
-        hs.get_replication_layer().register_edu_handler(
+        hs.get_federation_registry().register_edu_handler(
             "m.receipt", self._received_remote_receipt
         )
         self.clock = self.hs.get_clock()
@@ -59,7 +57,11 @@ class ReceiptsHandler(BaseHandler):
         is_new = yield self._handle_new_receipts([receipt])
 
         if is_new:
-            self._push_remotes([receipt])
+            # fire off a process in the background to send the receipt to
+            # remote servers
+            run_as_background_process(
+                'push_receipts_to_remotes', self._push_remotes, receipt
+            )
 
     @defer.inlineCallbacks
     def _received_remote_receipt(self, origin, content):
@@ -115,24 +117,23 @@ class ReceiptsHandler(BaseHandler):
 
         affected_room_ids = list(set([r["room_id"] for r in receipts]))
 
-        with PreserveLoggingContext():
-            self.notifier.on_new_event(
-                "receipt_key", max_batch_id, rooms=affected_room_ids
-            )
-            # Note that the min here shouldn't be relied upon to be accurate.
-            self.hs.get_pusherpool().on_new_receipts(
-                min_batch_id, max_batch_id, affected_room_ids
-            )
+        self.notifier.on_new_event(
+            "receipt_key", max_batch_id, rooms=affected_room_ids
+        )
+        # Note that the min here shouldn't be relied upon to be accurate.
+        yield self.hs.get_pusherpool().on_new_receipts(
+            min_batch_id, max_batch_id, affected_room_ids,
+        )
 
-            defer.returnValue(True)
+        defer.returnValue(True)
 
     @defer.inlineCallbacks
-    def _push_remotes(self, receipts):
-        """Given a list of receipts, works out which remote servers should be
+    def _push_remotes(self, receipt):
+        """Given a receipt, works out which remote servers should be
         poked and pokes them.
         """
-        # TODO: Some of this stuff should be coallesced.
-        for receipt in receipts:
+        try:
+            # TODO: optimise this to move some of the work to the workers.
             room_id = receipt["room_id"]
             receipt_type = receipt["receipt_type"]
             user_id = receipt["user_id"]
@@ -162,6 +163,8 @@ class ReceiptsHandler(BaseHandler):
                     },
                     key=(room_id, receipt_type, user_id),
                 )
+        except Exception:
+            logger.exception("Error pushing receipts to remote servers")
 
     @defer.inlineCallbacks
     def get_receipts_for_room(self, room_id, to_key):

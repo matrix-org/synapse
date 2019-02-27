@@ -14,14 +14,14 @@
 # limitations under the License.
 
 import logging
-import ujson
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
-from .background_updates import BackgroundUpdateStore
-
 from synapse.util.caches.expiringcache import ExpiringCache
 
+from .background_updates import BackgroundUpdateStore
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 class DeviceInboxStore(BackgroundUpdateStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
 
-    def __init__(self, hs):
-        super(DeviceInboxStore, self).__init__(hs)
+    def __init__(self, db_conn, hs):
+        super(DeviceInboxStore, self).__init__(db_conn, hs)
 
         self.register_background_index_update(
             "device_inbox_stream_index",
@@ -85,7 +85,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
             )
             rows = []
             for destination, edu in remote_messages_by_destination.items():
-                edu_json = ujson.dumps(edu)
+                edu_json = json.dumps(edu)
                 rows.append((destination, stream_id, now_ms, edu_json))
             txn.executemany(sql, rows)
 
@@ -169,7 +169,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
             messages_json_for_user = {}
-            devices = messages_by_device.keys()
+            devices = list(messages_by_device.keys())
             if len(devices) == 1 and devices[0] == "*":
                 # Handle wildcard device_ids.
                 sql = (
@@ -177,7 +177,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
                     " WHERE user_id = ?"
                 )
                 txn.execute(sql, (user_id,))
-                message_json = ujson.dumps(messages_by_device["*"])
+                message_json = json.dumps(messages_by_device["*"])
                 for row in txn:
                     # Add the message for all devices for this user on this
                     # server.
@@ -199,7 +199,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
                     # Only insert into the local inbox if the device exists on
                     # this server
                     device = row[0]
-                    message_json = ujson.dumps(messages_by_device[device])
+                    message_json = json.dumps(messages_by_device[device])
                     messages_json_for_user[device] = message_json
 
             if messages_json_for_user:
@@ -253,7 +253,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
             messages = []
             for row in txn:
                 stream_pos = row[0]
-                messages.append(ujson.loads(row[1]))
+                messages.append(json.loads(row[1]))
             if len(messages) < limit:
                 stream_pos = current_stream_id
             return (messages, stream_pos)
@@ -325,22 +325,25 @@ class DeviceInboxStore(BackgroundUpdateStore):
             # we return.
             upper_pos = min(current_pos, last_pos + limit)
             sql = (
-                "SELECT stream_id, user_id"
+                "SELECT max(stream_id), user_id"
                 " FROM device_inbox"
                 " WHERE ? < stream_id AND stream_id <= ?"
-                " ORDER BY stream_id ASC"
+                " GROUP BY user_id"
             )
             txn.execute(sql, (last_pos, upper_pos))
             rows = txn.fetchall()
 
             sql = (
-                "SELECT stream_id, destination"
+                "SELECT max(stream_id), destination"
                 " FROM device_federation_outbox"
                 " WHERE ? < stream_id AND stream_id <= ?"
-                " ORDER BY stream_id ASC"
+                " GROUP BY destination"
             )
             txn.execute(sql, (last_pos, upper_pos))
             rows.extend(txn)
+
+            # Order by ascending stream ordering
+            rows.sort()
 
             return rows
 
@@ -386,7 +389,7 @@ class DeviceInboxStore(BackgroundUpdateStore):
             messages = []
             for row in txn:
                 stream_pos = row[0]
-                messages.append(ujson.loads(row[1]))
+                messages.append(json.loads(row[1]))
             if len(messages) < limit:
                 stream_pos = current_stream_id
             return (messages, stream_pos)

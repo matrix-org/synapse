@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
-from ._slaved_id_tracker import SlavedIdTracker
 from synapse.storage import DataStore
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.caches.stream_change_cache import StreamChangeCache
+
+from ._base import BaseSlavedStore, __func__
+from ._slaved_id_tracker import SlavedIdTracker
 
 
 class SlavedDeviceInboxStore(BaseSlavedStore):
@@ -42,32 +43,29 @@ class SlavedDeviceInboxStore(BaseSlavedStore):
             expiry_ms=30 * 60 * 1000,
         )
 
-    get_to_device_stream_token = DataStore.get_to_device_stream_token.__func__
-    get_new_messages_for_device = DataStore.get_new_messages_for_device.__func__
-    get_new_device_msgs_for_remote = DataStore.get_new_device_msgs_for_remote.__func__
-    delete_messages_for_device = DataStore.delete_messages_for_device.__func__
-    delete_device_msgs_for_remote = DataStore.delete_device_msgs_for_remote.__func__
+    get_to_device_stream_token = __func__(DataStore.get_to_device_stream_token)
+    get_new_messages_for_device = __func__(DataStore.get_new_messages_for_device)
+    get_new_device_msgs_for_remote = __func__(DataStore.get_new_device_msgs_for_remote)
+    delete_messages_for_device = __func__(DataStore.delete_messages_for_device)
+    delete_device_msgs_for_remote = __func__(DataStore.delete_device_msgs_for_remote)
 
     def stream_positions(self):
         result = super(SlavedDeviceInboxStore, self).stream_positions()
         result["to_device"] = self._device_inbox_id_gen.get_current_token()
         return result
 
-    def process_replication(self, result):
-        stream = result.get("to_device")
-        if stream:
-            self._device_inbox_id_gen.advance(int(stream["position"]))
-            for row in stream["rows"]:
-                stream_id = row[0]
-                entity = row[1]
-
-                if entity.startswith("@"):
+    def process_replication_rows(self, stream_name, token, rows):
+        if stream_name == "to_device":
+            self._device_inbox_id_gen.advance(token)
+            for row in rows:
+                if row.entity.startswith("@"):
                     self._device_inbox_stream_cache.entity_has_changed(
-                        entity, stream_id
+                        row.entity, token
                     )
                 else:
                     self._device_federation_outbox_stream_cache.entity_has_changed(
-                        entity, stream_id
+                        row.entity, token
                     )
-
-        return super(SlavedDeviceInboxStore, self).process_replication(result)
+        return super(SlavedDeviceInboxStore, self).process_replication_rows(
+            stream_name, token, rows
+        )

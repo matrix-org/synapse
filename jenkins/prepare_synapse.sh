@@ -1,5 +1,7 @@
 #! /bin/bash
 
+set -eux
+
 cd "`dirname $0`/.."
 
 TOX_DIR=$WORKSPACE/.tox
@@ -12,9 +14,3 @@ fi
 
 # set up the virtualenv
 tox -e py27 --notest -v
-
-TOX_BIN=$TOX_DIR/py27/bin
-$TOX_BIN/pip install setuptools
-{ python synapse/python_dependencies.py
-  echo lxml psycopg2
-} | xargs $TOX_BIN/pip install

@@ -13,34 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from collections import namedtuple
+
+from prometheus_client import Counter
+
 from twisted.internet import defer
+
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 from synapse.handlers.presence import format_user_presence_state
-
-from synapse.util import DeferredTimedOutError
-from synapse.util.logutils import log_function
-from synapse.util.async import ObservableDeferred
-from synapse.util.logcontext import PreserveLoggingContext, preserve_fn
-from synapse.util.metrics import Measure
+from synapse.metrics import LaterGauge
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import StreamToken
+from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
+from synapse.util.logcontext import PreserveLoggingContext
+from synapse.util.logutils import log_function
+from synapse.util.metrics import Measure
 from synapse.visibility import filter_events_for_client
-import synapse.metrics
-
-from collections import namedtuple
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
-metrics = synapse.metrics.get_metrics_for(__name__)
+notified_events_counter = Counter("synapse_notifier_notified_events", "")
 
-notified_events_counter = metrics.register_counter("notified_events")
-
-users_woken_by_stream_counter = metrics.register_counter(
-    "users_woken_by_stream", labels=["stream"]
-)
+users_woken_by_stream_counter = Counter(
+    "synapse_notifier_users_woken_by_stream", "", ["stream"])
 
 
 # TODO(paul): Should be shared somewhere
@@ -105,7 +102,7 @@ class _NotifierUserStream(object):
         self.last_notified_ms = time_now_ms
         noify_deferred = self.notify_deferred
 
-        users_woken_by_stream_counter.inc(stream_key)
+        users_woken_by_stream_counter.labels(stream_key).inc()
 
         with PreserveLoggingContext():
             self.notify_deferred = ObservableDeferred(defer.Deferred())
@@ -144,6 +141,7 @@ class _NotifierUserStream(object):
 class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
     def __nonzero__(self):
         return bool(self.events)
+    __bool__ = __nonzero__  # python3
 
 
 class Notifier(object):
@@ -159,9 +157,12 @@ class Notifier(object):
         self.user_to_user_stream = {}
         self.room_to_user_streams = {}
 
+        self.hs = hs
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
         self.pending_new_room_events = []
+
+        self.replication_callbacks = []
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
@@ -185,24 +186,29 @@ class Notifier(object):
         def count_listeners():
             all_user_streams = set()
 
-            for x in self.room_to_user_streams.values():
+            for x in list(self.room_to_user_streams.values()):
                 all_user_streams |= x
-            for x in self.user_to_user_stream.values():
+            for x in list(self.user_to_user_stream.values()):
                 all_user_streams.add(x)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
-        metrics.register_callback("listeners", count_listeners)
+        LaterGauge("synapse_notifier_listeners", "", [], count_listeners)
 
-        metrics.register_callback(
-            "rooms",
-            lambda: count(bool, self.room_to_user_streams.values()),
+        LaterGauge(
+            "synapse_notifier_rooms", "", [],
+            lambda: count(bool, list(self.room_to_user_streams.values())),
         )
-        metrics.register_callback(
-            "users",
+        LaterGauge(
+            "synapse_notifier_users", "", [],
             lambda: len(self.user_to_user_stream),
         )
 
-    @preserve_fn
+    def add_replication_callback(self, cb):
+        """Add a callback that will be called when some new data is available.
+        Callback is not given any arguments.
+        """
+        self.replication_callbacks.append(cb)
+
     def on_new_room_event(self, event, room_stream_id, max_room_stream_id,
                           extra_users=[]):
         """ Used by handlers to inform the notifier something has happened
@@ -216,15 +222,13 @@ class Notifier(object):
         until all previous events have been persisted before notifying
         the client streams.
         """
-        with PreserveLoggingContext():
-            self.pending_new_room_events.append((
-                room_stream_id, event, extra_users
-            ))
-            self._notify_pending_new_room_events(max_room_stream_id)
+        self.pending_new_room_events.append((
+            room_stream_id, event, extra_users
+        ))
+        self._notify_pending_new_room_events(max_room_stream_id)
 
-            self.notify_replication()
+        self.notify_replication()
 
-    @preserve_fn
     def _notify_pending_new_room_events(self, max_room_stream_id):
         """Notify for the room events that were queued waiting for a previous
         event to be persisted.
@@ -242,11 +246,13 @@ class Notifier(object):
             else:
                 self._on_new_room_event(event, room_stream_id, extra_users)
 
-    @preserve_fn
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
-        self.appservice_handler.notify_interested_services(room_stream_id)
+        run_as_background_process(
+            "notify_app_services",
+            self._notify_app_services, room_stream_id,
+        )
 
         if self.federation_sender:
             self.federation_sender.notify_new_events(room_stream_id)
@@ -260,9 +266,15 @@ class Notifier(object):
             rooms=[event.room_id],
         )
 
-    @preserve_fn
+    @defer.inlineCallbacks
+    def _notify_app_services(self, room_stream_id):
+        try:
+            yield self.appservice_handler.notify_interested_services(room_stream_id)
+        except Exception:
+            logger.exception("Error notifying application services of event")
+
     def on_new_event(self, stream_key, new_token, users=[], rooms=[]):
-        """ Used to inform listeners that something has happend event wise.
+        """ Used to inform listeners that something has happened event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
@@ -282,17 +294,15 @@ class Notifier(object):
                 for user_stream in user_streams:
                     try:
                         user_stream.notify(stream_key, new_token, time_now_ms)
-                    except:
+                    except Exception:
                         logger.exception("Failed to notify listener")
 
                 self.notify_replication()
 
-    @preserve_fn
     def on_new_replication_data(self):
         """Used to inform replication listeners that something has happend
         without waking up any of the normal user event streams"""
-        with PreserveLoggingContext():
-            self.notify_replication()
+        self.notify_replication()
 
     @defer.inlineCallbacks
     def wait_for_events(self, user_id, timeout, callback, room_ids=None,
@@ -327,11 +337,13 @@ class Notifier(object):
                     # Now we wait for the _NotifierUserStream to be told there
                     # is a new token.
                     listener = user_stream.new_listener(prev_token)
+                    listener.deferred = timeout_deferred(
+                        listener.deferred,
+                        (end_time - now) / 1000.,
+                        self.hs.get_reactor(),
+                    )
                     with PreserveLoggingContext():
-                        yield self.clock.time_bound_deferred(
-                            listener.deferred,
-                            time_out=(end_time - now) / 1000.
-                        )
+                        yield listener.deferred
 
                     current_token = user_stream.current_token
 
@@ -342,7 +354,7 @@ class Notifier(object):
                     # Update the prev_token to the current_token since nothing
                     # has happened between the old prev_token and the current_token
                     prev_token = current_token
-                except DeferredTimedOutError:
+                except defer.TimeoutError:
                     break
                 except defer.CancelledError:
                     break
@@ -510,6 +522,15 @@ class Notifier(object):
             self.replication_deferred = ObservableDeferred(defer.Deferred())
             deferred.callback(None)
 
+            # the callbacks may well outlast the current request, so we run
+            # them in the sentinel logcontext.
+            #
+            # (ideally it would be up to the callbacks to know if they were
+            # starting off background processes and drop the logcontext
+            # accordingly, but that requires more changes)
+            for cb in self.replication_callbacks:
+                cb()
+
     @defer.inlineCallbacks
     def wait_for_replication(self, callback, timeout):
         """Wait for an event to happen.
@@ -538,13 +559,16 @@ class Notifier(object):
             if end_time <= now:
                 break
 
+            listener.deferred = timeout_deferred(
+                listener.deferred,
+                timeout=(end_time - now) / 1000.,
+                reactor=self.hs.get_reactor(),
+            )
+
             try:
                 with PreserveLoggingContext():
-                    yield self.clock.time_bound_deferred(
-                        listener.deferred,
-                        time_out=(end_time - now) / 1000.
-                    )
-            except DeferredTimedOutError:
+                    yield listener.deferred
+            except defer.TimeoutError:
                 break
             except defer.CancelledError:
                 break

@@ -25,3 +25,10 @@ CREATE TABLE IF NOT EXISTS applied_schema_deltas(
     file TEXT NOT NULL,
     UNIQUE(version, file)
 );
+
+-- a list of schema files we have loaded on behalf of dynamic modules
+CREATE TABLE IF NOT EXISTS applied_module_schemas(
+    module_name TEXT NOT NULL,
+    file TEXT NOT NULL,
+    UNIQUE(module_name, file)
+);

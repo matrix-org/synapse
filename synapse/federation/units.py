@@ -17,10 +17,9 @@
 server protocol.
 """
 
-from synapse.util.jsonobject import JsonEncodedObject
-
 import logging
 
+from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +73,6 @@ class Transaction(JsonEncodedObject):
         "previous_ids",
         "pdus",
         "edus",
-        "transaction_id",
-        "destination",
-        "pdu_failures",
     ]
 
     internal_keys = [
@@ -120,9 +116,6 @@ class Transaction(JsonEncodedObject):
             raise KeyError(
                 "Require 'transaction_id' to construct a Transaction"
             )
-
-        for p in pdus:
-            p.transaction_id = kwargs["transaction_id"]
 
         kwargs["pdus"] = [p.get_pdu_json() for p in pdus]
 

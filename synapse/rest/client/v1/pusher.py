@@ -13,19 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
-from synapse.push import PusherConfigException
-from synapse.http.servlet import (
-    parse_json_object_from_request, parse_string, RestServlet
-)
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.http.server import finish_request
-from synapse.api.errors import StoreError
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.push import PusherConfigException
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ class PushersRestServlet(ClientV1RestServlet):
         ]
 
         for p in pushers:
-            for k, v in p.items():
+            for k, v in list(p.items()):
                 if k not in allowed_keys:
                     del p[k]
 
@@ -73,6 +75,7 @@ class PushersSetRestServlet(ClientV1RestServlet):
     def __init__(self, hs):
         super(PushersSetRestServlet, self).__init__(hs)
         self.notifier = hs.get_notifier()
+        self.pusher_pool = self.hs.get_pusherpool()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -81,25 +84,19 @@ class PushersSetRestServlet(ClientV1RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        pusher_pool = self.hs.get_pusherpool()
-
         if ('pushkey' in content and 'app_id' in content
                 and 'kind' in content and
                 content['kind'] is None):
-            yield pusher_pool.remove_pusher(
+            yield self.pusher_pool.remove_pusher(
                 content['app_id'], content['pushkey'], user_id=user.to_string()
             )
             defer.returnValue((200, {}))
 
-        reqd = ['kind', 'app_id', 'app_display_name',
-                'device_display_name', 'pushkey', 'lang', 'data']
-        missing = []
-        for i in reqd:
-            if i not in content:
-                missing.append(i)
-        if len(missing):
-            raise SynapseError(400, "Missing parameters: " + ','.join(missing),
-                               errcode=Codes.MISSING_PARAM)
+        assert_params_in_dict(
+            content,
+            ['kind', 'app_id', 'app_display_name',
+             'device_display_name', 'pushkey', 'lang', 'data']
+        )
 
         logger.debug("set pushkey %s to kind %s", content['pushkey'], content['kind'])
         logger.debug("Got pushers request with body: %r", content)
@@ -109,14 +106,14 @@ class PushersSetRestServlet(ClientV1RestServlet):
             append = content['append']
 
         if not append:
-            yield pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
+            yield self.pusher_pool.remove_pushers_by_app_id_and_pushkey_not_user(
                 app_id=content['app_id'],
                 pushkey=content['pushkey'],
                 not_user_id=user.to_string()
             )
 
         try:
-            yield pusher_pool.add_pusher(
+            yield self.pusher_pool.add_pusher(
                 user_id=user.to_string(),
                 access_token=requester.access_token_id,
                 kind=content['kind'],
@@ -129,7 +126,7 @@ class PushersSetRestServlet(ClientV1RestServlet):
                 profile_tag=content.get('profile_tag', ""),
             )
         except PusherConfigException as pce:
-            raise SynapseError(400, "Config Error: " + pce.message,
+            raise SynapseError(400, "Config Error: " + str(pce),
                                errcode=Codes.MISSING_PARAM)
 
         self.notifier.on_new_replication_data()
@@ -145,13 +142,14 @@ class PushersRemoveRestServlet(RestServlet):
     To allow pusher to be delete by clicking a link (ie. GET request)
     """
     PATTERNS = client_path_patterns("/pushers/remove$")
-    SUCCESS_HTML = "<html><body>You have been unsubscribed</body><html>"
+    SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):
-        super(RestServlet, self).__init__()
+        super(PushersRemoveRestServlet, self).__init__()
         self.hs = hs
         self.notifier = hs.get_notifier()
-        self.auth = hs.get_v1auth()
+        self.auth = hs.get_auth()
+        self.pusher_pool = self.hs.get_pusherpool()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -161,10 +159,8 @@ class PushersRemoveRestServlet(RestServlet):
         app_id = parse_string(request, "app_id", required=True)
         pushkey = parse_string(request, "pushkey", required=True)
 
-        pusher_pool = self.hs.get_pusherpool()
-
         try:
-            yield pusher_pool.remove_pusher(
+            yield self.pusher_pool.remove_pusher(
                 app_id=app_id,
                 pushkey=pushkey,
                 user_id=user.to_string(),
@@ -178,7 +174,6 @@ class PushersRemoveRestServlet(RestServlet):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Server", self.hs.version_string)
         request.setHeader(b"Content-Length", b"%d" % (
             len(PushersRemoveRestServlet.SUCCESS_HTML),
         ))

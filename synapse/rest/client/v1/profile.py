@@ -16,9 +16,10 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.types import UserID
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
@@ -26,13 +27,13 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(ProfileDisplaynameRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.profile_handler = hs.get_profile_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         user = UserID.from_string(user_id)
 
-        displayname = yield self.handlers.profile_handler.get_displayname(
+        displayname = yield self.profile_handler.get_displayname(
             user,
         )
 
@@ -52,10 +53,10 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
         try:
             new_name = content["displayname"]
-        except:
+        except Exception:
             defer.returnValue((400, "Unable to parse name"))
 
-        yield self.handlers.profile_handler.set_displayname(
+        yield self.profile_handler.set_displayname(
             user, requester, new_name, is_admin)
 
         defer.returnValue((200, {}))
@@ -69,13 +70,13 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(ProfileAvatarURLRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.profile_handler = hs.get_profile_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         user = UserID.from_string(user_id)
 
-        avatar_url = yield self.handlers.profile_handler.get_avatar_url(
+        avatar_url = yield self.profile_handler.get_avatar_url(
             user,
         )
 
@@ -94,10 +95,10 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         content = parse_json_object_from_request(request)
         try:
             new_name = content["avatar_url"]
-        except:
+        except Exception:
             defer.returnValue((400, "Unable to parse name"))
 
-        yield self.handlers.profile_handler.set_avatar_url(
+        yield self.profile_handler.set_avatar_url(
             user, requester, new_name, is_admin)
 
         defer.returnValue((200, {}))
@@ -111,16 +112,16 @@ class ProfileRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         super(ProfileRestServlet, self).__init__(hs)
-        self.handlers = hs.get_handlers()
+        self.profile_handler = hs.get_profile_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         user = UserID.from_string(user_id)
 
-        displayname = yield self.handlers.profile_handler.get_displayname(
+        displayname = yield self.profile_handler.get_displayname(
             user,
         )
-        avatar_url = yield self.handlers.profile_handler.get_avatar_url(
+        avatar_url = yield self.profile_handler.get_avatar_url(
             user,
         )
 

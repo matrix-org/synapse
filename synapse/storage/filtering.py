@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from canonicaljson import encode_canonical_json
+
 from twisted.internet import defer
 
-from ._base import SQLBaseStore
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
-import simplejson as json
+from ._base import SQLBaseStore, db_to_json
 
 
 class FilteringStore(SQLBaseStore):
@@ -43,14 +44,23 @@ class FilteringStore(SQLBaseStore):
             desc="get_user_filter",
         )
 
-        defer.returnValue(json.loads(str(def_json).decode("utf-8")))
+        defer.returnValue(db_to_json(def_json))
 
     def add_user_filter(self, user_localpart, user_filter):
-        def_json = json.dumps(user_filter).encode("utf-8")
+        def_json = encode_canonical_json(user_filter)
 
         # Need an atomic transaction to SELECT the maximal ID so far then
         # INSERT a new one
         def _do_txn(txn):
+            sql = (
+                "SELECT filter_id FROM user_filters "
+                "WHERE user_id = ? AND filter_json = ?"
+            )
+            txn.execute(sql, (user_localpart, def_json))
+            filter_id_response = txn.fetchone()
+            if filter_id_response is not None:
+                return filter_id_response[0]
+
             sql = (
                 "SELECT MAX(filter_id) FROM user_filters "
                 "WHERE user_id = ?"

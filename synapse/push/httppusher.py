@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +13,44 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 
-from synapse.push import PusherConfigException
+import six
 
-from twisted.internet import defer, reactor
+from prometheus_client import Counter
+
+from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
-import logging
-import push_rule_evaluator
-import push_tools
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.push import PusherConfigException
 
-from synapse.util.logcontext import LoggingContext
-from synapse.util.metrics import Measure
+from . import push_rule_evaluator, push_tools
+
+if six.PY3:
+    long = int
 
 logger = logging.getLogger(__name__)
+
+http_push_processed_counter = Counter(
+    "synapse_http_httppusher_http_pushes_processed",
+    "Number of push notifications successfully sent",
+)
+
+http_push_failed_counter = Counter(
+    "synapse_http_httppusher_http_pushes_failed",
+    "Number of push notifications which failed",
+)
+
+http_badges_processed_counter = Counter(
+    "synapse_http_httppusher_badge_updates_processed",
+    "Number of badge updates successfully sent",
+)
+
+http_badges_failed_counter = Counter(
+    "synapse_http_httppusher_badge_updates_failed",
+    "Number of badge updates which failed",
+)
 
 
 class HttpPusher(object):
@@ -51,7 +76,7 @@ class HttpPusher(object):
         self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
         self.failing_since = pusherdict['failing_since']
         self.timed_call = None
-        self.processing = False
+        self._is_processing = False
 
         # This is the highest stream ordering we know it's safe to process.
         # When new events arrive, we'll be given a window of new events: we
@@ -72,6 +97,11 @@ class HttpPusher(object):
             pusherdict['pushkey'],
         )
 
+        if self.data is None:
+            raise PusherConfigException(
+                "data can not be null for HTTP pusher"
+            )
+
         if 'url' not in self.data:
             raise PusherConfigException(
                 "'url' required in data for HTTP pusher"
@@ -82,31 +112,27 @@ class HttpPusher(object):
         self.data_minus_url.update(self.data)
         del self.data_minus_url['url']
 
-    @defer.inlineCallbacks
     def on_started(self):
-        yield self._process()
+        self._start_processing()
 
-    @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
-        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering)
-        yield self._process()
+        self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering or 0)
+        self._start_processing()
 
-    @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id):
         # Note that the min here shouldn't be relied upon to be accurate.
 
         # We could check the receipts are actually m.read receipts here,
         # but currently that's the only type of receipt anyway...
-        with LoggingContext("push.on_new_receipts"):
-            with Measure(self.clock, "push.on_new_receipts"):
-                badge = yield push_tools.get_badge_count(
-                    self.hs.get_datastore(), self.user_id
-                )
-            yield self._send_badge(badge)
+        run_as_background_process("http_pusher.on_new_receipts", self._update_badge)
 
     @defer.inlineCallbacks
+    def _update_badge(self):
+        badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
+        yield self._send_badge(badge)
+
     def on_timer(self):
-        yield self._process()
+        self._start_processing()
 
     def on_stop(self):
         if self.timed_call:
@@ -116,27 +142,31 @@ class HttpPusher(object):
                 pass
             self.timed_call = None
 
-    @defer.inlineCallbacks
-    def _process(self):
-        if self.processing:
+    def _start_processing(self):
+        if self._is_processing:
             return
 
-        with LoggingContext("push._process"):
-            with Measure(self.clock, "push._process"):
+        run_as_background_process("httppush.process", self._process)
+
+    @defer.inlineCallbacks
+    def _process(self):
+        # we should never get here if we are already processing
+        assert not self._is_processing
+
+        try:
+            self._is_processing = True
+            # if the max ordering changes while we're running _unsafe_process,
+            # call it again, and so on until we've caught up.
+            while True:
+                starting_max_ordering = self.max_stream_ordering
                 try:
-                    self.processing = True
-                    # if the max ordering changes while we're running _unsafe_process,
-                    # call it again, and so on until we've caught up.
-                    while True:
-                        starting_max_ordering = self.max_stream_ordering
-                        try:
-                            yield self._unsafe_process()
-                        except:
-                            logger.exception("Exception processing notifs")
-                        if self.max_stream_ordering == starting_max_ordering:
-                            break
-                finally:
-                    self.processing = False
+                    yield self._unsafe_process()
+                except Exception:
+                    logger.exception("Exception processing notifs")
+                if self.max_stream_ordering == starting_max_ordering:
+                    break
+        finally:
+            self._is_processing = False
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
@@ -151,9 +181,16 @@ class HttpPusher(object):
             self.user_id, self.last_stream_ordering, self.max_stream_ordering
         )
 
+        logger.info(
+            "Processing %i unprocessed push actions for %s starting at "
+            "stream_ordering %s",
+            len(unprocessed), self.name, self.last_stream_ordering,
+        )
+
         for push_action in unprocessed:
             processed = yield self._process_one(push_action)
             if processed:
+                http_push_processed_counter.inc()
                 self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
                 self.last_stream_ordering = push_action['stream_ordering']
                 yield self.store.update_pusher_last_stream_ordering_and_success(
@@ -168,6 +205,7 @@ class HttpPusher(object):
                         self.failing_since
                     )
             else:
+                http_push_failed_counter.inc()
                 if not self.failing_since:
                     self.failing_since = self.clock.time_msec()
                     yield self.store.update_pusher_failing_since(
@@ -204,7 +242,9 @@ class HttpPusher(object):
                     )
                 else:
                     logger.info("Push failed: delaying for %ds", self.backoff_delay)
-                    self.timed_call = reactor.callLater(self.backoff_delay, self.on_timer)
+                    self.timed_call = self.hs.get_reactor().callLater(
+                        self.backoff_delay, self.on_timer
+                    )
                     self.backoff_delay = min(self.backoff_delay * 2, self.MAX_BACKOFF_SEC)
                     break
 
@@ -244,6 +284,26 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _build_notification_dict(self, event, tweaks, badge):
+        if self.data.get('format') == 'event_id_only':
+            d = {
+                'notification': {
+                    'event_id': event.event_id,
+                    'room_id': event.room_id,
+                    'counts': {
+                        'unread': badge,
+                    },
+                    'devices': [
+                        {
+                            'app_id': self.app_id,
+                            'pushkey': self.pushkey,
+                            'pushkey_ts': long(self.pushkey_ts / 1000),
+                            'data': self.data_minus_url,
+                        }
+                    ]
+                }
+            }
+            defer.returnValue(d)
+
         ctx = yield push_tools.get_context_for_event(
             self.store, self.state_handler, event, self.user_id
         )
@@ -272,10 +332,10 @@ class HttpPusher(object):
                 ]
             }
         }
-        if event.type == 'm.room.member':
+        if event.type == 'm.room.member' and event.is_state():
             d['notification']['membership'] = event.content['membership']
             d['notification']['user_is_target'] = event.state_key == self.user_id
-        if 'content' in event:
+        if self.hs.config.push_include_content and event.content:
             d['notification']['content'] = event.content
 
         # We no longer send aliases separately, instead, we send the human
@@ -294,8 +354,11 @@ class HttpPusher(object):
             defer.returnValue([])
         try:
             resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
-        except:
-            logger.warn("Failed to push %s ", self.url)
+        except Exception as e:
+            logger.warning(
+                "Failed to push event %s to %s: %s %s",
+                event.event_id, self.name, type(e), e,
+            )
             defer.returnValue(False)
         rejected = []
         if 'rejected' in resp:
@@ -304,7 +367,11 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _send_badge(self, badge):
-        logger.info("Sending updated badge count %d to %r", badge, self.user_id)
+        """
+        Args:
+            badge (int): number of unread messages
+        """
+        logger.info("Sending updated badge count %d to %s", badge, self.name)
         d = {
             'notification': {
                 'id': '',
@@ -324,11 +391,11 @@ class HttpPusher(object):
             }
         }
         try:
-            resp = yield self.http_client.post_json_get_json(self.url, d)
-        except:
-            logger.exception("Failed to push %s ", self.url)
-            defer.returnValue(False)
-        rejected = []
-        if 'rejected' in resp:
-            rejected = resp['rejected']
-        defer.returnValue(rejected)
+            yield self.http_client.post_json_get_json(self.url, d)
+            http_badges_processed_counter.inc()
+        except Exception as e:
+            logger.warning(
+                "Failed to send badge count to %s: %s %s",
+                self.name, type(e), e,
+            )
+            http_badges_failed_counter.inc()

@@ -18,10 +18,9 @@ import logging
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.constants import Membership, EventTypes
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import LimitExceededError
 from synapse.types import UserID
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,20 @@ class BaseHandler(object):
 
         self.event_builder_factory = hs.get_event_builder_factory()
 
-    def ratelimit(self, requester):
+    @defer.inlineCallbacks
+    def ratelimit(self, requester, update=True):
+        """Ratelimits requests.
+
+        Args:
+            requester (Requester)
+            update (bool): Whether to record that a request is being processed.
+                Set to False when doing multiple checks for one request (e.g.
+                to check up front if we would reject the request), and set to
+                True for the last call for a given request.
+
+        Raises:
+            LimitExceededError if the request should be ratelimited
+        """
         time_now = self.clock.time()
         user_id = requester.user.to_string()
 
@@ -67,10 +79,25 @@ class BaseHandler(object):
         if requester.app_service and not requester.app_service.is_rate_limited():
             return
 
+        # Check if there is a per user override in the DB.
+        override = yield self.store.get_ratelimit_for_user(user_id)
+        if override:
+            # If overriden with a null Hz then ratelimiting has been entirely
+            # disabled for the user
+            if not override.messages_per_second:
+                return
+
+            messages_per_second = override.messages_per_second
+            burst_count = override.burst_count
+        else:
+            messages_per_second = self.hs.config.rc_messages_per_second
+            burst_count = self.hs.config.rc_message_burst_count
+
         allowed, time_allowed = self.ratelimiter.send_message(
             user_id, time_now,
-            msg_rate_hz=self.hs.config.rc_messages_per_second,
-            burst_count=self.hs.config.rc_message_burst_count,
+            msg_rate_hz=messages_per_second,
+            burst_count=burst_count,
+            update=update,
         )
         if not allowed:
             raise LimitExceededError(
@@ -85,15 +112,16 @@ class BaseHandler(object):
             guest_access = event.content.get("guest_access", "forbidden")
             if guest_access != "can_join":
                 if context:
+                    current_state_ids = yield context.get_current_state_ids(self.store)
                     current_state = yield self.store.get_events(
-                        context.current_state_ids.values()
+                        list(current_state_ids.values())
                     )
                 else:
                     current_state = yield self.state_handler.get_current_state(
                         event.room_id
                     )
 
-                current_state = current_state.values()
+                current_state = list(current_state.values())
 
                 logger.info("maybe_kick_guest_users %r", current_state)
                 yield self.kick_guest_users(current_state)
@@ -130,7 +158,7 @@ class BaseHandler(object):
                 # homeserver.
                 requester = synapse.types.create_requester(
                     target_user, is_guest=True)
-                handler = self.hs.get_handlers().room_member_handler
+                handler = self.hs.get_room_member_handler()
                 yield handler.update_membership(
                     requester,
                     target_user,
@@ -139,4 +167,4 @@ class BaseHandler(object):
                     ratelimit=False,
                 )
             except Exception as e:
-                logger.warn("Error kicking guest user: %s" % (e,))
+                logger.exception("Error kicking guest user: %s" % (e,))

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.async import ObservableDeferred
+from synapse.util.async_helpers import ObservableDeferred
 
 
 class SnapshotCache(object):

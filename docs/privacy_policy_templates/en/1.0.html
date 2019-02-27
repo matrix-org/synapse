@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Matrix.org Privacy policy</title>
+  </head>
+  <body>
+  {% if has_consented %}
+    <p>
+      Your base already belong to us.
+    </p>
+  {% else %}
+    <p>
+      All your base are belong to us.
+    </p>
+    {% if not public_version %}
+      <!-- The variables used here are only provided when the 'u' param is given to the homeserver -->
+      <form method="post" action="consent">
+        <input type="hidden" name="v" value="{{version}}"/>
+        <input type="hidden" name="u" value="{{user}}"/>
+        <input type="hidden" name="h" value="{{userhmac}}"/>
+        <input type="submit" value="Sure thing!"/>
+      </form>
+    {% endif %}
+  {% endif %}
+  </body>
+</html>

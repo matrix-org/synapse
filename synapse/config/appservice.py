@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
+import logging
+
+from six import string_types
+from six.moves.urllib import parse as urlparse
+
+import yaml
+from netaddr import IPSet
 
 from synapse.appservice import ApplicationService
 from synapse.types import UserID
 
-import urllib
-import yaml
-import logging
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +33,18 @@ class AppServiceConfig(Config):
     def read_config(self, config):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
+        self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
     def default_config(cls, **kwargs):
         return """\
         # A list of application service config file to use
+        #
         app_service_config_files: []
+
+        # Whether or not to track application service IP addresses. Implicitly
+        # enables MAU tracking for application service users.
+        #
+        track_appservice_user_ips: False
         """
 
 
@@ -89,21 +100,21 @@ def _load_appservice(hostname, as_info, config_filename):
         "id", "as_token", "hs_token", "sender_localpart"
     ]
     for field in required_string_fields:
-        if not isinstance(as_info.get(field), basestring):
+        if not isinstance(as_info.get(field), string_types):
             raise KeyError("Required string field: '%s' (%s)" % (
                 field, config_filename,
             ))
 
     # 'url' must either be a string or explicitly null, not missing
     # to avoid accidentally turning off push for ASes.
-    if (not isinstance(as_info.get("url"), basestring) and
+    if (not isinstance(as_info.get("url"), string_types) and
             as_info.get("url", "") is not None):
         raise KeyError(
             "Required string field or explicit null: 'url' (%s)" % (config_filename,)
         )
 
     localpart = as_info["sender_localpart"]
-    if urllib.quote(localpart) != localpart:
+    if urlparse.quote(localpart) != localpart:
         raise ValueError(
             "sender_localpart needs characters which are not URL encoded."
         )
@@ -128,7 +139,7 @@ def _load_appservice(hostname, as_info, config_filename):
                         "Expected namespace entry in %s to be an object,"
                         " but got %s", ns, regex_obj
                     )
-                if not isinstance(regex_obj.get("regex"), basestring):
+                if not isinstance(regex_obj.get("regex"), string_types):
                     raise ValueError(
                         "Missing/bad type 'regex' key in %s", regex_obj
                     )
@@ -152,13 +163,22 @@ def _load_appservice(hostname, as_info, config_filename):
             " will not receive events or queries.",
             config_filename,
         )
+
+    ip_range_whitelist = None
+    if as_info.get('ip_range_whitelist'):
+        ip_range_whitelist = IPSet(
+            as_info.get('ip_range_whitelist')
+        )
+
     return ApplicationService(
         token=as_info["as_token"],
+        hostname=hostname,
         url=as_info["url"],
         namespaces=as_info["namespaces"],
         hs_token=as_info["hs_token"],
         sender=user_id,
         id=as_info["id"],
         protocols=protocols,
-        rate_limited=rate_limited
+        rate_limited=rate_limited,
+        ip_range_whitelist=ip_range_whitelist,
     )

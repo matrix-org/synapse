@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -21,19 +23,14 @@ from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
 from synapse.streams.config import PaginationConfig
-from synapse.types import (
-    UserID, StreamToken,
-)
+from synapse.types import StreamToken, UserID
 from synapse.util import unwrapFirstError
-from synapse.util.async import concurrently_execute
+from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.snapshot_cache import SnapshotCache
-from synapse.util.logcontext import preserve_fn, preserve_context_over_deferred
+from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -151,22 +148,25 @@ class InitialSyncHandler(BaseHandler):
             try:
                 if event.membership == Membership.JOIN:
                     room_end_token = now_token.room_key
-                    deferred_room_state = self.state_handler.get_current_state(
-                        event.room_id
+                    deferred_room_state = run_in_background(
+                        self.state_handler.get_current_state,
+                        event.room_id,
                     )
                 elif event.membership == Membership.LEAVE:
                     room_end_token = "s%d" % (event.stream_ordering,)
-                    deferred_room_state = self.store.get_state_for_events(
-                        [event.event_id], None
+                    deferred_room_state = run_in_background(
+                        self.store.get_state_for_events,
+                        [event.event_id],
                     )
                     deferred_room_state.addCallback(
                         lambda states: states[event.event_id]
                     )
 
-                (messages, token), current_state = yield preserve_context_over_deferred(
+                (messages, token), current_state = yield make_deferred_yieldable(
                     defer.gatherResults(
                         [
-                            preserve_fn(self.store.get_recent_events_for_room)(
+                            run_in_background(
+                                self.store.get_recent_events_for_room,
                                 event.room_id,
                                 limit=limit,
                                 end_token=room_end_token,
@@ -180,8 +180,8 @@ class InitialSyncHandler(BaseHandler):
                     self.store, user_id, messages
                 )
 
-                start_token = now_token.copy_and_replace("room_key", token[0])
-                end_token = now_token.copy_and_replace("room_key", token[1])
+                start_token = now_token.copy_and_replace("room_key", token)
+                end_token = now_token.copy_and_replace("room_key", room_end_token)
                 time_now = self.clock.time_msec()
 
                 d["messages"] = {
@@ -214,7 +214,7 @@ class InitialSyncHandler(BaseHandler):
                     })
 
                 d["account_data"] = account_data_events
-            except:
+            except Exception:
                 logger.exception("Failed to get snapshot")
 
         yield concurrently_execute(handle_room, room_list, 10)
@@ -301,7 +301,7 @@ class InitialSyncHandler(BaseHandler):
     def _room_initial_sync_parted(self, user_id, room_id, pagin_config,
                                   membership, member_event_id, is_peeking):
         room_state = yield self.store.get_state_for_events(
-            [member_event_id], None
+            [member_event_id],
         )
 
         room_state = room_state[member_event_id]
@@ -324,8 +324,8 @@ class InitialSyncHandler(BaseHandler):
             self.store, user_id, messages, is_peeking=is_peeking
         )
 
-        start_token = StreamToken.START.copy_and_replace("room_key", token[0])
-        end_token = StreamToken.START.copy_and_replace("room_key", token[1])
+        start_token = StreamToken.START.copy_and_replace("room_key", token)
+        end_token = StreamToken.START.copy_and_replace("room_key", stream_token)
 
         time_now = self.clock.time_msec()
 
@@ -372,6 +372,10 @@ class InitialSyncHandler(BaseHandler):
 
         @defer.inlineCallbacks
         def get_presence():
+            # If presence is disabled, return an empty list
+            if not self.hs.config.use_presence:
+                defer.returnValue([])
+
             states = yield presence_handler.get_states(
                 [m.user_id for m in room_members],
                 as_event=True,
@@ -389,25 +393,28 @@ class InitialSyncHandler(BaseHandler):
                 receipts = []
             defer.returnValue(receipts)
 
-        presence, receipts, (messages, token) = yield defer.gatherResults(
-            [
-                preserve_fn(get_presence)(),
-                preserve_fn(get_receipts)(),
-                preserve_fn(self.store.get_recent_events_for_room)(
-                    room_id,
-                    limit=limit,
-                    end_token=now_token.room_key,
-                )
-            ],
-            consumeErrors=True,
-        ).addErrback(unwrapFirstError)
+        presence, receipts, (messages, token) = yield make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(get_presence),
+                    run_in_background(get_receipts),
+                    run_in_background(
+                        self.store.get_recent_events_for_room,
+                        room_id,
+                        limit=limit,
+                        end_token=now_token.room_key,
+                    )
+                ],
+                consumeErrors=True,
+            ).addErrback(unwrapFirstError),
+        )
 
         messages = yield filter_events_for_client(
             self.store, user_id, messages, is_peeking=is_peeking,
         )
 
-        start_token = now_token.copy_and_replace("room_key", token[0])
-        end_token = now_token.copy_and_replace("room_key", token[1])
+        start_token = now_token.copy_and_replace("room_key", token)
+        end_token = now_token
 
         time_now = self.clock.time_msec()
 

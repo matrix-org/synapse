@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 import copy
+
+from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
 
 
 def list_with_base_rules(rawrules):
@@ -38,7 +40,7 @@ def list_with_base_rules(rawrules):
     rawrules = [r for r in rawrules if r['priority_class'] >= 0]
 
     # shove the server default rules for each kind onto the end of each
-    current_prio_class = PRIORITY_CLASS_INVERSE_MAP.keys()[-1]
+    current_prio_class = list(PRIORITY_CLASS_INVERSE_MAP)[-1]
 
     ruleslist.extend(make_base_prepend_rules(
         PRIORITY_CLASS_INVERSE_MAP[current_prio_class], modified_base_rules
@@ -238,6 +240,28 @@ BASE_APPEND_OVERRIDE_RULES = [
             }
         ]
     },
+    {
+        'rule_id': 'global/override/.m.rule.roomnotif',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'content.body',
+                'pattern': '@room',
+                '_id': '_roomnotif_content',
+            },
+            {
+                'kind': 'sender_notification_permission',
+                'key': 'room',
+                '_id': '_roomnotif_pl',
+            },
+        ],
+        'actions': [
+            'notify', {
+                'set_tweak': 'highlight',
+                'value': True,
+            }
+        ]
+    }
 ]
 
 

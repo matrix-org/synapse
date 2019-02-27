@@ -14,13 +14,15 @@
 # limitations under the License.
 
 
-from twisted.web.resource import Resource
-from synapse.http.server import respond_with_json_bytes
-from signedjson.sign import sign_json
-from unpaddedbase64 import encode_base64
-from canonicaljson import encode_canonical_json
 import logging
 
+from canonicaljson import encode_canonical_json
+from signedjson.sign import sign_json
+from unpaddedbase64 import encode_base64
+
+from twisted.web.resource import Resource
+
+from synapse.http.server import respond_with_json_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,6 @@ class LocalKey(Resource):
     isLeaf = True
 
     def __init__(self, hs):
-        self.version_string = hs.version_string
         self.config = hs.config
         self.clock = hs.clock
         self.update_response_body(self.clock.time_msec())
@@ -84,12 +85,11 @@ class LocalKey(Resource):
             }
 
         old_verify_keys = {}
-        for key in self.config.old_signing_keys:
-            key_id = "%s:%s" % (key.alg, key.version)
+        for key_id, key in self.config.old_signing_keys.items():
             verify_key_bytes = key.encode()
             old_verify_keys[key_id] = {
                 u"key": encode_base64(verify_key_bytes),
-                u"expired_ts": key.expired,
+                u"expired_ts": key.expired_ts,
             }
 
         tls_fingerprints = self.config.tls_fingerprints
@@ -116,5 +116,4 @@ class LocalKey(Resource):
             self.update_response_body(time_now)
         return respond_with_json_bytes(
             request, 200, self.response_body,
-            version_string=self.version_string
         )

@@ -26,28 +26,10 @@ expose the append-only log to the readers should be fairly minimal.
 Architecture
 ------------
 
-The Replication API
-~~~~~~~~~~~~~~~~~~~
+The Replication Protocol
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-Synapse will optionally expose a long poll HTTP API for extracting updates. The
-API will have a similar shape to /sync in that clients provide tokens
-indicating where in the log they have reached and a timeout. The synapse server
-then either responds with updates immediately if it already has updates or it
-waits until the timeout for more updates. If the timeout expires and nothing
-happened then the server returns an empty response.
-
-However unlike the /sync API this replication API is returning synapse specific
-data rather than trying to implement a matrix specification. The replication
-results are returned as arrays of rows where the rows are mostly lifted
-directly from the database. This avoids unnecessary JSON parsing on the server
-and hopefully avoids an impedance mismatch between the data returned and the
-required updates to the datastore.
-
-This does not replicate all the database tables as many of the database tables
-are indexes that can be recovered from the contents of other tables.
-
-The format and parameters for the api are documented in
-``synapse/replication/resource.py``.
+See ``tcp_replication.rst``
 
 
 The Slaved DataStore

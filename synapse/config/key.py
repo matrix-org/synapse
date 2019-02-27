@@ -13,21 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
-
-from synapse.util.stringutils import random_string
-from signedjson.key import (
-    generate_signing_key, is_signing_algorithm_supported,
-    decode_signing_key_base64, decode_verify_key_bytes,
-    read_signing_keys, write_signing_keys, NACL_ED25519
-)
-from unpaddedbase64 import decode_base64
-from synapse.util.stringutils import random_string_with_symbols
-
-import os
 import hashlib
 import logging
+import os
 
+from signedjson.key import (
+    NACL_ED25519,
+    decode_signing_key_base64,
+    decode_verify_key_bytes,
+    generate_signing_key,
+    is_signing_algorithm_supported,
+    read_signing_keys,
+    write_signing_keys,
+)
+from unpaddedbase64 import decode_base64
+
+from synapse.util.stringutils import random_string, random_string_with_symbols
+
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +40,7 @@ class KeyConfig(Config):
     def read_config(self, config):
         self.signing_key = self.read_signing_key(config["signing_key_path"])
         self.old_signing_keys = self.read_old_signing_keys(
-            config["old_signing_keys"]
+            config.get("old_signing_keys", {})
         )
         self.key_refresh_interval = self.parse_duration(
             config["key_refresh_interval"]
@@ -53,35 +56,56 @@ class KeyConfig(Config):
         if not self.macaroon_secret_key:
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
-            logger.warn("Config is missing missing macaroon_secret_key")
-            seed = self.signing_key[0].seed
-            self.macaroon_secret_key = hashlib.sha256(seed)
+            logger.warn("Config is missing macaroon_secret_key")
+            seed = bytes(self.signing_key[0])
+            self.macaroon_secret_key = hashlib.sha256(seed).digest()
 
         self.expire_access_token = config.get("expire_access_token", False)
 
-    def default_config(self, config_dir_path, server_name, is_generating_file=False,
+        # a secret which is used to calculate HMACs for form values, to stop
+        # falsification of values
+        self.form_secret = config.get("form_secret", None)
+
+    def default_config(self, config_dir_path, server_name, generate_secrets=False,
                        **kwargs):
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        if is_generating_file:
-            macaroon_secret_key = random_string_with_symbols(50)
+        if generate_secrets:
+            macaroon_secret_key = 'macaroon_secret_key: "%s"' % (
+                random_string_with_symbols(50),
+            )
+            form_secret = 'form_secret: "%s"' % random_string_with_symbols(50)
         else:
-            macaroon_secret_key = None
+            macaroon_secret_key = "# macaroon_secret_key: <PRIVATE STRING>"
+            form_secret = "# form_secret: <PRIVATE STRING>"
 
         return """\
-        macaroon_secret_key: "%(macaroon_secret_key)s"
+        # a secret which is used to sign access tokens. If none is specified,
+        # the registration_shared_secret is used, if one is given; otherwise,
+        # a secret key is derived from the signing key.
+        #
+        %(macaroon_secret_key)s
 
         # Used to enable access token expiration.
+        #
         expire_access_token: False
+
+        # a secret which is used to calculate HMACs for form values, to stop
+        # falsification of values. Must be specified for the User Consent
+        # forms to work.
+        #
+        %(form_secret)s
 
         ## Signing Keys ##
 
         # Path to the signing key to sign messages with
+        #
         signing_key_path: "%(base_key_name)s.signing.key"
 
         # The keys that the server used to sign messages with but won't use
         # to sign new messages. E.g. it has lost its private key
-        old_signing_keys: {}
+        #
+        #old_signing_keys:
         #  "ed25519:auto":
         #    # Base64 encoded public key
         #    key: "The public part of your old signing key."
@@ -92,9 +116,11 @@ class KeyConfig(Config):
         # Used to set the valid_until_ts in /key/v2 APIs.
         # Determines how quickly servers will query to check which keys
         # are still valid.
+        #
         key_refresh_interval: "1d" # 1 Day.
 
         # The trusted servers to download signing keys from.
+        #
         perspectives:
           servers:
             "matrix.org":
@@ -118,10 +144,9 @@ class KeyConfig(Config):
         signing_keys = self.read_file(signing_key_path, "signing_key")
         try:
             return read_signing_keys(signing_keys.splitlines(True))
-        except Exception:
+        except Exception as e:
             raise ConfigError(
-                "Error reading signing_key."
-                " Try running again with --generate-config"
+                "Error reading signing_key: %s" % (str(e))
             )
 
     def read_old_signing_keys(self, old_signing_keys):
@@ -141,7 +166,8 @@ class KeyConfig(Config):
 
     def generate_files(self, config):
         signing_key_path = config["signing_key_path"]
-        if not os.path.exists(signing_key_path):
+
+        if not self.path_exists(signing_key_path):
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(

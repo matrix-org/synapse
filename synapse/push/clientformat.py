@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.push.rulekinds import (
-    PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
-)
-
 import copy
+
+from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
 
 
 def format_push_rules_for_user(user, ruleslist):
@@ -86,7 +84,7 @@ def _rule_to_template(rule):
         templaterule["pattern"] = thecond["pattern"]
 
     if unscoped_rule_id:
-            templaterule['rule_id'] = unscoped_rule_id
+        templaterule['rule_id'] = unscoped_rule_id
     if 'default' in rule:
         templaterule['default'] = rule['default']
     return templaterule

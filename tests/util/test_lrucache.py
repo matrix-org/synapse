@@ -14,16 +14,15 @@
 # limitations under the License.
 
 
-from .. import unittest
+from mock import Mock
 
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
 
-from mock import Mock
+from .. import unittest
 
 
 class LruCacheTestCase(unittest.TestCase):
-
     def test_get_set(self):
         cache = LruCache(1)
         cache["key"] = "value"
@@ -235,7 +234,6 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
 
 
 class LruCacheSizedTestCase(unittest.TestCase):
-
     def test_evict(self):
         cache = LruCache(5, size_callback=len)
         cache["key1"] = [0]
