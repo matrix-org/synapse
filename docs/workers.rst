@@ -182,6 +182,7 @@ endpoints matching the following regular expressions::
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/send/
+    ^/_matrix/key/v2/query
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
