@@ -58,7 +58,7 @@ steps:
 
   - command:
       - "python -m pip install tox"
-      - "tox -e py36,codecov"
+      - "tox -e py37,codecov"
     label: ":python: Python 3.7 / SQLite"
     env:
       - TRIAL_FLAGS="-j 2"
