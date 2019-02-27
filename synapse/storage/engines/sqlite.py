@@ -70,6 +70,15 @@ class Sqlite3Engine(object):
             self._current_state_group_id += 1
             return self._current_state_group_id
 
+    @property
+    def server_version(self):
+        """Gets a string giving the server version. For example: '3.22.0'
+
+        Returns:
+            string
+        """
+        return "%i.%i.%i" % self.module.sqlite_version_info
+
 
 # Following functions taken from: https://github.com/coleifer/peewee
 
