@@ -12,6 +12,7 @@ steps:
           propagate-environment: true
 
   - command:
+      - "python -m pip install tox"
       - "scripts-dev/check-newsfragment"
     label: ":newspaper: Newsfile"
     branches: "!master !develop !release-*"
