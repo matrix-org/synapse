@@ -14,6 +14,7 @@ services:
     env_file: .env
     environment:
       SYNAPSE_POSTGRES_HOST: postgres
+      SYNAPSE_POSTGRES_USER: postgres
       SYNAPSE_POSTGRES_PASSWORD: postgres
     working_dir: /app
     volumes:
