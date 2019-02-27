@@ -179,9 +179,9 @@ class StatsHandler(StateDeltasHandler):
                 ),
                 "encryption": _or_none(encryption, "algorithm"),
                 "name": _or_none(name, "name"),
-                "topic": _or_none(name, "topic"),
-                "avatar": _or_none(name, "url"),
-                "canonical_alias": _or_none(name, "alias"),
+                "topic": _or_none(topic, "topic"),
+                "avatar": _or_none(avatar, "url"),
+                "canonical_alias": _or_none(canonical_alias, "alias"),
             },
         )
 
