@@ -886,6 +886,9 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
     def on_edu(self, edu_type, origin, content):
         """Overrides FederationHandlerRegistry
         """
+        if not self.config.use_presence and edu_type == "m.presence":
+            return
+
         handler = self.edu_handlers.get(edu_type)
         if handler:
             return super(ReplicationFederationHandlerRegistry, self).on_edu(
