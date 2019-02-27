@@ -70,7 +70,7 @@ steps:
   - label: ":python: Python 2.7 / PostgreSQL 9.4"
     command:
       - "python -m pip install tox"
-      - "tox -e py27-postgres,codecov"
+      - "python -m tox -e py27-postgres,codecov"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
