@@ -45,8 +45,8 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 # set this to True to run the tests against postgres instead of sqlite.
 USE_POSTGRES_FOR_TESTS = os.environ.get("SYNAPSE_POSTGRES", False)
 LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
-POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", "postgres")
-POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", "localhost")
+POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", None)
+POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", None)
 POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
