@@ -25,9 +25,10 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
+    Codes,
     FederationError,
     IncompatibleRoomVersionError,
     NotFoundError,
@@ -148,6 +149,22 @@ class FederationServer(FederationBase):
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
+        # Reject if PDU count > 50 and EDU count > 100
+        if (len(transaction.pdus) > 50
+                or (hasattr(transaction, "edus") and len(transaction.edus) > 100)):
+
+            logger.info(
+                "Transaction PDU or EDU count too large. Returning 400",
+            )
+
+            response = {}
+            yield self.transaction_actions.set_response(
+                origin,
+                transaction,
+                400, response
+            )
+            defer.returnValue((400, response))
+
         received_pdus_counter.inc(len(transaction.pdus))
 
         origin_host, _ = parse_server_name(origin)
@@ -223,8 +240,9 @@ class FederationServer(FederationBase):
                         f = failure.Failure()
                         pdu_results[event_id] = {"error": str(e)}
                         logger.error(
-                            "Failed to handle PDU %s: %s",
-                            event_id, f.getTraceback().rstrip(),
+                            "Failed to handle PDU %s",
+                            event_id,
+                            exc_info=(f.type, f.value, f.getTracebackObject()),
                         )
 
         yield concurrently_execute(
@@ -370,6 +388,13 @@ class FederationServer(FederationBase):
 
     @defer.inlineCallbacks
     def on_invite_request(self, origin, content, room_version):
+        if room_version not in KNOWN_ROOM_VERSIONS:
+            raise SynapseError(
+                400,
+                "Homeserver does not support this room version",
+                Codes.UNSUPPORTED_ROOM_VERSION,
+            )
+
         format_ver = room_version_to_event_format(room_version)
 
         pdu = event_from_pdu_json(content, format_ver)
@@ -861,6 +886,9 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
     def on_edu(self, edu_type, origin, content):
         """Overrides FederationHandlerRegistry
         """
+        if not self.config.use_presence and edu_type == "m.presence":
+            return
+
         handler = self.edu_handlers.get(edu_type)
         if handler:
             return super(ReplicationFederationHandlerRegistry, self).on_edu(

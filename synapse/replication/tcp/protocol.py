@@ -268,7 +268,17 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         if "\n" in string:
             raise Exception("Unexpected newline in command: %r", string)
 
-        self.sendLine(string.encode("utf-8"))
+        encoded_string = string.encode("utf-8")
+
+        if len(encoded_string) > self.MAX_LENGTH:
+            raise Exception(
+                "Failed to send command %s as too long (%d > %d)" % (
+                    cmd.NAME,
+                    len(encoded_string), self.MAX_LENGTH,
+                )
+            )
+
+        self.sendLine(encoded_string)
 
         self.last_sent_command = self.clock.time_msec()
 
@@ -360,6 +370,11 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
     def id(self):
         return "%s-%s" % (self.name, self.conn_id)
+
+    def lineLengthExceeded(self, line):
+        """Called when we receive a line that is above the maximum line length
+        """
+        self.send_error("Line length exceeded")
 
 
 class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
@@ -511,6 +526,11 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.server_name = server_name
         self.handler = handler
 
+        # Set of stream names that have been subscribe to, but haven't yet
+        # caught up with. This is used to track when the client has been fully
+        # connected to the remote.
+        self.streams_connecting = set()
+
         # Map of stream to batched updates. See RdataCommand for info on how
         # batching works.
         self.pending_batches = {}
@@ -532,6 +552,10 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         # We've now finished connecting to so inform the client handler
         self.handler.update_connection(self)
+
+        # This will happen if we don't actually subscribe to any streams
+        if not self.streams_connecting:
+            self.handler.finished_connecting()
 
     def on_SERVER(self, cmd):
         if cmd.data != self.server_name:
@@ -562,6 +586,12 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             return self.handler.on_rdata(stream_name, cmd.token, rows)
 
     def on_POSITION(self, cmd):
+        # When we get a `POSITION` command it means we've finished getting
+        # missing updates for the given stream, and are now up to date.
+        self.streams_connecting.discard(cmd.stream_name)
+        if not self.streams_connecting:
+            self.handler.finished_connecting()
+
         return self.handler.on_position(cmd.stream_name, cmd.token)
 
     def on_SYNC(self, cmd):
@@ -577,6 +607,8 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             "[%s] Subscribing to replication stream: %r from %r",
             self.id(), stream_name, token
         )
+
+        self.streams_connecting.add(stream_name)
 
         self.send_command(ReplicateCommand(stream_name, token))
 

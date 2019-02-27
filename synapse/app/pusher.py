@@ -224,11 +224,10 @@ def start(config_options):
     )
 
     ps.setup()
-    ps.start_listening(config.worker_listeners)
 
     def start():
+        _base.start(ps, config.worker_listeners)
         ps.get_pusherpool().start()
-        ps.get_datastore().start_profiling()
 
     reactor.callWhenRunning(start)
 

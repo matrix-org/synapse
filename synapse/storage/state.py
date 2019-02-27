@@ -428,13 +428,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         # for now we do this by looking at the create event. We may want to cache this
         # more intelligently in future.
-        state_ids = yield self.get_current_state_ids(room_id)
-        create_id = state_ids.get((EventTypes.Create, ""))
 
-        if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id))
-
-        create_event = yield self.get_event(create_id)
+        # Retrieve the room's create event
+        create_event = yield self.get_create_event_for_room(room_id)
         defer.returnValue(create_event.content.get("room_version", "1"))
 
     @defer.inlineCallbacks
@@ -447,19 +443,39 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         Returns:
             Deferred[unicode|None]: predecessor room id
+
+        Raises:
+            NotFoundError if the room is unknown
+        """
+        # Retrieve the room's create event
+        create_event = yield self.get_create_event_for_room(room_id)
+
+        # Return predecessor if present
+        defer.returnValue(create_event.content.get("predecessor", None))
+
+    @defer.inlineCallbacks
+    def get_create_event_for_room(self, room_id):
+        """Get the create state event for a room.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[EventBase]: The room creation event.
+
+        Raises:
+            NotFoundError if the room is unknown
         """
         state_ids = yield self.get_current_state_ids(room_id)
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            defer.returnValue(None)
+            raise NotFoundError("Unknown room %s" % (room_id))
 
-        # Retrieve the room's create event
+        # Retrieve the room's create event and return
         create_event = yield self.get_event(create_id)
-
-        # Return predecessor if present
-        defer.returnValue(create_event.content.get("predecessor", None))
+        defer.returnValue(create_event)
 
     @cached(max_entries=100000, iterable=True)
     def get_current_state_ids(self, room_id):
@@ -533,59 +549,29 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_current_state(self, room_id, types):
-        """Get the current state event of a given type for a room based on the
-        current_state_events table.  This may not be as up-to-date as the result
-        of doing a fresh state resolution as per state_handler.get_current_state
+    def get_canonical_alias_for_room(self, room_id):
+        """Get canonical alias for room, if any
+
         Args:
             room_id (str)
-            types (list): List of (type, state_key) tuples which are used to
-                filter the state fetched. `state_key` may be None, which matches
-                any `state_key`
+
         Returns:
-            deferred: dict of (type, state_key) -> event
+            Deferred[str|None]: The canonical alias, if any
         """
-        def _get_current_state_txn(txn):
-            sql = """SELECT type, state_key, event_id FROM current_state_events
-                     WHERE room_id = ? %s"""
-            # Turns out that postgres doesn't like doing a list of OR's and
-            # is about 1000x slower, so we just issue a query for each specific
-            # type seperately.
-            if types:
-                clause_to_args = [
-                    (
-                        " AND type = ? AND state_key = ?",
-                        (etype, state_key)
-                    ) if state_key is not None else (
-                        " AND type = ?",
-                        (etype,)
-                    )
-                    for etype, state_key in types
-                ]
-            else:
-                # If types is None we fetch all the state, and so just use an
-                # empty where clause with no extra args.
-                clause_to_args = [("", [])]
 
-            results = {}
-            for where_clause, where_args in clause_to_args:
-                args = [room_id]
-                args.extend(where_args)
-                txn.execute(sql % (where_clause,), args)
-                for row in txn:
-                    typ, state_key, event_id = row
-                    key = (typ, state_key)
-                    results[key] = event_id
-            return results
+        state = yield self.get_filtered_current_state_ids(room_id, StateFilter.from_types(
+            [(EventTypes.CanonicalAlias, "")]
+        ))
 
-        results = yield self.runInteraction(
-            "get_current_state",
-            _get_current_state_txn,
-        )
-        for (key, event_id) in iteritems(results):
-            results[key] = yield self.get_event(event_id, allow_none=True)
+        event_id = state.get((EventTypes.CanonicalAlias, ""))
+        if not event_id:
+            return
 
-        defer.returnValue(results)
+        event = yield self.get_event(event_id, allow_none=True)
+        if not event:
+            return
+
+        defer.returnValue(event.content.get("canonical_alias"))
 
     @cached(max_entries=10000, iterable=True)
     def get_state_group_delta(self, state_group):

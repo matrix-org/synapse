@@ -33,6 +33,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import (
     CodeMessageException,
+    Codes,
     FederationDeniedError,
     HttpResponseException,
     SynapseError,
@@ -792,10 +793,25 @@ class FederationClient(FederationBase):
             defer.returnValue(content)
         except HttpResponseException as e:
             if e.code in [400, 404]:
+                err = e.to_synapse_error()
+
+                # If we receive an error response that isn't a generic error, we
+                # assume that the remote understands the v2 invite API and this
+                # is a legitimate error.
+                if err.errcode != Codes.UNKNOWN:
+                    raise err
+
+                # Otherwise, we assume that the remote server doesn't understand
+                # the v2 invite API.
+
                 if room_version in (RoomVersions.V1, RoomVersions.V2):
                     pass  # We'll fall through
                 else:
-                    raise Exception("Remote server is too old")
+                    raise SynapseError(
+                        400,
+                        "User's homeserver does not support this room version",
+                        Codes.UNSUPPORTED_ROOM_VERSION,
+                    )
             elif e.code == 403:
                 raise e.to_synapse_error()
             else:

@@ -31,6 +31,7 @@ from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
+from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
@@ -63,6 +64,7 @@ from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
+from synapse.handlers.register import RegistrationHandler
 from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
@@ -113,6 +115,8 @@ class HomeServer(object):
 
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
+        _listening_services (list[twisted.internet.tcp.Port]): TCP ports that
+            we are listening on to provide HTTP services.
     """
 
     __metaclass__ = abc.ABCMeta
@@ -180,6 +184,7 @@ class HomeServer(object):
         'pagination_handler',
         'room_context_handler',
         'sendmail',
+        'registration_handler',
     ]
 
     REQUIRED_ON_MASTER_STARTUP = [
@@ -203,6 +208,7 @@ class HomeServer(object):
         self._reactor = reactor
         self.hostname = hostname
         self._building = {}
+        self._listening_services = []
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
@@ -375,7 +381,10 @@ class HomeServer(object):
         return PusherPool(self)
 
     def build_http_client(self):
-        return MatrixFederationHttpClient(self)
+        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            self.config
+        )
+        return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     def build_db_pool(self):
         name = self.db_config["name"]
@@ -487,6 +496,9 @@ class HomeServer(object):
 
     def build_room_context_handler(self):
         return RoomContextHandler(self)
+
+    def build_registration_handler(self):
+        return RegistrationHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

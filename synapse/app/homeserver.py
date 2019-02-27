@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,12 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+
 import gc
 import logging
 import os
-import signal
 import sys
-import traceback
 
 from six import iteritems
 
@@ -28,7 +29,7 @@ from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
-from twisted.protocols.tls import TLSMemoryBIOFactory
+from twisted.python.failure import Failure
 from twisted.web.resource import EncodingResourceWrapper, NoResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -49,7 +50,6 @@ from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
-from synapse.crypto import context_factory
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import RootRedirect
@@ -86,7 +86,6 @@ def gz_wrap(r):
 
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
-    _listening_services = []
 
     def _listener_http(self, config, listener_config):
         port = listener_config["port"]
@@ -94,14 +93,13 @@ class SynapseHomeServer(HomeServer):
         tls = listener_config.get("tls", False)
         site_tag = listener_config.get("tag", port)
 
-        if tls and config.no_tls:
-            raise ConfigError(
-                "Listener on port %i has TLS enabled, but no_tls is set" % (port,),
-            )
-
         resources = {}
         for res in listener_config["resources"]:
             for name in res["names"]:
+                if name == "openid" and "federation" in res["names"]:
+                    # Skip loading openid resource if federation is defined
+                    # since federation resource will include openid
+                    continue
                 resources.update(self._configure_named_resource(
                     name, res.get("compress", False),
                 ))
@@ -126,7 +124,7 @@ class SynapseHomeServer(HomeServer):
         root_resource = create_resource_tree(resources, root_resource)
 
         if tls:
-            return listen_ssl(
+            ports = listen_ssl(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -137,10 +135,12 @@ class SynapseHomeServer(HomeServer):
                     self.version_string,
                 ),
                 self.tls_server_context_factory,
+                reactor=self.get_reactor(),
             )
+            logger.info("Synapse now listening on TCP port %d (TLS)", port)
 
         else:
-            return listen_tcp(
+            ports = listen_tcp(
                 bind_addresses,
                 port,
                 SynapseSite(
@@ -149,8 +149,12 @@ class SynapseHomeServer(HomeServer):
                     listener_config,
                     root_resource,
                     self.version_string,
-                )
+                ),
+                reactor=self.get_reactor(),
             )
+            logger.info("Synapse now listening on TCP port %d", port)
+
+        return ports
 
     def _configure_named_resource(self, name, compress=False):
         """Build a resource map for a named resource
@@ -194,6 +198,11 @@ class SynapseHomeServer(HomeServer):
         if name == "federation":
             resources.update({
                 FEDERATION_PREFIX: TransportLayerServer(self),
+            })
+
+        if name == "openid":
+            resources.update({
+                FEDERATION_PREFIX: TransportLayerServer(self, servlet_groups=["openid"]),
             })
 
         if name in ["static", "client"]:
@@ -241,10 +250,10 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self):
+    def start_listening(self, listeners):
         config = self.get_config()
 
-        for listener in config.listeners:
+        for listener in listeners:
             if listener["type"] == "http":
                 self._listening_services.extend(
                     self._listener_http(config, listener)
@@ -260,14 +269,14 @@ class SynapseHomeServer(HomeServer):
                     )
                 )
             elif listener["type"] == "replication":
-                bind_addresses = listener["bind_addresses"]
-                for address in bind_addresses:
-                    factory = ReplicationStreamProtocolFactory(self)
-                    server_listener = reactor.listenTCP(
-                        listener["port"], factory, interface=address
-                    )
+                services = listen_tcp(
+                    listener["bind_addresses"],
+                    listener["port"],
+                    ReplicationStreamProtocolFactory(self),
+                )
+                for s in services:
                     reactor.addSystemEventTrigger(
-                        "before", "shutdown", server_listener.stopListening,
+                        "before", "shutdown", s.stopListening,
                     )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
@@ -328,19 +337,10 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    sighup_callbacks = []
     synapse.config.logger.setup_logging(
         config,
-        use_worker_options=False,
-        register_sighup=sighup_callbacks.append
+        use_worker_options=False
     )
-
-    def handle_sighup(*args, **kwargs):
-        for i in sighup_callbacks:
-            i(*args, **kwargs)
-
-    if hasattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, handle_sighup)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -377,76 +377,77 @@ def setup(config_options):
 
     hs.setup()
 
-    def refresh_certificate(*args):
+    @defer.inlineCallbacks
+    def do_acme():
         """
-        Refresh the TLS certificates that Synapse is using by re-reading them
-        from disk and updating the TLS context factories to use them.
+        Reprovision an ACME certificate, if it's required.
+
+        Returns:
+            Deferred[bool]: Whether the cert has been updated.
         """
-        logging.info("Reloading certificate from disk...")
-        hs.config.read_certificate_from_disk()
-        hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-        hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-            config
+        acme = hs.get_acme_handler()
+
+        # Check how long the certificate is active for.
+        cert_days_remaining = hs.config.is_disk_cert_valid(
+            allow_self_signed=False
         )
-        logging.info("Certificate reloaded.")
 
-        logging.info("Updating context factories...")
-        for i in hs._listening_services:
-            if isinstance(i.factory, TLSMemoryBIOFactory):
-                i.factory = TLSMemoryBIOFactory(
-                    hs.tls_server_context_factory,
-                    False,
-                    i.factory.wrappedFactory
-                )
-        logging.info("Context factories updated.")
+        # We want to reprovision if cert_days_remaining is None (meaning no
+        # certificate exists), or the days remaining number it returns
+        # is less than our re-registration threshold.
+        provision = False
 
-    sighup_callbacks.append(refresh_certificate)
+        if (
+            cert_days_remaining is None or
+            cert_days_remaining < hs.config.acme_reprovision_threshold
+        ):
+            provision = True
+
+        if provision:
+            yield acme.provision_certificate()
+
+        defer.returnValue(provision)
+
+    @defer.inlineCallbacks
+    def reprovision_acme():
+        """
+        Provision a certificate from ACME, if required, and reload the TLS
+        certificate if it's renewed.
+        """
+        reprovisioned = yield do_acme()
+        if reprovisioned:
+            _base.refresh_certificate(hs)
 
     @defer.inlineCallbacks
     def start():
         try:
-            # Check if the certificate is still valid.
-            cert_days_remaining = hs.config.is_disk_cert_valid()
-
+            # Run the ACME provisioning code, if it's enabled.
             if hs.config.acme_enabled:
-                # If ACME is enabled, we might need to provision a certificate
-                # before starting.
                 acme = hs.get_acme_handler()
-
                 # Start up the webservices which we will respond to ACME
-                # challenges with.
+                # challenges with, and then provision.
                 yield acme.start_listening()
+                yield do_acme()
 
-                # We want to reprovision if cert_days_remaining is None (meaning no
-                # certificate exists), or the days remaining number it returns
-                # is less than our re-registration threshold.
-                if (cert_days_remaining is None) or (
-                    not cert_days_remaining > hs.config.acme_reprovision_threshold
-                ):
-                    yield acme.provision_certificate()
+                # Check if it needs to be reprovisioned every day.
+                hs.get_clock().looping_call(
+                    reprovision_acme,
+                    24 * 60 * 60 * 1000
+                )
 
-            # Read the certificate from disk and build the context factories for
-            # TLS.
-            hs.config.read_certificate_from_disk()
-            hs.tls_server_context_factory = context_factory.ServerContextFactory(config)
-            hs.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-                config
-            )
+            _base.start(hs, config.listeners)
 
-            # It is now safe to start your Synapse.
-            hs.start_listening()
             hs.get_pusherpool().start()
-            hs.get_datastore().start_profiling()
             hs.get_datastore().start_doing_background_updates()
-        except Exception as e:
-            # If a DeferredList failed (like in listening on the ACME listener),
-            # we need to print the subfailure explicitly.
-            if isinstance(e, defer.FirstError):
-                e.subFailure.printTraceback(sys.stderr)
-                sys.exit(1)
+        except Exception:
+            # Print the exception and bail out.
+            print("Error during startup:", file=sys.stderr)
 
-            # Something else went wrong when starting. Print it and bail out.
-            traceback.print_exc(file=sys.stderr)
+            # this gives better tracebacks than traceback.print_exc()
+            Failure().printTraceback(file=sys.stderr)
+
+            if reactor.running:
+                reactor.stop()
             sys.exit(1)
 
     reactor.callWhenRunning(start)
@@ -455,7 +456,8 @@ def setup(config_options):
 
 
 class SynapseService(service.Service):
-    """A twisted Service class that will start synapse. Used to run synapse
+    """
+    A twisted Service class that will start synapse. Used to run synapse
     via twistd and a .tac.
     """
     def __init__(self, config):
@@ -552,6 +554,9 @@ def run(hs):
             for process in stats_process:
                 stats["memory_rss"] += process.memory_info().rss
                 stats["cpu_average"] += int(process.cpu_percent(interval=None))
+
+        stats["database_engine"] = hs.get_datastore().database_engine_name
+        stats["database_server_version"] = hs.get_datastore().get_server_version()
 
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:

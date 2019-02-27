@@ -25,7 +25,6 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.crypto import context_factory
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseSite
 from synapse.metrics import RegistryProxy
@@ -41,6 +40,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.rest.client.v1.login import LoginRestServlet
 from synapse.rest.client.v1.room import (
     JoinedRoomMemberListRestServlet,
     PublicRoomListRestServlet,
@@ -48,6 +48,8 @@ from synapse.rest.client.v1.room import (
     RoomMemberListRestServlet,
     RoomStateRestServlet,
 )
+from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
+from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
@@ -93,6 +95,9 @@ class ClientReaderServer(HomeServer):
                     JoinedRoomMemberListRestServlet(self).register(resource)
                     RoomStateRestServlet(self).register(resource)
                     RoomEventContextServlet(self).register(resource)
+                    RegisterRestServlet(self).register(resource)
+                    LoginRestServlet(self).register(resource)
+                    ThreepidRestServlet(self).register(resource)
 
                     resources.update({
                         "/_matrix/client/r0": resource,
@@ -173,17 +178,7 @@ def start(config_options):
     )
 
     ss.setup()
-
-    def start():
-        ss.config.read_certificate_from_disk()
-        ss.tls_server_context_factory = context_factory.ServerContextFactory(config)
-        ss.tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
-            config
-        )
-        ss.start_listening(config.worker_listeners)
-        ss.get_datastore().start_profiling()
-
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-client-reader", config)
 

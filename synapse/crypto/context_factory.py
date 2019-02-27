@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
 
 from zope.interface import implementer
@@ -43,9 +45,7 @@ class ServerContextFactory(ContextFactory):
             logger.exception("Failed to enable elliptic curve for TLS")
         context.set_options(SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3)
         context.use_certificate_chain_file(config.tls_certificate_file)
-
-        if not config.no_tls:
-            context.use_privatekey(config.tls_private_key)
+        context.use_privatekey(config.tls_private_key)
 
         # https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
         context.set_cipher_list(
@@ -107,9 +107,7 @@ class ClientTLSOptions(object):
             self._hostnameBytes = _idnaBytes(hostname)
             self._sendSNI = True
 
-        ctx.set_info_callback(
-            _tolerateErrors(self._identityVerifyingInfoCallback)
-        )
+        ctx.set_info_callback(_tolerateErrors(self._identityVerifyingInfoCallback))
 
     def clientConnectionForTLS(self, tlsProtocol):
         context = self._ctx
@@ -130,10 +128,8 @@ class ClientTLSOptionsFactory(object):
 
     def __init__(self, config):
         # We don't use config options yet
-        pass
+        self._options = CertificateOptions(verify=False)
 
     def get_options(self, host):
-        return ClientTLSOptions(
-            host,
-            CertificateOptions(verify=False).getContext()
-        )
+        # Use _makeContext so that we get a fresh OpenSSL CTX each time.
+        return ClientTLSOptions(host, self._options._makeContext())

@@ -13,7 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from ._base import Config, ConfigError
+
+MISSING_SENTRY = (
+    """Missing sentry-sdk library. This is required to enable sentry
+    integration.
+    """
+)
 
 
 class MetricsConfig(Config):
@@ -23,12 +29,38 @@ class MetricsConfig(Config):
         self.metrics_port = config.get("metrics_port")
         self.metrics_bind_host = config.get("metrics_bind_host", "127.0.0.1")
 
+        self.sentry_enabled = "sentry" in config
+        if self.sentry_enabled:
+            try:
+                import sentry_sdk  # noqa F401
+            except ImportError:
+                raise ConfigError(MISSING_SENTRY)
+
+            self.sentry_dsn = config["sentry"].get("dsn")
+            if not self.sentry_dsn:
+                raise ConfigError(
+                    "sentry.dsn field is required when sentry integration is enabled",
+                )
+
     def default_config(self, report_stats=None, **kwargs):
         res = """\
         ## Metrics ###
 
         # Enable collection and rendering of performance metrics
+        #
         enable_metrics: False
+
+        # Enable sentry integration
+        # NOTE: While attempts are made to ensure that the logs don't contain
+        # any sensitive information, this cannot be guaranteed. By enabling
+        # this option the sentry server may therefore receive sensitive
+        # information, and it in turn may then diseminate sensitive information
+        # through insecure notification channels if so configured.
+        #
+        #sentry:
+        #    dsn: "..."
+
+        # Whether or not to report anonymized homeserver usage statistics.
         """
 
         if report_stats is None:

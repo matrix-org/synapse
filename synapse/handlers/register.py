@@ -19,6 +19,7 @@ import logging
 from twisted.internet import defer
 
 from synapse import types
+from synapse.api.constants import LoginType
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -26,7 +27,14 @@ from synapse.api.errors import (
     RegistrationError,
     SynapseError,
 )
+from synapse.config.server import is_threepid_reserved
 from synapse.http.client import CaptchaServerHttpClient
+from synapse.http.servlet import assert_params_in_dict
+from synapse.replication.http.login import RegisterDeviceReplicationServlet
+from synapse.replication.http.register import (
+    ReplicationPostRegisterActionsServlet,
+    ReplicationRegisterServlet,
+)
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
 from synapse.util.threepids import check_3pid_allowed
@@ -51,6 +59,7 @@ class RegistrationHandler(BaseHandler):
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
+        self.identity_handler = self.hs.get_handlers().identity_handler
 
         self._next_generated_user_id = None
 
@@ -60,6 +69,18 @@ class RegistrationHandler(BaseHandler):
             name="_generate_user_id_linearizer",
         )
         self._server_notices_mxid = hs.config.server_notices_mxid
+
+        if hs.config.worker_app:
+            self._register_client = ReplicationRegisterServlet.make_client(hs)
+            self._register_device_client = (
+                RegisterDeviceReplicationServlet.make_client(hs)
+            )
+            self._post_registration_client = (
+                ReplicationPostRegisterActionsServlet.make_client(hs)
+            )
+        else:
+            self.device_handler = hs.get_device_handler()
+            self.pusher_pool = hs.get_pusherpool()
 
     @defer.inlineCallbacks
     def check_username(self, localpart, guest_access_token=None,
@@ -155,7 +176,7 @@ class RegistrationHandler(BaseHandler):
         yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:
-            password_hash = yield self.auth_handler().hash(password)
+            password_hash = yield self._auth_handler.hash(password)
 
         if localpart:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
@@ -185,7 +206,7 @@ class RegistrationHandler(BaseHandler):
             token = None
             if generate_token:
                 token = self.macaroon_gen.generate_access_token(user_id)
-            yield self.store.register(
+            yield self._register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -217,7 +238,7 @@ class RegistrationHandler(BaseHandler):
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
-                    yield self.store.register(
+                    yield self._register_with_store(
                         user_id=user_id,
                         token=token,
                         password_hash=password_hash,
@@ -316,7 +337,7 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
-        yield self.store.register(
+        yield self._register_with_store(
             user_id=user_id,
             password_hash="",
             appservice_id=service_id,
@@ -359,8 +380,7 @@ class RegistrationHandler(BaseHandler):
             logger.info("validating threepidcred sid %s on id server %s",
                         c['sid'], c['idServer'])
             try:
-                identity_handler = self.hs.get_handlers().identity_handler
-                threepid = yield identity_handler.threepid_from_creds(c)
+                threepid = yield self.identity_handler.threepid_from_creds(c)
             except Exception:
                 logger.exception("Couldn't validate 3pid")
                 raise RegistrationError(400, "Couldn't validate 3pid")
@@ -384,9 +404,8 @@ class RegistrationHandler(BaseHandler):
 
         # Now we have a matrix ID, bind it to the threepids we were given
         for c in threepidCreds:
-            identity_handler = self.hs.get_handlers().identity_handler
             # XXX: This should be a deferred list, shouldn't it?
-            yield identity_handler.bind_threepid(c, user_id)
+            yield self.identity_handler.bind_threepid(c, user_id)
 
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
         # don't allow people to register the server notices mxid
@@ -441,7 +460,7 @@ class RegistrationHandler(BaseHandler):
         lines = response.split('\n')
         json = {
             "valid": lines[0] == 'true',
-            "error_url": "http://www.google.com/recaptcha/api/challenge?" +
+            "error_url": "http://www.recaptcha.net/recaptcha/api/challenge?" +
                          "error=%s" % lines[1]
         }
         defer.returnValue(json)
@@ -452,7 +471,7 @@ class RegistrationHandler(BaseHandler):
         Used only by c/s api v1
         """
         data = yield self.captcha_client.post_urlencoded_get_raw(
-            "http://www.google.com:80/recaptcha/api/verify",
+            "http://www.recaptcha.net:80/recaptcha/api/verify",
             args={
                 'privatekey': private_key,
                 'remoteip': ip_addr,
@@ -494,7 +513,7 @@ class RegistrationHandler(BaseHandler):
         token = self.macaroon_gen.generate_access_token(user_id)
 
         if need_register:
-            yield self.store.register(
+            yield self._register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -511,9 +530,6 @@ class RegistrationHandler(BaseHandler):
             )
 
         defer.returnValue((user_id, token))
-
-    def auth_handler(self):
-        return self.hs.get_auth_handler()
 
     @defer.inlineCallbacks
     def get_or_register_3pid_guest(self, medium, address, inviter_user_id):
@@ -573,3 +589,275 @@ class RegistrationHandler(BaseHandler):
             action="join",
             ratelimit=False,
         )
+
+    def _register_with_store(self, user_id, token=None, password_hash=None,
+                             was_guest=False, make_guest=False, appservice_id=None,
+                             create_profile_with_displayname=None, admin=False,
+                             user_type=None):
+        """Register user in the datastore.
+
+        Args:
+            user_id (str): The desired user ID to register.
+            token (str): The desired access token to use for this user. If this
+                is not None, the given access token is associated with the user
+                id.
+            password_hash (str|None): Optional. The password hash for this user.
+            was_guest (bool): Optional. Whether this is a guest account being
+                upgraded to a non-guest account.
+            make_guest (boolean): True if the the new user should be guest,
+                false to add a regular user account.
+            appservice_id (str|None): The ID of the appservice registering the user.
+            create_profile_with_displayname (unicode|None): Optionally create a
+                profile for the user, setting their displayname to the given value
+            admin (boolean): is an admin user?
+            user_type (str|None): type of user. One of the values from
+                api.constants.UserTypes, or None for a normal user.
+
+        Returns:
+            Deferred
+        """
+        if self.hs.config.worker_app:
+            return self._register_client(
+                user_id=user_id,
+                token=token,
+                password_hash=password_hash,
+                was_guest=was_guest,
+                make_guest=make_guest,
+                appservice_id=appservice_id,
+                create_profile_with_displayname=create_profile_with_displayname,
+                admin=admin,
+                user_type=user_type,
+            )
+        else:
+            return self.store.register(
+                user_id=user_id,
+                token=token,
+                password_hash=password_hash,
+                was_guest=was_guest,
+                make_guest=make_guest,
+                appservice_id=appservice_id,
+                create_profile_with_displayname=create_profile_with_displayname,
+                admin=admin,
+                user_type=user_type,
+            )
+
+    @defer.inlineCallbacks
+    def register_device(self, user_id, device_id, initial_display_name,
+                        is_guest=False):
+        """Register a device for a user and generate an access token.
+
+        Args:
+            user_id (str): full canonical @user:id
+            device_id (str|None): The device ID to check, or None to generate
+                a new one.
+            initial_display_name (str|None): An optional display name for the
+                device.
+            is_guest (bool): Whether this is a guest account
+
+        Returns:
+            defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
+        """
+
+        if self.hs.config.worker_app:
+            r = yield self._register_device_client(
+                user_id=user_id,
+                device_id=device_id,
+                initial_display_name=initial_display_name,
+                is_guest=is_guest,
+            )
+            defer.returnValue((r["device_id"], r["access_token"]))
+        else:
+            device_id = yield self.device_handler.check_device_registered(
+                user_id, device_id, initial_display_name
+            )
+            if is_guest:
+                access_token = self.macaroon_gen.generate_access_token(
+                    user_id, ["guest = true"]
+                )
+            else:
+                access_token = yield self._auth_handler.get_access_token_for_user_id(
+                    user_id, device_id=device_id,
+                )
+
+            defer.returnValue((device_id, access_token))
+
+    @defer.inlineCallbacks
+    def post_registration_actions(self, user_id, auth_result, access_token,
+                                  bind_email, bind_msisdn):
+        """A user has completed registration
+
+        Args:
+            user_id (str): The user ID that consented
+            auth_result (dict): The authenticated credentials of the newly
+                registered user.
+            access_token (str|None): The access token of the newly logged in
+                device, or None if `inhibit_login` enabled.
+            bind_email (bool): Whether to bind the email with the identity
+                server
+            bind_msisdn (bool): Whether to bind the msisdn with the identity
+                server
+        """
+        if self.hs.config.worker_app:
+            yield self._post_registration_client(
+                user_id=user_id,
+                auth_result=auth_result,
+                access_token=access_token,
+                bind_email=bind_email,
+                bind_msisdn=bind_msisdn,
+            )
+            return
+
+        if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
+            threepid = auth_result[LoginType.EMAIL_IDENTITY]
+            # Necessary due to auth checks prior to the threepid being
+            # written to the db
+            if is_threepid_reserved(
+                self.hs.config.mau_limits_reserved_threepids, threepid
+            ):
+                yield self.store.upsert_monthly_active_user(user_id)
+
+            yield self._register_email_threepid(
+                user_id, threepid, access_token,
+                bind_email,
+            )
+
+        if auth_result and LoginType.MSISDN in auth_result:
+            threepid = auth_result[LoginType.MSISDN]
+            yield self._register_msisdn_threepid(
+                user_id, threepid, bind_msisdn,
+            )
+
+        if auth_result and LoginType.TERMS in auth_result:
+            yield self._on_user_consented(
+                user_id, self.hs.config.user_consent_version,
+            )
+
+    @defer.inlineCallbacks
+    def _on_user_consented(self, user_id, consent_version):
+        """A user consented to the terms on registration
+
+        Args:
+            user_id (str): The user ID that consented
+            consent_version (str): version of the policy the user has
+                consented to.
+        """
+        logger.info("%s has consented to the privacy policy", user_id)
+        yield self.store.user_set_consent_version(
+            user_id, consent_version,
+        )
+        yield self.post_consent_actions(user_id)
+
+    @defer.inlineCallbacks
+    def _register_email_threepid(self, user_id, threepid, token, bind_email):
+        """Add an email address as a 3pid identifier
+
+        Also adds an email pusher for the email address, if configured in the
+        HS config
+
+        Also optionally binds emails to the given user_id on the identity server
+
+        Must be called on master.
+
+        Args:
+            user_id (str): id of user
+            threepid (object): m.login.email.identity auth response
+            token (str|None): access_token for the user, or None if not logged
+                in.
+            bind_email (bool): true if the client requested the email to be
+                bound at the identity server
+        Returns:
+            defer.Deferred:
+        """
+        reqd = ('medium', 'address', 'validated_at')
+        if any(x not in threepid for x in reqd):
+            # This will only happen if the ID server returns a malformed response
+            logger.info("Can't add incomplete 3pid")
+            return
+
+        yield self._auth_handler.add_threepid(
+            user_id,
+            threepid['medium'],
+            threepid['address'],
+            threepid['validated_at'],
+        )
+
+        # And we add an email pusher for them by default, but only
+        # if email notifications are enabled (so people don't start
+        # getting mail spam where they weren't before if email
+        # notifs are set up on a home server)
+        if (self.hs.config.email_enable_notifs and
+                self.hs.config.email_notif_for_new_users
+                and token):
+            # Pull the ID of the access token back out of the db
+            # It would really make more sense for this to be passed
+            # up when the access token is saved, but that's quite an
+            # invasive change I'd rather do separately.
+            user_tuple = yield self.store.get_user_by_access_token(
+                token
+            )
+            token_id = user_tuple["token_id"]
+
+            yield self.pusher_pool.add_pusher(
+                user_id=user_id,
+                access_token=token_id,
+                kind="email",
+                app_id="m.email",
+                app_display_name="Email Notifications",
+                device_display_name=threepid["address"],
+                pushkey=threepid["address"],
+                lang=None,  # We don't know a user's language here
+                data={},
+            )
+
+        if bind_email:
+            logger.info("bind_email specified: binding")
+            logger.debug("Binding emails %s to %s" % (
+                threepid, user_id
+            ))
+            yield self.identity_handler.bind_threepid(
+                threepid['threepid_creds'], user_id
+            )
+        else:
+            logger.info("bind_email not specified: not binding email")
+
+    @defer.inlineCallbacks
+    def _register_msisdn_threepid(self, user_id, threepid, bind_msisdn):
+        """Add a phone number as a 3pid identifier
+
+        Also optionally binds msisdn to the given user_id on the identity server
+
+        Must be called on master.
+
+        Args:
+            user_id (str): id of user
+            threepid (object): m.login.msisdn auth response
+            token (str): access_token for the user
+            bind_email (bool): true if the client requested the email to be
+                bound at the identity server
+        Returns:
+            defer.Deferred:
+        """
+        try:
+            assert_params_in_dict(threepid, ['medium', 'address', 'validated_at'])
+        except SynapseError as ex:
+            if ex.errcode == Codes.MISSING_PARAM:
+                # This will only happen if the ID server returns a malformed response
+                logger.info("Can't add incomplete 3pid")
+                defer.returnValue(None)
+            raise
+
+        yield self._auth_handler.add_threepid(
+            user_id,
+            threepid['medium'],
+            threepid['address'],
+            threepid['validated_at'],
+        )
+
+        if bind_msisdn:
+            logger.info("bind_msisdn specified: binding")
+            logger.debug("Binding msisdn %s to %s", threepid, user_id)
+            yield self.identity_handler.bind_threepid(
+                threepid['threepid_creds'], user_id
+            )
+        else:
+            logger.info("bind_msisdn not specified: not binding msisdn")

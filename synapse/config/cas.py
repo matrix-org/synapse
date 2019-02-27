@@ -38,6 +38,7 @@ class CasConfig(Config):
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable CAS for registration and login.
+        #
         #cas_config:
         #   enabled: true
         #   server_url: "https://cas-server.com"

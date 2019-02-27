@@ -24,6 +24,14 @@ from ._base import Config, ConfigError
 
 logger = logging.Logger(__name__)
 
+# by default, we attempt to listen on both '::' *and* '0.0.0.0' because some OSes
+# (Windows, macOS, other BSD/Linux where net.ipv6.bindv6only is set) will only listen
+# on IPv6 when '::' is set.
+#
+# We later check for errors when binding to 0.0.0.0 and ignore them if :: is also in
+# in the list.
+DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
+
 
 class ServerConfig(Config):
 
@@ -118,16 +126,38 @@ class ServerConfig(Config):
                 self.public_baseurl += '/'
         self.start_pushers = config.get("start_pushers", True)
 
-        self.listeners = config.get("listeners", [])
+        self.listeners = []
+        for listener in config.get("listeners", []):
+            if not isinstance(listener.get("port", None), int):
+                raise ConfigError(
+                    "Listener configuration is lacking a valid 'port' option"
+                )
 
-        for listener in self.listeners:
+            if listener.setdefault("tls", False):
+                # no_tls is not really supported any more, but let's grandfather it in
+                # here.
+                if config.get("no_tls", False):
+                    logger.info(
+                        "Ignoring TLS-enabled listener on port %i due to no_tls"
+                    )
+                    continue
+
             bind_address = listener.pop("bind_address", None)
             bind_addresses = listener.setdefault("bind_addresses", [])
 
+            # if bind_address was specified, add it to the list of addresses
             if bind_address:
                 bind_addresses.append(bind_address)
-            elif not bind_addresses:
-                bind_addresses.append('')
+
+            # if we still have an empty list of addresses, use the default list
+            if not bind_addresses:
+                if listener['type'] == 'metrics':
+                    # the metrics listener doesn't support IPv6
+                    bind_addresses.append('0.0.0.0')
+                else:
+                    bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
+
+            self.listeners.append(listener)
 
         if not self.web_client_location:
             _warn_if_webclient_configured(self.listeners)
@@ -136,6 +166,9 @@ class ServerConfig(Config):
 
         bind_port = config.get("bind_port")
         if bind_port:
+            if config.get("no_tls", False):
+                raise ConfigError("no_tls is incompatible with bind_port")
+
             self.listeners = []
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
@@ -182,6 +215,7 @@ class ServerConfig(Config):
                 "port": manhole,
                 "bind_addresses": ["127.0.0.1"],
                 "type": "manhole",
+                "tls": False,
             })
 
         metrics_port = config.get("metrics_port")
@@ -206,6 +240,9 @@ class ServerConfig(Config):
             })
 
         _check_resource_config(self.listeners)
+
+    def has_tls_listener(self):
+        return any(l["tls"] for l in self.listeners)
 
     def default_config(self, server_name, data_dir_path, **kwargs):
         _, bind_port = parse_and_validate_server_name(server_name)
@@ -249,19 +286,20 @@ class ServerConfig(Config):
         #
         # This setting requires the affinity package to be installed!
         #
-        # cpu_affinity: 0xFFFFFFFF
+        #cpu_affinity: 0xFFFFFFFF
 
         # The path to the web client which will be served at /_matrix/client/
         # if 'webclient' is configured under the 'listeners' configuration.
         #
-        # web_client_location: "/path/to/web/root"
+        #web_client_location: "/path/to/web/root"
 
         # The public-facing base URL that clients use to access this HS
         # (not including _matrix/...). This is the same URL a user would
         # enter into the 'custom HS URL' field on their client. If you
         # use synapse with a reverse proxy, this should be the URL to reach
         # synapse via the proxy.
-        # public_baseurl: https://example.com/
+        #
+        #public_baseurl: https://example.com/
 
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
@@ -272,15 +310,25 @@ class ServerConfig(Config):
         use_presence: true
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
-        # gc_thresholds: [700, 10, 10]
+        #
+        #gc_thresholds: [700, 10, 10]
 
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is -1, means no upper limit.
-        # filter_timeline_limit: 5000
+        #
+        #filter_timeline_limit: 5000
 
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
-        # block_non_admin_invites: True
+        #
+        #block_non_admin_invites: True
+
+        # Room searching
+        #
+        # If disabled, new messages will not be indexed for searching and users
+        # will receive errors when searching for messages. Defaults to enabled.
+        #
+        #enable_search: false
 
         # Restrict federation to the following whitelist of domains.
         # N.B. we recommend also firewalling your federation listener to limit
@@ -288,117 +336,145 @@ class ServerConfig(Config):
         # purely on this application-layer restriction.  If not specified, the
         # default is to whitelist everything.
         #
-        # federation_domain_whitelist:
+        #federation_domain_whitelist:
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
+        #
+        # Options for each listener include:
+        #
+        #   port: the TCP port to bind to
+        #
+        #   bind_addresses: a list of local addresses to listen on. The default is
+        #       'all local interfaces'.
+        #
+        #   type: the type of listener. Normally 'http', but other valid options are:
+        #       'manhole' (see docs/manhole.md),
+        #       'metrics' (see docs/metrics-howto.rst),
+        #       'replication' (see docs/workers.rst).
+        #
+        #   tls: set to true to enable TLS for this listener. Will use the TLS
+        #       key/cert specified in tls_private_key_path / tls_certificate_path.
+        #
+        #   x_forwarded: Only valid for an 'http' listener. Set to true to use the
+        #       X-Forwarded-For header as the client IP. Useful when Synapse is
+        #       behind a reverse-proxy.
+        #
+        #   resources: Only valid for an 'http' listener. A list of resources to host
+        #       on this port. Options for each resource are:
+        #
+        #       names: a list of names of HTTP resources. See below for a list of
+        #           valid resource names.
+        #
+        #       compress: set to true to enable HTTP comression for this resource.
+        #
+        #   additional_resources: Only valid for an 'http' listener. A map of
+        #        additional endpoints which should be loaded via dynamic modules.
+        #
+        # Valid resource names are:
+        #
+        #   client: the client-server API (/_matrix/client). Also implies 'media' and
+        #       'static'.
+        #
+        #   consent: user consent forms (/_matrix/consent). See
+        #       docs/consent_tracking.md.
+        #
+        #   federation: the server-server API (/_matrix/federation). Also implies
+        #       'media', 'keys', 'openid'
+        #
+        #   keys: the key discovery API (/_matrix/keys).
+        #
+        #   media: the media API (/_matrix/media).
+        #
+        #   metrics: the metrics interface. See docs/metrics-howto.rst.
+        #
+        #   openid: OpenID authentication.
+        #
+        #   replication: the HTTP replication API (/_synapse/replication). See
+        #       docs/workers.rst.
+        #
+        #   static: static resources under synapse/static (/_matrix/static). (Mostly
+        #       useful for 'fallback authentication'.)
+        #
+        #   webclient: A web client. Requires web_client_location to be set.
+        #
         listeners:
-          # Main HTTPS listener
-          # For when matrix traffic is sent directly to synapse.
-          -
-            # The port to listen for HTTPS requests on.
-            port: %(bind_port)s
+          # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
+          #
+          # Disabled by default. To enable it, uncomment the following. (Note that you
+          # will also need to give Synapse a TLS key and certificate: see the TLS section
+          # below.)
+          #
+          #- port: %(bind_port)s
+          #  type: http
+          #  tls: true
+          #  resources:
+          #    - names: [client, federation]
 
-            # Local addresses to listen on.
-            # On Linux and Mac OS, `::` will listen on all IPv4 and IPv6
-            # addresses by default. For most other OSes, this will only listen
-            # on IPv6.
-            bind_addresses:
-              - '::'
-              - '0.0.0.0'
-
-            # This is a 'http' listener, allows us to specify 'resources'.
-            type: http
-
-            tls: true
-
-            # Use the X-Forwarded-For (XFF) header as the client IP and not the
-            # actual client IP.
-            x_forwarded: false
-
-            # List of HTTP resources to serve on this listener.
-            resources:
-              -
-                # List of resources to host on this listener.
-                names:
-                  - client       # The client-server APIs, both v1 and v2
-                  # - webclient  # A web client. Requires web_client_location to be set.
-
-                # Should synapse compress HTTP responses to clients that support it?
-                # This should be disabled if running synapse behind a load balancer
-                # that can do automatic compression.
-                compress: true
-
-              - names: [federation]  # Federation APIs
-                compress: false
-
-            # optional list of additional endpoints which can be loaded via
-            # dynamic modules
-            # additional_resources:
-            #   "/_matrix/my/custom/endpoint":
-            #     module: my_module.CustomRequestHandler
-            #     config: {}
-
-          # Unsecure HTTP listener,
-          # For when matrix traffic passes through loadbalancer that unwraps TLS.
+          # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+          # that unwraps TLS.
+          #
+          # If you plan to use a reverse proxy, please see
+          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+          #
           - port: %(unsecure_port)s
             tls: false
-            bind_addresses: ['::', '0.0.0.0']
+            bind_addresses: ['::1', '127.0.0.1']
             type: http
-
-            x_forwarded: false
+            x_forwarded: true
 
             resources:
-              - names: [client]
-                compress: true
-              - names: [federation]
+              - names: [client, federation]
                 compress: false
+
+            # example additonal_resources:
+            #
+            #additional_resources:
+            #  "/_matrix/my/custom/endpoint":
+            #    module: my_module.CustomRequestHandler
+            #    config: {}
 
           # Turn on the twisted ssh manhole service on localhost on the given
           # port.
-          # - port: 9000
-          #   bind_addresses: ['::1', '127.0.0.1']
-          #   type: manhole
+          #
+          #- port: 9000
+          #  bind_addresses: ['::1', '127.0.0.1']
+          #  type: manhole
 
 
-        # Homeserver blocking
-        #
+        ## Homeserver blocking ##
+
         # How to reach the server admin, used in ResourceLimitError
-        # admin_contact: 'mailto:admin@server.com'
         #
-        # Global block config
+        #admin_contact: 'mailto:admin@server.com'
+
+        # Global blocking
         #
-        # hs_disabled: False
-        # hs_disabled_message: 'Human readable reason for why the HS is blocked'
-        # hs_disabled_limit_type: 'error code(str), to help clients decode reason'
-        #
+        #hs_disabled: False
+        #hs_disabled_message: 'Human readable reason for why the HS is blocked'
+        #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
+
         # Monthly Active User Blocking
         #
-        # Enables monthly active user checking
-        # limit_usage_by_mau: False
-        # max_mau_value: 50
-        # mau_trial_days: 2
-        #
+        #limit_usage_by_mau: False
+        #max_mau_value: 50
+        #mau_trial_days: 2
+
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau
         # is true, this is implied to be true.
-        # mau_stats_only: False
         #
+        #mau_stats_only: False
+
         # Sometimes the server admin will want to ensure certain accounts are
         # never blocked by mau checking. These accounts are specified here.
         #
-        # mau_limit_reserved_threepids:
-        # - medium: 'email'
-        #   address: 'reserved_user@example.com'
-        #
-        # Room searching
-        #
-        # If disabled, new messages will not be indexed for searching and users
-        # will receive errors when searching for messages. Defaults to enabled.
-        # enable_search: true
+        #mau_limit_reserved_threepids:
+        #  - medium: 'email'
+        #    address: 'reserved_user@example.com'
         """ % locals()
 
     def read_arguments(self, args):
@@ -480,6 +556,7 @@ KNOWN_RESOURCES = (
     'keys',
     'media',
     'metrics',
+    'openid',
     'replication',
     'static',
     'webclient',

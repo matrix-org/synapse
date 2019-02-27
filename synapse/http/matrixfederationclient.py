@@ -32,7 +32,6 @@ from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
-from twisted.web.client import FileBodyProducer
 from twisted.web.http_headers import Headers
 
 import synapse.metrics
@@ -44,6 +43,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.http import QuieterFileBodyProducer
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
@@ -168,7 +168,7 @@ class MatrixFederationHttpClient(object):
             requests.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs, tls_client_options_factory):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
@@ -176,7 +176,7 @@ class MatrixFederationHttpClient(object):
 
         self.agent = MatrixFederationAgent(
             hs.get_reactor(),
-            hs.tls_client_options_factory,
+            tls_client_options_factory,
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
@@ -286,7 +286,7 @@ class MatrixFederationHttpClient(object):
                             json,
                         )
                         data = encode_canonical_json(json)
-                        producer = FileBodyProducer(
+                        producer = QuieterFileBodyProducer(
                             BytesIO(data),
                             cooperator=self._cooperator,
                         )

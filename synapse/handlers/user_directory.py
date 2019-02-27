@@ -134,7 +134,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Support users are for diagnostics and should not appear in the user directory.
         if not is_support:
             yield self.store.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url, None,
+                user_id, profile.display_name, profile.avatar_url, None
             )
 
     @defer.inlineCallbacks
@@ -170,8 +170,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                 self.pos = deltas[-1]["stream_id"]
 
                 # Expose current event processing position to prometheus
-                synapse.metrics.event_processing_positions.labels(
-                    "user_dir").set(self.pos)
+                synapse.metrics.event_processing_positions.labels("user_dir").set(
+                    self.pos
+                )
 
                 yield self.store.update_user_directory_stream_pos(self.pos)
 
@@ -195,21 +196,25 @@ class UserDirectoryHandler(StateDeltasHandler):
             logger.info("Handling room %d/%d", num_processed_rooms + 1, len(room_ids))
             yield self._handle_initial_room(room_id)
             num_processed_rooms += 1
-            yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
+            yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.0)
 
         logger.info("Processed all rooms.")
 
         if self.search_all_users:
             num_processed_users = 0
             user_ids = yield self.store.get_all_local_users()
-            logger.info("Doing initial update of user directory. %d users", len(user_ids))
+            logger.info(
+                "Doing initial update of user directory. %d users", len(user_ids)
+            )
             for user_id in user_ids:
                 # We add profiles for all users even if they don't match the
                 # include pattern, just in case we want to change it in future
-                logger.info("Handling user %d/%d", num_processed_users + 1, len(user_ids))
+                logger.info(
+                    "Handling user %d/%d", num_processed_users + 1, len(user_ids)
+                )
                 yield self._handle_local_user(user_id)
                 num_processed_users += 1
-                yield self.clock.sleep(self.INITIAL_USER_SLEEP_MS / 1000.)
+                yield self.clock.sleep(self.INITIAL_USER_SLEEP_MS / 1000.0)
 
             logger.info("Processed all users")
 
@@ -228,24 +233,24 @@ class UserDirectoryHandler(StateDeltasHandler):
         if not is_in_room:
             return
 
-        is_public = yield self.store.is_room_world_readable_or_publicly_joinable(room_id)
+        is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
 
         users_with_profile = yield self.state.get_current_user_in_room(room_id)
         user_ids = set(users_with_profile)
         unhandled_users = user_ids - self.initially_handled_users
 
         yield self.store.add_profiles_to_user_dir(
-            room_id, {
-                user_id: users_with_profile[user_id] for user_id in unhandled_users
-            }
+            room_id,
+            {user_id: users_with_profile[user_id] for user_id in unhandled_users},
         )
 
         self.initially_handled_users |= unhandled_users
 
         if is_public:
             yield self.store.add_users_to_public_room(
-                room_id,
-                user_ids=user_ids - self.initially_handled_users_in_public
+                room_id, user_ids=user_ids - self.initially_handled_users_in_public
             )
             self.initially_handled_users_in_public |= user_ids
 
@@ -257,7 +262,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         count = 0
         for user_id in user_ids:
             if count % self.INITIAL_ROOM_SLEEP_COUNT == 0:
-                yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
+                yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.0)
 
             if not self.is_mine_id(user_id):
                 count += 1
@@ -272,7 +277,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     continue
 
                 if count % self.INITIAL_ROOM_SLEEP_COUNT == 0:
-                    yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.)
+                    yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.0)
                 count += 1
 
                 user_set = (user_id, other_user_id)
@@ -294,25 +299,23 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 if len(to_insert) > self.INITIAL_ROOM_BATCH_SIZE:
                     yield self.store.add_users_who_share_room(
-                        room_id, not is_public, to_insert,
+                        room_id, not is_public, to_insert
                     )
                     to_insert.clear()
 
                 if len(to_update) > self.INITIAL_ROOM_BATCH_SIZE:
                     yield self.store.update_users_who_share_room(
-                        room_id, not is_public, to_update,
+                        room_id, not is_public, to_update
                     )
                     to_update.clear()
 
         if to_insert:
-            yield self.store.add_users_who_share_room(
-                room_id, not is_public, to_insert,
-            )
+            yield self.store.add_users_who_share_room(room_id, not is_public, to_insert)
             to_insert.clear()
 
         if to_update:
             yield self.store.update_users_who_share_room(
-                room_id, not is_public, to_update,
+                room_id, not is_public, to_update
             )
             to_update.clear()
 
@@ -333,11 +336,12 @@ class UserDirectoryHandler(StateDeltasHandler):
             # may have become public or not and add/remove the users in said room
             if typ in (EventTypes.RoomHistoryVisibility, EventTypes.JoinRules):
                 yield self._handle_room_publicity_change(
-                    room_id, prev_event_id, event_id, typ,
+                    room_id, prev_event_id, event_id, typ
                 )
             elif typ == EventTypes.Member:
                 change = yield self._get_key_change(
-                    prev_event_id, event_id,
+                    prev_event_id,
+                    event_id,
                     key_name="membership",
                     public_value=Membership.JOIN,
                 )
@@ -346,14 +350,16 @@ class UserDirectoryHandler(StateDeltasHandler):
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
                     is_in_room = yield self.store.is_host_joined(
-                        room_id, self.server_name,
+                        room_id, self.server_name
                     )
                     if not is_in_room:
                         logger.info("Server left room: %r", room_id)
                         # Fetch all the users that we marked as being in user
                         # directory due to being in the room and then check if
                         # need to remove those users or not
-                        user_ids = yield self.store.get_users_in_dir_due_to_room(room_id)
+                        user_ids = yield self.store.get_users_in_dir_due_to_room(
+                            room_id
+                        )
                         for user_id in user_ids:
                             yield self._handle_remove_user(room_id, user_id)
                         return
@@ -365,7 +371,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     if change is None:
                         # Handle any profile changes
                         yield self._handle_profile_change(
-                            state_key, room_id, prev_event_id, event_id,
+                            state_key, room_id, prev_event_id, event_id
                         )
                         continue
 
@@ -397,13 +403,15 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         if typ == EventTypes.RoomHistoryVisibility:
             change = yield self._get_key_change(
-                prev_event_id, event_id,
+                prev_event_id,
+                event_id,
                 key_name="history_visibility",
                 public_value="world_readable",
             )
         elif typ == EventTypes.JoinRules:
             change = yield self._get_key_change(
-                prev_event_id, event_id,
+                prev_event_id,
+                event_id,
                 key_name="join_rule",
                 public_value=JoinRules.PUBLIC,
             )
@@ -528,7 +536,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             )
             if self.is_mine_id(other_user_id) and not is_appservice:
                 shared_is_private = yield self.store.get_if_users_share_a_room(
-                    other_user_id, user_id,
+                    other_user_id, user_id
                 )
                 if shared_is_private is True:
                     # We've already marked in the database they share a private room
@@ -543,13 +551,11 @@ class UserDirectoryHandler(StateDeltasHandler):
                     to_insert.add((other_user_id, user_id))
 
         if to_insert:
-            yield self.store.add_users_who_share_room(
-                room_id, not is_public, to_insert,
-            )
+            yield self.store.add_users_who_share_room(room_id, not is_public, to_insert)
 
         if to_update:
             yield self.store.update_users_who_share_room(
-                room_id, not is_public, to_update,
+                room_id, not is_public, to_update
             )
 
     @defer.inlineCallbacks
@@ -568,15 +574,15 @@ class UserDirectoryHandler(StateDeltasHandler):
         row = yield self.store.get_user_in_public_room(user_id)
         update_user_in_public = row and row["room_id"] == room_id
 
-        if (update_user_in_public or update_user_dir):
+        if update_user_in_public or update_user_dir:
             # XXX: Make this faster?
             rooms = yield self.store.get_rooms_for_user(user_id)
             for j_room_id in rooms:
-                if (not update_user_in_public and not update_user_dir):
+                if not update_user_in_public and not update_user_dir:
                     break
 
                 is_in_room = yield self.store.is_host_joined(
-                    j_room_id, self.server_name,
+                    j_room_id, self.server_name
                 )
 
                 if not is_in_room:
@@ -604,19 +610,19 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Get a list of user tuples that were in the DB due to this room and
         # users (this includes tuples where the other user matches `user_id`)
         user_tuples = yield self.store.get_users_in_share_dir_with_room_id(
-            user_id, room_id,
+            user_id, room_id
         )
 
         for user_id, other_user_id in user_tuples:
             # For each user tuple get a list of rooms that they still share,
             # trying to find a private room, and update the entry in the DB
-            rooms = yield self.store.get_rooms_in_common_for_users(user_id, other_user_id)
+            rooms = yield self.store.get_rooms_in_common_for_users(
+                user_id, other_user_id
+            )
 
             # If they dont share a room anymore, remove the mapping
             if not rooms:
-                yield self.store.remove_user_who_share_room(
-                    user_id, other_user_id,
-                )
+                yield self.store.remove_user_who_share_room(user_id, other_user_id)
                 continue
 
             found_public_share = None
@@ -630,13 +636,13 @@ class UserDirectoryHandler(StateDeltasHandler):
                 else:
                     found_public_share = None
                     yield self.store.update_users_who_share_room(
-                        room_id, not is_public, [(user_id, other_user_id)],
+                        room_id, not is_public, [(user_id, other_user_id)]
                     )
                     break
 
             if found_public_share:
                 yield self.store.update_users_who_share_room(
-                    room_id, not is_public, [(user_id, other_user_id)],
+                    room_id, not is_public, [(user_id, other_user_id)]
                 )
 
     @defer.inlineCallbacks
@@ -664,5 +670,5 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         if prev_name != new_name or prev_avatar != new_avatar:
             yield self.store.update_profile_in_user_dir(
-                user_id, new_name, new_avatar, room_id,
+                user_id, new_name, new_avatar, room_id
             )

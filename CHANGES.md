@@ -1,20 +1,120 @@
-Synapse 0.99.0rc2 (2019-01-30)
+Synapse 0.99.2rc1 (2019-02-27)
 ==============================
+
+Features
+--------
+
+- Added an HAProxy example in the reverse proxy documentation. Contributed by Benoît S. (“Benpro”). ([\#4541](https://github.com/matrix-org/synapse/issues/4541))
+- Add basic optional sentry integration. ([\#4632](https://github.com/matrix-org/synapse/issues/4632), [\#4694](https://github.com/matrix-org/synapse/issues/4694))
+- Transfer bans on room upgrade. ([\#4642](https://github.com/matrix-org/synapse/issues/4642))
+- Add configurable room list publishing rules. ([\#4647](https://github.com/matrix-org/synapse/issues/4647))
+- Support .well-known delegation when issuing certificates through ACME. ([\#4652](https://github.com/matrix-org/synapse/issues/4652))
+- Allow registration and login to be handled by a worker instance. ([\#4666](https://github.com/matrix-org/synapse/issues/4666), [\#4670](https://github.com/matrix-org/synapse/issues/4670), [\#4682](https://github.com/matrix-org/synapse/issues/4682))
+- Reduce the overhead of creating outbound federation connections over TLS by caching the TLS client options. ([\#4674](https://github.com/matrix-org/synapse/issues/4674))
+- Add prometheus metrics for number of outgoing EDUs, by type. ([\#4695](https://github.com/matrix-org/synapse/issues/4695))
+- Return correct error code when inviting a remote user to a room whose homeserver does not support the room version. ([\#4721](https://github.com/matrix-org/synapse/issues/4721))
+- Prevent showing rooms to other servers that were set to not federate. ([\#4746](https://github.com/matrix-org/synapse/issues/4746))
+
 
 Bugfixes
 --------
 
-- Fix bug when rejecting remote invites. ([\#4527](https://github.com/matrix-org/synapse/issues/4527))
-- Fix incorrect rendering of server capabilities. ([81b7e7eed](https://github.com/matrix-org/synapse/commit/81b7e7eed323f55d6550e7a270a9dc2c4c7b0fe0))
+- Fix possible exception when paginating. ([\#4263](https://github.com/matrix-org/synapse/issues/4263))
+- The dependency checker now correctly reports a version mismatch for optional
+  dependencies, instead of reporting the dependency missing. ([\#4450](https://github.com/matrix-org/synapse/issues/4450))
+- Set CORS headers on .well-known requests. ([\#4651](https://github.com/matrix-org/synapse/issues/4651))
+- Fix kicking guest users on guest access revocation in worker mode. ([\#4667](https://github.com/matrix-org/synapse/issues/4667))
+- Fix an issue in the database migration script where the
+  `e2e_room_keys.is_verified` column wasn't considered as
+  a boolean. ([\#4680](https://github.com/matrix-org/synapse/issues/4680))
+- Fix TaskStopped exceptions in logs when outbound requests time out. ([\#4690](https://github.com/matrix-org/synapse/issues/4690))
+- Fix ACME config for python 2. ([\#4717](https://github.com/matrix-org/synapse/issues/4717))
+- Fix paginating over federation persisting incorrect state. ([\#4718](https://github.com/matrix-org/synapse/issues/4718))
 
-Improved Documentation
-----------------------
 
-- Add documentation on enabling ACME support when upgrading to v0.99. ([\#4528](https://github.com/matrix-org/synapse/issues/4528))
+Internal Changes
+----------------
+
+- Run `black` to reformat user directory code. ([\#4635](https://github.com/matrix-org/synapse/issues/4635))
+- Reduce number of exceptions we log. ([\#4643](https://github.com/matrix-org/synapse/issues/4643), [\#4668](https://github.com/matrix-org/synapse/issues/4668))
+- Introduce upsert batching functionality in the database layer. ([\#4644](https://github.com/matrix-org/synapse/issues/4644))
+- Fix various spelling mistakes. ([\#4657](https://github.com/matrix-org/synapse/issues/4657))
+- Cleanup request exception logging. ([\#4669](https://github.com/matrix-org/synapse/issues/4669), [\#4737](https://github.com/matrix-org/synapse/issues/4737), [\#4738](https://github.com/matrix-org/synapse/issues/4738))
+- Improve replication performance by reducing cache invalidation traffic. ([\#4671](https://github.com/matrix-org/synapse/issues/4671), [\#4715](https://github.com/matrix-org/synapse/issues/4715), [\#4748](https://github.com/matrix-org/synapse/issues/4748))
+- Test against Postgres 9.5 as well as 9.4. ([\#4676](https://github.com/matrix-org/synapse/issues/4676))
+- Run unit tests against python 3.7. ([\#4677](https://github.com/matrix-org/synapse/issues/4677))
+- Attempt to clarify installation instructions/config. ([\#4681](https://github.com/matrix-org/synapse/issues/4681))
+- Clean up gitignores. ([\#4688](https://github.com/matrix-org/synapse/issues/4688))
+- Minor tweaks to acme docs. ([\#4689](https://github.com/matrix-org/synapse/issues/4689))
+- Improve the logging in the pusher process. ([\#4691](https://github.com/matrix-org/synapse/issues/4691))
+- Better checks on newsfragments. ([\#4698](https://github.com/matrix-org/synapse/issues/4698), [\#4750](https://github.com/matrix-org/synapse/issues/4750))
+- Avoid some redundant work when processing read receipts. ([\#4706](https://github.com/matrix-org/synapse/issues/4706))
+- Run `push_receipts_to_remotes` as background job. ([\#4707](https://github.com/matrix-org/synapse/issues/4707))
+- Add prometheus metrics for number of badge update pushes. ([\#4709](https://github.com/matrix-org/synapse/issues/4709))
+- Reduce pusher logging on startup ([\#4716](https://github.com/matrix-org/synapse/issues/4716))
+- Don't log exceptions when failing to fetch remote server keys. ([\#4722](https://github.com/matrix-org/synapse/issues/4722))
+- Correctly proxy exception in frontend_proxy worker. ([\#4723](https://github.com/matrix-org/synapse/issues/4723))
+- Add database version to phonehome stats. ([\#4753](https://github.com/matrix-org/synapse/issues/4753))
 
 
-Synapse 0.99.0rc1 (2019-01-30)
-==============================
+Synapse 0.99.1.1 (2019-02-14)
+=============================
+
+Bugfixes
+--------
+
+- Fix "TypeError: '>' not supported" when starting without an existing certificate.
+  Fix a bug where an existing certificate would be reprovisoned every day. ([\#4648](https://github.com/matrix-org/synapse/issues/4648))
+
+
+Synapse 0.99.1 (2019-02-14)
+===========================
+
+Features
+--------
+
+- Include m.room.encryption on invites by default ([\#3902](https://github.com/matrix-org/synapse/issues/3902))
+- Federation OpenID listener resource can now be activated even if federation is disabled ([\#4420](https://github.com/matrix-org/synapse/issues/4420))
+- Synapse's ACME support will now correctly reprovision a certificate that approaches its expiry while Synapse is running. ([\#4522](https://github.com/matrix-org/synapse/issues/4522))
+- Add ability to update backup versions ([\#4580](https://github.com/matrix-org/synapse/issues/4580))
+- Allow the "unavailable" presence status for /sync.
+  This change makes Synapse compliant with r0.4.0 of the Client-Server specification. ([\#4592](https://github.com/matrix-org/synapse/issues/4592))
+- There is no longer any need to specify `no_tls`: it is inferred from the absence of TLS listeners ([\#4613](https://github.com/matrix-org/synapse/issues/4613), [\#4615](https://github.com/matrix-org/synapse/issues/4615), [\#4617](https://github.com/matrix-org/synapse/issues/4617), [\#4636](https://github.com/matrix-org/synapse/issues/4636))
+- The default configuration no longer requires TLS certificates. ([\#4614](https://github.com/matrix-org/synapse/issues/4614))
+
+
+Bugfixes
+--------
+
+- Copy over room federation ability on room upgrade. ([\#4530](https://github.com/matrix-org/synapse/issues/4530))
+- Fix noisy "twisted.internet.task.TaskStopped" errors in logs ([\#4546](https://github.com/matrix-org/synapse/issues/4546))
+- Synapse is now tolerant of the `tls_fingerprints` option being None or not specified. ([\#4589](https://github.com/matrix-org/synapse/issues/4589))
+- Fix 'no unique or exclusion constraint' error ([\#4591](https://github.com/matrix-org/synapse/issues/4591))
+- Transfer Server ACLs on room upgrade. ([\#4608](https://github.com/matrix-org/synapse/issues/4608))
+- Fix failure to start when not TLS certificate was given even if TLS was disabled. ([\#4618](https://github.com/matrix-org/synapse/issues/4618))
+- Fix self-signed cert notice from generate-config. ([\#4625](https://github.com/matrix-org/synapse/issues/4625))
+- Fix performance of `user_ips` table deduplication background update ([\#4626](https://github.com/matrix-org/synapse/issues/4626), [\#4627](https://github.com/matrix-org/synapse/issues/4627))
+
+
+Internal Changes
+----------------
+
+- Change the user directory state query to use a filtered call to the db instead of a generic one. ([\#4462](https://github.com/matrix-org/synapse/issues/4462))
+- Reject federation transactions if they include more than 50 PDUs or 100 EDUs. ([\#4513](https://github.com/matrix-org/synapse/issues/4513))
+- Reduce duplication of ``synapse.app`` code. ([\#4567](https://github.com/matrix-org/synapse/issues/4567))
+- Fix docker upload job to push -py2 images. ([\#4576](https://github.com/matrix-org/synapse/issues/4576))
+- Add port configuration information to ACME instructions. ([\#4578](https://github.com/matrix-org/synapse/issues/4578))
+- Update MSC1711 FAQ to calrify .well-known usage ([\#4584](https://github.com/matrix-org/synapse/issues/4584))
+- Clean up default listener configuration ([\#4586](https://github.com/matrix-org/synapse/issues/4586))
+- Clarifications for reverse proxy docs ([\#4607](https://github.com/matrix-org/synapse/issues/4607))
+- Move ClientTLSOptionsFactory init out of `refresh_certificates` ([\#4611](https://github.com/matrix-org/synapse/issues/4611))
+- Fail cleanly if listener config lacks a 'port' ([\#4616](https://github.com/matrix-org/synapse/issues/4616))
+- Remove redundant entries from docker config ([\#4619](https://github.com/matrix-org/synapse/issues/4619))
+- README updates ([\#4621](https://github.com/matrix-org/synapse/issues/4621))
+
+
+Synapse 0.99.0 (2019-02-05)
+===========================
 
 Synapse v0.99.x is a precursor to the upcoming Synapse v1.0 release. It contains foundational changes to room architecture and the federation security model necessary to support the upcoming r0 release of the Server to Server API.
 
@@ -22,15 +122,15 @@ Features
 --------
 
 - Synapse's cipher string has been updated to require ECDH key exchange. Configuring and generating dh_params is no longer required, and they will be ignored. ([\#4229](https://github.com/matrix-org/synapse/issues/4229))
-- Synapse can now automatically provision TLS certificates via ACME (the protocol used by CAs like Let's Encrypt). ([\#4384](https://github.com/matrix-org/synapse/issues/4384), [\#4492](https://github.com/matrix-org/synapse/issues/4492), [\#4525](https://github.com/matrix-org/synapse/issues/4525))
-- Implement MSC1708 (.well-known routing for server-server federation) ([\#4408](https://github.com/matrix-org/synapse/issues/4408), [\#4409](https://github.com/matrix-org/synapse/issues/4409), [\#4426](https://github.com/matrix-org/synapse/issues/4426), [\#4427](https://github.com/matrix-org/synapse/issues/4427), [\#4428](https://github.com/matrix-org/synapse/issues/4428), [\#4464](https://github.com/matrix-org/synapse/issues/4464), [\#4468](https://github.com/matrix-org/synapse/issues/4468), [\#4487](https://github.com/matrix-org/synapse/issues/4487), [\#4488](https://github.com/matrix-org/synapse/issues/4488), [\#4489](https://github.com/matrix-org/synapse/issues/4489), [\#4497](https://github.com/matrix-org/synapse/issues/4497), [\#4511](https://github.com/matrix-org/synapse/issues/4511), [\#4516](https://github.com/matrix-org/synapse/issues/4516), [\#4520](https://github.com/matrix-org/synapse/issues/4520), [\#4521](https://github.com/matrix-org/synapse/issues/4521))
+- Synapse can now automatically provision TLS certificates via ACME (the protocol used by CAs like Let's Encrypt). ([\#4384](https://github.com/matrix-org/synapse/issues/4384), [\#4492](https://github.com/matrix-org/synapse/issues/4492), [\#4525](https://github.com/matrix-org/synapse/issues/4525), [\#4572](https://github.com/matrix-org/synapse/issues/4572), [\#4564](https://github.com/matrix-org/synapse/issues/4564), [\#4566](https://github.com/matrix-org/synapse/issues/4566), [\#4547](https://github.com/matrix-org/synapse/issues/4547), [\#4557](https://github.com/matrix-org/synapse/issues/4557))
+- Implement MSC1708 (.well-known routing for server-server federation) ([\#4408](https://github.com/matrix-org/synapse/issues/4408), [\#4409](https://github.com/matrix-org/synapse/issues/4409), [\#4426](https://github.com/matrix-org/synapse/issues/4426), [\#4427](https://github.com/matrix-org/synapse/issues/4427), [\#4428](https://github.com/matrix-org/synapse/issues/4428), [\#4464](https://github.com/matrix-org/synapse/issues/4464), [\#4468](https://github.com/matrix-org/synapse/issues/4468), [\#4487](https://github.com/matrix-org/synapse/issues/4487), [\#4488](https://github.com/matrix-org/synapse/issues/4488), [\#4489](https://github.com/matrix-org/synapse/issues/4489), [\#4497](https://github.com/matrix-org/synapse/issues/4497), [\#4511](https://github.com/matrix-org/synapse/issues/4511), [\#4516](https://github.com/matrix-org/synapse/issues/4516), [\#4520](https://github.com/matrix-org/synapse/issues/4520), [\#4521](https://github.com/matrix-org/synapse/issues/4521), [\#4539](https://github.com/matrix-org/synapse/issues/4539), [\#4542](https://github.com/matrix-org/synapse/issues/4542), [\#4544](https://github.com/matrix-org/synapse/issues/4544))
 - Search now includes results from predecessor rooms after a room upgrade. ([\#4415](https://github.com/matrix-org/synapse/issues/4415))
 - Config option to disable requesting MSISDN on registration. ([\#4423](https://github.com/matrix-org/synapse/issues/4423))
 - Add a metric for tracking event stream position of the user directory. ([\#4445](https://github.com/matrix-org/synapse/issues/4445))
-- Support exposing server capabilities in CS API (MSC1753, MSC1804) ([\#4472](https://github.com/matrix-org/synapse/issues/4472))
-- Add support for room version 3 ([\#4483](https://github.com/matrix-org/synapse/issues/4483), [\#4499](https://github.com/matrix-org/synapse/issues/4499), [\#4515](https://github.com/matrix-org/synapse/issues/4515), [\#4523](https://github.com/matrix-org/synapse/issues/4523))
+- Support exposing server capabilities in CS API (MSC1753, MSC1804) ([\#4472](https://github.com/matrix-org/synapse/issues/4472), [81b7e7eed](https://github.com/matrix-org/synapse/commit/81b7e7eed323f55d6550e7a270a9dc2c4c7b0fe0)))
+- Add support for room version 3 ([\#4483](https://github.com/matrix-org/synapse/issues/4483), [\#4499](https://github.com/matrix-org/synapse/issues/4499), [\#4515](https://github.com/matrix-org/synapse/issues/4515), [\#4523](https://github.com/matrix-org/synapse/issues/4523), [\#4535](https://github.com/matrix-org/synapse/issues/4535))
 - Synapse will now reload TLS certificates from disk upon SIGHUP. ([\#4495](https://github.com/matrix-org/synapse/issues/4495), [\#4524](https://github.com/matrix-org/synapse/issues/4524))
-
+- The matrixdotorg/synapse Docker images now use Python 3 by default. ([\#4558](https://github.com/matrix-org/synapse/issues/4558))
 
 Bugfixes
 --------
@@ -39,7 +139,7 @@ Bugfixes
 - Fix typo in ALL_USER_TYPES definition to ensure type is a tuple ([\#4392](https://github.com/matrix-org/synapse/issues/4392))
 - Fix high CPU usage due to remote devicelist updates ([\#4397](https://github.com/matrix-org/synapse/issues/4397))
 - Fix potential bug where creating or joining a room could fail ([\#4404](https://github.com/matrix-org/synapse/issues/4404))
-- Fix bug when rejecting remote invites ([\#4405](https://github.com/matrix-org/synapse/issues/4405))
+- Fix bug when rejecting remote invites ([\#4405](https://github.com/matrix-org/synapse/issues/4405), [\#4527](https://github.com/matrix-org/synapse/issues/4527))
 - Fix incorrect logcontexts after a Deferred was cancelled ([\#4407](https://github.com/matrix-org/synapse/issues/4407))
 - Ensure encrypted room state is persisted across room upgrades. ([\#4411](https://github.com/matrix-org/synapse/issues/4411))
 - Copy over whether a room is a direct message and any associated room tags on room upgrade. ([\#4412](https://github.com/matrix-org/synapse/issues/4412))
@@ -55,6 +155,12 @@ Deprecations and Removals
 -------------------------
 
 - Synapse no longer generates self-signed TLS certificates when generating a configuration file. ([\#4509](https://github.com/matrix-org/synapse/issues/4509))
+
+
+Improved Documentation
+----------------------
+
+- Update debian installation instructions ([\#4526](https://github.com/matrix-org/synapse/issues/4526))
 
 
 Internal Changes
@@ -79,6 +185,8 @@ Internal Changes
 - Make it possible to set the log level for tests via an environment variable ([\#4506](https://github.com/matrix-org/synapse/issues/4506))
 - Reduce the log level of linearizer lock acquirement to DEBUG. ([\#4507](https://github.com/matrix-org/synapse/issues/4507))
 - Fix code to comply with linting in PyFlakes 3.7.1. ([\#4519](https://github.com/matrix-org/synapse/issues/4519))
+- Add some debug for membership syncing issues ([\#4538](https://github.com/matrix-org/synapse/issues/4538))
+- Docker: only copy what we need to the build image ([\#4562](https://github.com/matrix-org/synapse/issues/4562))
 
 
 Synapse 0.34.1.1 (2019-01-11)

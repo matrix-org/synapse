@@ -126,6 +126,78 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         })
 
     @defer.inlineCallbacks
+    def test_update_version(self):
+        """Check that we can update versions.
+        """
+        version = yield self.handler.create_version(self.local_user, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "first_version_auth_data",
+        })
+        self.assertEqual(version, "1")
+
+        res = yield self.handler.update_version(self.local_user, version, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "revised_first_version_auth_data",
+            "version": version
+        })
+        self.assertDictEqual(res, {})
+
+        # check we can retrieve it as the current version
+        res = yield self.handler.get_version_info(self.local_user)
+        self.assertDictEqual(res, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "revised_first_version_auth_data",
+            "version": version
+        })
+
+    @defer.inlineCallbacks
+    def test_update_missing_version(self):
+        """Check that we get a 404 on updating nonexistent versions
+        """
+        res = None
+        try:
+            yield self.handler.update_version(self.local_user, "1", {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data",
+                "version": "1"
+            })
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 404)
+
+    @defer.inlineCallbacks
+    def test_update_bad_version(self):
+        """Check that we get a 400 if the version in the body is missing or
+        doesn't match
+        """
+        version = yield self.handler.create_version(self.local_user, {
+            "algorithm": "m.megolm_backup.v1",
+            "auth_data": "first_version_auth_data",
+        })
+        self.assertEqual(version, "1")
+
+        res = None
+        try:
+            yield self.handler.update_version(self.local_user, version, {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data"
+            })
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 400)
+
+        res = None
+        try:
+            yield self.handler.update_version(self.local_user, version, {
+                "algorithm": "m.megolm_backup.v1",
+                "auth_data": "revised_first_version_auth_data",
+                "version": "incorrect"
+            })
+        except errors.SynapseError as e:
+            res = e.code
+        self.assertEqual(res, 400)
+
+    @defer.inlineCallbacks
     def test_delete_missing_version(self):
         """Check that we get a 404 on deleting nonexistent versions
         """

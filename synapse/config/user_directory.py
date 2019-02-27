@@ -40,5 +40,5 @@ class UserDirectoryConfig(Config):
         # on your database to tell it to rebuild the user_directory search indexes.
         #
         #user_directory:
-        #   search_all_users: false
+        #  search_all_users: false
         """

@@ -17,6 +17,7 @@
 import logging
 from collections import namedtuple
 
+from six import raise_from
 from six.moves import urllib
 
 from signedjson.key import (
@@ -35,7 +36,12 @@ from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import (
+    Codes,
+    HttpResponseException,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.logcontext import (
     LoggingContext,
@@ -44,6 +50,7 @@ from synapse.util.logcontext import (
     run_in_background,
 )
 from synapse.util.metrics import Measure
+from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
 
@@ -367,13 +374,18 @@ class Keyring(object):
                     server_name_and_key_ids, perspective_name, perspective_keys
                 )
                 defer.returnValue(result)
+            except KeyLookupError as e:
+                logger.warning(
+                    "Key lookup failed from %r: %s", perspective_name, e,
+                )
             except Exception as e:
                 logger.exception(
                     "Unable to get key from %r: %s %s",
                     perspective_name,
                     type(e).__name__, str(e),
                 )
-                defer.returnValue({})
+
+            defer.returnValue({})
 
         results = yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
@@ -421,21 +433,30 @@ class Keyring(object):
         # TODO(mark): Set the minimum_valid_until_ts to that needed by
         # the events being validated or the current time if validating
         # an incoming request.
-        query_response = yield self.client.post_json(
-            destination=perspective_name,
-            path="/_matrix/key/v2/query",
-            data={
-                u"server_keys": {
-                    server_name: {
-                        key_id: {
-                            u"minimum_valid_until_ts": 0
-                        } for key_id in key_ids
+        try:
+            query_response = yield self.client.post_json(
+                destination=perspective_name,
+                path="/_matrix/key/v2/query",
+                data={
+                    u"server_keys": {
+                        server_name: {
+                            key_id: {
+                                u"minimum_valid_until_ts": 0
+                            } for key_id in key_ids
+                        }
+                        for server_name, key_ids in server_names_and_key_ids
                     }
-                    for server_name, key_ids in server_names_and_key_ids
-                }
-            },
-            long_retries=True,
-        )
+                },
+                long_retries=True,
+            )
+        except (NotRetryingDestination, RequestSendFailed) as e:
+            raise_from(
+                KeyLookupError("Failed to connect to remote server"), e,
+            )
+        except HttpResponseException as e:
+            raise_from(
+                KeyLookupError("Remote server returned an error"), e,
+            )
 
         keys = {}
 
@@ -502,11 +523,20 @@ class Keyring(object):
             if requested_key_id in keys:
                 continue
 
-            response = yield self.client.get_json(
-                destination=server_name,
-                path="/_matrix/key/v2/server/" + urllib.parse.quote(requested_key_id),
-                ignore_backoff=True,
-            )
+            try:
+                response = yield self.client.get_json(
+                    destination=server_name,
+                    path="/_matrix/key/v2/server/" + urllib.parse.quote(requested_key_id),
+                    ignore_backoff=True,
+                )
+            except (NotRetryingDestination, RequestSendFailed) as e:
+                raise_from(
+                    KeyLookupError("Failed to connect to remote server"), e,
+                )
+            except HttpResponseException as e:
+                raise_from(
+                    KeyLookupError("Remote server returned an error"), e,
+                )
 
             if (u"signatures" not in response
                     or server_name not in response[u"signatures"]):
@@ -656,7 +686,7 @@ def _handle_key_deferred(verify_request):
     try:
         with PreserveLoggingContext():
             _, key_id, verify_key = yield verify_request.deferred
-    except IOError as e:
+    except (IOError, RequestSendFailed) as e:
         logger.warn(
             "Got IOError when downloading keys for %s: %s %s",
             server_name, type(e).__name__, str(e),
