@@ -95,3 +95,58 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py27.pg94.yaml
+
+  - label: ":python: Python 2.7 / PostgreSQL 9.5"
+    env:
+      TRIAL_FLAGS: "-j 4"
+    command:
+      - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
+    plugins:
+      - docker-compose#v2.1.0:
+          run: testenv
+          config:
+            - .buildkite/docker-compose.py27.pg95.yaml
+
+  - label: ":python: Python 3.5 / PostgreSQL 9.4"
+    env:
+      TRIAL_FLAGS: "-j 4"
+    command:
+      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
+    plugins:
+      - docker-compose#v2.1.0:
+          run: testenv
+          config:
+            - .buildkite/docker-compose.py35.pg94.yaml
+
+  - label: ":python: Python 3.5 / PostgreSQL 9.5"
+    env:
+      TRIAL_FLAGS: "-j 4"
+    command:
+      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
+    plugins:
+      - docker-compose#v2.1.0:
+          run: testenv
+          config:
+            - .buildkite/docker-compose.py35.pg95.yaml
+
+  - label: ":python: Python 3.7 / PostgreSQL 9.5"
+    env:
+      TRIAL_FLAGS: "-j 4"
+    command:
+      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+    plugins:
+      - docker-compose#v2.1.0:
+          run: testenv
+          config:
+            - .buildkite/docker-compose.py37.pg95.yaml
+
+  - label: ":python: Python 3.7 / PostgreSQL 11"
+    env:
+      TRIAL_FLAGS: "-j 4"
+    command:
+      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+    plugins:
+      - docker-compose#v2.1.0:
+          run: testenv
+          config:
+            - .buildkite/docker-compose.py37.pg11.yaml
