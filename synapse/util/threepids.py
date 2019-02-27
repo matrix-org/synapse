@@ -43,17 +43,19 @@ def check_3pid_allowed(hs, medium, address):
             {'medium': medium, 'address': address}
         )
 
-        # Assume false if invalid response
-        if 'hs' not in data:
+        # Check for invalid response
+        if 'hs' not in data and 'shadow_hs' not in data:
+            defer.returnValue(False)
+
+        # Check if this user is intended to register for this homeserver
+        if data['hs'] != hs.config.server_name and data['shadow_hs'] != hs.config.server_name:
             defer.returnValue(False)
 
         if data.get('requires_invite', False) and data.get('invited', False) == False:
             # Requires an invite but hasn't been invited
             defer.returnValue(False)
-        if hs.config.allow_invited_3pids and data.get('invited'):
-            defer.returnValue(True)
-        else:
-            defer.returnValue(data['hs'] == hs.config.server_name)
+
+        defer.returnValue(True)
 
     if hs.config.allowed_local_3pids:
         for constraint in hs.config.allowed_local_3pids:
