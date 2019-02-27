@@ -1,0 +1,1 @@
+Prevent showing rooms to other servers that were set to not federate.
