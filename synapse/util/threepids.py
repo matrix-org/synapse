@@ -51,7 +51,7 @@ def check_3pid_allowed(hs, medium, address):
         if data['hs'] != hs.config.server_name and data['shadow_hs'] != hs.config.server_name:
             defer.returnValue(False)
 
-        if data.get('requires_invite', False) and data.get('invited', False) == False:
+        if data.get('requires_invite', False) and not data.get('invited', False):
             # Requires an invite but hasn't been invited
             defer.returnValue(False)
 
