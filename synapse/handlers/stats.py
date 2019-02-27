@@ -459,13 +459,14 @@ class StatsHandler(StateDeltasHandler):
 
     @defer.inlineCallbacks
     def _is_public_room(self, room_id):
-        events = yield self.store.get_current_state(
+        join_rules = yield self.state.get_current_state(
             room_id,
-            ((EventTypes.JoinRules, ""), (EventTypes.RoomHistoryVisibility, "")),
+            EventTypes.JoinRules
         )
-
-        join_rules = events.get((EventTypes.JoinRules, ""))
-        history_visibility = events.get((EventTypes.RoomHistoryVisibility, ""))
+        history_visibility = yield self.state.get_current_state(
+            room_id,
+            EventTypes.RoomHistoryVisibility
+        )
 
         if (join_rules and join_rules.content.get("join_rule") == JoinRules.PUBLIC) or (
             (
