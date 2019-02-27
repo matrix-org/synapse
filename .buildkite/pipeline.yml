@@ -46,7 +46,7 @@ steps:
       - "tox -e py27,codecov"
     label: ":python: Python 2.7 / SQLite"
     env:
-      - TRIAL_FLAGS="-j 2"
+      TRIAL_FLAGS: "-j 2"
     plugins:
       - docker#v3.0.1:
           image: "python:2.7"
@@ -57,7 +57,7 @@ steps:
       - "tox -e py35,codecov"
     label: ":python: Python 3.5 / SQLite"
     env:
-      - TRIAL_FLAGS="-j 2"
+      TRIAL_FLAGS: "-j 2"
     plugins:
       - docker#v3.0.1:
           image: "python:3.5"
@@ -68,7 +68,7 @@ steps:
       - "tox -e py36,codecov"
     label: ":python: Python 3.6 / SQLite"
     env:
-      - TRIAL_FLAGS="-j 2"
+      TRIAL_FLAGS: "-j 2"
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
@@ -79,13 +79,15 @@ steps:
       - "tox -e py37,codecov"
     label: ":python: Python 3.7 / SQLite"
     env:
-      - TRIAL_FLAGS="-j 2"
+      TRIAL_FLAGS: "-j 2"
     plugins:
       - docker#v3.0.1:
           image: "python:3.7"
           propagate-environment: true
 
   - label: ":python: Python 2.7 / PostgreSQL 9.4"
+    env:
+      TRIAL_FLAGS: "-j 4"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
     plugins:
