@@ -15,7 +15,6 @@ services:
     environment:
       SYNAPSE_POSTGRES_HOST: postgres
       SYNAPSE_POSTGRES_PASSWORD: postgres
-      TRIAL_FLAGS: "-j 4"
     working_dir: /app
     volumes:
       - ..:/app
