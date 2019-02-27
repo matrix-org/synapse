@@ -8,7 +8,7 @@ steps:
     label: "\U0001F9F9 PEP-8"
     plugins:
       - docker#v3.0.1:
-          image: "python:3.7"
+          image: "python:3.6"
 
   - command:
       - "python -m pip install tox"
@@ -16,7 +16,7 @@ steps:
     label: "\U0001F9F9 packaging"
     plugins:
       - docker#v3.0.1:
-          image: "python:3.7"
+          image: "python:3.6"
 
   - command:
       - "python -m pip install tox"
@@ -24,7 +24,7 @@ steps:
     label: "\U0001F9F9 isort"
     plugins:
       - docker#v3.0.1:
-          image: "python:3.7"
+          image: "python:3.6"
 
   - command:
       - "python -m pip install tox"
@@ -33,7 +33,7 @@ steps:
     branches: "!master !develop !release-*"
     plugins:
       - docker#v3.0.1:
-          image: "python:3.7"
+          image: "python:3.6"
           propagate-environment: true
 
   - wait
