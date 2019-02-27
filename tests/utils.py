@@ -142,6 +142,9 @@ def default_config(name):
     config.saml2_enabled = False
     config.public_baseurl = None
     config.default_identity_server = None
+    config.key_refresh_interval = 24 * 60 * 60 * 1000
+    config.old_signing_keys = {}
+    config.tls_fingerprints = []
 
     config.use_frozen_dicts = False
 
@@ -456,6 +459,9 @@ class MockKey(object):
 
     def verify(self, message, sig):
         assert sig == b"\x9a\x87$"
+
+    def encode(self):
+        return b"<fake_encoded_key>"
 
 
 class MockClock(object):
