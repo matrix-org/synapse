@@ -268,6 +268,13 @@ def _parse_header(line):
     """Parse a Content-type like header.
 
     Cargo-culted from `cgi`, but works on bytes rather than strings.
+
+    Args:
+        line (bytes): header to be parsed
+
+    Returns:
+        Tuple[bytes, dict[bytes, bytes]]:
+            the main content-type, followed by the parameter dictionary
     """
     parts = _parseparam(b';' + line)
     key = next(parts)
@@ -291,6 +298,12 @@ def _parseparam(s):
     """Generator which splits the input on ;, respecting double-quoted sequences
 
     Cargo-culted from `cgi`, but works on bytes rather than strings.
+
+    Args:
+        s (bytes): header to be parsed
+
+    Returns:
+        Iterable[bytes]: the split input
     """
     while s[:1] == b';':
         s = s[1:]
