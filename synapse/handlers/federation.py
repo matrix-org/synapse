@@ -836,12 +836,22 @@ class FederationHandler(BaseHandler):
         #
         # We do this by filtering all the extremities and seeing if any remain.
         # Given we don't have the extremity events themselves, we need to
-        # actually check the events that references them.
+        # actually check the events that reference them.
         #
-        # TODO: Filter the list of extremities if we do do a backfill
+        # *Note*: the spec wants us to keep backfilling until we reach the start
+        # of the room in case we are allowed to see some of the history. However
+        # in practice that causes more issues than its worth, as a) its
+        # relatively rare for there to be any visible history and b) even when
+        # there is its often sufficiently long ago that clients would stop
+        # attempting to paginate before backfill reached the visible history.
+        #
+        # TODO: If we do do a backfill the we should filter the extremities to
+        #   only include those that point to visible portions of history.
+        #
         # TODO: Correctly handle the case where we are allowed to see the
         #   forward event but not the extremity, e.g. in the case of initial
-        #   join of the server.
+        #   join of the server where we are allowed to see the join event but
+        #   not anything before it.
 
         forward_events = yield self.store.get_forward_events(
             list(extremities),
