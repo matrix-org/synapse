@@ -555,6 +555,9 @@ def run(hs):
                 stats["memory_rss"] += process.memory_info().rss
                 stats["cpu_average"] += int(process.cpu_percent(interval=None))
 
+        stats["database_engine"] = hs.get_datastore().database_engine_name
+        stats["database_server_version"] = hs.get_datastore().get_server_version()
+
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
             yield hs.get_simple_http_client().put_json(

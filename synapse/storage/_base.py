@@ -1596,6 +1596,14 @@ class SQLBaseStore(object):
 
         return cls.cursor_to_dict(txn)
 
+    @property
+    def database_engine_name(self):
+        return self.database_engine.module.__name__
+
+    def get_server_version(self):
+        """Returns a string describing the server version number"""
+        return self.database_engine.server_version
+
 
 class _RollbackButIsFineException(Exception):
     """ This exception is used to rollback a transaction without implying
