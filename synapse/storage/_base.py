@@ -30,6 +30,7 @@ from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
+from synapse.util import batch_iter
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
@@ -1330,9 +1331,10 @@ class SQLBaseStore(object):
         # We need to be careful that the size of the `members_changed` list
         # isn't so large that it causes problems sending over replication, so we
         # send them in chunks.
-        members_changed = list(members_changed)
-        for i in range(0, len(members_changed), 100):
-            keys = itertools.chain([room_id], members_changed[i:i + 100])
+        # Max line length is 16K, and max user ID length is 255, so 50 should
+        # be safe.
+        for chunk in batch_iter(members_changed, 50):
+            keys = itertools.chain([room_id], chunk)
             self._send_invalidation_to_replication(
                 txn, _CURRENT_STATE_CACHE_NAME, keys,
             )
