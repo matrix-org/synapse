@@ -127,8 +127,11 @@ class RdataCommand(Command):
 
 
 class PositionCommand(Command):
-    """Sent by the client to tell the client the stream postition without
+    """Sent by the server to tell the client the stream postition without
     needing to send an RDATA.
+
+    Sent to the client after all missing updates for a stream have been sent
+    to the client and they're now up to date.
     """
     NAME = "POSITION"
 
