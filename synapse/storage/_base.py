@@ -149,7 +149,6 @@ class LoggingTransaction(object):
                 sql, *args
             )
         except Exception as e:
-            print(sql)
             logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
         finally:

@@ -228,8 +228,6 @@ class HomeServer(object):
         logger.info("Finished setting up.")
 
     def setup_master(self):
-        import traceback
-        traceback.print_stack()
         for i in self.REQUIRED_ON_MASTER_STARTUP:
             getattr(self, "get_" + i)()
 

@@ -42,7 +42,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         u1_token = self.login("u1", "pass")
 
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
-        print(room_1)
         self.helper.send_state(
             room_1, event_type="m.room.topic", body={"topic": "foo"}, tok=u1_token
         )
