@@ -34,7 +34,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """
 
     @defer.inlineCallbacks
-    def prepare(self):
+    def prepare(self, reactor, clock, hs):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
