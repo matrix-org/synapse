@@ -40,14 +40,13 @@ class StatsHandler(StateDeltasHandler):
 
     def __init__(self, hs):
         super(StatsHandler, self).__init__(hs)
-
+        self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.stats_enable = hs.config.stats_enable
         self.stats_bucket_size = hs.config.stats_bucket_size
 
         # The current position in the current_state_delta stream
@@ -56,7 +55,7 @@ class StatsHandler(StateDeltasHandler):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if self.stats_enable:
+        if hs.config.stats_enable:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
@@ -67,7 +66,7 @@ class StatsHandler(StateDeltasHandler):
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
-        if not self.stats_enable:
+        if not self.hs.config.stats_enable:
             return
 
         if self._is_processing:
@@ -144,6 +143,8 @@ class StatsHandler(StateDeltasHandler):
         """
 
         current_state_ids = yield self.store.get_current_state_ids(room_id)
+
+        print(current_state_ids)
 
         join_rules = yield self.store.get_event(
             current_state_ids.get((EventTypes.JoinRules, "")), allow_none=True
@@ -481,3 +482,5 @@ class StatsHandler(StateDeltasHandler):
     @defer.inlineCallbacks
     def _handle_local_user(self, user_id):
         logger.debug("Adding new local user to stats, %r", user_id)
+
+        yield defer.succeed(1)

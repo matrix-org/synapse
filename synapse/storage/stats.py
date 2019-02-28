@@ -69,6 +69,11 @@ class StatsStore(StateDeltasStore):
             desc="update_room_state",
         )
 
+    def get_all_room_state(self):
+        return self._simple_select_list(
+            "room_state", None, retcols=("name", "topic", "canonical_alias")
+        )
+
     def update_stats(self, stats_type, stats_id, ts, fields):
         return self._simple_upsert(
             table=("%s_stats" % stats_type),
