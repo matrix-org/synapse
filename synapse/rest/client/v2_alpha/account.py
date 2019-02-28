@@ -55,7 +55,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         if not (yield check_3pid_allowed(self.hs, "email", body['email'])):
             raise SynapseError(
                 403,
-                "Your email domain is not authorized on this server",
+                "Your email is not authorized on this server",
                 Codes.THREEPID_DENIED,
             )
 
@@ -271,7 +271,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         if not (yield check_3pid_allowed(self.hs, "email", body['email'])):
             raise SynapseError(
                 403,
-                "Your email domain is not authorized on this server",
+                "Your email is not authorized on this server",
                 Codes.THREEPID_DENIED,
             )
 
