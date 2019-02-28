@@ -332,6 +332,15 @@ class HomeserverTestCase(TestCase):
         self.pump()
         return self.successResultOf(d)
 
+    def get_failure(self, d, exc):
+        """
+        Run a Deferred and get a Failure from it. The failure must be of the type `exc`.
+        """
+        if not isinstance(d, Deferred):
+            return d
+        self.pump()
+        return self.failureResultOf(d, exc)
+
     def register_user(self, username, password, admin=False):
         """
         Register a user. Requires the Admin API be registered.

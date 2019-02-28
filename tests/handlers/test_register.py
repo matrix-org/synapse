@@ -103,32 +103,28 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
         )
-        with self.assertRaises(ResourceLimitError):
-            self.get_success(
-                self.handler.get_or_create_user(self.requester, 'b', "display_name")
-            )
+        self.get_failure(
+            self.handler.get_or_create_user(self.requester, 'b', "display_name"), ResourceLimitError
+        )
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        with self.assertRaises(ResourceLimitError):
-            self.get_success(
-                self.handler.get_or_create_user(self.requester, 'b', "display_name")
-            )
+        self.get_failure(
+            self.handler.get_or_create_user(self.requester, 'b', "display_name"), ResourceLimitError
+        )
 
     def test_register_mau_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
         )
-        with self.assertRaises(ResourceLimitError):
-            self.get_success(self.handler.register(localpart="local_part"))
+        self.get_failure(self.handler.register(localpart="local_part"), ResourceLimitError)
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        with self.assertRaises(ResourceLimitError):
-            self.get_success(self.handler.register(localpart="local_part"))
+        self.get_failure(self.handler.register(localpart="local_part"), ResourceLimitError)
 
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
@@ -176,8 +172,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(rooms), 0)
         directory_handler = self.hs.get_handlers().directory_handler
         room_alias = RoomAlias.from_string(room_alias_str)
-        with self.assertRaises(SynapseError):
-            self.get_success(directory_handler.get_association(room_alias))
+        self.get_failure(directory_handler.get_association(room_alias), SynapseError)
 
     def test_auto_create_auto_join_where_no_consent(self):
         self.hs.config.user_consent_at_registration = True
