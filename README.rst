@@ -248,8 +248,8 @@ Note that the server hostname cannot be an alias (CNAME record): it has to point
 directly to the server hosting the synapse instance.
 
 If it is not possible to acquire a certificate valid for you matrix domain,
-the correct method is create a Well Known entry. For more details on how to
-configure Well Known `see <https://github.com/matrix-org/synapse/blob/master/docs/well_known.md`_
+the correct method is create a .well-known entry. For more details on how to
+configure .well-known `see <https://github.com/matrix-org/synapse/blob/master/docs/well_known.md`_
 
 For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
 please take a look at `our guide <https://github.com/matrix-org/synapse/blob/master/docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100>`_
