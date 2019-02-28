@@ -20,10 +20,9 @@ DROP TABLE IF EXISTS users_who_share_rooms;
 DROP TABLE IF EXISTS users_in_public_rooms;
 
 -- Tables keeping track of what users share rooms. This is a map of local users
--- to local or remote users, per room. If it is a local user, there will also be
--- an entry making the user in the same room as themselves. Remote users cannot
--- be in the user_id column, only the other_user_id column.
--- There are two sets of tables, those for public rooms and those for private rooms.
+-- to local or remote users, per room. Remote users cannot be in the user_id
+-- column, only the other_user_id column. There are two tables, one for public
+-- rooms and those for private rooms.
 CREATE TABLE IF NOT EXISTS users_who_share_public_rooms (
     user_id TEXT NOT NULL,
     other_user_id TEXT NOT NULL,

@@ -572,10 +572,10 @@ class UserDirectoryStore(SQLBaseStore):
                     SELECT other_user_id AS user_id FROM users_who_share_public_rooms
                     UNION
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
-                    WHERE user_id = ? AND other_user_id != ?
+                    WHERE user_id = ?
                 ) AS p USING (user_id)
             """
-            join_args = (user_id, user_id)
+            join_args = (user_id,)
             where_clause = "p.user_id IS NOT NULL"
 
         if isinstance(self.database_engine, PostgresEngine):

@@ -449,9 +449,6 @@ class UserDirectoryHandler(object):
 
             # We don't care about appservice users.
             if not is_appservice:
-                # Our users are always in a room with themselves
-                to_insert.add((user_id, user_id))
-
                 for other_user_id in users_with_profile:
                     if user_id == other_user_id:
                         continue

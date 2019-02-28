@@ -158,10 +158,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         """
         r = set()
         for i in shared:
-            # Ignore users sharing a room with themselves
-            if i["user_id"] == i["other_user_id"]:
-                continue
-
             r.add((i["user_id"], i["other_user_id"], i["room_id"]))
         return r
 
