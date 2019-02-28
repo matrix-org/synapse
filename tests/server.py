@@ -137,6 +137,7 @@ def make_request(
     access_token=None,
     request=SynapseRequest,
     shorthand=True,
+    federation_auth_origin=None,
 ):
     """
     Make a web request using the given method and path, feed it the
@@ -150,9 +151,11 @@ def make_request(
         a dict.
         shorthand: Whether to try and be helpful and prefix the given URL
         with the usual REST API path, if it doesn't contain it.
+        federation_auth_origin (bytes|None): if set to not-None, we will add a fake
+            Authorization header pretenting to be the given server name.
 
     Returns:
-        A synapse.http.site.SynapseRequest.
+        Tuple[synapse.http.site.SynapseRequest, channel]
     """
     if not isinstance(method, bytes):
         method = method.encode('ascii')
@@ -182,6 +185,11 @@ def make_request(
     if access_token:
         req.requestHeaders.addRawHeader(
             b"Authorization", b"Bearer " + access_token.encode('ascii')
+        )
+
+    if federation_auth_origin is not None:
+        req.requestHeaders.addRawHeader(
+            b"Authorization", b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,)
         )
 
     if content:
@@ -288,9 +296,6 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
             **kwargs
         )
 
-    pool.runWithConnection = runWithConnection
-    pool.runInteraction = runInteraction
-
     class ThreadPool:
         """
         Threadless thread pool.
@@ -316,8 +321,12 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
             return d
 
     clock.threadpool = ThreadPool()
-    pool.threadpool = ThreadPool()
-    pool.running = True
+
+    if pool:
+        pool.runWithConnection = runWithConnection
+        pool.runInteraction = runInteraction
+        pool.threadpool = ThreadPool()
+        pool.running = True
     return d
 
 
