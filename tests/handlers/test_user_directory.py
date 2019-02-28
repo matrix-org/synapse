@@ -238,9 +238,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             set([(u1, u3, private_room), (u3, u1, private_room)]),
         )
 
-    def test_initial_profile(self):
+    def test_search_all_users(self):
         """
-
+        Search all users = True means that a user does not have to share a
+        private room with the searching user or be in a public room to be search
+        visible.
         """
         self.hs.config.user_directory_search_all_users = True
 
