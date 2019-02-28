@@ -116,7 +116,7 @@ def add_file_headers(request, media_type, file_size, upload_name):
         # [2]: https://tools.ietf.org/html/rfc2616#section-3.6
         # [3]: https://tools.ietf.org/html/rfc5987#section-3.2.1
 
-        # We avoid the quoted-string version of filename, because (a) synapse didn't
+        # We avoid the quoted-string version of `filename`, because (a) synapse didn't
         # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
         # may as well just do the filename* version.
         if _can_encode_filename_as_token(upload_name):
