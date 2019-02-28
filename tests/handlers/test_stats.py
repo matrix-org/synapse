@@ -35,6 +35,11 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         """
         initial_room_spam will build the table from scratch.
         """
+        r = self.get_success(self.store.get_all_room_state())
+        self.assertEqual(len(r), 0)
+
+        self.get_success(self.store.update_stats_stream_pos(None))
+
         # Disable stats
         self.hs.config.stats_enable = False
 
