@@ -134,11 +134,11 @@ ACME setup
 For details on having Synapse manage your federation TLS certificates
 automatically, please see `<docs/ACME.md>`_.
 
-Well Known setup
+.well-known setup
 =================
 
 For details on how to configure your TLS certificate such that one domain may
-delegate to another please see `<docs/well_known>`_.
+delegate to another please see `<docs/well-known>`_.
 
 Security Note
 =============
