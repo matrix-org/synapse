@@ -33,6 +33,10 @@ class RegistrationHandlers(object):
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """
 
+    def make_homeserver(self, reactor, clock):
+        hs = self.setup_test_homeserver(expire_access_token=True)
+        return hs
+
     def prepare(self, reactor, clock, hs):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
