@@ -32,7 +32,9 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.handler = self.hs.get_stats_handler()
 
     def test_initial_room(self):
-
+        """
+        initial_room_spam will build the table from scratch.
+        """
         # Disable stats
         self.hs.config.stats_enable = False
 
@@ -47,10 +49,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # Enable stats
         self.hs.config.stats_enable = True
-
         self.handler.notify_new_event()
         self.pump(10)
 
         r = self.get_success(self.store.get_all_room_state())
 
-        print(r)
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[0]["topic"], "foo")
