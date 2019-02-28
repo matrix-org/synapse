@@ -104,14 +104,16 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.lots_of_users)
         )
         self.get_failure(
-            self.handler.get_or_create_user(self.requester, 'b', "display_name"), ResourceLimitError
+            self.handler.get_or_create_user(self.requester, 'b', "display_name"),
+            ResourceLimitError,
         )
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         self.get_failure(
-            self.handler.get_or_create_user(self.requester, 'b', "display_name"), ResourceLimitError
+            self.handler.get_or_create_user(self.requester, 'b', "display_name"),
+            ResourceLimitError,
         )
 
     def test_register_mau_blocked(self):
@@ -119,12 +121,16 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.lots_of_users)
         )
-        self.get_failure(self.handler.register(localpart="local_part"), ResourceLimitError)
+        self.get_failure(
+            self.handler.register(localpart="local_part"), ResourceLimitError
+        )
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        self.get_failure(self.handler.register(localpart="local_part"), ResourceLimitError)
+        self.get_failure(
+            self.handler.register(localpart="local_part"), ResourceLimitError
+        )
 
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
