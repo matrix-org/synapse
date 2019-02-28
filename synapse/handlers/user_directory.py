@@ -63,10 +63,6 @@ class UserDirectoryHandler(object):
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
         self.initially_handled_users = set()
-        self.initially_handled_users_in_public = set()
-
-        self.initially_handled_users_share = set()
-        self.initially_handled_users_share_private_room = set()
 
         # The current position in the current_state_delta stream
         self.pos = None
@@ -214,13 +210,13 @@ class UserDirectoryHandler(object):
             logger.info("Processed all users")
 
         self.initially_handled_users = None
-        self.initially_handled_users_in_public = None
 
         yield self.store.update_user_directory_stream_pos(new_pos)
 
     @defer.inlineCallbacks
     def _handle_initial_room(self, room_id):
-        """Called when we initially fill out user_directory one room at a time
+        """
+        Called when we initially fill out user_directory one room at a time
         """
         is_in_room = yield self.store.is_host_joined(room_id, self.server_name)
         if not is_in_room:

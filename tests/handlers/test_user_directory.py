@@ -213,9 +213,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Reset the handled users caches
         self.handler.initially_handled_users = set()
-        self.handler.initially_handled_users_in_public = set()
 
-        # Do the initial handler
+        # Do the initial population
         d = self.handler._do_initial_spam()
 
         # This takes a while, so pump it a bunch of times to get through the
@@ -261,10 +260,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Reset the handled users caches
         self.handler.initially_handled_users = set()
-        self.handler.initially_handled_users_in_public = set()
 
-        # Configure the
-
+        # Do the initial population
         d = self.handler._do_initial_spam()
 
         # This takes a while, so pump it a bunch of times to get through the
