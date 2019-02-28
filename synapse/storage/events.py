@@ -1878,12 +1878,13 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
 
         def f(txn):
             sql = (
-                "SELECT sender LIKE '%%:%s' AS local, COUNT(*)"
+                "SELECT sender LIKE ? AS local, COUNT(*)"
                 " FROM events"
                 " WHERE room_id=?"
                 " GROUP BY local"
             )
-            txn.execute(sql, (local_server, room_id,))
+            print(sql)
+            txn.execute(sql, ("%%:" + local_server, room_id,))
             rows = txn.fetchall()
             results = {
                 ("local" if row[0] else "remote") : row[1]

@@ -149,6 +149,7 @@ class LoggingTransaction(object):
                 sql, *args
             )
         except Exception as e:
+            print(sql)
             logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
         finally:
@@ -631,7 +632,7 @@ class SQLBaseStore(object):
 
                 # presumably we raced with another transaction: let's retry.
                 logger.warn(
-                    "%s when upserting into %s; retrying: %s", e.__name__, table, e
+                    "IntegrityError when upserting into %s; retrying: %s", table, e
                 )
 
     def _simple_upsert_txn(

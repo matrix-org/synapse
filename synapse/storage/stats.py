@@ -73,7 +73,7 @@ class StatsStore(StateDeltasStore):
         return self._simple_upsert(
             table=("%s_stats" % stats_type),
             keyvalues={("%s_id" % stats_type): stats_id, "ts": ts},
-            updatevalues=fields,
+            values=fields,
             desc="update_stats",
         )
 
