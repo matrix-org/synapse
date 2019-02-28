@@ -159,8 +159,12 @@ class FederationRemoteSendQueue(object):
         # stream.
         pass
 
-    def send_edu(self, destination, edu_type, content, key=None):
+    def build_and_send_edu(self, destination, edu_type, content, key=None):
         """As per TransactionQueue"""
+        if destination == self.server_name:
+            logger.info("Not sending EDU to ourselves")
+            return
+
         pos = self._next_pos()
 
         edu = Edu(
@@ -465,15 +469,11 @@ def process_rows_for_federation(transaction_queue, rows):
 
     for destination, edu_map in iteritems(buff.keyed_edus):
         for key, edu in edu_map.items():
-            transaction_queue.send_edu(
-                edu.destination, edu.edu_type, edu.content, key=key,
-            )
+            transaction_queue.send_edu(edu, key)
 
     for destination, edu_list in iteritems(buff.edus):
         for edu in edu_list:
-            transaction_queue.send_edu(
-                edu.destination, edu.edu_type, edu.content, key=None,
-            )
+            transaction_queue.send_edu(edu, None)
 
     for destination in buff.device_destinations:
         transaction_queue.send_device_messages(destination)
