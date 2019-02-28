@@ -378,7 +378,7 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   for having Synapse automatically provision and renew federation
   certificates through ACME can be found at [ACME.md](docs/ACME.md). If,
   alternatively, you wish to delegate a TLS certificate from another domain
-  see the Well Known guide at [well_known.md](docs/well_known.md)
+  see the .well-known guide at [well-known.md](docs/well-known.md)
 
 
 
