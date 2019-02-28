@@ -6,7 +6,8 @@
 set -e
 
 # make sure that origin/develop is up to date
-git fetch origin develop
+git remote set-branches --add origin develop
+git fetch --depth=1 origin develop
 
 UPSTREAM=origin/develop
 
@@ -25,11 +26,15 @@ if git diff --name-only $UPSTREAM... | grep -qv '^develop/'; then
     tox -e check-newsfragment
 fi
 
+echo
+echo "--------------------------"
+echo
+
 # check that any new newsfiles on this branch end with a full stop.
-for f in git diff --name-only $UPSTREAM... -- changelog.d; do
+for f in `git diff --name-only $UPSTREAM... -- changelog.d`; do
     lastchar=`tr -d '\n' < $f | tail -c 1`
     if [ $lastchar != '.' ]; then
-        echo "Newsfragment $f does not end with a '.'" >&2
+        echo -e "\e[31mERROR: newsfragment $f does not end with a '.'\e[39m" >&2
         exit 1
     fi
 done
