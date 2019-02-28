@@ -93,13 +93,13 @@ Unless you are running a test instance of Synapse on your local machine, in
 general, you will need to enable TLS support before you can successfully
 connect from a client: see `<INSTALL.md#tls-certificates>`_.
 
-An easy way to get started is to login or register via Riot at 
-https://riot.im/app/#/login or https://riot.im/app/#/register respectively. 
+An easy way to get started is to login or register via Riot at
+https://riot.im/app/#/login or https://riot.im/app/#/register respectively.
 You will need to change the server you are logging into from ``matrix.org``
-and instead specify a Homeserver URL of ``https://<server_name>:8448`` 
-(or just ``https://<server_name>`` if you are using a reverse proxy). 
-(Leave the identity server as the default - see `Identity servers`_.) 
-If you prefer to use another client, refer to our 
+and instead specify a Homeserver URL of ``https://<server_name>:8448``
+(or just ``https://<server_name>`` if you are using a reverse proxy).
+(Leave the identity server as the default - see `Identity servers`_.)
+If you prefer to use another client, refer to our
 `client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
 If all goes well you should at least be able to log in, create a room, and
@@ -134,6 +134,11 @@ ACME setup
 For details on having Synapse manage your federation TLS certificates
 automatically, please see `<docs/ACME.md>`_.
 
+Well Known setup
+=================
+
+For details on how to configure your TLS certificate such that one domain may
+delegate to another please see `<docs/well_known>`_.
 
 Security Note
 =============
@@ -242,8 +247,16 @@ should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
 Note that the server hostname cannot be an alias (CNAME record): it has to point
 directly to the server hosting the synapse instance.
 
-You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
-its user-ids, by setting ``server_name``::
+If it is not possible to acquire a certificate valid for you matrix domain,
+the correct method is create a Well Known entry. For more details on how to
+configure Well Known `see <https://github.com/matrix-org/synapse/blob/master/docs/well_known.md`_
+
+For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
+please take a look at `our guide <https://github.com/matrix-org/synapse/blob/master/docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100>`_
+
+Having created a valid TLS certificate you can then configure your homeserver
+to use ``<yourdomain.com>`` as the domain in its user-ids, by setting
+``server_name``::
 
     python -m synapse.app.homeserver \
         --server-name <yourdomain.com> \
