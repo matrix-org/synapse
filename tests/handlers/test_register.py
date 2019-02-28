@@ -33,7 +33,6 @@ class RegistrationHandlers(object):
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """
 
-    @defer.inlineCallbacks
     def prepare(self, reactor, clock, hs):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
@@ -87,7 +86,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.handler.get_or_create_user(self.requester, 'a', "display_name")
         )
 
-    @defer.inlineCallbacks
     def test_get_or_create_user_mau_not_blocked(self):
         self.hs.config.limit_usage_by_mau = True
         self.store.count_monthly_users = Mock(
