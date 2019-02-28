@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.rest.client.v1 import admin, room, login
+from synapse.rest.client.v1 import admin, login, room
 
 from tests import unittest
 
