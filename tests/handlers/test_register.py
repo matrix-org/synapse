@@ -22,8 +22,6 @@ from synapse.api.errors import ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
-from tests.utils import setup_test_homeserver
-
 from .. import unittest
 
 
