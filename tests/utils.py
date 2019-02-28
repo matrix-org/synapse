@@ -330,7 +330,7 @@ def setup_test_homeserver(
                 cleanup_func(cleanup)
 
         hs.setup()
-        if homeserverToUse.__name__ == "HomeServer":
+        if homeserverToUse.__name__ == "TestHomeServer":
             hs.setup_master()
     else:
         hs = homeserverToUse(
