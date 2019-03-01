@@ -29,7 +29,7 @@ from twisted.internet import defer, reactor
 from synapse.api.constants import EventTypes, RoomVersions
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.config.server import ServerConfig
-from synapse.federation.transport import server
+from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
 from synapse.storage import DataStore
@@ -200,6 +200,9 @@ def setup_test_homeserver(
     Args:
         cleanup_func : The function used to register a cleanup routine for
                        after the test.
+
+    Calling this method directly is deprecated: you should instead derive from
+    HomeserverTestCase.
     """
     if reactor is None:
         from twisted.internet import reactor
@@ -351,21 +354,25 @@ def setup_test_homeserver(
 
     fed = kargs.get("resource_for_federation", None)
     if fed:
-        server.register_servlets(
-            hs,
-            resource=fed,
-            authenticator=server.Authenticator(hs),
-            ratelimiter=FederationRateLimiter(
-                hs.get_clock(),
-                window_size=hs.config.federation_rc_window_size,
-                sleep_limit=hs.config.federation_rc_sleep_limit,
-                sleep_msec=hs.config.federation_rc_sleep_delay,
-                reject_limit=hs.config.federation_rc_reject_limit,
-                concurrent_requests=hs.config.federation_rc_concurrent,
-            ),
-        )
+        register_federation_servlets(hs, fed)
 
     defer.returnValue(hs)
+
+
+def register_federation_servlets(hs, resource):
+    federation_server.register_servlets(
+        hs,
+        resource=resource,
+        authenticator=federation_server.Authenticator(hs),
+        ratelimiter=FederationRateLimiter(
+            hs.get_clock(),
+            window_size=hs.config.federation_rc_window_size,
+            sleep_limit=hs.config.federation_rc_sleep_limit,
+            sleep_msec=hs.config.federation_rc_sleep_delay,
+            reject_limit=hs.config.federation_rc_reject_limit,
+            concurrent_requests=hs.config.federation_rc_concurrent,
+        ),
+    )
 
 
 def get_mock_call_args(pattern_func, mock_func):
