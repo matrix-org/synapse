@@ -138,7 +138,7 @@ automatically, please see `<docs/ACME.md>`_.
 =================
 
 For details on how to configure your TLS certificate such that one domain may
-delegate to another please see `<docs/well-known>`_.
+delegate to another please see `<docs/well-known.md>`_.
 
 Security Note
 =============
@@ -249,12 +249,12 @@ should have the format ``_matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port>
 Note that the server hostname cannot be an alias (CNAME record): it has to point
 directly to the server hosting the synapse instance.
 
-If it is not possible to acquire a certificate valid for you matrix domain,
-the correct method is create a .well-known entry. For more details on how to
-configure .well-known `see <https://github.com/matrix-org/synapse/blob/master/docs/well_known.md`_
+If it is not possible to acquire a certificate valid for your matrix domain,
+the correct method is create a .well-known file. For more details on how to
+configure .well-known `see <docs/well_known.md>`_.
 
 For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
-please take a look at `our guide <https://github.com/matrix-org/synapse/blob/master/docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100>`_
+please take a look at `our guide <docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100>`_.
 
 Having created a valid TLS certificate you can then configure your homeserver
 to use ``<yourdomain.com>`` as the domain in its user-ids, by setting

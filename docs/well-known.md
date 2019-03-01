@@ -16,7 +16,7 @@ with a `.well-known` lookup.
 ## Configuring `.well-known`
 
  1. Give synapse a certificate corresponding to the target domain
-    (`customer.example.net`). Currently Synapse's ACME
+    (`customer.example.com`). Currently Synapse's ACME
     support [does not support
     this](https://github.com/matrix-org/synapse/issues/4552), so you will have
     to acquire a certificate yourself and give it to Synapse via
@@ -34,16 +34,16 @@ with a `.well-known` lookup.
     where the target server name is resolved as usual (i.e. SRV lookup, falling
     back to talking to port 8448).
 
-    In the above example, where synapse is listening on port 8000,
-    `https://example.com/.well-known/matrix/server` should have `m.server`
-    set to one of:
+    In the above `example.com` exmaple above, where synapse is listening on
+    port 8000, `https://example.com/.well-known/matrix/server` should have
+    `m.server` set to one of:
 
-    1. `customer.example.net` ─ with a SRV record on
+    1. `customer.example.com` ─ with a SRV record on
        `_matrix._tcp.customer.example.com` pointing to port 8000, or:
 
-    2. `customer.example.net` ─ updating synapse to listen on the default port
+    2. `customer.example.com` ─ updating synapse to listen on the default port
        8448, or:
 
-    3. `customer.example.net:8000` ─ ensuring that if there is a reverse proxy
-       on `customer.example.net:8000` it correctly handles HTTP requests with
-       Host header set to `customer.example.net:8000`.
+    3. `customer.example.com:8000` ─ ensuring that if there is a reverse proxy
+       on `customer.example.com:8000` it correctly handles HTTP requests with
+       Host header set to `customer.example.com:8000`.
