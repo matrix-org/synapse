@@ -20,14 +20,14 @@ import json
 from mock import Mock
 
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1.admin import register_servlets
+from synapse.rest.client.v1 import admin
 
 from tests import unittest
 
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
 
-    servlets = [register_servlets]
+    servlets = [admin.register_servlets]
 
     def make_homeserver(self, reactor, clock):
 
