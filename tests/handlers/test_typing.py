@@ -177,6 +177,8 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             timeout=20000,
         ))
 
+        self.reactor.advance(0)
+
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
             "farm",
@@ -253,6 +255,8 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.on_new_event.assert_has_calls(
             [call('typing_key', 1, rooms=[ROOM_ID])]
         )
+
+        self.reactor.advance(0)
 
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(

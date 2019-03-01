@@ -23,6 +23,16 @@ from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
 
+# Outgoing EDU bucket identifiers. When we queue EDUs for transmission over federation,
+# we sometimes want to batch them up. We do this by putting them into buckets according
+# to the type of edu.
+#
+# The "Instant" EDU bucket is ready for transmission immediately.
+INSTANT_EDU_BUCKET_ID = 0
+
+# the "Delayed" EDU bucket is queued for transmission after 5 seconds.
+DELAYED_EDU_BUCKET_ID = 1
+
 
 class Edu(JsonEncodedObject):
     """ An Edu represents a piece of data sent from one homeserver to another.
@@ -46,6 +56,7 @@ class Edu(JsonEncodedObject):
     internal_keys = [
         "origin",
         "destination",
+        "bucket_id",
     ]
 
 

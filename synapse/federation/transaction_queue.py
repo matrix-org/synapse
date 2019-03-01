@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import collections
 import datetime
+import itertools
 import logging
 
 from six import itervalues
 
+import attr
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -26,6 +29,13 @@ from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
+)
+from synapse.federation.persistence import TransactionActions
+from synapse.federation.units import (
+    DELAYED_EDU_BUCKET_ID,
+    INSTANT_EDU_BUCKET_ID,
+    Edu,
+    Transaction,
 )
 from synapse.handlers.presence import format_user_presence_state, get_interested_remotes
 from synapse.metrics import (
@@ -39,9 +49,6 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util import logcontext
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
-
-from .persistence import TransactionActions
-from .units import Edu, Transaction
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +72,9 @@ sent_edus_by_type = Counter(
     "Number of sent EDUs successfully sent, by event type",
     ["type"],
 )
+
+MAX_EDUS_PER_TRANSACTION = 100
+MAX_PDUS_PER_TRANSACTION = 50
 
 
 class TransactionQueue(object):
@@ -102,7 +112,8 @@ class TransactionQueue(object):
         # Is a mapping from destination -> list of
         # tuple(pending pdus, deferred, order)
         self.pending_pdus_by_dest = pdus = {}
-        # destination -> list of tuple(edu, deferred)
+
+        # destination -> PerDestinationQueue
         self.pending_edus_by_dest = edus = {}
 
         # Map of user_id -> UserPresenceState for all the pending presence
@@ -113,11 +124,6 @@ class TransactionQueue(object):
         # Map of destination -> user_id -> UserPresenceState of pending presence
         # to be sent to each destinations
         self.pending_presence_by_dest = presence = {}
-
-        # Pending EDUs by their "key". Keyed EDUs are EDUs that get clobbered
-        # based on their key (e.g. typing events by room_id)
-        # Map of destination -> (edu_type, key) -> Edu
-        self.pending_edus_keyed_by_dest = edus_keyed = {}
 
         LaterGauge(
             "synapse_federation_transaction_queue_pending_pdus",
@@ -130,9 +136,8 @@ class TransactionQueue(object):
             "",
             [],
             lambda: (
-                sum(map(len, edus.values()))
+                sum(d.get_edu_count() for d in edus.values())
                 + sum(map(len, presence.values()))
-                + sum(map(len, edus_keyed.values()))
             ),
         )
 
@@ -361,7 +366,9 @@ class TransactionQueue(object):
 
                 self._attempt_new_transaction(destination)
 
-    def build_and_send_edu(self, destination, edu_type, content, key=None):
+    def build_and_send_edu(
+        self, destination, edu_type, content, key=None, bucket_id=None
+    ):
         """Construct an Edu object, and queue it for sending
 
         Args:
@@ -369,6 +376,7 @@ class TransactionQueue(object):
             edu_type (str): type of EDU to send
             content (dict): content of EDU
             key (Any|None): clobbering key for this edu
+            bucket_id (int|None): fixme
         """
         if destination == self.server_name:
             logger.info("Not sending EDU to ourselves")
@@ -379,6 +387,7 @@ class TransactionQueue(object):
             destination=destination,
             edu_type=edu_type,
             content=content,
+            bucket_id=bucket_id
         )
 
         self.send_edu(edu, key)
@@ -390,14 +399,20 @@ class TransactionQueue(object):
             edu (Edu): edu to send
             key (Any|None): clobbering key for this edu
         """
-        if key:
-            self.pending_edus_keyed_by_dest.setdefault(
-                edu.destination, {}
-            )[(edu.edu_type, key)] = edu
-        else:
-            self.pending_edus_by_dest.setdefault(edu.destination, []).append(edu)
+        dest = edu.destination
+        queue = self.pending_edus_by_dest.get(dest)
+        if not queue:
+            def tx_cb():
+                self._attempt_new_transaction(dest)
 
-        self._attempt_new_transaction(edu.destination)
+            queue = PerDestinationQueue(
+                clock=self.clock,
+                attempt_transaction_cb=tx_cb,
+            )
+            self.pending_edus_by_dest[dest] = queue
+
+        bucket = queue.get_or_create_edu_bucket(edu.bucket_id)
+        bucket.add_edu(edu, key)
 
     def send_device_messages(self, destination):
         if destination == self.server_name:
@@ -455,6 +470,7 @@ class TransactionQueue(object):
 
             pending_pdus = []
             while True:
+                # FIXME need to limit this to 100 EDUs
                 device_message_edus, device_stream_id, dev_list_id = (
                     yield self._get_new_device_messages(destination)
                 )
@@ -471,44 +487,47 @@ class TransactionQueue(object):
                 pending_pdus = self.pending_pdus_by_dest.pop(destination, [])
 
                 # We can only include at most 50 PDUs per transactions
-                pending_pdus, leftover_pdus = pending_pdus[:50], pending_pdus[50:]
+                pending_pdus, leftover_pdus = (
+                    pending_pdus[:MAX_PDUS_PER_TRANSACTION],
+                    pending_pdus[MAX_PDUS_PER_TRANSACTION:],
+                )
                 if leftover_pdus:
                     self.pending_pdus_by_dest[destination] = leftover_pdus
 
-                pending_edus = self.pending_edus_by_dest.pop(destination, [])
+                pending_edus = device_message_edus
 
-                # We can only include at most 100 EDUs per transactions
-                pending_edus, leftover_edus = pending_edus[:100], pending_edus[100:]
-                if leftover_edus:
-                    self.pending_edus_by_dest[destination] = leftover_edus
+                if len(pending_edus) < MAX_EDUS_PER_TRANSACTION:
+                    pending_presence = self.pending_presence_by_dest.pop(destination, {})
 
-                pending_presence = self.pending_presence_by_dest.pop(destination, {})
+                    if pending_presence:
+                        pending_edus.append(
+                            Edu(
+                                origin=self.server_name,
+                                destination=destination,
+                                edu_type="m.presence",
+                                content={
+                                    "push": [
+                                        format_user_presence_state(
+                                            presence, self.clock.time_msec()
+                                        )
+                                        for presence in pending_presence.values()
+                                    ]
+                                },
+                            )
+                        )
 
                 pending_edus.extend(
-                    self.pending_edus_keyed_by_dest.pop(destination, {}).values()
-                )
+                    self._pop_pending_edus_for_destination(
+                        destination,
 
-                pending_edus.extend(device_message_edus)
-                if pending_presence:
-                    pending_edus.append(
-                        Edu(
-                            origin=self.server_name,
-                            destination=destination,
-                            edu_type="m.presence",
-                            content={
-                                "push": [
-                                    format_user_presence_state(
-                                        presence, self.clock.time_msec()
-                                    )
-                                    for presence in pending_presence.values()
-                                ]
-                            },
-                        )
+                        # we can include at most 100 EDUs per transaction
+                        limit=MAX_EDUS_PER_TRANSACTION - len(pending_edus),
+
+                        # if we're sending PDUs or other EDUs anyway, we may as well skip
+                        # the batching
+                        skip_batching=bool(pending_pdus or pending_edus),
                     )
-
-                if pending_pdus:
-                    logger.debug("TX [%s] len(pending_pdus_by_dest[dest]) = %d",
-                                 destination, len(pending_pdus))
+                )
 
                 if not pending_pdus and not pending_edus:
                     logger.debug("TX [%s] Nothing to send", destination)
@@ -607,6 +626,19 @@ class TransactionQueue(object):
             for content in results
         )
         defer.returnValue((edus, stream_id, now_stream_id))
+
+    def _pop_pending_edus_for_destination(self, destination, limit, skip_batching):
+        destination_edu_buckets = self.pending_edus_by_dest.get(destination)
+        if not destination_edu_buckets:
+            return []
+
+        result = list(itertools.islice(
+            destination_edu_buckets.pop_pending_edus(skip_batching),
+            limit,
+        ))
+        if destination_edu_buckets.is_empty():
+            del self.pending_edus_by_dest[destination]
+        return result
 
     @measure_func("_send_new_transaction")
     @defer.inlineCallbacks
@@ -714,3 +746,183 @@ class TransactionQueue(object):
             success = False
 
         defer.returnValue(success)
+
+
+@attr.s
+class PerDestinationQueue(object):
+    """
+    Holds the per-destination transmission queues.
+
+    (Currently it only holds the EDUs but at some point it would be good to extend it to
+    hold the other per-destination data like PDUs and presence.)
+    """
+    clock = attr.ib()  # type: synapse.util.Clock
+
+    # the callback to be called when our EDUs become ready for transmission.
+    attempt_transaction_cb = attr.ib()  # type: callable
+
+    # edu buckets for this destination, keyed by edu bucket ID
+    edu_buckets = attr.ib(factory=dict)   # type: dict[int, EduTransmissionBucket]
+
+    def get_edu_count(self):
+        """Get the number of pending EDUs for this destination
+
+        Returns:
+            int: number of pending EDUs
+        """
+        return sum(b.get_edu_count() for b in self.edu_buckets.values())
+
+    def is_empty(self):
+        """Check if this queue is empty (and can therefore be destroyed)
+
+        Returns:
+            bool: True if the queue is empty
+        """
+        # it's assumed that we never have any empty buckets, so we just need to
+        # check if we have any buckets at all
+        return not self.edu_buckets
+
+    def get_or_create_edu_bucket(self, bucket_id):
+        """Get (or create) an EDU bucket for the given bucket identifier
+
+        Args:
+            bucket_id (int|None): bucket identifier; None implies instant
+        """
+        if bucket_id is None:
+            bucket_id = INSTANT_EDU_BUCKET_ID
+
+        bucket = self.edu_buckets.get(bucket_id)
+        if bucket:
+            return bucket
+
+        if bucket_id == INSTANT_EDU_BUCKET_ID:
+            delay = 0
+        elif bucket_id == DELAYED_EDU_BUCKET_ID:
+            delay = 5000
+        else:
+            raise RuntimeError("Unknown bucket id %i" % (bucket_id,))
+
+        transmit_task = self.clock.call_later(delay, self.attempt_transaction_cb)
+        transmission_time = self.clock.time_msec() + delay
+        self.edu_buckets[bucket_id] = bucket = EduTransmissionBucket(
+            bucket_transmission_time=transmission_time,
+            transmission_task=transmit_task,
+        )
+        logger.debug(
+            "Created new bucket %i for transmission at %i", bucket_id, transmission_time
+        )
+
+        return bucket
+
+    def pop_pending_edus(self, skip_batching):
+        """Get pending EDUs from this queue
+
+        A Generator function which pops EDUs off the queue as the result is iterated.
+
+        If any buckets become empty, we will destroy them (and cancel their transmission
+        tasks, if necessary).
+
+        Args:
+            skip_batching (bool): True to ignore the transmission time on the buckets
+                and transmit anyway. (This is useful where we have already decided to
+                send a transaction to this destination, and so therefore might as well
+                send as many EDUs as we can.)
+
+        Returns:
+            Iterator[Edu]: an iterator whose each iteration will pop an edu off the queue.
+        """
+        now = self.clock.time_msec()
+        for bucket_id in (INSTANT_EDU_BUCKET_ID, DELAYED_EDU_BUCKET_ID):
+            bucket = self.edu_buckets.get(bucket_id)
+            if not bucket:
+                logger.debug("EDU bucket %i empty", bucket_id)
+                continue
+
+            if not skip_batching and (now - bucket.bucket_transmission_time) < 0:
+                # it's not yet time to send this bucket
+                logger.debug(
+                    "EDU bucket %i transmission time %i not yet reached: now %i",
+                    bucket_id, bucket.bucket_transmission_time, now,
+                )
+                continue
+
+            logger.debug("Popping EDUs from bucket %i", bucket_id)
+
+            try:
+                for e in bucket.pop_pending_edus():
+                    yield e
+                    skip_batching = True
+            finally:
+                # if the bucket is now empty, we need to destroy it.
+                # (we do this in a finally block so that if the caller pops exactly the
+                # right number of EDUs, it is still called.
+                if bucket.is_empty():
+                    self._destroy_bucket(bucket_id)
+
+    def _destroy_bucket(self, bucket_id):
+        bucket = self.edu_buckets.pop(bucket_id)
+        task = bucket.transmission_task
+        if not task.cancelled and not task.called:
+            task.cancel()
+
+
+@attr.s
+class EduTransmissionBucket(object):
+    """Bucket of EDUs waiting for transmission to a given destination
+    """
+    # when this bucket is due for transmission (ms since the epoch)
+    bucket_transmission_time = attr.ib()
+
+    # a reactor task to call _attempt_new_transaction when the EDUs are due
+    transmission_task = attr.ib(default=None)
+
+    # a list of edus in this bucket; most recent last
+    edus = attr.ib(factory=collections.deque)
+
+    # Pending EDUs by their "key". Keyed EDUs are EDUs that get clobbered
+    # based on their key (e.g. typing events by room_id). These aren't stored in
+    # any particular order.
+    #
+    # Map of (edu_type, key) -> Edu
+    keyed_edus = attr.ib(factory=dict)
+
+    def get_edu_count(self):
+        """Get the number of EDUs in this bucket
+
+        Returns:
+            int: number of pending edus
+        """
+        return len(self.edus) + len(self.keyed_edus)
+
+    def is_empty(self):
+        """Determine if this bucket is now empty (so can be destroyed)
+
+        Returns:
+            bool: True if the bucket is empty
+        """
+        return not self.edus and not self.keyed_edus
+
+    def add_edu(self, edu, key):
+        """Add an edu to this bucket
+
+        Args:
+            edu (Edu): edu to add to the queue
+            key (Any|None): clobbering key for this edu
+        """
+        if key is not None:
+            self.keyed_edus[(edu.edu_type, key)] = edu
+        else:
+            self.edus.append(edu)
+
+    def pop_pending_edus(self):
+        """Generator which pops items from this bucket
+
+        Returns:
+            Iterator[Edu]: an iterator whose each iteration will pop an edu off the queue.
+        """
+        while self.edus:
+            yield self.edus.pop()
+
+        while self.keyed_edus:
+            (_, v) = self.keyed_edus.popitem()
+            yield v

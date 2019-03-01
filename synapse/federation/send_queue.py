@@ -159,7 +159,9 @@ class FederationRemoteSendQueue(object):
         # stream.
         pass
 
-    def build_and_send_edu(self, destination, edu_type, content, key=None):
+    def build_and_send_edu(
+        self, destination, edu_type, content, key=None, bucket_id=None
+    ):
         """As per TransactionQueue"""
         if destination == self.server_name:
             logger.info("Not sending EDU to ourselves")
@@ -170,6 +172,7 @@ class FederationRemoteSendQueue(object):
         edu = Edu(
             origin=self.server_name,
             destination=destination,
+            bucket=bucket_id,
             edu_type=edu_type,
             content=content,
         )

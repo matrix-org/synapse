@@ -16,6 +16,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.federation.units import DELAYED_EDU_BUCKET_ID
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
 
@@ -162,6 +163,7 @@ class ReceiptsHandler(BaseHandler):
                         },
                     },
                     key=(room_id, receipt_type, user_id),
+                    bucket_id=DELAYED_EDU_BUCKET_ID,
                 )
         except Exception:
             logger.exception("Error pushing receipts to remote servers")
