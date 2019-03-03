@@ -1,5 +1,7 @@
 [Unit]
 Description=Synapse Matrix Worker
+After=matrix-synapse.service
+BindsTo=matrix-synapse.service
 
 [Service]
 Type=forking
@@ -12,4 +14,4 @@ Restart=always
 RestartSec=3
 
 [Install]
-WantedBy=matrix.target
+WantedBy=matrix-synapse.service
