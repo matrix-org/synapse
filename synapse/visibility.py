@@ -237,7 +237,7 @@ def filter_events_for_server(store, server_name, events, redact=True,
     """
 
     def is_sender_erased(event, erased_senders):
-        if erased_senders[event.sender]:
+        if erased_senders and erased_senders[event.sender]:
             logger.info(
                 "Sender of %s has been erased, redacting",
                 event.event_id,
