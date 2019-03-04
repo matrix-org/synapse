@@ -12,11 +12,7 @@
 # e.g. matrix.org, localhost:8080, etc.
 # This is also the last part of your UserID.
 #
-#server_name: domain.name
-
-# Whether or not to report anonymized homeserver usage statistics.
-#
-#report_stats: true|false
+server_name: "SERVERNAME"
 
 # When running as a daemon, the file to store the pid in
 #
@@ -245,11 +241,11 @@ listeners:
 # See 'ACME support' below to enable auto-provisioning this certificate via
 # Let's Encrypt.
 #
-#tls_certificate_path: "CONFDIR/server.tls.crt"
+#tls_certificate_path: "CONFDIR/SERVERNAME.tls.crt"
 
 # PEM-encoded private key for TLS
 #
-#tls_private_key_path: "CONFDIR/server.tls.key"
+#tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
 
 # ACME support: This will configure Synapse to request a valid TLS certificate
 # for your configured `server_name` via Let's Encrypt.
@@ -360,7 +356,7 @@ event_cache_size: "10K"
 
 # A yaml python logging config file
 #
-log_config: "CONFDIR/log_config.yaml"
+log_config: "CONFDIR/SERVERNAME.log.config"
 
 
 ## Ratelimiting ##
@@ -678,6 +674,9 @@ enable_metrics: False
 #sentry:
 #    dsn: "..."
 
+# Whether or not to report anonymized homeserver usage statistics.
+# report_stats: true|false
+
 
 ## API Configuration ##
 
@@ -721,7 +720,7 @@ expire_access_token: False
 
 # Path to the signing key to sign messages with
 #
-signing_key_path: "CONFDIR/server.signing.key"
+signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 
 # The keys that the server used to sign messages with but won't use
 # to sign new messages. E.g. it has lost its private key
@@ -1040,4 +1039,3 @@ enable_group_creation: false
 #    alias: "*"
 #    room_id: "*"
 #    action: allow
-foo

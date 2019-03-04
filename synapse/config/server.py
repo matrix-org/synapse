@@ -260,6 +260,7 @@ class ServerConfig(Config):
         # This is used by remote servers to connect to this server,
         # e.g. matrix.org, localhost:8080, etc.
         # This is also the last part of your UserID.
+        #
         server_name: "%(server_name)s"
 
         # When running as a daemon, the file to store the pid in

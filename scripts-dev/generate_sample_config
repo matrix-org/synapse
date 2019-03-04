@@ -10,7 +10,7 @@ SAMPLE_CONFIG="docs/sample_config.yaml"
 
 if [ "$1" == "--check" ]; then
     diff -u "$SAMPLE_CONFIG" <(./scripts/generate_config --header-file docs/.sample_config_header.yaml) >/dev/null || {
-        echo -e "\e[1m\e[31m$SAMPLE_CONFIG is not up-to-date. Regenerate it with \`$0\`.\e[0m" >&2
+        echo -e "\e[1m\e[31m$SAMPLE_CONFIG is not up-to-date. Regenerate it with \`scripts-dev/generate_sample_config\`.\e[0m" >&2
         exit 1
     }
 else
