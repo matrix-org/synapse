@@ -891,9 +891,11 @@ class FederationHandler(BaseHandler):
             get_prev_content=False,
         )
 
+        # We set `check_history_visibility_only` as we might otherwise get false
+        # positives from users having been erased.
         filtered_extremities = yield filter_events_for_server(
             self.store, self.server_name, list(extremities_events.values()),
-            redact=False,
+            redact=False, check_history_visibility_only=True,
         )
 
         if not filtered_extremities:
