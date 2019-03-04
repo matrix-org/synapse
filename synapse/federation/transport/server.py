@@ -312,7 +312,7 @@ class BaseFederationServlet(object):
 
 
 class FederationSendServlet(BaseFederationServlet):
-    PATH = "/send/(?P<transaction_id>[^/]*)/"
+    PATH = "/send/(?P<transaction_id>[^/]*)/*"
 
     def __init__(self, handler, server_name, **kwargs):
         super(FederationSendServlet, self).__init__(
@@ -378,7 +378,7 @@ class FederationSendServlet(BaseFederationServlet):
 
 
 class FederationEventServlet(BaseFederationServlet):
-    PATH = "/event/(?P<event_id>[^/]*)/"
+    PATH = "/event/(?P<event_id>[^/]*)/*"
 
     # This is when someone asks for a data item for a given server data_id pair.
     def on_GET(self, origin, content, query, event_id):
@@ -386,7 +386,7 @@ class FederationEventServlet(BaseFederationServlet):
 
 
 class FederationStateServlet(BaseFederationServlet):
-    PATH = "/state/(?P<context>[^/]*)/"
+    PATH = "/state/(?P<context>[^/]*)/*"
 
     # This is when someone asks for all data for a given context.
     def on_GET(self, origin, content, query, context):
@@ -398,7 +398,7 @@ class FederationStateServlet(BaseFederationServlet):
 
 
 class FederationStateIdsServlet(BaseFederationServlet):
-    PATH = "/state_ids/(?P<room_id>[^/]*)/"
+    PATH = "/state_ids/(?P<room_id>[^/]*)/*"
 
     def on_GET(self, origin, content, query, room_id):
         return self.handler.on_state_ids_request(
@@ -409,7 +409,7 @@ class FederationStateIdsServlet(BaseFederationServlet):
 
 
 class FederationBackfillServlet(BaseFederationServlet):
-    PATH = "/backfill/(?P<context>[^/]*)/"
+    PATH = "/backfill/(?P<context>[^/]*)/*"
 
     def on_GET(self, origin, content, query, context):
         versions = [x.decode('ascii') for x in query[b"v"]]
@@ -1100,7 +1100,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
     """Add/remove/get a category in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
+        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)/*$"
     )
 
     @defer.inlineCallbacks
@@ -1150,7 +1150,7 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
     """Get roles in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/$"
+        "/groups/(?P<group_id>[^/]*)/roles/*$"
     )
 
     @defer.inlineCallbacks
@@ -1170,7 +1170,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
     """Add/remove/get a role in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$"
+        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)/*$"
     )
 
     @defer.inlineCallbacks
