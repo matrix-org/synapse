@@ -263,6 +263,7 @@ class ServerConfig(Config):
         server_name: "%(server_name)s"
 
         # When running as a daemon, the file to store the pid in
+        #
         pid_file: %(pid_file)s
 
         # CPU affinity mask. Setting this restricts the CPUs on which the
@@ -304,9 +305,11 @@ class ServerConfig(Config):
         # Set the soft limit on the number of file descriptors synapse can use
         # Zero is used to indicate synapse should set the soft limit to the
         # hard limit.
+        #
         soft_file_limit: 0
 
         # Set to false to disable presence tracking on this homeserver.
+        #
         use_presence: true
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
