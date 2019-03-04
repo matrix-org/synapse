@@ -148,7 +148,7 @@ class ReceiptsHandler(BaseHandler):
             logger.debug("Sending receipt to: %r", remotedomains)
 
             for domain in remotedomains:
-                self.federation.send_edu(
+                self.federation.build_and_send_edu(
                     destination=domain,
                     edu_type="m.receipt",
                     content={
