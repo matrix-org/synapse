@@ -101,7 +101,7 @@ class DeviceWorkerHandler(BaseHandler):
             user_id (str)
             from_token (StreamToken)
         """
-        now_token = yield self.hs.get_event_sources().get_current_token()
+        now_room_key = yield self.store.get_room_events_max_id()
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
 
@@ -114,7 +114,7 @@ class DeviceWorkerHandler(BaseHandler):
         rooms_changed = self.store.get_rooms_that_changed(room_ids, from_token.room_key)
 
         member_events = yield self.store.get_membership_changes_for_user(
-            user_id, from_token.room_key, now_token.room_key,
+            user_id, from_token.room_key, now_room_key,
         )
         rooms_changed.update(event.room_id for event in member_events)
 

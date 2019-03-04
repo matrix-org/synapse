@@ -225,6 +225,8 @@ following regular expressions::
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
     ^/_matrix/client/(api/v1|r0|unstable)/login$
     ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
 
 Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance::
