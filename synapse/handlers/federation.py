@@ -881,7 +881,7 @@ class FederationHandler(BaseHandler):
         #   join of the server where we are allowed to see the join event but
         #   not anything before it.
 
-        forward_events = yield self.store.get_forward_events(
+        forward_events = yield self.store.get_successor_events(
             list(extremities),
         )
 

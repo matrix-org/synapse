@@ -443,7 +443,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
         return event_results
 
     @defer.inlineCallbacks
-    def get_forward_events(self, event_ids):
+    def get_successor_events(self, event_ids):
         """Fetch all events that have the given events as a prev event
 
         Args:
@@ -457,7 +457,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
             column="prev_event_id",
             iterable=event_ids,
             retcols=("event_id",),
-            desc="get_forward_events"
+            desc="get_successor_events"
         )
 
         defer.returnValue([
