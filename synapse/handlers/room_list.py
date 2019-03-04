@@ -50,16 +50,17 @@ class RoomListHandler(BaseHandler):
 
     def get_local_public_room_list(self, limit=None, since_token=None,
                                    search_filter=None,
-                                   network_tuple=EMPTY_THIRD_PARTY_ID,):
+                                   network_tuple=EMPTY_THIRD_PARTY_ID,
+                                   from_federation=False):
         """Generate a local public room list.
 
         There are multiple different lists: the main one plus one per third
         party network. A client can ask for a specific list or to return all.
 
         Args:
-            limit (int)
-            since_token (str)
-            search_filter (dict)
+            limit (int|None)
+            since_token (str|None)
+            search_filter (dict|None)
             network_tuple (ThirdPartyInstanceID): Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
@@ -87,14 +88,30 @@ class RoomListHandler(BaseHandler):
         return self.response_cache.wrap(
             key,
             self._get_public_room_list,
-            limit, since_token, network_tuple=network_tuple,
+            limit, since_token,
+            network_tuple=network_tuple, from_federation=from_federation,
         )
 
     @defer.inlineCallbacks
     def _get_public_room_list(self, limit=None, since_token=None,
                               search_filter=None,
                               network_tuple=EMPTY_THIRD_PARTY_ID,
+                              from_federation=False,
                               timeout=None,):
+        """Generate a public room list.
+        Args:
+            limit (int|None): Maximum amount of rooms to return.
+            since_token (str|None)
+            search_filter (dict|None): Dictionary to filter rooms by.
+            network_tuple (ThirdPartyInstanceID): Which public list to use.
+                This can be (None, None) to indicate the main list, or a particular
+                appservice and network id to use an appservice specific one.
+                Setting to None returns all public rooms across all lists.
+            from_federation (bool): Whether this request originated from a
+                federating server or a client. Used for room filtering.
+            timeout (int|None): Amount of seconds to wait for a response before
+                timing out.
+        """
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -217,7 +234,8 @@ class RoomListHandler(BaseHandler):
             yield concurrently_execute(
                 lambda r: self._append_room_entry_to_chunk(
                     r, rooms_to_num_joined[r],
-                    chunk, limit, search_filter
+                    chunk, limit, search_filter,
+                    from_federation=from_federation,
                 ),
                 batch, 5,
             )
@@ -288,23 +306,51 @@ class RoomListHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _append_room_entry_to_chunk(self, room_id, num_joined_users, chunk, limit,
-                                    search_filter):
+                                    search_filter, from_federation=False):
         """Generate the entry for a room in the public room list and append it
         to the `chunk` if it matches the search filter
+
+        Args:
+            room_id (str): The ID of the room.
+            num_joined_users (int): The number of joined users in the room.
+            chunk (list)
+            limit (int|None): Maximum amount of rooms to display. Function will
+                return if length of chunk is greater than limit + 1.
+            search_filter (dict|None)
+            from_federation (bool): Whether this request originated from a
+                federating server or a client. Used for room filtering.
         """
         if limit and len(chunk) > limit + 1:
             # We've already got enough, so lets just drop it.
             return
 
         result = yield self.generate_room_entry(room_id, num_joined_users)
+        if not result:
+            return
 
-        if result and _matches_room_entry(result, search_filter):
+        if from_federation and not result.get("m.federate", True):
+            # This is a room that other servers cannot join. Do not show them
+            # this room.
+            return
+
+        if _matches_room_entry(result, search_filter):
             chunk.append(result)
 
     @cachedInlineCallbacks(num_args=1, cache_context=True)
     def generate_room_entry(self, room_id, num_joined_users, cache_context,
                             with_alias=True, allow_private=False):
         """Returns the entry for a room
+
+        Args:
+            room_id (str): The room's ID.
+            num_joined_users (int): Number of users in the room.
+            cache_context: Information for cached responses.
+            with_alias (bool): Whether to return the room's aliases in the result.
+            allow_private (bool): Whether invite-only rooms should be shown.
+
+        Returns:
+            Deferred[dict|None]: Returns a room entry as a dictionary, or None if this
+            room was determined not to be shown publicly.
         """
         result = {
             "room_id": room_id,
@@ -318,6 +364,7 @@ class RoomListHandler(BaseHandler):
         event_map = yield self.store.get_events([
             event_id for key, event_id in iteritems(current_state_ids)
             if key[0] in (
+                EventTypes.Create,
                 EventTypes.JoinRules,
                 EventTypes.Name,
                 EventTypes.Topic,
@@ -334,11 +381,16 @@ class RoomListHandler(BaseHandler):
         }
 
         # Double check that this is actually a public room.
+
         join_rules_event = current_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
             join_rule = join_rules_event.content.get("join_rule", None)
             if not allow_private and join_rule and join_rule != JoinRules.PUBLIC:
                 defer.returnValue(None)
+
+        # Return whether this room is open to federation users or not
+        create_event = current_state.get((EventTypes.Create, ""))
+        result["m.federate"] = create_event.content.get("m.federate", True)
 
         if with_alias:
             aliases = yield self.store.get_aliases_for_room(

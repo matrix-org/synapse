@@ -1,3 +1,62 @@
+Synapse 0.99.2 (2019-03-01)
+===========================
+
+Features
+--------
+
+- Added an HAProxy example in the reverse proxy documentation. Contributed by Benoît S. (“Benpro”). ([\#4541](https://github.com/matrix-org/synapse/issues/4541))
+- Add basic optional sentry integration. ([\#4632](https://github.com/matrix-org/synapse/issues/4632), [\#4694](https://github.com/matrix-org/synapse/issues/4694))
+- Transfer bans on room upgrade. ([\#4642](https://github.com/matrix-org/synapse/issues/4642))
+- Add configurable room list publishing rules. ([\#4647](https://github.com/matrix-org/synapse/issues/4647))
+- Support .well-known delegation when issuing certificates through ACME. ([\#4652](https://github.com/matrix-org/synapse/issues/4652))
+- Allow registration and login to be handled by a worker instance. ([\#4666](https://github.com/matrix-org/synapse/issues/4666), [\#4670](https://github.com/matrix-org/synapse/issues/4670), [\#4682](https://github.com/matrix-org/synapse/issues/4682))
+- Reduce the overhead of creating outbound federation connections over TLS by caching the TLS client options. ([\#4674](https://github.com/matrix-org/synapse/issues/4674))
+- Add prometheus metrics for number of outgoing EDUs, by type. ([\#4695](https://github.com/matrix-org/synapse/issues/4695))
+- Return correct error code when inviting a remote user to a room whose homeserver does not support the room version. ([\#4721](https://github.com/matrix-org/synapse/issues/4721))
+- Prevent showing rooms to other servers that were set to not federate. ([\#4746](https://github.com/matrix-org/synapse/issues/4746))
+
+
+Bugfixes
+--------
+
+- Fix possible exception when paginating. ([\#4263](https://github.com/matrix-org/synapse/issues/4263))
+- The dependency checker now correctly reports a version mismatch for optional
+  dependencies, instead of reporting the dependency missing. ([\#4450](https://github.com/matrix-org/synapse/issues/4450))
+- Set CORS headers on .well-known requests. ([\#4651](https://github.com/matrix-org/synapse/issues/4651))
+- Fix kicking guest users on guest access revocation in worker mode. ([\#4667](https://github.com/matrix-org/synapse/issues/4667))
+- Fix an issue in the database migration script where the
+  `e2e_room_keys.is_verified` column wasn't considered as
+  a boolean. ([\#4680](https://github.com/matrix-org/synapse/issues/4680))
+- Fix TaskStopped exceptions in logs when outbound requests time out. ([\#4690](https://github.com/matrix-org/synapse/issues/4690))
+- Fix ACME config for python 2. ([\#4717](https://github.com/matrix-org/synapse/issues/4717))
+- Fix paginating over federation persisting incorrect state. ([\#4718](https://github.com/matrix-org/synapse/issues/4718))
+
+
+Internal Changes
+----------------
+
+- Run `black` to reformat user directory code. ([\#4635](https://github.com/matrix-org/synapse/issues/4635))
+- Reduce number of exceptions we log. ([\#4643](https://github.com/matrix-org/synapse/issues/4643), [\#4668](https://github.com/matrix-org/synapse/issues/4668))
+- Introduce upsert batching functionality in the database layer. ([\#4644](https://github.com/matrix-org/synapse/issues/4644))
+- Fix various spelling mistakes. ([\#4657](https://github.com/matrix-org/synapse/issues/4657))
+- Cleanup request exception logging. ([\#4669](https://github.com/matrix-org/synapse/issues/4669), [\#4737](https://github.com/matrix-org/synapse/issues/4737), [\#4738](https://github.com/matrix-org/synapse/issues/4738))
+- Improve replication performance by reducing cache invalidation traffic. ([\#4671](https://github.com/matrix-org/synapse/issues/4671), [\#4715](https://github.com/matrix-org/synapse/issues/4715), [\#4748](https://github.com/matrix-org/synapse/issues/4748))
+- Test against Postgres 9.5 as well as 9.4. ([\#4676](https://github.com/matrix-org/synapse/issues/4676))
+- Run unit tests against python 3.7. ([\#4677](https://github.com/matrix-org/synapse/issues/4677))
+- Attempt to clarify installation instructions/config. ([\#4681](https://github.com/matrix-org/synapse/issues/4681))
+- Clean up gitignores. ([\#4688](https://github.com/matrix-org/synapse/issues/4688))
+- Minor tweaks to acme docs. ([\#4689](https://github.com/matrix-org/synapse/issues/4689))
+- Improve the logging in the pusher process. ([\#4691](https://github.com/matrix-org/synapse/issues/4691))
+- Better checks on newsfragments. ([\#4698](https://github.com/matrix-org/synapse/issues/4698), [\#4750](https://github.com/matrix-org/synapse/issues/4750))
+- Avoid some redundant work when processing read receipts. ([\#4706](https://github.com/matrix-org/synapse/issues/4706))
+- Run `push_receipts_to_remotes` as background job. ([\#4707](https://github.com/matrix-org/synapse/issues/4707))
+- Add prometheus metrics for number of badge update pushes. ([\#4709](https://github.com/matrix-org/synapse/issues/4709))
+- Reduce pusher logging on startup ([\#4716](https://github.com/matrix-org/synapse/issues/4716))
+- Don't log exceptions when failing to fetch remote server keys. ([\#4722](https://github.com/matrix-org/synapse/issues/4722))
+- Correctly proxy exception in frontend_proxy worker. ([\#4723](https://github.com/matrix-org/synapse/issues/4723))
+- Add database version to phonehome stats. ([\#4753](https://github.com/matrix-org/synapse/issues/4753))
+
+
 Synapse 0.99.1.1 (2019-02-14)
 =============================
 

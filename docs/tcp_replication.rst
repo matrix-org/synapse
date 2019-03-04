@@ -188,7 +188,9 @@ RDATA (S)
     A single update in a stream
 
 POSITION (S)
-    The position of the stream has been updated
+    The position of the stream has been updated. Sent to the client after all
+    missing updates for a stream have been sent to the client and they're now
+    up to date.
 
 ERROR (S, C)
     There was an error

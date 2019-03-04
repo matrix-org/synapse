@@ -23,6 +23,7 @@ class PostgresEngine(object):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
+        self._version = None   # unknown as yet
 
     def check_database(self, txn):
         txn.execute("SHOW SERVER_ENCODING")
@@ -87,3 +88,27 @@ class PostgresEngine(object):
         """
         txn.execute("SELECT nextval('state_group_id_seq')")
         return txn.fetchone()[0]
+
+    @property
+    def server_version(self):
+        """Returns a string giving the server version. For example: '8.1.5'
+
+        Returns:
+            string
+        """
+        # note that this is a bit of a hack because it relies on on_new_connection
+        # having been called at least once. Still, that should be a safe bet here.
+        numver = self._version
+        assert numver is not None
+
+        # https://www.postgresql.org/docs/current/libpq-status.html#LIBPQ-PQSERVERVERSION
+        if numver >= 100000:
+            return "%i.%i" % (
+                numver / 10000, numver % 10000,
+            )
+        else:
+            return "%i.%i.%i" % (
+                numver / 10000,
+                (numver % 10000) / 100,
+                numver % 100,
+            )

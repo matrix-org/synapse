@@ -48,6 +48,7 @@ from synapse.rest.client.v1.room import (
     RoomMemberListRestServlet,
     RoomStateRestServlet,
 )
+from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
@@ -96,6 +97,7 @@ class ClientReaderServer(HomeServer):
                     RoomEventContextServlet(self).register(resource)
                     RegisterRestServlet(self).register(resource)
                     LoginRestServlet(self).register(resource)
+                    ThreepidRestServlet(self).register(resource)
 
                     resources.update({
                         "/_matrix/client/r0": resource,
