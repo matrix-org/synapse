@@ -5,8 +5,6 @@ from synapse.appservice import ApplicationService
 from synapse.rest.client.v2_alpha.register import register_servlets
 
 from tests import unittest
-from tests.utils import MockClock
-
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
