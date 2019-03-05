@@ -24,6 +24,7 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidCaptchaError,
+    LimitExceededError,
     RegistrationError,
     SynapseError,
 )
@@ -60,6 +61,7 @@ class RegistrationHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
         self.identity_handler = self.hs.get_handlers().identity_handler
+        self.ratelimiter = hs.get_ratelimiter()
 
         self._next_generated_user_id = None
 
@@ -149,6 +151,7 @@ class RegistrationHandler(BaseHandler):
         threepid=None,
         user_type=None,
         default_display_name=None,
+        address=None,
     ):
         """Registers a new client on the server.
 
@@ -167,6 +170,7 @@ class RegistrationHandler(BaseHandler):
               api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
+            address (str|None): the IP address used to perform the regitration.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -206,7 +210,7 @@ class RegistrationHandler(BaseHandler):
             token = None
             if generate_token:
                 token = self.macaroon_gen.generate_access_token(user_id)
-            yield self._register_with_store(
+            yield self.register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -215,6 +219,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=default_display_name,
                 admin=admin,
                 user_type=user_type,
+                address=address,
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -238,12 +243,13 @@ class RegistrationHandler(BaseHandler):
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
-                    yield self._register_with_store(
+                    yield self.register_with_store(
                         user_id=user_id,
                         token=token,
                         password_hash=password_hash,
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
+                        address=address,
                     )
                 except SynapseError:
                     # if user id is taken, just generate another
@@ -337,7 +343,7 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
-        yield self._register_with_store(
+        yield self.register_with_store(
             user_id=user_id,
             password_hash="",
             appservice_id=service_id,
@@ -513,7 +519,7 @@ class RegistrationHandler(BaseHandler):
         token = self.macaroon_gen.generate_access_token(user_id)
 
         if need_register:
-            yield self._register_with_store(
+            yield self.register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -590,10 +596,10 @@ class RegistrationHandler(BaseHandler):
             ratelimit=False,
         )
 
-    def _register_with_store(self, user_id, token=None, password_hash=None,
-                             was_guest=False, make_guest=False, appservice_id=None,
-                             create_profile_with_displayname=None, admin=False,
-                             user_type=None):
+    def register_with_store(self, user_id, token=None, password_hash=None,
+                            was_guest=False, make_guest=False, appservice_id=None,
+                            create_profile_with_displayname=None, admin=False,
+                            user_type=None, address=None):
         """Register user in the datastore.
 
         Args:
@@ -612,10 +618,26 @@ class RegistrationHandler(BaseHandler):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
+            address (str|None): the IP address used to perform the regitration.
 
         Returns:
             Deferred
         """
+        # Don't rate limit for app services
+        if appservice_id is None and address is not None:
+            time_now = self.clock.time()
+
+            allowed, time_allowed = self.ratelimiter.can_do_action(
+                address, time_now_s=time_now,
+                rate_hz=self.hs.config.rc_registration_requests_per_second,
+                burst_count=self.hs.config.rc_registration_request_burst_count,
+            )
+
+            if not allowed:
+                raise LimitExceededError(
+                    retry_after_ms=int(1000 * (time_allowed - time_now)),
+                )
+
         if self.hs.config.worker_app:
             return self._register_client(
                 user_id=user_id,
@@ -627,6 +649,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=create_profile_with_displayname,
                 admin=admin,
                 user_type=user_type,
+                address=address,
             )
         else:
             return self.store.register(

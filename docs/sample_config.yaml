@@ -657,6 +657,17 @@ trusted_third_party_id_servers:
 #
 autocreate_auto_join_rooms: true
 
+# Number of registration requests a client can send per second.
+# Defaults to 1/minute (0.17).
+#
+#rc_registration_requests_per_second: 0.17
+
+# Number of registration requests a client can send before being
+# throttled.
+# Defaults to 3.
+#
+#rc_registration_request_burst_count: 3.0
+
 
 ## Metrics ###
 
