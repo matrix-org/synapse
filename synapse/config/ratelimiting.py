@@ -27,6 +27,13 @@ class RatelimitConfig(Config):
         self.federation_rc_reject_limit = config["federation_rc_reject_limit"]
         self.federation_rc_concurrent = config["federation_rc_concurrent"]
 
+        self.rc_registration_requests_per_second = config.get(
+            "rc_registration_requests_per_second", 0.17,
+        )
+        self.rc_registration_request_burst_count = config.get(
+            "rc_registration_request_burst_count", 3,
+        )
+
     def default_config(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -62,4 +69,15 @@ class RatelimitConfig(Config):
         # single server
         #
         federation_rc_concurrent: 3
+
+        # Number of registration requests a client can send per second.
+        # Defaults to 1/minute (0.17).
+        #
+        #rc_registration_requests_per_second: 0.17
+
+        # Number of registration requests a client can send before being
+        # throttled.
+        # Defaults to 3.
+        #
+        #rc_registration_request_burst_count: 3.0
         """
