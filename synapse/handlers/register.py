@@ -210,7 +210,7 @@ class RegistrationHandler(BaseHandler):
             token = None
             if generate_token:
                 token = self.macaroon_gen.generate_access_token(user_id)
-            yield self._register_with_store(
+            yield self.register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -243,7 +243,7 @@ class RegistrationHandler(BaseHandler):
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
-                    yield self._register_with_store(
+                    yield self.register_with_store(
                         user_id=user_id,
                         token=token,
                         password_hash=password_hash,
@@ -343,7 +343,7 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
-        yield self._register_with_store(
+        yield self.register_with_store(
             user_id=user_id,
             password_hash="",
             appservice_id=service_id,
@@ -519,7 +519,7 @@ class RegistrationHandler(BaseHandler):
         token = self.macaroon_gen.generate_access_token(user_id)
 
         if need_register:
-            yield self._register_with_store(
+            yield self.register_with_store(
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
@@ -596,7 +596,7 @@ class RegistrationHandler(BaseHandler):
             ratelimit=False,
         )
 
-    def _register_with_store(self, user_id, token=None, password_hash=None,
+    def register_with_store(self, user_id, token=None, password_hash=None,
                              was_guest=False, make_guest=False, appservice_id=None,
                              create_profile_with_displayname=None, admin=False,
                              user_type=None, address=None):

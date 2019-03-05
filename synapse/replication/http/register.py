@@ -75,7 +75,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
     def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
-        yield self.registration_handler._register_with_store(
+        yield self.registration_handler.register_with_store(
             user_id=user_id,
             token=content["token"],
             password_hash=content["password_hash"],
