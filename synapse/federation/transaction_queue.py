@@ -406,6 +406,8 @@ class TransactionQueue(object):
         else:
             self.pending_edus_by_dest.setdefault(edu.destination, []).append(edu)
 
+        destination = edu.destination
+
         if destination not in self.edu_tx_time_by_dest:
             txtime = self.clock.time() + EDU_BATCH_TIME * 1000
             self.edu_tx_time_by_dest[destination] = txtime
