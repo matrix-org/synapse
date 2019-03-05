@@ -51,7 +51,7 @@ from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
-from synapse.handlers.device import DeviceHandler
+from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
@@ -307,7 +307,10 @@ class HomeServer(object):
         return MacaroonGenerator(self)
 
     def build_device_handler(self):
-        return DeviceHandler(self)
+        if self.config.worker_app:
+            return DeviceWorkerHandler(self)
+        else:
+            return DeviceHandler(self)
 
     def build_device_message_handler(self):
         return DeviceMessageHandler(self)

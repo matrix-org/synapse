@@ -180,9 +180,7 @@ class Config(object):
         Returns:
             str: the yaml config file
         """
-        default_config = "# vim:ft=yaml\n"
-
-        default_config += "\n\n".join(
+        default_config = "\n\n".join(
             dedent(conf)
             for conf in self.invoke_all(
                 "default_config",
@@ -297,19 +295,26 @@ class Config(object):
                         "Must specify a server_name to a generate config for."
                         " Pass -H server.name."
                     )
+
+                config_str = obj.generate_config(
+                    config_dir_path=config_dir_path,
+                    data_dir_path=os.getcwd(),
+                    server_name=server_name,
+                    report_stats=(config_args.report_stats == "yes"),
+                    generate_secrets=True,
+                )
+
                 if not cls.path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
                 with open(config_path, "w") as config_file:
-                    config_str = obj.generate_config(
-                        config_dir_path=config_dir_path,
-                        data_dir_path=os.getcwd(),
-                        server_name=server_name,
-                        report_stats=(config_args.report_stats == "yes"),
-                        generate_secrets=True,
+                    config_file.write(
+                        "# vim:ft=yaml\n\n"
                     )
-                    config = yaml.load(config_str)
-                    obj.invoke_all("generate_files", config)
                     config_file.write(config_str)
+
+                config = yaml.load(config_str)
+                obj.invoke_all("generate_files", config)
+
                 print(
                     (
                         "A config file has been generated in %r for server name"
