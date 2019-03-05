@@ -1,1 +1,1 @@
-Add configurable rate limiting to the /register endpoint
+Add configurable rate limiting to the /register endpoint.
