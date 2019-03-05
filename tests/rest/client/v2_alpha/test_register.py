@@ -145,7 +145,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.reactor.advance(retry_after_ms / 1000)
+        self.reactor.advance(retry_after_ms / 1000.)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
