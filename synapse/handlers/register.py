@@ -24,9 +24,9 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidCaptchaError,
+    LimitExceededError,
     RegistrationError,
     SynapseError,
-    LimitExceededError,
 )
 from synapse.config.server import is_threepid_reserved
 from synapse.http.client import CaptchaServerHttpClient
@@ -597,9 +597,9 @@ class RegistrationHandler(BaseHandler):
         )
 
     def register_with_store(self, user_id, token=None, password_hash=None,
-                             was_guest=False, make_guest=False, appservice_id=None,
-                             create_profile_with_displayname=None, admin=False,
-                             user_type=None, address=None):
+                            was_guest=False, make_guest=False, appservice_id=None,
+                            create_profile_with_displayname=None, admin=False,
+                            user_type=None, address=None):
         """Register user in the datastore.
 
         Args:

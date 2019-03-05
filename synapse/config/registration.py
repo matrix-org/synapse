@@ -54,8 +54,12 @@ class RegistrationConfig(Config):
             config.get("disable_msisdn_registration", False)
         )
 
-        self.rc_registration_requests_per_second = config.get("rc_registration_requests_per_second", 0.17)
-        self.rc_registration_request_burst_count = config.get("rc_registration_request_burst_count", 3)
+        self.rc_registration_requests_per_second = config.get(
+            "rc_registration_requests_per_second", 0.17,
+        )
+        self.rc_registration_request_burst_count = config.get(
+            "rc_registration_request_burst_count", 3,
+        )
 
     def default_config(self, generate_secrets=False, **kwargs):
         if generate_secrets:

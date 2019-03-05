@@ -27,9 +27,9 @@ import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     Codes,
+    LimitExceededError,
     SynapseError,
     UnrecognizedRequestError,
-    LimitExceededError,
 )
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (

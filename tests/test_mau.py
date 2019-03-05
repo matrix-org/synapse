@@ -17,7 +17,7 @@
 
 import json
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
