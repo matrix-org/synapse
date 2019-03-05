@@ -6,6 +6,7 @@ from synapse.rest.client.v2_alpha.register import register_servlets
 
 from tests import unittest
 
+
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [register_servlets]
