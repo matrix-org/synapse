@@ -20,14 +20,48 @@ import json
 from mock import Mock
 
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1.admin import register_servlets
+from synapse.rest.client.v1 import admin, login
 
 from tests import unittest
 
 
+class VersionTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+    ]
+
+    url = '/_matrix/client/r0/admin/server_version'
+
+    def test_version_string(self):
+        self.register_user("admin", "pass", admin=True)
+        self.admin_token = self.login("admin", "pass")
+
+        request, channel = self.make_request("GET", self.url,
+                                             access_token=self.admin_token)
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]),
+                         msg=channel.result["body"])
+        self.assertEqual({'server_version', 'python_version'},
+                         set(channel.json_body.keys()))
+
+    def test_inaccessible_to_non_admins(self):
+        self.register_user("unprivileged-user", "pass", admin=False)
+        user_token = self.login("unprivileged-user", "pass")
+
+        request, channel = self.make_request("GET", self.url,
+                                             access_token=user_token)
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result['code']),
+                         msg=channel.result['body'])
+
+
 class UserRegisterTestCase(unittest.HomeserverTestCase):
 
-    servlets = [register_servlets]
+    servlets = [admin.register_servlets]
 
     def make_homeserver(self, reactor, clock):
 
