@@ -44,7 +44,7 @@ class BaseHandler(object):
         self.notifier = hs.get_notifier()
         self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
-        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter = hs.get_events_ratelimiter()
         self.clock = hs.get_clock()
         self.hs = hs
 

@@ -58,7 +58,7 @@ class ProfileTestCase(unittest.TestCase):
             ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
-        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter = hs.get_events_ratelimiter()
         self.ratelimiter.can_do_action.return_value = (True, 0)
 
         self.store = hs.get_datastore()

@@ -61,7 +61,7 @@ class RegistrationHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
         self.identity_handler = self.hs.get_handlers().identity_handler
-        self.ratelimiter = hs.get_ratelimiter()
+        self.ratelimiter = hs.get_registration_ratelimiter()
 
         self._next_generated_user_id = None
 
