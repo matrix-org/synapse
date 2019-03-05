@@ -49,7 +49,8 @@ class DatabaseConfig(Config):
     def default_config(self, data_dir_path, **kwargs):
         database_path = os.path.join(data_dir_path, "homeserver.db")
         return """\
-        # Database configuration
+        ## Database ##
+
         database:
           # The database engine name
           name: "sqlite3"
