@@ -277,7 +277,7 @@ def filter_events_for_server(store, server_name, events, redact=True,
 
         return True
 
-    # Next lets check to see if all the events have a history visibility
+    # Lets check to see if all the events have a history visibility
     # of "shared" or "world_readable". If thats the case then we don't
     # need to check membership (as we know the server is in the room).
     event_to_state_ids = yield store.get_state_ids_for_events(

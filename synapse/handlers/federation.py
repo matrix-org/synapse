@@ -862,9 +862,9 @@ class FederationHandler(BaseHandler):
         # as otherwise we'll just spend a lot of resources to get redacted
         # events.
         #
-        # We do this by filtering all the extremities and seeing if any remain.
-        # Given we don't have the extremity events themselves, we need to
-        # actually check the events that reference them.
+        # We do this by filtering all the backwards extremities and seeing if
+        # any remain. Given we don't have the extremity events themselves, we
+        # need to actually check the events that reference them.
         #
         # *Note*: the spec wants us to keep backfilling until we reach the start
         # of the room in case we are allowed to see some of the history. However
@@ -873,13 +873,16 @@ class FederationHandler(BaseHandler):
         # there is its often sufficiently long ago that clients would stop
         # attempting to paginate before backfill reached the visible history.
         #
-        # TODO: If we do do a backfill the we should filter the extremities to
-        #   only include those that point to visible portions of history.
+        # TODO: If we do do a backfill then we should filter the backwards
+        #   extremities to only include those that point to visible portions of
+        #   history.
         #
         # TODO: Correctly handle the case where we are allowed to see the
-        #   forward event but not the extremity, e.g. in the case of initial
-        #   join of the server where we are allowed to see the join event but
-        #   not anything before it.
+        #   forward event but not the backward extremity, e.g. in the case of
+        #   initial join of the server where we are allowed to see the join
+        #   event but not anything before it. This would require looking at the
+        #   state *before* the event, ignoring the special casing certain event
+        #   types have.
 
         forward_events = yield self.store.get_successor_events(
             list(extremities),
