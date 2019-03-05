@@ -1,1 +1,1 @@
-Reword the sample config to be less scary
+Include a default configuration file in the 'docs' directory.
