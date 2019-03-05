@@ -393,7 +393,7 @@ class FederationStateServlet(BaseFederationServlet):
         return self.handler.on_context_state_request(
             origin,
             context,
-            parse_string_from_args(query, "event_id", None),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 
@@ -404,7 +404,7 @@ class FederationStateIdsServlet(BaseFederationServlet):
         return self.handler.on_state_ids_request(
             origin,
             room_id,
-            parse_string_from_args(query, "event_id", None),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 
@@ -736,7 +736,8 @@ class PublicRoomList(BaseFederationServlet):
 
         data = yield self.handler.get_local_public_room_list(
             limit, since_token,
-            network_tuple=network_tuple
+            network_tuple=network_tuple,
+            from_federation=True,
         )
         defer.returnValue((200, data))
 
@@ -758,7 +759,7 @@ class FederationVersionServlet(BaseFederationServlet):
 class FederationGroupsProfileServlet(BaseFederationServlet):
     """Get/set the basic profile of a group on behalf of a user
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/profile$"
+    PATH = "/groups/(?P<group_id>[^/]*)/profile"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -786,7 +787,7 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
 
 
 class FederationGroupsSummaryServlet(BaseFederationServlet):
-    PATH = "/groups/(?P<group_id>[^/]*)/summary$"
+    PATH = "/groups/(?P<group_id>[^/]*)/summary"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -804,7 +805,7 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
 class FederationGroupsRoomsServlet(BaseFederationServlet):
     """Get the rooms in a group on behalf of a user
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/rooms$"
+    PATH = "/groups/(?P<group_id>[^/]*)/rooms"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -822,7 +823,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 class FederationGroupsAddRoomsServlet(BaseFederationServlet):
     """Add/remove room from group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)$"
+    PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, room_id):
@@ -854,7 +855,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
     """
     PATH = (
         "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
-        "/config/(?P<config_key>[^/]*)$"
+        "/config/(?P<config_key>[^/]*)"
     )
 
     @defer.inlineCallbacks
@@ -873,7 +874,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
 class FederationGroupsUsersServlet(BaseFederationServlet):
     """Get the users in a group on behalf of a user
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -891,7 +892,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
     """Get the users that have been invited to a group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/invited_users$"
+    PATH = "/groups/(?P<group_id>[^/]*)/invited_users"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -909,7 +910,7 @@ class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
 class FederationGroupsInviteServlet(BaseFederationServlet):
     """Ask a group server to invite someone to the group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -927,7 +928,7 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
 class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
     """Accept an invitation from the group server
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -944,7 +945,7 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
 class FederationGroupsJoinServlet(BaseFederationServlet):
     """Attempt to join a group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -961,7 +962,7 @@ class FederationGroupsJoinServlet(BaseFederationServlet):
 class FederationGroupsRemoveUserServlet(BaseFederationServlet):
     """Leave or kick a user from the group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -979,7 +980,7 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
 class FederationGroupsLocalInviteServlet(BaseFederationServlet):
     """A group server has invited a local user
     """
-    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -996,7 +997,7 @@ class FederationGroupsLocalInviteServlet(BaseFederationServlet):
 class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
     """A group server has removed a local user
     """
-    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -1013,7 +1014,7 @@ class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
 class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
     """A group or user's server renews their attestation
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)$"
+    PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -1036,7 +1037,7 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
     PATH = (
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/categories/(?P<category_id>[^/]+))?"
-        "/rooms/(?P<room_id>[^/]*)$"
+        "/rooms/(?P<room_id>[^/]*)"
     )
 
     @defer.inlineCallbacks
@@ -1079,7 +1080,7 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
     """Get all categories for a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/$"
+        "/groups/(?P<group_id>[^/]*)/categories/"
     )
 
     @defer.inlineCallbacks
@@ -1099,7 +1100,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
     """Add/remove/get a category in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
+        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)"
     )
 
     @defer.inlineCallbacks
@@ -1149,7 +1150,7 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
     """Get roles in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/$"
+        "/groups/(?P<group_id>[^/]*)/roles/"
     )
 
     @defer.inlineCallbacks
@@ -1169,7 +1170,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
     """Add/remove/get a role in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$"
+        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)"
     )
 
     @defer.inlineCallbacks
@@ -1225,7 +1226,7 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
     PATH = (
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/roles/(?P<role_id>[^/]+))?"
-        "/users/(?P<user_id>[^/]*)$"
+        "/users/(?P<user_id>[^/]*)"
     )
 
     @defer.inlineCallbacks
@@ -1268,7 +1269,7 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
     """Get roles in a group
     """
     PATH = (
-        "/get_groups_publicised$"
+        "/get_groups_publicised"
     )
 
     @defer.inlineCallbacks
@@ -1283,7 +1284,7 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
 class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
     """Sets whether a group is joinable without an invite or knock
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy$"
+    PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, group_id):

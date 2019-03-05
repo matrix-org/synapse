@@ -117,9 +117,9 @@ recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.rst>`_.)
 Once ``enable_registration`` is set to ``true``, it is possible to register a
 user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
 
-Your new user name will be formed partly from the ``server_name`` (see
-`Configuring synapse`_), and partly from a localpart you specify when you
-create the account. Your name will take the form of::
+Your new user name will be formed partly from the ``server_name``, and partly
+from a localpart you specify when you create the account. Your name will take
+the form of::
 
     @localpart:my.domain.name
 
@@ -199,6 +199,8 @@ by installing the ``libjemalloc1`` package and adding this line to
 
     LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
+This can make a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.
 
 Upgrading an existing Synapse
 =============================

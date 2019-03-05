@@ -1,0 +1,7 @@
+# This file is a reference to the configuration options which can be set in
+# homeserver.yaml.
+#
+# Note that it is not quite ready to be used as-is. If you are starting from
+# scratch, it is easier to generate the config files following the instructions
+# in INSTALL.md.
+

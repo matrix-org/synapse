@@ -30,6 +30,7 @@ from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id
+from synapse.util import batch_iter
 from synapse.util.caches.descriptors import Cache
 from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
 from synapse.util.stringutils import exception_to_unicode
@@ -1327,10 +1328,16 @@ class SQLBaseStore(object):
         """
         txn.call_after(self._invalidate_state_caches, room_id, members_changed)
 
-        keys = itertools.chain([room_id], members_changed)
-        self._send_invalidation_to_replication(
-            txn, _CURRENT_STATE_CACHE_NAME, keys,
-        )
+        # We need to be careful that the size of the `members_changed` list
+        # isn't so large that it causes problems sending over replication, so we
+        # send them in chunks.
+        # Max line length is 16K, and max user ID length is 255, so 50 should
+        # be safe.
+        for chunk in batch_iter(members_changed, 50):
+            keys = itertools.chain([room_id], chunk)
+            self._send_invalidation_to_replication(
+                txn, _CURRENT_STATE_CACHE_NAME, keys,
+            )
 
     def _invalidate_state_caches(self, room_id, members_changed):
         """Invalidates caches that are based on the current state, but does
@@ -1342,15 +1349,43 @@ class SQLBaseStore(object):
                 changed
         """
         for member in members_changed:
-            self.get_rooms_for_user_with_stream_ordering.invalidate((member,))
+            self._attempt_to_invalidate_cache(
+                "get_rooms_for_user_with_stream_ordering", (member,),
+            )
 
         for host in set(get_domain_from_id(u) for u in members_changed):
-            self.is_host_joined.invalidate((room_id, host))
-            self.was_host_joined.invalidate((room_id, host))
+            self._attempt_to_invalidate_cache(
+                "is_host_joined", (room_id, host,),
+            )
+            self._attempt_to_invalidate_cache(
+                "was_host_joined", (room_id, host,),
+            )
 
-        self.get_users_in_room.invalidate((room_id,))
-        self.get_room_summary.invalidate((room_id,))
-        self.get_current_state_ids.invalidate((room_id,))
+        self._attempt_to_invalidate_cache(
+            "get_users_in_room", (room_id,),
+        )
+        self._attempt_to_invalidate_cache(
+            "get_room_summary", (room_id,),
+        )
+        self._attempt_to_invalidate_cache(
+            "get_current_state_ids", (room_id,),
+        )
+
+    def _attempt_to_invalidate_cache(self, cache_name, key):
+        """Attempts to invalidate the cache of the given name, ignoring if the
+        cache doesn't exist. Mainly used for invalidating caches on workers,
+        where they may not have the cache.
+
+        Args:
+            cache_name (str)
+            key (tuple)
+        """
+        try:
+            getattr(self, cache_name).invalidate(key)
+        except AttributeError:
+            # We probably haven't pulled in the cache in this worker,
+            # which is fine.
+            pass
 
     def _send_invalidation_to_replication(self, txn, cache_name, keys):
         """Notifies replication that given cache has been invalidated.
@@ -1567,6 +1602,14 @@ class SQLBaseStore(object):
             return 0
 
         return cls.cursor_to_dict(txn)
+
+    @property
+    def database_engine_name(self):
+        return self.database_engine.module.__name__
+
+    def get_server_version(self):
+        """Returns a string describing the server version number"""
+        return self.database_engine.server_version
 
 
 class _RollbackButIsFineException(Exception):

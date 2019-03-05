@@ -770,10 +770,26 @@ class FederationHandler(BaseHandler):
             set(auth_events.keys()) | set(state_events.keys())
         )
 
+        # We now have a chunk of events plus associated state and auth chain to
+        # persist. We do the persistence in two steps:
+        #   1. Auth events and state get persisted as outliers, plus the
+        #      backward extremities get persisted (as non-outliers).
+        #   2. The rest of the events in the chunk get persisted one by one, as
+        #      each one depends on the previous event for its state.
+        #
+        # The important thing is that events in the chunk get persisted as
+        # non-outliers, including when those events are also in the state or
+        # auth chain. Caution must therefore be taken to ensure that they are
+        # not accidentally marked as outliers.
+
+        # Step 1a: persist auth events that *don't* appear in the chunk
         ev_infos = []
         for a in auth_events.values():
-            if a.event_id in seen_events:
+            # We only want to persist auth events as outliers that we haven't
+            # seen and aren't about to persist as part of the backfilled chunk.
+            if a.event_id in seen_events or a.event_id in event_map:
                 continue
+
             a.internal_metadata.outlier = True
             ev_infos.append({
                 "event": a,
@@ -785,14 +801,21 @@ class FederationHandler(BaseHandler):
                 }
             })
 
+        # Step 1b: persist the events in the chunk we fetched state for (i.e.
+        # the backwards extremities) as non-outliers.
         for e_id in events_to_state:
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            ev = event_map[e_id]
+            assert(not ev.internal_metadata.is_outlier())
+
             ev_infos.append({
-                "event": event_map[e_id],
+                "event": ev,
                 "state": events_to_state[e_id],
                 "auth_events": {
                     (auth_events[a_id].type, auth_events[a_id].state_key):
                     auth_events[a_id]
-                    for a_id in event_map[e_id].auth_event_ids()
+                    for a_id in ev.auth_event_ids()
                     if a_id in auth_events
                 }
             })
@@ -802,11 +825,16 @@ class FederationHandler(BaseHandler):
             backfilled=True,
         )
 
+        # Step 2: Persist the rest of the events in the chunk one by one
         events.sort(key=lambda e: e.depth)
 
         for event in events:
             if event in events_to_state:
                 continue
+
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            assert(not event.internal_metadata.is_outlier())
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.
@@ -829,6 +857,52 @@ class FederationHandler(BaseHandler):
         if not extremities:
             logger.debug("Not backfilling as no extremeties found.")
             return
+
+        # We only want to paginate if we can actually see the events we'll get,
+        # as otherwise we'll just spend a lot of resources to get redacted
+        # events.
+        #
+        # We do this by filtering all the backwards extremities and seeing if
+        # any remain. Given we don't have the extremity events themselves, we
+        # need to actually check the events that reference them.
+        #
+        # *Note*: the spec wants us to keep backfilling until we reach the start
+        # of the room in case we are allowed to see some of the history. However
+        # in practice that causes more issues than its worth, as a) its
+        # relatively rare for there to be any visible history and b) even when
+        # there is its often sufficiently long ago that clients would stop
+        # attempting to paginate before backfill reached the visible history.
+        #
+        # TODO: If we do do a backfill then we should filter the backwards
+        #   extremities to only include those that point to visible portions of
+        #   history.
+        #
+        # TODO: Correctly handle the case where we are allowed to see the
+        #   forward event but not the backward extremity, e.g. in the case of
+        #   initial join of the server where we are allowed to see the join
+        #   event but not anything before it. This would require looking at the
+        #   state *before* the event, ignoring the special casing certain event
+        #   types have.
+
+        forward_events = yield self.store.get_successor_events(
+            list(extremities),
+        )
+
+        extremities_events = yield self.store.get_events(
+            forward_events,
+            check_redacted=False,
+            get_prev_content=False,
+        )
+
+        # We set `check_history_visibility_only` as we might otherwise get false
+        # positives from users having been erased.
+        filtered_extremities = yield filter_events_for_server(
+            self.store, self.server_name, list(extremities_events.values()),
+            redact=False, check_history_visibility_only=True,
+        )
+
+        if not filtered_extremities:
+            defer.returnValue(False)
 
         # Check if we reached a point where we should start backfilling.
         sorted_extremeties_tuple = sorted(

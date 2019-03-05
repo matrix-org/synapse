@@ -1,3 +1,10 @@
+matrix-synapse-py3 (0.99.2) stable; urgency=medium
+
+  * Fix overwriting of config settings on upgrade.
+  * New synapse release 0.99.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 01 Mar 2019 10:55:08 +0000
+
 matrix-synapse-py3 (0.99.1.1) stable; urgency=medium
 
   * New synapse release 0.99.1.1
