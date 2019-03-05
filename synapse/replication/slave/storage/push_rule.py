@@ -20,7 +20,7 @@ from ._slaved_id_tracker import SlavedIdTracker
 from .events import SlavedEventStore
 
 
-class SlavedPushRuleStore(PushRulesWorkerStore, SlavedEventStore):
+class SlavedPushRuleStore(SlavedEventStore, PushRulesWorkerStore):
     def __init__(self, db_conn, hs):
         self._push_rules_stream_id_gen = SlavedIdTracker(
             db_conn, "push_rules_stream", "stream_id",
