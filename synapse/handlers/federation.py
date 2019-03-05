@@ -858,6 +858,52 @@ class FederationHandler(BaseHandler):
             logger.debug("Not backfilling as no extremeties found.")
             return
 
+        # We only want to paginate if we can actually see the events we'll get,
+        # as otherwise we'll just spend a lot of resources to get redacted
+        # events.
+        #
+        # We do this by filtering all the backwards extremities and seeing if
+        # any remain. Given we don't have the extremity events themselves, we
+        # need to actually check the events that reference them.
+        #
+        # *Note*: the spec wants us to keep backfilling until we reach the start
+        # of the room in case we are allowed to see some of the history. However
+        # in practice that causes more issues than its worth, as a) its
+        # relatively rare for there to be any visible history and b) even when
+        # there is its often sufficiently long ago that clients would stop
+        # attempting to paginate before backfill reached the visible history.
+        #
+        # TODO: If we do do a backfill then we should filter the backwards
+        #   extremities to only include those that point to visible portions of
+        #   history.
+        #
+        # TODO: Correctly handle the case where we are allowed to see the
+        #   forward event but not the backward extremity, e.g. in the case of
+        #   initial join of the server where we are allowed to see the join
+        #   event but not anything before it. This would require looking at the
+        #   state *before* the event, ignoring the special casing certain event
+        #   types have.
+
+        forward_events = yield self.store.get_successor_events(
+            list(extremities),
+        )
+
+        extremities_events = yield self.store.get_events(
+            forward_events,
+            check_redacted=False,
+            get_prev_content=False,
+        )
+
+        # We set `check_history_visibility_only` as we might otherwise get false
+        # positives from users having been erased.
+        filtered_extremities = yield filter_events_for_server(
+            self.store, self.server_name, list(extremities_events.values()),
+            redact=False, check_history_visibility_only=True,
+        )
+
+        if not filtered_extremities:
+            defer.returnValue(False)
+
         # Check if we reached a point where we should start backfilling.
         sorted_extremeties_tuple = sorted(
             extremities.items(),

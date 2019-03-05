@@ -1,3 +1,0 @@
-Fix an issue in the database migration script where the 
-`e2e_room_keys.is_verified` column wasn't considered as 
-a boolean

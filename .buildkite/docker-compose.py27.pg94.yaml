@@ -1,0 +1,21 @@
+version: '3.1'
+
+services:
+
+  postgres:
+    image: postgres:9.4
+    environment:
+      POSTGRES_PASSWORD: postgres
+
+  testenv:
+    image: python:2.7
+    depends_on:
+      - postgres
+    env_file: .env
+    environment:
+      SYNAPSE_POSTGRES_HOST: postgres
+      SYNAPSE_POSTGRES_USER: postgres
+      SYNAPSE_POSTGRES_PASSWORD: postgres
+    working_dir: /app
+    volumes:
+      - ..:/app

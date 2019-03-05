@@ -1,0 +1,1 @@
+Fix attempting to paginate in rooms where server cannot see any events, to avoid unnecessarily pulling in lots of redacted events.

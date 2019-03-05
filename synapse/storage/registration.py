@@ -295,6 +295,39 @@ class RegistrationWorkerStore(SQLBaseStore):
             return ret['user_id']
         return None
 
+    @defer.inlineCallbacks
+    def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
+        yield self._simple_upsert("user_threepids", {
+            "medium": medium,
+            "address": address,
+        }, {
+            "user_id": user_id,
+            "validated_at": validated_at,
+            "added_at": added_at,
+        })
+
+    @defer.inlineCallbacks
+    def user_get_threepids(self, user_id):
+        ret = yield self._simple_select_list(
+            "user_threepids", {
+                "user_id": user_id
+            },
+            ['medium', 'address', 'validated_at', 'added_at'],
+            'user_get_threepids'
+        )
+        defer.returnValue(ret)
+
+    def user_delete_threepid(self, user_id, medium, address):
+        return self._simple_delete(
+            "user_threepids",
+            keyvalues={
+                "user_id": user_id,
+                "medium": medium,
+                "address": address,
+            },
+            desc="user_delete_threepids",
+        )
+
 
 class RegistrationStore(RegistrationWorkerStore,
                         background_updates.BackgroundUpdateStore):
@@ -631,39 +664,6 @@ class RegistrationStore(RegistrationWorkerStore,
         )
 
         defer.returnValue(res if res else False)
-
-    @defer.inlineCallbacks
-    def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
-        yield self._simple_upsert("user_threepids", {
-            "medium": medium,
-            "address": address,
-        }, {
-            "user_id": user_id,
-            "validated_at": validated_at,
-            "added_at": added_at,
-        })
-
-    @defer.inlineCallbacks
-    def user_get_threepids(self, user_id):
-        ret = yield self._simple_select_list(
-            "user_threepids", {
-                "user_id": user_id
-            },
-            ['medium', 'address', 'validated_at', 'added_at'],
-            'user_get_threepids'
-        )
-        defer.returnValue(ret)
-
-    def user_delete_threepid(self, user_id, medium, address):
-        return self._simple_delete(
-            "user_threepids",
-            keyvalues={
-                "user_id": user_id,
-                "medium": medium,
-                "address": address,
-            },
-            desc="user_delete_threepids",
-        )
 
     @defer.inlineCallbacks
     def save_or_get_3pid_guest_access_token(
