@@ -4,9 +4,9 @@ about: Create a report to help us improve
 
 ---
 
-<!-- 
+<!--
 
-**IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**: 
+**IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**:
 You will likely get better support more quickly if you ask in ** #matrix:matrix.org ** ;)
 
 
@@ -17,7 +17,7 @@ the necessary data to fix your issue.
 You can also preview your report before submitting it. You may remove sections
 that aren't relevant to your particular case.
 
-Text between <!-- and --> marks will be invisible in the report.
+Text between <!-- and --​> marks will be invisible in the report.
 
 -->
 
@@ -31,7 +31,7 @@ Text between <!-- and --> marks will be invisible in the report.
 - that reproduce the bug
 - using hyphens as bullet points
 
-<!-- 
+<!--
 Describe how what happens differs from what you expected.
 
 If you can identify any relevant log snippets from _homeserver.log_, please include
@@ -48,8 +48,8 @@ those (please be careful to remove any personal or private data). Please surroun
 
 If not matrix.org:
 
-<!-- 
-What version of Synapse is running? 
+<!--
+What version of Synapse is running?
 You can find the Synapse version by inspecting the server headers (replace matrix.org with
 your own homeserver domain):
 $ curl -v https://matrix.org/_matrix/client/versions 2>&1 | grep "Server:"
