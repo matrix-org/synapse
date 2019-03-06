@@ -452,6 +452,9 @@ class RoomMemberHandler(object):
                     )
 
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
+        logger.info("Is host in room? %s" % is_host_in_room)
+        logger.info("effective_membership_state %s" % effective_membership_state)
+        logger.info("remote_room_hosts %s" % remote_room_hosts)
 
         if effective_membership_state == Membership.JOIN:
             if requester.is_guest:

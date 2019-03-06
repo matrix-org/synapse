@@ -1386,6 +1386,7 @@ class SyncHandler(object):
 
         mem_change_events_by_room_id = {}
         for event in rooms_changed:
+            logger.warn("Membership %s" % event.room_id)
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
         newly_joined_rooms = []
