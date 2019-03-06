@@ -455,7 +455,6 @@ class RoomMemberHandler(object):
         logger.info("Is host in room? %s" % is_host_in_room)
         logger.info("effective_membership_state %s" % effective_membership_state)
         logger.info("remote_room_hosts %s" % remote_room_hosts)
-        logger.info("hs_is_mine %s" % self.hs.is_mine(target))
 
         if effective_membership_state == Membership.JOIN:
             if requester.is_guest:
@@ -486,14 +485,6 @@ class RoomMemberHandler(object):
                 defer.returnValue(ret)
 
         elif effective_membership_state == Membership.LEAVE:
-            # Send disinvite events to remotes
-            remote_invite = self.hs.is_mine(target)
-            if remote_invite and is_host_in_room:
-                remote_room_hosts = remote_room_hosts + [target.domain]
-                res = yield self._remote_reject_invite(
-                    requester, remote_room_hosts, room_id, target,
-                )
-                defer.returnValue(res)
             if not is_host_in_room:
                 # perhaps we've been invited
                 inviter = yield self._get_inviter(target.to_string(), room_id)
