@@ -103,7 +103,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
         self._address_ratelimiter = hs.get_login_address_ratelimiter()
-        self._userid_ratelimiter = hs.get_login_userid_ratelimiter()
+        self._user_ratelimiter = hs.get_login_user_ratelimiter()
 
     def on_GET(self, request):
         flows = []
@@ -168,6 +168,31 @@ class LoginRestServlet(ClientV1RestServlet):
             result["well_known"] = well_known_data
         defer.returnValue((200, result))
 
+    def _ratelimit_user(user_id):
+        """Checks whether a login request targetting a given user ID is allowed
+            by the ratelimiter. Also updates the raterlimiter's counter for this
+            key.
+
+        Args:
+            user_id (str): the user ID the login request is a targetting.
+
+        Raises:
+            LimitExceededError: The request is not allowed due to ratelimiting.
+        """
+        time_now = self.hs.clock.time()
+
+        allowed, time_allowed = self._user_ratelimiter.can_do_action(
+            key, time_now_s=time_now,
+            rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
+            burst_count=self.hs.config.rc_login_request_per_user_burst_count,
+            update=True,
+        )
+
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000 * (time_allowed - time_now)),
+            )
+
     @defer.inlineCallbacks
     def _do_other_login(self, login_submission):
         """Handle non-token/saml/jwt logins
@@ -189,6 +214,8 @@ class LoginRestServlet(ClientV1RestServlet):
             login_submission.get('user'),
         )
         login_submission_legacy_convert(login_submission)
+
+        original_identifier_type = identifier["type"]
 
         if "identifier" not in login_submission:
             raise SynapseError(400, "Missing param: identifier")
@@ -229,6 +256,8 @@ class LoginRestServlet(ClientV1RestServlet):
                 "user": user_id,
             }
 
+            self._ratelimit_user(user_id)
+
         # by this point, the identifier should be an m.id.user: if it's anything
         # else, we haven't understood it.
         if identifier["type"] != "m.id.user":
@@ -241,6 +270,11 @@ class LoginRestServlet(ClientV1RestServlet):
             identifier["user"],
             login_submission,
         )
+
+        # If the identifier wasn't initially a m.id.user, ratelimiting already
+        # happened for this request.
+        if original_identifier_type == "m.id.user":
+            self._ratelimit_user(canonical_user_id)
 
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
@@ -267,6 +301,8 @@ class LoginRestServlet(ClientV1RestServlet):
         user_id = (
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
+
+        self._ratelimit_user(user_id)
 
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
@@ -307,6 +343,9 @@ class LoginRestServlet(ClientV1RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
+
+        self._ratelimit_user(user_id)
+
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if registered_user_id:

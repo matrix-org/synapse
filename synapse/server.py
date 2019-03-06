@@ -208,7 +208,7 @@ class HomeServer(object):
         self.ratelimiter = Ratelimiter()
         self.registration_ratelimiter = Ratelimiter()
         self.login_address_ratelimiter = Ratelimiter()
-        self.login_userid_ratelimiter = Ratelimiter()
+        self.login_user_ratelimiter = Ratelimiter()
 
         self.datastore = None
 
@@ -260,8 +260,8 @@ class HomeServer(object):
     def get_login_address_ratelimiter(self):
         return self.login_address_ratelimiter
 
-    def get_login_userid_ratelimiter(self):
-        return self.login_userid_ratelimiter
+    def get_login_user_ratelimiter(self):
+        return self.login_user_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)
