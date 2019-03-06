@@ -195,6 +195,7 @@ class FederationServer(FederationBase):
                 )
                 continue
 
+            # TODO: Somehow trick the following into accepting disinvite events.
             try:
                 room_version = yield self.store.get_room_version(room_id)
                 format_ver = room_version_to_event_format(room_version)
