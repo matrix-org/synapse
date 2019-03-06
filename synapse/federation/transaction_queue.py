@@ -22,6 +22,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse.metrics
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
@@ -36,6 +37,7 @@ from synapse.metrics import (
     sent_transactions_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import UserID
 from synapse.util import logcontext
 from synapse.util.metrics import measure_func
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
@@ -202,6 +204,17 @@ class TransactionQueue(object):
                         destinations = yield self.state.get_current_hosts_in_room(
                             event.room_id, latest_event_ids=event.prev_event_ids(),
                         )
+
+                        # Special case leaves: We could be disinviting the host or
+                        # unbanning them, so send the event to the host if they are
+                        # not already in the list. The event affects their membership,
+                        # so they have a moderate right to know what's going on.
+                        if event.type == EventTypes.Member and (event.membership ==
+                                                                Membership.LEAVE):
+                            target_user = UserID.from_string(event.state_key)
+                            if target_user.domain not in destinations:
+                                destinations = set(destinations)
+                                destinations.add(target_user.domain)
                     except Exception:
                         logger.exception(
                             "Failed to calculate hosts in room for event: %s",
