@@ -177,7 +177,7 @@ class LoginRestServlet(ClientV1RestServlet):
         time_now = self.hs.clock.time()
 
         allowed, time_allowed = self._user_ratelimiter.can_do_action(
-            key, time_now_s=time_now,
+            user_id, time_now_s=time_now,
             rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
             burst_count=self.hs.config.rc_login_request_per_user_burst_count,
             update=True,
