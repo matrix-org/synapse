@@ -39,6 +39,9 @@ from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
 
+# Debug logger for https://github.com/matrix-org/synapse/issues/4422
+issue4422_logger = logging.getLogger("synapse.handler.sync.4422_debug")
+
 SYNC_RESPONSE_CACHE_MS = 2 * 60 * 1000
 
 # Counts the number of times we returned a non-empty sync. `type` is one of
@@ -969,7 +972,7 @@ class SyncHandler(object):
         for joined_room in sync_result_builder.joined:
             room_id = joined_room.room_id
             if room_id in newly_joined_rooms:
-                logger.info(
+                issue4422_logger.debug(
                     "Sync result for newly joined room %s: %r",
                     room_id, joined_room,
                 )
@@ -1443,7 +1446,7 @@ class SyncHandler(object):
                     prev_membership = None
                     if old_mem_ev:
                         prev_membership = old_mem_ev.membership
-                    logger.info(
+                    issue4422_logger.debug(
                         "Previous membership for room %s with join: %s (event %s)",
                         room_id, prev_membership, old_mem_ev_id,
                     )
@@ -1570,7 +1573,7 @@ class SyncHandler(object):
 
             if newly_joined:
                 # debugging for https://github.com/matrix-org/synapse/issues/4422
-                logger.info(
+                issue4422_logger.debug(
                     "RoomSyncResultBuilder events for newly joined room %s: %r",
                     room_id, entry.events,
                 )
@@ -1697,7 +1700,7 @@ class SyncHandler(object):
 
         if newly_joined:
             # debug for https://github.com/matrix-org/synapse/issues/4422
-            logger.info(
+            issue4422_logger.debug(
                 "Timeline events after filtering in newly-joined room %s: %r",
                 room_id, batch,
             )
@@ -1936,18 +1939,31 @@ class SyncResultBuilder(object):
     """Used to help build up a new SyncResult for a user
 
     Attributes:
-        joined (list[JoinedSyncResult]):
-        archived (list[ArchivedSyncResult]):
+        sync_config (SyncConfig)
+        full_state (bool)
+        since_token (StreamToken)
+        now_token (StreamToken)
+        joined_room_ids (list[str])
+
+        # The following mirror the fields in a sync response
+        presence (list)
+        account_data (list)
+        joined (list[JoinedSyncResult])
+        invited (list[InvitedSyncResult])
+        archived (list[ArchivedSyncResult])
+        device (list)
+        groups (GroupsSyncResult|None)
+        to_device (list)
     """
     def __init__(self, sync_config, full_state, since_token, now_token,
                  joined_room_ids):
         """
         Args:
-            sync_config(SyncConfig)
-            full_state(bool): The full_state flag as specified by user
-            since_token(StreamToken): The token supplied by user, or None.
-            now_token(StreamToken): The token to sync up to.
-
+            sync_config (SyncConfig)
+            full_state (bool): The full_state flag as specified by user
+            since_token (StreamToken): The token supplied by user, or None.
+            now_token (StreamToken): The token to sync up to.
+            joined_room_ids (list[str]): List of rooms the user is joined to
         """
         self.sync_config = sync_config
         self.full_state = full_state
@@ -1975,8 +1991,8 @@ class RoomSyncResultBuilder(object):
         Args:
             room_id(str)
             rtype(str): One of `"joined"` or `"archived"`
-            events(list[FrozenEvent]): List of events to include in the room (more events
-                may be added when generating result).
+            events(list[FrozenEvent]): List of events to include in the room
+                (more events may be added when generating result).
             newly_joined(bool): If the user has newly joined the room
             full_state(bool): Whether the full state should be sent in result
             since_token(StreamToken): Earliest point to return events from, or None

@@ -393,6 +393,17 @@ federation_rc_reject_limit: 50
 #
 federation_rc_concurrent: 3
 
+# Number of registration requests a client can send per second.
+# Defaults to 1/minute (0.17).
+#
+#rc_registration_requests_per_second: 0.17
+
+# Number of registration requests a client can send before being
+# throttled.
+# Defaults to 3.
+#
+#rc_registration_request_burst_count: 3.0
+
 
 
 # Directory where uploaded images and attachments are stored.
@@ -580,6 +591,8 @@ turn_allow_guests: True
 
 
 ## Registration ##
+# Registration can be rate-limited using the parameters in the "Ratelimiting"
+# section of this file.
 
 # Enable registration for new users.
 enable_registration: False
@@ -656,17 +669,6 @@ trusted_third_party_id_servers:
 # users cannot be auto-joined since they do not exist.
 #
 autocreate_auto_join_rooms: true
-
-# Number of registration requests a client can send per second.
-# Defaults to 1/minute (0.17).
-#
-#rc_registration_requests_per_second: 0.17
-
-# Number of registration requests a client can send before being
-# throttled.
-# Defaults to 3.
-#
-#rc_registration_request_burst_count: 3.0
 
 
 ## Metrics ###

@@ -191,14 +191,18 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
     @defer.inlineCallbacks
     def get_room_events_stream_for_rooms(self, room_ids, from_key, to_key, limit=0,
                                          order='DESC'):
-        """
+        """Get new room events in stream ordering since `from_key`.
 
         Args:
-            room_ids:
-            from_key:
-            to_key:
-            limit:
-            order:
+            room_id (str)
+            from_key (str): Token from which no events are returned before
+            to_key (str): Token from which no events are returned after. (This
+                is typically the current stream token)
+            limit (int): Maximum number of events to return
+            order (str): Either "DESC" or "ASC". Determines which events are
+                returned when the result is limited. If "DESC" then the most
+                recent `limit` events are returned, otherwise returns the
+                oldest `limit` events.
 
         Returns:
             Deferred[dict[str,tuple[list[FrozenEvent], str]]]

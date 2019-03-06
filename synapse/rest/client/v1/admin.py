@@ -17,12 +17,14 @@
 import hashlib
 import hmac
 import logging
+import platform
 
 from six import text_type
 from six.moves import http_client
 
 from twisted.internet import defer
 
+import synapse
 from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -32,6 +34,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.types import UserID, create_requester
+from synapse.util.versionstring import get_version_string
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -62,6 +65,25 @@ class UsersRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Can only users a local user")
 
         ret = yield self.handlers.admin_handler.get_users()
+
+        defer.returnValue((200, ret))
+
+
+class VersionServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/server_version")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        ret = {
+            'server_version': get_version_string(synapse),
+            'python_version': platform.python_version(),
+        }
 
         defer.returnValue((200, ret))
 
@@ -763,3 +785,4 @@ def register_servlets(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
+    VersionServlet(hs).register(http_server)
