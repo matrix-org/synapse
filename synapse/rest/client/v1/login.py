@@ -21,12 +21,7 @@ from six.moves import urllib
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
-from synapse.api.errors import (
-    Codes,
-    LimitExceededError,
-    LoginError,
-    SynapseError,
-)
+from synapse.api.errors import Codes, LimitExceededError, LoginError, SynapseError
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -215,14 +210,14 @@ class LoginRestServlet(ClientV1RestServlet):
         )
         login_submission_legacy_convert(login_submission)
 
-        original_identifier_type = identifier["type"]
-
         if "identifier" not in login_submission:
             raise SynapseError(400, "Missing param: identifier")
 
         identifier = login_submission["identifier"]
         if "type" not in identifier:
             raise SynapseError(400, "Login identifier has no type")
+
+        original_identifier_type = identifier["type"]
 
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
