@@ -15,6 +15,7 @@ import contextlib
 import logging
 import time
 
+from twisted.internet import error
 from twisted.web.server import Request, Site
 
 from synapse.http import redact_uri
@@ -199,9 +200,10 @@ class SynapseRequest(Request):
         # It's useful to log it here so that we can get an idea of when
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
-            logger.warn(
-                "Error processing request %r: %s %s", self, reason.type, reason.value,
-            )
+            if reason.type != error.ConnectionDone:
+                logger.warn(
+                    "Error processing request %r: %s %s", self, reason.type, reason.value,
+                )
 
             if not self._is_processing:
                 self._finished_processing()
