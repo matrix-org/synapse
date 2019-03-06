@@ -163,7 +163,7 @@ class LoginRestServlet(ClientV1RestServlet):
             result["well_known"] = well_known_data
         defer.returnValue((200, result))
 
-    def _ratelimit_user(user_id):
+    def _ratelimit_user(self, user_id):
         """Checks whether a login request targetting a given user ID is allowed
             by the ratelimiter. Also updates the raterlimiter's counter for this
             key.
