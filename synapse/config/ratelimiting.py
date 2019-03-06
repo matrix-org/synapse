@@ -41,8 +41,8 @@ class RatelimitConfig(Config):
             "rc_login_request_per_address_burst_count", 3,
         )
 
-        self.rc_login_request_per_user_burst_count = config.get(
-            "rc_login_request_per_user_burst_count", 0.17,
+        self.rc_login_requests_per_user_per_second = config.get(
+            "rc_login_requests_per_user_per_second", 0.17,
         )
         self.rc_login_request_per_user_burst_count = config.get(
             "rc_login_request_per_user_burst_count", 3,
