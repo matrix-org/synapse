@@ -761,13 +761,11 @@ class RoomInitialSyncTestCase(RoomBase):
 
         self.assertTrue("presence" in channel.json_body)
 
-        # presence is turned off on hotfixes
-
-        # presence_by_user = {
-        #     e["content"]["user_id"]: e for e in channel.json_body["presence"]
-        # }
-        # self.assertTrue(self.user_id in presence_by_user)
-        # self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
+        presence_by_user = {
+            e["content"]["user_id"]: e for e in channel.json_body["presence"]
+        }
+        self.assertTrue(self.user_id in presence_by_user)
+        self.assertEquals("m.presence", presence_by_user[self.user_id]["type"])
 
 
 class RoomMessageListTestCase(RoomBase):

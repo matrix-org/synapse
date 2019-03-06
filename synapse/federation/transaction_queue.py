@@ -397,9 +397,7 @@ class TransactionQueue(object):
         else:
             self.pending_edus_by_dest.setdefault(edu.destination, []).append(edu)
 
-        destination = edu.destination
-
-        self._attempt_new_transaction(destination)
+        self._attempt_new_transaction(edu.destination)
 
     def send_device_messages(self, destination):
         if destination == self.server_name:
