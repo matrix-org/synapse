@@ -34,6 +34,20 @@ class RatelimitConfig(Config):
             "rc_registration_request_burst_count", 3,
         )
 
+        self.rc_login_requests_per_address_per_second = config.get(
+            "rc_login_requests_per_address_per_second", 0.17,
+        )
+        self.rc_login_request_per_address_burst_count = config.get(
+            "rc_login_request_per_address_burst_count", 3,
+        )
+
+        self.rc_login_request_per_user_burst_count = config.get(
+            "rc_login_request_per_user_burst_count", 0.17,
+        )
+        self.rc_login_request_per_user_burst_count = config.get(
+            "rc_login_request_per_user_burst_count", 3,
+        )
+
     def default_config(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -80,4 +94,26 @@ class RatelimitConfig(Config):
         # Defaults to 3.
         #
         #rc_registration_request_burst_count: 3.0
+
+        # Number of login requests allowed from the same IP address per second.
+        # Defaults to 1/minute (0.17).
+        #
+        #rc_login_requests_per_address_per_second: 0.17
+
+        # Number of login requests allowed from the same IP address before being
+        # throttled.
+        # Defaults to 3.
+        #
+        #rc_login_request_per_address_burst_count: 3.0
+
+        # Number of login requests allowed for the same user per second.
+        # Defaults to 1/minute (0.17).
+        #
+        #rc_login_requests_per_user_per_second: 0.17
+
+        # Number of login requests allowed for the same user before being
+        # throttled.
+        # Defaults to 3.
+        #
+        #rc_login_request_per_user_burst_count: 3.0
         """

@@ -21,7 +21,12 @@ from six.moves import urllib
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
-from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.errors import (
+    Codes,
+    LimitExceededError,
+    LoginError,
+    SynapseError,
+)
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -97,6 +102,8 @@ class LoginRestServlet(ClientV1RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
+        self._address_ratelimiter = hs.get_login_address_ratelimiter()
+        self._userid_ratelimiter = hs.get_login_userid_ratelimiter()
 
     def on_GET(self, request):
         flows = []
@@ -129,6 +136,21 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+
+        time_now = self.hs.clock.time()
+
+        allowed, time_allowed = self._address_ratelimiter.can_do_action(
+            request.getClientIP(), time_now_s=time_now,
+            rate_hz=self.hs.config.rc_login_requests_per_address_per_second,
+            burst_count=self.hs.config.rc_login_request_per_address_burst_count,
+            update=True,
+        )
+
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000 * (time_allowed - time_now)),
+            )
+
         login_submission = parse_json_object_from_request(request)
         try:
             if self.jwt_enabled and (login_submission["type"] ==
