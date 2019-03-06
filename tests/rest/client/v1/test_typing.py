@@ -47,7 +47,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
-        self.ratelimiter = hs.get_events_ratelimiter()
+        self.ratelimiter = hs.get_ratelimiter()
         self.ratelimiter.can_do_action.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()

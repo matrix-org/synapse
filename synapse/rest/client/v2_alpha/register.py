@@ -196,7 +196,7 @@ class RegisterRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
-        self.ratelimiter = hs.get_registration_ratelimiter()
+        self.ratelimiter = hs.get_ratelimiter()
         self.clock = hs.get_clock()
 
     @interactive_auth_handler

@@ -34,7 +34,7 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
             ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
-        hs.get_events_ratelimiter().can_do_action.return_value = (True, 0)
+        hs.get_ratelimiter().can_do_action.return_value = (True, 0)
 
         return hs
 
