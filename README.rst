@@ -153,56 +153,6 @@ server on the same domain.
 See https://github.com/vector-im/riot-web/issues/1977 and
 https://developer.github.com/changes/2014-04-25-user-content-security for more details.
 
-Troubleshooting
-===============
-
-Running out of File Handles
----------------------------
-
-If synapse runs out of filehandles, it typically fails badly - live-locking
-at 100% CPU, and/or failing to accept new TCP connections (blocking the
-connecting client).  Matrix currently can legitimately use a lot of file handles,
-thanks to busy rooms like #matrix:matrix.org containing hundreds of participating
-servers.  The first time a server talks in a room it will try to connect
-simultaneously to all participating servers, which could exhaust the available
-file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
-to respond.  (We need to improve the routing algorithm used to be better than
-full mesh, but as of June 2017 this hasn't happened yet).
-
-If you hit this failure mode, we recommend increasing the maximum number of
-open file handles to be at least 4096 (assuming a default of 1024 or 256).
-This is typically done by editing ``/etc/security/limits.conf``
-
-Separately, Synapse may leak file handles if inbound HTTP requests get stuck
-during processing - e.g. blocked behind a lock or talking to a remote server etc.
-This is best diagnosed by matching up the 'Received request' and 'Processed request'
-log lines and looking for any 'Processed request' lines which take more than
-a few seconds to execute.  Please let us know at #synapse:matrix.org if
-you see this failure mode so we can help debug it, however.
-
-Help!! Synapse eats all my RAM!
--------------------------------
-
-Synapse's architecture is quite RAM hungry currently - we deliberately
-cache a lot of recent room data and metadata in RAM in order to speed up
-common requests.  We'll improve this in future, but for now the easiest
-way to either reduce the RAM usage (at the risk of slowing things down)
-is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
-variable.  The default is 0.5, which can be decreased to reduce RAM usage
-in memory constrained enviroments, or increased if performance starts to
-degrade.
-
-Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
-improvement in overall amount, and especially in terms of giving back RAM
-to the OS. To use it, the library must simply be put in the LD_PRELOAD
-environment variable when launching Synapse. On Debian, this can be done
-by installing the ``libjemalloc1`` package and adding this line to
-``/etc/default/matrix-synapse``::
-
-    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
-
-This can make a significant difference on Python 2.7 - it's unclear how
-much of an improvement it provides on Python 3.x.
 
 Upgrading an existing Synapse
 =============================
@@ -361,3 +311,54 @@ sphinxcontrib-napoleon::
 Building internal API documentation::
 
     python setup.py build_sphinx
+
+Troubleshooting
+===============
+
+Running out of File Handles
+---------------------------
+
+If synapse runs out of filehandles, it typically fails badly - live-locking
+at 100% CPU, and/or failing to accept new TCP connections (blocking the
+connecting client).  Matrix currently can legitimately use a lot of file handles,
+thanks to busy rooms like #matrix:matrix.org containing hundreds of participating
+servers.  The first time a server talks in a room it will try to connect
+simultaneously to all participating servers, which could exhaust the available
+file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
+to respond.  (We need to improve the routing algorithm used to be better than
+full mesh, but as of June 2017 this hasn't happened yet).
+
+If you hit this failure mode, we recommend increasing the maximum number of
+open file handles to be at least 4096 (assuming a default of 1024 or 256).
+This is typically done by editing ``/etc/security/limits.conf``
+
+Separately, Synapse may leak file handles if inbound HTTP requests get stuck
+during processing - e.g. blocked behind a lock or talking to a remote server etc.
+This is best diagnosed by matching up the 'Received request' and 'Processed request'
+log lines and looking for any 'Processed request' lines which take more than
+a few seconds to execute.  Please let us know at #synapse:matrix.org if
+you see this failure mode so we can help debug it, however.
+
+Help!! Synapse eats all my RAM!
+-------------------------------
+
+Synapse's architecture is quite RAM hungry currently - we deliberately
+cache a lot of recent room data and metadata in RAM in order to speed up
+common requests.  We'll improve this in future, but for now the easiest
+way to either reduce the RAM usage (at the risk of slowing things down)
+is to set the almost-undocumented ``SYNAPSE_CACHE_FACTOR`` environment
+variable.  The default is 0.5, which can be decreased to reduce RAM usage
+in memory constrained enviroments, or increased if performance starts to
+degrade.
+
+Using `libjemalloc <http://jemalloc.net/>`_ can also yield a significant
+improvement in overall amount, and especially in terms of giving back RAM
+to the OS. To use it, the library must simply be put in the LD_PRELOAD
+environment variable when launching Synapse. On Debian, this can be done
+by installing the ``libjemalloc1`` package and adding this line to
+``/etc/default/matrix-synapse``::
+
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
+
+This can make a significant difference on Python 2.7 - it's unclear how
+much of an improvement it provides on Python 3.x.
