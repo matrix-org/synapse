@@ -240,7 +240,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         private room with the searching user or be in a public room to be search
         visible.
         """
-        self.hs.config.user_directory_search_all_users = True
+        self.handler.search_all_users = True
 
         u1 = self.register_user("user1", "pass")
         u1_token = self.login(u1, "pass")

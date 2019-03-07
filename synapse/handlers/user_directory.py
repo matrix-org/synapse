@@ -51,7 +51,6 @@ class UserDirectoryHandler(object):
     INITIAL_USER_SLEEP_MS = 10
 
     def __init__(self, hs):
-        self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -59,6 +58,7 @@ class UserDirectoryHandler(object):
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.update_user_directory
+        self.search_all_users = hs.config.user_directory_search_all_users
 
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
@@ -191,7 +191,7 @@ class UserDirectoryHandler(object):
 
         logger.info("Processed all rooms.")
 
-        if self.hs.config.user_directory_search_all_users:
+        if self.search_all_users:
             num_processed_users = 0
             user_ids = yield self.store.get_all_local_users()
             logger.info(
@@ -403,6 +403,11 @@ class UserDirectoryHandler(object):
             yield self.store.remove_user_who_share_room(user_id, room_id)
 
         # Then, re-add them to the tables.
+        # NOTE: this is not the most efficient method, as handle_new_user sets
+        # up local_user -> other_user and other_user_whos_local -> local_user,
+        # which when ran over an entire room, will result in the same values
+        # being added multiple times. The batching upserts shouldn't make this
+        # too bad, though.
         for user_id, profile in iteritems(users_with_profile):
             yield self._handle_new_user(room_id, user_id, profile)
 
