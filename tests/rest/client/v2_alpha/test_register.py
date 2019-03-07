@@ -133,6 +133,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_POST_ratelimiting_guest(self):
         self.hs.config.rc_registration_request_burst_count = 5
+        self.hs.config.rc_registration_requests_per_second = 0.17
 
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
@@ -154,6 +155,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     def test_POST_ratelimiting(self):
         self.hs.config.rc_registration_request_burst_count = 5
+        self.hs.config.rc_registration_requests_per_second = 0.17
 
         for i in range(0, 6):
             params = {
