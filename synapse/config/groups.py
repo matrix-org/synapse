@@ -24,9 +24,11 @@ class GroupsConfig(Config):
     def default_config(self, **kwargs):
         return """\
         # Whether to allow non server admins to create groups on this server
+        #
         enable_group_creation: false
 
         # If enabled, non server admins can only create groups with local parts
         # starting with this prefix
-        # group_creation_prefix: "unofficial/"
+        #
+        #group_creation_prefix: "unofficial/"
         """

@@ -33,7 +33,7 @@ RECAPTCHA_TEMPLATE = """
 <title>Authentication</title>
 <meta name='viewport' content='width=device-width, initial-scale=1,
     user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<script src="https://www.google.com/recaptcha/api.js"
+<script src="https://www.recaptcha.net/recaptcha/api.js"
     async defer></script>
 <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
 <link rel="stylesheet" href="/_matrix/static/client/register/style.css">
@@ -129,7 +129,7 @@ class AuthRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
 
     def on_GET(self, request, stagetype):
         session = parse_string(request, "session")

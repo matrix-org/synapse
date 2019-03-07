@@ -27,7 +27,7 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, RoomVersions
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.config.server import ServerConfig
 from synapse.federation.transport import server
@@ -46,7 +46,9 @@ from synapse.util.ratelimitutils import FederationRateLimiter
 # set this to True to run the tests against postgres instead of sqlite.
 USE_POSTGRES_FOR_TESTS = os.environ.get("SYNAPSE_POSTGRES", False)
 LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
-POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", "postgres")
+POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", None)
+POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", None)
+POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
 
@@ -59,6 +61,8 @@ def setupdb():
             "args": {
                 "database": POSTGRES_BASE_DB,
                 "user": POSTGRES_USER,
+                "host": POSTGRES_HOST,
+                "password": POSTGRES_PASSWORD,
                 "cp_min": 1,
                 "cp_max": 5,
             },
@@ -67,7 +71,9 @@ def setupdb():
         config.password_providers = []
         config.database_config = pgconfig
         db_engine = create_engine(pgconfig)
-        db_conn = db_engine.module.connect(user=POSTGRES_USER)
+        db_conn = db_engine.module.connect(
+            user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+        )
         db_conn.autocommit = True
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
@@ -77,7 +83,10 @@ def setupdb():
 
         # Set up in the db
         db_conn = db_engine.module.connect(
-            database=POSTGRES_BASE_DB, user=POSTGRES_USER
+            database=POSTGRES_BASE_DB,
+            user=POSTGRES_USER,
+            host=POSTGRES_HOST,
+            password=POSTGRES_PASSWORD,
         )
         cur = db_conn.cursor()
         _get_or_create_schema_state(cur, db_engine)
@@ -87,7 +96,9 @@ def setupdb():
         db_conn.close()
 
         def _cleanup():
-            db_conn = db_engine.module.connect(user=POSTGRES_USER)
+            db_conn = db_engine.module.connect(
+                user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+            )
             db_conn.autocommit = True
             cur = db_conn.cursor()
             cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
@@ -143,6 +154,9 @@ def default_config(name):
     config.saml2_enabled = False
     config.public_baseurl = None
     config.default_identity_server = None
+    config.key_refresh_interval = 24 * 60 * 60 * 1000
+    config.old_signing_keys = {}
+    config.tls_fingerprints = []
 
     config.stats_enable = True
     config.stats_bucket_size = 86400
@@ -159,7 +173,9 @@ def default_config(name):
     config.update_user_directory = False
 
     def is_threepid_reserved(threepid):
-        return ServerConfig.is_threepid_reserved(config, threepid)
+        return ServerConfig.is_threepid_reserved(
+            config.mau_limits_reserved_threepids, threepid
+        )
 
     config.is_threepid_reserved.side_effect = is_threepid_reserved
 
@@ -206,7 +222,14 @@ def setup_test_homeserver(
 
         config.database_config = {
             "name": "psycopg2",
-            "args": {"database": test_db, "cp_min": 1, "cp_max": 5},
+            "args": {
+                "database": test_db,
+                "host": POSTGRES_HOST,
+                "password": POSTGRES_PASSWORD,
+                "user": POSTGRES_USER,
+                "cp_min": 1,
+                "cp_max": 5,
+            },
         }
     else:
         config.database_config = {
@@ -220,7 +243,10 @@ def setup_test_homeserver(
     # the template database we generate in setupdb()
     if datastore is None and isinstance(db_engine, PostgresEngine):
         db_conn = db_engine.module.connect(
-            database=POSTGRES_BASE_DB, user=POSTGRES_USER
+            database=POSTGRES_BASE_DB,
+            user=POSTGRES_USER,
+            host=POSTGRES_HOST,
+            password=POSTGRES_PASSWORD,
         )
         db_conn.autocommit = True
         cur = db_conn.cursor()
@@ -270,7 +296,10 @@ def setup_test_homeserver(
 
                 # Drop the test database
                 db_conn = db_engine.module.connect(
-                    database=POSTGRES_BASE_DB, user=POSTGRES_USER
+                    database=POSTGRES_BASE_DB,
+                    user=POSTGRES_USER,
+                    host=POSTGRES_HOST,
+                    password=POSTGRES_PASSWORD,
                 )
                 db_conn.autocommit = True
                 cur = db_conn.cursor()
@@ -301,7 +330,8 @@ def setup_test_homeserver(
                 cleanup_func(cleanup)
 
         hs.setup()
-        hs.setup_master()
+        if homeserverToUse.__name__ == "TestHomeServer":
+            hs.setup_master()
     else:
         hs = homeserverToUse(
             name,
@@ -461,6 +491,9 @@ class MockKey(object):
     def verify(self, message, sig):
         assert sig == b"\x9a\x87$"
 
+    def encode(self):
+        return b"<fake_encoded_key>"
+
 
 class MockClock(object):
     now = 1000
@@ -490,7 +523,7 @@ class MockClock(object):
         return t
 
     def looping_call(self, function, interval):
-        self.loopers.append([function, interval / 1000., self.now])
+        self.loopers.append([function, interval / 1000.0, self.now])
 
     def cancel_call_later(self, timer, ignore_errs=False):
         if timer[2]:
@@ -526,7 +559,7 @@ class MockClock(object):
                 looped[2] = self.now
 
     def advance_time_msec(self, ms):
-        self.advance_time(ms / 1000.)
+        self.advance_time(ms / 1000.0)
 
     def time_bound_deferred(self, d, *args, **kwargs):
         # We don't bother timing things out for now.
@@ -628,13 +661,14 @@ def create_room(hs, room_id, creator_id):
     event_creation_handler = hs.get_event_creation_handler()
 
     builder = event_builder_factory.new(
+        RoomVersions.V1,
         {
             "type": EventTypes.Create,
             "state_key": "",
             "sender": creator_id,
             "room_id": room_id,
             "content": {},
-        }
+        },
     )
 
     event, context = yield event_creation_handler.create_new_client_event(builder)

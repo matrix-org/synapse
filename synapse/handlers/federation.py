@@ -34,6 +34,7 @@ from synapse.api.constants import (
     EventTypes,
     Membership,
     RejectedReason,
+    RoomVersions,
 )
 from synapse.api.errors import (
     AuthError,
@@ -43,10 +44,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.crypto.event_signing import (
-    add_hashes_and_signatures,
-    compute_event_signature,
-)
+from synapse.crypto.event_signing import compute_event_signature
 from synapse.events.validator import EventValidator
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
@@ -58,7 +56,6 @@ from synapse.types import UserID, get_domain_from_id
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room
-from synapse.util.frozenutils import unfreeze
 from synapse.util.logutils import log_function
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.visibility import filter_events_for_server
@@ -105,7 +102,7 @@ class FederationHandler(BaseHandler):
 
         self.hs = hs
 
-        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
+        self.store = hs.get_datastore()
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -342,6 +339,8 @@ class FederationHandler(BaseHandler):
                             room_id, event_id, p,
                         )
 
+                        room_version = yield self.store.get_room_version(room_id)
+
                         with logcontext.nested_logging_context(p):
                             # note that if any of the missing prevs share missing state or
                             # auth events, the requests to fetch those events are deduped
@@ -355,7 +354,7 @@ class FederationHandler(BaseHandler):
                             # we want the state *after* p; get_state_for_room returns the
                             # state *before* p.
                             remote_event = yield self.federation_client.get_pdu(
-                                [origin], p, outlier=True,
+                                [origin], p, room_version, outlier=True,
                             )
 
                             if remote_event is None:
@@ -379,7 +378,6 @@ class FederationHandler(BaseHandler):
                             for x in remote_state:
                                 event_map[x.event_id] = x
 
-                    room_version = yield self.store.get_room_version(room_id)
                     state_map = yield resolve_events_with_store(
                         room_version, state_maps, event_map,
                         state_res_store=StateResolutionStore(self.store),
@@ -655,6 +653,8 @@ class FederationHandler(BaseHandler):
         if dest == self.server_name:
             raise SynapseError(400, "Can't backfill from self.")
 
+        room_version = yield self.store.get_room_version(room_id)
+
         events = yield self.federation_client.backfill(
             dest,
             room_id,
@@ -748,6 +748,7 @@ class FederationHandler(BaseHandler):
                             self.federation_client.get_pdu,
                             [dest],
                             event_id,
+                            room_version=room_version,
                             outlier=True,
                             timeout=10000,
                         )
@@ -769,10 +770,26 @@ class FederationHandler(BaseHandler):
             set(auth_events.keys()) | set(state_events.keys())
         )
 
+        # We now have a chunk of events plus associated state and auth chain to
+        # persist. We do the persistence in two steps:
+        #   1. Auth events and state get persisted as outliers, plus the
+        #      backward extremities get persisted (as non-outliers).
+        #   2. The rest of the events in the chunk get persisted one by one, as
+        #      each one depends on the previous event for its state.
+        #
+        # The important thing is that events in the chunk get persisted as
+        # non-outliers, including when those events are also in the state or
+        # auth chain. Caution must therefore be taken to ensure that they are
+        # not accidentally marked as outliers.
+
+        # Step 1a: persist auth events that *don't* appear in the chunk
         ev_infos = []
         for a in auth_events.values():
-            if a.event_id in seen_events:
+            # We only want to persist auth events as outliers that we haven't
+            # seen and aren't about to persist as part of the backfilled chunk.
+            if a.event_id in seen_events or a.event_id in event_map:
                 continue
+
             a.internal_metadata.outlier = True
             ev_infos.append({
                 "event": a,
@@ -784,14 +801,21 @@ class FederationHandler(BaseHandler):
                 }
             })
 
+        # Step 1b: persist the events in the chunk we fetched state for (i.e.
+        # the backwards extremities) as non-outliers.
         for e_id in events_to_state:
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            ev = event_map[e_id]
+            assert(not ev.internal_metadata.is_outlier())
+
             ev_infos.append({
-                "event": event_map[e_id],
+                "event": ev,
                 "state": events_to_state[e_id],
                 "auth_events": {
                     (auth_events[a_id].type, auth_events[a_id].state_key):
                     auth_events[a_id]
-                    for a_id in event_map[e_id].auth_event_ids()
+                    for a_id in ev.auth_event_ids()
                     if a_id in auth_events
                 }
             })
@@ -801,11 +825,16 @@ class FederationHandler(BaseHandler):
             backfilled=True,
         )
 
+        # Step 2: Persist the rest of the events in the chunk one by one
         events.sort(key=lambda e: e.depth)
 
         for event in events:
             if event in events_to_state:
                 continue
+
+            # For paranoia we ensure that these events are marked as
+            # non-outliers
+            assert(not event.internal_metadata.is_outlier())
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.
@@ -1060,7 +1089,7 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event = yield self._make_and_verify_event(
+        origin, event, event_format_version = yield self._make_and_verify_event(
             target_hosts,
             room_id,
             joinee,
@@ -1083,7 +1112,6 @@ class FederationHandler(BaseHandler):
         handled_events = set()
 
         try:
-            event = self._sign_event(event)
             # Try the host we successfully got a response to /make_join/
             # request first.
             try:
@@ -1091,7 +1119,9 @@ class FederationHandler(BaseHandler):
                 target_hosts.insert(0, origin)
             except ValueError:
                 pass
-            ret = yield self.federation_client.send_join(target_hosts, event)
+            ret = yield self.federation_client.send_join(
+                target_hosts, event, event_format_version,
+            )
 
             origin = ret["origin"]
             state = ret["state"]
@@ -1164,13 +1194,18 @@ class FederationHandler(BaseHandler):
         """
         event_content = {"membership": Membership.JOIN}
 
-        builder = self.event_builder_factory.new({
-            "type": EventTypes.Member,
-            "content": event_content,
-            "room_id": room_id,
-            "sender": user_id,
-            "state_key": user_id,
-        })
+        room_version = yield self.store.get_room_version(room_id)
+
+        builder = self.event_builder_factory.new(
+            room_version,
+            {
+                "type": EventTypes.Member,
+                "content": event_content,
+                "room_id": room_id,
+                "sender": user_id,
+                "state_key": user_id,
+            }
+        )
 
         try:
             event, context = yield self.event_creation_handler.create_new_client_event(
@@ -1182,7 +1217,9 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        yield self.auth.check_from_context(event, context, do_sig_check=False)
+        yield self.auth.check_from_context(
+            room_version, event, context, do_sig_check=False,
+        )
 
         defer.returnValue(event)
 
@@ -1287,11 +1324,11 @@ class FederationHandler(BaseHandler):
             )
 
         event.internal_metadata.outlier = True
-        event.internal_metadata.invite_from_remote = True
+        event.internal_metadata.out_of_band_membership = True
 
         event.signatures.update(
             compute_event_signature(
-                event,
+                event.get_pdu_json(),
                 self.hs.hostname,
                 self.hs.config.signing_key[0]
             )
@@ -1304,7 +1341,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id):
-        origin, event = yield self._make_and_verify_event(
+        origin, event, event_format_version = yield self._make_and_verify_event(
             target_hosts,
             room_id,
             user_id,
@@ -1313,7 +1350,7 @@ class FederationHandler(BaseHandler):
         # Mark as outlier as we don't have any state for this event; we're not
         # even in the room.
         event.internal_metadata.outlier = True
-        event = self._sign_event(event)
+        event.internal_metadata.out_of_band_membership = True
 
         # Try the host that we succesfully called /make_leave/ on first for
         # the /send_leave/ request.
@@ -1336,7 +1373,7 @@ class FederationHandler(BaseHandler):
     @defer.inlineCallbacks
     def _make_and_verify_event(self, target_hosts, room_id, user_id, membership,
                                content={}, params=None):
-        origin, pdu = yield self.federation_client.make_membership_event(
+        origin, event, format_ver = yield self.federation_client.make_membership_event(
             target_hosts,
             room_id,
             user_id,
@@ -1345,9 +1382,7 @@ class FederationHandler(BaseHandler):
             params=params,
         )
 
-        logger.debug("Got response to make_%s: %s", membership, pdu)
-
-        event = pdu
+        logger.debug("Got response to make_%s: %s", membership, event)
 
         # We should assert some things.
         # FIXME: Do this in a nicer way
@@ -1355,28 +1390,7 @@ class FederationHandler(BaseHandler):
         assert(event.user_id == user_id)
         assert(event.state_key == user_id)
         assert(event.room_id == room_id)
-        defer.returnValue((origin, event))
-
-    def _sign_event(self, event):
-        event.internal_metadata.outlier = False
-
-        builder = self.event_builder_factory.new(
-            unfreeze(event.get_pdu_json())
-        )
-
-        builder.event_id = self.event_builder_factory.create_event_id()
-        builder.origin = self.hs.hostname
-
-        if not hasattr(event, "signatures"):
-            builder.signatures = {}
-
-        add_hashes_and_signatures(
-            builder,
-            self.hs.hostname,
-            self.hs.config.signing_key[0],
-        )
-
-        return builder.build()
+        defer.returnValue((origin, event, format_ver))
 
     @defer.inlineCallbacks
     @log_function
@@ -1385,13 +1399,17 @@ class FederationHandler(BaseHandler):
         leave event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
         """
-        builder = self.event_builder_factory.new({
-            "type": EventTypes.Member,
-            "content": {"membership": Membership.LEAVE},
-            "room_id": room_id,
-            "sender": user_id,
-            "state_key": user_id,
-        })
+        room_version = yield self.store.get_room_version(room_id)
+        builder = self.event_builder_factory.new(
+            room_version,
+            {
+                "type": EventTypes.Member,
+                "content": {"membership": Membership.LEAVE},
+                "room_id": room_id,
+                "sender": user_id,
+                "state_key": user_id,
+            }
+        )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder=builder,
@@ -1400,7 +1418,9 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            yield self.auth.check_from_context(event, context, do_sig_check=False)
+            yield self.auth.check_from_context(
+                room_version, event, context, do_sig_check=False,
+            )
         except AuthError as e:
             logger.warn("Failed to create new leave %r because %s", event, e)
             raise e
@@ -1659,6 +1679,13 @@ class FederationHandler(BaseHandler):
                 create_event = e
                 break
 
+        if create_event is None:
+            # If the state doesn't have a create event then the room is
+            # invalid, and it would fail auth checks anyway.
+            raise SynapseError(400, "No create event in state")
+
+        room_version = create_event.content.get("room_version", RoomVersions.V1)
+
         missing_auth_events = set()
         for e in itertools.chain(auth_events, state, [event]):
             for e_id in e.auth_event_ids():
@@ -1669,6 +1696,7 @@ class FederationHandler(BaseHandler):
             m_ev = yield self.federation_client.get_pdu(
                 [origin],
                 e_id,
+                room_version=room_version,
                 outlier=True,
                 timeout=10000,
             )
@@ -1687,7 +1715,7 @@ class FederationHandler(BaseHandler):
                 auth_for_e[(EventTypes.Create, "")] = create_event
 
             try:
-                self.auth.check(e, auth_events=auth_for_e)
+                self.auth.check(room_version, e, auth_events=auth_for_e)
             except SynapseError as err:
                 # we may get SynapseErrors here as well as AuthErrors. For
                 # instance, there are a couple of (ancient) events in some
@@ -1931,6 +1959,8 @@ class FederationHandler(BaseHandler):
         current_state = set(e.event_id for e in auth_events.values())
         different_auth = event_auth_events - current_state
 
+        room_version = yield self.store.get_room_version(event.room_id)
+
         if different_auth and not event.internal_metadata.is_outlier():
             # Do auth conflict res.
             logger.info("Different auth: %s", different_auth)
@@ -1954,8 +1984,6 @@ class FederationHandler(BaseHandler):
                 remote_view.update({
                     (d.type, d.state_key): d for d in different_events if d
                 })
-
-                room_version = yield self.store.get_room_version(event.room_id)
 
                 new_state = yield self.state_handler.resolve_events(
                     room_version,
@@ -2056,7 +2084,7 @@ class FederationHandler(BaseHandler):
                 )
 
         try:
-            self.auth.check(event, auth_events=auth_events)
+            self.auth.check(room_version, event, auth_events=auth_events)
         except AuthError as e:
             logger.warn("Failed auth resolution for %r because %s", event, e)
             raise e
@@ -2279,18 +2307,26 @@ class FederationHandler(BaseHandler):
         }
 
         if (yield self.auth.check_host_in_room(room_id, self.hs.hostname)):
-            builder = self.event_builder_factory.new(event_dict)
-            EventValidator().validate_new(builder)
+            room_version = yield self.store.get_room_version(room_id)
+            builder = self.event_builder_factory.new(room_version, event_dict)
+
+            EventValidator().validate_builder(builder)
             event, context = yield self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
 
             event, context = yield self.add_display_name_to_third_party_invite(
-                event_dict, event, context
+                room_version, event_dict, event, context
             )
 
+            EventValidator().validate_new(event)
+
+            # We need to tell the transaction queue to send this out, even
+            # though the sender isn't a local user.
+            event.internal_metadata.send_on_behalf_of = self.hs.hostname
+
             try:
-                yield self.auth.check_from_context(event, context)
+                yield self.auth.check_from_context(room_version, event, context)
             except AuthError as e:
                 logger.warn("Denying new third party invite %r because %s", event, e)
                 raise e
@@ -2317,22 +2353,30 @@ class FederationHandler(BaseHandler):
         Returns:
             Deferred: resolves (to None)
         """
-        builder = self.event_builder_factory.new(event_dict)
+        room_version = yield self.store.get_room_version(room_id)
+
+        # NB: event_dict has a particular specced format we might need to fudge
+        # if we change event formats too much.
+        builder = self.event_builder_factory.new(room_version, event_dict)
 
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder=builder,
         )
 
         event, context = yield self.add_display_name_to_third_party_invite(
-            event_dict, event, context
+            room_version, event_dict, event, context
         )
 
         try:
-            self.auth.check_from_context(event, context)
+            self.auth.check_from_context(room_version, event, context)
         except AuthError as e:
             logger.warn("Denying third party invite %r because %s", event, e)
             raise e
         yield self._check_signature(event, context)
+
+        # We need to tell the transaction queue to send this out, even
+        # though the sender isn't a local user.
+        event.internal_metadata.send_on_behalf_of = get_domain_from_id(event.sender)
 
         # XXX we send the invite here, but send_membership_event also sends it,
         # so we end up making two requests. I think this is redundant.
@@ -2344,7 +2388,8 @@ class FederationHandler(BaseHandler):
         yield member_handler.send_membership_event(None, event, context)
 
     @defer.inlineCallbacks
-    def add_display_name_to_third_party_invite(self, event_dict, event, context):
+    def add_display_name_to_third_party_invite(self, room_version, event_dict,
+                                               event, context):
         key = (
             EventTypes.ThirdPartyInvite,
             event.content["third_party_invite"]["signed"]["token"]
@@ -2368,11 +2413,12 @@ class FederationHandler(BaseHandler):
             # auth checks. If we need the invite and don't have it then the
             # auth check code will explode appropriately.
 
-        builder = self.event_builder_factory.new(event_dict)
-        EventValidator().validate_new(builder)
+        builder = self.event_builder_factory.new(room_version, event_dict)
+        EventValidator().validate_builder(builder)
         event, context = yield self.event_creation_handler.create_new_client_event(
             builder=builder,
         )
+        EventValidator().validate_new(event)
         defer.returnValue((event, context))
 
     @defer.inlineCallbacks

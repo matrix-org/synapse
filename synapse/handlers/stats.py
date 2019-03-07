@@ -40,14 +40,13 @@ class StatsHandler(StateDeltasHandler):
 
     def __init__(self, hs):
         super(StatsHandler, self).__init__(hs)
-
+        self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.stats_enable = hs.config.stats_enable
         self.stats_bucket_size = hs.config.stats_bucket_size
 
         # The current position in the current_state_delta stream
@@ -56,7 +55,7 @@ class StatsHandler(StateDeltasHandler):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if self.stats_enable:
+        if hs.config.stats_enable:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
@@ -67,7 +66,7 @@ class StatsHandler(StateDeltasHandler):
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
-        if not self.stats_enable:
+        if not self.hs.config.stats_enable:
             return
 
         if self._is_processing:
@@ -145,24 +144,29 @@ class StatsHandler(StateDeltasHandler):
 
         current_state_ids = yield self.store.get_current_state_ids(room_id)
 
+        print(current_state_ids)
+
         join_rules = yield self.store.get_event(
-            current_state_ids.get((EventTypes.JoinRules, ""))
+            current_state_ids.get((EventTypes.JoinRules, "")), allow_none=True
         )
         history_visibility = yield self.store.get_event(
-            current_state_ids.get((EventTypes.RoomHistoryVisibility, ""))
+            current_state_ids.get((EventTypes.RoomHistoryVisibility, "")),
+            allow_none=True,
         )
         encryption = yield self.store.get_event(
-            current_state_ids.get((EventTypes.RoomEncryption, ""))
+            current_state_ids.get((EventTypes.RoomEncryption, "")), allow_none=True
         )
-        name = yield self.store.get_event(current_state_ids.get((EventTypes.Name, "")))
+        name = yield self.store.get_event(
+            current_state_ids.get((EventTypes.Name, "")), allow_none=True
+        )
         topic = yield self.store.get_event(
-            current_state_ids.get((EventTypes.Topic, ""))
+            current_state_ids.get((EventTypes.Topic, "")), allow_none=True
         )
         avatar = yield self.store.get_event(
-            current_state_ids.get((EventTypes.RoomAvatar, ""))
+            current_state_ids.get((EventTypes.RoomAvatar, "")), allow_none=True
         )
         canonical_alias = yield self.store.get_event(
-            current_state_ids.get((EventTypes.CanonicalAlias, ""))
+            current_state_ids.get((EventTypes.CanonicalAlias, "")), allow_none=True
         )
 
         def _or_none(x, arg):
@@ -179,9 +183,9 @@ class StatsHandler(StateDeltasHandler):
                 ),
                 "encryption": _or_none(encryption, "algorithm"),
                 "name": _or_none(name, "name"),
-                "topic": _or_none(name, "topic"),
-                "avatar": _or_none(name, "url"),
-                "canonical_alias": _or_none(name, "alias"),
+                "topic": _or_none(topic, "topic"),
+                "avatar": _or_none(avatar, "url"),
+                "canonical_alias": _or_none(canonical_alias, "alias"),
             },
         )
 
@@ -208,9 +212,8 @@ class StatsHandler(StateDeltasHandler):
             room_id, self.server_name
         )
 
-        yield self.store.delete_room_stats(room_id, now)
-
-        self.store.update_room_stats(
+        yield self.store.update_stats(
+            "room",
             room_id,
             now,
             {
@@ -223,6 +226,7 @@ class StatsHandler(StateDeltasHandler):
                 "state_events": state_events,
                 "local_events": local_events,
                 "remote_events": remote_events,
+                "sent_events": local_events + remote_events,
             },
         )
 
@@ -459,13 +463,10 @@ class StatsHandler(StateDeltasHandler):
 
     @defer.inlineCallbacks
     def _is_public_room(self, room_id):
-        events = yield self.store.get_current_state(
-            room_id,
-            ((EventTypes.JoinRules, ""), (EventTypes.RoomHistoryVisibility, "")),
+        join_rules = yield self.state.get_current_state(room_id, EventTypes.JoinRules)
+        history_visibility = yield self.state.get_current_state(
+            room_id, EventTypes.RoomHistoryVisibility
         )
-
-        join_rules = events.get((EventTypes.JoinRules, ""))
-        history_visibility = events.get((EventTypes.RoomHistoryVisibility, ""))
 
         if (join_rules and join_rules.content.get("join_rule") == JoinRules.PUBLIC) or (
             (
@@ -481,3 +482,5 @@ class StatsHandler(StateDeltasHandler):
     @defer.inlineCallbacks
     def _handle_local_user(self, user_id):
         logger.debug("Adding new local user to stats, %r", user_id)
+
+        yield defer.succeed(1)

@@ -257,7 +257,7 @@ class Config(object):
             "--keys-directory",
             metavar="DIRECTORY",
             help="Used with 'generate-*' options to specify where files such as"
-            " certs and signing keys should be stored in, unless explicitly"
+            " signing keys should be stored, unless explicitly"
             " specified in the config.",
         )
         config_parser.add_argument(
@@ -313,15 +313,10 @@ class Config(object):
                 print(
                     (
                         "A config file has been generated in %r for server name"
-                        " %r with corresponding SSL keys and self-signed"
-                        " certificates. Please review this file and customise it"
+                        " %r. Please review this file and customise it"
                         " to your needs."
                     )
                     % (config_path, server_name)
-                )
-                print(
-                    "If this server name is incorrect, you will need to"
-                    " regenerate the SSL certificates"
                 )
                 return
             else:
@@ -367,7 +362,7 @@ class Config(object):
         if not keys_directory:
             keys_directory = os.path.dirname(config_files[-1])
 
-        config_dir_path = os.path.abspath(keys_directory)
+        self.config_dir_path = os.path.abspath(keys_directory)
 
         specified_config = {}
         for config_file in config_files:
@@ -379,7 +374,7 @@ class Config(object):
 
         server_name = specified_config["server_name"]
         config_string = self.generate_config(
-            config_dir_path=config_dir_path,
+            config_dir_path=self.config_dir_path,
             data_dir_path=os.getcwd(),
             server_name=server_name,
             generate_secrets=False,

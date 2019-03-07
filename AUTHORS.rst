@@ -66,3 +66,6 @@ Pierre Jaury <pierre at jaury.eu>
 
 Serban Constantin <serban.constantin at gmail dot com>
  * Small bug fix
+
+Jason Robinson <jasonr at matrix.org>
+ * Minor fixes

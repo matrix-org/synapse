@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from six import text_type
+
 import jsonschema
 from canonicaljson import json
 from jsonschema import FormatChecker
@@ -353,7 +355,7 @@ class Filter(object):
             sender = event.user_id
             room_id = None
             ev_type = "m.presence"
-            is_url = False
+            contains_url = False
         else:
             sender = event.get("sender", None)
             if not sender:
@@ -368,13 +370,16 @@ class Filter(object):
 
             room_id = event.get("room_id", None)
             ev_type = event.get("type", None)
-            is_url = "url" in event.get("content", {})
+
+            content = event.get("content", {})
+            # check if there is a string url field in the content for filtering purposes
+            contains_url = isinstance(content.get("url"), text_type)
 
         return self.check_fields(
             room_id,
             sender,
             ev_type,
-            is_url,
+            contains_url,
         )
 
     def check_fields(self, room_id, sender, event_type, contains_url):
@@ -438,6 +443,20 @@ class Filter(object):
 
     def include_redundant_members(self):
         return self.filter_json.get("include_redundant_members", False)
+
+    def with_room_ids(self, room_ids):
+        """Returns a new filter with the given room IDs appended.
+
+        Args:
+            room_ids (iterable[unicode]): The room_ids to add
+
+        Returns:
+            filter: A new filter including the given rooms and the old
+                    filter's rooms.
+        """
+        newFilter = Filter(self.filter_json)
+        newFilter.rooms += room_ids
+        return newFilter
 
 
 def _matches_wildcard(actual_value, filter_value):

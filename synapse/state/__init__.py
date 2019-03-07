@@ -608,10 +608,10 @@ def resolve_events_with_store(room_version, state_sets, event_map, state_res_sto
             state_sets, event_map, state_res_store.get_events,
         )
     elif room_version in (
-        RoomVersions.VDH_TEST, RoomVersions.STATE_V2_TEST, RoomVersions.V2,
+        RoomVersions.STATE_V2_TEST, RoomVersions.V2, RoomVersions.V3,
     ):
         return v2.resolve_events_with_store(
-            state_sets, event_map, state_res_store,
+            room_version, state_sets, event_map, state_res_store,
         )
     else:
         # This should only happen if we added a version but forgot to add it to

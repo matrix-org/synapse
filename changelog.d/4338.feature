@@ -1,1 +1,1 @@
-XXX: stats changelog goes here
+Synapse now more efficiently collates room statistics.

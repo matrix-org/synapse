@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from os import path
+
+from synapse.config import ConfigError
+
 from ._base import Config
 
 DEFAULT_CONFIG = """\
@@ -50,20 +54,20 @@ DEFAULT_CONFIG = """\
 # for an account. Has no effect unless `require_at_registration` is enabled.
 # Defaults to "Privacy Policy".
 #
-# user_consent:
-#   template_dir: res/templates/privacy
-#   version: 1.0
-#   server_notice_content:
-#     msgtype: m.text
-#     body: >-
-#       To continue using this homeserver you must review and agree to the
-#       terms and conditions at %(consent_uri)s
-#   send_server_notice_to_guests: True
-#   block_events_error: >-
-#     To continue using this homeserver you must review and agree to the
-#     terms and conditions at %(consent_uri)s
-#   require_at_registration: False
-#   policy_name: Privacy Policy
+#user_consent:
+#  template_dir: res/templates/privacy
+#  version: 1.0
+#  server_notice_content:
+#    msgtype: m.text
+#    body: >-
+#      To continue using this homeserver you must review and agree to the
+#      terms and conditions at %(consent_uri)s
+#  send_server_notice_to_guests: True
+#  block_events_error: >-
+#    To continue using this homeserver you must review and agree to the
+#    terms and conditions at %(consent_uri)s
+#  require_at_registration: False
+#  policy_name: Privacy Policy
 #
 """
 
@@ -85,7 +89,15 @@ class ConsentConfig(Config):
         if consent_config is None:
             return
         self.user_consent_version = str(consent_config["version"])
-        self.user_consent_template_dir = consent_config["template_dir"]
+        self.user_consent_template_dir = self.abspath(
+            consent_config["template_dir"]
+        )
+        if not path.isdir(self.user_consent_template_dir):
+            raise ConfigError(
+                "Could not find template directory '%s'" % (
+                    self.user_consent_template_dir,
+                ),
+            )
         self.user_consent_server_notice_content = consent_config.get(
             "server_notice_content",
         )

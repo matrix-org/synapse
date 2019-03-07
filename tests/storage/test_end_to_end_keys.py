@@ -20,9 +20,6 @@ import tests.utils
 
 
 class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(EndToEndKeyStoreTestCase, self).__init__(*args, **kwargs)
-        self.store = None  # type: synapse.storage.DataStore
 
     @defer.inlineCallbacks
     def setUp(self):

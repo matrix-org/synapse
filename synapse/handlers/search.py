@@ -38,6 +38,41 @@ class SearchHandler(BaseHandler):
         super(SearchHandler, self).__init__(hs)
 
     @defer.inlineCallbacks
+    def get_old_rooms_from_upgraded_room(self, room_id):
+        """Retrieves room IDs of old rooms in the history of an upgraded room.
+
+        We do so by checking the m.room.create event of the room for a
+        `predecessor` key. If it exists, we add the room ID to our return
+        list and then check that room for a m.room.create event and so on
+        until we can no longer find any more previous rooms.
+
+        The full list of all found rooms in then returned.
+
+        Args:
+            room_id (str): id of the room to search through.
+
+        Returns:
+            Deferred[iterable[unicode]]: predecessor room ids
+        """
+
+        historical_room_ids = []
+
+        while True:
+            predecessor = yield self.store.get_room_predecessor(room_id)
+
+            # If no predecessor, assume we've hit a dead end
+            if not predecessor:
+                break
+
+            # Add predecessor's room ID
+            historical_room_ids.append(predecessor["room_id"])
+
+            # Scan through the old room for further predecessors
+            room_id = predecessor["room_id"]
+
+        defer.returnValue(historical_room_ids)
+
+    @defer.inlineCallbacks
     def search(self, user, content, batch=None):
         """Performs a full text search for a user.
 
@@ -136,6 +171,18 @@ class SearchHandler(BaseHandler):
             # membership_list=[Membership.JOIN, Membership.LEAVE, Membership.Ban],
         )
         room_ids = set(r.room_id for r in rooms)
+
+        # If doing a subset of all rooms seearch, check if any of the rooms
+        # are from an upgraded room, and search their contents as well
+        if search_filter.rooms:
+            historical_room_ids = []
+            for room_id in search_filter.rooms:
+                # Add any previous rooms to the search if they exist
+                ids = yield self.get_old_rooms_from_upgraded_room(room_id)
+                historical_room_ids += ids
+
+            # Prevent any historical events from being filtered
+            search_filter = search_filter.with_room_ids(historical_room_ids)
 
         room_ids = search_filter.filter_rooms(room_ids)
 

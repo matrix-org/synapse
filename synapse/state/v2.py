@@ -29,10 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 @defer.inlineCallbacks
-def resolve_events_with_store(state_sets, event_map, state_res_store):
+def resolve_events_with_store(room_version, state_sets, event_map, state_res_store):
     """Resolves the state using the v2 state resolution algorithm
 
     Args:
+        room_version (str): The room version
+
         state_sets(list): List of dicts of (type, state_key) -> event_id,
             which are the different state groups to resolve.
 
@@ -104,7 +106,7 @@ def resolve_events_with_store(state_sets, event_map, state_res_store):
 
     # Now sequentially auth each one
     resolved_state = yield _iterative_auth_checks(
-        sorted_power_events, unconflicted_state, event_map,
+        room_version, sorted_power_events, unconflicted_state, event_map,
         state_res_store,
     )
 
@@ -129,7 +131,7 @@ def resolve_events_with_store(state_sets, event_map, state_res_store):
     logger.debug("resolving remaining events")
 
     resolved_state = yield _iterative_auth_checks(
-        leftover_events, resolved_state, event_map,
+        room_version, leftover_events, resolved_state, event_map,
         state_res_store,
     )
 
@@ -350,11 +352,13 @@ def _reverse_topological_power_sort(event_ids, event_map, state_res_store, auth_
 
 
 @defer.inlineCallbacks
-def _iterative_auth_checks(event_ids, base_state, event_map, state_res_store):
+def _iterative_auth_checks(room_version, event_ids, base_state, event_map,
+                           state_res_store):
     """Sequentially apply auth checks to each event in given list, updating the
     state as it goes along.
 
     Args:
+        room_version (str)
         event_ids (list[str]): Ordered list of events to apply auth checks to
         base_state (dict[tuple[str, str], str]): The set of state to start with
         event_map (dict[str,FrozenEvent])
@@ -385,7 +389,7 @@ def _iterative_auth_checks(event_ids, base_state, event_map, state_res_store):
 
         try:
             event_auth.check(
-                event, auth_events,
+                room_version, event, auth_events,
                 do_sig_check=False,
                 do_size_check=False
             )

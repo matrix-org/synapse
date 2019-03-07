@@ -285,7 +285,10 @@ class LoggingContext(object):
         self.alive = False
 
         # if we have a parent, pass our CPU usage stats on
-        if self.parent_context is not None:
+        if (
+            self.parent_context is not None
+            and hasattr(self.parent_context, '_resource_usage')
+        ):
             self.parent_context._resource_usage += self._resource_usage
 
             # reset them in case we get entered again
