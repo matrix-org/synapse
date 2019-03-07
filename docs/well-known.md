@@ -7,7 +7,7 @@ federation endpoint where the certificate must match the server name.
 This presents difficulties for hosted server offerings: ExampleCorp
 may want to delegate responsibility for running its Matrix homeserver to an
 outside supplier, but it may be difficult for that supplier to obtain a TLS
-certificate for `exmaple.com` (and ExampleCorp may be reluctant to let them have
+certificate for `example.com` (and ExampleCorp may be reluctant to let them have
 one).
 
 `.well-known` solves this problem by augmenting the current `SRV` record
