@@ -221,10 +221,11 @@ Synapse offers two database engines:-
  * `SQLite <https://sqlite.org/>`_
  * `PostgreSQL <https://www.postgresql.org>`_
 
-SQLite is the default though trades performance for convenience. SQLite is only
-recommended in Synapse for testing purposes or servers with light workloads.
+By default Synapse uses SQLite in and doing so trades performance for convenience.
+SQLite is only recommended in Synapse for testing purposes or for servers with 
+light workloads.
 
-Almost all installations should opt to use PostresSQL, advantages include:-
+Almost all installations should opt to use PostreSQL, advantages include:-
 
 * significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
