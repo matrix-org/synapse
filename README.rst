@@ -80,7 +80,9 @@ Thanks for using Matrix!
 Synapse Installation
 ====================
 
-For details on how to install synapse, see `<INSTALL.md>`_.
+ * For details on how to install synapse, see `<INSTALL.md>`_.
+ * For specific details on how to configure Synapse for federation see 
+`docs/federate.md`
 
 
 Connecting to Synapse from a client
@@ -215,11 +217,14 @@ versions of synapse.
 Using PostgreSQL
 ================
 
-As of Synapse 0.9, `PostgreSQL <https://www.postgresql.org>`_ is supported as an
-alternative to the `SQLite <https://sqlite.org/>`_ database that Synapse has
-traditionally used for convenience and simplicity.
+Synapse offers two database engines:-
+ * `SQLite <https://sqlite.org/>`_
+ * `PostgreSQL <https://www.postgresql.org>`_
 
-The advantages of Postgres include:
+SQLite is the default though trades performance for convenience. SQLite is only
+recommended in Synapse for testing purposes or servers with light workloads.
+
+Almost all installations should opt to use PostresSQL, advantages include:-
 
 * significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
