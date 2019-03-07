@@ -80,9 +80,8 @@ Thanks for using Matrix!
 Synapse Installation
 ====================
 
- * For details on how to install synapse, see `<INSTALL.md>`_.
- * For specific details on how to configure Synapse for federation see 
-`docs/federate.md`
+* For details on how to install synapse, see `<INSTALL.md>`_.
+* For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
 
 Connecting to Synapse from a client
