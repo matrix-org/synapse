@@ -81,7 +81,9 @@ class LoggingConfig(Config):
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
-        return """
+        return """\
+        ## Logging ##
+
         # A yaml python logging config file
         #
         log_config: "%(log_config)s"
