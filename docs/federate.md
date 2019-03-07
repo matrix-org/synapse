@@ -37,11 +37,10 @@ expect to find your resources via ``example.com:8448``. The
 following methods allow you to provide a different server and port for
 ``*:example.com`` resources.
 
-If all goes well, you should be able to `connect to your server with a client`__,
-and then join a room via federation. (Try ``#synapse:matrix.org`` a room for 
+If all goes well, you should be able to [connect to your server with a client](../README.rst#registering-a-new-user-from-a-client).
+and then join a room via federation. (A good place to start is ``#synapse:matrix.org`` - a room for 
 Synapse admins.)
 
-.. __: `Connecting to Synapse from a client`_
 
 DNS SRV delegation
 ------------------
@@ -54,8 +53,8 @@ This method additionally requires your delegate server to provide a
 valid SSL certificate identifying it as the original ``server_name``
 domain zone. So the delegate domain name is only used to resolve a possible 
 different IP/Port combination to find your server. You must use the other 
-delegation method is this isn't what you want. (here is 
-`the rationale about this behavior <https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#interaction-with-srv-records>`_)
+delegation method is this isn't what you want. (for more details on the 
+rationale [see here](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#interaction-with-srv-records>))
 
 You need to add a SRV record in your ``server_name`` 's DNS zone with
 this format::
@@ -130,14 +129,13 @@ recreate the database.
 Troubleshooting
 ---------------
 
-You can use the `federation tester
-<https://matrix.org/federationtester>`_ to check if your homeserver is
-configured correctly. Or the `raw API url used by the federation tester
-<https://matrix.org/federationtester/api/report?server_name=DOMAIN>`_
+You can use the [federation tester](
+<https://matrix.org/federationtester>) to check if your homeserver is
+configured correctly. Or the [raw API url used by the federation tester](https://matrix.org/federationtester/api/report?server_name=DOMAIN)
 , note that you'll have to modify this URL to replace ``DOMAIN`` with your
 ``server_name``. Hitting the URL directly provides extra detail.
 
-For more details the see the `Server to Server Spec <https://matrix.org/docs/spec/server_server/r0.1.1.html#resolving-server-names>`_
+For more details the see the [Server to Server Spec](https://matrix.org/docs/spec/server_server/r0.1.1.html#resolving-server-names>).
 
 The typical failure mode for federation is that when the server tries to join 
 a room, it is rejected with "401: Unauthorized". Generally this means that other
@@ -146,7 +144,7 @@ a complicated dance which requires connections in both directions).
 
 Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see `<docs/reverse_proxy.rst>`_ for instructions on how to correctly
+proxy: see [reverse_proxy.rst](<reverse_proxy.rst>) for instructions on how to correctly
 configure a reverse proxy.
 
 
@@ -155,4 +153,4 @@ Running a Demo Federation of Synapses
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation, there is a script in the ``demo`` directory. This is mainly
-useful just for development purposes. See `<demo/README>`_.
+useful just for development purposes. See [demo/README](<../demo/README>).
