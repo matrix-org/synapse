@@ -15,7 +15,7 @@
 
 import logging
 
-from six import iteritems
+from six import iteritems, iterkeys
 
 from twisted.internet import defer
 
@@ -63,10 +63,6 @@ class UserDirectoryHandler(object):
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
         self.initially_handled_users = set()
-        self.initially_handled_users_in_public = set()
-
-        self.initially_handled_users_share = set()
-        self.initially_handled_users_share_private_room = set()
 
         # The current position in the current_state_delta stream
         self.pos = None
@@ -140,7 +136,6 @@ class UserDirectoryHandler(object):
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
         yield self.store.remove_from_user_dir(user_id)
-        yield self.store.remove_from_user_in_public_room(user_id)
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
@@ -215,15 +210,13 @@ class UserDirectoryHandler(object):
             logger.info("Processed all users")
 
         self.initially_handled_users = None
-        self.initially_handled_users_in_public = None
-        self.initially_handled_users_share = None
-        self.initially_handled_users_share_private_room = None
 
         yield self.store.update_user_directory_stream_pos(new_pos)
 
     @defer.inlineCallbacks
     def _handle_initial_room(self, room_id):
-        """Called when we initially fill out user_directory one room at a time
+        """
+        Called when we initially fill out user_directory one room at a time
         """
         is_in_room = yield self.store.is_host_joined(room_id, self.server_name)
         if not is_in_room:
@@ -238,23 +231,15 @@ class UserDirectoryHandler(object):
         unhandled_users = user_ids - self.initially_handled_users
 
         yield self.store.add_profiles_to_user_dir(
-            room_id,
             {user_id: users_with_profile[user_id] for user_id in unhandled_users},
         )
 
         self.initially_handled_users |= unhandled_users
 
-        if is_public:
-            yield self.store.add_users_to_public_room(
-                room_id, user_ids=user_ids - self.initially_handled_users_in_public
-            )
-            self.initially_handled_users_in_public |= user_ids
-
         # We now go and figure out the new users who share rooms with user entries
         # We sleep aggressively here as otherwise it can starve resources.
         # We also batch up inserts/updates, but try to avoid too many at once.
         to_insert = set()
-        to_update = set()
         count = 0
         for user_id in user_ids:
             if count % self.INITIAL_ROOM_SLEEP_COUNT == 0:
@@ -277,21 +262,7 @@ class UserDirectoryHandler(object):
                 count += 1
 
                 user_set = (user_id, other_user_id)
-
-                if user_set in self.initially_handled_users_share_private_room:
-                    continue
-
-                if user_set in self.initially_handled_users_share:
-                    if is_public:
-                        continue
-                    to_update.add(user_set)
-                else:
-                    to_insert.add(user_set)
-
-                if is_public:
-                    self.initially_handled_users_share.add(user_set)
-                else:
-                    self.initially_handled_users_share_private_room.add(user_set)
+                to_insert.add(user_set)
 
                 if len(to_insert) > self.INITIAL_ROOM_BATCH_SIZE:
                     yield self.store.add_users_who_share_room(
@@ -299,21 +270,9 @@ class UserDirectoryHandler(object):
                     )
                     to_insert.clear()
 
-                if len(to_update) > self.INITIAL_ROOM_BATCH_SIZE:
-                    yield self.store.update_users_who_share_room(
-                        room_id, not is_public, to_update
-                    )
-                    to_update.clear()
-
         if to_insert:
             yield self.store.add_users_who_share_room(room_id, not is_public, to_insert)
             to_insert.clear()
-
-        if to_update:
-            yield self.store.update_users_who_share_room(
-                room_id, not is_public, to_update
-            )
-            to_update.clear()
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
@@ -341,6 +300,27 @@ class UserDirectoryHandler(object):
                     key_name="membership",
                     public_value=Membership.JOIN,
                 )
+
+                if change is False:
+                    # Need to check if the server left the room entirely, if so
+                    # we might need to remove all the users in that room
+                    is_in_room = yield self.store.is_host_joined(
+                        room_id, self.server_name
+                    )
+                    if not is_in_room:
+                        logger.info("Server left room: %r", room_id)
+                        # Fetch all the users that we marked as being in user
+                        # directory due to being in the room and then check if
+                        # need to remove those users or not
+                        user_ids = yield self.store.get_users_in_dir_due_to_room(
+                            room_id
+                        )
+
+                        for user_id in user_ids:
+                            yield self._handle_remove_user(room_id, user_id)
+                        return
+                    else:
+                        logger.debug("Server is still in room: %r", room_id)
 
                 is_support = yield self.store.is_support_user(state_key)
                 if not is_support:
@@ -416,14 +396,20 @@ class UserDirectoryHandler(object):
             # ignore the change
             return
 
-        if change:
-            users_with_profile = yield self.state.get_current_user_in_room(room_id)
-            for user_id, profile in iteritems(users_with_profile):
-                yield self._handle_new_user(room_id, user_id, profile)
-        else:
-            users = yield self.store.get_users_in_public_due_to_room(room_id)
-            for user_id in users:
-                yield self._handle_remove_user(room_id, user_id)
+        users_with_profile = yield self.state.get_current_user_in_room(room_id)
+
+        # Remove every user from the sharing tables for that room.
+        for user_id in iterkeys(users_with_profile):
+            yield self.store.remove_user_who_share_room(user_id, room_id)
+
+        # Then, re-add them to the tables.
+        # NOTE: this is not the most efficient method, as handle_new_user sets
+        # up local_user -> other_user and other_user_whos_local -> local_user,
+        # which when ran over an entire room, will result in the same values
+        # being added multiple times. The batching upserts shouldn't make this
+        # too bad, though.
+        for user_id, profile in iteritems(users_with_profile):
+            yield self._handle_new_user(room_id, user_id, profile)
 
     @defer.inlineCallbacks
     def _handle_local_user(self, user_id):
@@ -437,7 +423,7 @@ class UserDirectoryHandler(object):
 
         row = yield self.store.get_user_in_directory(user_id)
         if not row:
-            yield self.store.add_profiles_to_user_dir(None, {user_id: profile})
+            yield self.store.add_profiles_to_user_dir({user_id: profile})
 
     @defer.inlineCallbacks
     def _handle_new_user(self, room_id, user_id, profile):
@@ -451,55 +437,27 @@ class UserDirectoryHandler(object):
 
         row = yield self.store.get_user_in_directory(user_id)
         if not row:
-            yield self.store.add_profiles_to_user_dir(room_id, {user_id: profile})
+            yield self.store.add_profiles_to_user_dir({user_id: profile})
 
         is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-
-        if is_public:
-            row = yield self.store.get_user_in_public_room(user_id)
-            if not row:
-                yield self.store.add_users_to_public_room(room_id, [user_id])
-        else:
-            logger.debug("Not adding new user to public dir, %r", user_id)
-
-        # Now we update users who share rooms with users. We do this by getting
-        # all the current users in the room and seeing which aren't already
-        # marked in the database as sharing with `user_id`
-
+        # Now we update users who share rooms with users.
         users_with_profile = yield self.state.get_current_user_in_room(room_id)
 
         to_insert = set()
-        to_update = set()
-
-        is_appservice = self.store.get_if_app_services_interested_in_user(user_id)
 
         # First, if they're our user then we need to update for every user
-        if self.is_mine_id(user_id) and not is_appservice:
-            # Returns a map of other_user_id -> shared_private. We only need
-            # to update mappings if for users that either don't share a room
-            # already (aren't in the map) or, if the room is private, those that
-            # only share a public room.
-            user_ids_shared = yield self.store.get_users_who_share_room_from_dir(
-                user_id
-            )
+        if self.is_mine_id(user_id):
 
-            for other_user_id in users_with_profile:
-                if user_id == other_user_id:
-                    continue
+            is_appservice = self.store.get_if_app_services_interested_in_user(user_id)
 
-                shared_is_private = user_ids_shared.get(other_user_id)
-                if shared_is_private is True:
-                    # We've already marked in the database they share a private room
-                    continue
-                elif shared_is_private is False:
-                    # They already share a public room, so only update if this is
-                    # a private room
-                    if not is_public:
-                        to_update.add((user_id, other_user_id))
-                elif shared_is_private is None:
-                    # This is the first time they both share a room
+            # We don't care about appservice users.
+            if not is_appservice:
+                for other_user_id in users_with_profile:
+                    if user_id == other_user_id:
+                        continue
+
                     to_insert.add((user_id, other_user_id))
 
         # Next we need to update for every local user in the room
@@ -511,28 +469,10 @@ class UserDirectoryHandler(object):
                 other_user_id
             )
             if self.is_mine_id(other_user_id) and not is_appservice:
-                shared_is_private = yield self.store.get_if_users_share_a_room(
-                    other_user_id, user_id
-                )
-                if shared_is_private is True:
-                    # We've already marked in the database they share a private room
-                    continue
-                elif shared_is_private is False:
-                    # They already share a public room, so only update if this is
-                    # a private room
-                    if not is_public:
-                        to_update.add((other_user_id, user_id))
-                elif shared_is_private is None:
-                    # This is the first time they both share a room
-                    to_insert.add((other_user_id, user_id))
+                to_insert.add((other_user_id, user_id))
 
         if to_insert:
             yield self.store.add_users_who_share_room(room_id, not is_public, to_insert)
-
-        if to_update:
-            yield self.store.update_users_who_share_room(
-                room_id, not is_public, to_update
-            )
 
     @defer.inlineCallbacks
     def _handle_remove_user(self, room_id, user_id):
@@ -542,84 +482,16 @@ class UserDirectoryHandler(object):
             room_id (str): room_id that user left or stopped being public that
             user_id (str)
         """
-        logger.debug("Maybe removing user %r", user_id)
+        logger.debug("Removing user %r", user_id)
 
-        row = yield self.store.get_user_in_directory(user_id)
-        update_user_dir = row and row["room_id"] == room_id
+        # Remove user from sharing tables
+        yield self.store.remove_user_who_share_room(user_id, room_id)
 
-        row = yield self.store.get_user_in_public_room(user_id)
-        update_user_in_public = row and row["room_id"] == room_id
+        # Are they still in a room with members? If not, remove them entirely.
+        users_in_room_with = yield self.store.get_users_who_share_room_from_dir(user_id)
 
-        if update_user_in_public or update_user_dir:
-            # XXX: Make this faster?
-            rooms = yield self.store.get_rooms_for_user(user_id)
-            for j_room_id in rooms:
-                if not update_user_in_public and not update_user_dir:
-                    break
-
-                is_in_room = yield self.store.is_host_joined(
-                    j_room_id, self.server_name
-                )
-
-                if not is_in_room:
-                    continue
-
-                if update_user_dir:
-                    update_user_dir = False
-                    yield self.store.update_user_in_user_dir(user_id, j_room_id)
-
-                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                    j_room_id
-                )
-
-                if update_user_in_public and is_public:
-                    yield self.store.update_user_in_public_user_list(user_id, j_room_id)
-                    update_user_in_public = False
-
-        if update_user_dir:
+        if len(users_in_room_with) == 0:
             yield self.store.remove_from_user_dir(user_id)
-        elif update_user_in_public:
-            yield self.store.remove_from_user_in_public_room(user_id)
-
-        # Now handle users_who_share_rooms.
-
-        # Get a list of user tuples that were in the DB due to this room and
-        # users (this includes tuples where the other user matches `user_id`)
-        user_tuples = yield self.store.get_users_in_share_dir_with_room_id(
-            user_id, room_id
-        )
-
-        for user_id, other_user_id in user_tuples:
-            # For each user tuple get a list of rooms that they still share,
-            # trying to find a private room, and update the entry in the DB
-            rooms = yield self.store.get_rooms_in_common_for_users(
-                user_id, other_user_id
-            )
-
-            # If they dont share a room anymore, remove the mapping
-            if not rooms:
-                yield self.store.remove_user_who_share_room(user_id, other_user_id)
-                continue
-
-            found_public_share = None
-            for j_room_id in rooms:
-                is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
-                    j_room_id
-                )
-
-                if is_public:
-                    found_public_share = j_room_id
-                else:
-                    found_public_share = None
-                    yield self.store.update_users_who_share_room(
-                        room_id, not is_public, [(user_id, other_user_id)]
-                    )
-                    break
-
-            if found_public_share:
-                yield self.store.update_users_who_share_room(
-                    room_id, not is_public, [(user_id, other_user_id)]
-                )
 
     @defer.inlineCallbacks
     def _handle_profile_change(self, user_id, room_id, prev_event_id, event_id):
