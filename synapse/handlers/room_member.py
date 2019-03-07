@@ -232,6 +232,11 @@ class RoomMemberHandler(object):
                 self.copy_room_tags_and_direct_to_room(
                     predecessor["room_id"], room_id, user_id,
                 )
+
+                # Copy over old push rules
+                self.copy_push_rules_to_room(
+                    predecessor["room_id"], room_id, user_id,
+                )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
@@ -239,6 +244,24 @@ class RoomMemberHandler(object):
                     yield self._user_left_room(target, room_id)
 
         defer.returnValue(event)
+
+    @defer.inlineCallbacks
+    def copy_push_rules_to_room(
+        self,
+        old_room_id,
+        new_room_id,
+        user_id,
+    ):
+        """Copies the push rules from one room to another.
+
+        Args:
+            old_room_id (str)
+            new_room_id (str)
+            user_id (str)
+
+        Returns:
+            Deferred[None]
+        """
 
     @defer.inlineCallbacks
     def copy_room_tags_and_direct_to_room(

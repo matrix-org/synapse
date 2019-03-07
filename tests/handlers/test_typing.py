@@ -201,7 +201,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         (request, channel) = self.make_request(
             "PUT",
-            "/_matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(
                 "m.typing",
                 content={

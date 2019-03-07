@@ -959,7 +959,7 @@ def _create_v1_path(path, *args):
 
     Example:
 
-        _create_v1_path("/event/%s/", event_id)
+        _create_v1_path("/event/%s", event_id)
 
     Args:
         path (str): String template for the path
@@ -980,7 +980,7 @@ def _create_v2_path(path, *args):
 
     Example:
 
-        _create_v2_path("/event/%s/", event_id)
+        _create_v2_path("/event/%s", event_id)
 
     Args:
         path (str): String template for the path
