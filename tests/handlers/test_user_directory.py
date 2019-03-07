@@ -39,7 +39,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, hs):
-        hs.config.update_user_directory = True
         self.store = hs.get_datastore()
         self.handler = hs.get_user_directory_handler()
 
@@ -241,6 +240,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         visible.
         """
         self.handler.search_all_users = True
+        self.hs.config.user_directory_search_all_users = True
 
         u1 = self.register_user("user1", "pass")
         u1_token = self.login(u1, "pass")
