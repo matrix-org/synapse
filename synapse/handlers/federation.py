@@ -1847,6 +1847,28 @@ class FederationHandler(BaseHandler):
 
             context.rejected = RejectedReason.AUTH_ERROR
 
+        if not context.rejected:
+            yield self._check_for_soft_fail(event, state, backfilled)
+
+        if event.type == EventTypes.GuestAccess and not context.rejected:
+            yield self.maybe_kick_guest_users(event)
+
+        defer.returnValue(context)
+
+    @defer.inlineCallbacks
+    def _check_for_soft_fail(self, event, state, backfilled):
+        """Checks if we should soft fail the event, if so marks the event as
+        such.
+
+        Args:
+            event (FrozenEvent)
+            state (dict|None): The state at the event if we don't have all the
+                event's prev events
+            backfilled (bool): Whether the event is from backfill
+
+        Returns:
+            Deferred
+        """
         # For new (non-backfilled and non-outlier) events we check if the event
         # passes auth based on the current state. If it doesn't then we
         # "soft-fail" the event.
@@ -1917,11 +1939,6 @@ class FederationHandler(BaseHandler):
                     event, e,
                 )
                 event.internal_metadata.soft_failed = True
-
-        if event.type == EventTypes.GuestAccess and not context.rejected:
-            yield self.maybe_kick_guest_users(event)
-
-        defer.returnValue(context)
 
     @defer.inlineCallbacks
     def on_query_auth(self, origin, event_id, room_id, remote_auth_chain, rejects,
