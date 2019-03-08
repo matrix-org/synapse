@@ -76,8 +76,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.rc_login_request_per_user_burst_count = 5
         self.hs.config.rc_login_requests_per_user_per_second = 0.17
 
-        # Create different users so we're sure not to be bothered by the per-user
-        # ratelimiter.
         self.create_user("kermit")
 
         for i in range(0, 6):
