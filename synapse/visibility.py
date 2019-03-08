@@ -67,6 +67,10 @@ def filter_events_for_client(store, user_id, events, is_peeking=False,
     Returns:
         Deferred[list[synapse.events.EventBase]]
     """
+    # Filter out events that have been soft failed so that we don't relay them
+    # to clients.
+    events = list(e for e in events if not e.internal_metadata.is_soft_failed())
+
     types = (
         (EventTypes.RoomHistoryVisibility, ""),
         (EventTypes.Member, user_id),
