@@ -40,7 +40,7 @@ Where the bottom (the transport layer) is what talks to the internet via HTTP, a
 3. Transaction Layer
     This layer makes incoming requests idempotent. I.e., it stores which transaction id's we have seen and what our response were. If we have already seen a message with the given transaction id, we do not notify higher levels but simply respond with the previous response.
 
-transaction_id is from "GET /send/<tx_id>/"
+transaction_id is from "GET /send/<tx_id>"
 
     It's also responsible for batching PDUs into single transaction for sending to remote destinations, so that we only ever have one transaction in flight to a given destination at any one time.
 

@@ -166,28 +166,28 @@ Note this worker cannot be load-balanced: only one instance should be active.
 Handles a subset of federation endpoints. In particular, it can handle REST
 endpoints matching the following regular expressions::
 
-    ^/_matrix/federation/v1/event/
-    ^/_matrix/federation/v1/state/
-    ^/_matrix/federation/v1/state_ids/
-    ^/_matrix/federation/v1/backfill/
-    ^/_matrix/federation/v1/get_missing_events/
+    ^/_matrix/federation/v1/event
+    ^/_matrix/federation/v1/state
+    ^/_matrix/federation/v1/state_ids
+    ^/_matrix/federation/v1/backfill
+    ^/_matrix/federation/v1/get_missing_events
     ^/_matrix/federation/v1/publicRooms
-    ^/_matrix/federation/v1/query/
-    ^/_matrix/federation/v1/make_join/
-    ^/_matrix/federation/v1/make_leave/
-    ^/_matrix/federation/v1/send_join/
-    ^/_matrix/federation/v1/send_leave/
-    ^/_matrix/federation/v1/invite/
-    ^/_matrix/federation/v1/query_auth/
-    ^/_matrix/federation/v1/event_auth/
-    ^/_matrix/federation/v1/exchange_third_party_invite/
-    ^/_matrix/federation/v1/send/
+    ^/_matrix/federation/v1/query
+    ^/_matrix/federation/v1/make_join
+    ^/_matrix/federation/v1/make_leave
+    ^/_matrix/federation/v1/send_join
+    ^/_matrix/federation/v1/send_leave
+    ^/_matrix/federation/v1/invite
+    ^/_matrix/federation/v1/query_auth
+    ^/_matrix/federation/v1/event_auth
+    ^/_matrix/federation/v1/exchange_third_party_invite
+    ^/_matrix/federation/v1/send
     ^/_matrix/key/v2/query
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
 
-The `^/_matrix/federation/v1/send/` endpoint must only be handled by a single
+The `^/_matrix/federation/v1/send` endpoint must only be handled by a single
 instance.
 
 ``synapse.app.federation_sender``
@@ -274,8 +274,8 @@ Handles some event creation. It can handle REST endpoints matching::
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
-    ^/_matrix/client/(api/v1|r0|unstable)/join/
-    ^/_matrix/client/(api/v1|r0|unstable)/profile/
+    ^/_matrix/client/(api/v1|r0|unstable)/join
+    ^/_matrix/client/(api/v1|r0|unstable)/profile
 
 It will create events locally and then send them on to the main synapse
 instance to be persisted and handled.
