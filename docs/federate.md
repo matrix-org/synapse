@@ -14,18 +14,21 @@ up and will work provided you set the ``server_name`` to match your
 machine's public DNS hostname, and provide Synapse with a TLS certificate
 which is valid for your ``server_name``.
 
+Once you have completed the steps necessary to federate, you should be able to
+ [connect to your server with a client](../README.rst#registering-a-new-user-from-a-client).
+and then join a room via federation. (A good place to start is ``#synapse:matrix.org``
+ - a room for Synapse admins.)
+
+
+## Delegation
+
 For a more flexible configuration, you can have ``server_name``
 resources (ie: ``@user:example.com``) served by a different host and
 port (ie: ``synapse.example.com:443``). There are two ways to do this:
 
 - adding a ``/.well-known/matrix/server`` URL served on ``https://example.com``.
 - adding a DNS ``SRV`` record in the DNS zone of domain
-  ``example.com``. Beware that this method has some limitations as it
-  will still require your delegated server to use a SSL certificate
-  identifying it as the original ``server_name`` domain name. This means
-  that the provided ``synapse.example.com`` delegate domain name will
-  only be used to get a possibly different IP/port, but won't be used
-  for SSL domain name verification.
+  ``example.com``.
 
 For both methods let's say you want to run your server at
 ``synapse.example.com`` on port ``443`` (instead of ``8448``), but you
@@ -36,12 +39,7 @@ expect to find your resources via ``example.com:8448``. The
 following methods allow you to provide a different server and port for
 ``*:example.com`` resources.
 
-If all goes well, you should be able to [connect to your server with a client](../README.rst#registering-a-new-user-from-a-client).
-and then join a room via federation. (A good place to start is ``#synapse:matrix.org`` - a room for
-Synapse admins.)
-
-.well-known delegation
-----------------------
+### .well-known delegation
 
 To use this method, you need to be able to alter the
 ``server_name`` 's https server to serve the ``/.well-known/matrix/server``
@@ -62,13 +60,21 @@ should return:
 	    "m.server": "synapse.example.com:443"
     }
 
-This delegation method allows a full delegation contrary to the DNS SRV
-method: federation servers will contact the given hostname's IP and
+Note, specifying a port is optional and will default to 443.
+
+Most installations will not need to configure .well-known. However it can  be
+useful in cases where the admin is hosting on behalf of someone else and
+therefore cannot gain access to the necessary certificate. With .well-known,
+federation servers will contact the given hostname's IP and
 will check for a valid SSL certificate on the same delegated hostname (in our
 example: ``synapse.example.com``).
 
-DNS SRV delegation
-------------------
+.well-known support first appeared in Synapse v0.99.0, to federate with older
+servers you may need to additionally configure SRV delegation. Alternatively,
+encourage the server admin in question to upgrade :)
+
+### DNS SRV delegation
+
 
 To use this method, you need to have write access to your
 ``server_name`` 's domain zone DNS records (in our example it would be
@@ -101,16 +107,12 @@ _matrix._tcp.<server_name>``, in our example, we would expect this:
 Note that the server host name cannot be an alias (CNAME record): it has to point
 directly to the server hosting the synapse instance.
 
-
-
-
-Troubleshooting
----------------
+## Troubleshooting
 
 You can use the [federation tester](
 <https://matrix.org/federationtester>) to check if your homeserver is
-configured correctly. Alternatively try the [raw API url used by the federation tester](https://matrix.org/federationtester/api/report?server_name=DOMAIN)
-, note that you'll have to modify this URL to replace ``DOMAIN`` with your
+configured correctly. Alternatively try the [raw API url used by the federation tester](https://matrix.org/federationtester/api/report?server_name=DOMAIN).
+Note that you'll have to modify this URL to replace ``DOMAIN`` with your
 ``server_name``. Hitting the URL directly provides extra detail.
 
 For more details the see the [Server to Server Spec](https://matrix.org/docs/spec/server_server/r0.1.1.html#resolving-server-names).
@@ -126,8 +128,7 @@ proxy: see [reverse_proxy.rst](<reverse_proxy.rst>) for instructions on how to c
 configure a reverse proxy.
 
 
-Running a Demo Federation of Synapses
--------------------------------------
+## Running a Demo Federation of Synapses
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation, there is a script in the ``demo`` directory. This is mainly
