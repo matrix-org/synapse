@@ -644,6 +644,51 @@ class MatrixFederationHttpClient(object):
         defer.returnValue(body)
 
     @defer.inlineCallbacks
+    def get_json_with_trailing_slashes_on_404(self, args={}):
+        """Runs client.get_json under the hood, but if receiving a 404, tries
+        the request again with a trailing slash. This is a result of removing
+        trailing slashes from some federation endpoints and in an effort to
+        remain backwards compatible with older versions of Synapse, we try
+        again if a server requires a trailing slash.
+
+        Args:
+            args (dict): A dictionary of arguments matching those provided by put_json.
+        Returns:
+            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            result will be the decoded JSON body.
+        """
+        response = yield self.get_json(**args)
+
+        # Retry with a trailing slash if we received a 404
+        if response.code == 404:
+            args["path"] += "/"
+            response = yield self.get_json(**args)
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
+    def put_json_with_trailing_slashes_on_404(self, args={}):
+        """Runs client.put_json under the hood, but if receiving a 404, tries
+        the request again with a trailing slash.
+
+        See get_json_with_trailing_slashes_on_404 for more details.
+
+        Args:
+            args (dict): A dictionary of arguments matching those provided by put_json.
+        Returns:
+            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            result will be the decoded JSON body.
+        """
+        response = yield self.put_json(**args)
+
+        # Retry with a trailing slash if we received a 404
+        if response.code == 404:
+            args["path"] += "/"
+            response = yield self.put_json(**args)
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
     def delete_json(self, destination, path, long_retries=False,
                     timeout=None, ignore_backoff=False, args={}):
         """Send a DELETE request to the remote expecting some json response

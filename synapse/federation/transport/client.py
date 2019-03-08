@@ -52,7 +52,7 @@ class TransportLayerClient(object):
                      destination, room_id)
 
         path = _create_v1_path("/state/%s", room_id)
-        return self.client.get_json(
+        return self.client.get_json_with_trailing_slashes_on_404(
             destination, path=path, args={"event_id": event_id},
         )
 
@@ -74,7 +74,7 @@ class TransportLayerClient(object):
                      destination, room_id)
 
         path = _create_v1_path("/state_ids/%s", room_id)
-        return self.client.get_json(
+        return self.client.get_json_with_trailing_slashes_on_404(
             destination, path=path, args={"event_id": event_id},
         )
 
@@ -96,7 +96,7 @@ class TransportLayerClient(object):
                      destination, event_id)
 
         path = _create_v1_path("/event/%s", event_id)
-        return self.client.get_json(destination, path=path, timeout=timeout)
+        return self.client.get_json_with_trailing_slashes_on_404(destination, path=path, timeout=timeout)
 
     @log_function
     def backfill(self, destination, room_id, event_tuples, limit):
@@ -128,7 +128,7 @@ class TransportLayerClient(object):
             "limit": [str(limit)],
         }
 
-        return self.client.get_json(
+        return self.client.get_json_with_trailing_slashes_on_404(
             destination,
             path=path,
             args=args,
@@ -169,7 +169,7 @@ class TransportLayerClient(object):
 
         path = _create_v1_path("/send/%s", transaction.transaction_id)
 
-        response = yield self.client.put_json(
+        response = yield self.client.put_json_with_trailing_slashes_on_404(
             transaction.destination,
             path=path,
             data=json_data,
