@@ -402,6 +402,12 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id, device_ids, list(hosts)
         )
 
+        for device_id in device_ids:
+            logger.debug(
+                "Notifying about update %r/%r, ID: %r", user_id, device_id,
+                position,
+            )
+
         room_ids = yield self.store.get_rooms_for_user(user_id)
 
         yield self.notifier.on_new_event(
@@ -409,7 +415,7 @@ class DeviceHandler(DeviceWorkerHandler):
         )
 
         if hosts:
-            logger.info("Sending device list update notif to: %r", hosts)
+            logger.info("Sending device list update notif for %r to: %r", user_id, hosts)
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
 
@@ -479,14 +485,25 @@ class DeviceListEduUpdater(object):
 
         if get_domain_from_id(user_id) != origin:
             # TODO: Raise?
-            logger.warning("Got device list update edu for %r from %r", user_id, origin)
+            logger.warning(
+                "Got device list update edu for %r/%r from %r",
+                user_id, device_id, origin,
+            )
             return
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
         if not room_ids:
             # We don't share any rooms with this user. Ignore update, as we
             # probably won't get any further updates.
+            logger.warning(
+                "Got device list update edu for %r/%r, but don't share a room",
+                user_id, device_id,
+            )
             return
+
+        logger.debug(
+            "Received device list update for %r/%r", user_id, device_id,
+        )
 
         self._pending_updates.setdefault(user_id, []).append(
             (device_id, stream_id, prev_ids, edu_content)
@@ -505,9 +522,17 @@ class DeviceListEduUpdater(object):
                 # This can happen since we batch updates
                 return
 
+            for device_id, stream_id, prev_ids, content in pending_updates:
+                logger.debug(
+                    "Handling update %r/%r, ID: %r, prev: %r ",
+                    user_id, device_id, stream_id, prev_ids,
+                )
+
             # Given a list of updates we check if we need to resync. This
             # happens if we've missed updates.
             resync = yield self._need_to_do_resync(user_id, pending_updates)
+
+            logger.debug("Need to re-sync devices for %r? %r", user_id, resync)
 
             if resync:
                 # Fetch all devices for the user.
@@ -561,11 +586,21 @@ class DeviceListEduUpdater(object):
                     )
                     devices = []
 
+                for device in devices:
+                    logger.debug(
+                        "Handling resync update %r/%r, ID: %r",
+                        user_id, device["device_id"], stream_id,
+                    )
+
                 yield self.store.update_remote_device_list_cache(
                     user_id, devices, stream_id,
                 )
                 device_ids = [device["device_id"] for device in devices]
                 yield self.device_handler.notify_device_update(user_id, device_ids)
+
+                # We clobber the seen updates since we've re-synced from a given
+                # point.
+                self._seen_updates[user_id] = set([stream_id])
             else:
                 # Simply update the single device, since we know that is the only
                 # change (because of the single prev_id matching the current cache)
@@ -578,9 +613,9 @@ class DeviceListEduUpdater(object):
                     user_id, [device_id for device_id, _, _, _ in pending_updates]
                 )
 
-            self._seen_updates.setdefault(user_id, set()).update(
-                stream_id for _, stream_id, _, _ in pending_updates
-            )
+                self._seen_updates.setdefault(user_id, set()).update(
+                    stream_id for _, stream_id, _, _ in pending_updates
+                )
 
     @defer.inlineCallbacks
     def _need_to_do_resync(self, user_id, updates):
@@ -591,6 +626,11 @@ class DeviceListEduUpdater(object):
 
         extremity = yield self.store.get_device_list_last_stream_id_for_remote(
             user_id
+        )
+
+        logger.debug(
+            "Current extremity for %r: %r",
+            user_id, extremity,
         )
 
         stream_id_in_updates = set()  # stream_ids in updates list

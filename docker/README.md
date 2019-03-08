@@ -28,7 +28,7 @@ with your postgres database.
 docker run \
     -d \
     --name synapse \
-    -v ${DATA_PATH}:/data \
+    --mount type=volume,src=synapse-data,dst=/data \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \
     -e SYNAPSE_REPORT_STATS=yes \
     matrixdotorg/synapse:latest
@@ -87,10 +87,15 @@ Global settings:
 * ``SYNAPSE_CONFIG_PATH``, path to a custom config file
 
 If ``SYNAPSE_CONFIG_PATH`` is set, you should generate a configuration file
-then customize it manually. No other environment variable is required.
+then customize it manually: see [Generating a config
+file](#generating-a-config-file).
 
-Otherwise, a dynamic configuration file will be used. The following environment
-variables are available for configuration:
+Otherwise, a dynamic configuration file will be used.
+
+### Environment variables used to build a dynamic configuration file
+
+The following environment variables are used to build the configuration file
+when ``SYNAPSE_CONFIG_PATH`` is not set.
 
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the server public hostname.
 * ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
@@ -143,3 +148,31 @@ Mail server specific values (will not send emails if not set):
   any.
 * ``SYNAPSE_SMTP_PASSWORD``, password for authenticating against the mail
   server if any.
+
+### Generating a config file
+
+It is possible to generate a basic configuration file for use with
+`SYNAPSE_CONFIG_PATH` using the `generate` commandline option. You will need to
+specify values for `SYNAPSE_CONFIG_PATH`, `SYNAPSE_SERVER_NAME` and
+`SYNAPSE_REPORT_STATS`, and mount a docker volume to store the data on. For
+example:
+
+```
+docker run -it --rm
+    --mount type=volume,src=synapse-data,dst=/data \
+    -e SYNAPSE_CONFIG_PATH=/data/homeserver.yaml \
+    -e SYNAPSE_SERVER_NAME=my.matrix.host \
+    -e SYNAPSE_REPORT_STATS=yes \
+    matrixdotorg/synapse:latest generate
+```
+
+This will generate a `homeserver.yaml` in (typically)
+`/var/lib/docker/volumes/synapse-data/_data`, which you can then customise and
+use with:
+
+```
+docker run -d --name synapse \
+    --mount type=volume,src=synapse-data,dst=/data \
+    -e SYNAPSE_CONFIG_PATH=/data/homeserver.yaml \
+    matrixdotorg/synapse:latest
+```
