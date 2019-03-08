@@ -597,6 +597,10 @@ class DeviceListEduUpdater(object):
                 )
                 device_ids = [device["device_id"] for device in devices]
                 yield self.device_handler.notify_device_update(user_id, device_ids)
+
+                # We clobber the seen updates since we've re-synced from a given
+                # point.
+                self._seen_updates[user_id] = set([stream_id])
             else:
                 # Simply update the single device, since we know that is the only
                 # change (because of the single prev_id matching the current cache)
@@ -609,9 +613,9 @@ class DeviceListEduUpdater(object):
                     user_id, [device_id for device_id, _, _, _ in pending_updates]
                 )
 
-            self._seen_updates.setdefault(user_id, set()).update(
-                stream_id for _, stream_id, _, _ in pending_updates
-            )
+                self._seen_updates.setdefault(user_id, set()).update(
+                    stream_id for _, stream_id, _, _ in pending_updates
+                )
 
     @defer.inlineCallbacks
     def _need_to_do_resync(self, user_id, updates):
