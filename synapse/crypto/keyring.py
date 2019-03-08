@@ -526,7 +526,7 @@ class Keyring(object):
             try:
                 response = yield self.client.get_json(
                     destination=server_name,
-                    path="/_matrix/key/v2/server" + urllib.parse.quote(requested_key_id),
+                    path="/_matrix/key/v2/server/" + urllib.parse.quote(requested_key_id),
                     ignore_backoff=True,
                 )
             except (NotRetryingDestination, RequestSendFailed) as e:
