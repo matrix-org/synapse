@@ -42,13 +42,13 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             "red",
             http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["send_message"]),
+            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
         self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.send_message.return_value = (True, 0)
+        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()
 

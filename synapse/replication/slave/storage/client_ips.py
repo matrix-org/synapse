@@ -43,6 +43,8 @@ class SlavedClientIpStore(BaseSlavedStore):
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
 
+        self.client_ip_last_seen.prefill(key, now)
+
         self.hs.get_tcp_replication().send_user_ip(
             user_id, access_token, ip, user_agent, device_id, now
         )
