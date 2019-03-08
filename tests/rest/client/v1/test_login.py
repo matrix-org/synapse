@@ -2,7 +2,6 @@ import json
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import HttpResponseException
-from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import register
 
@@ -122,7 +121,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "auth": {"type": LoginType.DUMMY},
             }
         )
-        request, channel = self.make_request(b"POST", b"/_matrix/client/r0/register", request_data)
+        request_url = b"/_matrix/client/r0/register"
+        request, channel = self.make_request(b"POST", request_url, request_data)
         self.render(request)
 
         if channel.code != 200:
