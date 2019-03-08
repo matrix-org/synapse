@@ -96,7 +96,9 @@ class TransportLayerClient(object):
                      destination, event_id)
 
         path = _create_v1_path("/event/%s", event_id)
-        return self.client.get_json_with_trailing_slashes_on_404(destination, path=path, timeout=timeout)
+        return self.client.get_json_with_trailing_slashes_on_404(
+            destination, path=path, timeout=timeout,
+        )
 
     @log_function
     def backfill(self, destination, room_id, event_tuples, limit):
