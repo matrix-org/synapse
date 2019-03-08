@@ -186,6 +186,55 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         defer.returnValue(results)
 
     @defer.inlineCallbacks
+    def copy_push_rules_from_room_to_room(self, old_room_id, new_room_id):
+        """Copy the push rules from one room to another.
+
+        Args:
+            old_room_id (str): ID of the old room.
+            new_room_id (str): ID of the new room.
+        """
+        # Get local users in the old room. We ignore app service users for now. 
+        old_room_users = yield self.get_users_in_room(old_room_id)
+        local_users_in_old_room = list(set(
+            u for u in old_room_users
+            if self.hs.is_mine_id(u)
+            and not self.get_if_app_services_interested_in_user(u)
+        ))
+
+        # Retrieve push rules
+        push_rules = []
+        for user_id in local_users_in_old_room:
+            user_push_rules = yield self.get_push_rules_for_user(user_id)
+
+            # Get rule for the old room
+            for rule in user_push_rules:
+                if old_room_id in rule["rule_id"]:
+                    push_rules.append((user_id, rule))
+
+        # Convert rules for old room to those for new room
+        for (user_id, rule) in push_rules:
+            # Create new rule id
+            rule_id_scope = '/'.join(rule["rule_id"].split('/')[:-1])
+            new_rule_id = rule_id_scope + "/" + new_room_id
+
+            # Change room id in each condition
+            for index, condition in enumerate(rule["conditions"]):
+                if rule["conditions"][index]["key"] == "room_id":
+                    rule["conditions"][index]["pattern"] = new_room_id
+
+            # Add the rule for the new room
+            yield self.add_push_rule(
+                user_id=user_id,
+                rule_id=new_rule_id,
+                priority_class=rule["priority_class"],
+                conditions=rule["conditions"],
+                actions=rule["actions"],
+            )
+
+            # Delete push rule for the old room
+            yield self.delete_push_rule(user_id, rule["rule_id"])
+
+    @defer.inlineCallbacks
     def bulk_get_push_rules_for_room(self, event, context):
         state_group = context.state_group
         if not state_group:
@@ -195,9 +244,12 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
+        if room_id is None:
+            room_id = event.room_id
+
         current_state_ids = yield context.get_current_state_ids(self)
         result = yield self._bulk_get_push_rules_for_room(
-            event.room_id, state_group, current_state_ids, event=event
+            room_id, state_group, current_state_ids, event=event
         )
         defer.returnValue(result)
 
