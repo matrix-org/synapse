@@ -16,7 +16,7 @@ which is valid for your ``server_name``.
 
 For a more flexible configuration, you can have ``server_name``
 resources (ie: ``@user:example.com``) served by a different host and
-port (ie: ``synapse.example.com:443``). There are 2 ways to do this:
+port (ie: ``synapse.example.com:443``). There are two ways to do this:
 
 - adding a DNS ``SRV`` record in the DNS zone of domain
   ``example.com``. Beware that this method has some limitations as it
@@ -26,7 +26,7 @@ port (ie: ``synapse.example.com:443``). There are 2 ways to do this:
   only be used to get a possibly different IP/port, but won't be used
   for SSL domain name verification.
 
-- adding a ``/.well-known/matrix/server`` URL served on ``https://example.com``
+- adding a ``/.well-known/matrix/server`` URL served on ``https://example.com``.
 
 For both methods let's say you want to run your server at
 ``synapse.example.com`` on port ``443`` (instead of ``8448``), but you
@@ -49,22 +49,22 @@ To use this method, you need to have write access to your
 ``server_name`` 's domain zone DNS records (in our example it would be
 ``example.com`` DNS zone).
 
-This method additionally requires your delegate server to provide a
+This method requires the target server to provide a
 valid SSL certificate identifying it as the original ``server_name``
 domain zone. So the delegate domain name is only used to resolve a possible 
 different IP/Port combination to find your server. You must use the other 
-delegation method is this isn't what you want. (for more details on the 
-rationale [see here](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#interaction-with-srv-records>))
+delegation method if this isn't what you want. (for more details on the 
+rationale [see here](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#interaction-with-srv-records))
 
 You need to add a SRV record in your ``server_name`` 's DNS zone with
 this format::
 
-     _matrix._tcp.<yourdomain.com> <ttl> IN SRV 10 0 <port> <synapse.server.name>
+     _matrix._tcp.<yourdomain.com> <ttl> IN SRV <priority> <weight> <port> <synapse.server.name>
 
 In our example, we would need to add this SRV record in the
 ``example.com`` DNS zone::
 
-     _matrix._tcp.example.com. 3600 IN SRV 10 0 443 synapse.example.com.
+     _matrix._tcp.example.com. 3600 IN SRV 10 5 443 synapse.example.com.
 
 
 Once done and set up, you can check the DNS record with ``dig -t srv
@@ -135,7 +135,7 @@ configured correctly. Or the [raw API url used by the federation tester](https:/
 , note that you'll have to modify this URL to replace ``DOMAIN`` with your
 ``server_name``. Hitting the URL directly provides extra detail.
 
-For more details the see the [Server to Server Spec](https://matrix.org/docs/spec/server_server/r0.1.1.html#resolving-server-names>).
+For more details the see the [Server to Server Spec](https://matrix.org/docs/spec/server_server/r0.1.1.html#resolving-server-names).
 
 The typical failure mode for federation is that when the server tries to join 
 a room, it is rejected with "401: Unauthorized". Generally this means that other

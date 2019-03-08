@@ -71,7 +71,7 @@ set this to the hostname of your server. For a more production-ready setup, you
 will probably want to specify your domain (`example.com`) rather than a
 matrix-specific hostname here (in the same way that your email address is
 probably `user@example.com` rather than `user@email.example.com`) - but
-doing so may require more advanced setup. - see [Setting up Federation](docs/federate.md). 
+doing so may require more advanced setup: see [Setting up Federation](docs/federate.md). 
 Beware that the server name cannot be changed later.
 
 This command will generate you a config file that you can then customise, but it will
