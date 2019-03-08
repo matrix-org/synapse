@@ -8,7 +8,7 @@ yours to send messages.
 The ``server_name`` configured in the Synapse configuration file (often
 ``homeserver.yaml``) defines how resources (users, rooms,...) will be
 identified (ie: ``@user:example.com``, ``#room:example.com``). By
-default, it is also the default domain that other servers will use to
+default, it is also the domain that other servers will use to
 try to reach your server via port 8448. This is easy to set
 up and will work provided you set the ``server_name`` to match your
 machine's public DNS hostname, and provide Synapse with a TLS certificate
@@ -18,15 +18,14 @@ For a more flexible configuration, you can have ``server_name``
 resources (ie: ``@user:example.com``) served by a different host and
 port (ie: ``synapse.example.com:443``). There are two ways to do this:
 
+- adding a ``/.well-known/matrix/server`` URL served on ``https://example.com``.
 - adding a DNS ``SRV`` record in the DNS zone of domain
   ``example.com``. Beware that this method has some limitations as it
   will still require your delegated server to use a SSL certificate
-  identifying it as the original ``server_name`` domain name. Meaning
+  identifying it as the original ``server_name`` domain name. This means
   that the provided ``synapse.example.com`` delegate domain name will
   only be used to get a possibly different IP/port, but won't be used
   for SSL domain name verification.
-
-- adding a ``/.well-known/matrix/server`` URL served on ``https://example.com``.
 
 For both methods let's say you want to run your server at
 ``synapse.example.com`` on port ``443`` (instead of ``8448``), but you
@@ -38,62 +37,26 @@ following methods allow you to provide a different server and port for
 ``*:example.com`` resources.
 
 If all goes well, you should be able to [connect to your server with a client](../README.rst#registering-a-new-user-from-a-client).
-and then join a room via federation. (A good place to start is ``#synapse:matrix.org`` - a room for 
+and then join a room via federation. (A good place to start is ``#synapse:matrix.org`` - a room for
 Synapse admins.)
-
-
-DNS SRV delegation
-------------------
-
-To use this method, you need to have write access to your
-``server_name`` 's domain zone DNS records (in our example it would be
-``example.com`` DNS zone).
-
-This method requires the target server to provide a
-valid SSL certificate identifying it as the original ``server_name``
-domain zone. So the delegate domain name is only used to resolve a possible 
-different IP/Port combination to find your server. You must use the other 
-delegation method if this isn't what you want. (for more details on the 
-rationale [see here](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#interaction-with-srv-records))
-
-You need to add a SRV record in your ``server_name`` 's DNS zone with
-this format::
-
-     _matrix._tcp.<yourdomain.com> <ttl> IN SRV <priority> <weight> <port> <synapse.server.name>
-
-In our example, we would need to add this SRV record in the
-``example.com`` DNS zone::
-
-     _matrix._tcp.example.com. 3600 IN SRV 10 5 443 synapse.example.com.
-
-
-Once done and set up, you can check the DNS record with ``dig -t srv
-_matrix._tcp.<server_name>``, in our example, we would expect this::
-
-    $ dig -t srv _matrix._tcp.example.com
-    _matrix._tcp.example.com. 3600    IN      SRV     10 0 443 synapse.example.com.
-
-Note that the server host name cannot be an alias (CNAME record): it has to point
-directly to the server hosting the synapse instance.
-
 
 .well-known delegation
 ----------------------
 
 To use this method, you need to be able to alter the
-``server_name`` 's https server to serve the ``/.well-known/matrix/server`` 
-URL. Having an active server (with a valid ``SSL`` certificate) serving your 
+``server_name`` 's https server to serve the ``/.well-known/matrix/server``
+URL. Having an active server (with a valid ``SSL`` certificate) serving your
 ``server_name`` domain is out of the scope of this documentation.
 
 The URL ``https://<server_name>/.well-known/matrix/server`` should
-return a JSON structure containing the key ``m.server`` like so::
+return a JSON structure containing the key ``m.server`` like so:
 
     {
 	    "m.server": "<synapse.server.name>:<yourport>"
     }
 
 In our example, this would mean that URL ``https://example.com/.well-known/matrix/server``
-should return::
+should return:
 
     {
 	    "m.server": "synapse.example.com:443"
@@ -104,26 +67,41 @@ method: federation servers will contact the given hostname's IP and
 will check for a valid SSL certificate on the same delegated hostname (in our
 example: ``synapse.example.com``).
 
+DNS SRV delegation
+------------------
 
-Setting your server_name
-------------------------
+To use this method, you need to have write access to your
+``server_name`` 's domain zone DNS records (in our example it would be
+``example.com`` DNS zone).
 
-Note that you can NOT change the ``server_name`` after the database
-is first created.  So choose your ``server_name`` with care.
+This method requires the target server to provide a
+valid SSL certificate identifying it as the original ``server_name``
+domain zone. So the delegate domain name is only used to resolve a possible
+different IP/Port combination to find your server. You must use the other
+delegation method if this isn't what you want. (for more details on the
+rationale [see here](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#interaction-with-srv-records))
 
-You can then configure your homeserver to use ``<yourdomain.com>`` as the domain in
-its user-ids, by setting ``server_name`` on the command line::
+You need to add a SRV record in your ``server_name`` 's DNS zone with
+this format:
 
-    python -m synapse.app.homeserver \
-        --server-name <yourdomain.com> \
-        --config-path homeserver.yaml \
-        --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
+     _matrix._tcp.<yourdomain.com> <ttl> IN SRV <priority> <weight> <port> <synapse.server.name>
 
-If you've already generated the config file, you need to edit the ``server_name``
-in your configuration file (often ``homeserver.yaml`` file). If you have 
-already started Synapse and a database has been created, you will need to 
-recreate the database.
+In our example, we would need to add this SRV record in the
+``example.com`` DNS zone:
+
+     _matrix._tcp.example.com. 3600 IN SRV 10 5 443 synapse.example.com.
+
+
+Once done and set up, you can check the DNS record with ``dig -t srv
+_matrix._tcp.<server_name>``, in our example, we would expect this:
+
+    $ dig -t srv _matrix._tcp.example.com
+    _matrix._tcp.example.com. 3600    IN      SRV     10 0 443 synapse.example.com.
+
+Note that the server host name cannot be an alias (CNAME record): it has to point
+directly to the server hosting the synapse instance.
+
+
 
 
 Troubleshooting
@@ -131,15 +109,15 @@ Troubleshooting
 
 You can use the [federation tester](
 <https://matrix.org/federationtester>) to check if your homeserver is
-configured correctly. Or the [raw API url used by the federation tester](https://matrix.org/federationtester/api/report?server_name=DOMAIN)
+configured correctly. Alternatively try the [raw API url used by the federation tester](https://matrix.org/federationtester/api/report?server_name=DOMAIN)
 , note that you'll have to modify this URL to replace ``DOMAIN`` with your
 ``server_name``. Hitting the URL directly provides extra detail.
 
 For more details the see the [Server to Server Spec](https://matrix.org/docs/spec/server_server/r0.1.1.html#resolving-server-names).
 
-The typical failure mode for federation is that when the server tries to join 
+The typical failure mode for federation is that when the server tries to join
 a room, it is rejected with "401: Unauthorized". Generally this means that other
-servers in the room could not access yours. (Joining a room over federation is 
+servers in the room could not access yours. (Joining a room over federation is
 a complicated dance which requires connections in both directions).
 
 Another common problem is that people on other servers can't join rooms that

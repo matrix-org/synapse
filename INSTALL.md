@@ -71,7 +71,7 @@ set this to the hostname of your server. For a more production-ready setup, you
 will probably want to specify your domain (`example.com`) rather than a
 matrix-specific hostname here (in the same way that your email address is
 probably `user@example.com` rather than `user@email.example.com`) - but
-doing so may require more advanced setup: see [Setting up Federation](docs/federate.md). 
+doing so may require more advanced setup: see [Setting up Federation](docs/federate.md).
 Beware that the server name cannot be changed later.
 
 This command will generate you a config file that you can then customise, but it will
@@ -349,6 +349,26 @@ https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-
 
 Once you have installed synapse as above, you will need to configure it.
 
+
+## Setting your server_name
+
+Note that you can NOT change the ``server_name`` after the database
+is first created.  So choose your ``server_name`` with care.
+
+You can configure your homeserver to use ``<yourdomain.com>`` as the domain in
+its user-ids, by setting ``server_name`` on the command line:
+
+    python -m synapse.app.homeserver \
+        --server-name <yourdomain.com> \
+        --config-path homeserver.yaml \
+        --generate-config
+    python -m synapse.app.homeserver --config-path homeserver.yaml
+
+If you've already generated the config file, you need to edit the ``server_name``
+in your configuration file (often ``homeserver.yaml`` file). If you have
+already started Synapse and a database has been created, you will need to
+recreate the database.
+
 ## TLS certificates
 
 The default configuration exposes a single HTTP port: http://localhost:8008. It
@@ -376,7 +396,7 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   `tls_private_key_path` lines under the `TLS` section. You can either
   point these settings at an existing certificate and key, or you can
   enable Synapse's built-in ACME (Let's Encrypt) support.  Instructions
-  for having Synapse automatically provision and renew federation 
+  for having Synapse automatically provision and renew federation
   certificates through ACME can be found at [ACME.md](docs/ACME.md).
 
 For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
