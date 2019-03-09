@@ -770,7 +770,7 @@ class SyncHandler(object):
                     current=current_state_ids,
                     lazy_load_members=lazy_load_members,
                 )
-            elif batch.limited:
+            elif batch.limited and batch.events:
                 state_at_timeline_start = yield self.store.get_state_ids_for_event(
                     batch.events[0].event_id, state_filter=state_filter,
                 )
