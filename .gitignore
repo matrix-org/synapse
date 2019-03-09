@@ -15,8 +15,15 @@ _trial_temp*/
 /*.signing.key
 /*.tls.crt
 /*.tls.key
+/*.tls.dh
 /uploads
 /media_store/
+/homeserver*.yaml
+*.db
+*.log
+*.log.config
+*.pid
+env/
 
 # IDEs
 /.idea/
