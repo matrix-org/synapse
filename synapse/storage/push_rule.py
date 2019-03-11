@@ -186,20 +186,25 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def copy_push_rules_from_room_to_room(self, old_room_id, new_room_id):
+    def copy_push_rules_from_room_to_room(self, old_room_id, new_room_id, user_id=None):
         """Copy the push rules from one room to another.
 
         Args:
             old_room_id (str): ID of the old room.
             new_room_id (str): ID of the new room.
+            user_id (str|None): ID of user to copy push rules for. If None
+                push rules for all local users will be copied.
         """
-        # Get local users in the old room. We ignore app service users for now. 
-        old_room_users = yield self.get_users_in_room(old_room_id)
-        local_users_in_old_room = list(set(
-            u for u in old_room_users
-            if self.hs.is_mine_id(u)
-            and not self.get_if_app_services_interested_in_user(u)
-        ))
+        if user_id is None:
+            # Get local users in the old room. We ignore app service users for now. 
+            old_room_users = yield self.get_users_in_room(old_room_id)
+            local_users_in_old_room = list(set(
+                u for u in old_room_users
+                if self.hs.is_mine_id(u)
+                and not self.get_if_app_services_interested_in_user(u)
+            ))
+        else:
+            local_users_in_old_room = [user_id]
 
         # Retrieve push rules
         push_rules = []
