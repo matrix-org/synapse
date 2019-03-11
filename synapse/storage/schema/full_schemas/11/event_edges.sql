@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS event_edges(
     event_id TEXT NOT NULL,
     prev_event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
+    -- We no longer insert prev_state into this table, so all new rows will have
+    -- is_state as false.
     is_state BOOL NOT NULL,
     UNIQUE (event_id, prev_event_id, room_id, is_state)
 );

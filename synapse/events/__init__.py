@@ -141,7 +141,6 @@ class EventBase(object):
     origin = _event_dict_property("origin")
     origin_server_ts = _event_dict_property("origin_server_ts")
     prev_events = _event_dict_property("prev_events")
-    prev_state = _event_dict_property("prev_state")
     redacts = _event_dict_property("redacts")
     room_id = _event_dict_property("room_id")
     sender = _event_dict_property("sender")
