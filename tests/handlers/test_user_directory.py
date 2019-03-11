@@ -121,6 +121,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
         )
+        self.assertEqual(set(public_users), set([u1, u2]))
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -140,9 +141,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Check we have removed the values.
         shares_public = self.get_users_who_share_public_rooms()
         shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
 
         self.assertEqual(shares_public, [])
         self.assertEqual(self._compress_shared(shares_private), set())
+        self.assertEqual(public_users, [u1])
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -159,6 +162,15 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         for i in shared:
             r.add((i["user_id"], i["other_user_id"], i["room_id"]))
         return r
+
+    def get_users_in_public_rooms(self):
+        return self.get_success(
+            self.store._simple_select_list(
+                "users_in_public_rooms",
+                None,
+                ["user_id"],
+            )
+        )
 
     def get_users_who_share_public_rooms(self):
         return self.get_success(

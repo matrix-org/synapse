@@ -242,6 +242,9 @@ class UserDirectoryStore(SQLBaseStore):
                 txn, table="user_directory_search", keyvalues={"user_id": user_id}
             )
             self._simple_delete_txn(
+                txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
                 txn,
                 table="users_who_share_public_rooms",
                 keyvalues={"user_id": user_id},
@@ -339,6 +342,21 @@ class UserDirectoryStore(SQLBaseStore):
                 value_names=(),
                 value_values=None,
             )
+
+            # If it's a public room, also update them in users_in_public_rooms.
+            # We don't look before they're in the table before we do it, as it's
+            # more efficient to simply have Postgres do that (one UPSERT vs one
+            # SELECT and maybe one INSERT).
+            if not share_private:
+                for user_id in set([x[1] for x in user_id_tuples]):
+                    self._simple_upsert_txn(
+                        txn,
+                        "users_in_public_rooms",
+                        keyvalues={"user_id": user_id},
+                        values={},
+                        desc="add_user_as_in_public_room",
+                    )
+
             for user_id, other_user_id in user_id_tuples:
                 txn.call_after(
                     self.get_users_who_share_room_from_dir.invalidate, (user_id,)
@@ -379,6 +397,21 @@ class UserDirectoryStore(SQLBaseStore):
                 table="users_who_share_public_rooms",
                 keyvalues={"other_user_id": user_id, "room_id": room_id},
             )
+
+            # Are the users still in a public room after we deleted them from this one?
+            still_in_public = self._simple_select_one_onecol_txn(
+                txn,
+                "users_who_share_public_rooms",
+                keyvalues={"other_user_id": user_id},
+                retcol="other_user_id",
+                allow_none=True,
+            )
+
+            if still_in_public is None:
+                self._simple_delete_txn(
+                    txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
+                )
+
             txn.call_after(
                 self.get_users_who_share_room_from_dir.invalidate, (user_id,)
             )
@@ -452,6 +485,7 @@ class UserDirectoryStore(SQLBaseStore):
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
+            txn.execute("DELETE FROM users_in_public_rooms")
             txn.execute("DELETE FROM users_who_share_public_rooms")
             txn.execute("DELETE FROM users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
