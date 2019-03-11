@@ -177,7 +177,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             timeout=20000,
         ))
 
-        put_json = self.hs.get_http_client().put_json_with_trailing_slashes_on_404(
+        put_json = self.hs.get_http_client().put_json_with_trailing_slashes_on_404
         put_json.assert_called_once_with(
             "farm",
             path="/_matrix/federation/v1/send/1000000",
