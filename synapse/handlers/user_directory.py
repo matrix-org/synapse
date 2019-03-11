@@ -60,13 +60,15 @@ class UserDirectoryHandler(object):
         self.update_user_directory = hs.config.update_user_directory
         self.search_all_users = hs.config.user_directory_search_all_users
 
+        # If we're a worker, don't sleep when doing the initial room work, as it
+        # won't monopolise the master's CPU.
+        if hs.config.worker_app:
+            self.INITIAL_ROOM_SLEEP_MS = 0
+            self.INITIAL_USER_SLEEP_MS = 0
+
         # When start up for the first time we need to populate the user_directory.
         # This is a set of user_id's we've inserted already
         self.initially_handled_users = set()
-
-        self.register_background_update_handler(
-            "users_in_public_rooms_initial", self._populate_users_in_public_rooms
-        )
 
         # The current position in the current_state_delta stream
         self.pos = None
@@ -80,41 +82,6 @@ class UserDirectoryHandler(object):
             # We kick this off so that we don't have to wait for a change before
             # we start populating the user directory
             self.clock.call_later(0, self.notify_new_event)
-
-    @defer.inlineCallbacks
-    def _populate_users_in_public_rooms(self, progress, batch_size):
-        """
-        Populate the users_in_public_rooms table with the contents of the
-        users_who_share_public_rooms table.
-        """
-
-        def _fetch(txn):
-            sql = "SELECT DISTINCT other_user_id FROM users_who_share_public_rooms"
-            txn.execute(sql)
-            return txn.fetchall()
-
-        users = yield self.store.runInteraction(
-            "populate_users_in_public_rooms_fetch", _fetch
-        )
-
-        if users:
-
-            def _fill(txn):
-                self._simple_upsert_many_txn(
-                    txn,
-                    table="users_in_public_rooms",
-                    key_names=["user_id"],
-                    key_values=users,
-                    value_names=(),
-                    value_values=None,
-                )
-
-            users = yield self.store.runInteraction(
-                "populate_users_in_public_rooms_fill", _fill
-            )
-
-        yield self._end_background_update("users_in_public_rooms_initial")
-        defer.returnValue(1)
 
     def search_users(self, user_id, search_term, limit):
         """Searches for users in directory

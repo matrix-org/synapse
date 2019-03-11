@@ -22,16 +22,57 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
-from ._base import SQLBaseStore
-
 logger = logging.getLogger(__name__)
 
 
-class UserDirectoryStore(SQLBaseStore):
+class UserDirectoryStore(BackgroundUpdateStore):
+    def __init__(self, dbconn, hs):
+        super(UserDirectoryStore, self).__init__(dbconn, hs)
+
+        self.register_background_update_handler(
+            "users_in_public_rooms_initial", self._populate_users_in_public_rooms
+        )
+
+
+    @defer.inlineCallbacks
+    def _populate_users_in_public_rooms(self, progress, batch_size):
+        """
+        Populate the users_in_public_rooms table with the contents of the
+        users_who_share_public_rooms table.
+        """
+
+        def _fetch(txn):
+            sql = "SELECT DISTINCT other_user_id FROM users_who_share_public_rooms"
+            txn.execute(sql)
+            return txn.fetchall()
+
+        users = yield self.runInteraction(
+            "populate_users_in_public_rooms_fetch", _fetch
+        )
+
+        if users:
+            def _fill(txn):
+                self._simple_upsert_many_txn(
+                    txn,
+                    table="users_in_public_rooms",
+                    key_names=["user_id"],
+                    key_values=users,
+                    value_names=(),
+                    value_values=None,
+                )
+
+            users = yield self.runInteraction(
+                "populate_users_in_public_rooms_fill", _fill
+            )
+
+        yield self._end_background_update("users_in_public_rooms_initial")
+        defer.returnValue(1)
+
     @defer.inlineCallbacks
     def is_room_world_readable_or_publicly_joinable(self, room_id):
         """Check if the room is either world_readable or publically joinable
@@ -353,8 +394,7 @@ class UserDirectoryStore(SQLBaseStore):
                         txn,
                         "users_in_public_rooms",
                         keyvalues={"user_id": user_id},
-                        values={},
-                        desc="add_user_as_in_public_room",
+                        values=None,
                     )
 
             for user_id, other_user_id in user_id_tuples:
@@ -603,7 +643,7 @@ class UserDirectoryStore(SQLBaseStore):
         else:
             join_clause = """
                 LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_public_rooms
+                    SELECT user_id FROM users_in_public_rooms
                     UNION
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
                     WHERE user_id = ?

@@ -116,12 +116,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Check we have populated the database correctly.
         shares_public = self.get_users_who_share_public_rooms()
         shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
 
         self.assertEqual(shares_public, [])
         self.assertEqual(
             self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
         )
-        self.assertEqual(set(public_users), set([u1, u2]))
+        self.assertEqual(public_users, [])
 
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -145,7 +146,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(shares_public, [])
         self.assertEqual(self._compress_shared(shares_private), set())
-        self.assertEqual(public_users, [u1])
+        self.assertEqual(public_users, [])
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -165,10 +166,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def get_users_in_public_rooms(self):
         return self.get_success(
-            self.store._simple_select_list(
+            self.store._simple_select_onecol(
                 "users_in_public_rooms",
                 None,
-                ["user_id"],
+                "user_id",
             )
         )
 
@@ -214,9 +215,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         shares_public = self.get_users_who_share_public_rooms()
         shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
 
+        # Nothing updated yet
         self.assertEqual(shares_private, [])
         self.assertEqual(shares_public, [])
+        self.assertEqual(public_users, [])
 
         # Reset the handled users caches
         self.handler.initially_handled_users = set()
@@ -233,6 +237,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         shares_public = self.get_users_who_share_public_rooms()
         shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
 
         # User 1 and User 2 share public rooms
         self.assertEqual(
@@ -244,6 +249,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self._compress_shared(shares_private),
             set([(u1, u3, private_room), (u3, u1, private_room)]),
         )
+
+        # User 1 and 2 are in public rooms
+        self.assertEqual(set(public_users), set([u1, u2]))
 
     def test_search_all_users(self):
         """
