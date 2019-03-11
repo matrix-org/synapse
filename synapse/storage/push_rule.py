@@ -196,7 +196,8 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
                 push rules for all local users will be copied.
         """
         if user_id is None:
-            # Get local users in the old room. We ignore app service users for now. 
+            # Get local users in the old room.
+            # We ignore app service users for now.
             old_room_users = yield self.get_users_in_room(old_room_id)
             local_users_in_old_room = list(set(
                 u for u in old_room_users
@@ -249,12 +250,9 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
-        if room_id is None:
-            room_id = event.room_id
-
         current_state_ids = yield context.get_current_state_ids(self)
         result = yield self._bulk_get_push_rules_for_room(
-            room_id, state_group, current_state_ids, event=event
+            event.room_id, state_group, current_state_ids, event=event
         )
         defer.returnValue(result)
 
