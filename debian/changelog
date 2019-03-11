@@ -1,3 +1,9 @@
+matrix-synapse-py3 (0.99.3) UNRELEASED; urgency=medium
+
+  * Fix warning during preconfiguration. (Fixes: #4819)
+
+ -- Richard van der Hoff <richard@matrix.org>  Thu, 07 Mar 2019 07:17:00 +0000
+
 matrix-synapse-py3 (0.99.2) stable; urgency=medium
 
   * Fix overwriting of config settings on upgrade.
