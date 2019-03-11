@@ -115,6 +115,7 @@ def default_config(name):
     config.signing_key = [MockKey()]
     config.event_cache_size = 1
     config.enable_registration = True
+    config.enable_registration_captcha = False
     config.macaroon_secret_key = "not even a little secret"
     config.expire_access_token = False
     config.server_name = name
