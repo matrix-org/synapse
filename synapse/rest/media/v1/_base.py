@@ -100,10 +100,29 @@ def add_file_headers(request, media_type, file_size, upload_name):
 
     request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
     if upload_name:
-        if is_ascii(upload_name):
-            disposition = "inline; filename=%s" % (_quote(upload_name),)
+        # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
+        #
+        # `filename` is defined to be a `value`, which is defined by RFC2616
+        # section 3.6 [2] to be a `token` or a `quoted-string`, where a `token`
+        # is (essentially) a single US-ASCII word, and a `quoted-string` is a
+        # US-ASCII string surrounded by double-quotes, using backslash as an
+        # escape charater. Note that %-encoding is *not* permitted.
+        #
+        # `filename*` is defined to be an `ext-value`, which is defined in
+        # RFC5987 section 3.2.1 [3] to be `charset "'" [ language ] "'" value-chars`,
+        # where `value-chars` is essentially a %-encoded string in the given charset.
+        #
+        # [1]: https://tools.ietf.org/html/rfc6266#section-4.1
+        # [2]: https://tools.ietf.org/html/rfc2616#section-3.6
+        # [3]: https://tools.ietf.org/html/rfc5987#section-3.2.1
+
+        # We avoid the quoted-string version of `filename`, because (a) synapse didn't
+        # correctly interpret those as of 0.99.2 and (b) they are a bit of a pain and we
+        # may as well just do the filename* version.
+        if _can_encode_filename_as_token(upload_name):
+            disposition = 'inline; filename=%s' % (upload_name, )
         else:
-            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name),)
+            disposition = "inline; filename*=utf-8''%s" % (_quote(upload_name), )
 
         request.setHeader(b"Content-Disposition", disposition.encode('ascii'))
 
@@ -114,6 +133,35 @@ def add_file_headers(request, media_type, file_size, upload_name):
     # clients are smart enough to be happy with Cache-Control
     request.setHeader(b"Cache-Control", b"public,max-age=86400,s-maxage=86400")
     request.setHeader(b"Content-Length", b"%d" % (file_size,))
+
+
+# separators as defined in RFC2616. SP and HT are handled separately.
+# see _can_encode_filename_as_token.
+_FILENAME_SEPARATOR_CHARS = set((
+    "(", ")", "<", ">", "@", ",", ";", ":", "\\", '"',
+    "/", "[", "]", "?", "=", "{", "}",
+))
+
+
+def _can_encode_filename_as_token(x):
+    for c in x:
+        # from RFC2616:
+        #
+        #        token          = 1*<any CHAR except CTLs or separators>
+        #
+        #        separators     = "(" | ")" | "<" | ">" | "@"
+        #                       | "," | ";" | ":" | "\" | <">
+        #                       | "/" | "[" | "]" | "?" | "="
+        #                       | "{" | "}" | SP | HT
+        #
+        #        CHAR           = <any US-ASCII character (octets 0 - 127)>
+        #
+        #        CTL            = <any US-ASCII control character
+        #                         (octets 0 - 31) and DEL (127)>
+        #
+        if ord(c) >= 127 or ord(c) <= 32 or c in _FILENAME_SEPARATOR_CHARS:
+            return False
+    return True
 
 
 @defer.inlineCallbacks
