@@ -1,0 +1,1 @@
+Make shutdown API send explanation message to room after users have been forced joined.

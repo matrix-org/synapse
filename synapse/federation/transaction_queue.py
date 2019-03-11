@@ -361,7 +361,19 @@ class TransactionQueue(object):
 
                 self._attempt_new_transaction(destination)
 
-    def send_edu(self, destination, edu_type, content, key=None):
+    def build_and_send_edu(self, destination, edu_type, content, key=None):
+        """Construct an Edu object, and queue it for sending
+
+        Args:
+            destination (str): name of server to send to
+            edu_type (str): type of EDU to send
+            content (dict): content of EDU
+            key (Any|None): clobbering key for this edu
+        """
+        if destination == self.server_name:
+            logger.info("Not sending EDU to ourselves")
+            return
+
         edu = Edu(
             origin=self.server_name,
             destination=destination,
@@ -369,18 +381,23 @@ class TransactionQueue(object):
             content=content,
         )
 
-        if destination == self.server_name:
-            logger.info("Not sending EDU to ourselves")
-            return
+        self.send_edu(edu, key)
 
+    def send_edu(self, edu, key):
+        """Queue an EDU for sending
+
+        Args:
+            edu (Edu): edu to send
+            key (Any|None): clobbering key for this edu
+        """
         if key:
             self.pending_edus_keyed_by_dest.setdefault(
-                destination, {}
+                edu.destination, {}
             )[(edu.edu_type, key)] = edu
         else:
-            self.pending_edus_by_dest.setdefault(destination, []).append(edu)
+            self.pending_edus_by_dest.setdefault(edu.destination, []).append(edu)
 
-        self._attempt_new_transaction(destination)
+        self._attempt_new_transaction(edu.destination)
 
     def send_device_messages(self, destination):
         if destination == self.server_name:

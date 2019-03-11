@@ -68,8 +68,12 @@ class MatrixFederationAgent(object):
             TLS policy to use for fetching .well-known files. None to use a default
             (browser-like) implementation.
 
-        srv_resolver (SrvResolver|None):
+        _srv_resolver (SrvResolver|None):
             SRVResolver impl to use for looking up SRV records. None to use a default
+            implementation.
+
+        _well_known_cache (TTLCache|None):
+            TTLCache impl for storing cached well-known lookups. None to use a default
             implementation.
     """
 

@@ -33,11 +33,12 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
     def __init__(self, hs):
         super(ReplicationRegisterServlet, self).__init__(hs)
         self.store = hs.get_datastore()
+        self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
     def _serialize_payload(
         user_id, token, password_hash, was_guest, make_guest, appservice_id,
-        create_profile_with_displayname, admin, user_type,
+        create_profile_with_displayname, admin, user_type, address,
     ):
         """
         Args:
@@ -56,6 +57,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
+            address (str|None): the IP address used to perform the regitration.
         """
         return {
             "token": token,
@@ -66,13 +68,14 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "create_profile_with_displayname": create_profile_with_displayname,
             "admin": admin,
             "user_type": user_type,
+            "address": address,
         }
 
     @defer.inlineCallbacks
     def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
-        yield self.store.register(
+        yield self.registration_handler.register_with_store(
             user_id=user_id,
             token=content["token"],
             password_hash=content["password_hash"],
@@ -82,6 +85,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             create_profile_with_displayname=content["create_profile_with_displayname"],
             admin=content["admin"],
             user_type=content["user_type"],
+            address=content["address"]
         )
 
         defer.returnValue((200, {}))

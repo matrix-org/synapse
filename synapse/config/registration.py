@@ -64,6 +64,8 @@ class RegistrationConfig(Config):
 
         return """\
         ## Registration ##
+        # Registration can be rate-limited using the parameters in the "Ratelimiting"
+        # section of this file.
 
         # Enable registration for new users.
         enable_registration: False

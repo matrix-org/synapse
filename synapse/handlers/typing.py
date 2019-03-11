@@ -231,7 +231,7 @@ class TypingHandler(object):
             for domain in set(get_domain_from_id(u) for u in users):
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
-                    self.federation.send_edu(
+                    self.federation.build_and_send_edu(
                         destination=domain,
                         edu_type="m.typing",
                         content={

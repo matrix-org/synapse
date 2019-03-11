@@ -6,11 +6,11 @@
                     <img alt="" class="sender_avatar" src="{{ message.sender_avatar_url|mxc_to_http(32,32) }}"  />
                 {% else %}
                     {% if message.sender_hash % 3 == 0 %}
-                        <img class="sender_avatar" src="https://vector.im/beta/img/76cfa6.png"  />
+                        <img class="sender_avatar" src="https://riot.im/img/external/avatar-1.png"  />
                     {% elif message.sender_hash % 3 == 1 %}
-                        <img class="sender_avatar" src="https://vector.im/beta/img/50e2c2.png"  />
+                        <img class="sender_avatar" src="https://riot.im/img/external/avatar-2.png"  />
                     {% else %}
-                        <img class="sender_avatar" src="https://vector.im/beta/img/f4c371.png"  />
+                        <img class="sender_avatar" src="https://riot.im/img/external/avatar-3.png"  />
                     {% endif %}
                 {% endif %}
             {% endif %}

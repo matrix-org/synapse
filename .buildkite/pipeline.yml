@@ -40,6 +40,14 @@ steps:
 
   - command:
       - "python -m pip install tox"
+      - "tox -e check-sampleconfig"
+    label: "\U0001F9F9 check-sample-config"
+    plugins:
+      - docker#v3.0.1:
+          image: "python:3.6"
+
+  - command:
+      - "python -m pip install tox"
       - "tox -e py27,codecov"
     label: ":python: 2.7 / SQLite"
     env:

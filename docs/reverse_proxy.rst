@@ -88,18 +88,16 @@ Let's assume that we expect clients to connect to our server at
 * HAProxy::
 
       frontend https
-        bind 0.0.0.0:443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
-        bind :::443 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
-        
+        bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
+
         # Matrix client traffic
         acl matrix hdr(host) -i matrix.example.com
         use_backend matrix if matrix
-        
+
       frontend matrix-federation
-        bind 0.0.0.0:8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
-        bind :::8448 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
+        bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
         default_backend matrix
-        
+
       backend matrix
         server matrix 127.0.0.1:8008
 
