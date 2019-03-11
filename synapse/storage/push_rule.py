@@ -186,7 +186,9 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def copy_push_rules_from_room_to_room_for_user(self, old_room_id, new_room_id, user_id):
+    def copy_push_rules_from_room_to_room_for_user(
+        self, old_room_id, new_room_id, user_id,
+    ):
         """Copy the push rules from one room to another for a specific user.
 
         Args:
@@ -198,12 +200,13 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         user_push_rules = yield self.get_push_rules_for_user(user_id)
 
         # Get rules for the old room
+        old_room_push_rules = []
         for rule in user_push_rules:
             if old_room_id in rule["rule_id"]:
-                push_rules.append(rule)
+                old_room_push_rules.append(rule)
 
         # Convert rules for old room to those for new room
-        for rule in push_rules:
+        for rule in old_room_push_rules:
             # Create new rule id
             rule_id_scope = '/'.join(rule["rule_id"].split('/')[:-1])
             new_rule_id = rule_id_scope + "/" + new_room_id
