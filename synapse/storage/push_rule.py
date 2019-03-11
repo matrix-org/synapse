@@ -186,39 +186,24 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def copy_push_rules_from_room_to_room(self, old_room_id, new_room_id, user_id=None):
+    def copy_push_rules_from_room_to_room_for_user(self, old_room_id, new_room_id, user_id):
         """Copy the push rules from one room to another.
 
         Args:
             old_room_id (str): ID of the old room.
             new_room_id (str): ID of the new room.
-            user_id (str|None): ID of user to copy push rules for. If None
-                push rules for all local users will be copied.
+            user_id (str): ID of user to copy push rules for.
         """
-        if user_id is None:
-            # Get local users in the old room.
-            # We ignore app service users for now.
-            old_room_users = yield self.get_users_in_room(old_room_id)
-            local_users_in_old_room = list(set(
-                u for u in old_room_users
-                if self.hs.is_mine_id(u)
-                and not self.get_if_app_services_interested_in_user(u)
-            ))
-        else:
-            local_users_in_old_room = [user_id]
-
         # Retrieve push rules
-        push_rules = []
-        for user_id in local_users_in_old_room:
-            user_push_rules = yield self.get_push_rules_for_user(user_id)
+        user_push_rules = yield self.get_push_rules_for_user(user_id)
 
-            # Get rule for the old room
-            for rule in user_push_rules:
-                if old_room_id in rule["rule_id"]:
-                    push_rules.append((user_id, rule))
+        # Get rules for the old room
+        for rule in user_push_rules:
+            if old_room_id in rule["rule_id"]:
+                push_rules.append(rule)
 
         # Convert rules for old room to those for new room
-        for (user_id, rule) in push_rules:
+        for rule in push_rules:
             # Create new rule id
             rule_id_scope = '/'.join(rule["rule_id"].split('/')[:-1])
             new_rule_id = rule_id_scope + "/" + new_room_id
