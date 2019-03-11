@@ -393,7 +393,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
                         txn,
                         "users_in_public_rooms",
                         keyvalues={"user_id": user_id},
-                        values=None,
+                        values={},
                     )
 
             for user_id, other_user_id in user_id_tuples:
