@@ -187,7 +187,7 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
 
     @defer.inlineCallbacks
     def copy_push_rules_from_room_to_room_for_user(self, old_room_id, new_room_id, user_id):
-        """Copy the push rules from one room to another.
+        """Copy the push rules from one room to another for a specific user.
 
         Args:
             old_room_id (str): ID of the old room.
