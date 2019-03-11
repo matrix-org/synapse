@@ -442,6 +442,28 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
         event_results.reverse()
         return event_results
 
+    @defer.inlineCallbacks
+    def get_successor_events(self, event_ids):
+        """Fetch all events that have the given events as a prev event
+
+        Args:
+            event_ids (iterable[str])
+
+        Returns:
+            Deferred[list[str]]
+        """
+        rows = yield self._simple_select_many_batch(
+            table="event_edges",
+            column="prev_event_id",
+            iterable=event_ids,
+            retcols=("event_id",),
+            desc="get_successor_events"
+        )
+
+        defer.returnValue([
+            row["event_id"] for row in rows
+        ])
+
 
 class EventFederationStore(EventFederationWorkerStore):
     """ Responsible for storing and serving up the various graphs associated

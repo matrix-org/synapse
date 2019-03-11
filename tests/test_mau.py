@@ -17,7 +17,7 @@
 
 import json
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
@@ -36,7 +36,6 @@ class TestMauLimit(unittest.HomeserverTestCase):
             "red",
             http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["send_message"]),
         )
 
         self.store = self.hs.get_datastore()

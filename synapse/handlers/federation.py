@@ -45,6 +45,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.event_auth import auth_types_for_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
@@ -858,6 +859,52 @@ class FederationHandler(BaseHandler):
             logger.debug("Not backfilling as no extremeties found.")
             return
 
+        # We only want to paginate if we can actually see the events we'll get,
+        # as otherwise we'll just spend a lot of resources to get redacted
+        # events.
+        #
+        # We do this by filtering all the backwards extremities and seeing if
+        # any remain. Given we don't have the extremity events themselves, we
+        # need to actually check the events that reference them.
+        #
+        # *Note*: the spec wants us to keep backfilling until we reach the start
+        # of the room in case we are allowed to see some of the history. However
+        # in practice that causes more issues than its worth, as a) its
+        # relatively rare for there to be any visible history and b) even when
+        # there is its often sufficiently long ago that clients would stop
+        # attempting to paginate before backfill reached the visible history.
+        #
+        # TODO: If we do do a backfill then we should filter the backwards
+        #   extremities to only include those that point to visible portions of
+        #   history.
+        #
+        # TODO: Correctly handle the case where we are allowed to see the
+        #   forward event but not the backward extremity, e.g. in the case of
+        #   initial join of the server where we are allowed to see the join
+        #   event but not anything before it. This would require looking at the
+        #   state *before* the event, ignoring the special casing certain event
+        #   types have.
+
+        forward_events = yield self.store.get_successor_events(
+            list(extremities),
+        )
+
+        extremities_events = yield self.store.get_events(
+            forward_events,
+            check_redacted=False,
+            get_prev_content=False,
+        )
+
+        # We set `check_history_visibility_only` as we might otherwise get false
+        # positives from users having been erased.
+        filtered_extremities = yield filter_events_for_server(
+            self.store, self.server_name, list(extremities_events.values()),
+            redact=False, check_history_visibility_only=True,
+        )
+
+        if not filtered_extremities:
+            defer.returnValue(False)
+
         # Check if we reached a point where we should start backfilling.
         sorted_extremeties_tuple = sorted(
             extremities.items(),
@@ -1582,6 +1629,7 @@ class FederationHandler(BaseHandler):
             origin, event,
             state=state,
             auth_events=auth_events,
+            backfilled=backfilled,
         )
 
         # reraise does not allow inlineCallbacks to preserve the stacktrace, so we
@@ -1626,6 +1674,7 @@ class FederationHandler(BaseHandler):
                     event,
                     state=ev_info.get("state"),
                     auth_events=ev_info.get("auth_events"),
+                    backfilled=backfilled,
                 )
             defer.returnValue(res)
 
@@ -1748,7 +1797,7 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _prep_event(self, origin, event, state=None, auth_events=None):
+    def _prep_event(self, origin, event, state, auth_events, backfilled):
         """
 
         Args:
@@ -1756,6 +1805,7 @@ class FederationHandler(BaseHandler):
             event:
             state:
             auth_events:
+            backfilled (bool)
 
         Returns:
             Deferred, which resolves to synapse.events.snapshot.EventContext
@@ -1797,10 +1847,98 @@ class FederationHandler(BaseHandler):
 
             context.rejected = RejectedReason.AUTH_ERROR
 
+        if not context.rejected:
+            yield self._check_for_soft_fail(event, state, backfilled)
+
         if event.type == EventTypes.GuestAccess and not context.rejected:
             yield self.maybe_kick_guest_users(event)
 
         defer.returnValue(context)
+
+    @defer.inlineCallbacks
+    def _check_for_soft_fail(self, event, state, backfilled):
+        """Checks if we should soft fail the event, if so marks the event as
+        such.
+
+        Args:
+            event (FrozenEvent)
+            state (dict|None): The state at the event if we don't have all the
+                event's prev events
+            backfilled (bool): Whether the event is from backfill
+
+        Returns:
+            Deferred
+        """
+        # For new (non-backfilled and non-outlier) events we check if the event
+        # passes auth based on the current state. If it doesn't then we
+        # "soft-fail" the event.
+        do_soft_fail_check = not backfilled and not event.internal_metadata.is_outlier()
+        if do_soft_fail_check:
+            extrem_ids = yield self.store.get_latest_event_ids_in_room(
+                event.room_id,
+            )
+
+            extrem_ids = set(extrem_ids)
+            prev_event_ids = set(event.prev_event_ids())
+
+            if extrem_ids == prev_event_ids:
+                # If they're the same then the current state is the same as the
+                # state at the event, so no point rechecking auth for soft fail.
+                do_soft_fail_check = False
+
+        if do_soft_fail_check:
+            room_version = yield self.store.get_room_version(event.room_id)
+
+            # Calculate the "current state".
+            if state is not None:
+                # If we're explicitly given the state then we won't have all the
+                # prev events, and so we have a gap in the graph. In this case
+                # we want to be a little careful as we might have been down for
+                # a while and have an incorrect view of the current state,
+                # however we still want to do checks as gaps are easy to
+                # maliciously manufacture.
+                #
+                # So we use a "current state" that is actually a state
+                # resolution across the current forward extremities and the
+                # given state at the event. This should correctly handle cases
+                # like bans, especially with state res v2.
+
+                state_sets = yield self.store.get_state_groups(
+                    event.room_id, extrem_ids,
+                )
+                state_sets = list(state_sets.values())
+                state_sets.append(state)
+                current_state_ids = yield self.state_handler.resolve_events(
+                    room_version, state_sets, event,
+                )
+                current_state_ids = {
+                    k: e.event_id for k, e in iteritems(current_state_ids)
+                }
+            else:
+                current_state_ids = yield self.state_handler.get_current_state_ids(
+                    event.room_id, latest_event_ids=extrem_ids,
+                )
+
+            # Now check if event pass auth against said current state
+            auth_types = auth_types_for_event(event)
+            current_state_ids = [
+                e for k, e in iteritems(current_state_ids)
+                if k in auth_types
+            ]
+
+            current_auth_events = yield self.store.get_events(current_state_ids)
+            current_auth_events = {
+                (e.type, e.state_key): e for e in current_auth_events.values()
+            }
+
+            try:
+                self.auth.check(room_version, event, auth_events=current_auth_events)
+            except AuthError as e:
+                logger.warn(
+                    "Failed current state auth resolution for %r because %s",
+                    event, e,
+                )
+                event.internal_metadata.soft_failed = True
 
     @defer.inlineCallbacks
     def on_query_auth(self, origin, event_id, room_id, remote_auth_chain, rejects,

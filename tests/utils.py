@@ -115,6 +115,7 @@ def default_config(name):
     config.signing_key = [MockKey()]
     config.event_cache_size = 1
     config.enable_registration = True
+    config.enable_registration_captcha = False
     config.macaroon_secret_key = "not even a little secret"
     config.expire_access_token = False
     config.server_name = name
@@ -150,6 +151,8 @@ def default_config(name):
     config.admin_contact = None
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
+    config.rc_registration_request_burst_count = 3.0
+    config.rc_registration_requests_per_second = 0.17
     config.saml2_enabled = False
     config.public_baseurl = None
     config.default_identity_server = None

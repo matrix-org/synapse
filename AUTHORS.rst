@@ -69,3 +69,6 @@ Serban Constantin <serban.constantin at gmail dot com>
 
 Jason Robinson <jasonr at matrix.org>
  * Minor fixes
+
+Joseph Weston <joseph at weston.cloud>
+ + Add admin API for querying HS version
