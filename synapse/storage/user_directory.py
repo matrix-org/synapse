@@ -21,8 +21,8 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.background_updates import BackgroundUpdateStore
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -37,7 +37,6 @@ class UserDirectoryStore(BackgroundUpdateStore):
         self.register_background_update_handler(
             "users_in_public_rooms_initial", self._populate_users_in_public_rooms
         )
-
 
     @defer.inlineCallbacks
     def _populate_users_in_public_rooms(self, progress, batch_size):
