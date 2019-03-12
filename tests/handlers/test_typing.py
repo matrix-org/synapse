@@ -192,7 +192,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             json_data_callback=ANY,
             long_retries=True,
             backoff_on_404=True,
-            trailing_slashes_on_404=True,
+            try_trailing_slash_on_404=True,
         )
 
     def test_started_typing_remote_recv(self):
@@ -270,7 +270,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             json_data_callback=ANY,
             long_retries=True,
             backoff_on_404=True,
-            trailing_slashes_on_404=True,
+            try_trailing_slash_on_404=True,
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
