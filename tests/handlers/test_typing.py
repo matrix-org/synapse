@@ -177,7 +177,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             timeout=20000,
         ))
 
-        put_json = self.hs.get_http_client().put_json_with_trailing_slashes_on_404
+        put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
             "farm",
             path="/_matrix/federation/v1/send/1000000",
@@ -192,6 +192,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             json_data_callback=ANY,
             long_retries=True,
             backoff_on_404=True,
+            trailing_slashes_on_404=True,
         )
 
     def test_started_typing_remote_recv(self):
@@ -254,7 +255,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             [call('typing_key', 1, rooms=[ROOM_ID])]
         )
 
-        put_json = self.hs.get_http_client().put_json_with_trailing_slashes_on_404
+        put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
             "farm",
             path="/_matrix/federation/v1/send/1000000",
@@ -269,6 +270,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             json_data_callback=ANY,
             long_retries=True,
             backoff_on_404=True,
+            trailing_slashes_on_404=True,
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)

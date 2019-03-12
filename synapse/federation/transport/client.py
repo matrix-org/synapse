@@ -52,8 +52,9 @@ class TransportLayerClient(object):
                      destination, room_id)
 
         path = _create_v1_path("/state/%s", room_id)
-        return self.client.get_json_with_trailing_slashes_on_404(
+        return self.client.get_json(
             destination, path=path, args={"event_id": event_id},
+            try_trailing_slash_on_404=True,
         )
 
     @log_function
@@ -74,8 +75,9 @@ class TransportLayerClient(object):
                      destination, room_id)
 
         path = _create_v1_path("/state_ids/%s", room_id)
-        return self.client.get_json_with_trailing_slashes_on_404(
+        return self.client.get_json(
             destination, path=path, args={"event_id": event_id},
+            try_trailing_slash_on_404=True,
         )
 
     @log_function
@@ -96,8 +98,9 @@ class TransportLayerClient(object):
                      destination, event_id)
 
         path = _create_v1_path("/event/%s", event_id)
-        return self.client.get_json_with_trailing_slashes_on_404(
+        return self.client.get_json(
             destination, path=path, timeout=timeout,
+            try_trailing_slash_on_404=True,
         )
 
     @log_function
@@ -130,10 +133,11 @@ class TransportLayerClient(object):
             "limit": [str(limit)],
         }
 
-        return self.client.get_json_with_trailing_slashes_on_404(
+        return self.client.get_json(
             destination,
             path=path,
             args=args,
+            try_trailing_slash_on_404=True,
         )
 
     @defer.inlineCallbacks
@@ -171,13 +175,14 @@ class TransportLayerClient(object):
 
         path = _create_v1_path("/send/%s", transaction.transaction_id)
 
-        response = yield self.client.put_json_with_trailing_slashes_on_404(
+        response = yield self.client.put_json(
             transaction.destination,
             path=path,
             data=json_data,
             json_data_callback=json_data_callback,
             long_retries=True,
             backoff_on_404=True,  # If we get a 404 the other side has gone
+            try_trailing_slash_on_404=True,
         )
 
         defer.returnValue(response)

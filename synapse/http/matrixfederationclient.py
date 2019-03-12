@@ -196,7 +196,8 @@ class MatrixFederationHttpClient(object):
         timeout=None,
         long_retries=False,
         ignore_backoff=False,
-        backoff_on_404=False
+        backoff_on_404=False,
+        try_trailing_slash_on_404=False,
     ):
         """
         Sends a request to the given server.
@@ -211,6 +212,11 @@ class MatrixFederationHttpClient(object):
                 and try the request anyway.
 
             backoff_on_404 (bool): Back off if we get a 404
+
+            try_trailing_slash_on_404 (bool): True if on a 404 response we
+                should try appending a trailing slash to the end of the
+                request. This will be attempted before backing off if backing
+                off has been enabled.
 
         Returns:
             Deferred[twisted.web.client.Response]: resolves with the HTTP
@@ -473,7 +479,8 @@ class MatrixFederationHttpClient(object):
                  json_data_callback=None,
                  long_retries=False, timeout=None,
                  ignore_backoff=False,
-                 backoff_on_404=False):
+                 backoff_on_404=False,
+                 try_trailing_slash_on_404=False):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -493,7 +500,11 @@ class MatrixFederationHttpClient(object):
                 and try the request anyway.
             backoff_on_404 (bool): True if we should count a 404 response as
                 a failure of the server (and should therefore back off future
-                requests)
+                requests).
+            try_trailing_slash_on_404 (bool): True if on a 404 response we
+                should try appending a trailing slash to the end of the
+                request. This will be attempted before backing off if backing
+                off has been enabled.
 
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
@@ -509,7 +520,6 @@ class MatrixFederationHttpClient(object):
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
-
         request = MatrixFederationRequest(
             method="PUT",
             destination=destination,
@@ -519,13 +529,26 @@ class MatrixFederationHttpClient(object):
             json=data,
         )
 
-        response = yield self._send_request(
-            request,
-            long_retries=long_retries,
-            timeout=timeout,
-            ignore_backoff=ignore_backoff,
-            backoff_on_404=backoff_on_404,
-        )
+        send_request_args = {
+            "request": request,
+            "long_retries": long_retries,
+            "timeout": timeout,
+            "ignore_backoff": ignore_backoff,
+            # Do not backoff on the initial request if we're trying with trailing slashes
+            # Otherwise we may end up waiting to contact a server that is actually up
+            "backoff_on_404": False if try_trailing_slash_on_404 else backoff_on_404,
+        }
+
+        response = yield self._send_request(**send_request_args)
+
+        # If enabled, retry with a trailing slash if we received a 404
+        if try_trailing_slash_on_404 and response.code == 404:
+            args["path"] += "/"
+
+            # Re-enable backoff if enabled
+            send_request_args["backoff_on_404"] = backoff_on_404
+
+            response = yield self.get_json(**send_request_args)
 
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
@@ -592,7 +615,8 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def get_json(self, destination, path, args=None, retry_on_dns_fail=True,
-                 timeout=None, ignore_backoff=False):
+                 timeout=None, ignore_backoff=False,
+                 try_trailing_slash_on_404=False):
         """ GETs some json from the given host homeserver and path
 
         Args:
@@ -606,6 +630,9 @@ class MatrixFederationHttpClient(object):
                 be retried.
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
+            try_trailing_slash_on_404 (bool): True if on a 404 response we
+                should try appending a trailing slash to the end of the
+                request.
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
@@ -631,62 +658,24 @@ class MatrixFederationHttpClient(object):
             query=args,
         )
 
-        response = yield self._send_request(
-            request,
-            retry_on_dns_fail=retry_on_dns_fail,
-            timeout=timeout,
-            ignore_backoff=ignore_backoff,
-        )
+        send_request_args = {
+            "request": request,
+            "retry_on_dns_fail": retry_on_dns_fail,
+            "timeout": timeout,
+            "ignore_backoff": ignore_backoff,
+        }
+
+        response = yield self._send_request(**send_request_args)
+
+        # If enabled, retry with a trailing slash if we received a 404
+        if try_trailing_slash_on_404 and response.code == 404:
+            args["path"] += "/"
+            response = yield self._send_request(**send_request_args)
 
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
         defer.returnValue(body)
-
-    @defer.inlineCallbacks
-    def get_json_with_trailing_slashes_on_404(self, args={}):
-        """Runs client.get_json under the hood, but if receiving a 404, tries
-        the request again with a trailing slash. This is a result of removing
-        trailing slashes from some federation endpoints and in an effort to
-        remain backwards compatible with older versions of Synapse, we try
-        again if a server requires a trailing slash.
-
-        Args:
-            args (dict): A dictionary of arguments matching those provided by put_json.
-        Returns:
-            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
-            result will be the decoded JSON body.
-        """
-        response = yield self.get_json(**args)
-
-        # Retry with a trailing slash if we received a 404
-        if response.code == 404:
-            args["path"] += "/"
-            response = yield self.get_json(**args)
-
-        defer.returnValue(response)
-
-    @defer.inlineCallbacks
-    def put_json_with_trailing_slashes_on_404(self, args={}):
-        """Runs client.put_json under the hood, but if receiving a 404, tries
-        the request again with a trailing slash.
-
-        See get_json_with_trailing_slashes_on_404 for more details.
-
-        Args:
-            args (dict): A dictionary of arguments matching those provided by put_json.
-        Returns:
-            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
-            result will be the decoded JSON body.
-        """
-        response = yield self.put_json(**args)
-
-        # Retry with a trailing slash if we received a 404
-        if response.code == 404:
-            args["path"] += "/"
-            response = yield self.put_json(**args)
-
-        defer.returnValue(response)
 
     @defer.inlineCallbacks
     def delete_json(self, destination, path, long_retries=False,
