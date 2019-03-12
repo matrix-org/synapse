@@ -165,8 +165,8 @@ class LoginRestServlet(ClientV1RestServlet):
 
     def _ratelimit_user(self, user_id):
         """Checks whether a login request targetting a given user ID is allowed
-            by the ratelimiter. Also updates the raterlimiter's counter for this
-            key.
+        by the ratelimiter. Also updates the raterlimiter's counter for this
+        key.
 
         Args:
             user_id (str): the user ID the login request is a targetting.
