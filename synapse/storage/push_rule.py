@@ -201,7 +201,7 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         new_rule_id = rule_id_scope + "/" + new_room_id
 
         # Change room id in each condition
-        for condition in rule["conditions"]:
+        for condition in rule.get("conditions", []):
             if condition.get("key") == "room_id":
                 condition["pattern"] = new_room_id
 
@@ -235,12 +235,12 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         # Get rules relating to the old room, move them to the new room, then
         # delete them from the old room
         for rule in user_push_rules:
-            for condition in rule["conditions"]:
-                if condition.get("key") == "room_id":
-                    if condition.get("pattern") == old_room_id:
-                        self.move_push_rule_from_room_to_room(
-                            new_room_id, user_id, rule,
-                        )
+            conditions = rule.get("conditions", [])
+            if any((c.get("key") == "room_id" and
+                    c.get("pattern") == old_room_id) for c in conditions):
+                self.move_push_rule_from_room_to_room(
+                    new_room_id, user_id, rule,
+                )
 
     @defer.inlineCallbacks
     def bulk_get_push_rules_for_room(self, event, context):
