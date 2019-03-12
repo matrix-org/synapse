@@ -31,15 +31,15 @@ port (eg: ``synapse.example.com:443``). There are two ways to do this:
 
 Without configuring delegation, the matrix federation will
 expect to find your server via ``example.com:8448``. The
-following methods allow you retain a ```server_name``` of ```example.com`` 
-while providing a different server and port for ``*:example.com`` resources 
+following methods allow you retain a `server_name` of `example.com`
+so that your user IDs, room aliases, etc continue to look like `*:example.com`, whilst having your federation traffic routed to a different server. 
 such user ids and room aliases.
 
 ### .well-known delegation
 
 To use this method, you need to be able to alter the
 ``server_name`` 's https server to serve the ``/.well-known/matrix/server``
-URL. Having an active server (with a valid ``SSL`` certificate) serving your
+URL. Having an active server (with a valid TLS certificate) serving your
 ``server_name`` domain is out of the scope of this documentation.
 
 The URL ``https://<server_name>/.well-known/matrix/server`` should
@@ -57,13 +57,13 @@ should return:
     }
 
 Note, specifying a port is optional. If a port is not specified an SRV lookup
-is perfomed, which may in turn specify a port. If the target of the
+is performed, as described below. If the target of the
 delegation does not have an SRV record, then the port defaults to 8448.
 
 Most installations will not need to configure .well-known. However, it can be
 useful in cases where the admin is hosting on behalf of someone else and
 therefore cannot gain access to the necessary certificate. With .well-known,
-federation servers will check for a valid SSL certificate on the same delegated
+federation servers will check for a valid TLS certificate for the delegated
 hostname (in our example: ``synapse.example.com``).
 
 .well-known support first appeared in Synapse v0.99.0. To federate with older
@@ -77,7 +77,7 @@ To use this delegation method, you need to have write access to your
 ``example.com`` DNS zone).
 
 This method requires the target server to provide a
-valid SSL certificate identifying it as the original ``server_name``
+valid TLS certificate for the original ``server_name``.
 domain zone. 
 
 You need to add a SRV record in your ``server_name`` 's DNS zone with
