@@ -385,7 +385,7 @@ class UserDirectoryStore(SQLBaseStore):
         )
 
     @defer.inlineCallbacks
-    def get_rooms_user_is_in(self, user_id):
+    def get_user_dir_rooms_user_is_in(self, user_id):
         """
         Returns the rooms that a user is in.
 
