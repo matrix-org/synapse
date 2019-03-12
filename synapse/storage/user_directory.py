@@ -21,6 +21,7 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id, get_localpart_from_id
@@ -29,7 +30,7 @@ from synapse.util.caches.descriptors import cached
 logger = logging.getLogger(__name__)
 
 
-class UserDirectoryStore(object):
+class UserDirectoryStore(SQLBaseStore):
     @defer.inlineCallbacks
     def is_room_world_readable_or_publicly_joinable(self, room_id):
         """Check if the room is either world_readable or publically joinable
