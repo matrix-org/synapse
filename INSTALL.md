@@ -378,8 +378,8 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   for having Synapse automatically provision and renew federation
   certificates through ACME can be found at [ACME.md](docs/ACME.md). If you
   are using your own certificate and key, be sure to use a certificate that
-  includes a full chain (for instance, if using Let's Encrypt, use
-  `fullchain.pem` as your certificate, not `cert.pem`).
+  includes a full chain (for instance, if using certbot, use `fullchain.pem`
+  as your certificate, not `cert.pem`).
 
 ## Registering a user
 
