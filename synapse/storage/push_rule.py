@@ -238,8 +238,8 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
             for condition in rule["conditions"]:
                 if condition.get("key") == "room_id":
                     if condition.get("pattern") == old_room_id:
-                        self.copy_push_rule_from_room_to_room(
-                            old_room_id, new_room_id, user_id, rule,
+                        self.move_push_rule_from_room_to_room(
+                            new_room_id, user_id, rule,
                         )
 
     @defer.inlineCallbacks
