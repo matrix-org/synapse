@@ -30,10 +30,10 @@ port (eg: ``synapse.example.com:443``). There are two ways to do this:
   ``example.com``.
 
 Without configuring delegation, the matrix federation will
-expect to find your server via ``example.com:8448``. The
-following methods allow you retain a `server_name` of `example.com`
-so that your user IDs, room aliases, etc continue to look like `*:example.com`, whilst having your federation traffic routed to a different server. 
-such user ids and room aliases.
+expect to find your server via ``example.com:8448``. The following methods
+allow you retain a `server_name` of `example.com` so that your user IDs, room
+aliases, etc continue to look like `*:example.com`, whilst having your
+federation traffic routed to a different server.
 
 ### .well-known delegation
 
