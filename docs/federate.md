@@ -78,7 +78,6 @@ To use this delegation method, you need to have write access to your
 
 This method requires the target server to provide a
 valid TLS certificate for the original ``server_name``.
-domain zone. 
 
 You need to add a SRV record in your ``server_name`` 's DNS zone with
 this format:
