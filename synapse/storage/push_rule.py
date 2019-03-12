@@ -186,13 +186,12 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         defer.returnValue(results)
 
     @defer.inlineCallbacks
-    def copy_push_rule_from_room_to_room(
-        self, old_room_id, new_room_id, user_id, rule,
+    def move_push_rule_from_room_to_room(
+        self, new_room_id, user_id, rule,
     ):
-        """Copy a single push rule from one room to another for a specific user.
+        """Move a single push rule from one room to another for a specific user.
 
         Args:
-            old_room_id (str): ID of the old room.
             new_room_id (str): ID of the new room.
             user_id (str): ID of user the push rule belongs to.
             rule (Dict): A push rule.
@@ -202,9 +201,9 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         new_rule_id = rule_id_scope + "/" + new_room_id
 
         # Change room id in each condition
-        for index, condition in enumerate(rule["conditions"]):
-            if rule["conditions"][index]["key"] == "room_id":
-                rule["conditions"][index]["pattern"] = new_room_id
+        for condition in rule["conditions"]:
+            if condition.get("key") == "room_id":
+                condition["pattern"] = new_room_id
 
         # Add the rule for the new room
         yield self.add_push_rule(
@@ -219,10 +218,11 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         yield self.delete_push_rule(user_id, rule["rule_id"])
 
     @defer.inlineCallbacks
-    def copy_push_rules_from_room_to_room_for_user(
+    def move_push_rules_from_room_to_room_for_user(
         self, old_room_id, new_room_id, user_id,
     ):
-        """Copy the push rules from one room to another for a specific user.
+        """Move all of the push rules from one room to another for a specific
+        user.
 
         Args:
             old_room_id (str): ID of the old room.
@@ -236,8 +236,8 @@ class PushRulesWorkerStore(ApplicationServiceWorkerStore,
         # delete them from the old room
         for rule in user_push_rules:
             for condition in rule["conditions"]:
-                if "key" in condition and condition["key"] == "room_id":
-                    if condition["pattern"] == old_room_id:
+                if condition.get("key") == "room_id":
+                    if condition.get("pattern") == old_room_id:
                         self.copy_push_rule_from_room_to_room(
                             old_room_id, new_room_id, user_id, rule,
                         )
