@@ -116,9 +116,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Check we have populated the database correctly.
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()
-        visible_users = self.get_publicly_visible_users()
 
-        self.assertEqual(visible_users, [])
         self.assertEqual(
             self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
         )
@@ -142,9 +140,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Check we have removed the values.
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()
-        visible_users = self.get_publicly_visible_users()
 
-        self.assertEqual(visible_users, [])
         self.assertEqual(self._compress_shared(shares_private), set())
         self.assertEqual(public_users, [])
 
@@ -176,15 +172,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         for i in r:
             retval.append((i["user_id"], i["room_id"]))
         return retval
-
-    def get_publicly_visible_users(self):
-        return self.get_success(
-            self.store._simple_select_onecol(
-                "publicly_visible_users",
-                None,
-                "user_id",
-            )
-        )
 
     def get_users_who_share_private_rooms(self):
         return self.get_success(
@@ -219,11 +206,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()
-        visible_users = self.get_publicly_visible_users()
 
         # Nothing updated yet
         self.assertEqual(shares_private, [])
-        self.assertEqual(visible_users, [])
         self.assertEqual(public_users, [])
 
         # Reset the handled users caches
@@ -241,9 +226,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()
-        visible_users = self.get_publicly_visible_users()
 
-        # User 1 and User 2 share public rooms
+        # User 1 and User 2 are in the same public room
         self.assertEqual(
             set(public_users), set([(u1, room), (u2, room)])
         )
@@ -253,9 +237,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self._compress_shared(shares_private),
             set([(u1, u3, private_room), (u3, u1, private_room)]),
         )
-
-        # User 1 and 2 are in public rooms
-        self.assertEqual(set(visible_users), set([u1, u2]))
 
     def test_search_all_users(self):
         """

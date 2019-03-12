@@ -241,9 +241,6 @@ class UserDirectoryStore(SQLBaseStore):
                 txn, table="user_directory_search", keyvalues={"user_id": user_id}
             )
             self._simple_delete_txn(
-                txn, table="publicly_visible_users", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
                 txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
             )
             self._simple_delete_txn(
@@ -352,18 +349,6 @@ class UserDirectoryStore(SQLBaseStore):
                 value_values=None,
             )
 
-            # If it's a public room, also update them in publicly_visible_users.
-            # We don't look before they're in the table before we do it, as it's
-            # more efficient to simply have Postgres do that (one UPSERT vs one
-            # SELECT and maybe one INSERT).
-            for user_id in user_ids:
-                self._simple_upsert_txn(
-                    txn,
-                    "publicly_visible_users",
-                    keyvalues={"user_id": user_id},
-                    values={},
-                )
-
         return self.runInteraction(
             "add_users_in_public_rooms", _add_users_in_public_rooms_txn
         )
@@ -394,20 +379,6 @@ class UserDirectoryStore(SQLBaseStore):
                 table="users_in_public_rooms",
                 keyvalues={"user_id": user_id, "room_id": room_id},
             )
-
-            # Are the users still in a public room after we deleted them from this one?
-            still_in_public = self._simple_select_one_onecol_txn(
-                txn,
-                "users_in_public_rooms",
-                keyvalues={"user_id": user_id},
-                retcol="user_id",
-                allow_none=True,
-            )
-
-            if still_in_public is None:
-                self._simple_delete_txn(
-                    txn, table="publicly_visible_users", keyvalues={"user_id": user_id}
-                )
 
         return self.runInteraction(
             "remove_user_who_share_room", _remove_user_who_share_room_txn
@@ -476,7 +447,6 @@ class UserDirectoryStore(SQLBaseStore):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
             txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM publicly_visible_users")
             txn.execute("DELETE FROM users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
 
@@ -583,22 +553,19 @@ class UserDirectoryStore(SQLBaseStore):
         """
 
         if self.hs.config.user_directory_search_all_users:
-            # make s.user_id null to keep the ordering algorithm happy
-            join_clause = """
-                CROSS JOIN (SELECT NULL as user_id) AS s
-            """
             join_args = ()
             where_clause = "1=1"
         else:
-            join_clause = """
-                LEFT JOIN publicly_visible_users AS p USING (user_id)
-                LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_private_rooms
-                    WHERE user_id = ?
-                ) AS s USING (user_id)
-            """
             join_args = (user_id,)
-            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
+            where_clause = """
+                (
+                    EXISTS (select 1 from users_in_public_rooms WHERE user_id = t.user_id)
+                    OR EXISTS (
+                        SELECT 1 FROM users_who_share_private_rooms
+                        WHERE user_id = ? AND other_user_id = t.user_id
+                    )
+                )
+            """
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
@@ -610,9 +577,8 @@ class UserDirectoryStore(SQLBaseStore):
             # search: (domain, _, display name, localpart)
             sql = """
                 SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search
+                FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
-                %s
                 WHERE
                     %s
                     AND vector @@ to_tsquery('english', ?)
@@ -639,7 +605,6 @@ class UserDirectoryStore(SQLBaseStore):
                     avatar_url IS NULL
                 LIMIT ?
             """ % (
-                join_clause,
                 where_clause,
             )
             args = join_args + (full_query, exact_query, prefix_query, limit + 1)
@@ -648,9 +613,8 @@ class UserDirectoryStore(SQLBaseStore):
 
             sql = """
                 SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search
+                FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
-                %s
                 WHERE
                     %s
                     AND value MATCH ?
@@ -660,7 +624,6 @@ class UserDirectoryStore(SQLBaseStore):
                     avatar_url IS NULL
                 LIMIT ?
             """ % (
-                join_clause,
                 where_clause,
             )
             args = join_args + (search_query, limit + 1)

@@ -26,10 +26,3 @@ CREATE TABLE IF NOT EXISTS users_in_public_rooms (
 );
 
 CREATE UNIQUE INDEX users_in_public_rooms_u_idx ON users_in_public_rooms(user_id, room_id);
-
--- Track what users are publicly visible
-CREATE TABLE IF NOT EXISTS publicly_visible_users (
-    user_id TEXT NOT NULL
-);
-
-CREATE UNIQUE INDEX publicly_visible_users_u_idx ON publicly_visible_users(user_id);

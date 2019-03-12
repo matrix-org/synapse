@@ -226,6 +226,11 @@ class HomeServer(object):
         logger.info("Finished setting up.")
 
     def setup_master(self):
+        """
+        Some handlers have side effects on instantiation (like registering
+        background updates). This function causes them to be fetched, and
+        therefore instantiated, to run those side effects.
+        """
         for i in self.REQUIRED_ON_MASTER_STARTUP:
             getattr(self, "get_" + i)()
 
