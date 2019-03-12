@@ -1,1 +1,1 @@
-Adds a systemd setup that supports synapse workers. Contributed by Luca Corbatto
+Add a systemd setup that supports synapse workers. Contributed by Luca Corbatto.
