@@ -14,9 +14,8 @@ up and will work provided you set the ``server_name`` to match your
 machine's public DNS hostname, and provide Synapse with a TLS certificate
 which is valid for your ``server_name``.
 
-Once you have completed the steps necessary to federate, you should be able to
-[connect to your server with a client](../README.rst#registering-a-new-user-from-a-client),
-and then join a room via federation. (A good place to start is ``#synapse:matrix.org``
+Once you have completed the steps necessary to federate, you should be able to 
+join a room via federation. (A good place to start is ``#synapse:matrix.org``
 - a room for Synapse admins.)
 
 
@@ -30,14 +29,11 @@ port (eg: ``synapse.example.com:443``). There are two ways to do this:
 - adding a DNS ``SRV`` record in the DNS zone of domain
   ``example.com``.
 
-For both methods let's say you want to run your server at
-``synapse.example.com`` on port ``443`` (instead of ``8448``), but you
-want to have your Matrix user-ids look like ``@user:example.com``.
-
 Without configuring delegation, the matrix federation will
 expect to find your server via ``example.com:8448``. The
-following methods allow you to provide a different server and port for
-``*:example.com`` resources.
+following methods allow you retain a ```server_name``` of ```example.com`` 
+while providing a different server and port for ``*:example.com`` resources 
+such user ids and room aliases.
 
 ### .well-known delegation
 
@@ -60,14 +56,15 @@ should return:
 	    "m.server": "synapse.example.com:443"
     }
 
-Note, specifying a port is optional and will default to 443.
+Note, specifying a port is optional. If a port is not specified an SRV lookup
+is perfomed, which may in turn specify a port. If the target of the
+delegation does not have an SRV record, then the port defaults to 8448.
 
 Most installations will not need to configure .well-known. However, it can be
 useful in cases where the admin is hosting on behalf of someone else and
 therefore cannot gain access to the necessary certificate. With .well-known,
-federation servers will contact the given hostname's IP and
-will check for a valid SSL certificate on the same delegated hostname (in our
-example: ``synapse.example.com``).
+federation servers will check for a valid SSL certificate on the same delegated
+hostname (in our example: ``synapse.example.com``).
 
 .well-known support first appeared in Synapse v0.99.0. To federate with older
 servers you may need to additionally configure SRV delegation. Alternatively,
@@ -81,10 +78,7 @@ To use this delegation method, you need to have write access to your
 
 This method requires the target server to provide a
 valid SSL certificate identifying it as the original ``server_name``
-domain zone. So the delegate domain name is only used to resolve a possible
-different IP/Port combination to find your server. You must use the other
-delegation method if this isn't what you want. (For more details on the
-rationale [see here](https://github.com/matrix-org/matrix-doc/blob/master/proposals/1711-x509-for-federation.md#interaction-with-srv-records).)
+domain zone. 
 
 You need to add a SRV record in your ``server_name`` 's DNS zone with
 this format:
@@ -113,8 +107,6 @@ You can use the [federation tester](
 configured correctly. Alternatively try the [JSON API used by the federation tester](https://matrix.org/federationtester/api/report?server_name=DOMAIN).
 Note that you'll have to modify this URL to replace ``DOMAIN`` with your
 ``server_name``. Hitting the API directly provides extra detail.
-
-For more details the see the [Server to Server Spec](https://matrix.org/docs/spec/server_server/r0.1.1.html#resolving-server-names).
 
 The typical failure mode for federation is that when the server tries to join
 a room, it is rejected with "401: Unauthorized". Generally this means that other

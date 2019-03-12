@@ -349,26 +349,6 @@ https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/misc/matrix-
 
 Once you have installed synapse as above, you will need to configure it.
 
-
-## Setting your server_name
-
-Note that you can NOT change the ``server_name`` after the database
-is first created.  So choose your ``server_name`` with care.
-
-You can configure your homeserver to use ``<yourdomain.com>`` as the domain in
-its user-ids, by setting ``server_name`` on the command line:
-
-    python -m synapse.app.homeserver \
-        --server-name <yourdomain.com> \
-        --config-path homeserver.yaml \
-        --generate-config
-    python -m synapse.app.homeserver --config-path homeserver.yaml
-
-If you've already generated the config file, you need to edit the ``server_name``
-in your configuration file (often ``homeserver.yaml`` file). If you have
-already started Synapse and a database has been created, you will need to
-recreate the database.
-
 ## TLS certificates
 
 The default configuration exposes a single HTTP port: http://localhost:8008. It
