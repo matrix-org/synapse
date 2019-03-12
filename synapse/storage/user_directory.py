@@ -641,12 +641,11 @@ class UserDirectoryStore(BackgroundUpdateStore):
             where_clause = "1=1"
         else:
             join_clause = """
+                LEFT JOIN users_in_public_rooms AS p USING (user_id)
                 LEFT JOIN (
-                    SELECT user_id FROM users_in_public_rooms
-                    UNION
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
                     WHERE user_id = ?
-                ) AS p USING (user_id)
+                ) AS s USING (user_id)
             """
             join_args = (user_id,)
             where_clause = "p.user_id IS NOT NULL"
