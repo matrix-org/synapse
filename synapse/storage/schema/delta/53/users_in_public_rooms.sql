@@ -16,13 +16,20 @@
 -- We don't need the old version of this table.
 DROP TABLE IF EXISTS users_in_public_rooms;
 
+-- Old version of users_in_public_rooms
+DROP TABLE IF EXISTS users_who_share_public_rooms;
+
 -- Track what users are in public rooms.
 CREATE TABLE IF NOT EXISTS users_in_public_rooms (
+    user_id TEXT NOT NULL,
+    room_id TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX users_in_public_rooms_u_idx ON users_in_public_rooms(user_id, room_id);
+
+-- Track what users are publicly visible
+CREATE TABLE IF NOT EXISTS publicly_visible_users (
     user_id TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX users_in_public_rooms_u_idx ON users_in_public_rooms(user_id);
-
--- Fill the table.
-INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('users_in_public_rooms_initial', '{}');
+CREATE UNIQUE INDEX publicly_visible_users_u_idx ON publicly_visible_users(user_id);

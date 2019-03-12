@@ -21,57 +21,15 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id, get_localpart_from_id
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
 
-class UserDirectoryStore(BackgroundUpdateStore):
-    def __init__(self, dbconn, hs):
-        super(UserDirectoryStore, self).__init__(dbconn, hs)
-
-        self.register_background_update_handler(
-            "users_in_public_rooms_initial", self._populate_users_in_public_rooms
-        )
-
-    @defer.inlineCallbacks
-    def _populate_users_in_public_rooms(self, progress, batch_size):
-        """
-        Populate the users_in_public_rooms table with the contents of the
-        users_who_share_public_rooms table.
-        """
-
-        def _fetch(txn):
-            sql = "SELECT DISTINCT other_user_id FROM users_who_share_public_rooms"
-            txn.execute(sql)
-            return txn.fetchall()
-
-        users = yield self.runInteraction(
-            "populate_users_in_public_rooms_fetch", _fetch
-        )
-
-        if users:
-            def _fill(txn):
-                self._simple_upsert_many_txn(
-                    txn,
-                    table="users_in_public_rooms",
-                    key_names=["user_id"],
-                    key_values=users,
-                    value_names=(),
-                    value_values=None,
-                )
-
-            users = yield self.runInteraction(
-                "populate_users_in_public_rooms_fill", _fill
-            )
-
-        yield self._end_background_update("users_in_public_rooms_initial")
-        defer.returnValue(1)
-
+class UserDirectoryStore(object):
     @defer.inlineCallbacks
     def is_room_world_readable_or_publicly_joinable(self, room_id):
         """Check if the room is either world_readable or publically joinable
@@ -282,17 +240,10 @@ class UserDirectoryStore(BackgroundUpdateStore):
                 txn, table="user_directory_search", keyvalues={"user_id": user_id}
             )
             self._simple_delete_txn(
+                txn, table="publicly_visible_users", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
                 txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
-            )
-            self._simple_delete_txn(
-                txn,
-                table="users_who_share_public_rooms",
-                keyvalues={"user_id": user_id},
-            )
-            self._simple_delete_txn(
-                txn,
-                table="users_who_share_public_rooms",
-                keyvalues={"other_user_id": user_id},
             )
             self._simple_delete_txn(
                 txn,
@@ -314,9 +265,9 @@ class UserDirectoryStore(BackgroundUpdateStore):
         in the given room_id
         """
         user_ids_share_pub = yield self._simple_select_onecol(
-            table="users_who_share_public_rooms",
+            table="publicly_visible_users",
             keyvalues={"room_id": room_id},
-            retcol="other_user_id",
+            retcol="user_id",
             desc="get_users_in_dir_due_to_room",
         )
 
@@ -354,26 +305,19 @@ class UserDirectoryStore(BackgroundUpdateStore):
         rows = yield self._execute("get_all_local_users", None, sql)
         defer.returnValue([name for name, in rows])
 
-    def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
-        """Insert entries into the users_who_share_*_rooms table. The first
+    def add_users_who_share_private_room(self, room_id, user_id_tuples):
+        """Insert entries into the users_who_share_private_rooms table. The first
         user should be a local user.
 
         Args:
             room_id (str)
-            share_private (bool): Is the room private
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
 
         def _add_users_who_share_room_txn(txn):
-
-            if share_private:
-                tbl = "users_who_share_private_rooms"
-            else:
-                tbl = "users_who_share_public_rooms"
-
             self._simple_upsert_many_txn(
                 txn,
-                table=tbl,
+                table="users_who_share_private_rooms",
                 key_names=["user_id", "other_user_id", "room_id"],
                 key_values=[
                     (user_id, other_user_id, room_id)
@@ -383,26 +327,44 @@ class UserDirectoryStore(BackgroundUpdateStore):
                 value_values=None,
             )
 
-            # If it's a public room, also update them in users_in_public_rooms.
+        return self.runInteraction(
+            "add_users_who_share_room", _add_users_who_share_room_txn
+        )
+
+    def add_users_in_public_rooms(self, room_id, user_ids):
+        """Insert entries into the users_who_share_private_rooms table. The first
+        user should be a local user.
+
+        Args:
+            room_id (str)
+            user_ids (list[str])
+        """
+
+        def _add_users_in_public_rooms_txn(txn):
+
+            self._simple_upsert_many_txn(
+                txn,
+                table="users_in_public_rooms",
+                key_names=["user_id", "room_id"],
+                key_values=[(user_id, room_id) for user_id in user_ids],
+                value_names=(),
+                value_values=None,
+            )
+
+            # If it's a public room, also update them in publicly_visible_users.
             # We don't look before they're in the table before we do it, as it's
             # more efficient to simply have Postgres do that (one UPSERT vs one
             # SELECT and maybe one INSERT).
-            if not share_private:
-                for user_id in set([x[1] for x in user_id_tuples]):
-                    self._simple_upsert_txn(
-                        txn,
-                        "users_in_public_rooms",
-                        keyvalues={"user_id": user_id},
-                        values={},
-                    )
-
-            for user_id, other_user_id in user_id_tuples:
-                txn.call_after(
-                    self.get_users_who_share_room_from_dir.invalidate, (user_id,)
+            for user_id in user_ids:
+                self._simple_upsert_txn(
+                    txn,
+                    "publicly_visible_users",
+                    keyvalues={"user_id": user_id},
+                    values={},
                 )
 
         return self.runInteraction(
-            "add_users_who_share_room", _add_users_who_share_room_txn
+            "add_users_in_public_rooms", _add_users_in_public_rooms_txn
         )
 
     def remove_user_who_share_room(self, user_id, room_id):
@@ -428,40 +390,32 @@ class UserDirectoryStore(BackgroundUpdateStore):
             )
             self._simple_delete_txn(
                 txn,
-                table="users_who_share_public_rooms",
+                table="users_in_public_rooms",
                 keyvalues={"user_id": user_id, "room_id": room_id},
-            )
-            self._simple_delete_txn(
-                txn,
-                table="users_who_share_public_rooms",
-                keyvalues={"other_user_id": user_id, "room_id": room_id},
             )
 
             # Are the users still in a public room after we deleted them from this one?
             still_in_public = self._simple_select_one_onecol_txn(
                 txn,
-                "users_who_share_public_rooms",
-                keyvalues={"other_user_id": user_id},
-                retcol="other_user_id",
+                "users_in_public_rooms",
+                keyvalues={"user_id": user_id},
+                retcol="user_id",
                 allow_none=True,
             )
 
             if still_in_public is None:
                 self._simple_delete_txn(
-                    txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
+                    txn, table="publicly_visible_users", keyvalues={"user_id": user_id}
                 )
-
-            txn.call_after(
-                self.get_users_who_share_room_from_dir.invalidate, (user_id,)
-            )
 
         return self.runInteraction(
             "remove_user_who_share_room", _remove_user_who_share_room_txn
         )
 
-    @cachedInlineCallbacks(max_entries=500000, iterable=True)
-    def get_users_who_share_room_from_dir(self, user_id):
-        """Returns the set of users who share a room with `user_id`
+    @defer.inlineCallbacks
+    def get_rooms_user_is_in(self, user_id):
+        """
+        Returns the rooms that a user is in.
 
         Args:
             user_id(str): Must be a local user
@@ -472,23 +426,19 @@ class UserDirectoryStore(BackgroundUpdateStore):
         rows = yield self._simple_select_onecol(
             table="users_who_share_private_rooms",
             keyvalues={"user_id": user_id},
-            retcol="other_user_id",
-            desc="get_users_who_share_room_with_user",
+            retcol="room_id",
+            desc="get_rooms_user_is_in",
         )
 
         pub_rows = yield self._simple_select_onecol(
-            table="users_who_share_public_rooms",
+            table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
-            retcol="other_user_id",
-            desc="get_users_who_share_room_with_user",
+            retcol="room_id",
+            desc="get_rooms_user_is_in",
         )
 
         users = set(pub_rows)
         users.update(rows)
-
-        # Remove the user themselves from this list.
-        users.discard(user_id)
-
         defer.returnValue(list(users))
 
     @defer.inlineCallbacks
@@ -525,10 +475,9 @@ class UserDirectoryStore(BackgroundUpdateStore):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
             txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM users_who_share_public_rooms")
+            txn.execute("DELETE FROM publicly_visible_users")
             txn.execute("DELETE FROM users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
-            txn.call_after(self.get_users_who_share_room_from_dir.invalidate_all)
 
         return self.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
@@ -641,7 +590,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
             where_clause = "1=1"
         else:
             join_clause = """
-                LEFT JOIN users_in_public_rooms AS p USING (user_id)
+                LEFT JOIN publicly_visible_users AS p USING (user_id)
                 LEFT JOIN (
                     SELECT other_user_id AS user_id FROM users_who_share_private_rooms
                     WHERE user_id = ?
