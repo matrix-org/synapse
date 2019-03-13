@@ -290,6 +290,41 @@ class TransactionQueue(object):
 
             self._attempt_new_transaction(destination)
 
+    @defer.inlineCallbacks
+    def send_read_receipt(self, receipt):
+        """Send a RR to any other servers in the room
+
+        Args:
+            receipt (synapse.types.ReadReceipt): receipt to be sent
+        """
+        # Work out which remote servers should be poked and poke them.
+        domains = yield self.state.get_current_hosts_in_room(receipt.room_id)
+        domains = [d for d in domains if d != self.server_name]
+        if not domains:
+            return
+
+        logger.debug("Sending receipt to: %r", domains)
+
+        content = {
+            receipt.room_id: {
+                receipt.receipt_type: {
+                    receipt.user_id: {
+                        "event_ids": receipt.event_ids,
+                        "data": receipt.data,
+                    },
+                },
+            },
+        }
+        key = (receipt.room_id, receipt.receipt_type, receipt.user_id)
+
+        for domain in domains:
+            self.build_and_send_edu(
+                destination=domain,
+                edu_type="m.receipt",
+                content=content,
+                key=key,
+            )
+
     @logcontext.preserve_fn  # the caller should not yield on this
     @defer.inlineCallbacks
     def send_presence(self, states):
