@@ -190,11 +190,12 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def _send_request_with_optional_trailing_slash(
-            self,
-            request,
-            try_trailing_slash_on_400=False,
-            backoff_on_404=False,
-            **kwargs):
+        self,
+        request,
+        try_trailing_slash_on_400=False,
+        backoff_on_404=False,
+        **kwargs,
+    ):
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
         'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <=v0.99.2
@@ -585,7 +586,7 @@ class MatrixFederationHttpClient(object):
         }
 
         response = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, backoff_on_404, send_request_args,
+            request, try_trailing_slash_on_400, backoff_on_404, **send_request_args,
         )
 
         body = yield _handle_json_response(
@@ -705,7 +706,7 @@ class MatrixFederationHttpClient(object):
         }
 
         response = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, False, send_request_args,
+            request, try_trailing_slash_on_400, False, **send_request_args,
         )
 
         body = yield _handle_json_response(
