@@ -57,3 +57,7 @@ class WorkerConfig(Config):
                     bind_addresses.append(bind_address)
                 elif not bind_addresses:
                     bind_addresses.append('')
+
+    def read_arguments(self, args):
+        if args.daemonize is not None:
+            self.worker_daemonize = args.daemonize

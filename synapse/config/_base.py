@@ -214,14 +214,20 @@ class Config(object):
             " Defaults to the directory containing the last config file",
         )
 
+        obj = cls()
+
+        obj.invoke_all("add_arguments", config_parser)
+
         config_args = config_parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
-        obj = cls()
         obj.read_config_files(
             config_files, keys_directory=config_args.keys_directory, generate_keys=False
         )
+
+        obj.invoke_all("read_arguments", config_args)
+
         return obj
 
     @classmethod
