@@ -585,7 +585,7 @@ class MatrixFederationHttpClient(object):
         }
 
         response = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, backoff_on_404, **send_request_args,
+            request, try_trailing_slash_on_400, backoff_on_404, send_request_args,
         )
 
         body = yield _handle_json_response(
@@ -705,7 +705,7 @@ class MatrixFederationHttpClient(object):
         }
 
         response = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, False, **send_request_args,
+            request, try_trailing_slash_on_400, False, send_request_args,
         )
 
         body = yield _handle_json_response(
