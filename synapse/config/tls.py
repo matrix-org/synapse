@@ -181,8 +181,10 @@ class TlsConfig(Config):
         # See 'ACME support' below to enable auto-provisioning this certificate via
         # Let's Encrypt.
         #
-        # If supplying your own, ensure you use a full chain certificate. If
-        # using certbot, this corresponds to the `fullchain.pem` file.
+        # If supplying your own, be sure to use a `.pem` file that includes the
+        # full certificate chain including any intermediate certificates (for
+        # instance, if using certbot, use `fullchain.pem` as your certificate,
+        # not `cert.pem`).
         #
         #tls_certificate_path: "%(tls_certificate_path)s"
 
