@@ -159,8 +159,8 @@ steps:
   - label: "Sytest postgres 3"
     plugins:
       - docker#v3.0.1:
-        image: "matrixdotorg/sytest-synapsepy3:latest"
-        environment:
-          - "POSTGRES=1"
-        volumes:
-          - "..:/src"
+          image: "matrixdotorg/sytest-synapsepy3:latest"
+          environment:
+            - "POSTGRES=1"
+          volumes:
+            - "..:/src"
