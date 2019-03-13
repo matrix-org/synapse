@@ -54,7 +54,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/state/%s", room_id)
         return self.client.get_json(
             destination, path=path, args={"event_id": event_id},
-            try_trailing_slash_on_404=True,
+            try_trailing_slash_on_400=True,
         )
 
     @log_function
@@ -77,7 +77,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/state_ids/%s", room_id)
         return self.client.get_json(
             destination, path=path, args={"event_id": event_id},
-            try_trailing_slash_on_404=True,
+            try_trailing_slash_on_400=True,
         )
 
     @log_function
@@ -100,7 +100,7 @@ class TransportLayerClient(object):
         path = _create_v1_path("/event/%s", event_id)
         return self.client.get_json(
             destination, path=path, timeout=timeout,
-            try_trailing_slash_on_404=True,
+            try_trailing_slash_on_400=True,
         )
 
     @log_function
@@ -137,7 +137,7 @@ class TransportLayerClient(object):
             destination,
             path=path,
             args=args,
-            try_trailing_slash_on_404=True,
+            try_trailing_slash_on_400=True,
         )
 
     @defer.inlineCallbacks
@@ -182,7 +182,7 @@ class TransportLayerClient(object):
             json_data_callback=json_data_callback,
             long_retries=True,
             backoff_on_404=True,  # If we get a 404 the other side has gone
-            try_trailing_slash_on_404=True,
+            try_trailing_slash_on_400=True,
         )
 
         defer.returnValue(response)

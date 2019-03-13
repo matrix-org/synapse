@@ -189,6 +189,55 @@ class MatrixFederationHttpClient(object):
         self._cooperator = Cooperator(scheduler=schedule)
 
     @defer.inlineCallbacks
+    def _send_request_with_optional_trailing_slash(
+        request,
+        try_trailing_slash_on_400=False,
+        backoff_on_404=False,
+        **kwargs,
+    ):
+        """Wrapper for _send_request which can optionally retry the request
+        upon receiving a combination of a 400 HTTP response code and a
+        'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <=v0.99.2
+        due to #3622.
+
+        Args:
+            request
+            try_trailing_slash_on_400 (bool): Whether on receiving a 400
+                'M_UNRECOGNIZED' from the server to retry the request with a
+                trailing slash appended to the request path.
+            backoff_on_404 (bool): Whether to backoff on 404 when making a
+                request with a trailing slash (only affects request if
+                try_trailing_slash_on_400 is True).
+            kwargs (Dict): A dictionary of arguments to pass to
+                `_send_request()`.
+
+        Returns:
+            Deferred[twisted.web.client.Response]: resolves with the HTTP
+            response object on success.
+        """
+        response = self._send_request(**kwargs)
+
+        if not try_trailing_slash_on_400:
+            defer.returnValue(response)
+
+        # Check if it's necessary to retry with a trailing slash
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
+        )
+
+        # Retry with a trailing slash if we received a 400 with
+        # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
+        # trailing slash on Synapse <=v0.99.2.
+        if (response.code == 400 and body.get("errcode") == "M_UNRECOGNIZED"):
+            # Enable backoff if initially disabled
+            kwargs["backoff_on_404"] = backoff_on_404
+
+            kwargs["path"] += "/"
+            response = yield self._send_request(**kwargs)
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
     def _send_request(
         self,
         request,
@@ -474,7 +523,7 @@ class MatrixFederationHttpClient(object):
                  long_retries=False, timeout=None,
                  ignore_backoff=False,
                  backoff_on_404=False,
-                 try_trailing_slash_on_404=False):
+                 try_trailing_slash_on_400=False):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -495,10 +544,11 @@ class MatrixFederationHttpClient(object):
             backoff_on_404 (bool): True if we should count a 404 response as
                 a failure of the server (and should therefore back off future
                 requests).
-            try_trailing_slash_on_404 (bool): True if on a 404 response we
-                should try appending a trailing slash to the end of the request.
-                Workaround for #3622 in Synapse <0.99.2. This will be attempted
-                before backing off if backing off has been enabled.
+            try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
+                response we should try appending a trailing slash to the end
+                of the request. Workaround for #3622 in Synapse <=v0.99.2. This
+                will be attempted before backing off if backing off has been
+                enabled.
 
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
@@ -528,21 +578,21 @@ class MatrixFederationHttpClient(object):
             "long_retries": long_retries,
             "timeout": timeout,
             "ignore_backoff": ignore_backoff,
-            # Do not backoff on the initial request if we're trying with trailing slashes
-            # Otherwise we may end up waiting to contact a server that is actually up
-            "backoff_on_404": False if try_trailing_slash_on_404 else backoff_on_404,
+            # Do not backoff on the initial request if we're trying again with
+            # trailing slashes Otherwise we may end up waiting to contact a
+            # server that is actually up
+            "backoff_on_404": False if try_trailing_slash_on_400 else backoff_on_404,
         }
 
-        response = yield self._send_request(**send_request_args)
+        response = yield self._send_request_with_optional_trailing_slash(
+            request, try_trailing_slash_on_400, backoff_on_404, **send_request_args,
+        )
 
-        # If enabled, retry with a trailing slash if we received a 404
-        if try_trailing_slash_on_404 and response.code == 404:
+        # If enabled, retry with a trailing slash if we received a 400
+        if try_trailing_slash_on_400 and response.code == 400:
             args["path"] += "/"
 
-            # Re-enable backoff if enabled
-            send_request_args["backoff_on_404"] = backoff_on_404
-
-            response = yield self.get_json(**send_request_args)
+            response = yield self._send_request(**send_request_args)
 
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
@@ -610,7 +660,7 @@ class MatrixFederationHttpClient(object):
     @defer.inlineCallbacks
     def get_json(self, destination, path, args=None, retry_on_dns_fail=True,
                  timeout=None, ignore_backoff=False,
-                 try_trailing_slash_on_404=False):
+                 try_trailing_slash_on_400=False):
         """ GETs some json from the given host homeserver and path
 
         Args:
@@ -624,9 +674,9 @@ class MatrixFederationHttpClient(object):
                 be retried.
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
-            try_trailing_slash_on_404 (bool): True if on a 404 response we
-                should try appending a trailing slash to the end of the
-                request. Workaround for #3622 in Synapse <0.99.2.
+            try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
+                response we should try appending a trailing slash to the end of
+                the request. Workaround for #3622 in Synapse <=v0.99.2.
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
@@ -659,20 +709,9 @@ class MatrixFederationHttpClient(object):
             "ignore_backoff": ignore_backoff,
         }
 
-        response = yield self._send_request(**send_request_args)
-
-        body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
+        response = yield self._send_request_with_optional_trailing_slash(
+            request, try_trailing_slash_on_400, False, **send_request_args,
         )
-
-        # If enabled, retry with a trailing slash if we received a 404
-        # or if a 400 with "M_UNRECOGNIZED" which some endpoints return
-        if (try_trailing_slash_on_404 and
-           (response.code == 404
-            or (response.code == 400
-                and body.get("errcode") == "M_UNRECOGNIZED"))):
-            args["path"] += "/"
-            response = yield self._send_request(**send_request_args)
 
         defer.returnValue(body)
 
