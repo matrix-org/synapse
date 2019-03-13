@@ -375,9 +375,13 @@ To configure Synapse to expose an HTTPS port, you will need to edit
 * You will also need to uncomment the `tls_certificate_path` and
   `tls_private_key_path` lines under the `TLS` section. You can either
   point these settings at an existing certificate and key, or you can
-  enable Synapse's built-in ACME (Let's Encrypt) support.  Instructions
+  enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
   for having Synapse automatically provision and renew federation
-  certificates through ACME can be found at [ACME.md](docs/ACME.md).
+  certificates through ACME can be found at [ACME.md](docs/ACME.md). If you
+  are using your own certificate, be sure to use a `.pem` file that includes
+  the full certificate chain including any intermediate certificates (for
+  instance, if using certbot, use `fullchain.pem` as your certificate, not
+  `cert.pem`).
 
 For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
 please take a look at `our guide <docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100>`_.
