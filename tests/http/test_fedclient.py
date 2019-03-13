@@ -268,45 +268,6 @@ class FederationClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, TimeoutError)
 
-    def test_client_requires_trailing_slashes(self):
-        """
-        If a connection is made to a client but the client rejects it due to
-        requiring a trailing slash. We need to retry the request with a
-        trailing slash. Workaround for Synapse <=v0.99.2, explained in #3622.
-        """
-        d = self.cl.get_json(
-            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
-        )
-
-        self.pump()
-
-        # there should have been a call to connectTCP
-        clients = self.reactor.tcpClients
-        self.assertEqual(len(clients), 1)
-        (_host, _port, factory, _timeout, _bindAddress) = clients[0]
-
-        # complete the connection and wire it up to a fake transport
-        client = factory.buildProtocol(None)
-        conn = StringTransport()
-        client.makeConnection(conn)
-
-        # that should have made it send the request to the connection
-        self.assertRegex(conn.value(), b"^GET /foo/bar")
-
-        # Send the HTTP response
-        client.dataReceived(
-            b"HTTP/1.1 400 Bad Request\r\n"
-            b"Content-Type: application/json\r\n"
-            b"Content-Length: 59\r\n"
-            b"\r\n"
-            b'{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}'
-        )
-
-        # We should get a successful response
-        r = self.successResultOf(d)
-        self.assertEqual(r.code, 400)
-        self.assertEqual(r, {})
-
     def test_client_sends_body(self):
         self.cl.post_json(
             "testserv:8008", "foo/bar", timeout=10000,
