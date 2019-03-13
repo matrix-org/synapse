@@ -238,10 +238,10 @@ class MatrixFederationHttpClient(object):
             # Enable backoff if initially disabled
             send_request_args["backoff_on_404"] = backoff_on_404
 
-            send_request_args["path"] += "/"
+            # Add trailing slash
+            send_request_args["request"].path += "/"
 
             response = yield self._send_request(**send_request_args)
-
             body = yield _handle_json_response(
                 self.hs.get_reactor(), self.default_timeout, request, response,
             )
