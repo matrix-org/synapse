@@ -226,9 +226,6 @@ class MatrixFederationHttpClient(object):
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
 
-        logger.info(" *** BODY IS *** ")
-        logger.info(body)
-
         # Retry with a trailing slash if we received a 400 with
         # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
         # trailing slash on Synapse <=v0.99.2.
