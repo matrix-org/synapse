@@ -193,7 +193,9 @@ class MatrixFederationHttpClient(object):
             self,
             request,
             try_trailing_slash_on_400=False,
-            **kwargs):
+            backoff_on_404=False,
+            send_request_args={},
+    ):
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
         'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <=v0.99.2
@@ -204,14 +206,17 @@ class MatrixFederationHttpClient(object):
             try_trailing_slash_on_400 (bool): Whether on receiving a 400
                 'M_UNRECOGNIZED' from the server to retry the request with a
                 trailing slash appended to the request path.
-            kwargs (Dict): A dictionary of arguments to pass to
+            404_backoff (bool): Whether to backoff on 404 when making a
+                request with a trailing slash (only affects request if
+                try_trailing_slash_on_400 is True).
+            send_request_args (Dict): A dictionary of arguments to pass to
                 `_send_request()`.
 
         Returns:
             Deferred[twisted.web.client.Response]: resolves with the HTTP
             response object on success.
         """
-        response = yield self._send_request(**kwargs)
+        response = yield self._send_request(**send_request_args)
 
         if not try_trailing_slash_on_400:
             defer.returnValue(response)
@@ -226,10 +231,10 @@ class MatrixFederationHttpClient(object):
         # trailing slash on Synapse <=v0.99.2.
         if (response.code == 400 and body.get("errcode") == "M_UNRECOGNIZED"):
             # Enable backoff if initially disabled
-            kwargs["backoff_on_404"] = backoff_on_404
+            send_request_args["backoff_on_404"] = backoff_on_404
 
-            kwargs["path"] += "/"
-            response = yield self._send_request(**kwargs)
+            send_request_args["path"] += "/"
+            response = yield self._send_request(**send_request_args)
 
         defer.returnValue(response)
 
@@ -581,7 +586,7 @@ class MatrixFederationHttpClient(object):
         }
 
         response = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, **send_request_args)
+            request, try_trailing_slash_on_400, backoff_on_404, send_request_args)
 
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
