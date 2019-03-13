@@ -438,6 +438,14 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #
 #federation_rc_concurrent: 3
 
+# Target outgoing federation transaction frequency for sending read-receipts,
+# per-room.
+#
+# If we end up trying to send out more read-receipts, they will get buffered up
+# into fewer transactions.
+#
+#federation_rr_transactions_per_room_per_second: 50
+
 
 
 # Directory where uploaded images and attachments are stored.
