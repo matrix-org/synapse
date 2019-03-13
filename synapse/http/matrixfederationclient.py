@@ -202,7 +202,7 @@ class MatrixFederationHttpClient(object):
         due to #3622.
 
         Args:
-            request
+            request (MatrixFederationRequest): details of request to be sent
             try_trailing_slash_on_400 (bool): Whether on receiving a 400
                 'M_UNRECOGNIZED' from the server to retry the request with a
                 trailing slash appended to the request path.
