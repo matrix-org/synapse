@@ -197,7 +197,6 @@ class MatrixFederationHttpClient(object):
         long_retries=False,
         ignore_backoff=False,
         backoff_on_404=False,
-        try_trailing_slash_on_404=False,
     ):
         """
         Sends a request to the given server.
@@ -212,11 +211,6 @@ class MatrixFederationHttpClient(object):
                 and try the request anyway.
 
             backoff_on_404 (bool): Back off if we get a 404
-
-            try_trailing_slash_on_404 (bool): True if on a 404 response we
-                should try appending a trailing slash to the end of the
-                request. This will be attempted before backing off if backing
-                off has been enabled.
 
         Returns:
             Deferred[twisted.web.client.Response]: resolves with the HTTP
@@ -502,9 +496,9 @@ class MatrixFederationHttpClient(object):
                 a failure of the server (and should therefore back off future
                 requests).
             try_trailing_slash_on_404 (bool): True if on a 404 response we
-                should try appending a trailing slash to the end of the
-                request. This will be attempted before backing off if backing
-                off has been enabled.
+                should try appending a trailing slash to the end of the request.
+                Workaround for #3622 in Synapse <0.99.2. This will be attempted
+                before backing off if backing off has been enabled.
 
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
@@ -632,7 +626,7 @@ class MatrixFederationHttpClient(object):
                 and try the request anyway.
             try_trailing_slash_on_404 (bool): True if on a 404 response we
                 should try appending a trailing slash to the end of the
-                request.
+                request. Workaround for #3622 in Synapse <0.99.2.
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
