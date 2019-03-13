@@ -190,6 +190,7 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def _send_request_with_optional_trailing_slash(
+        self,
         request,
         try_trailing_slash_on_400=False,
         backoff_on_404=False,
@@ -215,7 +216,7 @@ class MatrixFederationHttpClient(object):
             Deferred[twisted.web.client.Response]: resolves with the HTTP
             response object on success.
         """
-        response = self._send_request(**kwargs)
+        response = yield self._send_request(**kwargs)
 
         if not try_trailing_slash_on_400:
             defer.returnValue(response)
@@ -224,6 +225,9 @@ class MatrixFederationHttpClient(object):
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
+
+        logger.info(" *** BODY IS *** ")
+        logger.info(body)
 
         # Retry with a trailing slash if we received a 400 with
         # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
@@ -588,15 +592,10 @@ class MatrixFederationHttpClient(object):
             request, try_trailing_slash_on_400, backoff_on_404, **send_request_args,
         )
 
-        # If enabled, retry with a trailing slash if we received a 400
-        if try_trailing_slash_on_400 and response.code == 400:
-            args["path"] += "/"
-
-            response = yield self._send_request(**send_request_args)
-
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
+
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -711,6 +710,10 @@ class MatrixFederationHttpClient(object):
 
         response = yield self._send_request_with_optional_trailing_slash(
             request, try_trailing_slash_on_400, False, **send_request_args,
+        )
+
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
