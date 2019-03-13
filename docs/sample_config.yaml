@@ -1062,4 +1062,3 @@ enable_group_creation: false
 #    alias: "*"
 #    room_id: "*"
 #    action: allow
-
