@@ -212,27 +212,34 @@ class MatrixFederationHttpClient(object):
             send_request_args (Dict): A dictionary of arguments to pass to
                 `_send_request()`.
 
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+
         Returns:
             Deferred[Dict]: Parsed JSON response body.
         """
-        response = yield self._send_request(**send_request_args)
+        try:
+            response = yield self._send_request(**send_request_args)
+        except HttpResponseException as e:
+            # Received a 400. Raise unless we're retrying
+            if not try_trailing_slash_on_400:
+                raise e
 
         # Check if it's necessary to retry with a trailing slash
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
 
-        if not try_trailing_slash_on_400:
-            defer.returnValue(body)
-
         # Retry with a trailing slash if we received a 400 with
         # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
         # trailing slash on Synapse <=v0.99.2.
-        if (response.code == 400 and body.get("errcode") == "M_UNRECOGNIZED"):
+        if not (response.code == 400 and body.get("errcode") == "M_UNRECOGNIZED"):
             # Enable backoff if initially disabled
             send_request_args["backoff_on_404"] = backoff_on_404
 
             send_request_args["path"] += "/"
+
             response = yield self._send_request(**send_request_args)
 
             body = yield _handle_json_response(
