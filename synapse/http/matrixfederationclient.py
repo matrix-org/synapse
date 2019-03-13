@@ -474,8 +474,7 @@ class MatrixFederationHttpClient(object):
                  long_retries=False, timeout=None,
                  ignore_backoff=False,
                  backoff_on_404=False,
-                 try_trailing_slash_on_404=False,
-            ):
+                 try_trailing_slash_on_404=False):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -662,14 +661,19 @@ class MatrixFederationHttpClient(object):
 
         response = yield self._send_request(**send_request_args)
 
-        # If enabled, retry with a trailing slash if we received a 404
-        if try_trailing_slash_on_404 and response.code == 404:
-            args["path"] += "/"
-            response = yield self._send_request(**send_request_args)
-
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
+
+        # If enabled, retry with a trailing slash if we received a 404
+        # or if a 400 with "M_UNRECOGNIZED" which some endpoints return
+        if (try_trailing_slash_on_404 and
+           (response.code == 404
+            or (response.code == 400
+                and body.get("errcode") == "M_UNRECOGNIZED"))):
+            args["path"] += "/"
+            response = yield self._send_request(**send_request_args)
+
         defer.returnValue(body)
 
     @defer.inlineCallbacks
