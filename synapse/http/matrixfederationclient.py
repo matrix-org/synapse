@@ -474,7 +474,8 @@ class MatrixFederationHttpClient(object):
                  long_retries=False, timeout=None,
                  ignore_backoff=False,
                  backoff_on_404=False,
-                 try_trailing_slash_on_404=False):
+                 try_trailing_slash_on_404=False,
+            ):
         """ Sends the specifed json data using PUT
 
         Args:
