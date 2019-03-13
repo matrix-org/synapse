@@ -217,13 +217,13 @@ class MatrixFederationHttpClient(object):
         """
         response = yield self._send_request(**send_request_args)
 
-        if not try_trailing_slash_on_400:
-            defer.returnValue(response)
-
         # Check if it's necessary to retry with a trailing slash
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
+
+        if not try_trailing_slash_on_400:
+            defer.returnValue(body)
 
         # Retry with a trailing slash if we received a 400 with
         # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
