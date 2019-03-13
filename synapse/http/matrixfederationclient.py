@@ -190,11 +190,11 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def _send_request_with_optional_trailing_slash(
-            self,
-            request,
-            try_trailing_slash_on_400=False,
-            backoff_on_404=False,
-            send_request_args={},
+        self,
+        request,
+        try_trailing_slash_on_400=False,
+        backoff_on_404=False,
+        send_request_args={},
     ):
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
@@ -213,8 +213,7 @@ class MatrixFederationHttpClient(object):
                 `_send_request()`.
 
         Returns:
-            Deferred[twisted.web.client.Response]: resolves with the HTTP
-            response object on success.
+            Deferred[Dict]: Parsed JSON response body.
         """
         response = yield self._send_request(**send_request_args)
 
@@ -236,7 +235,11 @@ class MatrixFederationHttpClient(object):
             send_request_args["path"] += "/"
             response = yield self._send_request(**send_request_args)
 
-        defer.returnValue(response)
+            body = yield _handle_json_response(
+                self.hs.get_reactor(), self.default_timeout, request, response,
+            )
+
+        defer.returnValue(body)
 
     @defer.inlineCallbacks
     def _send_request(
@@ -585,12 +588,8 @@ class MatrixFederationHttpClient(object):
             "backoff_on_404": False if try_trailing_slash_on_400 else backoff_on_404,
         }
 
-        response = yield self._send_request_with_optional_trailing_slash(
+        body = yield self._send_request_with_optional_trailing_slash(
             request, try_trailing_slash_on_400, backoff_on_404, send_request_args,
-        )
-
-        body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
@@ -706,12 +705,8 @@ class MatrixFederationHttpClient(object):
             "backoff_on_404": False,
         }
 
-        response = yield self._send_request_with_optional_trailing_slash(
+        body = yield self._send_request_with_optional_trailing_slash(
             request, try_trailing_slash_on_400, False, send_request_args,
-        )
-
-        body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
