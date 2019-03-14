@@ -4,7 +4,7 @@ After=matrix-synapse.service
 BindsTo=matrix-synapse.service
 
 [Service]
-Type=forking
+Type=simple
 User=matrix-synapse
 WorkingDirectory=/var/lib/matrix-synapse
 EnvironmentFile=/etc/default/matrix-synapse
