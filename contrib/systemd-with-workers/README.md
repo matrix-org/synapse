@@ -67,7 +67,8 @@ systemctl restart matrix-synapse.service
 Make sure the `worker_app` is set in the `homeserver.yaml` and it does not fork.
 
 ```
-worker_app: synapse.app.homeserver daemonize: false
+worker_app: synapse.app.homeserver 
+daemonize: false
 ```
 
 None of the workers should fork, as forking is handled by systemd. Hence make
