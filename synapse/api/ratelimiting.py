@@ -14,6 +14,7 @@
 
 import collections
 
+from synapse.api.errors import LimitExceededError
 
 class Ratelimiter(object):
     """
@@ -82,3 +83,13 @@ class Ratelimiter(object):
                 break
             else:
                 del self.message_counts[key]
+
+    def ratelimit(self, key, time_now_s, rate_hz, burst_count, update=True):
+        allowed, time_allowed = self.can_do_action(
+            key, time_now_s, rate_hz, burst_count, update
+        )
+
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000 * (time_allowed - time_now_s)),
+            )

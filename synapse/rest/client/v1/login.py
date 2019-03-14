@@ -21,7 +21,8 @@ from six.moves import urllib
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
-from synapse.api.errors import Codes, LimitExceededError, LoginError, SynapseError
+from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -97,8 +98,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
-        self._address_ratelimiter = hs.get_login_address_ratelimiter()
-        self._user_ratelimiter = hs.get_login_user_ratelimiter()
+        self._address_ratelimiter = Ratelimiter()
 
     def on_GET(self, request):
         flows = []
@@ -131,20 +131,12 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-
-        time_now = self.hs.clock.time()
-
-        allowed, time_allowed = self._address_ratelimiter.can_do_action(
-            request.getClientIP(), time_now_s=time_now,
+        self._address_ratelimiter.ratelimit(
+            request.getClientIP(), time_now_s=self.hs.clock.time(),
             rate_hz=self.hs.config.rc_login_requests_per_address_per_second,
             burst_count=self.hs.config.rc_login_request_per_address_burst_count,
             update=True,
         )
-
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now)),
-            )
 
         login_submission = parse_json_object_from_request(request)
         try:
@@ -162,31 +154,6 @@ class LoginRestServlet(ClientV1RestServlet):
         if well_known_data:
             result["well_known"] = well_known_data
         defer.returnValue((200, result))
-
-    def _ratelimit_user(self, user_id):
-        """Checks whether a login request targetting a given user ID is allowed
-        by the ratelimiter. Also updates the raterlimiter's counter for this
-        key.
-
-        Args:
-            user_id (str): the user ID the login request is a targetting.
-
-        Raises:
-            LimitExceededError: The request is not allowed due to ratelimiting.
-        """
-        time_now = self.hs.clock.time()
-
-        allowed, time_allowed = self._user_ratelimiter.can_do_action(
-            user_id, time_now_s=time_now,
-            rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
-            burst_count=self.hs.config.rc_login_request_per_user_burst_count,
-            update=True,
-        )
-
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now)),
-            )
 
     @defer.inlineCallbacks
     def _do_other_login(self, login_submission):
@@ -251,8 +218,6 @@ class LoginRestServlet(ClientV1RestServlet):
                 "user": user_id,
             }
 
-            self._ratelimit_user(user_id)
-
         # by this point, the identifier should be an m.id.user: if it's anything
         # else, we haven't understood it.
         if identifier["type"] != "m.id.user":
@@ -265,11 +230,6 @@ class LoginRestServlet(ClientV1RestServlet):
             identifier["user"],
             login_submission,
         )
-
-        # If the identifier wasn't initially a m.id.user, ratelimiting already
-        # happened for this request.
-        if original_identifier_type == "m.id.user":
-            self._ratelimit_user(canonical_user_id)
 
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
@@ -296,8 +256,6 @@ class LoginRestServlet(ClientV1RestServlet):
         user_id = (
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
-
-        self._ratelimit_user(user_id)
 
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
@@ -338,8 +296,6 @@ class LoginRestServlet(ClientV1RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
-
-        self._ratelimit_user(user_id)
 
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)

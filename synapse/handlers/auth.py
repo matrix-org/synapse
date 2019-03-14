@@ -35,6 +35,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
 from synapse.util import logcontext
@@ -98,6 +99,10 @@ class AuthHandler(BaseHandler):
                     if t not in login_types:
                         login_types.append(t)
         self._supported_login_types = login_types
+
+        self._account_ratelimiter = Ratelimiter()
+
+        self._clock = self.hs.get_clock()
 
     @defer.inlineCallbacks
     def validate_user_via_ui_auth(self, requester, request_body, clientip):
@@ -569,6 +574,12 @@ class AuthHandler(BaseHandler):
             defer.Deferred: (unicode) canonical_user_id, or None if zero or
             multiple matches
         """
+        self._account_ratelimiter.ratelimit(
+            user_id, time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
+            burst_count=self.hs.config.rc_login_request_per_user_burst_count,
+            update=True,
+        )
         res = yield self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
             defer.returnValue(res[0])
@@ -642,6 +653,13 @@ class AuthHandler(BaseHandler):
             qualified_user_id = UserID(
                 username, self.hs.hostname
             ).to_string()
+
+        self._account_ratelimiter.ratelimit(
+                qualified_user_id, time_now_s=self._clock.time(),
+                rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
+                burst_count=self.hs.config.rc_login_request_per_user_burst_count,
+                update=True,
+        )
 
         login_type = login_submission.get("type")
         known_login_type = False
@@ -763,6 +781,12 @@ class AuthHandler(BaseHandler):
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+        self._account_ratelimiter.ratelimit(
+            user_id, time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
+            burst_count=self.hs.config.rc_login_request_per_user_burst_count,
+            update=True,
+        )
         yield self.auth.check_auth_blocking(user_id)
         defer.returnValue(user_id)
 
