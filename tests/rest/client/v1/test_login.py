@@ -1,7 +1,5 @@
 import json
 
-from synapse.api.constants import LoginType
-from synapse.api.errors import HttpResponseException
 from synapse.rest.client.v1 import admin, login
 
 from tests import unittest

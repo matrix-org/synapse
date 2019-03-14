@@ -16,6 +16,7 @@ import collections
 
 from synapse.api.errors import LimitExceededError
 
+
 class Ratelimiter(object):
     """
     Ratelimit message sending by user.

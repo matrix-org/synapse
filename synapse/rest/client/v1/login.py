@@ -184,8 +184,6 @@ class LoginRestServlet(ClientV1RestServlet):
         if "type" not in identifier:
             raise SynapseError(400, "Login identifier has no type")
 
-        original_identifier_type = identifier["type"]
-
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
             identifier = login_id_thirdparty_from_phone(identifier)
