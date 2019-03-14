@@ -12,7 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import attr
+
 from ._base import Config
+
+class ratelimiter(object):
+    def __init__(self, config):
+        self.per_second = config.get("per_second", 0.17)
+        self.burst_count = config.get("burst_count", 3.0)
+
+
+@attr.s
+class rclogin(object):
+    _address = attr.ib()
+    _account = attr.ib()
+    address = ratelimiter(attr.asdict(_address))
+    account = ratelimiter(attr.asdict(_account))
 
 
 class RatelimitConfig(Config):
@@ -21,8 +36,8 @@ class RatelimitConfig(Config):
         self.rc_messages_per_second = config["rc_messages_per_second"]
         self.rc_message_burst_count = config["rc_message_burst_count"]
 
-        self.rc_registration = config["rc_registration"]
-        self.rc_login = config["rc_login"]
+        self.rc_registration = ratelimiter(config.get("rc_registration", {}))
+        self.rc_login = rclogin(**config.get("rc_login", {}))
 
         self.federation_rc_window_size = config["federation_rc_window_size"]
         self.federation_rc_sleep_limit = config["federation_rc_sleep_limit"]
