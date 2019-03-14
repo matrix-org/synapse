@@ -3,7 +3,6 @@ import json
 from synapse.api.constants import LoginType
 from synapse.api.errors import HttpResponseException
 from synapse.rest.client.v1 import admin, login
-from synapse.rest.client.v2_alpha import register
 
 from tests import unittest
 
@@ -12,7 +11,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         admin.register_servlets,
-        register.register_servlets,
         login.register_servlets,
     ]
 
