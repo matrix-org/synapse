@@ -576,8 +576,8 @@ class AuthHandler(BaseHandler):
         """
         self._account_ratelimiter.ratelimit(
             user_id, time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.client_rc.login.account.per_second,
-            burst_count=self.hs.config.client_rc.login.account.burst_count,
+            rate_hz=self.hs.config.rc_login.account.per_second,
+            burst_count=self.hs.config.rc_login.account.burst_count,
             update=True,
         )
         res = yield self._find_user_id_and_pwd_hash(user_id)
@@ -656,8 +656,8 @@ class AuthHandler(BaseHandler):
 
         self._account_ratelimiter.ratelimit(
             qualified_user_id, time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.client_rc.login.account.per_second,
-            burst_count=self.hs.config.client_rc.login.account.burst_count,
+            rate_hz=self.hs.config.rc_login.account.per_second,
+            burst_count=self.hs.config.rc_login.account.burst_count,
             update=True,
         )
 
@@ -783,8 +783,8 @@ class AuthHandler(BaseHandler):
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
         self._account_ratelimiter.ratelimit(
             user_id, time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.client_rc.login.account.per_second,
-            burst_count=self.hs.config.client_rc.login.account.burst_count,
+            rate_hz=self.hs.config.rc_login.account.per_second,
+            burst_count=self.hs.config.rc_login.account.burst_count,
             update=True,
         )
         yield self.auth.check_auth_blocking(user_id)

@@ -629,8 +629,8 @@ class RegistrationHandler(BaseHandler):
 
             allowed, time_allowed = self.ratelimiter.can_do_action(
                 address, time_now_s=time_now,
-                rate_hz=self.hs.config.client_rc.registration.per_second,
-                burst_count=self.hs.config.client_rc.registration.burst_count,
+                rate_hz=self.hs.config.rc_registration.per_second,
+                burst_count=self.hs.config.rc_registration.burst_count,
             )
 
             if not allowed:

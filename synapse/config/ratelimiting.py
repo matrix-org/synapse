@@ -18,7 +18,11 @@ from ._base import Config
 class RatelimitConfig(Config):
 
     def read_config(self, config):
-        self.client_rc = config["client_rc"]
+        self.rc_messages_per_second = config["rc_messages_per_second"]
+        self.rc_message_burst_count = config["rc_message_burst_count"]
+
+        self.rc_registration = config["rc_registration"]
+        self.rc_login = config["rc_login"]
 
         self.federation_rc_window_size = config["federation_rc_window_size"]
         self.federation_rc_sleep_limit = config["federation_rc_sleep_limit"]
@@ -30,47 +34,45 @@ class RatelimitConfig(Config):
         return """\
         ## Ratelimiting ##
 
-        # Ratelimiting settings for client-side actions.
-        client_rc:
-            # Ratelimiting settings for sending messages.
-            messages:
-                # Number of messages a client can send per second.
-                per_second: 0.2
+        # Number of messages a client can send per second
+        #
+        rc_messages_per_second: 0.2
 
-                # Number of message a client can send before being throttled.
-                burst_count: 10.0
+        # Number of message a client can send before being throttled
+        #
+        rc_message_burst_count: 10.0
 
-            # Ratelimiting settings for registration.
-            registration:
-                # Number of registration requests a client can send per second.
+        # Ratelimiting settings for registration.
+        rc_registration:
+            # Number of registration requests a client can send per second.
+            per_second: 0.17
+
+            # Number of registration requests a client can send before being
+            # throttled.
+            burst_count: 3
+
+        # Ratelimiting settings for login.
+        rc_login:
+            # Per-IP address settings. This will define how Synapse ratelimits
+            # login requests for the same IP address.
+            address:
+                # Number of login requests allowed from the same IP address per
+                # second.
                 per_second: 0.17
 
-                # Number of registration requests a client can send before being
-                # throttled.
+                # Number of login requests allowed from the same IP address
+                # before being throttled.
                 burst_count: 3
 
-            # Ratelimiting settings for login.
-            login:
-                # Per-IP address settings. This will define how Synapse ratelimits
-                # login requests for the same IP address.
-                address:
-                    # Number of login requests allowed from the same IP address per
-                    # second.
-                    per_second: 0.17
+            # Per-account settings. This will define how Synapse ratelimits
+            # login requests for the same account.
+            account:
+                # Number of login requests allowed for the same user per second.
+                per_second: 0.17
 
-                    # Number of login requests allowed from the same IP address
-                    # before being throttled.
-                    burst_count: 3
-
-                # Per-account settings. This will define how Synapse ratelimits
-                # login requests for the same account.
-                account:
-                    # Number of login requests allowed for the same user per second.
-                    per_second: 0.17
-
-                    # Number of login requests allowed for the same user before being
-                    # throttled.
-                    burst_count: 3
+                # Number of login requests allowed for the same user before being
+                # throttled.
+                burst_count: 3
 
         # The federation window size in milliseconds
         #
