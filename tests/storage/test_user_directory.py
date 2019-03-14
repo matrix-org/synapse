@@ -41,8 +41,8 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
                 BOBBY: ProfileInfo(None, "bobby"),
             },
         )
-        yield self.store.add_users_who_share_room(
-            "!room:id", False, ((ALICE, BOB), (BOB, ALICE))
+        yield self.store.add_users_in_public_rooms(
+            "!room:id", (ALICE, BOB)
         )
 
     @defer.inlineCallbacks
