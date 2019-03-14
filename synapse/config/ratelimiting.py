@@ -16,6 +16,7 @@ import attr
 
 from ._base import Config
 
+
 class ratelimiter(object):
     def __init__(self, config):
         self.per_second = config.get("per_second", 0.17)
