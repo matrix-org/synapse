@@ -96,7 +96,7 @@ automatically starting (and potentially restarting) your bot/bridge with the
 systemctl enable <yourBotOrBridgeName>.service
 ```
 
-**Note** that from an inactive synapse the bots/bridges will only started with
+**Note** that from an inactive synapse the bots/bridges will only be started with
 synapse if you start the `matrix.target`, not if you start the
 `matrix-synapse.service`. This is on purpose. Think of `matrix-synapse.service`
 as *just* synapse, but `matrix.target` being anything matrix related, including
