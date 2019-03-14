@@ -655,10 +655,10 @@ class AuthHandler(BaseHandler):
             ).to_string()
 
         self._account_ratelimiter.ratelimit(
-                qualified_user_id, time_now_s=self._clock.time(),
-                rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
-                burst_count=self.hs.config.rc_login_request_per_user_burst_count,
-                update=True,
+            qualified_user_id, time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_requests_per_user_per_second,
+            burst_count=self.hs.config.rc_login_request_per_user_burst_count,
+            update=True,
         )
 
         login_type = login_submission.get("type")
