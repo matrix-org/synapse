@@ -537,6 +537,7 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
         new_events = [
             event for event, ctx in event_contexts
             if not event.internal_metadata.is_outlier() and not ctx.rejected
+            and not event.internal_metadata.is_soft_failed()
         ]
 
         # start with the existing forward extremities
@@ -1404,21 +1405,6 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
             txn,
             table="state_events",
             values=state_values,
-        )
-
-        self._simple_insert_many_txn(
-            txn,
-            table="event_edges",
-            values=[
-                {
-                    "event_id": event.event_id,
-                    "prev_event_id": prev_id,
-                    "room_id": event.room_id,
-                    "is_state": True,
-                }
-                for event, _ in state_events_and_contexts
-                for prev_id, _ in event.prev_state
-            ],
         )
 
         # Prefill the event cache

@@ -686,9 +686,9 @@ def _handle_key_deferred(verify_request):
     try:
         with PreserveLoggingContext():
             _, key_id, verify_key = yield verify_request.deferred
-    except (IOError, RequestSendFailed) as e:
+    except KeyLookupError as e:
         logger.warn(
-            "Got IOError when downloading keys for %s: %s %s",
+            "Failed to download keys for %s: %s %s",
             server_name, type(e).__name__, str(e),
         )
         raise SynapseError(

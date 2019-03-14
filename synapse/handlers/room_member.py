@@ -233,6 +233,10 @@ class RoomMemberHandler(object):
                 self.copy_room_tags_and_direct_to_room(
                     predecessor["room_id"], room_id, user_id,
                 )
+                # Move over old push rules
+                self.store.move_push_rules_from_room_to_room_for_user(
+                    predecessor["room_id"], room_id, user_id,
+                )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)

@@ -92,8 +92,8 @@ class RegistrationConfig(Config):
         #  - medium: msisdn
         #    pattern: '\\+44'
 
-        # If set, allows registration by anyone who also has the shared
-        # secret, even if registration is otherwise disabled.
+        # If set, allows registration of standard or admin accounts by anyone who
+        # has the shared secret, even if registration is otherwise disabled.
         #
         %(registration_shared_secret)s
 
