@@ -1,6 +1,6 @@
 # Setup Synapse with Workers and Systemd
 
-This is a setup for using managing synapse with systemd including support for
+This is a setup for managing synapse with systemd including support for
 managing workers. It provides a `matrix-synapse`, as well as a
 `matrix-synapse-worker@` service for any workers you require. Additionally to
 group the required services it sets up a `matrix.target`. You can use this to
