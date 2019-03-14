@@ -25,8 +25,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         return self.hs
 
     def test_POST_ratelimiting_per_address(self):
-        self.hs.config.rc_login_request_per_address_burst_count = 5
-        self.hs.config.rc_login_requests_per_address_per_second = 0.17
+        self.hs.config.client_rc.login.address.burst_count = 5
+        self.hs.config.client_rc.login.address.per_second = 0.17
 
         # Create different users so we're sure not to be bothered by the per-user
         # ratelimiter.
@@ -68,9 +68,9 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
-    def test_POST_ratelimiting_per_user(self):
-        self.hs.config.rc_login_request_per_user_burst_count = 5
-        self.hs.config.rc_login_requests_per_user_per_second = 0.17
+    def test_POST_ratelimiting_per_account(self):
+        self.hs.config.client_rc.login.account.burst_count = 5
+        self.hs.config.client_rc.login.account.per_second = 0.17
 
         self.register_user("kermit", "monkey")
 
