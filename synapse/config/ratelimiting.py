@@ -27,8 +27,10 @@ class ratelimiter(object):
 class rclogin(object):
     _address = attr.ib()
     _account = attr.ib()
-    address = ratelimiter(attr.asdict(_address))
-    account = ratelimiter(attr.asdict(_account))
+
+    def __attrs_post_init__(self):
+        self.address = ratelimiter(self._address)
+        self.account = ratelimiter(self._account)
 
 
 class RatelimitConfig(Config):
