@@ -163,5 +163,4 @@ steps:
           image: "matrixdotorg/sytest-synapsepy3:latest"
           environment:
             - "POSTGRES=1"
-          volumes:
-            - "..:/src"
+          workdir: "/src"
