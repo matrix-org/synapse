@@ -20,7 +20,11 @@ from twisted.internet import defer
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
-from synapse.api.errors import FederationDeniedError
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    RequestSendFailed,
+)
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
@@ -529,13 +533,13 @@ class DeviceListEduUpdater(object):
                 origin = get_domain_from_id(user_id)
                 try:
                     result = yield self.federation.query_user_devices(origin, user_id)
-                except NotRetryingDestination:
+                except (
+                    NotRetryingDestination, RequestSendFailed, HttpResponseException,
+                ):
                     # TODO: Remember that we are now out of sync and try again
                     # later
                     logger.warn(
-                        "Failed to handle device list update for %s,"
-                        " we're not retrying the remote",
-                        user_id,
+                        "Failed to handle device list update for %s", user_id,
                     )
                     # We abort on exceptions rather than accepting the update
                     # as otherwise synapse will 'forget' that its device list
@@ -563,6 +567,24 @@ class DeviceListEduUpdater(object):
                         "Handling resync update %r/%r, ID: %r",
                         user_id, device["device_id"], stream_id,
                     )
+
+                # If the remote server has more than ~1000 devices for this user
+                # we assume that something is going horribly wrong (e.g. a bot
+                # that logs in and creates a new device every time it tries to
+                # send a message).  Maintaining lots of devices per user in the
+                # cache can cause serious performance issues as if this request
+                # takes more than 60s to complete, internal replication from the
+                # inbound federation worker to the synapse master may time out
+                # causing the inbound federation to fail and causing the remote
+                # server to retry, causing a DoS.  So in this scenario we give
+                # up on storing the total list of devices and only handle the
+                # delta instead.
+                if len(devices) > 1000:
+                    logger.warn(
+                        "Ignoring device list snapshot for %s as it has >1K devs (%d)",
+                        user_id, len(devices)
+                    )
+                    devices = []
 
                 yield self.store.update_remote_device_list_cache(
                     user_id, devices, stream_id,

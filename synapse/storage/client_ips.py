@@ -65,7 +65,32 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             columns=["last_seen"],
         )
 
-        # (user_id, access_token, ip) -> (user_agent, device_id, last_seen)
+        self.register_background_update_handler(
+            "user_ips_analyze",
+            self._analyze_user_ip,
+        )
+
+        self.register_background_update_handler(
+            "user_ips_remove_dupes",
+            self._remove_user_ip_dupes,
+        )
+
+        # Register a unique index
+        self.register_background_index_update(
+            "user_ips_device_unique_index",
+            index_name="user_ips_user_token_ip_unique_index",
+            table="user_ips",
+            columns=["user_id", "access_token", "ip"],
+            unique=True,
+        )
+
+        # Drop the old non-unique index
+        self.register_background_update_handler(
+            "user_ips_drop_nonunique_index",
+            self._remove_user_ip_nonunique,
+        )
+
+        # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
         self._batch_row_update = {}
 
         self._client_ip_looper = self._clock.looping_call(
@@ -74,6 +99,205 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         self.hs.get_reactor().addSystemEventTrigger(
             "before", "shutdown", self._update_client_ips_batch
         )
+
+    @defer.inlineCallbacks
+    def _remove_user_ip_nonunique(self, progress, batch_size):
+        def f(conn):
+            txn = conn.cursor()
+            txn.execute(
+                "DROP INDEX IF EXISTS user_ips_user_ip"
+            )
+            txn.close()
+
+        yield self.runWithConnection(f)
+        yield self._end_background_update("user_ips_drop_nonunique_index")
+        defer.returnValue(1)
+
+    @defer.inlineCallbacks
+    def _analyze_user_ip(self, progress, batch_size):
+        # Background update to analyze user_ips table before we run the
+        # deduplication background update. The table may not have been analyzed
+        # for ages due to the table locks.
+        #
+        # This will lock out the naive upserts to user_ips while it happens, but
+        # the analyze should be quick (28GB table takes ~10s)
+        def user_ips_analyze(txn):
+            txn.execute("ANALYZE user_ips")
+
+        yield self.runInteraction(
+            "user_ips_analyze", user_ips_analyze
+        )
+
+        yield self._end_background_update("user_ips_analyze")
+
+        defer.returnValue(1)
+
+    @defer.inlineCallbacks
+    def _remove_user_ip_dupes(self, progress, batch_size):
+        # This works function works by scanning the user_ips table in batches
+        # based on `last_seen`. For each row in a batch it searches the rest of
+        # the table to see if there are any duplicates, if there are then they
+        # are removed and replaced with a suitable row.
+
+        # Fetch the start of the batch
+        begin_last_seen = progress.get("last_seen", 0)
+
+        def get_last_seen(txn):
+            txn.execute(
+                """
+                SELECT last_seen FROM user_ips
+                WHERE last_seen > ?
+                ORDER BY last_seen
+                LIMIT 1
+                OFFSET ?
+                """,
+                (begin_last_seen, batch_size)
+            )
+            row = txn.fetchone()
+            if row:
+                return row[0]
+            else:
+                return None
+
+        # Get a last seen that has roughly `batch_size` since `begin_last_seen`
+        end_last_seen = yield self.runInteraction(
+            "user_ips_dups_get_last_seen", get_last_seen
+        )
+
+        # If it returns None, then we're processing the last batch
+        last = end_last_seen is None
+
+        logger.info(
+            "Scanning for duplicate 'user_ips' rows in range: %s <= last_seen < %s",
+            begin_last_seen, end_last_seen,
+        )
+
+        def remove(txn):
+            # This works by looking at all entries in the given time span, and
+            # then for each (user_id, access_token, ip) tuple in that range
+            # checking for any duplicates in the rest of the table (via a join).
+            # It then only returns entries which have duplicates, and the max
+            # last_seen across all duplicates, which can the be used to delete
+            # all other duplicates.
+            # It is efficient due to the existence of (user_id, access_token,
+            # ip) and (last_seen) indices.
+
+            # Define the search space, which requires handling the last batch in
+            # a different way
+            if last:
+                clause = "? <= last_seen"
+                args = (begin_last_seen,)
+            else:
+                clause = "? <= last_seen AND last_seen < ?"
+                args = (begin_last_seen, end_last_seen)
+
+            # (Note: The DISTINCT in the inner query is important to ensure that
+            # the COUNT(*) is accurate, otherwise double counting may happen due
+            # to the join effectively being a cross product)
+            txn.execute(
+                """
+                SELECT user_id, access_token, ip,
+                       MAX(device_id), MAX(user_agent), MAX(last_seen),
+                       COUNT(*)
+                FROM (
+                    SELECT DISTINCT user_id, access_token, ip
+                    FROM user_ips
+                    WHERE {}
+                ) c
+                INNER JOIN user_ips USING (user_id, access_token, ip)
+                GROUP BY user_id, access_token, ip
+                HAVING count(*) > 1
+                """.format(clause),
+                args
+            )
+            res = txn.fetchall()
+
+            # We've got some duplicates
+            for i in res:
+                user_id, access_token, ip, device_id, user_agent, last_seen, count = i
+
+                # We want to delete the duplicates so we end up with only a
+                # single row.
+                #
+                # The naive way of doing this would be just to delete all rows
+                # and reinsert a constructed row. However, if there are a lot of
+                # duplicate rows this can cause the table to grow a lot, which
+                # can be problematic in two ways:
+                #   1. If user_ips is already large then this can cause the
+                #      table to rapidly grow, potentially filling the disk.
+                #   2. Reinserting a lot of rows can confuse the table
+                #      statistics for postgres, causing it to not use the
+                #      correct indices for the query above, resulting in a full
+                #      table scan. This is incredibly slow for large tables and
+                #      can kill database performance. (This seems to mainly
+                #      happen for the last query where the clause is simply `? <
+                #      last_seen`)
+                #
+                # So instead we want to delete all but *one* of the duplicate
+                # rows. That is hard to do reliably, so we cheat and do a two
+                # step process:
+                #   1. Delete all rows with a last_seen strictly less than the
+                #      max last_seen. This hopefully results in deleting all but
+                #      one row the majority of the time, but there may be
+                #      duplicate last_seen
+                #   2. If multiple rows remain, we fall back to the naive method
+                #      and simply delete all rows and reinsert.
+                #
+                # Note that this relies on no new duplicate rows being inserted,
+                # but if that is happening then this entire process is futile
+                # anyway.
+
+                # Do step 1:
+
+                txn.execute(
+                    """
+                    DELETE FROM user_ips
+                    WHERE user_id = ? AND access_token = ? AND ip = ? AND last_seen < ?
+                    """,
+                    (user_id, access_token, ip, last_seen)
+                )
+                if txn.rowcount == count - 1:
+                    # We deleted all but one of the duplicate rows, i.e. there
+                    # is exactly one remaining and so there is nothing left to
+                    # do.
+                    continue
+                elif txn.rowcount >= count:
+                    raise Exception(
+                        "We deleted more duplicate rows from 'user_ips' than expected",
+                    )
+
+                # The previous step didn't delete enough rows, so we fallback to
+                # step 2:
+
+                # Drop all the duplicates
+                txn.execute(
+                    """
+                    DELETE FROM user_ips
+                    WHERE user_id = ? AND access_token = ? AND ip = ?
+                    """,
+                    (user_id, access_token, ip)
+                )
+
+                # Add in one to be the last_seen
+                txn.execute(
+                    """
+                    INSERT INTO user_ips
+                    (user_id, access_token, ip, device_id, user_agent, last_seen)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (user_id, access_token, ip, device_id, user_agent, last_seen)
+                )
+
+            self._background_update_progress_txn(
+                txn, "user_ips_remove_dupes", {"last_seen": end_last_seen}
+            )
+
+        yield self.runInteraction("user_ips_dups_remove", remove)
+
+        if last:
+            yield self._end_background_update("user_ips_remove_dupes")
+
+        defer.returnValue(batch_size)
 
     @defer.inlineCallbacks
     def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
@@ -114,7 +338,10 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         )
 
     def _update_client_ips_batch_txn(self, txn, to_update):
-        self.database_engine.lock_table(txn, "user_ips")
+        if "user_ips" in self._unsafe_to_upsert_tables or (
+            not self.database_engine.can_native_upsert
+        ):
+            self.database_engine.lock_table(txn, "user_ips")
 
         for entry in iteritems(to_update):
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
@@ -127,10 +354,10 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                         "user_id": user_id,
                         "access_token": access_token,
                         "ip": ip,
-                        "user_agent": user_agent,
-                        "device_id": device_id,
                     },
                     values={
+                        "user_agent": user_agent,
+                        "device_id": device_id,
                         "last_seen": last_seen,
                     },
                     lock=False,
@@ -227,7 +454,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         results = {}
 
         for key in self._batch_row_update:
-            uid, access_token, ip = key
+            uid, access_token, ip, = key
             if uid == user_id:
                 user_agent, _, last_seen = self._batch_row_update[key]
                 results[(access_token, ip)] = (user_agent, last_seen)

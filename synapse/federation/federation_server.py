@@ -25,15 +25,17 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
+    Codes,
     FederationError,
     IncompatibleRoomVersionError,
     NotFoundError,
     SynapseError,
 )
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.events import room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
@@ -147,6 +149,22 @@ class FederationServer(FederationBase):
 
         logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
+        # Reject if PDU count > 50 and EDU count > 100
+        if (len(transaction.pdus) > 50
+                or (hasattr(transaction, "edus") and len(transaction.edus) > 100)):
+
+            logger.info(
+                "Transaction PDU or EDU count too large. Returning 400",
+            )
+
+            response = {}
+            yield self.transaction_actions.set_response(
+                origin,
+                transaction,
+                400, response
+            )
+            defer.returnValue((400, response))
+
         received_pdus_counter.inc(len(transaction.pdus))
 
         origin_host, _ = parse_server_name(origin)
@@ -162,8 +180,29 @@ class FederationServer(FederationBase):
                 p["age_ts"] = request_time - int(p["age"])
                 del p["age"]
 
-            event = event_from_pdu_json(p)
-            room_id = event.room_id
+            # We try and pull out an event ID so that if later checks fail we
+            # can log something sensible. We don't mandate an event ID here in
+            # case future event formats get rid of the key.
+            possible_event_id = p.get("event_id", "<Unknown>")
+
+            # Now we get the room ID so that we can check that we know the
+            # version of the room.
+            room_id = p.get("room_id")
+            if not room_id:
+                logger.info(
+                    "Ignoring PDU as does not have a room_id. Event ID: %s",
+                    possible_event_id,
+                )
+                continue
+
+            try:
+                room_version = yield self.store.get_room_version(room_id)
+                format_ver = room_version_to_event_format(room_version)
+            except NotFoundError:
+                logger.info("Ignoring PDU for unknown room_id: %s", room_id)
+                continue
+
+            event = event_from_pdu_json(p, format_ver)
             pdus_by_room.setdefault(room_id, []).append(event)
 
         pdu_results = {}
@@ -201,8 +240,9 @@ class FederationServer(FederationBase):
                         f = failure.Failure()
                         pdu_results[event_id] = {"error": str(e)}
                         logger.error(
-                            "Failed to handle PDU %s: %s",
-                            event_id, f.getTraceback().rstrip(),
+                            "Failed to handle PDU %s",
+                            event_id,
+                            exc_info=(f.type, f.value, f.getTracebackObject()),
                         )
 
         yield concurrently_execute(
@@ -300,7 +340,7 @@ class FederationServer(FederationBase):
             if self.hs.is_mine_id(event.event_id):
                 event.signatures.update(
                     compute_event_signature(
-                        event,
+                        event.get_pdu_json(),
                         self.hs.hostname,
                         self.hs.config.signing_key[0]
                     )
@@ -322,11 +362,6 @@ class FederationServer(FederationBase):
             )
         else:
             defer.returnValue((404, ""))
-
-    @defer.inlineCallbacks
-    @log_function
-    def on_pull_request(self, origin, versions):
-        raise NotImplementedError("Pull transactions not implemented")
 
     @defer.inlineCallbacks
     def on_query_request(self, query_type, args):
@@ -352,18 +387,30 @@ class FederationServer(FederationBase):
         })
 
     @defer.inlineCallbacks
-    def on_invite_request(self, origin, content):
-        pdu = event_from_pdu_json(content)
+    def on_invite_request(self, origin, content, room_version):
+        if room_version not in KNOWN_ROOM_VERSIONS:
+            raise SynapseError(
+                400,
+                "Homeserver does not support this room version",
+                Codes.UNSUPPORTED_ROOM_VERSION,
+            )
+
+        format_ver = room_version_to_event_format(room_version)
+
+        pdu = event_from_pdu_json(content, format_ver)
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
         time_now = self._clock.time_msec()
-        defer.returnValue((200, {"event": ret_pdu.get_pdu_json(time_now)}))
+        defer.returnValue({"event": ret_pdu.get_pdu_json(time_now)})
 
     @defer.inlineCallbacks
-    def on_send_join_request(self, origin, content):
+    def on_send_join_request(self, origin, content, room_id):
         logger.debug("on_send_join_request: content: %s", content)
-        pdu = event_from_pdu_json(content)
+
+        room_version = yield self.store.get_room_version(room_id)
+        format_ver = room_version_to_event_format(room_version)
+        pdu = event_from_pdu_json(content, format_ver)
 
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
@@ -383,13 +430,22 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, room_id)
         pdu = yield self.handler.on_make_leave_request(room_id, user_id)
+
+        room_version = yield self.store.get_room_version(room_id)
+
         time_now = self._clock.time_msec()
-        defer.returnValue({"event": pdu.get_pdu_json(time_now)})
+        defer.returnValue({
+            "event": pdu.get_pdu_json(time_now),
+            "room_version": room_version,
+        })
 
     @defer.inlineCallbacks
-    def on_send_leave_request(self, origin, content):
+    def on_send_leave_request(self, origin, content, room_id):
         logger.debug("on_send_leave_request: content: %s", content)
-        pdu = event_from_pdu_json(content)
+
+        room_version = yield self.store.get_room_version(room_id)
+        format_ver = room_version_to_event_format(room_version)
+        pdu = event_from_pdu_json(content, format_ver)
 
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
@@ -435,13 +491,16 @@ class FederationServer(FederationBase):
             origin_host, _ = parse_server_name(origin)
             yield self.check_server_matches_acl(origin_host, room_id)
 
+            room_version = yield self.store.get_room_version(room_id)
+            format_ver = room_version_to_event_format(room_version)
+
             auth_chain = [
-                event_from_pdu_json(e)
+                event_from_pdu_json(e, format_ver)
                 for e in content["auth_chain"]
             ]
 
             signed_auth = yield self._check_sigs_and_hash_and_fetch(
-                origin, auth_chain, outlier=True
+                origin, auth_chain, outlier=True, room_version=room_version,
             )
 
             ret = yield self.handler.on_query_auth(
@@ -586,16 +645,19 @@ class FederationServer(FederationBase):
         """
         # check that it's actually being sent from a valid destination to
         # workaround bug #1753 in 0.18.5 and 0.18.6
-        if origin != get_domain_from_id(pdu.event_id):
+        if origin != get_domain_from_id(pdu.sender):
             # We continue to accept join events from any server; this is
             # necessary for the federation join dance to work correctly.
             # (When we join over federation, the "helper" server is
             # responsible for sending out the join event, rather than the
-            # origin. See bug #1893).
+            # origin. See bug #1893. This is also true for some third party
+            # invites).
             if not (
                 pdu.type == 'm.room.member' and
                 pdu.content and
-                pdu.content.get("membership", None) == 'join'
+                pdu.content.get("membership", None) in (
+                    Membership.JOIN, Membership.INVITE,
+                )
             ):
                 logger.info(
                     "Discarding PDU %s from invalid origin %s",
@@ -608,9 +670,12 @@ class FederationServer(FederationBase):
                     pdu.event_id, origin
                 )
 
+        # We've already checked that we know the room version by this point
+        room_version = yield self.store.get_room_version(pdu.room_id)
+
         # Check signature.
         try:
-            pdu = yield self._check_sigs_and_hash(pdu)
+            pdu = yield self._check_sigs_and_hash(room_version, pdu)
         except SynapseError as e:
             raise FederationError(
                 "ERROR",

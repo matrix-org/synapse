@@ -20,9 +20,6 @@ import tests.utils
 
 
 class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(EndToEndKeyStoreTestCase, self).__init__(*args, **kwargs)
-        self.store = None  # type: synapse.storage.DataStore
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -43,6 +40,21 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         self.assertIn("device", res["user"])
         dev = res["user"]["device"]
         self.assertDictContainsSubset({"keys": json, "device_display_name": None}, dev)
+
+    @defer.inlineCallbacks
+    def test_reupload_key(self):
+        now = 1470174257070
+        json = {"key": "value"}
+
+        yield self.store.store_device("user", "device", None)
+
+        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        self.assertTrue(changed)
+
+        # If we try to upload the same key then we should be told nothing
+        # changed
+        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        self.assertFalse(changed)
 
     @defer.inlineCallbacks
     def test_get_key_with_device_name(self):

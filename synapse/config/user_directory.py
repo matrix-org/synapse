@@ -50,4 +50,5 @@ class UserDirectoryConfig(Config):
         #   of synapse performing the search itself.
         #   This is an experimental API.
         #   defer_to_id_server: https://id.example.com
+        #  search_all_users: false
         """

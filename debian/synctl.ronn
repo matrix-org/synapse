@@ -1,0 +1,70 @@
+synctl(1) -- Synapse server control interface
+=============================================
+
+## SYNOPSIS
+  Start, stop or restart synapse server.
+
+`synctl` {start|stop|restart} [configfile] [-w|--worker=<WORKERCONFIG>] [-a|--all-processes=<WORKERCONFIGDIR>]
+
+## DESCRIPTION
+
+**synctl** can be used to start, stop or restart Synapse server.  The
+control operation can be done on all processes or a single worker
+process.
+
+## OPTIONS
+
+  * `action`:
+    The value of action should be one of `start`, `stop` or `restart`.
+
+  * `configfile`:
+    Optional path of the configuration file to use.  Default value is
+    `homeserver.yaml`.  The configuration file must exist for the
+    operation to succeed.
+
+  * `-w`, `--worker`:
+
+    Perform start, stop or restart operations on a single worker.
+    Incompatible with `-a`|`--all-processes`.  Value passed must be a
+    valid worker's configuration file.
+
+  * `-a`, `--all-processes`:
+
+    Perform start, stop or restart operations on all the workers in
+    the given directory and the main synapse process. Incompatible
+    with `-w`|`--worker`.  Value passed must be a directory containing
+    valid work configuration files.  All files ending with `.yaml`
+    extension shall be considered as configuration files and all other
+    files in the directory are ignored.
+
+## CONFIGURATION FILE
+
+Configuration file may be generated as follows:
+
+    $ python -B -m synapse.app.homeserver -c config.yaml --generate-config --server-name=<server name>
+
+## ENVIRONMENT
+
+  * `SYNAPSE_CACHE_FACTOR`:
+    Synapse's architecture is quite RAM hungry currently - a lot of
+    recent room data and metadata is deliberately cached in RAM in
+    order to speed up common requests.  This will be improved in
+    future, but for now the easiest way to either reduce the RAM usage
+    (at the risk of slowing things down) is to set the
+    SYNAPSE_CACHE_FACTOR environment variable. Roughly speaking, a
+    SYNAPSE_CACHE_FACTOR of 1.0 will max out at around 3-4GB of
+    resident memory - this is what we currently run the matrix.org
+    on. The default setting is currently 0.1, which is probably around
+    a ~700MB footprint. You can dial it down further to 0.02 if
+    desired, which targets roughly ~512MB. Conversely you can dial it
+    up if you need performance for lots of users and have a box with a
+    lot of RAM.
+
+## COPYRIGHT
+
+This man page was written by Sunil Mohan Adapa <<sunil@medhas.org>> for
+Debian GNU/Linux distribution.
+
+## SEE ALSO
+
+synapse_port_db(1), hash_password(1), register_new_matrix_user(1)

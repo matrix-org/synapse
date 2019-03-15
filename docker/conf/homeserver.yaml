@@ -2,11 +2,18 @@
 
 ## TLS ##
 
+{% if not SYNAPSE_NO_TLS %}
+
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
-tls_dh_params_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.dh"
-no_tls: {{ "True" if SYNAPSE_NO_TLS else "False" }}
-tls_fingerprints: []
+
+{% if SYNAPSE_ACME %}
+acme:
+    enabled: true
+    port: 8009
+{% endif %}
+
+{% endif %}
 
 ## Server ##
 
@@ -14,6 +21,7 @@ server_name: "{{ SYNAPSE_SERVER_NAME }}"
 pid_file: /homeserver.pid
 web_client: False
 soft_file_limit: 0
+log_config: "/compiled/log.config"
 
 ## Ports ##
 
@@ -67,9 +75,6 @@ database:
 ## Performance ##
 
 event_cache_size: "{{ SYNAPSE_EVENT_CACHE_SIZE or "10K" }}"
-verbose: 0
-log_file: "/data/homeserver.log"
-log_config: "/compiled/log.config"
 
 ## Ratelimiting ##
 
@@ -150,10 +155,12 @@ enable_group_creation: true
 
 # The list of identity servers trusted to verify third party
 # identifiers by this server.
+#
+# Also defines the ID server which will be called when an account is
+# deactivated (one will be picked arbitrarily).
 trusted_third_party_id_servers:
     - matrix.org
     - vector.im
-    - riot.im
 
 ## Metrics ###
 
