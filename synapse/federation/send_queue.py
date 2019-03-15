@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 class FederationRemoteSendQueue(object):
-    """A drop in replacement for TransactionQueue"""
+    """A drop in replacement for FederationSender"""
 
     def __init__(self, hs):
         self.server_name = hs.hostname
@@ -154,13 +154,13 @@ class FederationRemoteSendQueue(object):
                 del self.device_messages[key]
 
     def notify_new_events(self, current_id):
-        """As per TransactionQueue"""
+        """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.
         pass
 
     def build_and_send_edu(self, destination, edu_type, content, key=None):
-        """As per TransactionQueue"""
+        """As per FederationSender"""
         if destination == self.server_name:
             logger.info("Not sending EDU to ourselves")
             return
@@ -184,7 +184,7 @@ class FederationRemoteSendQueue(object):
         self.notifier.on_new_replication_data()
 
     def send_read_receipt(self, receipt):
-        """As per TransactionQueue
+        """As per FederationSender
 
         Args:
             receipt (synapse.types.ReadReceipt):
@@ -193,7 +193,7 @@ class FederationRemoteSendQueue(object):
         pass
 
     def send_presence(self, states):
-        """As per TransactionQueue
+        """As per FederationSender
 
         Args:
             states (list(UserPresenceState))
@@ -210,7 +210,7 @@ class FederationRemoteSendQueue(object):
         self.notifier.on_new_replication_data()
 
     def send_device_messages(self, destination):
-        """As per TransactionQueue"""
+        """As per FederationSender"""
         pos = self._next_pos()
         self.device_messages[pos] = destination
         self.notifier.on_new_replication_data()
@@ -448,7 +448,7 @@ def process_rows_for_federation(transaction_queue, rows):
     transaction queue ready for sending to the relevant homeservers.
 
     Args:
-        transaction_queue (TransactionQueue)
+        transaction_queue (FederationSender)
         rows (list(synapse.replication.tcp.streams.FederationStreamRow))
     """
 

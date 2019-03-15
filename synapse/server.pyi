@@ -1,5 +1,6 @@
 import synapse.api.auth
 import synapse.config.homeserver
+import synapse.federation.sender
 import synapse.federation.transaction_queue
 import synapse.federation.transport.client
 import synapse.handlers
@@ -62,7 +63,7 @@ class HomeServer(object):
     def get_set_password_handler(self) -> synapse.handlers.set_password.SetPasswordHandler:
         pass
 
-    def get_federation_sender(self) -> synapse.federation.transaction_queue.TransactionQueue:
+    def get_federation_sender(self) -> synapse.federation.sender.FederationSender:
         pass
 
     def get_federation_transport_client(self) -> synapse.federation.transport.client.TransportLayerClient:
