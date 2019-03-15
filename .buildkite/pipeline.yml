@@ -3,13 +3,14 @@ env:
 
 steps:
   - label: "Sytest postgres 3"
-    command: "-v"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3:latest"
           environment:
             - "POSTGRES=1"
           workdir: "/src"
+          shell: false
+          command: []
 
   - command:
       - "python -m pip install tox"
