@@ -6,6 +6,7 @@ from tests import unittest
 
 LOGIN_URL = b"/_matrix/client/r0/login"
 
+
 class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
