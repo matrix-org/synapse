@@ -16,8 +16,6 @@
 import logging
 import re
 
-from six import iteritems
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
