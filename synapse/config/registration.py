@@ -102,33 +102,34 @@ class RegistrationConfig(Config):
         # The 3PID type should be present in registrations_require_3pid to avoid
         # users failing to register if they don't specify the right kind of 3pid.
         #
-        # register_mxid_from_3pid: email
+        #register_mxid_from_3pid: email
 
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
         #
         # Use an Identity Server to establish which 3PIDs are allowed to register?
         # Overrides allowed_local_3pids below.
-        # check_is_for_allowed_local_3pids: matrix.org
+        #
+        #check_is_for_allowed_local_3pids: matrix.org
         #
         # If you are using an IS you can also check whether that IS registers
         # pending invites for the given 3PID (and then allow it to sign up on
         # the platform):
         #
-        # allow_invited_3pids: False
+        #allow_invited_3pids: False
         #
-        # allowed_local_3pids:
-        #     - medium: email
-        #       pattern: ".*@matrix\\.org"
-        #     - medium: email
-        #       pattern: ".*@vector\\.im"
-        #     - medium: msisdn
-        #       pattern: "\\+44"
+        #allowed_local_3pids:
+        #  - medium: email
+        #    pattern: '.*@matrix\\.org'
+        #  - medium: email
+        #    pattern: '.*@vector\\.im'
+        #  - medium: msisdn
+        #    pattern: '\\+44'
 
         # If true, stop users from trying to change the 3PIDs associated with
         # their accounts.
         #
-        # disable_3pid_changes: False
+        #disable_3pid_changes: False
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
@@ -171,23 +172,25 @@ class RegistrationConfig(Config):
         # to this server whenever they change.
         # This is an experimental API currently implemented by sydent to support
         # cross-homeserver user directories.
-        # replicate_user_profiles_to: example.com
+        #
+        #replicate_user_profiles_to: example.com
 
         # If specified, attempt to replay registrations, profile changes & 3pid
         # bindings on the given target homeserver via the AS API. The HS is authed
         # via a given AS token.
-        # shadow_server:
-        #     hs_url: https://shadow.example.com
-        #     hs: shadow.example.com
-        #     as_token: 12u394refgbdhivsia
+        #
+        #shadow_server:
+        #  hs_url: https://shadow.example.com
+        #  hs: shadow.example.com
+        #  as_token: 12u394refgbdhivsia
 
         # If enabled, don't let users set their own display names/avatars
         # other than for the very first time (unless they are a server admin).
         # Useful when provisioning users based on the contents of a 3rd party
         # directory and to avoid ambiguities.
         #
-        # disable_set_displayname: False
-        # disable_set_avatar_url: False
+        #disable_set_displayname: False
+        #disable_set_avatar_url: False
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
