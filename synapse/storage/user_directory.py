@@ -110,7 +110,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
             "populate_user_directory_temp_read", _get_next_batch
         )
 
-        if rooms_to_work_on is None:
+        if not rooms_to_work_on:
             self.runInteraction(
                 "populate_user_directory_temp_cleanup", _delete_staging_area
             )
@@ -171,10 +171,10 @@ class UserDirectoryStore(BackgroundUpdateStore):
                     to_insert.clear()
 
             # We've finished a room. Delete it from the table.
-            self._simple_delete_one(TEMP_TABLE, {"room_id": room_id})
+            yield self._simple_delete_one(TEMP_TABLE, {"room_id": room_id})
             # Update the remaining counter.
             progress["remaining"] -= 1
-            self.runInteraction(
+            yield self.runInteraction(
                 "populate_user_directory",
                 self._background_update_progress_txn,
                 "populate_user_directory",
