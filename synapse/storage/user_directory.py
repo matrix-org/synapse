@@ -125,50 +125,51 @@ class UserDirectoryStore(BackgroundUpdateStore):
 
         for room_id in rooms_to_work_on:
             is_in_room = yield self.is_host_joined(room_id, self.server_name)
-            if not is_in_room:
-                continue
 
-            is_public = yield self.is_room_world_readable_or_publicly_joinable(room_id)
-
-            users_with_profile = yield state.get_current_user_in_room(room_id)
-            user_ids = set(users_with_profile)
-
-            # Update each user in the user directory.
-            for user_id, profile in users_with_profile.items():
-                yield self.update_profile_in_user_dir(
-                    user_id, profile.display_name, profile.avatar_url
+            if is_in_room:
+                is_public = yield self.is_room_world_readable_or_publicly_joinable(
+                    room_id
                 )
 
-            to_insert = set()
+                users_with_profile = yield state.get_current_user_in_room(room_id)
+                user_ids = set(users_with_profile)
 
-            if is_public:
-                for user_id in user_ids:
-                    if self.get_if_app_services_interested_in_user(user_id):
-                        continue
+                # Update each user in the user directory.
+                for user_id, profile in users_with_profile.items():
+                    yield self.update_profile_in_user_dir(
+                        user_id, profile.display_name, profile.avatar_url
+                    )
 
-                    to_insert.add(user_id)
+                to_insert = set()
 
-                if to_insert:
-                    yield self.add_users_in_public_rooms(room_id, to_insert)
-                    to_insert.clear()
-            else:
-                for user_id in user_ids:
-                    if not self.hs.is_mine_id(user_id):
-                        continue
-
-                    if self.get_if_app_services_interested_in_user(user_id):
-                        continue
-
-                    for other_user_id in user_ids:
-                        if user_id == other_user_id:
+                if is_public:
+                    for user_id in user_ids:
+                        if self.get_if_app_services_interested_in_user(user_id):
                             continue
 
-                        user_set = (user_id, other_user_id)
-                        to_insert.add(user_set)
+                        to_insert.add(user_id)
 
-                if to_insert:
-                    yield self.add_users_who_share_private_room(room_id, to_insert)
-                    to_insert.clear()
+                    if to_insert:
+                        yield self.add_users_in_public_rooms(room_id, to_insert)
+                        to_insert.clear()
+                else:
+                    for user_id in user_ids:
+                        if not self.hs.is_mine_id(user_id):
+                            continue
+
+                        if self.get_if_app_services_interested_in_user(user_id):
+                            continue
+
+                        for other_user_id in user_ids:
+                            if user_id == other_user_id:
+                                continue
+
+                            user_set = (user_id, other_user_id)
+                            to_insert.add(user_set)
+
+                    if to_insert:
+                        yield self.add_users_who_share_private_room(room_id, to_insert)
+                        to_insert.clear()
 
             # We've finished a room. Delete it from the table.
             yield self._simple_delete_one(TEMP_TABLE, {"room_id": room_id})
@@ -218,6 +219,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
         """
         Update or add a user's profile in the user directory.
         """
+
         def _update_profile_in_user_dir_txn(txn):
             new_entry = self._simple_upsert_txn(
                 txn,
