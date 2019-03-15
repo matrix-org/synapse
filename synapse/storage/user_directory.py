@@ -79,7 +79,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
         if progress.get("stage") != "processing":
             new_pos = yield self.get_max_stream_id_in_current_state_deltas()
             progress["pos"] = new_pos
-            self.runInteraction(
+            yield self.runInteraction(
                 "populate_user_directory_temp_build", _make_staging_area
             )
 
@@ -111,7 +111,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
         )
 
         if not rooms_to_work_on:
-            self.runInteraction(
+            yield self.runInteraction(
                 "populate_user_directory_temp_cleanup", _delete_staging_area
             )
             yield self.update_user_directory_stream_pos(progress["pos"])
