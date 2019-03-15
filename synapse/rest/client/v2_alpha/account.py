@@ -27,9 +27,9 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
 )
+from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
-from synapse.types import UserID
 
 from ._base import client_v2_patterns, interactive_auth_handler
 
