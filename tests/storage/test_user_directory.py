@@ -16,7 +16,6 @@
 from twisted.internet import defer
 
 from synapse.storage import UserDirectoryStore
-from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
