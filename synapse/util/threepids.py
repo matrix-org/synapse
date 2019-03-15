@@ -48,7 +48,10 @@ def check_3pid_allowed(hs, medium, address):
             defer.returnValue(False)
 
         # Check if this user is intended to register for this homeserver
-        if data['hs'] != hs.config.server_name and data['shadow_hs'] != hs.config.server_name:
+        if (
+            data['hs'] != hs.config.server_name
+            and data['shadow_hs'] != hs.config.server_name
+        ):
             defer.returnValue(False)
 
         if data.get('requires_invite', False) and not data.get('invited', False):
