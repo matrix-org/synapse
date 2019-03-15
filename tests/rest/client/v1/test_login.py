@@ -4,6 +4,7 @@ from synapse.rest.client.v1 import admin, login
 
 from tests import unittest
 
+LOGIN_URL = b"/_matrix/client/r0/login"
 
 class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
@@ -13,8 +14,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-
-        self.url = b"/_matrix/client/r0/login"
 
         self.hs = self.setup_test_homeserver()
         self.hs.config.enable_registration = True
@@ -43,7 +42,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "password": "monkey",
             }
             request_data = json.dumps(params)
-            request, channel = self.make_request(b"POST", self.url, request_data)
+            request, channel = self.make_request(b"POST", LOGIN_URL, request_data)
             self.render(request)
 
             if i == 5:
@@ -67,7 +66,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "password": "monkey",
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(b"POST", self.url, params)
+        request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
@@ -88,7 +87,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "password": "monkey",
             }
             request_data = json.dumps(params)
-            request, channel = self.make_request(b"POST", self.url, request_data)
+            request, channel = self.make_request(b"POST", LOGIN_URL, request_data)
             self.render(request)
 
             if i == 5:
@@ -112,7 +111,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "password": "monkey",
         }
         request_data = json.dumps(params)
-        request, channel = self.make_request(b"POST", self.url, params)
+        request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
