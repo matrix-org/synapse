@@ -66,8 +66,8 @@ class RatelimitConfig(Config):
         #     client's IP address.
         #   - one for login that ratelimits login requests based on the client's IP
         #     address.
-        #   - one for login that ratelimits login requests based on the user the client
-        #     is attempting to log in as.
+        #   - one for login that ratelimits login requests based on the account the
+        #     client is attempting to log into.
         #
         # This configuration follows the following structure:
         #
