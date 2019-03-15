@@ -34,13 +34,9 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.
-        yield self.store.add_profiles_to_user_dir(
-            {
-                ALICE: ProfileInfo(None, "alice"),
-                BOB: ProfileInfo(None, "bob"),
-                BOBBY: ProfileInfo(None, "bobby"),
-            },
-        )
+        yield self.store.update_profile_in_user_dir(ALICE, "alice", None)
+        yield self.store.update_profile_in_user_dir(BOB, "bob", None)
+        yield self.store.update_profile_in_user_dir(BOBBY, "bobby", None)
         yield self.store.add_users_in_public_rooms(
             "!room:id", (ALICE, BOB)
         )
