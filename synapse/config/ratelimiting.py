@@ -12,25 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import attr
-
 from ._base import Config
 
 
-class ratelimiter(object):
+class RateLimitConfig(object):
     def __init__(self, config):
         self.per_second = config.get("per_second", 0.17)
         self.burst_count = config.get("burst_count", 3.0)
-
-
-@attr.s
-class rclogin(object):
-    _address = attr.ib()
-    _account = attr.ib()
-
-    def __attrs_post_init__(self):
-        self.address = ratelimiter(self._address)
-        self.account = ratelimiter(self._account)
 
 
 class RatelimitConfig(Config):
@@ -39,8 +27,11 @@ class RatelimitConfig(Config):
         self.rc_messages_per_second = config["rc_messages_per_second"]
         self.rc_message_burst_count = config["rc_message_burst_count"]
 
-        self.rc_registration = ratelimiter(config.get("rc_registration", {}))
-        self.rc_login = rclogin(**config.get("rc_login", {}))
+        self.rc_registration = RateLimitConfig(config.get("rc_registration", {}))
+
+        rc_login_config = config.get("rc_login", {})
+        self.rc_login_address = RateLimitConfig(rc_login_config.get("address", {}))
+        self.rc_login_account = RateLimitConfig(rc_login_config.get("account", {}))
 
         self.federation_rc_window_size = config["federation_rc_window_size"]
         self.federation_rc_sleep_limit = config["federation_rc_sleep_limit"]
@@ -60,37 +51,37 @@ class RatelimitConfig(Config):
         #
         rc_message_burst_count: 10.0
 
-        # Ratelimiting settings for registration.
-        rc_registration:
-            # Number of registration requests a client can send per second.
-            per_second: 0.17
-
-            # Number of registration requests a client can send before being
-            # throttled.
-            burst_count: 3
-
-        # Ratelimiting settings for login.
-        rc_login:
-            # Per-IP address settings. This will define how Synapse ratelimits
-            # login requests for the same IP address.
-            address:
-                # Number of login requests allowed from the same IP address per
-                # second.
-                per_second: 0.17
-
-                # Number of login requests allowed from the same IP address
-                # before being throttled.
-                burst_count: 3
-
-            # Per-account settings. This will define how Synapse ratelimits
-            # login requests for the same account.
-            account:
-                # Number of login requests allowed for the same user per second.
-                per_second: 0.17
-
-                # Number of login requests allowed for the same user before being
-                # throttled.
-                burst_count: 3
+        # Optional ratelimiting settings for registration and login.
+        #
+        # Each ratelimiting configuration is made of two parameters:
+        #   - per_second: number of requests a client can send per second.
+        #   - burst_count: number of requests a client can send before being throttled.
+        #
+        # If a ratelimiting configuration is omitted from Synapse's configuration,
+        # its `per_second` value will default to 0.17 (1/min) and its `burst_count`
+        # value will default to 3.0.
+        #
+        # Synapse currently uses three different configurations:
+        #   - one for registration that ratelimits registration requests based on the
+        #     client's IP address.
+        #   - one for login that ratelimits login requests based on the client's IP
+        #     address.
+        #   - one for login that ratelimits login requests based on the user the client
+        #     is attempting to log in as.
+        #
+        # This configuration follows the following structure:
+        #
+        # rc_registration:
+        #     per_second: 0.17
+        #     burst_count: 3
+        #
+        # rc_login:
+        #     address:
+        #         per_second: 0.17
+        #         burst_count: 3
+        #     account:
+        #         per_second: 0.17
+        #         burst_count: 3
 
         # The federation window size in milliseconds
         #

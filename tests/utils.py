@@ -152,10 +152,10 @@ def default_config(name):
     config.rc_message_burst_count = 10000
     config.rc_registration.per_second = 10000
     config.rc_registration.burst_count = 10000
-    config.rc_login.address.per_second = 10000
-    config.rc_login.address.burst_count = 10000
-    config.rc_login.account.per_second = 10000
-    config.rc_login.account.burst_count = 10000
+    config.rc_login_address.per_second = 10000
+    config.rc_login_address.burst_count = 10000
+    config.rc_login_account.per_second = 10000
+    config.rc_login_account.burst_count = 10000
     config.saml2_enabled = False
     config.public_baseurl = None
     config.default_identity_server = None

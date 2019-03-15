@@ -25,8 +25,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         return self.hs
 
     def test_POST_ratelimiting_per_address(self):
-        self.hs.config.rc_login.address.burst_count = 5
-        self.hs.config.rc_login.address.per_second = 0.17
+        self.hs.config.rc_login_address.burst_count = 5
+        self.hs.config.rc_login_address.per_second = 0.17
 
         # Create different users so we're sure not to be bothered by the per-user
         # ratelimiter.
@@ -52,6 +52,10 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
+        # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
+        # than 1min.
+        self.assertTrue(retry_after_ms < 6000)
+
         self.reactor.advance(retry_after_ms / 1000.)
 
         params = {
@@ -69,8 +73,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_POST_ratelimiting_per_account(self):
-        self.hs.config.rc_login.account.burst_count = 5
-        self.hs.config.rc_login.account.per_second = 0.17
+        self.hs.config.rc_login_account.burst_count = 5
+        self.hs.config.rc_login_account.per_second = 0.17
 
         self.register_user("kermit", "monkey")
 
@@ -92,6 +96,10 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
+        # than 1min.
+        self.assertTrue(retry_after_ms < 6000)
 
         self.reactor.advance(retry_after_ms / 1000.)
 

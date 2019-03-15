@@ -133,8 +133,8 @@ class LoginRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         self._address_ratelimiter.ratelimit(
             request.getClientIP(), time_now_s=self.hs.clock.time(),
-            rate_hz=self.hs.config.rc_login.address.per_second,
-            burst_count=self.hs.config.rc_login.address.burst_count,
+            rate_hz=self.hs.config.rc_login_address.per_second,
+            burst_count=self.hs.config.rc_login_address.burst_count,
             update=True,
         )
 

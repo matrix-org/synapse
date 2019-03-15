@@ -573,13 +573,12 @@ class AuthHandler(BaseHandler):
         Returns:
             defer.Deferred: (unicode) canonical_user_id, or None if zero or
             multiple matches
+
+        Raises:
+            LimitExceededError if the ratelimiter's login requests count for this
+                user is too high too proceed.
         """
-        self._account_ratelimiter.ratelimit(
-            user_id, time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login.account.per_second,
-            burst_count=self.hs.config.rc_login.account.burst_count,
-            update=True,
-        )
+        self.ratelimit_login_per_account(user_id)
         res = yield self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
             defer.returnValue(res[0])
@@ -645,6 +644,8 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem accessing the database
             SynapseError if there was a problem with the request
             LoginError if there was an authentication problem.
+            LimitExceededError if the ratelimiter's login requests count for this
+                user is too high too proceed.
         """
 
         if username.startswith('@'):
@@ -654,12 +655,7 @@ class AuthHandler(BaseHandler):
                 username, self.hs.hostname
             ).to_string()
 
-        self._account_ratelimiter.ratelimit(
-            qualified_user_id, time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login.account.per_second,
-            burst_count=self.hs.config.rc_login.account.burst_count,
-            update=True,
-        )
+        self.ratelimit_login_per_account(qualified_user_id)
 
         login_type = login_submission.get("type")
         known_login_type = False
@@ -753,6 +749,10 @@ class AuthHandler(BaseHandler):
             password (unicode): the provided password
         Returns:
             (unicode) the canonical_user_id, or None if unknown user / bad password
+
+        Raises:
+            LimitExceededError if the ratelimiter's login requests count for this
+                user is too high too proceed.
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
@@ -781,12 +781,7 @@ class AuthHandler(BaseHandler):
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
-        self._account_ratelimiter.ratelimit(
-            user_id, time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login.account.per_second,
-            burst_count=self.hs.config.rc_login.account.burst_count,
-            update=True,
-        )
+        self.ratelimit_login_per_account(user_id)
         yield self.auth.check_auth_blocking(user_id)
         defer.returnValue(user_id)
 
@@ -957,6 +952,23 @@ class AuthHandler(BaseHandler):
             return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
+
+    def ratelimit_login_per_account(self, user_id):
+        """Checks whether the process must be stopped because of ratelimiting.
+
+        Args:
+            user_id (unicode): complete @user:id
+
+        Raises:
+            LimitExceededError if the ratelimiter's login requests count for this
+                user is too high too proceed.
+        """
+        self._account_ratelimiter.ratelimit(
+            user_id.lower(), time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_account.per_second,
+            burst_count=self.hs.config.rc_login_account.burst_count,
+            update=True,
+        )
 
 
 @attr.s
