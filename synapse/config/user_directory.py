@@ -44,10 +44,10 @@ class UserDirectoryConfig(Config):
         # on your database to tell it to rebuild the user_directory search indexes.
         #
         #user_directory:
-        #   search_all_users: false
+        #  search_all_users: false
         #
-        #   If this is set, user search will be delegated to this ID server instead
-        #   of synapse performing the search itself.
-        #   This is an experimental API.
-        #   defer_to_id_server: https://id.example.com
+        #  If this is set, user search will be delegated to this ID server instead
+        #  of synapse performing the search itself.
+        #  This is an experimental API.
+        #  defer_to_id_server: https://id.example.com
         """

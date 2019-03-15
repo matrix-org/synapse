@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomVersions
 from synapse.storage.state import StateFilter
 from synapse.types import RoomID, UserID
 
@@ -28,9 +28,6 @@ logger = logging.getLogger(__name__)
 
 
 class StateStoreTestCase(tests.unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(StateStoreTestCase, self).__init__(*args, **kwargs)
-        self.store = None  # type: synapse.storage.DataStore
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -52,6 +49,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def inject_state_event(self, room, sender, typ, state_key, content):
         builder = self.event_builder_factory.new(
+            RoomVersions.V1,
             {
                 "type": typ,
                 "sender": sender.to_string(),

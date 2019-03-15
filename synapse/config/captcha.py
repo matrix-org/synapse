@@ -30,19 +30,22 @@ class CaptchaConfig(Config):
         # See docs/CAPTCHA_SETUP for full details of configuring this.
 
         # This Home Server's ReCAPTCHA public key.
+        #
         recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
         # This Home Server's ReCAPTCHA private key.
+        #
         recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
         # Enables ReCaptcha checks when registering, preventing signup
         # unless a captcha is answered. Requires a valid ReCaptcha
         # public/private key.
+        #
         enable_registration_captcha: False
 
         # A secret key used to bypass the captcha test entirely.
         #captcha_bypass_secret: "YOUR_SECRET_HERE"
 
         # The API endpoint to use for verifying m.login.recaptcha responses.
-        recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
+        recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
         """

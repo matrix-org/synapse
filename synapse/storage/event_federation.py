@@ -125,6 +125,29 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
 
         return dict(txn)
 
+    @defer.inlineCallbacks
+    def get_max_depth_of(self, event_ids):
+        """Returns the max depth of a set of event IDs
+
+        Args:
+            event_ids (list[str])
+
+        Returns
+            Deferred[int]
+        """
+        rows = yield self._simple_select_many_batch(
+            table="events",
+            column="event_id",
+            iterable=event_ids,
+            retcols=("depth",),
+            desc="get_max_depth_of",
+        )
+
+        if not rows:
+            defer.returnValue(0)
+        else:
+            defer.returnValue(max(row["depth"] for row in rows))
+
     def _get_oldest_events_in_room_txn(self, txn, room_id):
         return self._simple_select_onecol_txn(
             txn,
@@ -419,6 +442,28 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore,
         event_results.reverse()
         return event_results
 
+    @defer.inlineCallbacks
+    def get_successor_events(self, event_ids):
+        """Fetch all events that have the given events as a prev event
+
+        Args:
+            event_ids (iterable[str])
+
+        Returns:
+            Deferred[list[str]]
+        """
+        rows = yield self._simple_select_many_batch(
+            table="event_edges",
+            column="prev_event_id",
+            iterable=event_ids,
+            retcols=("event_id",),
+            desc="get_successor_events"
+        )
+
+        defer.returnValue([
+            row["event_id"] for row in rows
+        ])
+
 
 class EventFederationStore(EventFederationWorkerStore):
     """ Responsible for storing and serving up the various graphs associated
@@ -477,7 +522,7 @@ class EventFederationStore(EventFederationWorkerStore):
                     "is_state": False,
                 }
                 for ev in events
-                for e_id, _ in ev.prev_events
+                for e_id in ev.prev_event_ids()
             ],
         )
 
@@ -510,7 +555,7 @@ class EventFederationStore(EventFederationWorkerStore):
 
         txn.executemany(query, [
             (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
-            for ev in events for e_id, _ in ev.prev_events
+            for ev in events for e_id in ev.prev_event_ids()
             if not ev.internal_metadata.is_outlier()
         ])
 

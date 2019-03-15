@@ -63,11 +63,8 @@ class TypingHandler(object):
         self._member_typing_until = {}  # clock time we expect to stop
         self._member_last_federation_poke = {}
 
-        # map room IDs to serial numbers
-        self._room_serials = {}
         self._latest_room_serial = 0
-        # map room IDs to sets of users currently typing
-        self._room_typing = {}
+        self._reset()
 
         # caches which room_ids changed at which serials
         self._typing_stream_change_cache = StreamChangeCache(
@@ -78,6 +75,15 @@ class TypingHandler(object):
             self._handle_timeouts,
             5000,
         )
+
+    def _reset(self):
+        """
+        Reset the typing handler's data caches.
+        """
+        # map room IDs to serial numbers
+        self._room_serials = {}
+        # map room IDs to sets of users currently typing
+        self._room_typing = {}
 
     def _handle_timeouts(self):
         logger.info("Checking for typing timeouts")
@@ -225,7 +231,7 @@ class TypingHandler(object):
             for domain in set(get_domain_from_id(u) for u in users):
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
-                    self.federation.send_edu(
+                    self.federation.build_and_send_edu(
                         destination=domain,
                         edu_type="m.typing",
                         content={

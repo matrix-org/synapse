@@ -93,9 +93,9 @@ class BaseHandler(object):
             messages_per_second = self.hs.config.rc_messages_per_second
             burst_count = self.hs.config.rc_message_burst_count
 
-        allowed, time_allowed = self.ratelimiter.send_message(
+        allowed, time_allowed = self.ratelimiter.can_do_action(
             user_id, time_now,
-            msg_rate_hz=messages_per_second,
+            rate_hz=messages_per_second,
             burst_count=burst_count,
             update=update,
         )
@@ -167,4 +167,4 @@ class BaseHandler(object):
                     ratelimit=False,
                 )
             except Exception as e:
-                logger.warn("Error kicking guest user: %s" % (e,))
+                logger.exception("Error kicking guest user: %s" % (e,))

@@ -21,22 +21,29 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
+from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id, get_localpart_from_id
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
-
-from ._base import SQLBaseStore
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
 
 class UserDirectoryStore(SQLBaseStore):
-    @cachedInlineCallbacks(cache_context=True)
-    def is_room_world_readable_or_publicly_joinable(self, room_id, cache_context):
+    @defer.inlineCallbacks
+    def is_room_world_readable_or_publicly_joinable(self, room_id):
         """Check if the room is either world_readable or publically joinable
         """
-        current_state_ids = yield self.get_current_state_ids(
-            room_id, on_invalidate=cache_context.invalidate
+
+        # Create a state filter that only queries join and history state event
+        types_to_filter = (
+            (EventTypes.JoinRules, ""),
+            (EventTypes.RoomHistoryVisibility, ""),
+        )
+
+        current_state_ids = yield self.get_filtered_current_state_ids(
+            room_id, StateFilter.from_types(types_to_filter)
         )
 
         join_rules_id = current_state_ids.get((EventTypes.JoinRules, ""))
@@ -55,37 +62,14 @@ class UserDirectoryStore(SQLBaseStore):
 
         defer.returnValue(False)
 
-    @defer.inlineCallbacks
-    def add_users_to_public_room(self, room_id, user_ids):
-        """Add user to the list of users in public rooms
-
-        Args:
-            room_id (str): A room_id that all users are in that is world_readable
-                or publically joinable
-            user_ids (list(str)): Users to add
-        """
-        yield self._simple_insert_many(
-            table="users_in_public_rooms",
-            values=[
-                {
-                    "user_id": user_id,
-                    "room_id": room_id,
-                }
-                for user_id in user_ids
-            ],
-            desc="add_users_to_public_room"
-        )
-        for user_id in user_ids:
-            self.get_user_in_public_room.invalidate((user_id,))
-
-    def add_profiles_to_user_dir(self, room_id, users_with_profile):
+    def add_profiles_to_user_dir(self, users_with_profile):
         """Add profiles to the user directory
 
         Args:
-            room_id (str): A room_id that all users are joined to
             users_with_profile (dict): Users to add to directory in the form of
                 mapping of user_id -> ProfileInfo
         """
+
         if isinstance(self.database_engine, PostgresEngine):
             # We weight the loclpart most highly, then display name and finally
             # server name
@@ -99,7 +83,9 @@ class UserDirectoryStore(SQLBaseStore):
             """
             args = (
                 (
-                    user_id, get_localpart_from_id(user_id), get_domain_from_id(user_id),
+                    user_id,
+                    get_localpart_from_id(user_id),
+                    get_domain_from_id(user_id),
                     profile.display_name,
                 )
                 for user_id, profile in iteritems(users_with_profile)
@@ -109,10 +95,10 @@ class UserDirectoryStore(SQLBaseStore):
                 INSERT INTO user_directory_search(user_id, value)
                 VALUES (?,?)
             """
-            args = (
+            args = tuple(
                 (
                     user_id,
-                    "%s %s" % (user_id, p.display_name,) if p.display_name else user_id
+                    "%s %s" % (user_id, p.display_name) if p.display_name else user_id,
                 )
                 for user_id, p in iteritems(users_with_profile)
             )
@@ -128,17 +114,15 @@ class UserDirectoryStore(SQLBaseStore):
                 values=[
                     {
                         "user_id": user_id,
-                        "room_id": room_id,
+                        "room_id": None,
                         "display_name": profile.display_name,
                         "avatar_url": profile.avatar_url,
                     }
                     for user_id, profile in iteritems(users_with_profile)
-                ]
+                ],
             )
             for user_id in users_with_profile:
-                txn.call_after(
-                    self.get_user_in_directory.invalidate, (user_id,)
-                )
+                txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
         return self.runInteraction(
             "add_profiles_to_user_dir", _add_profiles_to_user_dir_txn
@@ -168,39 +152,69 @@ class UserDirectoryStore(SQLBaseStore):
             if isinstance(self.database_engine, PostgresEngine):
                 # We weight the localpart most highly, then display name and finally
                 # server name
-                if new_entry:
+                if self.database_engine.can_native_upsert:
                     sql = """
                         INSERT INTO user_directory_search(user_id, vector)
                         VALUES (?,
                             setweight(to_tsvector('english', ?), 'A')
                             || setweight(to_tsvector('english', ?), 'D')
                             || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
-                        )
+                        ) ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
                     """
                     txn.execute(
                         sql,
                         (
-                            user_id, get_localpart_from_id(user_id),
-                            get_domain_from_id(user_id), display_name,
-                        )
+                            user_id,
+                            get_localpart_from_id(user_id),
+                            get_domain_from_id(user_id),
+                            display_name,
+                        ),
                     )
                 else:
-                    sql = """
-                        UPDATE user_directory_search
-                        SET vector = setweight(to_tsvector('english', ?), 'A')
-                            || setweight(to_tsvector('english', ?), 'D')
-                            || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
-                        WHERE user_id = ?
-                    """
-                    txn.execute(
-                        sql,
-                        (
-                            get_localpart_from_id(user_id), get_domain_from_id(user_id),
-                            display_name, user_id,
+                    # TODO: Remove this code after we've bumped the minimum version
+                    # of postgres to always support upserts, so we can get rid of
+                    # `new_entry` usage
+                    if new_entry is True:
+                        sql = """
+                            INSERT INTO user_directory_search(user_id, vector)
+                            VALUES (?,
+                                setweight(to_tsvector('english', ?), 'A')
+                                || setweight(to_tsvector('english', ?), 'D')
+                                || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                            )
+                        """
+                        txn.execute(
+                            sql,
+                            (
+                                user_id,
+                                get_localpart_from_id(user_id),
+                                get_domain_from_id(user_id),
+                                display_name,
+                            ),
                         )
-                    )
+                    elif new_entry is False:
+                        sql = """
+                            UPDATE user_directory_search
+                            SET vector = setweight(to_tsvector('english', ?), 'A')
+                                || setweight(to_tsvector('english', ?), 'D')
+                                || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                            WHERE user_id = ?
+                        """
+                        txn.execute(
+                            sql,
+                            (
+                                get_localpart_from_id(user_id),
+                                get_domain_from_id(user_id),
+                                display_name,
+                                user_id,
+                            ),
+                        )
+                    else:
+                        raise RuntimeError(
+                            "upsert returned None when 'can_native_upsert' is False"
+                        )
             elif isinstance(self.database_engine, Sqlite3Engine):
-                value = "%s %s" % (user_id, display_name,) if display_name else user_id
+                value = "%s %s" % (user_id, display_name) if display_name else user_id
                 self._simple_upsert_txn(
                     txn,
                     table="user_directory_search",
@@ -218,92 +232,52 @@ class UserDirectoryStore(SQLBaseStore):
             "update_profile_in_user_dir", _update_profile_in_user_dir_txn
         )
 
-    @defer.inlineCallbacks
-    def update_user_in_public_user_list(self, user_id, room_id):
-        yield self._simple_update_one(
-            table="users_in_public_rooms",
-            keyvalues={"user_id": user_id},
-            updatevalues={"room_id": room_id},
-            desc="update_user_in_public_user_list",
-        )
-        self.get_user_in_public_room.invalidate((user_id,))
-
     def remove_from_user_dir(self, user_id):
         def _remove_from_user_dir_txn(txn):
             self._simple_delete_txn(
+                txn, table="user_directory", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn, table="user_directory_search", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
+                txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
+            )
+            self._simple_delete_txn(
                 txn,
-                table="user_directory",
+                table="users_who_share_private_rooms",
                 keyvalues={"user_id": user_id},
             )
             self._simple_delete_txn(
                 txn,
-                table="user_directory_search",
-                keyvalues={"user_id": user_id},
+                table="users_who_share_private_rooms",
+                keyvalues={"other_user_id": user_id},
             )
-            self._simple_delete_txn(
-                txn,
-                table="users_in_public_rooms",
-                keyvalues={"user_id": user_id},
-            )
-            txn.call_after(
-                self.get_user_in_directory.invalidate, (user_id,)
-            )
-            txn.call_after(
-                self.get_user_in_public_room.invalidate, (user_id,)
-            )
-        return self.runInteraction(
-            "remove_from_user_dir", _remove_from_user_dir_txn,
-        )
+            txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
 
-    @defer.inlineCallbacks
-    def remove_from_user_in_public_room(self, user_id):
-        yield self._simple_delete(
-            table="users_in_public_rooms",
-            keyvalues={"user_id": user_id},
-            desc="remove_from_user_in_public_room",
-        )
-        self.get_user_in_public_room.invalidate((user_id,))
-
-    def get_users_in_public_due_to_room(self, room_id):
-        """Get all user_ids that are in the room directory because they're
-        in the given room_id
-        """
-        return self._simple_select_onecol(
-            table="users_in_public_rooms",
-            keyvalues={"room_id": room_id},
-            retcol="user_id",
-            desc="get_users_in_public_due_to_room",
-        )
+        return self.runInteraction("remove_from_user_dir", _remove_from_user_dir_txn)
 
     @defer.inlineCallbacks
     def get_users_in_dir_due_to_room(self, room_id):
         """Get all user_ids that are in the room directory because they're
         in the given room_id
         """
-        user_ids_dir = yield self._simple_select_onecol(
-            table="user_directory",
-            keyvalues={"room_id": room_id},
-            retcol="user_id",
-            desc="get_users_in_dir_due_to_room",
-        )
-
-        user_ids_pub = yield self._simple_select_onecol(
+        user_ids_share_pub = yield self._simple_select_onecol(
             table="users_in_public_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_dir_due_to_room",
         )
 
-        user_ids_share = yield self._simple_select_onecol(
-            table="users_who_share_rooms",
+        user_ids_share_priv = yield self._simple_select_onecol(
+            table="users_who_share_private_rooms",
             keyvalues={"room_id": room_id},
-            retcol="user_id",
+            retcol="other_user_id",
             desc="get_users_in_dir_due_to_room",
         )
 
-        user_ids = set(user_ids_dir)
-        user_ids.update(user_ids_pub)
-        user_ids.update(user_ids_share)
+        user_ids = set(user_ids_share_pub)
+        user_ids.update(user_ids_share_priv)
 
         defer.returnValue(user_ids)
 
@@ -329,170 +303,115 @@ class UserDirectoryStore(SQLBaseStore):
         rows = yield self._execute("get_all_local_users", None, sql)
         defer.returnValue([name for name, in rows])
 
-    def add_users_who_share_room(self, room_id, share_private, user_id_tuples):
-        """Insert entries into the users_who_share_rooms table. The first
+    def add_users_who_share_private_room(self, room_id, user_id_tuples):
+        """Insert entries into the users_who_share_private_rooms table. The first
         user should be a local user.
 
         Args:
             room_id (str)
-            share_private (bool): Is the room private
             user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
+
         def _add_users_who_share_room_txn(txn):
-            self._simple_insert_many_txn(
+            self._simple_upsert_many_txn(
                 txn,
-                table="users_who_share_rooms",
-                values=[
-                    {
-                        "user_id": user_id,
-                        "other_user_id": other_user_id,
-                        "room_id": room_id,
-                        "share_private": share_private,
-                    }
+                table="users_who_share_private_rooms",
+                key_names=["user_id", "other_user_id", "room_id"],
+                key_values=[
+                    (user_id, other_user_id, room_id)
                     for user_id, other_user_id in user_id_tuples
                 ],
+                value_names=(),
+                value_values=None,
             )
-            for user_id, other_user_id in user_id_tuples:
-                txn.call_after(
-                    self.get_users_who_share_room_from_dir.invalidate,
-                    (user_id,),
-                )
-                txn.call_after(
-                    self.get_if_users_share_a_room.invalidate,
-                    (user_id, other_user_id),
-                )
+
         return self.runInteraction(
             "add_users_who_share_room", _add_users_who_share_room_txn
         )
 
-    def update_users_who_share_room(self, room_id, share_private, user_id_sets):
-        """Updates entries in the users_who_share_rooms table. The first
+    def add_users_in_public_rooms(self, room_id, user_ids):
+        """Insert entries into the users_who_share_private_rooms table. The first
         user should be a local user.
 
         Args:
             room_id (str)
-            share_private (bool): Is the room private
-            user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
+            user_ids (list[str])
         """
-        def _update_users_who_share_room_txn(txn):
-            sql = """
-                UPDATE users_who_share_rooms
-                SET room_id = ?, share_private = ?
-                WHERE user_id = ? AND other_user_id = ?
-            """
-            txn.executemany(
-                sql,
-                (
-                    (room_id, share_private, uid, oid)
-                    for uid, oid in user_id_sets
-                )
+
+        def _add_users_in_public_rooms_txn(txn):
+
+            self._simple_upsert_many_txn(
+                txn,
+                table="users_in_public_rooms",
+                key_names=["user_id", "room_id"],
+                key_values=[(user_id, room_id) for user_id in user_ids],
+                value_names=(),
+                value_values=None,
             )
-            for user_id, other_user_id in user_id_sets:
-                txn.call_after(
-                    self.get_users_who_share_room_from_dir.invalidate,
-                    (user_id,),
-                )
-                txn.call_after(
-                    self.get_if_users_share_a_room.invalidate,
-                    (user_id, other_user_id),
-                )
+
         return self.runInteraction(
-            "update_users_who_share_room", _update_users_who_share_room_txn
+            "add_users_in_public_rooms", _add_users_in_public_rooms_txn
         )
 
-    def remove_user_who_share_room(self, user_id, other_user_id):
-        """Deletes entries in the users_who_share_rooms table. The first
+    def remove_user_who_share_room(self, user_id, room_id):
+        """
+        Deletes entries in the users_who_share_*_rooms table. The first
         user should be a local user.
 
         Args:
+            user_id (str)
             room_id (str)
-            share_private (bool): Is the room private
-            user_id_tuples([(str, str)]): iterable of 2-tuple of user IDs.
         """
+
         def _remove_user_who_share_room_txn(txn):
             self._simple_delete_txn(
                 txn,
-                table="users_who_share_rooms",
-                keyvalues={
-                    "user_id": user_id,
-                    "other_user_id": other_user_id,
-                },
+                table="users_who_share_private_rooms",
+                keyvalues={"user_id": user_id, "room_id": room_id},
             )
-            txn.call_after(
-                self.get_users_who_share_room_from_dir.invalidate,
-                (user_id,),
+            self._simple_delete_txn(
+                txn,
+                table="users_who_share_private_rooms",
+                keyvalues={"other_user_id": user_id, "room_id": room_id},
             )
-            txn.call_after(
-                self.get_if_users_share_a_room.invalidate,
-                (user_id, other_user_id),
+            self._simple_delete_txn(
+                txn,
+                table="users_in_public_rooms",
+                keyvalues={"user_id": user_id, "room_id": room_id},
             )
 
         return self.runInteraction(
             "remove_user_who_share_room", _remove_user_who_share_room_txn
         )
 
-    @cached(max_entries=500000)
-    def get_if_users_share_a_room(self, user_id, other_user_id):
-        """Gets if users share a room.
-
-        Args:
-            user_id (str): Must be a local user_id
-            other_user_id (str)
-
-        Returns:
-            bool|None: None if they don't share a room, otherwise whether they
-            share a private room or not.
+    @defer.inlineCallbacks
+    def get_user_dir_rooms_user_is_in(self, user_id):
         """
-        return self._simple_select_one_onecol(
-            table="users_who_share_rooms",
-            keyvalues={
-                "user_id": user_id,
-                "other_user_id": other_user_id,
-            },
-            retcol="share_private",
-            allow_none=True,
-            desc="get_if_users_share_a_room",
-        )
-
-    @cachedInlineCallbacks(max_entries=500000, iterable=True)
-    def get_users_who_share_room_from_dir(self, user_id):
-        """Returns the set of users who share a room with `user_id`
+        Returns the rooms that a user is in.
 
         Args:
             user_id(str): Must be a local user
 
         Returns:
-            dict: user_id -> share_private mapping
+            list: user_id
         """
-        rows = yield self._simple_select_list(
-            table="users_who_share_rooms",
-            keyvalues={
-                "user_id": user_id,
-            },
-            retcols=("other_user_id", "share_private",),
-            desc="get_users_who_share_room_with_user",
+        rows = yield self._simple_select_onecol(
+            table="users_who_share_private_rooms",
+            keyvalues={"user_id": user_id},
+            retcol="room_id",
+            desc="get_rooms_user_is_in",
         )
 
-        defer.returnValue({
-            row["other_user_id"]: row["share_private"]
-            for row in rows
-        })
-
-    def get_users_in_share_dir_with_room_id(self, user_id, room_id):
-        """Get all user tuples that are in the users_who_share_rooms due to the
-        given room_id.
-
-        Returns:
-            [(user_id, other_user_id)]: where one of the two will match the given
-            user_id.
-        """
-        sql = """
-            SELECT user_id, other_user_id FROM users_who_share_rooms
-            WHERE room_id = ? AND (user_id = ? OR other_user_id = ?)
-        """
-        return self._execute(
-            "get_users_in_share_dir_with_room_id", None, sql, room_id, user_id, user_id
+        pub_rows = yield self._simple_select_onecol(
+            table="users_in_public_rooms",
+            keyvalues={"user_id": user_id},
+            retcol="room_id",
+            desc="get_rooms_user_is_in",
         )
+
+        users = set(pub_rows)
+        users.update(rows)
+        defer.returnValue(list(users))
 
     @defer.inlineCallbacks
     def get_rooms_in_common_for_users(self, user_id, other_user_id):
@@ -523,15 +442,14 @@ class UserDirectoryStore(SQLBaseStore):
     def delete_all_from_user_dir(self):
         """Delete the entire user directory
         """
+
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
             txn.execute("DELETE FROM user_directory_search")
             txn.execute("DELETE FROM users_in_public_rooms")
-            txn.execute("DELETE FROM users_who_share_rooms")
+            txn.execute("DELETE FROM users_who_share_private_rooms")
             txn.call_after(self.get_user_in_directory.invalidate_all)
-            txn.call_after(self.get_user_in_public_room.invalidate_all)
-            txn.call_after(self.get_users_who_share_room_from_dir.invalidate_all)
-            txn.call_after(self.get_if_users_share_a_room.invalidate_all)
+
         return self.runInteraction(
             "delete_all_from_user_dir", _delete_all_from_user_dir_txn
         )
@@ -541,19 +459,9 @@ class UserDirectoryStore(SQLBaseStore):
         return self._simple_select_one(
             table="user_directory",
             keyvalues={"user_id": user_id},
-            retcols=("room_id", "display_name", "avatar_url",),
+            retcols=("display_name", "avatar_url"),
             allow_none=True,
             desc="get_user_in_directory",
-        )
-
-    @cached()
-    def get_user_in_public_room(self, user_id):
-        return self._simple_select_one(
-            table="users_in_public_rooms",
-            keyvalues={"user_id": user_id},
-            retcols=("room_id",),
-            allow_none=True,
-            desc="get_user_in_public_room",
         )
 
     def get_user_directory_stream_pos(self):
@@ -574,7 +482,9 @@ class UserDirectoryStore(SQLBaseStore):
 
     def get_current_state_deltas(self, prev_stream_id):
         prev_stream_id = int(prev_stream_id)
-        if not self._curr_state_delta_stream_cache.has_any_entity_changed(prev_stream_id):
+        if not self._curr_state_delta_stream_cache.has_any_entity_changed(
+            prev_stream_id
+        ):
             return []
 
         def get_current_state_deltas_txn(txn):
@@ -608,7 +518,7 @@ class UserDirectoryStore(SQLBaseStore):
                 WHERE ? < stream_id AND stream_id <= ?
                 ORDER BY stream_id ASC
             """
-            txn.execute(sql, (prev_stream_id, max_stream_id,))
+            txn.execute(sql, (prev_stream_id, max_stream_id))
             return self.cursor_to_dict(txn)
 
         return self.runInteraction(
@@ -643,22 +553,19 @@ class UserDirectoryStore(SQLBaseStore):
         """
 
         if self.hs.config.user_directory_search_all_users:
-            # make s.user_id null to keep the ordering algorithm happy
-            join_clause = """
-                CROSS JOIN (SELECT NULL as user_id) AS s
-            """
             join_args = ()
             where_clause = "1=1"
         else:
-            join_clause = """
-                LEFT JOIN users_in_public_rooms AS p USING (user_id)
-                LEFT JOIN (
-                    SELECT other_user_id AS user_id FROM users_who_share_rooms
-                    WHERE user_id = ? AND share_private
-                ) AS s USING (user_id)
-            """
             join_args = (user_id,)
-            where_clause = "(s.user_id IS NOT NULL OR p.user_id IS NOT NULL)"
+            where_clause = """
+                (
+                    EXISTS (select 1 from users_in_public_rooms WHERE user_id = t.user_id)
+                    OR EXISTS (
+                        SELECT 1 FROM users_who_share_private_rooms
+                        WHERE user_id = ? AND other_user_id = t.user_id
+                    )
+                )
+            """
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
@@ -670,14 +577,13 @@ class UserDirectoryStore(SQLBaseStore):
             # search: (domain, _, display name, localpart)
             sql = """
                 SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search
+                FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
-                %s
                 WHERE
                     %s
                     AND vector @@ to_tsquery('english', ?)
                 ORDER BY
-                    (CASE WHEN s.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
+                    (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
                     * (CASE WHEN avatar_url IS NOT NULL THEN 1.2 ELSE 1.0 END)
                     * (
@@ -698,16 +604,17 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % (join_clause, where_clause)
-            args = join_args + (full_query, exact_query, prefix_query, limit + 1,)
+            """ % (
+                where_clause,
+            )
+            args = join_args + (full_query, exact_query, prefix_query, limit + 1)
         elif isinstance(self.database_engine, Sqlite3Engine):
             search_query = _parse_query_sqlite(search_term)
 
             sql = """
                 SELECT d.user_id AS user_id, display_name, avatar_url
-                FROM user_directory_search
+                FROM user_directory_search as t
                 INNER JOIN user_directory AS d USING (user_id)
-                %s
                 WHERE
                     %s
                     AND value MATCH ?
@@ -716,7 +623,9 @@ class UserDirectoryStore(SQLBaseStore):
                     display_name IS NULL,
                     avatar_url IS NULL
                 LIMIT ?
-            """ % (join_clause, where_clause)
+            """ % (
+                where_clause,
+            )
             args = join_args + (search_query, limit + 1)
         else:
             # This should be unreachable.
@@ -728,10 +637,7 @@ class UserDirectoryStore(SQLBaseStore):
 
         limited = len(results) > limit
 
-        defer.returnValue({
-            "limited": limited,
-            "results": results,
-        })
+        defer.returnValue({"limited": limited, "results": results})
 
 
 def _parse_query_sqlite(search_term):
@@ -746,7 +652,7 @@ def _parse_query_sqlite(search_term):
 
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
-    return " & ".join("(%s* OR %s)" % (result, result,) for result in results)
+    return " & ".join("(%s* OR %s)" % (result, result) for result in results)
 
 
 def _parse_query_postgres(search_term):
@@ -759,7 +665,7 @@ def _parse_query_postgres(search_term):
     # Pull out the individual words, discarding any non-word characters.
     results = re.findall(r"([\w\-]+)", search_term, re.UNICODE)
 
-    both = " & ".join("(%s:* | %s)" % (result, result,) for result in results)
+    both = " & ".join("(%s:* | %s)" % (result, result) for result in results)
     exact = " & ".join("%s" % (result,) for result in results)
     prefix = " & ".join("%s:*" % (result,) for result in results)
 

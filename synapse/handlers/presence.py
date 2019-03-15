@@ -816,7 +816,7 @@ class PresenceHandler(object):
         if self.is_mine(observed_user):
             yield self.invite_presence(observed_user, observer_user)
         else:
-            yield self.federation.send_edu(
+            yield self.federation.build_and_send_edu(
                 destination=observed_user.domain,
                 edu_type="m.presence_invite",
                 content={
@@ -836,7 +836,7 @@ class PresenceHandler(object):
         if self.is_mine(observer_user):
             yield self.accept_presence(observed_user, observer_user)
         else:
-            self.federation.send_edu(
+            self.federation.build_and_send_edu(
                 destination=observer_user.domain,
                 edu_type="m.presence_accept",
                 content={
@@ -848,7 +848,7 @@ class PresenceHandler(object):
             state_dict = yield self.get_state(observed_user, as_event=False)
             state_dict = format_user_presence_state(state_dict, self.clock.time_msec())
 
-            self.federation.send_edu(
+            self.federation.build_and_send_edu(
                 destination=observer_user.domain,
                 edu_type="m.presence",
                 content={

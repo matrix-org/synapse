@@ -51,6 +51,7 @@ class LoginType(object):
     EMAIL_IDENTITY = u"m.login.email.identity"
     MSISDN = u"m.login.msisdn"
     RECAPTCHA = u"m.login.recaptcha"
+    TERMS = u"m.login.terms"
     DUMMY = u"m.login.dummy"
 
     # Only for C/S API v1
@@ -61,15 +62,18 @@ class LoginType(object):
 class EventTypes(object):
     Member = "m.room.member"
     Create = "m.room.create"
+    Tombstone = "m.room.tombstone"
     JoinRules = "m.room.join_rules"
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
+    Encryption = "m.room.encryption"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
     RoomAvatar = "m.room.avatar"
+    RoomEncryption = "m.room.encryption"
     GuestAccess = "m.room.guest_access"
     Encryption = "m.room.encryption"
 
@@ -101,7 +105,14 @@ class ThirdPartyEntityKind(object):
 
 class RoomVersions(object):
     V1 = "1"
-    VDH_TEST = "vdh-test-version"
+    V2 = "2"
+    V3 = "3"
+    STATE_V2_TEST = "state-v2-test"
+
+
+class RoomDisposition(object):
+    STABLE = "stable"
+    UNSTABLE = "unstable"
 
 
 # the version we will give rooms which are created on this server
@@ -109,7 +120,36 @@ DEFAULT_ROOM_VERSION = RoomVersions.V1
 
 # vdh-test-version is a placeholder to get room versioning support working and tested
 # until we have a working v2.
-KNOWN_ROOM_VERSIONS = {RoomVersions.V1, RoomVersions.VDH_TEST}
+KNOWN_ROOM_VERSIONS = {
+    RoomVersions.V1,
+    RoomVersions.V2,
+    RoomVersions.V3,
+    RoomVersions.STATE_V2_TEST,
+    RoomVersions.V3,
+}
+
+
+class EventFormatVersions(object):
+    """This is an internal enum for tracking the version of the event format,
+    independently from the room version.
+    """
+    V1 = 1
+    V2 = 2
+
+
+KNOWN_EVENT_FORMAT_VERSIONS = {
+    EventFormatVersions.V1,
+    EventFormatVersions.V2,
+}
+
 
 ServerNoticeMsgType = "m.server_notice"
 ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
+
+
+class UserTypes(object):
+    """Allows for user type specific behaviour. With the benefit of hindsight
+    'admin' and 'guest' users should also be UserTypes. Normal users are type None
+    """
+    SUPPORT = "support"
+    ALL_USER_TYPES = (SUPPORT,)

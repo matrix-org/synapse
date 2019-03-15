@@ -74,8 +74,14 @@ class RoomListHandler(BaseHandler):
             # We explicitly don't bother caching searches or requests for
             # appservice specific lists.
             logger.info("Bypassing cache as search request.")
+
+            # XXX: Quick hack to stop room directory queries taking too long.
+            # Timeout request after 60s. Probably want a more fundamental
+            # solution at some point
+            timeout = self.clock.time() + 60
             return self._get_public_room_list(
-                limit, since_token, search_filter, network_tuple=network_tuple,
+                limit, since_token, search_filter,
+                network_tuple=network_tuple, timeout=timeout,
             )
 
         key = (limit, since_token, network_tuple)
@@ -90,7 +96,22 @@ class RoomListHandler(BaseHandler):
     def _get_public_room_list(self, limit=None, since_token=None,
                               search_filter=None,
                               network_tuple=EMPTY_THIRD_PARTY_ID,
-                              from_federation=False,):
+                              from_federation=False,
+                              timeout=None,):
+        """Generate a public room list.
+        Args:
+            limit (int|None): Maximum amount of rooms to return.
+            since_token (str|None)
+            search_filter (dict|None): Dictionary to filter rooms by.
+            network_tuple (ThirdPartyInstanceID): Which public list to use.
+                This can be (None, None) to indicate the main list, or a particular
+                appservice and network id to use an appservice specific one.
+                Setting to None returns all public rooms across all lists.
+            from_federation (bool): Whether this request originated from a
+                federating server or a client. Used for room filtering.
+            timeout (int|None): Amount of seconds to wait for a response before
+                timing out.
+        """
         if since_token and since_token != "END":
             since_token = RoomListNextBatch.from_token(since_token)
         else:
@@ -205,6 +226,9 @@ class RoomListHandler(BaseHandler):
 
         chunk = []
         for i in range(0, len(rooms_to_scan), step):
+            if timeout and self.clock.time() > timeout:
+                raise Exception("Timed out searching room directory")
+
             batch = rooms_to_scan[i:i + step]
             logger.info("Processing %i rooms for result", len(batch))
             yield concurrently_execute(

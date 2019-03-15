@@ -65,7 +65,7 @@ class Auth(object):
         register_cache("cache", "token_cache", self.token_cache)
 
     @defer.inlineCallbacks
-    def check_from_context(self, event, context, do_sig_check=True):
+    def check_from_context(self, room_version, event, context, do_sig_check=True):
         prev_state_ids = yield context.get_prev_state_ids(self.store)
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True,
@@ -74,12 +74,16 @@ class Auth(object):
         auth_events = {
             (e.type, e.state_key): e for e in itervalues(auth_events)
         }
-        self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
+        self.check(
+            room_version, event,
+            auth_events=auth_events, do_sig_check=do_sig_check,
+        )
 
-    def check(self, event, auth_events, do_sig_check=True):
+    def check(self, room_version, event, auth_events, do_sig_check=True):
         """ Checks if this event is correctly authed.
 
         Args:
+            room_version (str): version of the room
             event: the event being checked.
             auth_events (dict: event-key -> event): the existing room state.
 
@@ -88,7 +92,9 @@ class Auth(object):
             True if the auth checks pass.
         """
         with Measure(self.clock, "auth.check"):
-            event_auth.check(event, auth_events, do_sig_check=do_sig_check)
+            event_auth.check(
+                room_version, event, auth_events, do_sig_check=do_sig_check
+            )
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
@@ -188,17 +194,33 @@ class Auth(object):
         """
         # Can optionally look elsewhere in the request (e.g. headers)
         try:
-            user_id, app_service = yield self._get_appservice_user_id(request)
-
-            if user_id:
-                request.authenticated_entity = user_id
-                defer.returnValue(
-                    synapse.types.create_requester(user_id, app_service=app_service)
-                )
+            ip_addr = self.hs.get_ip_from_request(request)
+            user_agent = request.requestHeaders.getRawHeaders(
+                b"User-Agent",
+                default=[b""]
+            )[0].decode('ascii', 'surrogateescape')
 
             access_token = self.get_access_token_from_request(
                 request, self.TOKEN_NOT_FOUND_HTTP_STATUS
             )
+
+            user_id, app_service = yield self._get_appservice_user_id(request)
+
+            if user_id:
+                request.authenticated_entity = user_id
+
+                if ip_addr and self.hs.config.track_appservice_user_ips:
+                    yield self.store.insert_client_ip(
+                        user_id=user_id,
+                        access_token=access_token,
+                        ip=ip_addr,
+                        user_agent=user_agent,
+                        device_id="dummy-device",  # stubbed
+                    )
+
+                defer.returnValue(
+                    synapse.types.create_requester(user_id, app_service=app_service)
+                )
 
             user_info = yield self.get_user_by_access_token(access_token, rights)
             user = user_info["user"]
@@ -209,11 +231,6 @@ class Auth(object):
             # stubbed out.
             device_id = user_info.get("device_id")
 
-            ip_addr = self.hs.get_ip_from_request(request)
-            user_agent = request.requestHeaders.getRawHeaders(
-                b"User-Agent",
-                default=[b""]
-            )[0].decode('ascii', 'surrogateescape')
             if user and access_token and ip_addr:
                 yield self.store.insert_client_ip(
                     user_id=user.to_string(),
@@ -291,20 +308,28 @@ class Auth(object):
         Raises:
             AuthError if no user by that token exists or the token is invalid.
         """
+
+        if rights == "access":
+            # first look in the database
+            r = yield self._look_up_user_by_access_token(token)
+            if r:
+                defer.returnValue(r)
+
+        # otherwise it needs to be a valid macaroon
         try:
             user_id, guest = self._parse_and_validate_macaroon(token, rights)
-        except _InvalidMacaroonException:
-            # doesn't look like a macaroon: treat it as an opaque token which
-            # must be in the database.
-            # TODO: it would be nice to get rid of this, but apparently some
-            # people use access tokens which aren't macaroons
-            r = yield self._look_up_user_by_access_token(token)
-            defer.returnValue(r)
-
-        try:
             user = UserID.from_string(user_id)
 
-            if guest:
+            if rights == "access":
+                if not guest:
+                    # non-guest access tokens must be in the database
+                    logger.warning("Unrecognised access token - not in store.")
+                    raise AuthError(
+                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                        "Unrecognised access token.",
+                        errcode=Codes.UNKNOWN_TOKEN,
+                    )
+
                 # Guest access tokens are not stored in the database (there can
                 # only be one access token per guest, anyway).
                 #
@@ -345,31 +370,15 @@ class Auth(object):
                     "device_id": None,
                 }
             else:
-                # This codepath exists for several reasons:
-                #   * so that we can actually return a token ID, which is used
-                #     in some parts of the schema (where we probably ought to
-                #     use device IDs instead)
-                #   * the only way we currently have to invalidate an
-                #     access_token is by removing it from the database, so we
-                #     have to check here that it is still in the db
-                #   * some attributes (notably device_id) aren't stored in the
-                #     macaroon. They probably should be.
-                # TODO: build the dictionary from the macaroon once the
-                # above are fixed
-                ret = yield self._look_up_user_by_access_token(token)
-                if ret["user"] != user:
-                    logger.error(
-                        "Macaroon user (%s) != DB user (%s)",
-                        user,
-                        ret["user"]
-                    )
-                    raise AuthError(
-                        self.TOKEN_NOT_FOUND_HTTP_STATUS,
-                        "User mismatch in macaroon",
-                        errcode=Codes.UNKNOWN_TOKEN
-                    )
+                raise RuntimeError("Unknown rights setting %s", rights)
             defer.returnValue(ret)
-        except (pymacaroons.exceptions.MacaroonException, TypeError, ValueError):
+        except (
+            _InvalidMacaroonException,
+            pymacaroons.exceptions.MacaroonException,
+            TypeError,
+            ValueError,
+        ) as e:
+            logger.warning("Invalid macaroon in auth: %s %s", type(e), e)
             raise AuthError(
                 self.TOKEN_NOT_FOUND_HTTP_STATUS, "Invalid macaroon passed.",
                 errcode=Codes.UNKNOWN_TOKEN
@@ -499,11 +508,8 @@ class Auth(object):
     def _look_up_user_by_access_token(self, token):
         ret = yield self.store.get_user_by_access_token(token)
         if not ret:
-            logger.warn("Unrecognised access token - not in store.")
-            raise AuthError(
-                self.TOKEN_NOT_FOUND_HTTP_STATUS, "Unrecognised access token.",
-                errcode=Codes.UNKNOWN_TOKEN
-            )
+            defer.returnValue(None)
+
         # we use ret.get() below because *lots* of unit tests stub out
         # get_user_by_access_token in a way where it only returns a couple of
         # the fields.
@@ -532,17 +538,6 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
-    def add_auth_events(self, builder, context):
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
-        auth_ids = yield self.compute_auth_events(builder, prev_state_ids)
-
-        auth_events_entries = yield self.store.add_event_hashes(
-            auth_ids
-        )
-
-        builder.auth_events = auth_events_entries
-
-    @defer.inlineCallbacks
     def compute_auth_events(self, event, current_state_ids, for_verification=False):
         if event.type == EventTypes.Create:
             defer.returnValue([])
@@ -558,7 +553,7 @@ class Auth(object):
         key = (EventTypes.JoinRules, "", )
         join_rule_event_id = current_state_ids.get(key)
 
-        key = (EventTypes.Member, event.user_id, )
+        key = (EventTypes.Member, event.sender, )
         member_event_id = current_state_ids.get(key)
 
         key = (EventTypes.Create, "", )
@@ -608,7 +603,7 @@ class Auth(object):
 
         defer.returnValue(auth_ids)
 
-    def check_redaction(self, event, auth_events):
+    def check_redaction(self, room_version, event, auth_events):
         """Check whether the event sender is allowed to redact the target event.
 
         Returns:
@@ -621,7 +616,7 @@ class Auth(object):
             AuthError if the event sender is definitely not allowed to redact
             the target event.
         """
-        return event_auth.check_redaction(event, auth_events)
+        return event_auth.check_redaction(room_version, event, auth_events)
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):
@@ -778,9 +773,10 @@ class Auth(object):
             threepid should never be set at the same time.
         """
 
-        # Never fail an auth check for the server notices users
+        # Never fail an auth check for the server notices users or support user
         # This can be a problem where event creation is prohibited due to blocking
-        if user_id == self.hs.config.server_notices_mxid:
+        is_support = yield self.store.is_support_user(user_id)
+        if user_id == self.hs.config.server_notices_mxid or is_support:
             return
 
         if self.hs.config.hs_disabled:
@@ -805,7 +801,9 @@ class Auth(object):
             elif threepid:
                 # If the user does not exist yet, but is signing up with a
                 # reserved threepid then pass auth check
-                if is_threepid_reserved(self.hs.config, threepid):
+                if is_threepid_reserved(
+                    self.hs.config.mau_limits_reserved_threepids, threepid
+                ):
                     return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()

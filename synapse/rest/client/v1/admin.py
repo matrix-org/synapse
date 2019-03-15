@@ -17,13 +17,15 @@
 import hashlib
 import hmac
 import logging
+import platform
 
 from six import text_type
 from six.moves import http_client
 
 from twisted.internet import defer
 
-from synapse.api.constants import Membership
+import synapse
+from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     assert_params_in_dict,
@@ -32,6 +34,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.types import UserID, create_requester
+from synapse.util.versionstring import get_version_string
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -62,6 +65,25 @@ class UsersRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Can only users a local user")
 
         ret = yield self.handlers.admin_handler.get_users()
+
+        defer.returnValue((200, ret))
+
+
+class VersionServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/server_version")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        ret = {
+            'server_version': get_version_string(synapse),
+            'python_version': platform.python_version(),
+        }
 
         defer.returnValue((200, ret))
 
@@ -158,6 +180,11 @@ class UserRegisterServlet(ClientV1RestServlet):
                 raise SynapseError(400, "Invalid password")
 
         admin = body.get("admin", None)
+        user_type = body.get("user_type", None)
+
+        if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
+            raise SynapseError(400, "Invalid user type")
+
         got_mac = body["mac"]
 
         want_mac = hmac.new(
@@ -171,6 +198,9 @@ class UserRegisterServlet(ClientV1RestServlet):
         want_mac.update(password)
         want_mac.update(b"\x00")
         want_mac.update(b"admin" if admin else b"notadmin")
+        if user_type:
+            want_mac.update(b"\x00")
+            want_mac.update(user_type.encode('utf8'))
         want_mac = want_mac.hexdigest()
 
         if not hmac.compare_digest(
@@ -189,6 +219,7 @@ class UserRegisterServlet(ClientV1RestServlet):
             password=body["password"],
             admin=bool(admin),
             generate_token=False,
+            user_type=user_type,
         )
 
         result = yield register._create_registration_details(user_id, body)
@@ -457,17 +488,6 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         )
         new_room_id = info["room_id"]
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            room_creator_requester,
-            {
-                "type": "m.room.message",
-                "content": {"body": message, "msgtype": "m.text"},
-                "room_id": new_room_id,
-                "sender": new_room_user_id,
-            },
-            ratelimit=False,
-        )
-
         requester_user_id = requester.user.to_string()
 
         logger.info("Shutting down room %r", room_id)
@@ -504,6 +524,17 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             )
 
             kicked_users.append(user_id)
+
+        yield self.event_creation_handler.create_and_send_nonmember_event(
+            room_creator_requester,
+            {
+                "type": "m.room.message",
+                "content": {"body": message, "msgtype": "m.text"},
+                "room_id": new_room_id,
+                "sender": new_room_user_id,
+            },
+            ratelimit=False,
+        )
 
         aliases_for_room = yield self.store.get_aliases_for_room(room_id)
 
@@ -754,3 +785,4 @@ def register_servlets(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
+    VersionServlet(hs).register(http_server)
