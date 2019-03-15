@@ -42,3 +42,8 @@ prune .codecov.yml
 
 exclude jenkins*
 recursive-exclude jenkins *.sh
+
+# FIXME: we shouldn't have these templates here
+recursive-include res/templates-dinsic *.css
+recursive-include res/templates-dinsic *.html
+recursive-include res/templates-dinsic *.txt
