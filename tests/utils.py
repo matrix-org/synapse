@@ -26,7 +26,7 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, RoomVersions
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.config.server import ServerConfig
 from synapse.federation.transport import server
@@ -124,6 +124,8 @@ def default_config(name):
     config.replicate_user_profiles_to = []
     config.user_consent_server_notice_content = None
     config.block_events_without_consent_error = None
+    config.user_consent_at_registration = False
+    config.user_consent_policy_name = "Privacy Policy"
     config.media_storage_providers = []
     config.autocreate_auto_join_rooms = True
     config.auto_join_rooms = []
@@ -133,12 +135,16 @@ def default_config(name):
     config.hs_disabled_limit_type = ""
     config.max_mau_value = 50
     config.mau_trial_days = 0
+    config.mau_stats_only = False
     config.mau_limits_reserved_threepids = []
     config.admin_contact = None
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
     config.register_mxid_from_3pid = None
     config.shadow_server = None
+    config.saml2_enabled = False
+    config.public_baseurl = None
+    config.default_identity_server = None
 
     config.use_frozen_dicts = False
 
@@ -151,7 +157,9 @@ def default_config(name):
     config.update_user_directory = False
 
     def is_threepid_reserved(threepid):
-        return ServerConfig.is_threepid_reserved(config, threepid)
+        return ServerConfig.is_threepid_reserved(
+            config.mau_limits_reserved_threepids, threepid
+        )
 
     config.is_threepid_reserved.side_effect = is_threepid_reserved
 
@@ -619,6 +627,7 @@ def create_room(hs, room_id, creator_id):
     event_creation_handler = hs.get_event_creation_handler()
 
     builder = event_builder_factory.new(
+        RoomVersions.V1,
         {
             "type": EventTypes.Create,
             "state_key": "",

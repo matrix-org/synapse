@@ -168,12 +168,7 @@ def start(config_options):
     )
 
     ps.setup()
-    ps.start_listening(config.worker_listeners)
-
-    def start():
-        ps.get_datastore().start_profiling()
-
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(_base.start, ps, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-appservice", config)
 

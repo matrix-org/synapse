@@ -84,7 +84,7 @@ def _rule_to_template(rule):
         templaterule["pattern"] = thecond["pattern"]
 
     if unscoped_rule_id:
-            templaterule['rule_id'] = unscoped_rule_id
+        templaterule['rule_id'] = unscoped_rule_id
     if 'default' in rule:
         templaterule['default'] = rule['default']
     return templaterule

@@ -63,6 +63,14 @@ class KeyringTestCase(unittest.TestCase):
         keys = self.mock_perspective_server.get_verify_keys()
         self.hs.config.perspectives = {self.mock_perspective_server.server_name: keys}
 
+    def assert_sentinel_context(self):
+        if LoggingContext.current_context() != LoggingContext.sentinel:
+            self.fail(
+                "Expected sentinel context but got %s" % (
+                    LoggingContext.current_context(),
+                )
+            )
+
     def check_context(self, _, expected):
         self.assertEquals(
             getattr(LoggingContext.current_context(), "request", None), expected
@@ -70,8 +78,6 @@ class KeyringTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_wait_for_previous_lookups(self):
-        sentinel_context = LoggingContext.current_context()
-
         kr = keyring.Keyring(self.hs)
 
         lookup_1_deferred = defer.Deferred()
@@ -99,8 +105,10 @@ class KeyringTestCase(unittest.TestCase):
                 ["server1"], {"server1": lookup_2_deferred}
             )
             self.assertFalse(wait_2_deferred.called)
+
             # ... so we should have reset the LoggingContext.
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assert_sentinel_context()
+
             wait_2_deferred.addBoth(self.check_context, "two")
 
             # let the first lookup complete (in the sentinel context)
@@ -198,8 +206,6 @@ class KeyringTestCase(unittest.TestCase):
         json1 = {}
         signedjson.sign.sign_json(json1, "server9", key1)
 
-        sentinel_context = LoggingContext.current_context()
-
         with LoggingContext("one") as context_one:
             context_one.request = "one"
 
@@ -213,7 +219,7 @@ class KeyringTestCase(unittest.TestCase):
 
             defer = kr.verify_json_for_server("server9", json1)
             self.assertFalse(defer.called)
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assert_sentinel_context()
             yield defer
 
             self.assertIs(LoggingContext.current_context(), context_one)

@@ -45,6 +45,7 @@ class RegistrationConfig(Config):
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
+        self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
         self.invite_3pid_guest = (
@@ -67,9 +68,17 @@ class RegistrationConfig(Config):
         self.shadow_server = config.get("shadow_server", None)
         self.rewrite_identity_server_urls = config.get("rewrite_identity_server_urls", {})
 
+        self.disable_msisdn_registration = (
+            config.get("disable_msisdn_registration", False)
+        )
 
-    def default_config(self, **kwargs):
-        registration_shared_secret = random_string_with_symbols(50)
+    def default_config(self, generate_secrets=False, **kwargs):
+        if generate_secrets:
+            registration_shared_secret = 'registration_shared_secret: "%s"' % (
+                random_string_with_symbols(50),
+            )
+        else:
+            registration_shared_secret = '# registration_shared_secret: <PRIVATE STRING>'
 
         return """\
         ## Registration ##
@@ -79,98 +88,122 @@ class RegistrationConfig(Config):
 
         # The user must provide all of the below types of 3PID when registering.
         #
-        # registrations_require_3pid:
-        #     - email
-        #     - msisdn
+        #registrations_require_3pid:
+        #  - email
+        #  - msisdn
+
+        # Explicitly disable asking for MSISDNs from the registration
+        # flow (overrides registrations_require_3pid if MSISDNs are set as required)
+        #
+        #disable_msisdn_registration: True
 
         # Derive the user's matrix ID from a type of 3PID used when registering.
         # This overrides any matrix ID the user proposes when calling /register
         # The 3PID type should be present in registrations_require_3pid to avoid
         # users failing to register if they don't specify the right kind of 3pid.
         #
-        # register_mxid_from_3pid: email
+        #register_mxid_from_3pid: email
 
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
         #
         # Use an Identity Server to establish which 3PIDs are allowed to register?
         # Overrides allowed_local_3pids below.
-        # check_is_for_allowed_local_3pids: matrix.org
+        #
+        #check_is_for_allowed_local_3pids: matrix.org
         #
         # If you are using an IS you can also check whether that IS registers
         # pending invites for the given 3PID (and then allow it to sign up on
         # the platform):
         #
-        # allow_invited_3pids: False
+        #allow_invited_3pids: False
         #
-        # allowed_local_3pids:
-        #     - medium: email
-        #       pattern: ".*@matrix\\.org"
-        #     - medium: email
-        #       pattern: ".*@vector\\.im"
-        #     - medium: msisdn
-        #       pattern: "\\+44"
+        #allowed_local_3pids:
+        #  - medium: email
+        #    pattern: '.*@matrix\\.org'
+        #  - medium: email
+        #    pattern: '.*@vector\\.im'
+        #  - medium: msisdn
+        #    pattern: '\\+44'
 
         # If true, stop users from trying to change the 3PIDs associated with
         # their accounts.
         #
-        # disable_3pid_changes: False
+        #disable_3pid_changes: False
 
         # If set, allows registration by anyone who also has the shared
         # secret, even if registration is otherwise disabled.
-        registration_shared_secret: "%(registration_shared_secret)s"
+        #
+        %(registration_shared_secret)s
 
         # Set the number of bcrypt rounds used to generate password hash.
         # Larger numbers increase the work factor needed to generate the hash.
         # The default number is 12 (which equates to 2^12 rounds).
         # N.B. that increasing this will exponentially increase the time required
         # to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
+        #
         bcrypt_rounds: 12
 
         # Allows users to register as guests without a password/email/etc, and
         # participate in rooms hosted on this server which have been made
         # accessible to anonymous users.
+        #
         allow_guest_access: False
+
+        # The identity server which we suggest that clients should use when users log
+        # in on this server.
+        #
+        # (By default, no suggestion is made, so it is left up to the client.
+        # This setting is ignored unless public_baseurl is also set.)
+        #
+        #default_identity_server: https://matrix.org
 
         # The list of identity servers trusted to verify third party
         # identifiers by this server.
+        #
+        # Also defines the ID server which will be called when an account is
+        # deactivated (one will be picked arbitrarily).
+        #
         trusted_third_party_id_servers:
-            - matrix.org
-            - vector.im
-            - riot.im
+          - matrix.org
+          - vector.im
 
         # If enabled, user IDs, display names and avatar URLs will be replicated
         # to this server whenever they change.
         # This is an experimental API currently implemented by sydent to support
         # cross-homeserver user directories.
-        # replicate_user_profiles_to: example.com
+        #
+        #replicate_user_profiles_to: example.com
 
         # If specified, attempt to replay registrations, profile changes & 3pid
         # bindings on the given target homeserver via the AS API. The HS is authed
         # via a given AS token.
-        # shadow_server:
-        #     hs_url: https://shadow.example.com
-        #     hs: shadow.example.com
-        #     as_token: 12u394refgbdhivsia
+        #
+        #shadow_server:
+        #  hs_url: https://shadow.example.com
+        #  hs: shadow.example.com
+        #  as_token: 12u394refgbdhivsia
 
         # If enabled, don't let users set their own display names/avatars
         # other than for the very first time (unless they are a server admin).
         # Useful when provisioning users based on the contents of a 3rd party
         # directory and to avoid ambiguities.
         #
-        # disable_set_displayname: False
-        # disable_set_avatar_url: False
+        #disable_set_displayname: False
+        #disable_set_avatar_url: False
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
+        #
         #auto_join_rooms:
-        #    - "#example:example.com"
+        #  - "#example:example.com"
 
         # Where auto_join_rooms are specified, setting this flag ensures that the
         # the rooms exist by creating them when the first user on the
         # homeserver registers.
         # Setting to false means that if the rooms are not manually created,
         # users cannot be auto-joined since they do not exist.
+        #
         autocreate_auto_join_rooms: true
         """ % locals()
 

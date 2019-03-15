@@ -136,7 +136,11 @@ class PaginationHandler(object):
             logger.info("[purge] complete")
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
         except Exception:
-            logger.error("[purge] failed: %s", Failure().getTraceback().rstrip())
+            f = Failure()
+            logger.error(
+                "[purge] failed",
+                exc_info=(f.type, f.value, f.getTracebackObject()),
+            )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
         finally:
             self._purges_in_progress_by_room.discard(room_id)
@@ -235,6 +239,17 @@ class PaginationHandler(object):
                 "room_key", next_key
             )
 
+        if events:
+            if event_filter:
+                events = event_filter.filter(events)
+
+            events = yield filter_events_for_client(
+                self.store,
+                user_id,
+                events,
+                is_peeking=(member_event_id is None),
+            )
+
         if not events:
             defer.returnValue({
                 "chunk": [],
@@ -242,18 +257,8 @@ class PaginationHandler(object):
                 "end": next_token.to_string(),
             })
 
-        if event_filter:
-            events = event_filter.filter(events)
-
-        events = yield filter_events_for_client(
-            self.store,
-            user_id,
-            events,
-            is_peeking=(member_event_id is None),
-        )
-
         state = None
-        if event_filter and event_filter.lazy_load_members():
+        if event_filter and event_filter.lazy_load_members() and len(events) > 0:
             # TODO: remove redundant members
 
             # FIXME: we also care about invite targets etc.

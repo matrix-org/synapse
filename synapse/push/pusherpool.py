@@ -19,6 +19,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.push import PusherConfigException
 from synapse.push.pusher import PusherFactory
 
 logger = logging.getLogger(__name__)
@@ -140,6 +141,10 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_id, max_stream_id):
+        if not self.pushers:
+            # nothing to do here.
+            return
+
         try:
             users_affected = yield self.store.get_push_action_users_in_range(
                 min_stream_id, max_stream_id
@@ -155,6 +160,10 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
+        if not self.pushers:
+            # nothing to do here.
+            return
+
         try:
             # Need to subtract 1 from the minimum because the lower bound here
             # is not inclusive
@@ -214,6 +223,15 @@ class PusherPool:
         """
         try:
             p = self.pusher_factory.create_pusher(pusherdict)
+        except PusherConfigException as e:
+            logger.warning(
+                "Pusher incorrectly configured user=%s, appid=%s, pushkey=%s: %s",
+                pusherdict.get('user_name'),
+                pusherdict.get('app_id'),
+                pusherdict.get('pushkey'),
+                e,
+            )
+            return
         except Exception:
             logger.exception("Couldn't start a pusher: caught Exception")
             return
