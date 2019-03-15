@@ -1,0 +1,1 @@
+The repopulation of the user directory on upgrades will now no longer start from scratch if interrupted by a server restart.
