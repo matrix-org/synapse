@@ -51,15 +51,11 @@ class RatelimitConfig(Config):
         #
         rc_message_burst_count: 10.0
 
-        # Optional ratelimiting settings for registration and login.
+        # Ratelimiting settings for registration and login.
         #
         # Each ratelimiting configuration is made of two parameters:
         #   - per_second: number of requests a client can send per second.
         #   - burst_count: number of requests a client can send before being throttled.
-        #
-        # If a ratelimiting configuration is omitted from Synapse's configuration,
-        # its `per_second` value will default to 0.17 (1/min) and its `burst_count`
-        # value will default to 3.0.
         #
         # Synapse currently uses three different configurations:
         #   - one for registration that ratelimits registration requests based on the
@@ -69,19 +65,19 @@ class RatelimitConfig(Config):
         #   - one for login that ratelimits login requests based on the account the
         #     client is attempting to log into.
         #
-        # This configuration follows the following structure:
+        # The defaults are as shown below.
         #
-        # rc_registration:
-        #     per_second: 0.17
-        #     burst_count: 3
+        #rc_registration:
+        #  per_second: 0.17
+        #  burst_count: 3
         #
-        # rc_login:
-        #     address:
-        #         per_second: 0.17
-        #         burst_count: 3
-        #     account:
-        #         per_second: 0.17
-        #         burst_count: 3
+        #rc_login:
+        #  address:
+        #    per_second: 0.17
+        #    burst_count: 3
+        #  account:
+        #    per_second: 0.17
+        #    burst_count: 3
 
         # The federation window size in milliseconds
         #
