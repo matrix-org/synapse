@@ -157,6 +157,8 @@ def default_config(name):
     config.rc_login_address.burst_count = 10000
     config.rc_login_account.per_second = 10000
     config.rc_login_account.burst_count = 10000
+    config.rc_login_failed_attempts.per_second = 10000
+    config.rc_login_failed_attempts.burst_count = 10000
     config.saml2_enabled = False
     config.public_baseurl = None
     config.default_identity_server = None

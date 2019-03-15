@@ -392,6 +392,9 @@ rc_message_burst_count: 10.0
 #     address.
 #   - one for login that ratelimits login requests based on the account the
 #     client is attempting to log into.
+#   - one for login that ratelimits login requests based on the account the
+#     client is attempting to log into, based on the amount of failed login
+#     attempts for this account.
 #
 # The defaults are as shown below.
 #
@@ -404,6 +407,9 @@ rc_message_burst_count: 10.0
 #    per_second: 0.17
 #    burst_count: 3
 #  account:
+#    per_second: 0.17
+#    burst_count: 3
+#  failed_attempts:
 #    per_second: 0.17
 #    burst_count: 3
 
