@@ -21,7 +21,7 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.state import StateFilter
 from synapse.types import get_domain_from_id, get_localpart_from_id
@@ -30,7 +30,161 @@ from synapse.util.caches.descriptors import cached
 logger = logging.getLogger(__name__)
 
 
-class UserDirectoryStore(SQLBaseStore):
+class UserDirectoryStore(BackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+        super(UserDirectoryStore, self).__init__(db_conn, hs)
+
+        self.server_name = hs.hostname
+
+        self.register_background_update_handler(
+            "populate_user_directory", self._populate_user_directory
+        )
+
+    @defer.inlineCallbacks
+    def _populate_user_directory(self, progress, batch_size):
+
+        TEMP_TABLE = "_temp_populate_user_directory_rooms"
+        state = self.hs.get_state_handler()
+
+        # If we don't have progress filed, delete everything.
+        if not progress:
+            yield self.delete_all_from_user_dir()
+
+        # Get all the rooms that we want to process.
+        def _make_staging_area(txn):
+            sql = (
+                "CREATE TABLE IF NOT EXISTS "
+                + TEMP_TABLE
+                + "(room_id TEXT NOT NULL, events BIGINT NOT NULL)"
+            )
+            txn.execute(sql)
+
+            # Get rooms we want to process from the database
+            sql = """
+                SELECT room_id, count(*) FROM current_state_events
+                GROUP BY room_id
+            """
+            txn.execute(sql)
+            rooms = [{"room_id": x[0], "events": x[1]} for x in txn.fetchall()]
+
+            self._simple_insert_many_txn(txn, TEMP_TABLE, rooms)
+
+            progress["stage"] = "processing"
+            self._background_update_progress_txn(
+                txn, "populate_user_directory", progress
+            )
+
+        def _delete_staging_area(txn):
+            sql = "DROP TABLE IF EXISTS " + TEMP_TABLE
+            txn.execute(sql)
+
+        if progress.get("stage") != "processing":
+            new_pos = yield self.get_max_stream_id_in_current_state_deltas()
+            progress["pos"] = new_pos
+            self.runInteraction(
+                "populate_user_directory_temp_build", _make_staging_area
+            )
+
+        def _get_next_batch(txn):
+            sql = """
+                SELECT room_id FROM %s
+                ORDER BY events DESC
+                LIMIT %s
+            """ % (
+                TEMP_TABLE,
+                str(batch_size),
+            )
+            txn.execute(sql)
+            rooms_to_work_on = txn.fetchall()
+
+            if not rooms_to_work_on:
+                return None
+
+            rooms_to_work_on = [x[0] for x in rooms_to_work_on]
+
+            sql = "SELECT COUNT(*) FROM " + TEMP_TABLE
+            txn.execute(sql)
+            progress["remaining"] = txn.fetchone()[0]
+
+            return rooms_to_work_on
+
+        rooms_to_work_on = yield self.runInteraction(
+            "populate_user_directory_temp_read", _get_next_batch
+        )
+
+        if rooms_to_work_on is None:
+            self.runInteraction(
+                "populate_user_directory_temp_cleanup", _delete_staging_area
+            )
+            yield self.update_user_directory_stream_pos(progress["pos"])
+            self._end_background_update("populate_user_directory")
+            defer.returnValue(1)
+
+        logger.info(
+            "Processing the next %d rooms of %d remaining"
+            % (len(rooms_to_work_on), progress["remaining"])
+        )
+
+        for room_id in rooms_to_work_on:
+            is_in_room = yield self.is_host_joined(room_id, self.server_name)
+            if not is_in_room:
+                continue
+
+            is_public = yield self.is_room_world_readable_or_publicly_joinable(room_id)
+
+            users_with_profile = yield state.get_current_user_in_room(room_id)
+            user_ids = set(users_with_profile)
+
+            # Update each user in the user directory.
+            for user_id, profile in users_with_profile.items():
+                yield self.update_profile_in_user_dir(
+                    user_id, profile.display_name, profile.avatar_url
+                )
+
+            to_insert = set()
+
+            if is_public:
+                for user_id in user_ids:
+                    if self.get_if_app_services_interested_in_user(user_id):
+                        continue
+
+                    to_insert.add(user_id)
+
+                if to_insert:
+                    yield self.add_users_in_public_rooms(room_id, to_insert)
+                    to_insert.clear()
+            else:
+                for user_id in user_ids:
+                    if not self.hs.is_mine_id(user_id):
+                        continue
+
+                    if self.get_if_app_services_interested_in_user(user_id):
+                        continue
+
+                    for other_user_id in user_ids:
+                        if user_id == other_user_id:
+                            continue
+
+                        user_set = (user_id, other_user_id)
+                        to_insert.add(user_set)
+
+                if to_insert:
+                    yield self.add_users_who_share_private_room(room_id, to_insert)
+                    to_insert.clear()
+
+            # We've finished a room. Delete it from the table.
+            self._simple_delete_one(TEMP_TABLE, {"room_id": room_id})
+            # Update the remaining counter.
+            progress["remaining"] -= 1
+            self.runInteraction(
+                "populate_user_directory",
+                self._background_update_progress_txn,
+                "populate_user_directory",
+                progress,
+            )
+
+        defer.returnValue(len(rooms_to_work_on))
+
     @defer.inlineCallbacks
     def is_room_world_readable_or_publicly_joinable(self, room_id):
         """Check if the room is either world_readable or publically joinable
@@ -62,89 +216,15 @@ class UserDirectoryStore(SQLBaseStore):
 
         defer.returnValue(False)
 
-    def add_profiles_to_user_dir(self, users_with_profile):
-        """Add profiles to the user directory
-
-        Args:
-            users_with_profile (dict): Users to add to directory in the form of
-                mapping of user_id -> ProfileInfo
+    def update_profile_in_user_dir(self, user_id, display_name, avatar_url):
         """
-
-        if isinstance(self.database_engine, PostgresEngine):
-            # We weight the loclpart most highly, then display name and finally
-            # server name
-            sql = """
-                INSERT INTO user_directory_search(user_id, vector)
-                VALUES (?,
-                    setweight(to_tsvector('english', ?), 'A')
-                    || setweight(to_tsvector('english', ?), 'D')
-                    || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
-                )
-            """
-            args = (
-                (
-                    user_id,
-                    get_localpart_from_id(user_id),
-                    get_domain_from_id(user_id),
-                    profile.display_name,
-                )
-                for user_id, profile in iteritems(users_with_profile)
-            )
-        elif isinstance(self.database_engine, Sqlite3Engine):
-            sql = """
-                INSERT INTO user_directory_search(user_id, value)
-                VALUES (?,?)
-            """
-            args = tuple(
-                (
-                    user_id,
-                    "%s %s" % (user_id, p.display_name) if p.display_name else user_id,
-                )
-                for user_id, p in iteritems(users_with_profile)
-            )
-        else:
-            # This should be unreachable.
-            raise Exception("Unrecognized database engine")
-
-        def _add_profiles_to_user_dir_txn(txn):
-            txn.executemany(sql, args)
-            self._simple_insert_many_txn(
-                txn,
-                table="user_directory",
-                values=[
-                    {
-                        "user_id": user_id,
-                        "room_id": None,
-                        "display_name": profile.display_name,
-                        "avatar_url": profile.avatar_url,
-                    }
-                    for user_id, profile in iteritems(users_with_profile)
-                ],
-            )
-            for user_id in users_with_profile:
-                txn.call_after(self.get_user_in_directory.invalidate, (user_id,))
-
-        return self.runInteraction(
-            "add_profiles_to_user_dir", _add_profiles_to_user_dir_txn
-        )
-
-    @defer.inlineCallbacks
-    def update_user_in_user_dir(self, user_id, room_id):
-        yield self._simple_update_one(
-            table="user_directory",
-            keyvalues={"user_id": user_id},
-            updatevalues={"room_id": room_id},
-            desc="update_user_in_user_dir",
-        )
-        self.get_user_in_directory.invalidate((user_id,))
-
-    def update_profile_in_user_dir(self, user_id, display_name, avatar_url, room_id):
+        Update or add a user's profile in the user directory.
+        """
         def _update_profile_in_user_dir_txn(txn):
             new_entry = self._simple_upsert_txn(
                 txn,
                 table="user_directory",
                 keyvalues={"user_id": user_id},
-                insertion_values={"room_id": room_id},
                 values={"display_name": display_name, "avatar_url": avatar_url},
                 lock=False,  # We're only inserter
             )
@@ -280,18 +360,6 @@ class UserDirectoryStore(SQLBaseStore):
         user_ids.update(user_ids_share_priv)
 
         defer.returnValue(user_ids)
-
-    @defer.inlineCallbacks
-    def get_all_rooms(self):
-        """Get all room_ids we've ever known about, in ascending order of "size"
-        """
-        sql = """
-            SELECT room_id FROM current_state_events
-            GROUP BY room_id
-            ORDER BY count(*) ASC
-        """
-        rows = yield self._execute("get_all_rooms", None, sql)
-        defer.returnValue([room_id for room_id, in rows])
 
     @defer.inlineCallbacks
     def get_all_local_users(self):

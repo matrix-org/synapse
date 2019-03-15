@@ -163,9 +163,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def get_users_in_public_rooms(self):
         r = self.get_success(
             self.store._simple_select_list(
-                "users_in_public_rooms",
-                None,
-                ("user_id", "room_id"),
+                "users_in_public_rooms", None, ("user_id", "room_id")
             )
         )
         retval = []
@@ -182,6 +180,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
+    @unittest.DEBUG
     def test_initial(self):
         """
         The user directory's initial handler correctly updates the search tables.
@@ -211,11 +210,17 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(shares_private, [])
         self.assertEqual(public_users, [])
 
-        # Reset the handled users caches
-        self.handler.initially_handled_users = set()
+        # Do the initial population of the user directory via the background update
+        self.store._all_done = False
+        d = self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {"update_name": "populate_user_directory", "progress_json": "{}"},
+            )
+        )
 
-        # Do the initial population
-        d = self.handler._do_initial_spam()
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
 
         # This takes a while, so pump it a bunch of times to get through the
         # sleep delays
@@ -228,9 +233,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         # User 1 and User 2 are in the same public room
-        self.assertEqual(
-            set(public_users), set([(u1, room), (u2, room)])
-        )
+        self.assertEqual(set(public_users), set([(u1, room), (u2, room)]))
 
         # User 1 and User 3 share private rooms
         self.assertEqual(
