@@ -10,7 +10,7 @@ steps:
             - "POSTGRES=1"
           workdir: "/src"
           shell: false
-          command: []
+          command: ["-v"]
 
   - command:
       - "python -m pip install tox"
