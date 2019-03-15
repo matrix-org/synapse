@@ -1,1 +1,1 @@
-Add a default .m.rule.tombstone push rule
+Add a default .m.rule.tombstone push rule.
