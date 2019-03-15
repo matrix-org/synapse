@@ -3,9 +3,9 @@ env:
 
 steps:
   - label: "Sytest postgres 3"
+    command: "-v"
     plugins:
       - docker#v3.0.1:
-          command: "-v"
           image: "matrixdotorg/sytest-synapsepy3:latest"
           environment:
             - "POSTGRES=1"
