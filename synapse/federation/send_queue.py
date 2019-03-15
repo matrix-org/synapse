@@ -183,6 +183,15 @@ class FederationRemoteSendQueue(object):
 
         self.notifier.on_new_replication_data()
 
+    def send_read_receipt(self, receipt):
+        """As per TransactionQueue
+
+        Args:
+            receipt (synapse.types.ReadReceipt):
+        """
+        # nothing to do here: the replication listener will handle it.
+        pass
+
     def send_presence(self, states):
         """As per TransactionQueue
 
