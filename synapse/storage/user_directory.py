@@ -115,7 +115,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
                 "populate_user_directory_temp_cleanup", _delete_staging_area
             )
             yield self.update_user_directory_stream_pos(progress["pos"])
-            self._end_background_update("populate_user_directory")
+            yield self._end_background_update("populate_user_directory")
             defer.returnValue(1)
 
         logger.info(
