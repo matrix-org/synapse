@@ -14,10 +14,10 @@
 # limitations under the License.
 
 
-from tests import unittest
-
 from synapse.config._base import ConfigError
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
+
+from tests import unittest
 
 
 class DomainRuleCheckerTestCase(unittest.TestCase):

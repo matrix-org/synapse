@@ -16,11 +16,11 @@
 
 import logging
 
+from six.moves import range
+
 from signedjson.sign import sign_json
 
 from twisted.internet import defer, reactor
-
-from six.moves import range
 
 from synapse.api.errors import (
     AuthError,
