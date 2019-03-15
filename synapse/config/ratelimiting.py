@@ -57,7 +57,7 @@ class RatelimitConfig(Config):
         #   - per_second: number of requests a client can send per second.
         #   - burst_count: number of requests a client can send before being throttled.
         #
-        # Synapse currently uses three different configurations:
+        # Synapse currently uses the following configurations:
         #   - one for registration that ratelimits registration requests based on the
         #     client's IP address.
         #   - one for login that ratelimits login requests based on the client's IP
