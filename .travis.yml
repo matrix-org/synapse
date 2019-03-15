@@ -74,11 +74,11 @@ matrix:
     services:
       - postgresql
 
-  - # we only need to check for the newsfragment if it's a PR build
-    if: type = pull_request
-    name: "check-newsfragment"
-    python: 3.6
-    script: scripts-dev/check-newsfragment
+  # - # we only need to check for the newsfragment if it's a PR build
+  #   if: type = pull_request
+  #   name: "check-newsfragment"
+  #   python: 3.6
+  #   script: scripts-dev/check-newsfragment
 
 install:
   # this just logs the postgres version we will be testing against (if any)
