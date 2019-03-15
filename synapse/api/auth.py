@@ -523,6 +523,12 @@ class Auth(object):
 
     def get_appservice_by_req(self, request):
         (user_id, app_service) = self._get_appservice_user_id(request)
+        if not app_service:
+            raise AuthError(
+                self.TOKEN_NOT_FOUND_HTTP_STATUS,
+                "Unrecognised access token.",
+                errcode=Codes.UNKNOWN_TOKEN,
+            )
         request.authenticated_entity = app_service.sender
         return app_service
 
