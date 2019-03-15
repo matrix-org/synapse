@@ -157,7 +157,7 @@ steps:
             - .buildkite/docker-compose.py37.pg11.yaml
 
   - label: "Sytest postgres 3"
-    command: ""
+    command: "/synapse_sytest.sh"
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3:latest"
