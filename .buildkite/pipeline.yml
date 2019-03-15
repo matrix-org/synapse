@@ -2,6 +2,15 @@ env:
   CODECOV_TOKEN: "2dd7eb9b-0eda-45fe-a47c-9b5ac040045f"
 
 steps:
+  - label: "Sytest postgres 3"
+    plugins:
+      - docker#v3.0.1:
+          # command: "/synapse_sytest.sh"
+          image: "matrixdotorg/sytest-synapsepy3:latest"
+          environment:
+            - "POSTGRES=1"
+          workdir: "/src"
+
   - command:
       - "python -m pip install tox"
       - "tox -e pep8"
@@ -155,12 +164,3 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
-
-  - label: "Sytest postgres 3"
-    command: "/synapse_sytest.sh"
-    plugins:
-      - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapsepy3:latest"
-          environment:
-            - "POSTGRES=1"
-          workdir: "/src"
