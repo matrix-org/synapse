@@ -11,14 +11,14 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3:latest"
-          # environment:
-          #   - "POSTGRES=1"
-          #   - "WORKERS=1"
+          environment:
+            - "POSTGRES=1"
+            - "WORKERS=1"
           workdir: "/src"
           volumes:
             - /tmp:/logs
           shell: false
-          command: ["tests/10apidoc/30room-create.pl"]
+          command: ["--all"]
 
   - wait: ~
     continue_on_failure: true
