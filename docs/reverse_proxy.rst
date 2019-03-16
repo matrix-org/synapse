@@ -69,10 +69,8 @@ Let's assume that we expect clients to connect to our server at
           SSLEngine on
           ServerName matrix.example.com;
 
-          <Location /_matrix>
-              ProxyPass http://127.0.0.1:8008/_matrix nocanon
-              ProxyPassReverse http://127.0.0.1:8008/_matrix
-          </Location>
+          ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
+          ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
       </VirtualHost>
 
       <VirtualHost *:8448>
