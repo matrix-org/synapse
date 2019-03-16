@@ -19,8 +19,12 @@ steps:
             - /tmp:/logs
           shell: false
           command: ["--all"]
+  - wait: ~
+    continue_on_failure: true
+
+  - plugins:
       - junit-annotate#v1.2.0:
-          artifacts: tmp/sytest/results.xml
+          artifacts: /tmp/sytest/results.xml
 
   - command:
       - "python -m pip install tox"
