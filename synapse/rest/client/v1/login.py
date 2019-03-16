@@ -22,6 +22,7 @@ from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -97,6 +98,7 @@ class LoginRestServlet(ClientV1RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
+        self._address_ratelimiter = Ratelimiter()
 
     def on_GET(self, request):
         flows = []
@@ -129,6 +131,13 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        self._address_ratelimiter.ratelimit(
+            request.getClientIP(), time_now_s=self.hs.clock.time(),
+            rate_hz=self.hs.config.rc_login_address.per_second,
+            burst_count=self.hs.config.rc_login_address.burst_count,
+            update=True,
+        )
+
         login_submission = parse_json_object_from_request(request)
         try:
             if self.jwt_enabled and (login_submission["type"] ==
@@ -285,6 +294,7 @@ class LoginRestServlet(ClientV1RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
+
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if registered_user_id:

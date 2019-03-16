@@ -376,6 +376,7 @@ def setup(config_options):
     logger.info("Database prepared in %s.", config.database_config['name'])
 
     hs.setup()
+    hs.setup_master()
 
     @defer.inlineCallbacks
     def do_acme():
@@ -636,17 +637,15 @@ def run(hs):
         # be quite busy the first few minutes
         clock.call_later(5 * 60, start_phone_stats_home)
 
-    if hs.config.daemonize and hs.config.print_pidfile:
-        print(hs.config.pid_file)
-
     _base.start_reactor(
         "synapse-homeserver",
-        hs.config.soft_file_limit,
-        hs.config.gc_thresholds,
-        hs.config.pid_file,
-        hs.config.daemonize,
-        hs.config.cpu_affinity,
-        logger,
+        soft_file_limit=hs.config.soft_file_limit,
+        gc_thresholds=hs.config.gc_thresholds,
+        pid_file=hs.config.pid_file,
+        daemonize=hs.config.daemonize,
+        cpu_affinity=hs.config.cpu_affinity,
+        print_pidfile=hs.config.print_pidfile,
+        logger=logger,
     )
 
 
