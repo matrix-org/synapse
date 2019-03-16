@@ -3,12 +3,17 @@ env:
 
 steps:
   - label: "Sytest postgres 3"
+    artifact_paths:
+      - logs/*
+      - logs/**/*
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3:latest"
           environment:
             - "POSTGRES=1"
           workdir: "/src"
+          volumes:
+            - logs:/logs
           shell: false
           command: ["-v"]
 
