@@ -20,9 +20,6 @@ steps:
           shell: false
           command: ["tests/10apidoc/30room-create.pl"]
 
-      - junit-annotate#v1.2.0:
-          artifacts: /tmp/sytest/results.xml
-
   - wait: ~
     continue_on_failure: true
 
