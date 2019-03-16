@@ -18,7 +18,7 @@ steps:
           volumes:
             - /tmp:/logs
           shell: false
-          command: ["-v"]
+          command: ["--all"]
 
   - command:
       - "python -m pip install tox"
