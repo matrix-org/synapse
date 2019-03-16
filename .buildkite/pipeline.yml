@@ -6,13 +6,14 @@ steps:
     artifact_paths:
       - /tmp/*.log*
       - /tmp/**/*.log*
-      - /tmp/results.xml
+      - /tmp/sytest/results.xml
       - /tmp/results.tap
     plugins:
       - docker#v3.0.1:
           image: "matrixdotorg/sytest-synapsepy3:latest"
           environment:
             - "POSTGRES=1"
+            - "WORKERS=1"
           workdir: "/src"
           volumes:
             - /tmp:/logs
@@ -52,6 +53,13 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
           propagate-environment: true
+
+  - wait: ~
+    continue_on_failure: true
+
+  - plugins:
+      - junit-annotate#v1.2.0:
+          artifacts: /tmp/sytest/results.xml
 
   - wait
 
@@ -172,3 +180,4 @@ steps:
           run: testenv
           config:
             - .buildkite/docker-compose.py37.pg11.yaml
+
