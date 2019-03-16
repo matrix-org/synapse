@@ -13,7 +13,7 @@ steps:
             - "POSTGRES=1"
           workdir: "/src"
           volumes:
-            - logs:/logs
+            - logs/:/logs
           shell: false
           command: ["-v"]
 
