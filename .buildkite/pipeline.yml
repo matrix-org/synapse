@@ -20,7 +20,7 @@ steps:
           shell: false
           command: ["--all"]
       - junit-annotate#v1.2.0:
-          artifacts: /tmp/sytest/results.xml
+          artifacts: tmp/sytest/results.xml
 
   - command:
       - "python -m pip install tox"
