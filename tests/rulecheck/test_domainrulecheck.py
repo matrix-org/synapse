@@ -31,13 +31,13 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertTrue(
-            check.user_may_invite("test:source_one", "test:target_one", "room")
+            check.user_may_invite("test:source_one", "test:target_one", "room", False)
         )
         self.assertTrue(
-            check.user_may_invite("test:source_one", "test:target_two", "room")
+            check.user_may_invite("test:source_one", "test:target_two", "room", False)
         )
         self.assertTrue(
-            check.user_may_invite("test:source_two", "test:target_two", "room")
+            check.user_may_invite("test:source_two", "test:target_two", "room", False)
         )
 
     def test_disallowed(self):
@@ -51,16 +51,16 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertFalse(
-            check.user_may_invite("test:source_one", "test:target_three", "room")
+            check.user_may_invite("test:source_one", "test:target_three", "room", False)
         )
         self.assertFalse(
-            check.user_may_invite("test:source_two", "test:target_three", "room")
+            check.user_may_invite("test:source_two", "test:target_three", "room", False)
         )
         self.assertFalse(
-            check.user_may_invite("test:source_two", "test:target_one", "room")
+            check.user_may_invite("test:source_two", "test:target_one", "room", False)
         )
         self.assertFalse(
-            check.user_may_invite("test:source_four", "test:target_one", "room")
+            check.user_may_invite("test:source_four", "test:target_one", "room", False)
         )
 
     def test_default_allow(self):
@@ -73,7 +73,7 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertTrue(
-            check.user_may_invite("test:source_three", "test:target_one", "room")
+            check.user_may_invite("test:source_three", "test:target_one", "room", False)
         )
 
     def test_default_deny(self):
@@ -86,7 +86,7 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertFalse(
-            check.user_may_invite("test:source_three", "test:target_one", "room")
+            check.user_may_invite("test:source_three", "test:target_one", "room", False)
         )
 
     def test_config_parse(self):
