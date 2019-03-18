@@ -301,7 +301,30 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            new_room=False,
     ):
+        """Update a users membership in a room
+
+        Args:
+            requester (Requester)
+            target (UserID)
+            room_id (str)
+            action (str): The "action" the requester is performing against the
+                target. One of join/leave/kick/ban/invite/unban.
+            txn_id (str|None): The transaction ID associated with the request,
+                or None not provided.
+            remote_room_hosts (list[str]|None): List of remote servers to try
+                and join via if server isn't already in the room.
+            third_party_signed (dict|None): The signed object for third party
+                invites.
+            ratelimit (bool): Whether to apply ratelimiting to this request.
+            content (dict|None): Fields to include in the new events content.
+            new_room (bool): Whether these membership changes are happening
+                as part of a room creation (e.g. initial joins and invites)
+
+        Returns:
+            Deferred[FrozenEvent]
+        """
         key = (room_id,)
 
         with (yield self.member_linearizer.queue(key)):
@@ -315,6 +338,7 @@ class RoomMemberHandler(object):
                 third_party_signed=third_party_signed,
                 ratelimit=ratelimit,
                 content=content,
+                new_room=new_room,
             )
 
         defer.returnValue(result)
@@ -331,6 +355,7 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            new_room=False,
     ):
         content_specified = bool(content)
         if content is None:
@@ -392,6 +417,7 @@ class RoomMemberHandler(object):
 
                 if not self.spam_checker.user_may_invite(
                     requester.user.to_string(), target.to_string(), room_id,
+                    new_room=new_room,
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True
@@ -461,8 +487,29 @@ class RoomMemberHandler(object):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
+            if (self._server_notices_mxid is not None and
+                    requester.user.to_string() == self._server_notices_mxid):
+                # allow the server notices mxid to join rooms
+                is_requester_admin = True
+
+            else:
+                is_requester_admin = yield self.auth.is_server_admin(
+                    requester.user,
+                )
+
+            inviter = yield self._get_inviter(target.to_string(), room_id)
+            if not is_requester_admin:
+                # We assume that if the spam checker allowed the user to create
+                # a room then they're allowed to join it.
+                if not new_room and not self.spam_checker.user_may_join_room(
+                    target.to_string(), room_id,
+                    is_invited=inviter is not None,
+                ):
+                    raise SynapseError(
+                        403, "Not allowed to join this room",
+                    )
+
             if not is_host_in_room:
-                inviter = yield self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
                     remote_room_hosts.append(inviter.domain)
 

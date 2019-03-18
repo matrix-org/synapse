@@ -34,7 +34,17 @@ class DomainRuleChecker(object):
             "inviter_domain": [ "invitee_domain_permitted", "other_domain_permitted" ]
             "other_inviter_domain": [ "invitee_domain_permitted" ]
           default: False
-        }
+
+          # Only let local users join rooms if they were explicitly invited.
+          can_only_join_rooms_with_invite: false
+
+          # Only let local users create rooms if they are inviting only one
+          # other user, and that user matches the rules above.
+          can_only_create_one_to_one_rooms: false
+
+          # Only let local users invite during room creation, regardless of the
+          # domain mapping rules above.
+          can_only_invite_during_room_creation: false
 
     Don't forget to consider if you can invite users from your own domain.
     """
@@ -43,14 +53,28 @@ class DomainRuleChecker(object):
         self.domain_mapping = config["domain_mapping"] or {}
         self.default = config["default"]
 
+        self.can_only_join_rooms_with_invite = config.get(
+            "can_only_join_rooms_with_invite", False,
+        )
+        self.can_only_create_one_to_one_rooms = config.get(
+            "can_only_create_one_to_one_rooms", False,
+        )
+        self.can_only_invite_during_room_creation = config.get(
+            "can_only_invite_during_room_creation", False,
+        )
+
     def check_event_for_spam(self, event):
         """Implements synapse.events.SpamChecker.check_event_for_spam
         """
         return False
 
-    def user_may_invite(self, inviter_userid, invitee_userid, room_id):
+    def user_may_invite(self, inviter_userid, invitee_userid, room_id,
+                        new_room):
         """Implements synapse.events.SpamChecker.user_may_invite
         """
+        if self.can_only_invite_during_room_creation and not new_room:
+            return False
+
         inviter_domain = self._get_domain_from_id(inviter_userid)
         invitee_domain = self._get_domain_from_id(invitee_userid)
 
@@ -59,9 +83,16 @@ class DomainRuleChecker(object):
 
         return invitee_domain in self.domain_mapping[inviter_domain]
 
-    def user_may_create_room(self, userid):
+    def user_may_create_room(self, userid, invite_list, cloning):
         """Implements synapse.events.SpamChecker.user_may_create_room
         """
+
+        if cloning:
+            return True
+
+        if self.can_only_create_one_to_one_rooms and len(invite_list) != 1:
+            return False
+
         return True
 
     def user_may_create_room_alias(self, userid, room_alias):
@@ -72,6 +103,14 @@ class DomainRuleChecker(object):
     def user_may_publish_room(self, userid, room_id):
         """Implements synapse.events.SpamChecker.user_may_publish_room
         """
+        return True
+
+    def user_may_join_room(self, userid, room_id, is_invited):
+        """Implements synapse.events.SpamChecker.user_may_join_room
+        """
+        if self.can_only_join_rooms_with_invite and not is_invited:
+            return False
+
         return True
 
     @staticmethod
