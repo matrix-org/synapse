@@ -79,8 +79,22 @@ class UserDirectoryStore(BackgroundUpdateStore):
             """
             txn.execute(sql)
             rooms = [{"room_id": x[0], "events": x[1]} for x in txn.fetchall()]
-
             self._simple_insert_many_txn(txn, TEMP_TABLE + "_rooms", rooms)
+            del rooms
+
+            # If search all users is on, get all the users we want to add.
+            if self.hs.config.search_all_users:
+                sql = (
+                    "CREATE TABLE IF NOT EXISTS "
+                    + TEMP_TABLE
+                    + "_users(user_id TEXT NOT NULL)"
+                )
+                txn.execute(sql)
+
+                txn.execute("SELECT name FROM users")
+                users = [{"user_id": x[0]} for x in txn.fetchall()]
+
+                self._simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
 
         new_pos = yield self.get_max_stream_id_in_current_state_deltas()
         yield self.runInteraction(
@@ -103,6 +117,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
 
         def _delete_staging_area(txn):
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_rooms")
+            txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_users")
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_position")
 
         yield self.runInteraction(
@@ -140,8 +155,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
 
             # Get how many are left to process, so we can give status on how
             # far we are in processing
-            sql = "SELECT COUNT(*) FROM " + TEMP_TABLE + "_rooms"
-            txn.execute(sql)
+            txn.execute("SELECT COUNT(*) FROM " + TEMP_TABLE + "_rooms")
             progress["remaining"] = txn.fetchone()[0]
 
             return rooms_to_work_on
@@ -223,8 +237,66 @@ class UserDirectoryStore(BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _populate_user_directory_process_users(self, progress, batch_size):
-        yield self._end_background_update("populate_user_directory_process_users")
-        defer.returnValue(1)
+        """
+        If search_all_users is enabled, add all of the users to the user directory.
+        """
+        if not self.hs.config.search_all_users:
+            yield self._end_background_update("populate_user_directory_process_users")
+            defer.returnValue(1)
+
+        def _get_next_batch(txn):
+            sql = "SELECT user_id FROM %s LIMIT %s" % (
+                TEMP_TABLE + "_users",
+                str(batch_size),
+            )
+            txn.execute(sql)
+            users_to_work_on = txn.fetchall()
+
+            if not users_to_work_on:
+                return None
+
+            users_to_work_on = [x[0] for x in users_to_work_on]
+
+            # Get how many are left to process, so we can give status on how
+            # far we are in processing
+            sql = "SELECT COUNT(*) FROM " + TEMP_TABLE + "_users"
+            txn.execute(sql)
+            progress["remaining"] = txn.fetchone()[0]
+
+            return users_to_work_on
+
+        users_to_work_on = yield self.runInteraction(
+            "populate_user_directory_temp_read", _get_next_batch
+        )
+
+        # No more users -- complete the transaction.
+        if not users_to_work_on:
+            yield self._end_background_update("populate_user_directory_process_users")
+            defer.returnValue(1)
+
+        logger.info(
+            "Processing the next %d users of %d remaining"
+            % (len(users_to_work_on), progress["remaining"])
+        )
+
+        for user_id in users_to_work_on:
+            profile = yield self.get_profileinfo(get_localpart_from_id(user_id))
+            yield self.update_profile_in_user_dir(
+                user_id, profile.display_name, profile.avatar_url
+            )
+
+            # We've finished processing a user. Delete it from the table.
+            yield self._simple_delete_one(TEMP_TABLE + "_users", {"user_id": user_id})
+            # Update the remaining counter.
+            progress["remaining"] -= 1
+            yield self.runInteraction(
+                "populate_user_directory",
+                self._background_update_progress_txn,
+                "populate_user_directory_process_users",
+                progress,
+            )
+
+        defer.returnValue(len(users_to_work_on))
 
     @defer.inlineCallbacks
     def is_room_world_readable_or_publicly_joinable(self, room_id):
@@ -663,8 +735,8 @@ class UserDirectoryStore(BackgroundUpdateStore):
         """
 
         if self.hs.config.user_directory_search_all_users:
-            join_args = ()
-            where_clause = "1=1"
+            join_args = (user_id,)
+            where_clause = "user_id != ?"
         else:
             join_args = (user_id,)
             where_clause = """

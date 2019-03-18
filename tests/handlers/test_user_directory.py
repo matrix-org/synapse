@@ -180,7 +180,53 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    @unittest.DEBUG
+    def _add_background_updates(self):
+        """
+        Add the background updates we need to run.
+        """
+        # Ugh, have to reset this flag
+        self.store._all_done = False
+
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_user_directory_createtables",
+                    "progress_json": "{}",
+                },
+            )
+        )
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_user_directory_process_rooms",
+                    "progress_json": "{}",
+                    "depends_on": "populate_user_directory_createtables",
+                },
+            )
+        )
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_user_directory_process_users",
+                    "progress_json": "{}",
+                    "depends_on": "populate_user_directory_process_rooms",
+                },
+            )
+        )
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_user_directory_cleanup",
+                    "progress_json": "{}",
+                    "depends_on": "populate_user_directory_process_users",
+                },
+            )
+        )
+
     def test_initial(self):
         """
         The user directory's initial handler correctly updates the search tables.
@@ -211,25 +257,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(public_users, [])
 
         # Do the initial population of the user directory via the background update
-        self.store._all_done = False
-        self.get_success(
-            self.store._simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_createtables",
-                    "progress_json": "{}",
-                },
-            )
-        )
-        self.get_success(
-            self.store._simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_process_rooms",
-                    "progress_json": "{}",
-                },
-            )
-        )
+        self._add_background_updates()
 
         while not self.get_success(self.store.has_completed_background_updates()):
             self.get_success(self.store.do_next_background_update(100), by=0.1)
@@ -246,7 +274,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             set([(u1, u3, private_room), (u3, u1, private_room)]),
         )
 
-    def test_search_all_users(self):
+    def test_initial_share_all_users(self):
         """
         Search all users = True means that a user does not have to share a
         private room with the searching user or be in a public room to be search
@@ -256,33 +284,36 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.hs.config.user_directory_search_all_users = True
 
         u1 = self.register_user("user1", "pass")
-        u1_token = self.login(u1, "pass")
         u2 = self.register_user("user2", "pass")
-        u2_token = self.login(u2, "pass")
         u3 = self.register_user("user3", "pass")
 
-        # User 1 and User 2 join a room. User 3 never does.
-        room = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
-        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
-        self.helper.join(room, user=u2, tok=u2_token)
-
+        # Wipe the user dir
         self.get_success(self.store.update_user_directory_stream_pos(None))
         self.get_success(self.store.delete_all_from_user_dir())
 
-        # Reset the handled users caches
-        self.handler.initially_handled_users = set()
+        # Do the initial population of the user directory via the background update
+        self._add_background_updates()
 
-        # Do the initial population
-        d = self.handler._do_initial_spam()
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
 
-        # This takes a while, so pump it a bunch of times to get through the
-        # sleep delays
-        for i in range(10):
-            self.pump(1)
+        shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
 
-        self.get_success(d)
+        # No users share rooms
+        self.assertEqual(public_users, [])
+        self.assertEqual(self._compress_shared(shares_private), set([]))
 
         # Despite not sharing a room, search_all_users means we get a search
         # result.
         s = self.get_success(self.handler.search_users(u1, u3, 10))
+        self.assertEqual(len(s["results"]), 1)
+
+        # We can find the other two users
+        s = self.get_success(self.handler.search_users(u1, "user", 10))
+        self.assertEqual(len(s["results"]), 2)
+
+        # Registering a user and then searching for them works.
+        u4 = self.register_user("user4", "pass")
+        s = self.get_success(self.handler.search_users(u1, u4, 10))
         self.assertEqual(len(s["results"]), 1)
