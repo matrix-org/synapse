@@ -32,6 +32,9 @@ class RatelimitConfig(Config):
         rc_login_config = config.get("rc_login", {})
         self.rc_login_address = RateLimitConfig(rc_login_config.get("address", {}))
         self.rc_login_account = RateLimitConfig(rc_login_config.get("account", {}))
+        self.rc_login_failed_attempts = RateLimitConfig(
+            rc_login_config.get("failed_attempts", {}),
+        )
 
         self.federation_rc_window_size = config["federation_rc_window_size"]
         self.federation_rc_sleep_limit = config["federation_rc_sleep_limit"]
@@ -64,6 +67,9 @@ class RatelimitConfig(Config):
         #     address.
         #   - one for login that ratelimits login requests based on the account the
         #     client is attempting to log into.
+        #   - one for login that ratelimits login requests based on the account the
+        #     client is attempting to log into, based on the amount of failed login
+        #     attempts for this account.
         #
         # The defaults are as shown below.
         #
@@ -76,6 +82,9 @@ class RatelimitConfig(Config):
         #    per_second: 0.17
         #    burst_count: 3
         #  account:
+        #    per_second: 0.17
+        #    burst_count: 3
+        #  failed_attempts:
         #    per_second: 0.17
         #    burst_count: 3
 
