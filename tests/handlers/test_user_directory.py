@@ -284,7 +284,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.hs.config.user_directory_search_all_users = True
 
         u1 = self.register_user("user1", "pass")
-        u2 = self.register_user("user2", "pass")
+        self.register_user("user2", "pass")
         u3 = self.register_user("user3", "pass")
 
         # Wipe the user dir
