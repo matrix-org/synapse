@@ -83,7 +83,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
             del rooms
 
             # If search all users is on, get all the users we want to add.
-            if self.hs.config.search_all_users:
+            if self.hs.config.user_directory_search_all_users:
                 sql = (
                     "CREATE TABLE IF NOT EXISTS "
                     + TEMP_TABLE
@@ -240,7 +240,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
         """
         If search_all_users is enabled, add all of the users to the user directory.
         """
-        if not self.hs.config.search_all_users:
+        if not self.hs.config.user_directory_search_all_users:
             yield self._end_background_update("populate_user_directory_process_users")
             defer.returnValue(1)
 
