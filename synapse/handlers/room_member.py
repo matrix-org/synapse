@@ -301,7 +301,30 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            new_room=False,
     ):
+        """Update a users membership in a room
+
+        Args:
+            requester (Requester)
+            target (UserID)
+            room_id (str)
+            action (str): The "action" the requester is performing against the
+                target. One of join/leave/kick/ban/invite/unban.
+            txn_id (str|None): The transaction ID associated with the request,
+                or None not provided.
+            remote_room_hosts (list[str]|None): List of remote servers to try
+                and join via if server isn't already in the room.
+            third_party_signed (dict|None): The signed object for third party
+                invites.
+            ratelimit (bool): Whether to apply ratelimiting to this request.
+            content (dict|None): Fields to include in the new events content.
+            new_room (bool): Whether these membership changes are happening
+                as part of a room creation (e.g. initial joins and invites)
+
+        Returns:
+            Deferred[FrozenEvent]
+        """
         key = (room_id,)
 
         with (yield self.member_linearizer.queue(key)):
@@ -315,6 +338,7 @@ class RoomMemberHandler(object):
                 third_party_signed=third_party_signed,
                 ratelimit=ratelimit,
                 content=content,
+                new_room=new_room,
             )
 
         defer.returnValue(result)
@@ -331,6 +355,7 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            new_room=False,
     ):
         content_specified = bool(content)
         if content is None:
@@ -392,6 +417,7 @@ class RoomMemberHandler(object):
 
                 if not self.spam_checker.user_may_invite(
                     requester.user.to_string(), target.to_string(), room_id,
+                    new_room=new_room,
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True

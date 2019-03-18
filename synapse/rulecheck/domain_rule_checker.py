@@ -48,7 +48,8 @@ class DomainRuleChecker(object):
         """
         return False
 
-    def user_may_invite(self, inviter_userid, invitee_userid, room_id):
+    def user_may_invite(self, inviter_userid, invitee_userid, room_id,
+                        new_room):
         """Implements synapse.events.SpamChecker.user_may_invite
         """
         inviter_domain = self._get_domain_from_id(inviter_userid)
@@ -59,7 +60,7 @@ class DomainRuleChecker(object):
 
         return invitee_domain in self.domain_mapping[inviter_domain]
 
-    def user_may_create_room(self, userid):
+    def user_may_create_room(self, userid, invite_list, cloning):
         """Implements synapse.events.SpamChecker.user_may_create_room
         """
         return True

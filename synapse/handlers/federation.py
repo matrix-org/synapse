@@ -1299,7 +1299,7 @@ class FederationHandler(BaseHandler):
             raise SynapseError(403, "This server does not accept room invites")
 
         if not self.spam_checker.user_may_invite(
-            event.sender, event.state_key, event.room_id,
+            event.sender, event.state_key, event.room_id, new_room=False,
         ):
             raise SynapseError(
                 403, "This user is not permitted to send invites to this server/user"

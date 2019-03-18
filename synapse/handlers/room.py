@@ -254,7 +254,11 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if not self.spam_checker.user_may_create_room(user_id):
+        if not self.spam_checker.user_may_create_room(
+            user_id,
+            invite_list=[],
+            cloning=True,
+        ):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         creation_content = {
@@ -475,7 +479,13 @@ class RoomCreationHandler(BaseHandler):
 
         yield self.auth.check_auth_blocking(user_id)
 
-        if not self.spam_checker.user_may_create_room(user_id):
+        invite_list = config.get("invite", [])
+
+        if not self.spam_checker.user_may_create_room(
+            user_id,
+            invite_list=invite_list,
+            cloning=False,
+        ):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
@@ -518,7 +528,6 @@ class RoomCreationHandler(BaseHandler):
         else:
             room_alias = None
 
-        invite_list = config.get("invite", [])
         for i in invite_list:
             try:
                 UserID.from_string(i)
@@ -615,6 +624,7 @@ class RoomCreationHandler(BaseHandler):
                 "invite",
                 ratelimit=False,
                 content=content,
+                new_room=True,
             )
 
         for invite_3pid in invite_3pid_list:
@@ -699,6 +709,7 @@ class RoomCreationHandler(BaseHandler):
             "join",
             ratelimit=False,
             content=creator_join_profile,
+            new_room=True,
         )
 
         # We treat the power levels override specially as this needs to be one
