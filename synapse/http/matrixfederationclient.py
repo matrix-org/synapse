@@ -230,7 +230,7 @@ class MatrixFederationHttpClient(object):
             if not try_trailing_slash_on_400:
                 # Received an error >= 300. Raise unless we're retrying
                 raise e
-        except:
+        except Exception as e:
             raise e
 
         # Retry with a trailing slash if we received a 400 with
