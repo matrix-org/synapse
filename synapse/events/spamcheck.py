@@ -122,3 +122,21 @@ class SpamChecker(object):
             return True
 
         return self.spam_checker.user_may_publish_room(userid, room_id)
+
+    def user_may_join_room(self, userid, room_id, is_invited):
+        """Checks if a given users is allowed to join a room.
+
+        Is not called when the user creates a room.
+
+        Args:
+            userid (str)
+            room_id (str)
+            is_invited (bool): Whether the user is invited into the room
+
+        Returns:
+            bool: Whether the user may join the room
+        """
+        if self.spam_checker is None:
+            return True
+
+        return self.spam_checker.user_may_join_room(userid, room_id, is_invited)

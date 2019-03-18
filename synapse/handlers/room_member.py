@@ -487,8 +487,19 @@ class RoomMemberHandler(object):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
+            inviter = yield self._get_inviter(target.to_string(), room_id)
+            # We assume that if the spam checker allowed the user to create
+            # a room then they're allowed to join it.
+            if not new_room and not self.spam_checker.user_may_join_room(
+                target.to_string(), room_id,
+                is_invited=inviter is not None,
+                new_room=new_room,
+            ):
+                raise SynapseError(
+                    403, "Not allowed to join this room",
+                )
+
             if not is_host_in_room:
-                inviter = yield self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
                     remote_room_hosts.append(inviter.domain)
 

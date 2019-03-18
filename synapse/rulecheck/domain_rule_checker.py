@@ -75,6 +75,11 @@ class DomainRuleChecker(object):
         """
         return True
 
+    def user_may_join_room(self, userid, room_id, is_invited, new_room):
+        """Implements synapse.events.SpamChecker.user_may_join_room
+        """
+        return True
+
     @staticmethod
     def parse_config(config):
         """Implements synapse.events.SpamChecker.parse_config
