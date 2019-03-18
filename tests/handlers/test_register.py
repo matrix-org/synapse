@@ -187,6 +187,12 @@ class RegistrationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_auto_create_auto_join_where_no_consent(self):
+        """XXX what is this trying to test? I *think* it is trying to test
+        that we are not auto-joined to the server notices room if
+        block_events_without_consent_error is set, but (a) that doesn't seem to be
+        a sensible thing to test for, and (b) it doesn't work anyway because you can't
+        change the config after the EventCreationHandler has been instantiated.
+        """
         self.hs.config.user_consent_at_registration = True
         self.hs.config.block_events_without_consent_error = "Error"
         room_alias_str = "#room:test"
