@@ -212,22 +212,27 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Do the initial population of the user directory via the background update
         self.store._all_done = False
-        d = self.get_success(
+        self.get_success(
             self.store._simple_insert(
                 "background_updates",
-                {"update_name": "populate_user_directory", "progress_json": "{}"},
+                {
+                    "update_name": "populate_user_directory_createtables",
+                    "progress_json": "{}",
+                },
+            )
+        )
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_user_directory_process_rooms",
+                    "progress_json": "{}",
+                },
             )
         )
 
         while not self.get_success(self.store.has_completed_background_updates()):
             self.get_success(self.store.do_next_background_update(100), by=0.1)
-
-        # This takes a while, so pump it a bunch of times to get through the
-        # sleep delays
-        for i in range(10):
-            self.pump(1)
-
-        self.get_success(d)
 
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()

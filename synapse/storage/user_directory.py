@@ -28,6 +28,9 @@ from synapse.util.caches.descriptors import cached
 logger = logging.getLogger(__name__)
 
 
+TEMP_TABLE = "_temp_populate_user_directory"
+
+
 class UserDirectoryStore(BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
         super(UserDirectoryStore, self).__init__(db_conn, hs)
@@ -35,25 +38,37 @@ class UserDirectoryStore(BackgroundUpdateStore):
         self.server_name = hs.hostname
 
         self.register_background_update_handler(
-            "populate_user_directory", self._populate_user_directory
+            "populate_user_directory_createtables",
+            self._populate_user_directory_createtables,
+        )
+        self.register_background_update_handler(
+            "populate_user_directory_process_rooms",
+            self._populate_user_directory_process_rooms,
+        )
+        self.register_background_update_handler(
+            "populate_user_directory_process_users",
+            self._populate_user_directory_process_users,
+        )
+        self.register_background_update_handler(
+            "populate_user_directory_cleanup", self._populate_user_directory_cleanup
         )
 
     @defer.inlineCallbacks
-    def _populate_user_directory(self, progress, batch_size):
-
-        TEMP_TABLE = "_temp_populate_user_directory_rooms"
-        state = self.hs.get_state_handler()
-
-        # If we don't have progress filed, delete everything.
-        if not progress:
-            yield self.delete_all_from_user_dir()
+    def _populate_user_directory_createtables(self, progress, batch_size):
 
         # Get all the rooms that we want to process.
         def _make_staging_area(txn):
             sql = (
                 "CREATE TABLE IF NOT EXISTS "
                 + TEMP_TABLE
-                + "(room_id TEXT NOT NULL, events BIGINT NOT NULL)"
+                + "_rooms(room_id TEXT NOT NULL, events BIGINT NOT NULL)"
+            )
+            txn.execute(sql)
+
+            sql = (
+                "CREATE TABLE IF NOT EXISTS "
+                + TEMP_TABLE
+                + "_position(position TEXT NOT NULL)"
             )
             txn.execute(sql)
 
@@ -65,23 +80,46 @@ class UserDirectoryStore(BackgroundUpdateStore):
             txn.execute(sql)
             rooms = [{"room_id": x[0], "events": x[1]} for x in txn.fetchall()]
 
-            self._simple_insert_many_txn(txn, TEMP_TABLE, rooms)
+            self._simple_insert_many_txn(txn, TEMP_TABLE + "_rooms", rooms)
 
-            progress["stage"] = "processing"
-            self._background_update_progress_txn(
-                txn, "populate_user_directory", progress
-            )
+        new_pos = yield self.get_max_stream_id_in_current_state_deltas()
+        yield self.runInteraction(
+            "populate_user_directory_temp_build", _make_staging_area
+        )
+        yield self._simple_insert(TEMP_TABLE + "_position", {"position": new_pos})
+
+        yield self._end_background_update("populate_user_directory_createtables")
+        defer.returnValue(1)
+
+    @defer.inlineCallbacks
+    def _populate_user_directory_cleanup(self, progress, batch_size):
+        """
+        Update the user directory stream position, then clean up the old tables.
+        """
+        position = yield self._simple_select_one_onecol(
+            TEMP_TABLE + "_position", None, "position"
+        )
+        yield self.update_user_directory_stream_pos(position)
 
         def _delete_staging_area(txn):
-            sql = "DROP TABLE IF EXISTS " + TEMP_TABLE
-            txn.execute(sql)
+            txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_rooms")
+            txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_position")
 
-        if progress.get("stage") != "processing":
-            new_pos = yield self.get_max_stream_id_in_current_state_deltas()
-            progress["pos"] = new_pos
-            yield self.runInteraction(
-                "populate_user_directory_temp_build", _make_staging_area
-            )
+        yield self.runInteraction(
+            "populate_user_directory_cleanup", _delete_staging_area
+        )
+
+        yield self._end_background_update("populate_user_directory_cleanup")
+        defer.returnValue(1)
+
+    @defer.inlineCallbacks
+    def _populate_user_directory_process_rooms(self, progress, batch_size):
+
+        state = self.hs.get_state_handler()
+
+        # If we don't have progress filed, delete everything.
+        if not progress:
+            yield self.delete_all_from_user_dir()
 
         def _get_next_batch(txn):
             sql = """
@@ -89,7 +127,7 @@ class UserDirectoryStore(BackgroundUpdateStore):
                 ORDER BY events DESC
                 LIMIT %s
             """ % (
-                TEMP_TABLE,
+                TEMP_TABLE + "_rooms",
                 str(batch_size),
             )
             txn.execute(sql)
@@ -100,7 +138,9 @@ class UserDirectoryStore(BackgroundUpdateStore):
 
             rooms_to_work_on = [x[0] for x in rooms_to_work_on]
 
-            sql = "SELECT COUNT(*) FROM " + TEMP_TABLE
+            # Get how many are left to process, so we can give status on how
+            # far we are in processing
+            sql = "SELECT COUNT(*) FROM " + TEMP_TABLE + "_rooms"
             txn.execute(sql)
             progress["remaining"] = txn.fetchone()[0]
 
@@ -110,12 +150,9 @@ class UserDirectoryStore(BackgroundUpdateStore):
             "populate_user_directory_temp_read", _get_next_batch
         )
 
+        # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
-            yield self.runInteraction(
-                "populate_user_directory_temp_cleanup", _delete_staging_area
-            )
-            yield self.update_user_directory_stream_pos(progress["pos"])
-            yield self._end_background_update("populate_user_directory")
+            yield self._end_background_update("populate_user_directory_process_rooms")
             defer.returnValue(1)
 
         logger.info(
@@ -172,17 +209,22 @@ class UserDirectoryStore(BackgroundUpdateStore):
                         to_insert.clear()
 
             # We've finished a room. Delete it from the table.
-            yield self._simple_delete_one(TEMP_TABLE, {"room_id": room_id})
+            yield self._simple_delete_one(TEMP_TABLE + "_rooms", {"room_id": room_id})
             # Update the remaining counter.
             progress["remaining"] -= 1
             yield self.runInteraction(
                 "populate_user_directory",
                 self._background_update_progress_txn,
-                "populate_user_directory",
+                "populate_user_directory_process_rooms",
                 progress,
             )
 
         defer.returnValue(len(rooms_to_work_on))
+
+    @defer.inlineCallbacks
+    def _populate_user_directory_process_users(self, progress, batch_size):
+        yield self._end_background_update("populate_user_directory_process_users")
+        defer.returnValue(1)
 
     @defer.inlineCallbacks
     def is_room_world_readable_or_publicly_joinable(self, room_id):
