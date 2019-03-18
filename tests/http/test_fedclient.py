@@ -272,7 +272,7 @@ class FederationClientTests(HomeserverTestCase):
         """
         If a connection is made to a client but the client rejects it due to
         requiring a trailing slash. We need to retry the request with a
-        trailing slash. Workaround for Synapse <=v0.99.2, explained in #3622.
+        trailing slash. Workaround for Synapse <= v0.99.2, explained in #3622.
         """
         d = self.cl.get_json(
             "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
@@ -301,9 +301,6 @@ class FederationClientTests(HomeserverTestCase):
             b"\r\n"
             b'{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}'
         )
-
-        # We should get a 400 response, then try again
-        self.pump()
 
         # We should get another request wiht a trailing slash
         self.assertRegex(conn.value(), b"^GET /foo/bar/")

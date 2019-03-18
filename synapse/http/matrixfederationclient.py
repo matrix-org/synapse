@@ -221,30 +221,31 @@ class MatrixFederationHttpClient(object):
         """
         try:
             response = yield self._send_request(**send_request_args)
-        except HttpResponseException as e:
-            # Received a 400. Raise unless we're retrying
-            if not try_trailing_slash_on_400:
-                raise e
 
-        # Check if it's necessary to retry with a trailing slash
-        body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
-        )
-
-        # Retry with a trailing slash if we received a 400 with
-        # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
-        # trailing slash on Synapse <=v0.99.2.
-        if not (response.code == 400 and body.get("errcode") == "M_UNRECOGNIZED"):
-            # Enable backoff if initially disabled
-            send_request_args["backoff_on_404"] = backoff_on_404
-
-            # Add trailing slash
-            send_request_args["request"].path += "/"
-
-            response = yield self._send_request(**send_request_args)
+            # Check if it's necessary to retry with a trailing slash
             body = yield _handle_json_response(
                 self.hs.get_reactor(), self.default_timeout, request, response,
             )
+        except HttpResponseException as e:
+            if not try_trailing_slash_on_400:
+                # Received an error >= 300. Raise unless we're retrying
+                raise e
+        except:
+            raise e
+
+        # Retry with a trailing slash if we received a 400 with
+        # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
+        # trailing slash on Synapse <= v0.99.2.
+        # Enable backoff if initially disabled
+        send_request_args["backoff_on_404"] = backoff_on_404
+
+        # Add trailing slash
+        send_request_args["request"].path += "/"
+
+        response = yield self._send_request(**send_request_args)
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
+        )
 
         defer.returnValue(body)
 
