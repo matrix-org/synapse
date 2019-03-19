@@ -18,6 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util import logcontext
 from synapse.util.metrics import Measure
@@ -62,7 +63,6 @@ class StatsHandler(StateDeltasHandler):
             # we start populating stats
             self.clock.call_later(0, self.notify_new_event)
 
-    @defer.inlineCallbacks
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
@@ -72,11 +72,16 @@ class StatsHandler(StateDeltasHandler):
         if self._is_processing:
             return
 
+        @defer.inlineCallbacks
+        def process():
+            try:
+                yield self._unsafe_process()
+            finally:
+                self._is_processing = False
+
         self._is_processing = True
-        try:
-            yield self._unsafe_process()
-        finally:
-            self._is_processing = False
+        run_as_background_process("stats.notify_new_event", process)
+
 
     @defer.inlineCallbacks
     def _unsafe_process(self):
