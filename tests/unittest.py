@@ -333,10 +333,10 @@ class HomeserverTestCase(TestCase):
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(self, d):
+    def get_success(self, d, by=0.0):
         if not isinstance(d, Deferred):
             return d
-        self.pump()
+        self.pump(by=by)
         return self.successResultOf(d)
 
     def get_failure(self, d, exc):

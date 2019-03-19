@@ -767,18 +767,25 @@ class SQLBaseStore(object):
         """
         allvalues = {}
         allvalues.update(keyvalues)
-        allvalues.update(values)
         allvalues.update(insertion_values)
+
+        if not values:
+            latter = "NOTHING"
+        else:
+            allvalues.update(values)
+            latter = (
+                "UPDATE SET " + ", ".join(k + "=EXCLUDED." + k for k in values)
+            )
 
         sql = (
             "INSERT INTO %s (%s) VALUES (%s) "
-            "ON CONFLICT (%s) DO UPDATE SET %s"
+            "ON CONFLICT (%s) DO %s"
         ) % (
             table,
             ", ".join(k for k in allvalues),
             ", ".join("?" for _ in allvalues),
             ", ".join(k for k in keyvalues),
-            ", ".join(k + "=EXCLUDED." + k for k in values),
+            latter
         )
         txn.execute(sql, list(allvalues.values()))
 

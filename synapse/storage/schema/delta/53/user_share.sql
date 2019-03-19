@@ -16,9 +16,6 @@
 -- Old disused version of the tables below.
 DROP TABLE IF EXISTS users_who_share_rooms;
 
--- This is no longer used because it's duplicated by the users_who_share_public_rooms
-DROP TABLE IF EXISTS users_in_public_rooms;
-
 -- Tables keeping track of what users share rooms. This is a map of local users
 -- to local or remote users, per room. Remote users cannot be in the user_id
 -- column, only the other_user_id column. There are two tables, one for public

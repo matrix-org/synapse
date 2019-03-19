@@ -34,7 +34,13 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """
 
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver(expire_access_token=True)
+        hs_config = self.default_config("test")
+
+        # some of the tests rely on us having a user consent version
+        hs_config.user_consent_version = "test_consent_version"
+        hs_config.max_mau_value = 50
+
+        hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
         return hs
 
     def prepare(self, reactor, clock, hs):
@@ -47,7 +53,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
-        self.hs.config.max_mau_value = 50
         self.lots_of_users = 100
         self.small_number_of_users = 1
 
@@ -181,12 +186,32 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.get_failure(directory_handler.get_association(room_alias), SynapseError)
 
     def test_auto_create_auto_join_where_no_consent(self):
-        self.hs.config.user_consent_at_registration = True
-        self.hs.config.block_events_without_consent_error = "Error"
+        """Test to ensure that the first user is not auto-joined to a room if
+        they have not given general consent.
+        """
+
+        # Given:-
+        #    * a user must give consent,
+        #    * they have not given that consent
+        #    * The server is configured to auto-join to a room
+        # (and autocreate if necessary)
+
+        event_creation_handler = self.hs.get_event_creation_handler()
+        # (Messing with the internals of event_creation_handler is fragile
+        # but can't see a better way to do this. One option could be to subclass
+        # the test with custom config.)
+        event_creation_handler._block_events_without_consent_error = "Error"
+        event_creation_handler._consent_uri_builder = Mock()
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
+
+        # When:-
+        #   * the user is registered and post consent actions are called
         res = self.get_success(self.handler.register(localpart='jeff'))
         self.get_success(self.handler.post_consent_actions(res[0]))
+
+        # Then:-
+        #   * Ensure that they have not been joined to the room
         rooms = self.get_success(self.store.get_rooms_for_user(res[0]))
         self.assertEqual(len(rooms), 0)
 
