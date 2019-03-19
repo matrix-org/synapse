@@ -82,7 +82,6 @@ class StatsHandler(StateDeltasHandler):
         self._is_processing = True
         run_as_background_process("stats.notify_new_event", process)
 
-
     @defer.inlineCallbacks
     def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
