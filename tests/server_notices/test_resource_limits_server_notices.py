@@ -9,13 +9,16 @@ from synapse.server_notices.resource_limits_server_notices import (
 )
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.utils import default_config, setup_test_homeserver
 
 
 class TestResourceLimitsServerNotices(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
+        hs_config = default_config(name="test")
+        hs_config.server_notices_mxid = "@server:test"
+
+        self.hs = yield setup_test_homeserver(self.addCleanup, config=hs_config)
         self.server_notices_sender = self.hs.get_server_notices_sender()
 
         # relying on [1] is far from ideal, but the only case where

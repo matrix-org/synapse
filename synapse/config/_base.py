@@ -405,7 +405,10 @@ class Config(object):
             self.invoke_all("generate_files", config)
             return
 
-        self.invoke_all("read_config", config)
+        self.parse_config_dict(config)
+
+    def parse_config_dict(self, config_dict):
+        self.invoke_all("read_config", config_dict)
 
 
 def find_config_files(search_paths):

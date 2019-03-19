@@ -1,0 +1,1 @@
+Use a regular HomeServerConfig object for unit tests rater than a Mock.
