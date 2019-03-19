@@ -23,11 +23,13 @@ from synapse.api.constants import LoginType
 from synapse.api.errors import (
     AuthError,
     Codes,
+    ConsentNotGivenError,
     InvalidCaptchaError,
     LimitExceededError,
     RegistrationError,
     SynapseError,
 )
+
 from synapse.config.server import is_threepid_reserved
 from synapse.http.client import CaptchaServerHttpClient
 from synapse.http.servlet import assert_params_in_dict
@@ -311,6 +313,10 @@ class RegistrationHandler(BaseHandler):
                         )
                 else:
                     yield self._join_user_to_room(fake_requester, r)
+            except ConsentNotGivenError as e:
+                # Technically not necessary to pull out this error though
+                # moving away from bare excepts is a good thing to do.
+                logger.error("Failed to join new user to %r: %r", r, e)
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
