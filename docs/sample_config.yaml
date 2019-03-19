@@ -1036,6 +1036,11 @@ password_config:
 
 
 
+# Wether the public room list can be searched. When disabled blocks
+# searching local and remote room list for local and remote users.
+#
+#enable_room_list_search: true
+
 # The `alias_creation` option controls who's allowed to create aliases
 # on this server.
 #

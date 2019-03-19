@@ -20,6 +20,10 @@ from ._base import Config, ConfigError
 
 class RoomDirectoryConfig(Config):
     def read_config(self, config):
+        self.enable_room_list_search = config.get(
+            "enable_room_list_search", True,
+        )
+
         alias_creation_rules = config.get("alias_creation_rules")
 
         if alias_creation_rules is not None:
@@ -54,6 +58,11 @@ class RoomDirectoryConfig(Config):
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
+        # Wether the public room list can be searched. When disabled blocks
+        # searching local and remote room list for local and remote users.
+        #
+        #enable_room_list_search: true
+
         # The `alias_creation` option controls who's allowed to create aliases
         # on this server.
         #
