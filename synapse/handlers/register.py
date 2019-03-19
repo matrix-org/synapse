@@ -29,7 +29,6 @@ from synapse.api.errors import (
     RegistrationError,
     SynapseError,
 )
-
 from synapse.config.server import is_threepid_reserved
 from synapse.http.client import CaptchaServerHttpClient
 from synapse.http.servlet import assert_params_in_dict

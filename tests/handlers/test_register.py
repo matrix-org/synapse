@@ -21,7 +21,7 @@ from synapse.api.constants import UserTypes
 from synapse.api.errors import ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
-from synapse.api.urls import ConsentURIBuilder
+
 from tests.utils import setup_test_homeserver
 
 from .. import unittest
@@ -190,27 +190,29 @@ class RegistrationTestCase(unittest.TestCase):
         """Test to ensure that the first user is not auto-joined to a room if
         they have not given general consent.
         """
-        self.hs.config.user_consent_at_registration = True
-        self.hs.config.block_events_without_consent_error = "Error"
 
         # Given:-
         #    * a user must give consent,
         #    * they have not given that consent
         #    * The server is configured to auto-join to a room
         # (and autocreate if necessary)
+
         event_creation_handler = self.hs.get_event_creation_handler()
-        event_creation_handler._block_events_without_consent_error = (
-            self.hs.config.block_events_without_consent_error
-        )
+        # (Messing with the internals of event_creation_handler is fragile
+        # but can't see a better way to do this. One option could be to subclass
+        # the test with custom config.)
+        event_creation_handler._block_events_without_consent_error = ("Error")
         event_creation_handler._consent_uri_builder = Mock()
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
 
-        # When the user is registered, and post consent actions are called
+        # When:-
+        #   * the user is registered and post consent actions are called
         res = yield self.handler.register(localpart='jeff')
         yield self.handler.post_consent_actions(res[0])
 
-        # Ensure that they have not been joined to the room
+        # Then:-
+        #   * Ensure that they have not been joined to the room
         rooms = yield self.store.get_rooms_for_user(res[0])
         self.assertEqual(len(rooms), 0)
 
