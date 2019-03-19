@@ -314,7 +314,7 @@ class HomeserverTestCase(TestCase):
         """
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
-        if not config in self.kwargs:
+        if "config" not in self.kwargs:
             config = self.default_config()
             kwargs["config"] = config
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
