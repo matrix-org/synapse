@@ -788,9 +788,11 @@ class Auth(object):
 
         # Never fail an auth check for the server notices users or support user
         # This can be a problem where event creation is prohibited due to blocking
-        is_support = yield self.store.is_support_user(user_id)
-        if user_id == self.hs.config.server_notices_mxid or is_support:
-            return
+        if user_id is not None:
+            if user_id == self.hs.config.server_notices_mxid:
+                return
+            if (yield self.store.is_support_user(user_id)):
+                return
 
         if self.hs.config.hs_disabled:
             raise ResourceLimitError(
