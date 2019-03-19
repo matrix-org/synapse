@@ -45,7 +45,7 @@ class ServerConfig(Config):
 
         self.pid_file = self.abspath(config.get("pid_file"))
         self.web_client_location = config.get("web_client_location", None)
-        self.soft_file_limit = config["soft_file_limit"]
+        self.soft_file_limit = config.get("soft_file_limit", 0)
         self.daemonize = config.get("daemonize")
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
@@ -307,11 +307,11 @@ class ServerConfig(Config):
         # Zero is used to indicate synapse should set the soft limit to the
         # hard limit.
         #
-        soft_file_limit: 0
+        #soft_file_limit: 0
 
         # Set to false to disable presence tracking on this homeserver.
         #
-        use_presence: true
+        #use_presence: false
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #

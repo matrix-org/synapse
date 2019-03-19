@@ -24,8 +24,8 @@ class RateLimitConfig(object):
 class RatelimitConfig(Config):
 
     def read_config(self, config):
-        self.rc_messages_per_second = config["rc_messages_per_second"]
-        self.rc_message_burst_count = config["rc_message_burst_count"]
+        self.rc_messages_per_second = config.get("rc_messages_per_second", 0.2)
+        self.rc_message_burst_count = config.get("rc_message_burst_count", 10.0)
 
         self.rc_registration = RateLimitConfig(config.get("rc_registration", {}))
 
@@ -36,11 +36,11 @@ class RatelimitConfig(Config):
             rc_login_config.get("failed_attempts", {}),
         )
 
-        self.federation_rc_window_size = config["federation_rc_window_size"]
-        self.federation_rc_sleep_limit = config["federation_rc_sleep_limit"]
-        self.federation_rc_sleep_delay = config["federation_rc_sleep_delay"]
-        self.federation_rc_reject_limit = config["federation_rc_reject_limit"]
-        self.federation_rc_concurrent = config["federation_rc_concurrent"]
+        self.federation_rc_window_size = config.get("federation_rc_window_size", 1000)
+        self.federation_rc_sleep_limit = config.get("federation_rc_sleep_limit", 10)
+        self.federation_rc_sleep_delay = config.get("federation_rc_sleep_delay", 500)
+        self.federation_rc_reject_limit = config.get("federation_rc_reject_limit", 50)
+        self.federation_rc_concurrent = config.get("federation_rc_concurrent", 3)
 
     def default_config(self, **kwargs):
         return """\
@@ -48,11 +48,11 @@ class RatelimitConfig(Config):
 
         # Number of messages a client can send per second
         #
-        rc_messages_per_second: 0.2
+        #rc_messages_per_second: 0.2
 
         # Number of message a client can send before being throttled
         #
-        rc_message_burst_count: 10.0
+        #rc_message_burst_count: 10.0
 
         # Ratelimiting settings for registration and login.
         #
@@ -90,25 +90,25 @@ class RatelimitConfig(Config):
 
         # The federation window size in milliseconds
         #
-        federation_rc_window_size: 1000
+        #federation_rc_window_size: 1000
 
         # The number of federation requests from a single server in a window
         # before the server will delay processing the request.
         #
-        federation_rc_sleep_limit: 10
+        #federation_rc_sleep_limit: 10
 
         # The duration in milliseconds to delay processing events from
         # remote servers by if they go over the sleep limit.
         #
-        federation_rc_sleep_delay: 500
+        #federation_rc_sleep_delay: 500
 
         # The maximum number of concurrent federation requests allowed
         # from a single server
         #
-        federation_rc_reject_limit: 50
+        #federation_rc_reject_limit: 50
 
         # The number of federation requests to concurrently process from a
         # single server
         #
-        federation_rc_concurrent: 3
+        #federation_rc_concurrent: 3
         """

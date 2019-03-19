@@ -63,11 +63,11 @@ pid_file: DATADIR/homeserver.pid
 # Zero is used to indicate synapse should set the soft limit to the
 # hard limit.
 #
-soft_file_limit: 0
+#soft_file_limit: 0
 
 # Set to false to disable presence tracking on this homeserver.
 #
-use_presence: true
+#use_presence: false
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -359,7 +359,8 @@ database:
     database: "DATADIR/homeserver.db"
 
 # Number of events to cache in memory.
-event_cache_size: "10K"
+#
+#event_cache_size: 10K
 
 
 ## Logging ##
@@ -373,11 +374,11 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 
 # Number of messages a client can send per second
 #
-rc_messages_per_second: 0.2
+#rc_messages_per_second: 0.2
 
 # Number of message a client can send before being throttled
 #
-rc_message_burst_count: 10.0
+#rc_message_burst_count: 10.0
 
 # Ratelimiting settings for registration and login.
 #
@@ -415,27 +416,27 @@ rc_message_burst_count: 10.0
 
 # The federation window size in milliseconds
 #
-federation_rc_window_size: 1000
+#federation_rc_window_size: 1000
 
 # The number of federation requests from a single server in a window
 # before the server will delay processing the request.
 #
-federation_rc_sleep_limit: 10
+#federation_rc_sleep_limit: 10
 
 # The duration in milliseconds to delay processing events from
 # remote servers by if they go over the sleep limit.
 #
-federation_rc_sleep_delay: 500
+#federation_rc_sleep_delay: 500
 
 # The maximum number of concurrent federation requests allowed
 # from a single server
 #
-federation_rc_reject_limit: 50
+#federation_rc_reject_limit: 50
 
 # The number of federation requests to concurrently process from a
 # single server
 #
-federation_rc_concurrent: 3
+#federation_rc_concurrent: 3
 
 
 
@@ -464,11 +465,11 @@ uploads_path: "DATADIR/uploads"
 
 # The largest allowed upload size in bytes
 #
-max_upload_size: "10M"
+#max_upload_size: 10M
 
 # Maximum number of pixels that will be thumbnailed
 #
-max_image_pixels: "32M"
+#max_image_pixels: 32M
 
 # Whether to generate new thumbnails on the fly to precisely match
 # the resolution requested by the client. If true then whenever
@@ -476,32 +477,32 @@ max_image_pixels: "32M"
 # generate a new thumbnail. If false the server will pick a thumbnail
 # from a precalculated list.
 #
-dynamic_thumbnails: false
+#dynamic_thumbnails: false
 
 # List of thumbnails to precalculate when an image is uploaded.
 #
-thumbnail_sizes:
-- width: 32
-  height: 32
-  method: crop
-- width: 96
-  height: 96
-  method: crop
-- width: 320
-  height: 240
-  method: scale
-- width: 640
-  height: 480
-  method: scale
-- width: 800
-  height: 600
-  method: scale
+#thumbnail_sizes:
+#  - width: 32
+#    height: 32
+#    method: crop
+#  - width: 96
+#    height: 96
+#    method: crop
+#  - width: 320
+#    height: 240
+#    method: scale
+#  - width: 640
+#    height: 480
+#    method: scale
+#  - width: 800
+#    height: 600
+#    method: scale
 
 # Is the preview URL API enabled?  If enabled, you *must* specify
 # an explicit url_preview_ip_range_blacklist of IPs that the spider is
 # denied from accessing.
 #
-url_preview_enabled: False
+#url_preview_enabled: false
 
 # List of IP address CIDR ranges that the URL preview spider is denied
 # from accessing.  There are no defaults: you must explicitly
@@ -566,8 +567,8 @@ url_preview_enabled: False
 #  - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 
 # The largest allowed URL preview spidering size in bytes
-max_spider_size: "10M"
-
+#
+#max_spider_size: 10M
 
 
 ## Captcha ##
@@ -575,23 +576,25 @@ max_spider_size: "10M"
 
 # This Home Server's ReCAPTCHA public key.
 #
-recaptcha_public_key: "YOUR_PUBLIC_KEY"
+#recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
 # This Home Server's ReCAPTCHA private key.
 #
-recaptcha_private_key: "YOUR_PRIVATE_KEY"
+#recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
 # Enables ReCaptcha checks when registering, preventing signup
 # unless a captcha is answered. Requires a valid ReCaptcha
 # public/private key.
 #
-enable_registration_captcha: False
+#enable_registration_captcha: false
 
 # A secret key used to bypass the captcha test entirely.
+#
 #captcha_bypass_secret: "YOUR_SECRET_HERE"
 
 # The API endpoint to use for verifying m.login.recaptcha responses.
-recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
+#
+#recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
 
 
 ## TURN ##
@@ -612,7 +615,7 @@ recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
 
 # How long generated TURN credentials last
 #
-turn_user_lifetime: "1h"
+#turn_user_lifetime: 1h
 
 # Whether guests should be allowed to use the TURN server.
 # This defaults to True, otherwise VoIP will be unreliable for guests.
@@ -620,15 +623,17 @@ turn_user_lifetime: "1h"
 # connect to arbitrary endpoints without having first signed up for a
 # valid account (e.g. by passing a CAPTCHA).
 #
-turn_allow_guests: True
+#turn_allow_guests: True
 
 
 ## Registration ##
+#
 # Registration can be rate-limited using the parameters in the "Ratelimiting"
 # section of this file.
 
 # Enable registration for new users.
-enable_registration: False
+#
+#enable_registration: false
 
 # The user must provide all of the below types of 3PID when registering.
 #
@@ -639,7 +644,7 @@ enable_registration: False
 # Explicitly disable asking for MSISDNs from the registration
 # flow (overrides registrations_require_3pid if MSISDNs are set as required)
 #
-#disable_msisdn_registration: True
+#disable_msisdn_registration: true
 
 # Mandate that users are only allowed to associate certain formats of
 # 3PIDs with accounts on this server.
@@ -663,13 +668,13 @@ enable_registration: False
 # N.B. that increasing this will exponentially increase the time required
 # to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
 #
-bcrypt_rounds: 12
+#bcrypt_rounds: 12
 
 # Allows users to register as guests without a password/email/etc, and
 # participate in rooms hosted on this server which have been made
 # accessible to anonymous users.
 #
-allow_guest_access: False
+#allow_guest_access: false
 
 # The identity server which we suggest that clients should use when users log
 # in on this server.
@@ -685,9 +690,9 @@ allow_guest_access: False
 # Also defines the ID server which will be called when an account is
 # deactivated (one will be picked arbitrarily).
 #
-trusted_third_party_id_servers:
-  - matrix.org
-  - vector.im
+#trusted_third_party_id_servers:
+#  - matrix.org
+#  - vector.im
 
 # Users who register on this homeserver will automatically be joined
 # to these rooms
@@ -701,14 +706,14 @@ trusted_third_party_id_servers:
 # Setting to false means that if the rooms are not manually created,
 # users cannot be auto-joined since they do not exist.
 #
-autocreate_auto_join_rooms: true
+#autocreate_auto_join_rooms: true
 
 
 ## Metrics ###
 
 # Enable collection and rendering of performance metrics
 #
-enable_metrics: False
+#enable_metrics: False
 
 # Enable sentry integration
 # NOTE: While attempts are made to ensure that the logs don't contain
@@ -728,22 +733,24 @@ enable_metrics: False
 
 # A list of event types that will be included in the room_invite_state
 #
-room_invite_state_types:
-    - "m.room.join_rules"
-    - "m.room.canonical_alias"
-    - "m.room.avatar"
-    - "m.room.encryption"
-    - "m.room.name"
+#room_invite_state_types:
+#  - "m.room.join_rules"
+#  - "m.room.canonical_alias"
+#  - "m.room.avatar"
+#  - "m.room.encryption"
+#  - "m.room.name"
 
 
-# A list of application service config file to use
+# A list of application service config files to use
 #
-app_service_config_files: []
+#app_service_config_files:
+#  - app_service_1.yaml
+#  - app_service_2.yaml
 
-# Whether or not to track application service IP addresses. Implicitly
+# Uncomment to enable tracking of application service IP addresses. Implicitly
 # enables MAU tracking for application service users.
 #
-track_appservice_user_ips: False
+#track_appservice_user_ips: True
 
 
 # a secret which is used to sign access tokens. If none is specified,
@@ -754,7 +761,7 @@ track_appservice_user_ips: False
 
 # Used to enable access token expiration.
 #
-expire_access_token: False
+#expire_access_token: False
 
 # a secret which is used to calculate HMACs for form values, to stop
 # falsification of values. Must be specified for the User Consent
@@ -783,17 +790,16 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 # Determines how quickly servers will query to check which keys
 # are still valid.
 #
-key_refresh_interval: "1d" # 1 Day.
+#key_refresh_interval: 1d
 
 # The trusted servers to download signing keys from.
 #
-perspectives:
-  servers:
-    "matrix.org":
-      verify_keys:
-        "ed25519:auto":
-          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
-
+#perspectives:
+#  servers:
+#    "matrix.org":
+#      verify_keys:
+#        "ed25519:auto":
+#          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
 
 
 # Enable SAML2 for registration and login. Uses pysaml2.
@@ -858,14 +864,15 @@ perspectives:
 #   algorithm: "HS256"
 
 
-
-# Enable password for login.
-#
 password_config:
-   enabled: true
+   # Uncomment to disable password login
+   #
+   #enabled: false
+
    # Uncomment and change to a secret random string for extra security.
    # DO NOT CHANGE THIS AFTER INITIAL SETUP!
-   #pepper: ""
+   #
+   #pepper: "EVEN_MORE_SECRET"
 
 
 
@@ -934,9 +941,9 @@ password_config:
 #    example_option: 'things'
 
 
-# Whether to allow non server admins to create groups on this server
+# Uncomment to allow non-server-admin users to create groups on this server
 #
-enable_group_creation: false
+#enable_group_creation: true
 
 # If enabled, non server admins can only create groups with local parts
 # starting with this prefix
