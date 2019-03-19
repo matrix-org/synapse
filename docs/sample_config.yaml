@@ -1015,6 +1015,15 @@ password_config:
 #
 
 
+
+# Stats configuration
+#
+# stats:
+#    enable: true
+#    bucket_size: 86400 # 1 day
+#    retention: 31536000 # 1 year
+
+
 # Server Notices room configuration
 #
 # Uncomment this section to enable a room which can be used to send notices
