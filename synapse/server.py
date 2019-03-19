@@ -42,7 +42,7 @@ from synapse.federation.federation_server import (
     ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.transaction_queue import TransactionQueue
+from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler
@@ -434,7 +434,7 @@ class HomeServer(object):
 
     def build_federation_sender(self):
         if self.should_send_federation():
-            return TransactionQueue(self)
+            return FederationSender(self)
         elif not self.config.worker_app:
             return FederationRemoteSendQueue(self)
         else:
