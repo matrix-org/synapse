@@ -391,6 +391,10 @@ class EventCreationHandler(object):
         if self._block_events_without_consent_error is None:
             return
 
+        # exempt AS users from needing consent
+        if requester.app_service is not None:
+            return
+
         user_id = requester.user.to_string()
 
         # exempt the system notices user
