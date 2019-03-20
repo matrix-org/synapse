@@ -198,7 +198,7 @@ class MatrixFederationHttpClient(object):
     ):
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
-        'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <=v0.99.2
+        'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <= v0.99.3
         due to #3622.
 
         Args:
@@ -237,7 +237,7 @@ class MatrixFederationHttpClient(object):
 
         # Retry with a trailing slash if we received a 400 with
         # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
-        # trailing slash on Synapse <= v0.99.2.
+        # trailing slash on Synapse <= v0.99.3.
         # Enable backoff if initially disabled
         send_request_args["backoff_on_404"] = backoff_on_404
 
@@ -560,7 +560,7 @@ class MatrixFederationHttpClient(object):
                 requests).
             try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end
-                of the request. Workaround for #3622 in Synapse <=v0.99.2. This
+                of the request. Workaround for #3622 in Synapse <= v0.99.3. This
                 will be attempted before backing off if backing off has been
                 enabled.
 
@@ -593,7 +593,7 @@ class MatrixFederationHttpClient(object):
             "timeout": timeout,
             "ignore_backoff": ignore_backoff,
             # Do not backoff on the initial request if we're trying again with
-            # trailing slashes Otherwise we may end up waiting to contact a
+            # trailing slashes. Otherwise we may end up waiting to contact a
             # server that is actually up
             "backoff_on_404": False if try_trailing_slash_on_400 else backoff_on_404,
         }
@@ -681,7 +681,7 @@ class MatrixFederationHttpClient(object):
                 and try the request anyway.
             try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end of
-                the request. Workaround for #3622 in Synapse <=v0.99.2.
+                the request. Workaround for #3622 in Synapse <= v0.99.3.
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
