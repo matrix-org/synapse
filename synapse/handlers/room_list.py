@@ -67,15 +67,16 @@ class RoomListHandler(BaseHandler):
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
         """
-        logger.info(
-            "Getting public room list: limit=%r, since=%r, search=%r, network=%r",
-            limit, since_token, bool(search_filter), network_tuple,
-        )
         if not self.config.enable_room_list_search:
             return defer.succeed({
                 "chunk": [],
                 "total_room_count_estimate": 0,
             })
+
+        logger.info(
+            "Getting public room list: limit=%r, since=%r, search=%r, network=%r",
+            limit, since_token, bool(search_filter), network_tuple,
+        )
 
         if search_filter:
             # We explicitly don't bother caching searches or requests for
