@@ -340,6 +340,8 @@ class ApplicationServiceTransactionWorkerStore(ApplicationServiceWorkerStore,
     def get_new_events_for_appservice(self, current_id, limit):
         """Get all new evnets"""
 
+        logger.info("call get_new_events_for_appservice(%s, %s)", current_id, limit)
+
         def get_new_events_for_appservice_txn(txn):
             sql = (
                 "SELECT e.stream_ordering, e.event_id"
@@ -365,7 +367,11 @@ class ApplicationServiceTransactionWorkerStore(ApplicationServiceWorkerStore,
             "get_new_events_for_appservice", get_new_events_for_appservice_txn,
         )
 
+        logger.info("call get_new_events_for_appservice len(event_ids) = %s", len(event_ids))
+
         events = yield self._get_events(event_ids)
+
+        logger.info("call get_new_events_for_appservice len(event_ids) = %s", len(events))
 
         defer.returnValue((upper_bound, events))
 
