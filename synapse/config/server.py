@@ -126,6 +126,11 @@ class ServerConfig(Config):
                 self.public_baseurl += '/'
         self.start_pushers = config.get("start_pushers", True)
 
+        # (undocumented) option for torturing the worker-mode replication a bit,
+        # for testing. The value defines the number of milliseconds to pause before
+        # sending out any replication updates.
+        self.replication_torture_level = config.get("replication_torture_level")
+
         self.listeners = []
         for listener in config.get("listeners", []):
             if not isinstance(listener.get("port", None), int):
