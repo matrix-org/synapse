@@ -118,4 +118,6 @@ class SlavedEventStore(EventFederationWorkerStore,
             self._membership_stream_cache.entity_has_changed(
                 state_key, stream_ordering
             )
-            self.get_invited_rooms_for_user.invalidate((state_key,))
+            if not backfilled:
+                self.get_invited_rooms_for_user.invalidate((state_key,))
+                self.get_rooms_for_user_with_stream_ordering.invalidate((state_key,))
