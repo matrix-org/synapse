@@ -38,7 +38,7 @@ class UserDirectoryConfig(Config):
         # User Directory configuration
         #
         # 'enabled' defines whether users can search the user directory,
-        #  defaults to True.
+        # Defaults to true.
         # 'search_all_users' defines whether to search all users visible to your HS
         # when searching the user directory, rather than limiting to users visible
         # in public rooms.  Defaults to false.  If you set it True, you'll have to run
