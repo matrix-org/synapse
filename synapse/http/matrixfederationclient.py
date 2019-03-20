@@ -226,6 +226,8 @@ class MatrixFederationHttpClient(object):
             body = yield _handle_json_response(
                 self.hs.get_reactor(), self.default_timeout, request, response,
             )
+
+            defer.returnValue(body)
         except HttpResponseException as e:
             if not try_trailing_slash_on_400:
                 # Received an error >= 300. Raise unless we're retrying
