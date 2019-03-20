@@ -194,7 +194,7 @@ class MatrixFederationHttpClient(object):
         request,
         try_trailing_slash_on_400=False,
         backoff_on_404=False,
-        send_request_args={},
+        **send_request_args
     ):
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
@@ -206,9 +206,8 @@ class MatrixFederationHttpClient(object):
             try_trailing_slash_on_400 (bool): Whether on receiving a 400
                 'M_UNRECOGNIZED' from the server to retry the request with a
                 trailing slash appended to the request path.
-            404_backoff (bool): Whether to backoff on 404 when making a
-                request with a trailing slash (only affects request if
-                try_trailing_slash_on_400 is True).
+            backoff_on_404 (bool): Whether to backoff on 404 when making a
+                request with a trailing slash.
             send_request_args (Dict): A dictionary of arguments to pass to
                 `_send_request()`.
 
@@ -220,36 +219,24 @@ class MatrixFederationHttpClient(object):
             Deferred[Dict]: Parsed JSON response body.
         """
         try:
-            response = yield self._send_request(**send_request_args)
-
-            # Check if it's necessary to retry with a trailing slash
-            body = yield _handle_json_response(
-                self.hs.get_reactor(), self.default_timeout, request, response,
-            )
-
-            defer.returnValue(body)
+            response = yield self._send_request(request, backoff_on_404=backoff_on_404, **send_request_args)
         except HttpResponseException as e:
+            # Received an HTTP error > 300. Check if it meets the requirements
+            # to retry with a trailing slash
             if not try_trailing_slash_on_400:
-                # Received an error >= 300. Raise unless we're retrying
-                raise e
-        except Exception as e:
-            raise e
+                raise
 
-        # Retry with a trailing slash if we received a 400 with
-        # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
-        # trailing slash on Synapse <= v0.99.3.
-        # Enable backoff if initially disabled
-        send_request_args["backoff_on_404"] = backoff_on_404
+            if e.code != 400 or e.to_synapse_error().errcode != "M_UNRECOGNIZED":
+                raise
 
-        # Add trailing slash
-        send_request_args["request"].path += "/"
+            # Retry with a trailing slash if we received a 400 with
+            # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
+            # trailing slash on Synapse <= v0.99.3.
+            request.path += "/"
 
-        response = yield self._send_request(**send_request_args)
-        body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
-        )
+            response = yield self._send_request(request, backoff_on_404=backoff_on_404, **send_request_args)
 
-        defer.returnValue(body)
+        defer.returnValue(response)
 
     @defer.inlineCallbacks
     def _send_request(
@@ -587,19 +574,13 @@ class MatrixFederationHttpClient(object):
             json=data,
         )
 
-        send_request_args = {
-            "request": request,
-            "long_retries": long_retries,
-            "timeout": timeout,
-            "ignore_backoff": ignore_backoff,
-            # Do not backoff on the initial request if we're trying again with
-            # trailing slashes. Otherwise we may end up waiting to contact a
-            # server that is actually up
-            "backoff_on_404": False if try_trailing_slash_on_400 else backoff_on_404,
-        }
+        response = yield self._send_request_with_optional_trailing_slash(
+            request, try_trailing_slash_on_400, backoff_on_404,
+            long_retries=long_retries, timeout=timeout, ignore_backoff=ignore_backoff,
+        )
 
-        body = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, backoff_on_404, send_request_args,
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
@@ -707,16 +688,14 @@ class MatrixFederationHttpClient(object):
             query=args,
         )
 
-        send_request_args = {
-            "request": request,
-            "retry_on_dns_fail": retry_on_dns_fail,
-            "timeout": timeout,
-            "ignore_backoff": ignore_backoff,
-            "backoff_on_404": False,
-        }
+        response = yield self._send_request_with_optional_trailing_slash(
+            request, try_trailing_slash_on_400, False,
+            retry_on_dns_fail=retry_on_dns_fail, timeout=timeout,
+            ignore_backoff=ignore_backoff,
+        )
 
-        body = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, False, send_request_args,
+        body = yield _handle_json_response(
+            self.hs.get_reactor(), self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
