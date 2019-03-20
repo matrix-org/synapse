@@ -367,7 +367,7 @@ class ApplicationServiceTransactionWorkerStore(ApplicationServiceWorkerStore,
             "get_new_events_for_appservice", get_new_events_for_appservice_txn,
         )
 
-        logger.info("call get_new_events_for_appservice len(event_ids) = %s", len(event_ids))
+        logger.info("call get_new_events_for_appservice len(event_ids): %s = %s", len(event_ids), event_ids)
 
         events = yield self._get_events(event_ids)
 
