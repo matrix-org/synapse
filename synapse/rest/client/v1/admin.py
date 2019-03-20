@@ -516,7 +516,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
                     room_id=room_id,
                     action=Membership.LEAVE,
                     content={},
-                    ratelimit=False
+                    ratelimit=False,
+                    require_consent=False,
                 )
 
                 yield self.room_member_handler.forget(target_requester.user, room_id)
@@ -527,7 +528,8 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
                     room_id=new_room_id,
                     action=Membership.JOIN,
                     content={},
-                    ratelimit=False
+                    ratelimit=False,
+                    require_consent=False,
                 )
 
                 kicked_users.append(user_id)
