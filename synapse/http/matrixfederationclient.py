@@ -220,7 +220,7 @@ class MatrixFederationHttpClient(object):
         """
         try:
             response = yield self._send_request(
-                request, backoff_on_404=backoff_on_404, **send_request_args,
+                request, backoff_on_404=backoff_on_404, **send_request_args
             )
         except HttpResponseException as e:
             # Received an HTTP error > 300. Check if it meets the requirements
@@ -237,7 +237,7 @@ class MatrixFederationHttpClient(object):
             request.path += "/"
 
             response = yield self._send_request(
-                request, backoff_on_404=backoff_on_404, **send_request_args,
+                request, backoff_on_404=backoff_on_404, **send_request_args
             )
 
         defer.returnValue(response)
