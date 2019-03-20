@@ -58,10 +58,11 @@ class RoomDirectoryConfig(Config):
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
-        # Wether the public room list can be searched. When disabled blocks
-        # searching local and remote room list for local and remote users.
+        # Uncomment to disable searching the public room list. When disabled
+        # blocks searching local and remote room lists for local and remote
+        # users by always returning an empty list for all queries.
         #
-        #enable_room_list_search: true
+        #enable_room_list_search: false
 
         # The `alias_creation` option controls who's allowed to create aliases
         # on this server.
