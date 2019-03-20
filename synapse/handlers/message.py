@@ -316,8 +316,12 @@ class EventCreationHandler(object):
                         target, e
                     )
 
+        # Check if the user has accepted the privacy policy. We only do this if
+        # the requester has an associated access_token_id, which indicates that
+        # this action came from a user request rather than an automatice server
+        # or admin action.
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
-        if not is_exempt:
+        if requester.access_token_id and not is_exempt:
             yield self.assert_accepted_privacy_policy(requester)
 
         if token_id is not None:
