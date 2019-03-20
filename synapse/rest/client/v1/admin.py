@@ -490,8 +490,13 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
 
         requester_user_id = requester.user.to_string()
 
-        logger.info("Shutting down room %r", room_id)
+        logger.info(
+            "Shutting down room %r, joining to new room: %r",
+            room_id, new_room_id,
+        )
 
+        # This will work even if the room is already blocked, but that is
+        # desirable in case the first attempt at blocking the room failed below.
         yield self.store.block_room(room_id, requester_user_id)
 
         users = yield self.state.get_current_user_in_room(room_id)
