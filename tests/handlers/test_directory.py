@@ -111,7 +111,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
 
     servlets = [directory.register_servlets, room.register_servlets]
 
-    def prepare(self, hs, reactor, clock):
+    def prepare(self, reactor, clock, hs):
         # We cheekily override the config to add custom alias creation rules
         config = {}
         config["alias_creation_rules"] = [
@@ -151,3 +151,60 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
+
+
+class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
+    user_id = "@test:test"
+
+    servlets = [directory.register_servlets, room.register_servlets]
+
+    def prepare(self, reactor, clock, hs):
+        room_id = self.helper.create_room_as(self.user_id)
+
+        request, channel = self.make_request(
+            "PUT",
+            b"directory/list/room/%s" % (room_id.encode('ascii'),),
+            b'{}',
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+        self.room_list_handler = hs.get_room_list_handler()
+        self.directory_handler = hs.get_handlers().directory_handler
+
+        return hs
+
+    def test_disabling_room_list(self):
+        self.room_list_handler.enable_room_list_search = True
+        self.directory_handler.enable_room_list_search = True
+
+        # Room list is enabled so we should get some results
+        request, channel = self.make_request(
+            "GET",
+            b"publicRooms",
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertTrue(len(channel.json_body["chunk"]) > 0)
+
+        self.room_list_handler.enable_room_list_search = False
+        self.directory_handler.enable_room_list_search = False
+
+        # Room list disabled so we should get no results
+        request, channel = self.make_request(
+            "GET",
+            b"publicRooms",
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertTrue(len(channel.json_body["chunk"]) == 0)
+
+        # Room list disabled so we shouldn't be allowed to publish rooms
+        room_id = self.helper.create_room_as(self.user_id)
+        request, channel = self.make_request(
+            "PUT",
+            b"directory/list/room/%s" % (room_id.encode('ascii'),),
+            b'{}',
+        )
+        self.render(request)
+        self.assertEquals(403, channel.code, channel.result)
