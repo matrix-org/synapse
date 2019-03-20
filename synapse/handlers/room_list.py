@@ -44,7 +44,7 @@ EMPTY_THIRD_PARTY_ID = ThirdPartyInstanceID(None, None)
 class RoomListHandler(BaseHandler):
     def __init__(self, hs):
         super(RoomListHandler, self).__init__(hs)
-        self.config = hs.config
+        self.enable_room_list_search = hs.config.enable_room_list_search
         self.response_cache = ResponseCache(hs, "room_list")
         self.remote_response_cache = ResponseCache(hs, "remote_room_list",
                                                    timeout_ms=30 * 1000)
@@ -67,7 +67,7 @@ class RoomListHandler(BaseHandler):
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
         """
-        if not self.config.enable_room_list_search:
+        if not self.enable_room_list_search:
             return defer.succeed({
                 "chunk": [],
                 "total_room_count_estimate": 0,
@@ -449,7 +449,7 @@ class RoomListHandler(BaseHandler):
     def get_remote_public_room_list(self, server_name, limit=None, since_token=None,
                                     search_filter=None, include_all_networks=False,
                                     third_party_instance_id=None,):
-        if not self.config.enable_room_list_search:
+        if not self.enable_room_list_search:
             defer.returnValue({
                 "chunk": [],
                 "total_room_count_estimate": 0,
