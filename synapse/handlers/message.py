@@ -782,6 +782,7 @@ class EventCreationHandler(object):
 
         def _notify():
             try:
+                logger.info("call _notify")
                 self.notifier.on_new_room_event(
                     event, event_stream_id, max_stream_id,
                     extra_users=extra_users

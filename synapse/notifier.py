@@ -222,6 +222,7 @@ class Notifier(object):
         until all previous events have been persisted before notifying
         the client streams.
         """
+        logger.info("call on_new_room_event")
         self.pending_new_room_events.append((
             room_stream_id, event, extra_users
         ))
@@ -236,6 +237,7 @@ class Notifier(object):
             max_room_stream_id(int): The highest stream_id below which all
                 events have been persisted.
         """
+        logger.info("call _notify_pending_new_room_events")
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
         for room_stream_id, event, extra_users in pending:
@@ -249,6 +251,7 @@ class Notifier(object):
     def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
+        logger.info("call _on_new_room_event")
         run_as_background_process(
             "notify_app_services",
             self._notify_app_services, room_stream_id,
@@ -268,6 +271,7 @@ class Notifier(object):
 
     @defer.inlineCallbacks
     def _notify_app_services(self, room_stream_id):
+        logger.info("call _notify_app_services")
         try:
             yield self.appservice_handler.notify_interested_services(room_stream_id)
         except Exception:

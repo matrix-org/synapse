@@ -61,12 +61,15 @@ class ApplicationServicesHandler(object):
         Args:
             current_id(int): The current maximum ID.
         """
+        logger.info("call notify_interested_services")
         services = self.store.get_app_services()
         if not services or not self.notify_appservices:
+            logger.info("ret not services or not self.notify_appservices")
             return
 
         self.current_max = max(self.current_max, current_id)
         if self.is_processing:
+            logger.info("ret self.is_processing")
             return
 
         with Measure(self.clock, "notify_interested_services"):
@@ -79,6 +82,7 @@ class ApplicationServicesHandler(object):
                     )
 
                     if not events:
+                        logger.info("ret not events")
                         break
 
                     events_by_room = {}
