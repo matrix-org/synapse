@@ -365,7 +365,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertEqual(conn.value(), b"")
 
         # We should get a 404 failure response
-        r = self.failureResultOf(d)
+        self.failureResultOf(d)
 
     def test_client_sends_body(self):
         self.cl.post_json(

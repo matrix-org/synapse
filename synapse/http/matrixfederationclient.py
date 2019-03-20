@@ -219,7 +219,9 @@ class MatrixFederationHttpClient(object):
             Deferred[Dict]: Parsed JSON response body.
         """
         try:
-            response = yield self._send_request(request, backoff_on_404=backoff_on_404, **send_request_args)
+            response = yield self._send_request(
+                request, backoff_on_404=backoff_on_404, **send_request_args,
+            )
         except HttpResponseException as e:
             # Received an HTTP error > 300. Check if it meets the requirements
             # to retry with a trailing slash
@@ -234,7 +236,9 @@ class MatrixFederationHttpClient(object):
             # trailing slash on Synapse <= v0.99.3.
             request.path += "/"
 
-            response = yield self._send_request(request, backoff_on_404=backoff_on_404, **send_request_args)
+            response = yield self._send_request(
+                request, backoff_on_404=backoff_on_404, **send_request_args,
+            )
 
         defer.returnValue(response)
 
