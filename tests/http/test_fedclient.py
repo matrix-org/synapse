@@ -278,6 +278,7 @@ class FederationClientTests(HomeserverTestCase):
             "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
         )
 
+        # Send the request
         self.pump()
 
         # there should have been a call to connectTCP
@@ -293,6 +294,9 @@ class FederationClientTests(HomeserverTestCase):
         # that should have made it send the request to the connection
         self.assertRegex(conn.value(), b"^GET /foo/bar")
 
+        # Clear the original request data before sending a response
+        conn.clear()
+
         # Send the HTTP response
         client.dataReceived(
             b"HTTP/1.1 400 Bad Request\r\n"
@@ -302,7 +306,7 @@ class FederationClientTests(HomeserverTestCase):
             b'{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}'
         )
 
-        # We should get another request wiht a trailing slash
+        # We should get another request with a trailing slash
         self.assertRegex(conn.value(), b"^GET /foo/bar/")
 
         # Send a happy response this time
@@ -316,7 +320,6 @@ class FederationClientTests(HomeserverTestCase):
 
         # We should get a successful response
         r = self.successResultOf(d)
-        self.assertEqual(r.code, 200)
         self.assertEqual(r, {})
 
     def test_client_sends_body(self):
