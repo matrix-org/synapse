@@ -587,7 +587,8 @@ class RoomMemberStore(RoomMemberWorkerStore):
                 self.get_invited_rooms_for_user.invalidate, (event.state_key,)
             )
             txn.call_after(
-                self.get_rooms_for_user_with_stream_ordering, (event.state_key,)
+                self.get_rooms_for_user_with_stream_ordering.invalidate,
+                (event.state_key,),
             )
 
             # We update the local_invites table only if the event is "current",
