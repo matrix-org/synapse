@@ -35,13 +35,19 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertTrue(
-            check.user_may_invite("test:source_one", "test:target_one", "room", False)
+            check.user_may_invite(
+                "test:source_one", "test:target_one", None, "room", False
+            )
         )
         self.assertTrue(
-            check.user_may_invite("test:source_one", "test:target_two", "room", False)
+            check.user_may_invite(
+                "test:source_one", "test:target_two", None, "room", False
+            )
         )
         self.assertTrue(
-            check.user_may_invite("test:source_two", "test:target_two", "room", False)
+            check.user_may_invite(
+                "test:source_two", "test:target_two", None, "room", False
+            )
         )
 
     def test_disallowed(self):
@@ -55,16 +61,24 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertFalse(
-            check.user_may_invite("test:source_one", "test:target_three", "room", False)
+            check.user_may_invite(
+                "test:source_one", "test:target_three", None, "room", False
+            )
         )
         self.assertFalse(
-            check.user_may_invite("test:source_two", "test:target_three", "room", False)
+            check.user_may_invite(
+                "test:source_two", "test:target_three", None, "room", False
+            )
         )
         self.assertFalse(
-            check.user_may_invite("test:source_two", "test:target_one", "room", False)
+            check.user_may_invite(
+                "test:source_two", "test:target_one", None, "room", False
+            )
         )
         self.assertFalse(
-            check.user_may_invite("test:source_four", "test:target_one", "room", False)
+            check.user_may_invite(
+                "test:source_four", "test:target_one", None, "room", False
+            )
         )
 
     def test_default_allow(self):
@@ -77,7 +91,9 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertTrue(
-            check.user_may_invite("test:source_three", "test:target_one", "room", False)
+            check.user_may_invite(
+                "test:source_three", "test:target_one", None, "room", False
+            )
         )
 
     def test_default_deny(self):
@@ -90,7 +106,9 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         }
         check = DomainRuleChecker(config)
         self.assertFalse(
-            check.user_may_invite("test:source_three", "test:target_one", "room", False)
+            check.user_may_invite(
+                "test:source_three", "test:target_one", None, "room", False
+            )
         )
 
     def test_config_parse(self):
@@ -125,13 +143,17 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
 
-        config.spam_checker = (DomainRuleChecker, {
-            "default": True,
-            "domain_mapping": {},
-            "can_only_join_rooms_with_invite": True,
-            "can_only_create_one_to_one_rooms": True,
-            "can_only_invite_during_room_creation": True,
-        })
+        config.spam_checker = (
+            DomainRuleChecker,
+            {
+                "default": True,
+                "domain_mapping": {},
+                "can_only_join_rooms_with_invite": True,
+                "can_only_create_one_to_one_rooms": True,
+                "can_only_invite_during_room_creation": True,
+                "can_invite_by_third_party_id": False,
+            },
+        )
 
         hs = self.setup_test_homeserver(config=config)
         return hs
@@ -154,15 +176,36 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         assert channel.result["code"] == b"403", channel.result
 
     def test_normal_user_cannot_create_room_with_multiple_invites(self):
-        channel = self._create_room(self.normal_access_token, content={
-            "invite": [self.other_user_id, self.admin_user_id],
-        })
+        channel = self._create_room(
+            self.normal_access_token,
+            content={"invite": [self.other_user_id, self.admin_user_id]},
+        )
+        assert channel.result["code"] == b"403", channel.result
+
+        # Test that it correctly counts both normal and third party invites
+        channel = self._create_room(
+            self.normal_access_token,
+            content={
+                "invite": [self.other_user_id],
+                "invite_3pid": [{"medium": "email", "address": "foo@example.com"}],
+            },
+        )
+        assert channel.result["code"] == b"403", channel.result
+
+        # Test that it correctly rejects third party invites
+        channel = self._create_room(
+            self.normal_access_token,
+            content={
+                "invite": [],
+                "invite_3pid": [{"medium": "email", "address": "foo@example.com"}],
+            },
+        )
         assert channel.result["code"] == b"403", channel.result
 
     def test_normal_user_can_room_with_single_invites(self):
-        channel = self._create_room(self.normal_access_token, content={
-            "invite": [self.other_user_id],
-        })
+        channel = self._create_room(
+            self.normal_access_token, content={"invite": [self.other_user_id]}
+        )
         assert channel.result["code"] == b"200", channel.result
 
     def test_cannot_join_public_room(self):
@@ -172,9 +215,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         room_id = channel.json_body["room_id"]
 
         self.helper.join(
-            room_id, self.normal_user_id,
-            tok=self.normal_access_token,
-            expect_code=403,
+            room_id, self.normal_user_id, tok=self.normal_access_token, expect_code=403
         )
 
     def test_can_join_invited_room(self):
@@ -191,12 +232,37 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.helper.join(
-            room_id, self.normal_user_id,
-            tok=self.normal_access_token,
-            expect_code=200,
+            room_id, self.normal_user_id, tok=self.normal_access_token, expect_code=200
         )
 
     def test_cannot_invite(self):
+        channel = self._create_room(self.admin_access_token)
+        assert channel.result["code"] == b"200", channel.result
+
+        room_id = channel.json_body["room_id"]
+
+        self.helper.invite(
+            room_id,
+            src=self.admin_user_id,
+            targ=self.normal_user_id,
+            tok=self.admin_access_token,
+        )
+
+        self.helper.join(
+            room_id, self.normal_user_id, tok=self.normal_access_token, expect_code=200
+        )
+
+        self.helper.invite(
+            room_id,
+            src=self.normal_user_id,
+            targ=self.other_user_id,
+            tok=self.normal_access_token,
+            expect_code=403,
+        )
+
+    def test_cannot_3pid_invite(self):
+        """Test that unbound 3pid invites get rejected.
+        """
         channel = self._create_room(self.admin_access_token)
         assert channel.result["code"] == b"200", channel.result
 
@@ -223,13 +289,26 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
             expect_code=403,
         )
 
-    def _create_room(self, token, content={}):
-        path = "/_matrix/client/r0/createRoom?access_token=%s" % (
-            token,
+        request, channel = self.make_request(
+            "POST",
+            "rooms/%s/invite" % (room_id),
+            {
+                "address": "foo@bar.com",
+                "medium": "email",
+                "id_server": "localhost"
+            },
+            access_token=self.normal_access_token,
         )
+        self.render(request)
+        self.assertEqual(channel.code, 403, channel.result["body"])
+
+    def _create_room(self, token, content={}):
+        path = "/_matrix/client/r0/createRoom?access_token=%s" % (token,)
 
         request, channel = make_request(
-            self.hs.get_reactor(), "POST", path,
+            self.hs.get_reactor(),
+            "POST",
+            path,
             content=json.dumps(content).encode("utf8"),
         )
         render(request, self.resource, self.hs.get_reactor())

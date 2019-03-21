@@ -46,14 +46,19 @@ class SpamChecker(object):
 
         return self.spam_checker.check_event_for_spam(event)
 
-    def user_may_invite(self, inviter_userid, invitee_userid, room_id, new_room):
+    def user_may_invite(self, inviter_userid, invitee_userid, third_party_invite,
+                        room_id, new_room):
         """Checks if a given user may send an invite
 
         If this method returns false, the invite will be rejected.
 
         Args:
             inviter_userid (str)
-            invitee_userid (str)
+            invitee_userid (str|None): The user ID of the invitee. Is None
+                if this is a third party invite and the 3PID is not bound to a
+                user ID.
+            third_party_invite (dict|None): If a third party invite then is a
+                dict containing the medium and address of the invitee.
             room_id (str)
             new_room (bool): Wether the user is being invited to the room as
                 part of a room creation, if so the invitee would have been
@@ -66,10 +71,11 @@ class SpamChecker(object):
             return True
 
         return self.spam_checker.user_may_invite(
-            inviter_userid, invitee_userid, room_id, new_room,
+            inviter_userid, invitee_userid, third_party_invite, room_id, new_room,
         )
 
-    def user_may_create_room(self, userid, invite_list, cloning):
+    def user_may_create_room(self, userid, invite_list, third_party_invite_list,
+                             cloning):
         """Checks if a given user may create a room
 
         If this method returns false, the creation request will be rejected.
@@ -78,6 +84,8 @@ class SpamChecker(object):
             userid (string): The sender's user ID
             invite_list (list[str]): List of user IDs that would be invited to
                 the new room.
+            third_party_invite_list (list[dict]): List of third party invites
+                for the new room.
             cloning (bool): Whether the user is cloning an existing room, e.g.
                 upgrading a room.
 
@@ -87,7 +95,9 @@ class SpamChecker(object):
         if self.spam_checker is None:
             return True
 
-        return self.spam_checker.user_may_create_room(userid, invite_list, cloning)
+        return self.spam_checker.user_may_create_room(
+            userid, invite_list, third_party_invite_list, cloning,
+        )
 
     def user_may_create_room_alias(self, userid, room_alias):
         """Checks if a given user may create a room alias
