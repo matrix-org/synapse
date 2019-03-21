@@ -38,7 +38,12 @@ logger = logging.getLogger(__name__)
 class KeyConfig(Config):
 
     def read_config(self, config):
-        self.signing_key = self.read_signing_key(config["signing_key_path"])
+        # the signing key can be specified inline or in a separate file
+        if "signing_key" in config:
+            self.signing_key = read_signing_keys([config["signing_key"]])
+        else:
+            self.signing_key = self.read_signing_key(config["signing_key_path"])
+
         self.old_signing_keys = self.read_old_signing_keys(
             config.get("old_signing_keys", {})
         )

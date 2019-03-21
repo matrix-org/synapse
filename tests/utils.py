@@ -28,7 +28,7 @@ from twisted.internet import defer, reactor
 
 from synapse.api.constants import EventTypes, RoomVersions
 from synapse.api.errors import CodeMessageException, cs_error
-from synapse.config.server import ServerConfig
+from synapse.config.homeserver import HomeServerConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
@@ -111,14 +111,25 @@ def default_config(name):
     """
     Create a reasonable test config.
     """
-    config = Mock()
-    config.signing_key = [MockKey()]
+    config_dict = {
+        "server_name": name,
+        "media_store_path": "media",
+        "uploads_path": "uploads",
+
+        # the test signing key is just an arbitrary ed25519 key to keep the config
+        # parser happy
+        "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
+    }
+
+    config = HomeServerConfig()
+    config.parse_config_dict(config_dict)
+
+    # TODO: move this stuff into config_dict or get rid of it
     config.event_cache_size = 1
     config.enable_registration = True
     config.enable_registration_captcha = False
     config.macaroon_secret_key = "not even a little secret"
     config.expire_access_token = False
-    config.server_name = name
     config.trusted_third_party_id_servers = []
     config.room_invite_state_types = []
     config.password_providers = []
@@ -175,13 +186,6 @@ def default_config(name):
     # disable user directory updates, because they get done in the
     # background, which upsets the test runner.
     config.update_user_directory = False
-
-    def is_threepid_reserved(threepid):
-        return ServerConfig.is_threepid_reserved(
-            config.mau_limits_reserved_threepids, threepid
-        )
-
-    config.is_threepid_reserved.side_effect = is_threepid_reserved
 
     return config
 
@@ -276,7 +280,6 @@ def setup_test_homeserver(
             db_config=config.database_config,
             version_string="Synapse/tests",
             database_engine=db_engine,
-            room_list_handler=object(),
             tls_server_context_factory=Mock(),
             tls_client_options_factory=Mock(),
             reactor=reactor,
@@ -347,7 +350,6 @@ def setup_test_homeserver(
             config=config,
             version_string="Synapse/tests",
             database_engine=db_engine,
-            room_list_handler=object(),
             tls_server_context_factory=Mock(),
             tls_client_options_factory=Mock(),
             reactor=reactor,

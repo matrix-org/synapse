@@ -42,6 +42,10 @@ class RatelimitConfig(Config):
         self.federation_rc_reject_limit = config.get("federation_rc_reject_limit", 50)
         self.federation_rc_concurrent = config.get("federation_rc_concurrent", 3)
 
+        self.federation_rr_transactions_per_room_per_second = config.get(
+            "federation_rr_transactions_per_room_per_second", 50,
+        )
+
     def default_config(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -111,4 +115,12 @@ class RatelimitConfig(Config):
         # single server
         #
         #federation_rc_concurrent: 3
+
+        # Target outgoing federation transaction frequency for sending read-receipts,
+        # per-room.
+        #
+        # If we end up trying to send out more read-receipts, they will get buffered up
+        # into fewer transactions.
+        #
+        #federation_rr_transactions_per_room_per_second: 50
         """

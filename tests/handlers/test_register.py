@@ -22,7 +22,7 @@ from synapse.api.errors import ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
-from tests.utils import setup_test_homeserver
+from tests.utils import default_config, setup_test_homeserver
 
 from .. import unittest
 
@@ -40,8 +40,16 @@ class RegistrationTestCase(unittest.TestCase):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
+
+        hs_config = default_config("test")
+
+        # some of the tests rely on us having a user consent version
+        hs_config.user_consent_version = "test_consent_version"
+        hs_config.max_mau_value = 50
+
         self.hs = yield setup_test_homeserver(
             self.addCleanup,
+            config=hs_config,
             expire_access_token=True,
         )
         self.macaroon_generator = Mock(
@@ -50,7 +58,6 @@ class RegistrationTestCase(unittest.TestCase):
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
-        self.hs.config.max_mau_value = 50
         self.lots_of_users = 100
         self.small_number_of_users = 1
 

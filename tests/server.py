@@ -119,14 +119,7 @@ class FakeSite:
 
     server_version_string = b"1"
     site_tag = "test"
-
-    @property
-    def access_logger(self):
-        class FakeLogger:
-            def info(self, *args, **kwargs):
-                pass
-
-        return FakeLogger()
+    access_logger = logging.getLogger("synapse.access.http.fake")
 
 
 def make_request(

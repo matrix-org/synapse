@@ -164,6 +164,7 @@ class DeactivateAccountHandler(BaseHandler):
                     room_id,
                     "leave",
                     ratelimit=False,
+                    require_consent=False,
                 )
             except Exception:
                 logger.exception(

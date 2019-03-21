@@ -1,0 +1,2 @@
+Fix a bug where hs_disabled_message was sometimes not correctly enforced.
+
