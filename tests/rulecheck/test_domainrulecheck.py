@@ -260,6 +260,48 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
             expect_code=403,
         )
 
+    def test_cannot_3pid_invite(self):
+        """Test that unbound 3pid invites get rejected.
+        """
+        channel = self._create_room(self.admin_access_token)
+        assert channel.result["code"] == b"200", channel.result
+
+        room_id = channel.json_body["room_id"]
+
+        self.helper.invite(
+            room_id,
+            src=self.admin_user_id,
+            targ=self.normal_user_id,
+            tok=self.admin_access_token,
+        )
+
+        self.helper.join(
+            room_id, self.normal_user_id,
+            tok=self.normal_access_token,
+            expect_code=200,
+        )
+
+        self.helper.invite(
+            room_id,
+            src=self.normal_user_id,
+            targ=self.other_user_id,
+            tok=self.normal_access_token,
+            expect_code=403,
+        )
+
+        request, channel = self.make_request(
+            "POST",
+            "rooms/%s/invite" % (room_id),
+            {
+                "address": "foo@bar.com",
+                "medium": "email",
+                "id_server": "localhost"
+            },
+            access_token=self.normal_access_token,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 403, channel.result["body"])
+
     def _create_room(self, token, content={}):
         path = "/_matrix/client/r0/createRoom?access_token=%s" % (token,)
 
