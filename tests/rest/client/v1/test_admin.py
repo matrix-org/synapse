@@ -373,7 +373,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         self.store = hs.get_datastore()
 
-    @unittest.DEBUG
     def test_shutdown_room_conset(self):
         admin_user = self.register_user("admin", "pass", admin=True)
         admin_user_tok = self.login("admin", "pass")
