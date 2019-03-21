@@ -18,7 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
@@ -261,6 +261,10 @@ class InitialSyncHandler(BaseHandler):
         Returns:
             A JSON serialisable dict with the snapshot of the room.
         """
+
+        blocked = yield self.store.is_room_blocked(room_id)
+        if blocked:
+            raise SynapseError(403, "This room has been blocked on this server")
 
         user_id = requester.user.to_string()
 
