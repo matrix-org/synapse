@@ -20,7 +20,7 @@ import json
 from mock import Mock
 
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v1 import admin, login, room
 
 from tests import unittest
 
@@ -353,3 +353,76 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid user type', channel.json_body["error"])
+
+
+class ShutdownRoomTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.event_creation_handler = hs.get_event_creation_handler()
+        hs.config.user_consent_version = "1"
+
+        consent_uri_builder = Mock()
+        consent_uri_builder.build_user_consent_uri.return_value = (
+            "http://example.com"
+        )
+        self.event_creation_handler._consent_uri_builder = consent_uri_builder
+
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_token = self.login("user", "pass")
+
+        # Mark the admin user as having consented
+        self.get_success(
+            self.store.user_set_consent_version(self.admin_user, "1"),
+        )
+
+    def test_shutdown_room_consent(self):
+        """Test that we can shutdown rooms with local users who have not
+        yet accepted the privacy policy. This used to fail when we tried to
+        force part the user from the old room.
+        """
+        self.event_creation_handler._block_events_without_consent_error = None
+
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
+
+        # Assert one user in room
+        users_in_room = self.get_success(
+            self.store.get_users_in_room(room_id),
+        )
+        self.assertEqual([self.other_user], users_in_room)
+
+        # Enable require consent to send events
+        self.event_creation_handler._block_events_without_consent_error = "Error"
+
+        # Assert that the user is getting consent error
+        self.helper.send(
+            room_id,
+            body="foo", tok=self.other_user_token, expect_code=403,
+        )
+
+        # Test that the admin can still send shutdown
+        url = "admin/shutdown_room/" + room_id
+        request, channel = self.make_request(
+            "POST",
+            url.encode('ascii'),
+            json.dumps({"new_room_user_id": self.admin_user}),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Assert there is now no longer anyone in the room
+        users_in_room = self.get_success(
+            self.store.get_users_in_room(room_id),
+        )
+        self.assertEqual([], users_in_room)

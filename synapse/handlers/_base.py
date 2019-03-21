@@ -165,6 +165,7 @@ class BaseHandler(object):
                     member_event.room_id,
                     "leave",
                     ratelimit=False,
+                    require_consent=False,
                 )
             except Exception as e:
                 logger.exception("Error kicking guest user: %s" % (e,))

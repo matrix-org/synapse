@@ -160,6 +160,7 @@ class RoomMemberHandler(object):
         txn_id=None,
         ratelimit=True,
         content=None,
+        require_consent=True,
     ):
         user_id = target.to_string()
 
@@ -185,6 +186,7 @@ class RoomMemberHandler(object):
             token_id=requester.access_token_id,
             txn_id=txn_id,
             prev_events_and_hashes=prev_events_and_hashes,
+            require_consent=require_consent,
         )
 
         # Check if this event matches the previous membership event for the user.
@@ -305,6 +307,7 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            require_consent=True,
     ):
         key = (room_id,)
 
@@ -319,6 +322,7 @@ class RoomMemberHandler(object):
                 third_party_signed=third_party_signed,
                 ratelimit=ratelimit,
                 content=content,
+                require_consent=require_consent,
             )
 
         defer.returnValue(result)
@@ -335,6 +339,7 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            require_consent=True,
     ):
         content_specified = bool(content)
         if content is None:
@@ -516,6 +521,7 @@ class RoomMemberHandler(object):
             ratelimit=ratelimit,
             prev_events_and_hashes=prev_events_and_hashes,
             content=content,
+            require_consent=require_consent,
         )
         defer.returnValue(res)
 
