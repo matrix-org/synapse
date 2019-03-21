@@ -22,7 +22,7 @@ from synapse.api.errors import ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
-from tests.utils import setup_test_homeserver
+from tests.utils import default_config, setup_test_homeserver
 
 from .. import unittest
 
@@ -40,8 +40,16 @@ class RegistrationTestCase(unittest.TestCase):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
+
+        hs_config = default_config("test")
+
+        # some of the tests rely on us having a user consent version
+        hs_config.user_consent_version = "test_consent_version"
+        hs_config.max_mau_value = 50
+
         self.hs = yield setup_test_homeserver(
             self.addCleanup,
+            config=hs_config,
             expire_access_token=True,
         )
         self.macaroon_generator = Mock(
@@ -50,7 +58,6 @@ class RegistrationTestCase(unittest.TestCase):
         self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
-        self.hs.config.max_mau_value = 50
         self.lots_of_users = 100
         self.small_number_of_users = 1
 
@@ -187,12 +194,32 @@ class RegistrationTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_auto_create_auto_join_where_no_consent(self):
-        self.hs.config.user_consent_at_registration = True
-        self.hs.config.block_events_without_consent_error = "Error"
+        """Test to ensure that the first user is not auto-joined to a room if
+        they have not given general consent.
+        """
+
+        # Given:-
+        #    * a user must give consent,
+        #    * they have not given that consent
+        #    * The server is configured to auto-join to a room
+        # (and autocreate if necessary)
+
+        event_creation_handler = self.hs.get_event_creation_handler()
+        # (Messing with the internals of event_creation_handler is fragile
+        # but can't see a better way to do this. One option could be to subclass
+        # the test with custom config.)
+        event_creation_handler._block_events_without_consent_error = ("Error")
+        event_creation_handler._consent_uri_builder = Mock()
         room_alias_str = "#room:test"
         self.hs.config.auto_join_rooms = [room_alias_str]
+
+        # When:-
+        #   * the user is registered and post consent actions are called
         res = yield self.handler.register(localpart='jeff')
         yield self.handler.post_consent_actions(res[0])
+
+        # Then:-
+        #   * Ensure that they have not been joined to the room
         rooms = yield self.store.get_rooms_for_user(res[0])
         self.assertEqual(len(rooms), 0)
 

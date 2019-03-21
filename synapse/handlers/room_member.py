@@ -160,6 +160,7 @@ class RoomMemberHandler(object):
         txn_id=None,
         ratelimit=True,
         content=None,
+        require_consent=True,
     ):
         user_id = target.to_string()
 
@@ -185,6 +186,7 @@ class RoomMemberHandler(object):
             token_id=requester.access_token_id,
             txn_id=txn_id,
             prev_events_and_hashes=prev_events_and_hashes,
+            require_consent=require_consent,
         )
 
         # Check if this event matches the previous membership event for the user.
@@ -230,6 +232,10 @@ class RoomMemberHandler(object):
             if predecessor:
                 # It is an upgraded room. Copy over old tags
                 self.copy_room_tags_and_direct_to_room(
+                    predecessor["room_id"], room_id, user_id,
+                )
+                # Move over old push rules
+                self.store.move_push_rules_from_room_to_room_for_user(
                     predecessor["room_id"], room_id, user_id,
                 )
         elif event.membership == Membership.LEAVE:
@@ -302,6 +308,7 @@ class RoomMemberHandler(object):
             ratelimit=True,
             content=None,
             new_room=False,
+            require_consent=True,
     ):
         """Update a users membership in a room
 
@@ -339,6 +346,7 @@ class RoomMemberHandler(object):
                 ratelimit=ratelimit,
                 content=content,
                 new_room=new_room,
+                require_consent=require_consent,
             )
 
         defer.returnValue(result)
@@ -356,6 +364,7 @@ class RoomMemberHandler(object):
             ratelimit=True,
             content=None,
             new_room=False,
+            require_consent=True,
     ):
         content_specified = bool(content)
         if content is None:
@@ -559,6 +568,7 @@ class RoomMemberHandler(object):
             ratelimit=ratelimit,
             prev_events_and_hashes=prev_events_and_hashes,
             content=content,
+            require_consent=require_consent,
         )
         defer.returnValue(res)
 

@@ -24,7 +24,7 @@ class RegistrationConfig(Config):
 
     def read_config(self, config):
         self.enable_registration = bool(
-            strtobool(str(config["enable_registration"]))
+            strtobool(str(config.get("enable_registration", False)))
         )
         if "disable_registration" in config:
             self.enable_registration = not bool(
@@ -44,7 +44,10 @@ class RegistrationConfig(Config):
         self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
-        self.trusted_third_party_id_servers = config["trusted_third_party_id_servers"]
+        self.trusted_third_party_id_servers = config.get(
+            "trusted_third_party_id_servers",
+            ["matrix.org", "vector.im"],
+        )
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
@@ -82,9 +85,13 @@ class RegistrationConfig(Config):
 
         return """\
         ## Registration ##
+        #
+        # Registration can be rate-limited using the parameters in the "Ratelimiting"
+        # section of this file.
 
         # Enable registration for new users.
-        enable_registration: False
+        #
+        #enable_registration: false
 
         # The user must provide all of the below types of 3PID when registering.
         #
@@ -95,7 +102,7 @@ class RegistrationConfig(Config):
         # Explicitly disable asking for MSISDNs from the registration
         # flow (overrides registrations_require_3pid if MSISDNs are set as required)
         #
-        #disable_msisdn_registration: True
+        #disable_msisdn_registration: true
 
         # Derive the user's matrix ID from a type of 3PID used when registering.
         # This overrides any matrix ID the user proposes when calling /register
@@ -131,8 +138,8 @@ class RegistrationConfig(Config):
         #
         #disable_3pid_changes: False
 
-        # If set, allows registration by anyone who also has the shared
-        # secret, even if registration is otherwise disabled.
+        # If set, allows registration of standard or admin accounts by anyone who
+        # has the shared secret, even if registration is otherwise disabled.
         #
         %(registration_shared_secret)s
 
@@ -142,13 +149,13 @@ class RegistrationConfig(Config):
         # N.B. that increasing this will exponentially increase the time required
         # to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
         #
-        bcrypt_rounds: 12
+        #bcrypt_rounds: 12
 
         # Allows users to register as guests without a password/email/etc, and
         # participate in rooms hosted on this server which have been made
         # accessible to anonymous users.
         #
-        allow_guest_access: False
+        #allow_guest_access: false
 
         # The identity server which we suggest that clients should use when users log
         # in on this server.
@@ -164,9 +171,9 @@ class RegistrationConfig(Config):
         # Also defines the ID server which will be called when an account is
         # deactivated (one will be picked arbitrarily).
         #
-        trusted_third_party_id_servers:
-          - matrix.org
-          - vector.im
+        #trusted_third_party_id_servers:
+        #  - matrix.org
+        #  - vector.im
 
         # If enabled, user IDs, display names and avatar URLs will be replicated
         # to this server whenever they change.
@@ -204,7 +211,7 @@ class RegistrationConfig(Config):
         # Setting to false means that if the rooms are not manually created,
         # users cannot be auto-joined since they do not exist.
         #
-        autocreate_auto_join_rooms: true
+        #autocreate_auto_join_rooms: true
         """ % locals()
 
     def add_arguments(self, parser):

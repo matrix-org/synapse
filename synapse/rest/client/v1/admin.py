@@ -17,12 +17,14 @@
 import hashlib
 import hmac
 import logging
+import platform
 
 from six import text_type
 from six.moves import http_client
 
 from twisted.internet import defer
 
+import synapse
 from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -32,6 +34,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.types import UserID, create_requester
+from synapse.util.versionstring import get_version_string
 
 from .base import ClientV1RestServlet, client_path_patterns
 
@@ -62,6 +65,25 @@ class UsersRestServlet(ClientV1RestServlet):
             raise SynapseError(400, "Can only users a local user")
 
         ret = yield self.handlers.admin_handler.get_users()
+
+        defer.returnValue((200, ret))
+
+
+class VersionServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/server_version")
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        ret = {
+            'server_version': get_version_string(synapse),
+            'python_version': platform.python_version(),
+        }
 
         defer.returnValue((200, ret))
 
@@ -466,6 +488,57 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         )
         new_room_id = info["room_id"]
 
+        requester_user_id = requester.user.to_string()
+
+        logger.info(
+            "Shutting down room %r, joining to new room: %r",
+            room_id, new_room_id,
+        )
+
+        # This will work even if the room is already blocked, but that is
+        # desirable in case the first attempt at blocking the room failed below.
+        yield self.store.block_room(room_id, requester_user_id)
+
+        users = yield self.state.get_current_user_in_room(room_id)
+        kicked_users = []
+        failed_to_kick_users = []
+        for user_id in users:
+            if not self.hs.is_mine_id(user_id):
+                continue
+
+            logger.info("Kicking %r from %r...", user_id, room_id)
+
+            try:
+                target_requester = create_requester(user_id)
+                yield self.room_member_handler.update_membership(
+                    requester=target_requester,
+                    target=target_requester.user,
+                    room_id=room_id,
+                    action=Membership.LEAVE,
+                    content={},
+                    ratelimit=False,
+                    require_consent=False,
+                )
+
+                yield self.room_member_handler.forget(target_requester.user, room_id)
+
+                yield self.room_member_handler.update_membership(
+                    requester=target_requester,
+                    target=target_requester.user,
+                    room_id=new_room_id,
+                    action=Membership.JOIN,
+                    content={},
+                    ratelimit=False,
+                    require_consent=False,
+                )
+
+                kicked_users.append(user_id)
+            except Exception:
+                logger.exception(
+                    "Failed to leave old room and join new room for %r", user_id,
+                )
+                failed_to_kick_users.append(user_id)
+
         yield self.event_creation_handler.create_and_send_nonmember_event(
             room_creator_requester,
             {
@@ -477,43 +550,6 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
             ratelimit=False,
         )
 
-        requester_user_id = requester.user.to_string()
-
-        logger.info("Shutting down room %r", room_id)
-
-        yield self.store.block_room(room_id, requester_user_id)
-
-        users = yield self.state.get_current_user_in_room(room_id)
-        kicked_users = []
-        for user_id in users:
-            if not self.hs.is_mine_id(user_id):
-                continue
-
-            logger.info("Kicking %r from %r...", user_id, room_id)
-
-            target_requester = create_requester(user_id)
-            yield self.room_member_handler.update_membership(
-                requester=target_requester,
-                target=target_requester.user,
-                room_id=room_id,
-                action=Membership.LEAVE,
-                content={},
-                ratelimit=False
-            )
-
-            yield self.room_member_handler.forget(target_requester.user, room_id)
-
-            yield self.room_member_handler.update_membership(
-                requester=target_requester,
-                target=target_requester.user,
-                room_id=new_room_id,
-                action=Membership.JOIN,
-                content={},
-                ratelimit=False
-            )
-
-            kicked_users.append(user_id)
-
         aliases_for_room = yield self.store.get_aliases_for_room(room_id)
 
         yield self.store.update_aliases_for_room(
@@ -522,6 +558,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {
             "kicked_users": kicked_users,
+            "failed_to_kick_users": failed_to_kick_users,
             "local_aliases": aliases_for_room,
             "new_room_id": new_room_id,
         }))
@@ -763,3 +800,4 @@ def register_servlets(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
+    VersionServlet(hs).register(http_server)

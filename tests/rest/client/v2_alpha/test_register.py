@@ -20,6 +20,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
         self.hs.config.enable_registration_captcha = False
+        self.hs.config.allow_guest_access = True
 
         return self.hs
 
@@ -28,7 +29,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         as_token = "i_am_an_app_service"
 
         appservice = ApplicationService(
-            as_token, self.hs.config.hostname,
+            as_token, self.hs.config.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": r"@as_user.*", "exclusive": True}],
@@ -130,3 +131,53 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
+
+    def test_POST_ratelimiting_guest(self):
+        self.hs.config.rc_registration.burst_count = 5
+        self.hs.config.rc_registration.per_second = 0.17
+
+        for i in range(0, 6):
+            url = self.url + b"?kind=guest"
+            request, channel = self.make_request(b"POST", url, b"{}")
+            self.render(request)
+
+            if i == 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(retry_after_ms / 1000.)
+
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_POST_ratelimiting(self):
+        self.hs.config.rc_registration.burst_count = 5
+        self.hs.config.rc_registration.per_second = 0.17
+
+        for i in range(0, 6):
+            params = {
+                "username": "kermit" + str(i),
+                "password": "monkey",
+                "device_id": "frogfone",
+                "auth": {"type": LoginType.DUMMY},
+            }
+            request_data = json.dumps(params)
+            request, channel = self.make_request(b"POST", self.url, request_data)
+            self.render(request)
+
+            if i == 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(retry_after_ms / 1000.)
+
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)

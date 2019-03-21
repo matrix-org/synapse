@@ -243,12 +243,19 @@ class EventCreationHandler(object):
 
         self.spam_checker = hs.get_spam_checker()
 
-        if self.config.block_events_without_consent_error is not None:
+        self._block_events_without_consent_error = (
+            self.config.block_events_without_consent_error
+        )
+
+        # we need to construct a ConsentURIBuilder here, as it checks that the necessary
+        # config options, but *only* if we have a configuration for which we are
+        # going to need it.
+        if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
     @defer.inlineCallbacks
     def create_event(self, requester, event_dict, token_id=None, txn_id=None,
-                     prev_events_and_hashes=None):
+                     prev_events_and_hashes=None, require_consent=True):
         """
         Given a dict from a client, create a new event.
 
@@ -269,6 +276,9 @@ class EventCreationHandler(object):
                 where *hashes* is a map from algorithm to hash.
 
                 If None, they will be requested from the database.
+
+            require_consent (bool): Whether to check if the requester has
+                consented to privacy policy.
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
@@ -310,7 +320,7 @@ class EventCreationHandler(object):
                     )
 
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
-        if not is_exempt:
+        if require_consent and not is_exempt:
             yield self.assert_accepted_privacy_policy(requester)
 
         if token_id is not None:
@@ -378,7 +388,7 @@ class EventCreationHandler(object):
         Raises:
             ConsentNotGivenError: if the user has not given consent yet
         """
-        if self.config.block_events_without_consent_error is None:
+        if self._block_events_without_consent_error is None:
             return
 
         # exempt AS users from needing consent
@@ -405,7 +415,7 @@ class EventCreationHandler(object):
         consent_uri = self._consent_uri_builder.build_user_consent_uri(
             requester.user.localpart,
         )
-        msg = self.config.block_events_without_consent_error % {
+        msg = self._block_events_without_consent_error % {
             'consent_uri': consent_uri,
         }
         raise ConsentNotGivenError(
@@ -436,10 +446,11 @@ class EventCreationHandler(object):
 
         if event.is_state():
             prev_state = yield self.deduplicate_state_event(event, context)
-            logger.info(
-                "Not bothering to persist duplicate state event %s", event.event_id,
-            )
             if prev_state is not None:
+                logger.info(
+                    "Not bothering to persist state event %s duplicated by %s",
+                    event.event_id, prev_state.event_id,
+                )
                 defer.returnValue(prev_state)
 
         yield self.handle_new_client_event(

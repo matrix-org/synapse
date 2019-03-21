@@ -39,6 +39,7 @@ prune .circleci
 prune .coveragerc
 prune debian
 prune .codecov.yml
+prune .buildkite
 
 exclude jenkins*
 recursive-exclude jenkins *.sh

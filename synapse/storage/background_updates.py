@@ -52,7 +52,9 @@ class BackgroundUpdatePerformance(object):
         Returns:
             A duration in ms as a float
         """
-        if self.total_item_count == 0:
+        if self.avg_duration_ms == 0:
+            return 0
+        elif self.total_item_count == 0:
             return None
         else:
             # Use the exponential moving average so that we can adapt to
@@ -64,7 +66,9 @@ class BackgroundUpdatePerformance(object):
         Returns:
             A duration in ms as a float
         """
-        if self.total_item_count == 0:
+        if self.total_duration_ms == 0:
+            return 0
+        elif self.total_item_count == 0:
             return None
         else:
             return float(self.total_item_count) / float(self.total_duration_ms)

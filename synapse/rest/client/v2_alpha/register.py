@@ -27,7 +27,12 @@ from twisted.internet import defer
 import synapse
 import synapse.types
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, SynapseError, UnrecognizedRequestError
+from synapse.api.errors import (
+    Codes,
+    LimitExceededError,
+    SynapseError,
+    UnrecognizedRequestError,
+)
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
@@ -193,18 +198,36 @@ class RegisterRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
+        self.ratelimiter = hs.get_registration_ratelimiter()
+        self.clock = hs.get_clock()
 
     @interactive_auth_handler
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
+        client_addr = request.getClientIP()
+
+        time_now = self.clock.time()
+
+        allowed, time_allowed = self.ratelimiter.can_do_action(
+            client_addr, time_now_s=time_now,
+            rate_hz=self.hs.config.rc_registration.per_second,
+            burst_count=self.hs.config.rc_registration.burst_count,
+            update=False,
+        )
+
+        if not allowed:
+            raise LimitExceededError(
+                retry_after_ms=int(1000 * (time_allowed - time_now)),
+            )
+
         kind = b"user"
         if b"kind" in request.args:
             kind = request.args[b"kind"][0]
 
         if kind == b"guest":
-            ret = yield self._do_guest_registration(body)
+            ret = yield self._do_guest_registration(body, address=client_addr)
             defer.returnValue(ret)
             return
         elif kind != b"user":
@@ -499,6 +522,7 @@ class RegisterRestServlet(RestServlet):
                 generate_token=False,
                 default_display_name=desired_display_name,
                 threepid=threepid,
+                address=client_addr,
             )
             # Necessary due to auth checks prior to the threepid being
             # written to the db
@@ -640,12 +664,13 @@ class RegisterRestServlet(RestServlet):
         defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def _do_guest_registration(self, params):
+    def _do_guest_registration(self, params, address=None):
         if not self.hs.config.allow_guest_access:
             raise SynapseError(403, "Guest access is disabled")
         user_id, _ = yield self.registration_handler.register(
             generate_token=False,
-            make_guest=True
+            make_guest=True,
+            address=address,
         )
 
         # we don't allow guests to specify their own device_id, because

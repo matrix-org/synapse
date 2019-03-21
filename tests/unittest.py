@@ -262,6 +262,7 @@ class HomeserverTestCase(TestCase):
         access_token=None,
         request=SynapseRequest,
         shorthand=True,
+        federation_auth_origin=None,
     ):
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -275,15 +276,18 @@ class HomeserverTestCase(TestCase):
             a dict.
             shorthand: Whether to try and be helpful and prefix the given URL
             with the usual REST API path, if it doesn't contain it.
+            federation_auth_origin (bytes|None): if set to not-None, we will add a fake
+                Authorization header pretenting to be the given server name.
 
         Returns:
-            A synapse.http.site.SynapseRequest.
+            Tuple[synapse.http.site.SynapseRequest, channel]
         """
         if isinstance(content, dict):
             content = json.dumps(content).encode('utf8')
 
         return make_request(
-            self.reactor, method, path, content, access_token, request, shorthand
+            self.reactor, method, path, content, access_token, request, shorthand,
+            federation_auth_origin,
         )
 
     def render(self, request):
@@ -326,10 +330,10 @@ class HomeserverTestCase(TestCase):
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(self, d):
+    def get_success(self, d, by=0.0):
         if not isinstance(d, Deferred):
             return d
-        self.pump()
+        self.pump(by=by)
         return self.successResultOf(d)
 
     def register_user(self, username, password, admin=False):

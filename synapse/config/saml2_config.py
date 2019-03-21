@@ -64,7 +64,7 @@ class SAML2Config(Config):
         }
 
     def default_config(self, config_dir_path, server_name, **kwargs):
-        return """
+        return """\
         # Enable SAML2 for registration and login. Uses pysaml2.
         #
         # `sp_config` is the configuration for the pysaml2 Service Provider.

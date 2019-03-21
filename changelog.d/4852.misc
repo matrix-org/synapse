@@ -1,0 +1,1 @@
+ Move client read-receipt processing to federation sender worker.

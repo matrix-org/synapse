@@ -42,7 +42,7 @@ from synapse.federation.federation_server import (
     ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.transaction_queue import TransactionQueue
+from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler
@@ -51,7 +51,7 @@ from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
-from synapse.handlers.device import DeviceHandler
+from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
@@ -185,6 +185,10 @@ class HomeServer(object):
         'registration_handler',
     ]
 
+    REQUIRED_ON_MASTER_STARTUP = [
+        "user_directory_handler",
+    ]
+
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
@@ -206,6 +210,7 @@ class HomeServer(object):
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
+        self.registration_ratelimiter = Ratelimiter()
 
         self.datastore = None
 
@@ -219,6 +224,15 @@ class HomeServer(object):
             self.datastore = self.DATASTORE_CLASS(conn, self)
             conn.commit()
         logger.info("Finished setting up.")
+
+    def setup_master(self):
+        """
+        Some handlers have side effects on instantiation (like registering
+        background updates). This function causes them to be fetched, and
+        therefore instantiated, to run those side effects.
+        """
+        for i in self.REQUIRED_ON_MASTER_STARTUP:
+            getattr(self, "get_" + i)()
 
     def get_reactor(self):
         """
@@ -250,6 +264,9 @@ class HomeServer(object):
 
     def get_ratelimiter(self):
         return self.ratelimiter
+
+    def get_registration_ratelimiter(self):
+        return self.registration_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)
@@ -307,7 +324,10 @@ class HomeServer(object):
         return MacaroonGenerator(self)
 
     def build_device_handler(self):
-        return DeviceHandler(self)
+        if self.config.worker_app:
+            return DeviceWorkerHandler(self)
+        else:
+            return DeviceHandler(self)
 
     def build_device_message_handler(self):
         return DeviceMessageHandler(self)
@@ -414,7 +434,7 @@ class HomeServer(object):
 
     def build_federation_sender(self):
         if self.should_send_federation():
-            return TransactionQueue(self)
+            return FederationSender(self)
         elif not self.config.worker_app:
             return FederationRemoteSendQueue(self)
         else:

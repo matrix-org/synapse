@@ -63,12 +63,13 @@ def start_worker_reactor(appname, config):
 
     start_reactor(
         appname,
-        config.soft_file_limit,
-        config.gc_thresholds,
-        config.worker_pid_file,
-        config.worker_daemonize,
-        config.worker_cpu_affinity,
-        logger,
+        soft_file_limit=config.soft_file_limit,
+        gc_thresholds=config.gc_thresholds,
+        pid_file=config.worker_pid_file,
+        daemonize=config.worker_daemonize,
+        cpu_affinity=config.worker_cpu_affinity,
+        print_pidfile=config.print_pidfile,
+        logger=logger,
     )
 
 
@@ -79,6 +80,7 @@ def start_reactor(
         pid_file,
         daemonize,
         cpu_affinity,
+        print_pidfile,
         logger,
 ):
     """ Run the reactor in the main process
@@ -93,6 +95,7 @@ def start_reactor(
         pid_file (str): name of pid file to write to if daemonize is True
         daemonize (bool): true to run the reactor in a background process
         cpu_affinity (int|None): cpu affinity mask
+        print_pidfile (bool): whether to print the pid file, if daemonize is True
         logger (logging.Logger): logger instance to pass to Daemonize
     """
 
@@ -124,6 +127,9 @@ def start_reactor(
             reactor.run()
 
     if daemonize:
+        if print_pidfile:
+            print(pid_file)
+
         daemon = Daemonize(
             app=appname,
             pid=pid_file,
