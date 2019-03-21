@@ -193,7 +193,6 @@ class MatrixFederationHttpClient(object):
         self,
         request,
         try_trailing_slash_on_400=False,
-        backoff_on_404=False,
         **send_request_args
     ):
         """Wrapper for _send_request which can optionally retry the request
@@ -206,8 +205,6 @@ class MatrixFederationHttpClient(object):
             try_trailing_slash_on_400 (bool): Whether on receiving a 400
                 'M_UNRECOGNIZED' from the server to retry the request with a
                 trailing slash appended to the request path.
-            backoff_on_404 (bool): Whether to backoff on 404 when making a
-                request with a trailing slash.
             send_request_args (Dict): A dictionary of arguments to pass to
                 `_send_request()`.
 
@@ -220,7 +217,7 @@ class MatrixFederationHttpClient(object):
         """
         try:
             response = yield self._send_request(
-                request, backoff_on_404=backoff_on_404, **send_request_args
+                request, **send_request_args
             )
         except HttpResponseException as e:
             # Received an HTTP error > 300. Check if it meets the requirements
@@ -237,7 +234,7 @@ class MatrixFederationHttpClient(object):
             request.path += "/"
 
             response = yield self._send_request(
-                request, backoff_on_404=backoff_on_404, **send_request_args
+                request, **send_request_args
             )
 
         defer.returnValue(response)
@@ -579,8 +576,12 @@ class MatrixFederationHttpClient(object):
         )
 
         response = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, backoff_on_404,
-            long_retries=long_retries, timeout=timeout, ignore_backoff=ignore_backoff,
+            request,
+            try_trailing_slash_on_400,
+            backoff_on_404=backoff_on_404,
+            ignore_backoff=ignore_backoff,
+            long_retries=long_retries,
+            timeout=timeout,
         )
 
         body = yield _handle_json_response(
@@ -693,9 +694,12 @@ class MatrixFederationHttpClient(object):
         )
 
         response = yield self._send_request_with_optional_trailing_slash(
-            request, try_trailing_slash_on_400, False,
-            retry_on_dns_fail=retry_on_dns_fail, timeout=timeout,
+            request,
+            try_trailing_slash_on_400,
+            backoff_on_404=False,
             ignore_backoff=ignore_backoff,
+            retry_on_dns_fail=retry_on_dns_fail,
+            timeout=timeout,
         )
 
         body = yield _handle_json_response(
