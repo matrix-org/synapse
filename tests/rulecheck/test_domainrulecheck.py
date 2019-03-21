@@ -131,6 +131,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
             "can_only_join_rooms_with_invite": True,
             "can_only_create_one_to_one_rooms": True,
             "can_only_invite_during_room_creation": True,
+            "can_invite_by_third_party_id": False,
         })
 
         hs = self.setup_test_homeserver(config=config)
@@ -156,6 +157,20 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
     def test_normal_user_cannot_create_room_with_multiple_invites(self):
         channel = self._create_room(self.normal_access_token, content={
             "invite": [self.other_user_id, self.admin_user_id],
+        })
+        assert channel.result["code"] == b"403", channel.result
+
+        # Test that it correctly counts both normal and third party invites
+        channel = self._create_room(self.normal_access_token, content={
+            "invite": [self.other_user_id],
+            "invite_3pid": [{"medium": "email", "address": "foo@example.com"}],
+        })
+        assert channel.result["code"] == b"403", channel.result
+
+        # Test that it correctly rejects third party invites
+        channel = self._create_room(self.normal_access_token, content={
+            "invite": [],
+            "invite_3pid": [{"medium": "email", "address": "foo@example.com"}],
         })
         assert channel.result["code"] == b"403", channel.result
 

@@ -269,6 +269,7 @@ class RoomCreationHandler(BaseHandler):
         if not is_requester_admin and not self.spam_checker.user_may_create_room(
             user_id,
             invite_list=[],
+            third_party_invite_list=[],
             cloning=True,
         ):
             raise SynapseError(403, "You are not permitted to create rooms")
@@ -492,6 +493,7 @@ class RoomCreationHandler(BaseHandler):
         yield self.auth.check_auth_blocking(user_id)
 
         invite_list = config.get("invite", [])
+        invite_3pid_list = config.get("invite_3pid", [])
 
         if (self._server_notices_mxid is not None and
                 requester.user.to_string() == self._server_notices_mxid):
@@ -505,6 +507,7 @@ class RoomCreationHandler(BaseHandler):
         if not is_requester_admin and not self.spam_checker.user_may_create_room(
             user_id,
             invite_list=invite_list,
+            third_party_invite_list=invite_3pid_list,
             cloning=False,
         ):
             raise SynapseError(403, "You are not permitted to create rooms")
@@ -558,8 +561,6 @@ class RoomCreationHandler(BaseHandler):
         yield self.event_creation_handler.assert_accepted_privacy_policy(
             requester,
         )
-
-        invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
         is_public = visibility == "public"

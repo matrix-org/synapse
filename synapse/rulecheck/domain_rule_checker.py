@@ -46,6 +46,9 @@ class DomainRuleChecker(object):
           # domain mapping rules above.
           can_only_invite_during_room_creation: false
 
+          # Allow third party invites
+          can_invite_by_third_party_id: true
+
     Don't forget to consider if you can invite users from your own domain.
     """
 
@@ -61,6 +64,9 @@ class DomainRuleChecker(object):
         )
         self.can_only_invite_during_room_creation = config.get(
             "can_only_invite_during_room_creation", False,
+        )
+        self.can_invite_by_third_party_id = config.get(
+            "can_invite_by_third_party_id", True,
         )
 
     def check_event_for_spam(self, event):
@@ -83,14 +89,20 @@ class DomainRuleChecker(object):
 
         return invitee_domain in self.domain_mapping[inviter_domain]
 
-    def user_may_create_room(self, userid, invite_list, cloning):
+    def user_may_create_room(self, userid, invite_list, third_party_invite_list,
+                             cloning):
         """Implements synapse.events.SpamChecker.user_may_create_room
         """
 
         if cloning:
             return True
 
-        if self.can_only_create_one_to_one_rooms and len(invite_list) != 1:
+        if not self.can_invite_by_third_party_id and third_party_invite_list:
+            return False
+
+        number_of_invites = len(invite_list) + len(third_party_invite_list)
+
+        if self.can_only_create_one_to_one_rooms and number_of_invites != 1:
             return False
 
         return True
