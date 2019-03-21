@@ -1049,6 +1049,12 @@ password_config:
 
 
 
+# Uncomment to disable searching the public room list. When disabled
+# blocks searching local and remote room lists for local and remote
+# users by always returning an empty list for all queries.
+#
+#enable_room_list_search: false
+
 # The `alias_creation` option controls who's allowed to create aliases
 # on this server.
 #
