@@ -385,7 +385,11 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
             self.store.user_set_consent_version(self.admin_user, "1"),
         )
 
-    def test_shutdown_room_conset(self):
+    def test_shutdown_room_consent(self):
+        """Test that we can shutdown rooms with local users who have not
+        yet accepted the privacy policy. This used to fail when we tried to
+        force part the user from the old room.
+        """
         self.event_creation_handler._block_events_without_consent_error = None
 
         room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
