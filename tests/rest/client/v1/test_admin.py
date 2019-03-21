@@ -20,7 +20,7 @@ import json
 from mock import Mock
 
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1 import admin, login, room, events
+from synapse.rest.client.v1 import admin, events, login, room
 
 from tests import unittest
 
