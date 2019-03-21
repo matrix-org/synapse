@@ -57,8 +57,8 @@ class SpamChecker(object):
             invitee_userid (str|None): The user ID of the invitee. Is None
                 if this is a third party invite and the 3PID is not bound to a
                 user ID.
-            invitee_userid (dict|None): If a third party invite then is a dict
-                containing the medium and address of the invitee.
+            third_party_invite (dict|None): If a third party invite then is a
+                dict containing the medium and address of the invitee.
             room_id (str)
             new_room (bool): Wether the user is being invited to the room as
                 part of a room creation, if so the invitee would have been

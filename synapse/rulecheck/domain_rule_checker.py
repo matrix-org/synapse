@@ -84,7 +84,9 @@ class DomainRuleChecker(object):
         if not self.can_invite_by_third_party_id and third_party_invite:
             return False
 
-        if third_party_invite and not invitee_userid:
+        # This is a third party invite (without a bound mxid), so unless we have
+        # banned all third party invites (above) we allow it.
+        if not invitee_userid:
             return True
 
         inviter_domain = self._get_domain_from_id(inviter_userid)
