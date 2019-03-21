@@ -514,6 +514,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
             keyvalues={
                 "room_id": room_id,
             },
+            values={},
             insertion_values={
                 "user_id": user_id,
             },
