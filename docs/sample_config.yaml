@@ -438,6 +438,14 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #
 #federation_rc_concurrent: 3
 
+# Target outgoing federation transaction frequency for sending read-receipts,
+# per-room.
+#
+# If we end up trying to send out more read-receipts, they will get buffered up
+# into fewer transactions.
+#
+#federation_rr_transactions_per_room_per_second: 50
+
 
 
 # Directory where uploaded images and attachments are stored.
@@ -954,6 +962,10 @@ password_config:
 
 # User Directory configuration
 #
+# 'enabled' defines whether users can search the user directory. If
+# false then empty responses are returned to all queries. Defaults to
+# true.
+#
 # 'search_all_users' defines whether to search all users visible to your HS
 # when searching the user directory, rather than limiting to users visible
 # in public rooms.  Defaults to false.  If you set it True, you'll have to run
@@ -961,6 +973,7 @@ password_config:
 # on your database to tell it to rebuild the user_directory search indexes.
 #
 #user_directory:
+#  enabled: true
 #  search_all_users: false
 
 

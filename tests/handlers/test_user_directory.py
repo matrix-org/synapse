@@ -16,6 +16,7 @@ from mock import Mock
 
 from synapse.api.constants import UserTypes
 from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v2_alpha import user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
@@ -317,3 +318,54 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         u4 = self.register_user("user4", "pass")
         s = self.get_success(self.handler.search_users(u1, u4, 10))
         self.assertEqual(len(s["results"]), 1)
+
+
+class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
+    user_id = "@test:test"
+
+    servlets = [
+        user_directory.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+        admin.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config.update_user_directory = True
+        hs = self.setup_test_homeserver(config=config)
+
+        self.config = hs.config
+
+        return hs
+
+    def test_disabling_room_list(self):
+        self.config.user_directory_search_enabled = True
+
+        # First we create a room with another user so that user dir is non-empty
+        # for our user
+        self.helper.create_room_as(self.user_id)
+        u2 = self.register_user("user2", "pass")
+        room = self.helper.create_room_as(self.user_id)
+        self.helper.join(room, user=u2)
+
+        # Assert user directory is not empty
+        request, channel = self.make_request(
+            "POST",
+            b"user_directory/search",
+            b'{"search_term":"user2"}',
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertTrue(len(channel.json_body["results"]) > 0)
+
+        # Disable user directory and check search returns nothing
+        self.config.user_directory_search_enabled = False
+        request, channel = self.make_request(
+            "POST",
+            b"user_directory/search",
+            b'{"search_term":"user2"}',
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertTrue(len(channel.json_body["results"]) == 0)

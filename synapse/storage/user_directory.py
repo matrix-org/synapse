@@ -34,6 +34,11 @@ TEMP_TABLE = "_temp_populate_user_directory"
 
 
 class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
+
+    # How many records do we calculate before sending it to
+    # add_users_who_share_private_rooms?
+    SHARE_PRIVATE_WORKING_SET = 500
+
     def __init__(self, db_conn, hs):
         super(UserDirectoryStore, self).__init__(db_conn, hs)
 
@@ -219,6 +224,14 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
 
                             user_set = (user_id, other_user_id)
                             to_insert.add(user_set)
+
+                            # If it gets too big, stop and write to the database
+                            # to prevent storing too much in RAM.
+                            if len(to_insert) >= self.SHARE_PRIVATE_WORKING_SET:
+                                yield self.add_users_who_share_private_room(
+                                    room_id, to_insert
+                                )
+                                to_insert.clear()
 
                     if to_insert:
                         yield self.add_users_who_share_private_room(room_id, to_insert)
