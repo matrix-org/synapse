@@ -74,12 +74,18 @@ class DomainRuleChecker(object):
         """
         return False
 
-    def user_may_invite(self, inviter_userid, invitee_userid, room_id,
-                        new_room):
+    def user_may_invite(self, inviter_userid, invitee_userid, third_party_invite,
+                        room_id, new_room):
         """Implements synapse.events.SpamChecker.user_may_invite
         """
         if self.can_only_invite_during_room_creation and not new_room:
             return False
+
+        if not self.can_invite_by_third_party_id and third_party_invite:
+            return False
+
+        if third_party_invite and not invitee_userid:
+            return True
 
         inviter_domain = self._get_domain_from_id(inviter_userid)
         invitee_domain = self._get_domain_from_id(invitee_userid)

@@ -666,7 +666,8 @@ class RoomMembershipRestServlet(ClientV1RestServlet):
                 content["address"],
                 content["id_server"],
                 requester,
-                txn_id
+                txn_id,
+                new_room=False,
             )
             defer.returnValue((200, {}))
             return

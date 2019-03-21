@@ -661,6 +661,7 @@ class RoomCreationHandler(BaseHandler):
                 id_server,
                 requester,
                 txn_id=None,
+                new_room=True,
             )
 
         result = {"room_id": room_id}

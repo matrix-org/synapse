@@ -425,7 +425,9 @@ class RoomMemberHandler(object):
                     block_invite = True
 
                 if not self.spam_checker.user_may_invite(
-                    requester.user.to_string(), target.to_string(), room_id,
+                    requester.user.to_string(), target.to_string(),
+                    third_party_invite=None,
+                    room_id=room_id,
                     new_room=new_room,
                 ):
                     logger.info("Blocking invite due to spam checker")
@@ -728,7 +730,8 @@ class RoomMemberHandler(object):
             address,
             id_server,
             requester,
-            txn_id
+            txn_id,
+            new_room=False,
     ):
         if self.config.block_non_admin_invites:
             is_requester_admin = yield self.auth.is_server_admin(
@@ -743,6 +746,20 @@ class RoomMemberHandler(object):
         invitee = yield self._lookup_3pid(
             id_server, medium, address
         )
+
+        if not self.spam_checker.user_may_invite(
+            requester.user.to_string(), invitee,
+            third_party_invite={
+                "medium": medium,
+                "address": address,
+            },
+            room_id=room_id,
+            new_room=new_room,
+        ):
+            logger.info("Blocking invite due to spam checker")
+            raise SynapseError(
+                403, "Invites have been disabled on this server",
+            )
 
         if invitee:
             yield self.update_membership(
