@@ -20,7 +20,7 @@ import json
 from mock import Mock
 
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v1 import admin, login, room
 
 from tests import unittest
 
@@ -353,3 +353,68 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual('Invalid user type', channel.json_body["error"])
+
+
+class ShutdownRoomTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.event_creation_handler = hs.get_event_creation_handler()
+        hs.config.user_consent_version = "1"
+
+        self._consent_uri_builder = Mock()
+        self._consent_uri_builder.build_user_consent_uri.return_value = (
+            "http://example.com"
+        )
+
+        self.store = hs.get_datastore()
+
+    @unittest.DEBUG
+    def test_shutdown_room_conset(self):
+        admin_user = self.register_user("admin", "pass", admin=True)
+        admin_user_tok = self.login("admin", "pass")
+
+        other_user = self.register_user("user", "pass")
+        other_user_token = self.login("user", "pass")
+
+        room_id = self.helper.create_room_as(other_user, tok=other_user_token)
+
+        # Assert one user in room
+        users_in_room = self.get_success(
+            self.store.get_users_in_room(room_id),
+        )
+        self.assertEqual([other_user], users_in_room)
+
+        # Enable require consent to send events
+        self.event_creation_handler._block_events_without_consent_error = "Error"
+        self.event_creation_handler._consent_uri_builder = self._consent_uri_builder
+
+        # Assert that the user is getting consent error
+        self.helper.send(room_id, body="foo", tok=other_user_token, expect_code=403)
+
+        # Mark the admin user as having consented
+        self.get_success(
+            self.store.user_set_consent_version(admin_user, "1"),
+        )
+
+        # Test that the admin can still send shutdown
+        url = "admin/shutdown_room/" + room_id
+        request, channel = self.make_request(
+            "POST",
+            url.encode('ascii'),
+            json.dumps({"new_room_user_id": admin_user}),
+            access_token=admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Assert there is now no longer anyone in the room
+        users_in_room = self.get_success(
+            self.store.get_users_in_room(room_id),
+        )
+        self.assertEqual([], users_in_room)
