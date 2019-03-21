@@ -268,6 +268,105 @@ class FederationClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, TimeoutError)
 
+    def test_client_requires_trailing_slashes(self):
+        """
+        If a connection is made to a client but the client rejects it due to
+        requiring a trailing slash. We need to retry the request with a
+        trailing slash. Workaround for Synapse <= v0.99.3, explained in #3622.
+        """
+        d = self.cl.get_json(
+            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
+        )
+
+        # Send the request
+        self.pump()
+
+        # there should have been a call to connectTCP
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (_host, _port, factory, _timeout, _bindAddress) = clients[0]
+
+        # complete the connection and wire it up to a fake transport
+        client = factory.buildProtocol(None)
+        conn = StringTransport()
+        client.makeConnection(conn)
+
+        # that should have made it send the request to the connection
+        self.assertRegex(conn.value(), b"^GET /foo/bar")
+
+        # Clear the original request data before sending a response
+        conn.clear()
+
+        # Send the HTTP response
+        client.dataReceived(
+            b"HTTP/1.1 400 Bad Request\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 59\r\n"
+            b"\r\n"
+            b'{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}'
+        )
+
+        # We should get another request with a trailing slash
+        self.assertRegex(conn.value(), b"^GET /foo/bar/")
+
+        # Send a happy response this time
+        client.dataReceived(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 2\r\n"
+            b"\r\n"
+            b'{}'
+        )
+
+        # We should get a successful response
+        r = self.successResultOf(d)
+        self.assertEqual(r, {})
+
+    def test_client_does_not_retry_on_400_plus(self):
+        """
+        Another test for trailing slashes but now test that we don't retry on
+        trailing slashes on a non-400/M_UNRECOGNIZED response.
+
+        See test_client_requires_trailing_slashes() for context.
+        """
+        d = self.cl.get_json(
+            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
+        )
+
+        # Send the request
+        self.pump()
+
+        # there should have been a call to connectTCP
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (_host, _port, factory, _timeout, _bindAddress) = clients[0]
+
+        # complete the connection and wire it up to a fake transport
+        client = factory.buildProtocol(None)
+        conn = StringTransport()
+        client.makeConnection(conn)
+
+        # that should have made it send the request to the connection
+        self.assertRegex(conn.value(), b"^GET /foo/bar")
+
+        # Clear the original request data before sending a response
+        conn.clear()
+
+        # Send the HTTP response
+        client.dataReceived(
+            b"HTTP/1.1 404 Not Found\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 2\r\n"
+            b"\r\n"
+            b"{}"
+        )
+
+        # We should not get another request
+        self.assertEqual(conn.value(), b"")
+
+        # We should get a 404 failure response
+        self.failureResultOf(d)
+
     def test_client_sends_body(self):
         self.cl.post_json(
             "testserv:8008", "foo/bar", timeout=10000,
