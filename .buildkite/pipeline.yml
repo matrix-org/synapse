@@ -62,7 +62,7 @@ steps:
           propagate-environment: true
 
   - command:
-      - "python -m pip install tox"
+      - "python -m pip install tox python-subunit junitxml"
       - "tox -e py35,codecov"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.5 / SQLite"
@@ -75,7 +75,7 @@ steps:
           propagate-environment: true
 
   - command:
-      - "python -m pip install tox"
+      - "python -m pip install tox python-subunit junitxml"
       - "tox -e py36,codecov"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.6 / SQLite"
@@ -88,7 +88,7 @@ steps:
           propagate-environment: true
 
   - command:
-      - "python -m pip install tox"
+      - "python -m pip install tox python-subunit junitxml"
       - "tox -e py37,codecov"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.7 / SQLite"
@@ -101,7 +101,7 @@ steps:
           propagate-environment: true
 
   - command:
-      - "python -m pip install tox"
+      - "python -m pip install tox python-subunit junitxml"
       - "tox -e py27-old,codecov"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 2.7 / SQLite / Old Deps"
@@ -118,7 +118,7 @@ steps:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
+      - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py27-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
@@ -131,7 +131,7 @@ steps:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
+      - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py27-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
@@ -144,7 +144,7 @@ steps:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
+      - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py35-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
@@ -157,7 +157,7 @@ steps:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
+      - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py35-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
@@ -170,7 +170,7 @@ steps:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+      - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py37-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
@@ -183,7 +183,7 @@ steps:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
-      - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+      - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py37-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
