@@ -67,7 +67,7 @@ steps:
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.5 / SQLite"
     env:
-      TRIAL_FLAGS: "-j 2"
+      TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
@@ -80,7 +80,7 @@ steps:
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.6 / SQLite"
     env:
-      TRIAL_FLAGS: "-j 2"
+      TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
@@ -93,7 +93,7 @@ steps:
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.7 / SQLite"
     env:
-      TRIAL_FLAGS: "-j 2"
+      TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
@@ -106,7 +106,7 @@ steps:
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 2.7 / SQLite / Old Deps"
     env:
-      TRIAL_FLAGS: "-j 2"
+      TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
@@ -115,7 +115,7 @@ steps:
 
   - label: ":python: 2.7 / :postgres: 9.4"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
@@ -128,7 +128,7 @@ steps:
 
   - label: ":python: 2.7 / :postgres: 9.5"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
@@ -141,7 +141,7 @@ steps:
 
   - label: ":python: 3.5 / :postgres: 9.4"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
@@ -154,7 +154,7 @@ steps:
 
   - label: ":python: 3.5 / :postgres: 9.5"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
@@ -167,7 +167,7 @@ steps:
 
   - label: ":python: 3.7 / :postgres: 9.5"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
@@ -180,7 +180,7 @@ steps:
 
   - label: ":python: 3.7 / :postgres: 11"
     env:
-      TRIAL_FLAGS: "-j 4"
+      TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
