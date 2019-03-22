@@ -52,7 +52,8 @@ steps:
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-buildkite-job-$BUILDKITE_JOB_ID.xml"
     label: ":python: 2.7 / SQLite"
     env:
-      TRIAL_FLAGS: "-j 2 --reporter=subunit | tee results.subunit"
+      TRIAL_FLAGS: "-j 2 --reporter=subunit"
+      TOX_SUFFIX: "| tee results.subunit"
     artifact_paths:
       - "junit-*.xml"
     plugins:
