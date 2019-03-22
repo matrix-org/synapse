@@ -53,7 +53,7 @@ steps:
     label: ":python: 2.7 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2 --reporter=subunit"
-      TOX_SUFFIX: "| tee results.subunit"
+      TOXSUFFIX: "| tee results.subunit"
     artifact_paths:
       - "junit-*.xml"
     plugins:
