@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 class StateDeltasHandler(object):
 
     def __init__(self, hs):
-        super(StateDeltasHandler, self).__init__(hs)
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks

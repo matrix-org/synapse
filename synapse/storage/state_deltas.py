@@ -15,9 +15,7 @@
 
 import logging
 
-from twisted.internet import defer
-
-from ._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
