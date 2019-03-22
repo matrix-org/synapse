@@ -17,12 +17,10 @@ import logging
 
 from twisted.internet import defer
 
-from ._base import BaseHandler
-
 logger = logging.getLogger(__name__)
 
 
-class StateDeltasHandler(BaseHandler):
+class StateDeltasHandler(object):
 
     def __init__(self, hs):
         super(StateDeltasHandler, self).__init__(hs)
