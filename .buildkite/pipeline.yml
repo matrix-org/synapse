@@ -53,7 +53,7 @@ steps:
     label: ":python: 2.7 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2 --reporter=subunit | tee results.subunit"
-    artifacts:
+    artifact_paths:
       - "junit-*.xml"
     plugins:
       - docker#v3.0.1:
