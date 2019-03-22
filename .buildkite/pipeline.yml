@@ -47,7 +47,7 @@ steps:
           image: "python:3.6"
 
   - command:
-      - "python -m pip install tox python-subunit junit-xml"
+      - "python -m pip install tox python-subunit junitxml"
       - "tox -e py27,codecov"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-buildkite-job-$BUILDKITE_JOB_ID.xml"
     label: ":python: 2.7 / SQLite"
