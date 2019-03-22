@@ -63,6 +63,8 @@ class AuthTestCase(unittest.TestCase):
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(requester.user.to_string(), self.test_user)
 
+        assert False
+
     def test_get_user_by_req_user_bad_token(self):
         self.store.get_user_by_access_token = Mock(return_value=None)
 
