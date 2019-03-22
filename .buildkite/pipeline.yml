@@ -49,7 +49,7 @@ steps:
   - command:
       - "python -m pip install tox python-subunit junitxml"
       - "tox -e py27,codecov"
-      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-buildkite-job-$BUILDKITE_JOB_ID.xml"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 2.7 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2 --reporter=subunit"
@@ -64,9 +64,11 @@ steps:
   - command:
       - "python -m pip install tox"
       - "tox -e py35,codecov"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.5 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2"
+      TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
           image: "python:3.5"
@@ -75,9 +77,11 @@ steps:
   - command:
       - "python -m pip install tox"
       - "tox -e py36,codecov"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.6 / SQLite"
     env:
       TRIAL_FLAGS: "-j 2"
+      TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
@@ -86,7 +90,9 @@ steps:
   - command:
       - "python -m pip install tox"
       - "tox -e py37,codecov"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.7 / SQLite"
+      TOXSUFFIX: "| tee results.subunit"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
@@ -97,9 +103,11 @@ steps:
   - command:
       - "python -m pip install tox"
       - "tox -e py27-old,codecov"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 2.7 / SQLite / Old Deps"
     env:
       TRIAL_FLAGS: "-j 2"
+      TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
           image: "python:2.7"
@@ -108,8 +116,10 @@ steps:
   - label: ":python: 2.7 / :postgres: 9.4"
     env:
       TRIAL_FLAGS: "-j 4"
+      TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
@@ -119,8 +129,10 @@ steps:
   - label: ":python: 2.7 / :postgres: 9.5"
     env:
       TRIAL_FLAGS: "-j 4"
+      TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
@@ -130,8 +142,10 @@ steps:
   - label: ":python: 3.5 / :postgres: 9.4"
     env:
       TRIAL_FLAGS: "-j 4"
+      TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
@@ -141,8 +155,10 @@ steps:
   - label: ":python: 3.5 / :postgres: 9.5"
     env:
       TRIAL_FLAGS: "-j 4"
+      TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
@@ -152,8 +168,10 @@ steps:
   - label: ":python: 3.7 / :postgres: 9.5"
     env:
       TRIAL_FLAGS: "-j 4"
+      TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
@@ -163,8 +181,10 @@ steps:
   - label: ":python: 3.7 / :postgres: 11"
     env:
       TRIAL_FLAGS: "-j 4"
+      TOXSUFFIX: "| tee results.subunit"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
+      - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
