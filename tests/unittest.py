@@ -314,6 +314,9 @@ class HomeserverTestCase(TestCase):
         """
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
+        if "config" not in kwargs:
+            config = self.default_config()
+            kwargs["config"] = config
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
 
@@ -330,11 +333,20 @@ class HomeserverTestCase(TestCase):
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(self, d):
+    def get_success(self, d, by=0.0):
+        if not isinstance(d, Deferred):
+            return d
+        self.pump(by=by)
+        return self.successResultOf(d)
+
+    def get_failure(self, d, exc):
+        """
+        Run a Deferred and get a Failure from it. The failure must be of the type `exc`.
+        """
         if not isinstance(d, Deferred):
             return d
         self.pump()
-        return self.successResultOf(d)
+        return self.failureResultOf(d, exc)
 
     def register_user(self, username, password, admin=False):
         """

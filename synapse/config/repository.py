@@ -19,6 +19,36 @@ from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
 
+DEFAULT_THUMBNAIL_SIZES = [
+    {
+        "width": 32,
+        "height": 32,
+        "method": "crop",
+    }, {
+        "width": 96,
+        "height": 96,
+        "method": "crop",
+    }, {
+        "width": 320,
+        "height": 240,
+        "method": "scale",
+    }, {
+        "width": 640,
+        "height": 480,
+        "method": "scale",
+    }, {
+        "width": 800,
+        "height": 600,
+        "method": "scale"
+    },
+]
+
+THUMBNAIL_SIZE_YAML = """\
+        #  - width: %(width)i
+        #    height: %(height)i
+        #    method: %(method)s
+"""
+
 MISSING_NETADDR = (
     "Missing netaddr library. This is required for URL preview API."
 )
@@ -77,9 +107,9 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 class ContentRepositoryConfig(Config):
     def read_config(self, config):
-        self.max_upload_size = self.parse_size(config["max_upload_size"])
-        self.max_image_pixels = self.parse_size(config["max_image_pixels"])
-        self.max_spider_size = self.parse_size(config["max_spider_size"])
+        self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
+        self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
+        self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
         self.media_store_path = self.ensure_directory(config["media_store_path"])
 
@@ -139,9 +169,9 @@ class ContentRepositoryConfig(Config):
             )
 
         self.uploads_path = self.ensure_directory(config["uploads_path"])
-        self.dynamic_thumbnails = config["dynamic_thumbnails"]
+        self.dynamic_thumbnails = config.get("dynamic_thumbnails", False)
         self.thumbnail_requirements = parse_thumbnail_requirements(
-            config["thumbnail_sizes"]
+            config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES),
         )
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
@@ -178,6 +208,13 @@ class ContentRepositoryConfig(Config):
     def default_config(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
         uploads_path = os.path.join(data_dir_path, "uploads")
+
+        formatted_thumbnail_sizes = "".join(
+            THUMBNAIL_SIZE_YAML % s for s in DEFAULT_THUMBNAIL_SIZES
+        )
+        # strip final NL
+        formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
+
         return r"""
         # Directory where uploaded images and attachments are stored.
         #
@@ -204,11 +241,11 @@ class ContentRepositoryConfig(Config):
 
         # The largest allowed upload size in bytes
         #
-        max_upload_size: "10M"
+        #max_upload_size: 10M
 
         # Maximum number of pixels that will be thumbnailed
         #
-        max_image_pixels: "32M"
+        #max_image_pixels: 32M
 
         # Whether to generate new thumbnails on the fly to precisely match
         # the resolution requested by the client. If true then whenever
@@ -216,32 +253,18 @@ class ContentRepositoryConfig(Config):
         # generate a new thumbnail. If false the server will pick a thumbnail
         # from a precalculated list.
         #
-        dynamic_thumbnails: false
+        #dynamic_thumbnails: false
 
         # List of thumbnails to precalculate when an image is uploaded.
         #
-        thumbnail_sizes:
-        - width: 32
-          height: 32
-          method: crop
-        - width: 96
-          height: 96
-          method: crop
-        - width: 320
-          height: 240
-          method: scale
-        - width: 640
-          height: 480
-          method: scale
-        - width: 800
-          height: 600
-          method: scale
+        #thumbnail_sizes:
+%(formatted_thumbnail_sizes)s
 
         # Is the preview URL API enabled?  If enabled, you *must* specify
         # an explicit url_preview_ip_range_blacklist of IPs that the spider is
         # denied from accessing.
         #
-        url_preview_enabled: False
+        #url_preview_enabled: false
 
         # List of IP address CIDR ranges that the URL preview spider is denied
         # from accessing.  There are no defaults: you must explicitly
@@ -306,6 +329,6 @@ class ContentRepositoryConfig(Config):
         #  - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 
         # The largest allowed URL preview spidering size in bytes
-        max_spider_size: "10M"
-
+        #
+        #max_spider_size: 10M
         """ % locals()

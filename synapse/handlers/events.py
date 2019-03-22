@@ -19,7 +19,7 @@ import random
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import serialize_event
 from synapse.types import UserID
@@ -60,6 +60,11 @@ class EventStreamHandler(BaseHandler):
 
         If `only_keys` is not None, events from keys will be sent down.
         """
+
+        if room_id:
+            blocked = yield self.store.is_room_blocked(room_id)
+            if blocked:
+                raise SynapseError(403, "This room has been blocked on this server")
 
         # send any outstanding server notices to the user.
         yield self._server_notices_sender.on_user_syncing(auth_user_id)

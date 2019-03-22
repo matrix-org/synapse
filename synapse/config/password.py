@@ -22,16 +22,21 @@ class PasswordConfig(Config):
 
     def read_config(self, config):
         password_config = config.get("password_config", {})
+        if password_config is None:
+            password_config = {}
+
         self.password_enabled = password_config.get("enabled", True)
         self.password_pepper = password_config.get("pepper", "")
 
     def default_config(self, config_dir_path, server_name, **kwargs):
-        return """
-        # Enable password for login.
-        #
+        return """\
         password_config:
-           enabled: true
+           # Uncomment to disable password login
+           #
+           #enabled: false
+
            # Uncomment and change to a secret random string for extra security.
            # DO NOT CHANGE THIS AFTER INITIAL SETUP!
-           #pepper: ""
+           #
+           #pepper: "EVEN_MORE_SECRET"
         """

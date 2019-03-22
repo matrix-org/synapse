@@ -15,8 +15,8 @@ machine's public DNS hostname, and provide Synapse with a TLS certificate
 which is valid for your ``server_name``.
 
 Once you have completed the steps necessary to federate, you should be able to 
-join a room via federation. (A good place to start is ``#synapse:matrix.org``
-- a room for Synapse admins.)
+join a room via federation. (A good place to start is ``#synapse:matrix.org`` - a 
+room for Synapse admins.)
 
 
 ## Delegation
@@ -89,7 +89,6 @@ In our example, we would need to add this SRV record in the
 
      _matrix._tcp.example.com. 3600 IN SRV 10 5 443 synapse.example.com.
 
-
 Once done and set up, you can check the DNS record with ``dig -t srv
 _matrix._tcp.<server_name>``. In our example, we would expect this:
 
@@ -116,7 +115,6 @@ Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
 proxy: see [reverse_proxy.rst](<reverse_proxy.rst>) for instructions on how to correctly
 configure a reverse proxy.
-
 
 ## Running a Demo Federation of Synapses
 

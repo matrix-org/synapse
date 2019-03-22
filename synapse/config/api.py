@@ -34,10 +34,10 @@ class ApiConfig(Config):
 
         # A list of event types that will be included in the room_invite_state
         #
-        room_invite_state_types:
-            - "{JoinRules}"
-            - "{CanonicalAlias}"
-            - "{RoomAvatar}"
-            - "{RoomEncryption}"
-            - "{Name}"
+        #room_invite_state_types:
+        #  - "{JoinRules}"
+        #  - "{CanonicalAlias}"
+        #  - "{RoomAvatar}"
+        #  - "{RoomEncryption}"
+        #  - "{Name}"
         """.format(**vars(EventTypes))
