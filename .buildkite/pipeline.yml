@@ -92,9 +92,9 @@ steps:
       - "tox -e py37,codecov"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
     label: ":python: 3.7 / SQLite"
-      TOXSUFFIX: "| tee results.subunit"
     env:
       TRIAL_FLAGS: "-j 2"
+      TOXSUFFIX: "| tee results.subunit"
     plugins:
       - docker#v3.0.1:
           image: "python:3.7"
