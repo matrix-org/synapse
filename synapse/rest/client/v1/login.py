@@ -192,6 +192,36 @@ class LoginRestServlet(ClientV1RestServlet):
                 # We store all email addreses as lowercase in the DB.
                 # (See add_threepid in synapse/handlers/auth.py)
                 address = address.lower()
+
+            # Check for login providers that support 3pid login types
+            auth_handler = self.auth_handler
+            canonical_user_id, callback_3pid = yield auth_handler.check_password_provider_3pid(
+                medium,
+                address,
+                login_submission["password"],
+            )
+            if canonical_user_id:
+                # Authentication through password provider and 3pid succeeded
+                device_id = login_submission.get("device_id")
+                initial_display_name = login_submission.get("initial_device_display_name")
+                device_id, access_token = yield self.registration_handler.register_device(
+                    canonical_user_id, device_id, initial_display_name,
+                )
+
+                result = {
+                    "user_id": canonical_user_id,
+                    "access_token": access_token,
+                    "home_server": self.hs.hostname,
+                    "device_id": device_id,
+                }
+
+                if callback_3pid is not None:
+                    yield callback_3pid(result)
+
+                defer.returnValue(result)
+
+            # No password providers were able to handle this 3pid
+            # Check local store
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 medium, address,
             )

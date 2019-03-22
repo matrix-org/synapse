@@ -724,6 +724,25 @@ class AuthHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
+    def check_password_provider_3pid(self, medium, address, password):
+        """Check if a password provider is able to validate a thirdparty login"""
+        logger.info("3PID PROVIDERS: %s", self.password_providers)
+        logger.info(
+            "medium: %s, address: %s, password: %s", medium, address, password,
+        )
+        for provider in self.password_providers:
+            if hasattr(provider, "check_3pid_auth"):
+                result = yield provider.check_3pid_auth(
+                    medium, address, password,
+                )
+                if result:
+                    if isinstance(result, str):
+                        result = (result, None)
+                    defer.returnValue(result)
+
+        defer.returnValue((None, None))
+
+    @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
         """Authenticate a user against the local password database.
 
