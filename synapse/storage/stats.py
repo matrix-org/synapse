@@ -14,9 +14,10 @@
 # limitations under the License.
 
 import logging
-from synapse.api.constants import EventTypes, Membership
 
 from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
 from synapse.storage.state_deltas import StateDeltasStore
 
 logger = logging.getLogger(__name__)

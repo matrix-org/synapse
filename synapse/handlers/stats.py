@@ -18,12 +18,11 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
 from synapse.util import logcontext
 from synapse.util.metrics import Measure
-
-from synapse.handlers.state_deltas import StateDeltasHandler
 
 logger = logging.getLogger(__name__)
 
