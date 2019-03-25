@@ -142,7 +142,7 @@ steps:
       TOXSUFFIX: "| tee results.subunit"
     artifact_paths:
       - "junit-*.xml"
-    command: >.
+    command: >-
       python -m pip install tox python-subunit junitxml
       && python -m tox -e py27-postgres,codecov
       && cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml
