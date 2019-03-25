@@ -57,7 +57,6 @@ class ReplicationStreamProtocolFactory(Factory):
             self.server_name,
             self.clock,
             self.streamer,
-            addr
         )
 
 
