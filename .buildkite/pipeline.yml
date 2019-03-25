@@ -145,7 +145,7 @@ steps:
     command: >-
       bash -c "python -m pip install tox python-subunit junitxml
       && python -m tox -e py27-postgres,codecov
-      && cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
+      && cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$$BUILDKITE_JOB_ID.xml"
     plugins:
       - docker-compose#v2.1.0:
           run: testenv
