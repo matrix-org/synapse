@@ -43,7 +43,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
         self.generate_config()
 
         with open(self.file, "r") as f:
-            raw = yaml.load(f)
+            raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
         config = HomeServerConfig.load_config("", ["-c", self.file])
