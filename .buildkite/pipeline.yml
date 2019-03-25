@@ -215,6 +215,26 @@ steps:
   - wait: ~
     continue_on_failure: true
 
-  - plugins:
-      - junit-annotate#v1.6.0:
-          artifacts: junit-*.xml
+  # - plugins:
+  #     - junit-annotate#v1.6.0:
+  #         artifacts: junit-*.xml
+
+  - label: annotate
+  plugins:
+    - bugcrowd/test-summary#v1.9.0:
+        inputs:
+          - label: Unit Tests
+            artifact_path: junit-*.xml
+            type: junit
+          - label: eslint
+            artifact_path: artifacts/eslint.xml
+            type: checkstyle
+          - label: ava
+            artifact_path: artifacts/ava.tap
+            type: tap
+          - label: rubocop
+            artifact_path: artifacts/rubocop.txt
+            type: oneline
+        formatter:
+          type: details
+        context: test-summary
