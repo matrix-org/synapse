@@ -1,0 +1,1 @@
+Refactor out the state deltas portion of the user directory store and handler.
