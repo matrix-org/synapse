@@ -237,7 +237,7 @@ class LoginRestServlet(ClientV1RestServlet):
             login_submission,
         )
 
-        yield self._register_device_with_callback(
+        result = yield self._register_device_with_callback(
             canonical_user_id, login_submission, callback,
         )
         defer.returnValue(result)

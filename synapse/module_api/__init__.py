@@ -16,6 +16,8 @@ from twisted.internet import defer
 
 from synapse.types import UserID
 
+import time
+
 
 class ModuleApi(object):
     """A proxy object that gets passed to password auth providers so they
@@ -73,14 +75,41 @@ class ModuleApi(object):
         """
         return self._auth_handler.check_user_exists(user_id)
 
-    def register(self, localpart):
-        """Registers a new user with given localpart
+    @defer.inlineCallbacks
+    def register(self, localpart, displayname=None, email=None):
+        """Registers a new user with given localpart and optional
+           displayname, email.
+
+        Args:
+            localpart (str): The localpart of the new user.
+            displayname (str|None): The displayname of the new user.
+            email (str|None): The email of the new user.
 
         Returns:
             Deferred: a 2-tuple of (user_id, access_token)
         """
+        # Register the user
         reg = self.hs.get_registration_handler()
-        return reg.register(localpart=localpart)
+        user_id, access_token = yield reg.register(
+            localpart=localpart, default_display_name=displayname,
+        )
+
+        # Bind email address with the registered identity service
+        if email:
+            # generate threepid dict
+            unix_secs = int(time.time())
+            threepid_dict = {
+                "medium": "email",
+                "address": email,
+                "validated_at": unix_secs,
+            }
+
+            # Bind email to new account
+            yield reg._register_email_threepid(
+                user_id, threepid_dict, None, False,
+            )
+
+        defer.returnValue((user_id, access_token))
 
     @defer.inlineCallbacks
     def invalidate_access_token(self, access_token):
