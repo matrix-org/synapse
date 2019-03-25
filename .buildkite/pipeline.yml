@@ -226,15 +226,6 @@ steps:
             - label: Unit Tests
               artifact_path: junit-*.xml
               type: junit
-            - label: eslint
-              artifact_path: artifacts/eslint.xml
-              type: checkstyle
-            - label: ava
-              artifact_path: artifacts/ava.tap
-              type: tap
-            - label: rubocop
-              artifact_path: artifacts/rubocop.txt
-              type: oneline
           formatter:
             type: details
           context: test-summary
