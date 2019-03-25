@@ -1869,7 +1869,6 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
                 " WHERE room_id=?"
                 " GROUP BY local"
             )
-            print(sql)
             txn.execute(sql, ("%%:" + local_server, room_id,))
             rows = txn.fetchall()
             results = {

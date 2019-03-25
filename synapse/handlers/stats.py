@@ -23,7 +23,7 @@ from synapse.types import UserID
 from synapse.util import logcontext
 from synapse.util.metrics import Measure
 
-from .state_deltas import StateDeltasHandler
+from synapse.handlers.state_deltas import StateDeltasHandler
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +86,11 @@ class StatsHandler(StateDeltasHandler):
     def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
-            self.pos = yield self.store.get_stats_stream_pos()
+            self.pos = yield self.store.get_user_directory_stream_pos()
 
-        # If still None then we need to do the initial fill of stats
+        # If still None then the initial background update hasn't happened yet
         if self.pos is None:
-            yield self._do_initial_spam()
-            self.pos = yield self.store.get_stats_stream_pos()
+            defer.returnValue(None)
 
         # Loop round handling deltas until we're up to date
         while True:
@@ -140,99 +139,6 @@ class StatsHandler(StateDeltasHandler):
         logger.info("Processed all users")
 
         yield self.store.update_stats_stream_pos(new_pos)
-
-    @defer.inlineCallbacks
-    def _handle_initial_room(self, room_id):
-        """Called when we initially fill out stats one room at a time
-        """
-
-        current_state_ids = yield self.store.get_current_state_ids(room_id)
-
-        print(current_state_ids)
-
-        join_rules = yield self.store.get_event(
-            current_state_ids.get((EventTypes.JoinRules, "")), allow_none=True
-        )
-        history_visibility = yield self.store.get_event(
-            current_state_ids.get((EventTypes.RoomHistoryVisibility, "")),
-            allow_none=True,
-        )
-        encryption = yield self.store.get_event(
-            current_state_ids.get((EventTypes.RoomEncryption, "")), allow_none=True
-        )
-        name = yield self.store.get_event(
-            current_state_ids.get((EventTypes.Name, "")), allow_none=True
-        )
-        topic = yield self.store.get_event(
-            current_state_ids.get((EventTypes.Topic, "")), allow_none=True
-        )
-        avatar = yield self.store.get_event(
-            current_state_ids.get((EventTypes.RoomAvatar, "")), allow_none=True
-        )
-        canonical_alias = yield self.store.get_event(
-            current_state_ids.get((EventTypes.CanonicalAlias, "")), allow_none=True
-        )
-
-        def _or_none(x, arg):
-            if x:
-                return x.content.get(arg)
-            return None
-
-        yield self.store.update_room_state(
-            room_id,
-            {
-                "join_rules": _or_none(join_rules, "join_rule"),
-                "history_visibility": _or_none(
-                    history_visibility, "history_visibility"
-                ),
-                "encryption": _or_none(encryption, "algorithm"),
-                "name": _or_none(name, "name"),
-                "topic": _or_none(topic, "topic"),
-                "avatar": _or_none(avatar, "url"),
-                "canonical_alias": _or_none(canonical_alias, "alias"),
-            },
-        )
-
-        now = self.clock.time_msec()
-
-        # quantise time to the nearest bucket
-        now = int(now / (self.stats_bucket_size * 1000)) * self.stats_bucket_size * 1000
-
-        current_state_events = len(current_state_ids)
-        joined_members = yield self.store.get_user_count_in_room(
-            room_id, Membership.JOIN
-        )
-        invited_members = yield self.store.get_user_count_in_room(
-            room_id, Membership.INVITE
-        )
-        left_members = yield self.store.get_user_count_in_room(
-            room_id, Membership.LEAVE
-        )
-        banned_members = yield self.store.get_user_count_in_room(
-            room_id, Membership.BAN
-        )
-        state_events = yield self.store.get_state_event_counts(room_id)
-        (local_events, remote_events) = yield self.store.get_event_counts(
-            room_id, self.server_name
-        )
-
-        yield self.store.update_stats(
-            "room",
-            room_id,
-            now,
-            {
-                "bucket_size": self.stats_bucket_size,
-                "current_state_events": current_state_events,
-                "joined_members": joined_members,
-                "invited_members": invited_members,
-                "left_members": left_members,
-                "banned_members": banned_members,
-                "state_events": state_events,
-                "local_events": local_events,
-                "remote_events": remote_events,
-                "sent_events": local_events + remote_events,
-            },
-        )
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
@@ -488,25 +394,3 @@ class StatsHandler(StateDeltasHandler):
         logger.debug("Adding new local user to stats, %r", user_id)
 
         yield defer.succeed(1)
-
-    @defer.inlineCallbacks
-    def get_all_rooms(self):
-        """Get all room_ids we've ever known about, in ascending order of "size"
-        """
-        sql = """
-            SELECT room_id FROM current_state_events
-            GROUP BY room_id
-            ORDER BY count(*) ASC
-        """
-        rows = yield self._execute("get_all_rooms", None, sql)
-        defer.returnValue([room_id for room_id, in rows])
-
-    @defer.inlineCallbacks
-    def get_all_local_users(self):
-        """Get all local users
-        """
-        sql = """
-            SELECT name FROM users
-        """
-        rows = yield self._execute("get_all_local_users", None, sql)
-        defer.returnValue([name for name, in rows])
