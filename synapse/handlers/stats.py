@@ -35,9 +35,6 @@ class StatsHandler(StateDeltasHandler):
     Heavily derived from UserDirectoryHandler
     """
 
-    INITIAL_ROOM_SLEEP_MS = 50
-    INITIAL_USER_SLEEP_MS = 10
-
     def __init__(self, hs):
         super(StatsHandler, self).__init__(hs)
         self.hs = hs
