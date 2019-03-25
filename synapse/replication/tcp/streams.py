@@ -23,7 +23,7 @@ Each stream is defined by the following information:
     current_token:      The function that returns the current token for the stream
     update_function:    The function that returns a list of updates between two tokens
 """
-
+import itertools
 import logging
 from collections import namedtuple
 
@@ -195,14 +195,19 @@ class Stream(object):
                 limit=MAX_EVENTS_BEHIND + 1,
             )
 
-            if len(rows) >= MAX_EVENTS_BEHIND:
-                raise Exception("stream %s has fallen behind" % (self.NAME))
+            # never turn more than MAX_EVENTS_BEHIND + 1 into updates.
+            rows = itertools.islice(rows, MAX_EVENTS_BEHIND + 1)
         else:
             rows = yield self.update_function(
                 from_token, current_token,
             )
 
         updates = [(row[0], self.ROW_TYPE(*row[1:])) for row in rows]
+
+        # check we didn't get more rows than the limit.
+        # doing it like this allows the update_function to be a generator.
+        if self._LIMITED and len(updates) >= MAX_EVENTS_BEHIND:
+            raise Exception("stream %s has fallen behind" % (self.NAME))
 
         defer.returnValue((updates, current_token))
 
