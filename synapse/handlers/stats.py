@@ -106,42 +106,9 @@ class StatsHandler(StateDeltasHandler):
                     yield self.store.update_stats_stream_pos(self.pos)
 
     @defer.inlineCallbacks
-    def _do_initial_spam(self):
-        """Populates the stats tables from the current state of the DB, used
-        when synapse first starts with stats support
-        """
-        new_pos = yield self.store.get_max_stream_id_in_current_state_deltas()
-
-        # We process by going through each existing room at a time.
-        room_ids = yield self.store.get_all_rooms()
-
-        logger.info("Doing initial update of room_stats. %d rooms", len(room_ids))
-        num_processed_rooms = 0
-
-        for room_id in room_ids:
-            logger.info("Handling room %d/%d", num_processed_rooms + 1, len(room_ids))
-            yield self._handle_initial_room(room_id)
-            num_processed_rooms += 1
-            yield self.clock.sleep(self.INITIAL_ROOM_SLEEP_MS / 1000.0)
-
-        logger.info("Processed all rooms.")
-
-        num_processed_users = 0
-        user_ids = yield self.store.get_all_local_users()
-        logger.info("Doing initial update user_stats. %d users", len(user_ids))
-        for user_id in user_ids:
-            logger.info("Handling user %d/%d", num_processed_users + 1, len(user_ids))
-            yield self._handle_local_user(user_id)
-            num_processed_users += 1
-            yield self.clock.sleep(self.INITIAL_USER_SLEEP_MS / 1000.0)
-
-        logger.info("Processed all users")
-
-        yield self.store.update_stats_stream_pos(new_pos)
-
-    @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
-        """Called with the state deltas to process
+        """
+        Called with the state deltas to process
         """
 
         # XXX: shouldn't this be the timestamp where the delta was emitted rather
