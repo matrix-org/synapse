@@ -26,8 +26,6 @@ from synapse.storage.state_deltas import StateDeltasStore
 from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached
 
-from .state_deltas import StateDeltasStore
-
 logger = logging.getLogger(__name__)
 
 
