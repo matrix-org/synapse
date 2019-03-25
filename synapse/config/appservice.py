@@ -37,14 +37,16 @@ class AppServiceConfig(Config):
 
     def default_config(cls, **kwargs):
         return """\
-        # A list of application service config file to use
+        # A list of application service config files to use
         #
-        app_service_config_files: []
+        #app_service_config_files:
+        #  - app_service_1.yaml
+        #  - app_service_2.yaml
 
-        # Whether or not to track application service IP addresses. Implicitly
+        # Uncomment to enable tracking of application service IP addresses. Implicitly
         # enables MAU tracking for application service users.
         #
-        track_appservice_user_ips: False
+        #track_appservice_user_ips: True
         """
 
 
@@ -66,7 +68,7 @@ def load_appservices(hostname, config_files):
         try:
             with open(config_file, 'r') as f:
                 appservice = _load_appservice(
-                    hostname, yaml.load(f), config_file
+                    hostname, yaml.safe_load(f), config_file
                 )
                 if appservice.id in seen_ids:
                     raise ConfigError(

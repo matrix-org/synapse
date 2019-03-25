@@ -500,10 +500,22 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
     @defer.inlineCallbacks
     def block_room(self, room_id, user_id):
-        yield self._simple_insert(
+        """Marks the room as blocked. Can be called multiple times.
+
+        Args:
+            room_id (str): Room to block
+            user_id (str): Who blocked it
+
+        Returns:
+            Deferred
+        """
+        yield self._simple_upsert(
             table="blocked_rooms",
-            values={
+            keyvalues={
                 "room_id": room_id,
+            },
+            values={},
+            insertion_values={
                 "user_id": user_id,
             },
             desc="block_room",

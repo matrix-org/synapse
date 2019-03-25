@@ -118,7 +118,7 @@ class ReceiptsHandler(BaseHandler):
         if not is_new:
             return
 
-        self.federation.send_read_receipt(receipt)
+        yield self.federation.send_read_receipt(receipt)
 
     @defer.inlineCallbacks
     def get_receipts_for_room(self, room_id, to_key):

@@ -101,6 +101,7 @@ class AuthHandler(BaseHandler):
         self._supported_login_types = login_types
 
         self._account_ratelimiter = Ratelimiter()
+        self._failed_attempts_ratelimiter = Ratelimiter()
 
         self._clock = self.hs.get_clock()
 
@@ -729,9 +730,16 @@ class AuthHandler(BaseHandler):
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
 
-        # unknown username or invalid password. We raise a 403 here, but note
-        # that if we're doing user-interactive login, it turns all LoginErrors
-        # into a 401 anyway.
+        # unknown username or invalid password.
+        self._failed_attempts_ratelimiter.ratelimit(
+            qualified_user_id.lower(), time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            update=True,
+        )
+
+        # We raise a 403 here, but note that if we're doing user-interactive
+        # login, it turns all LoginErrors into a 401 anyway.
         raise LoginError(
             403, "Invalid password",
             errcode=Codes.FORBIDDEN
@@ -956,13 +964,23 @@ class AuthHandler(BaseHandler):
     def ratelimit_login_per_account(self, user_id):
         """Checks whether the process must be stopped because of ratelimiting.
 
+        Checks against two ratelimiters: the generic one for login attempts per
+        account and the one specific to failed attempts.
+
         Args:
             user_id (unicode): complete @user:id
 
         Raises:
-            LimitExceededError if the ratelimiter's login requests count for this
-                user is too high too proceed.
+            LimitExceededError if one of the ratelimiters' login requests count
+                for this user is too high too proceed.
         """
+        self._failed_attempts_ratelimiter.ratelimit(
+            user_id.lower(), time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            update=False,
+        )
+
         self._account_ratelimiter.ratelimit(
             user_id.lower(), time_now_s=self._clock.time(),
             rate_hz=self.hs.config.rc_login_account.per_second,

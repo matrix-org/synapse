@@ -104,7 +104,26 @@ class FederationSender(object):
 
         self._processing_pending_presence = False
 
+        # map from room_id to a set of PerDestinationQueues which we believe are
+        # awaiting a call to flush_read_receipts_for_room. The presence of an entry
+        # here for a given room means that we are rate-limiting RR flushes to that room,
+        # and that there is a pending call to _flush_rrs_for_room in the system.
+        self._queues_awaiting_rr_flush_by_room = {
+        }   # type: dict[str, set[PerDestinationQueue]]
+
+        self._rr_txn_interval_per_room_ms = (
+            1000.0 / hs.get_config().federation_rr_transactions_per_room_per_second
+        )
+
     def _get_per_destination_queue(self, destination):
+        """Get or create a PerDestinationQueue for the given destination
+
+        Args:
+            destination (str): server_name of remote server
+
+        Returns:
+            PerDestinationQueue
+        """
         queue = self._per_destination_queues.get(destination)
         if not queue:
             queue = PerDestinationQueue(self.hs, self._transaction_manager, destination)
@@ -250,33 +269,91 @@ class FederationSender(object):
         Args:
             receipt (synapse.types.ReadReceipt): receipt to be sent
         """
+
+        # Some background on the rate-limiting going on here.
+        #
+        # It turns out that if we attempt to send out RRs as soon as we get them from
+        # a client, then we end up trying to do several hundred Hz of federation
+        # transactions. (The number of transactions scales as O(N^2) on the size of a
+        # room, since in a large room we have both more RRs coming in, and more servers
+        # to send them to.)
+        #
+        # This leads to a lot of CPU load, and we end up getting behind. The solution
+        # currently adopted is as follows:
+        #
+        # The first receipt in a given room is sent out immediately, at time T0. Any
+        # further receipts are, in theory, batched up for N seconds, where N is calculated
+        # based on the number of servers in the room to achieve a transaction frequency
+        # of around 50Hz. So, for example, if there were 100 servers in the room, then
+        # N would be 100 / 50Hz = 2 seconds.
+        #
+        # Then, after T+N, we flush out any receipts that have accumulated, and restart
+        # the timer to flush out more receipts at T+2N, etc. If no receipts accumulate,
+        # we stop the cycle and go back to the start.
+        #
+        # However, in practice, it is often possible to flush out receipts earlier: in
+        # particular, if we are sending a transaction to a given server anyway (for
+        # example, because we have a PDU or a RR in another room to send), then we may
+        # as well send out all of the pending RRs for that server. So it may be that
+        # by the time we get to T+N, we don't actually have any RRs left to send out.
+        # Nevertheless we continue to buffer up RRs for the room in question until we
+        # reach the point that no RRs arrive between timer ticks.
+        #
+        # For even more background, see https://github.com/matrix-org/synapse/issues/4730.
+
+        room_id = receipt.room_id
+
         # Work out which remote servers should be poked and poke them.
-        domains = yield self.state.get_current_hosts_in_room(receipt.room_id)
+        domains = yield self.state.get_current_hosts_in_room(room_id)
         domains = [d for d in domains if d != self.server_name]
         if not domains:
             return
 
-        logger.debug("Sending receipt to: %r", domains)
+        queues_pending_flush = self._queues_awaiting_rr_flush_by_room.get(
+            room_id
+        )
 
-        content = {
-            receipt.room_id: {
-                receipt.receipt_type: {
-                    receipt.user_id: {
-                        "event_ids": receipt.event_ids,
-                        "data": receipt.data,
-                    },
-                },
-            },
-        }
-        key = (receipt.room_id, receipt.receipt_type, receipt.user_id)
+        # if there is no flush yet scheduled, we will send out these receipts with
+        # immediate flushes, and schedule the next flush for this room.
+        if queues_pending_flush is not None:
+            logger.debug("Queuing receipt for: %r", domains)
+        else:
+            logger.debug("Sending receipt to: %r", domains)
+            self._schedule_rr_flush_for_room(room_id, len(domains))
 
         for domain in domains:
-            self.build_and_send_edu(
-                destination=domain,
-                edu_type="m.receipt",
-                content=content,
-                key=key,
-            )
+            queue = self._get_per_destination_queue(domain)
+            queue.queue_read_receipt(receipt)
+
+            # if there is already a RR flush pending for this room, then make sure this
+            # destination is registered for the flush
+            if queues_pending_flush is not None:
+                queues_pending_flush.add(queue)
+            else:
+                queue.flush_read_receipts_for_room(room_id)
+
+    def _schedule_rr_flush_for_room(self, room_id, n_domains):
+        # that is going to cause approximately len(domains) transactions, so now back
+        # off for that multiplied by RR_TXN_INTERVAL_PER_ROOM
+        backoff_ms = self._rr_txn_interval_per_room_ms * n_domains
+
+        logger.debug("Scheduling RR flush in %s in %d ms", room_id, backoff_ms)
+        self.clock.call_later(backoff_ms, self._flush_rrs_for_room, room_id)
+        self._queues_awaiting_rr_flush_by_room[room_id] = set()
+
+    def _flush_rrs_for_room(self, room_id):
+        queues = self._queues_awaiting_rr_flush_by_room.pop(room_id)
+        logger.debug("Flushing RRs in %s to %s", room_id, queues)
+
+        if not queues:
+            # no more RRs arrived for this room; we are done.
+            return
+
+        # schedule the next flush
+        self._schedule_rr_flush_for_room(room_id, len(queues))
+
+        for queue in queues:
+            queue.flush_read_receipts_for_room(room_id)
 
     @logcontext.preserve_fn  # the caller should not yield on this
     @defer.inlineCallbacks

@@ -20,6 +20,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
         self.hs.config.enable_registration_captcha = False
+        self.hs.config.allow_guest_access = True
 
         return self.hs
 
@@ -28,7 +29,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         as_token = "i_am_an_app_service"
 
         appservice = ApplicationService(
-            as_token, self.hs.config.hostname,
+            as_token, self.hs.config.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": r"@as_user.*", "exclusive": True}],

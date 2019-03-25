@@ -490,40 +490,54 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
 
         requester_user_id = requester.user.to_string()
 
-        logger.info("Shutting down room %r", room_id)
+        logger.info(
+            "Shutting down room %r, joining to new room: %r",
+            room_id, new_room_id,
+        )
 
+        # This will work even if the room is already blocked, but that is
+        # desirable in case the first attempt at blocking the room failed below.
         yield self.store.block_room(room_id, requester_user_id)
 
         users = yield self.state.get_current_user_in_room(room_id)
         kicked_users = []
+        failed_to_kick_users = []
         for user_id in users:
             if not self.hs.is_mine_id(user_id):
                 continue
 
             logger.info("Kicking %r from %r...", user_id, room_id)
 
-            target_requester = create_requester(user_id)
-            yield self.room_member_handler.update_membership(
-                requester=target_requester,
-                target=target_requester.user,
-                room_id=room_id,
-                action=Membership.LEAVE,
-                content={},
-                ratelimit=False
-            )
+            try:
+                target_requester = create_requester(user_id)
+                yield self.room_member_handler.update_membership(
+                    requester=target_requester,
+                    target=target_requester.user,
+                    room_id=room_id,
+                    action=Membership.LEAVE,
+                    content={},
+                    ratelimit=False,
+                    require_consent=False,
+                )
 
-            yield self.room_member_handler.forget(target_requester.user, room_id)
+                yield self.room_member_handler.forget(target_requester.user, room_id)
 
-            yield self.room_member_handler.update_membership(
-                requester=target_requester,
-                target=target_requester.user,
-                room_id=new_room_id,
-                action=Membership.JOIN,
-                content={},
-                ratelimit=False
-            )
+                yield self.room_member_handler.update_membership(
+                    requester=target_requester,
+                    target=target_requester.user,
+                    room_id=new_room_id,
+                    action=Membership.JOIN,
+                    content={},
+                    ratelimit=False,
+                    require_consent=False,
+                )
 
-            kicked_users.append(user_id)
+                kicked_users.append(user_id)
+            except Exception:
+                logger.exception(
+                    "Failed to leave old room and join new room for %r", user_id,
+                )
+                failed_to_kick_users.append(user_id)
 
         yield self.event_creation_handler.create_and_send_nonmember_event(
             room_creator_requester,
@@ -544,6 +558,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
 
         defer.returnValue((200, {
             "kicked_users": kicked_users,
+            "failed_to_kick_users": failed_to_kick_users,
             "local_aliases": aliases_for_room,
             "new_room_id": new_room_id,
         }))

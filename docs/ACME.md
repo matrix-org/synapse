@@ -67,7 +67,7 @@ For nginx users, add the following line to your existing `server` block:
 
 ```
 location /.well-known/acme-challenge {
-    proxy_pass http://localhost:8009/;
+    proxy_pass http://localhost:8009;
 }
 ```
 

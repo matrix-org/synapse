@@ -195,7 +195,7 @@ def setup_logging(config, use_worker_options=False):
     else:
         def load_log_config():
             with open(log_config, 'r') as f:
-                logging.config.dictConfig(yaml.load(f))
+                logging.config.dictConfig(yaml.safe_load(f))
 
         def sighup(*args):
             # it might be better to use a file watcher or something for this.
