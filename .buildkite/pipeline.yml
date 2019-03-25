@@ -28,7 +28,7 @@ steps:
       - bugcrowd/test-summary#v1.9.0:
           inputs:
             - label: Sytests
-              artifact_path: *.tap
+              artifact_path: "*.tap"
               type: tap
           formatter:
             type: details
