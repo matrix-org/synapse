@@ -69,6 +69,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     plugins:
       - docker#v3.0.1:
           image: "python:3.5"
@@ -82,6 +84,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"
@@ -95,6 +99,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     plugins:
       - docker#v3.0.1:
           image: "python:3.7"
@@ -108,6 +114,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 2 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     plugins:
       - docker#v3.0.1:
           image: "python:2.7"
@@ -117,6 +125,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     command:
       - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py27-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
@@ -130,6 +140,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     command:
       - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py27-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
@@ -143,6 +155,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     command:
       - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py35-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
@@ -156,6 +170,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     command:
       - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py35-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
@@ -169,6 +185,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     command:
       - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py37-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
@@ -182,6 +200,8 @@ steps:
     env:
       TRIAL_FLAGS: "-j 4 --reporter=subunit"
       TOXSUFFIX: "| tee results.subunit"
+    artifact_paths:
+      - "junit-*.xml"
     command:
       - "bash -c 'python -m pip install tox python-subunit junitxml && python -m tox -e py37-postgres,codecov'"
       - "cat results.subunit | subunit-1to2 | subunit2junitxml -o junit-$BUILDKITE_JOB_ID.xml"
