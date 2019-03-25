@@ -76,14 +76,14 @@ class ModuleApi(object):
         return self._auth_handler.check_user_exists(user_id)
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, email=None):
+    def register(self, localpart, displayname=None, emails=[]):
         """Registers a new user with given localpart and optional
            displayname, email.
 
         Args:
             localpart (str): The localpart of the new user.
             displayname (str|None): The displayname of the new user.
-            email (str|None): The email of the new user.
+            emails (List[str]): List of emails to assign to the new user.
 
         Returns:
             Deferred: a 2-tuple of (user_id, access_token)
@@ -95,9 +95,9 @@ class ModuleApi(object):
         )
 
         # Bind email address with the registered identity service
-        if email:
+        unix_secs = int(time.time())
+        for email in emails:
             # generate threepid dict
-            unix_secs = int(time.time())
             threepid_dict = {
                 "medium": "email",
                 "address": email,
