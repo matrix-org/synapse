@@ -194,30 +194,18 @@ class LoginRestServlet(ClientV1RestServlet):
                 address = address.lower()
 
             # Check for login providers that support 3pid login types
-            auth_handler = self.auth_handler
-            canonical_user_id, callback_3pid = yield auth_handler.check_password_provider_3pid(
-                medium,
-                address,
-                login_submission["password"],
+            canonical_user_id, callback_3pid = (
+                yield self.auth_handler.check_password_provider_3pid(
+                    medium,
+                    address,
+                    login_submission["password"],
+                )
             )
             if canonical_user_id:
                 # Authentication through password provider and 3pid succeeded
-                device_id = login_submission.get("device_id")
-                initial_display_name = login_submission.get("initial_device_display_name")
-                device_id, access_token = yield self.registration_handler.register_device(
-                    canonical_user_id, device_id, initial_display_name,
+                result = yield self._register_device_with_callback(
+                    canonical_user_id, login_submission, callback_3pid,
                 )
-
-                result = {
-                    "user_id": canonical_user_id,
-                    "access_token": access_token,
-                    "home_server": self.hs.hostname,
-                    "device_id": device_id,
-                }
-
-                if callback_3pid is not None:
-                    yield callback_3pid(result)
-
                 defer.returnValue(result)
 
             # No password providers were able to handle this 3pid
@@ -244,20 +232,43 @@ class LoginRestServlet(ClientV1RestServlet):
         if "user" not in identifier:
             raise SynapseError(400, "User identifier is missing 'user' key")
 
-        auth_handler = self.auth_handler
-        canonical_user_id, callback = yield auth_handler.validate_login(
+        canonical_user_id, callback = yield self.auth_handler.validate_login(
             identifier["user"],
             login_submission,
         )
 
+        yield self._register_device_with_callback(
+            canonical_user_id, login_submission, callback,
+        )
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _register_device_with_callback(
+        self,
+        user_id,
+        login_submission,
+        callback=None,
+    ):
+        """ Registers a device with a given user_id. Optionally run a callback
+        function after registration has completed.
+
+        Args:
+            user_id (str): ID of the user to register.
+            login_submission (dict): Dictionary of login information.
+            callback (func|None): Callback function to run after registration.
+
+        Returns:
+            result (Dict[str,str]): Dictionary of account information after
+                successful registration.
+        """
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = yield self.registration_handler.register_device(
-            canonical_user_id, device_id, initial_display_name,
+            user_id, device_id, initial_display_name,
         )
 
         result = {
-            "user_id": canonical_user_id,
+            "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
