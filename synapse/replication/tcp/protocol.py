@@ -223,14 +223,25 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             return
 
         # Now lets try and call on_<CMD_NAME> function
-        try:
-            run_as_background_process(
-                "replication-" + cmd.get_logcontext_id(),
-                getattr(self, "on_%s" % (cmd_name,)),
-                cmd,
-            )
-        except Exception:
-            logger.exception("[%s] Failed to handle line: %r", self.id(), line)
+        run_as_background_process(
+            "replication-" + cmd.get_logcontext_id(),
+            self.handle_command,
+            cmd,
+        )
+
+    def handle_command(self, cmd):
+        """Handle a command we have received over the replication stream.
+
+        By default delegates to on_<COMMAND>
+
+        Args:
+            cmd (synapse.replication.tcp.commands.Command): received command
+
+        Returns:
+            Deferred
+        """
+        handler = getattr(self, "on_%s" % (cmd.NAME,))
+        return handler(cmd)
 
     def close(self):
         logger.warn("[%s] Closing connection", self.id())
