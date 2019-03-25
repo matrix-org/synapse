@@ -1,0 +1,3 @@
+* handler/sync: Handle batches without events #4842
+* PresenceHandler: Fix exception in _handle_timeouts loop #3715
+* SynapseRequest.connectionLost: Ignore connection_done #4594
