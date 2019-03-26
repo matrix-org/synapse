@@ -765,8 +765,8 @@ class AuthHandler(BaseHandler):
             user_id (unicode): complete @user:id
             password (unicode): the provided password
         Returns:
-            Deferred[unicode] the canonical_user_id, or None if unknown user/
-                bad password
+            Deferred[unicode] the canonical_user_id, or Deferred[None] if
+                unknown user/bad password
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
