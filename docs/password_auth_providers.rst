@@ -75,6 +75,19 @@ Password auth provider classes may optionally provide the following methods.
     result from the ``/login`` call (including ``access_token``, ``device_id``,
     etc.)
 
+``someprovider.check_3pid_auth``\(*medium*, *address*, *password*)
+
+    This method, if implemented, is called when a user attempts to register or
+    log in with a third party identifier, such as email. It is passed the
+    medium (ex. "email"), an address (ex. "jdoe@example.com") and the user's
+    password.
+
+    The method should return a Twisted ``Deferred`` object, which resolves to
+    a ``str`` containing the user's (canonical) User ID if authentication was
+    successful, and ``None`` if not. The ``Deferred`` can also instead
+    resolve to a tuple of ``(str, callback)``, where ``callback`` is a
+    function that is run after login/registration has completed successfully.
+
 ``someprovider.check_password``\(*user_id*, *password*)
 
     This method provides a simpler interface than ``get_supported_login_types``
@@ -97,14 +110,3 @@ Password auth provider classes may optionally provide the following methods.
 
     It may return a Twisted ``Deferred`` object; the logout request will wait
     for the deferred to complete but the result is ignored.
-
-``someprovider.check_3pid_auth``\(*medium*, *address*, *password*)
-
-    This method, if implemented, is called when a user attempts to register or
-    log in with a third party identifier, such as email. It is passed the
-    medium (ex. "email"), an address (ex. "jdoe@example.com") and the user's
-    password.
-
-    The method should return a Twisted ``Deferred`` object, which resolves to
-    a ``String`` containing the user's User ID if authentication was
-    successful, and ``None`` if not.
