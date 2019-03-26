@@ -76,7 +76,7 @@ class ModuleApi(object):
     @defer.inlineCallbacks
     def register(self, localpart, displayname=None):
         """Registers a new user with given localpart and optional
-           displayname, email.
+           displayname.
 
         Args:
             localpart (str): The localpart of the new user.
