@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
-
 from twisted.internet import defer
 
 from synapse.types import UserID
@@ -95,13 +93,12 @@ class ModuleApi(object):
         )
 
         # Bind email address with the registered identity service
-        unix_secs = int(time.time())
         for email in emails:
             # generate threepid dict
             threepid_dict = {
                 "medium": "email",
                 "address": email,
-                "validated_at": unix_secs,
+                "validated_at": self.hs.get_clock(),
             }
 
             # Bind email to new account
