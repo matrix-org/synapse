@@ -4,6 +4,7 @@ services:
 
   postgres:
     image: postgres:9.5
+    tmpfs: /var/lib/postgresql/data:rw
     environment:
       POSTGRES_PASSWORD: postgres
 
