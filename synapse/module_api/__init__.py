@@ -74,14 +74,13 @@ class ModuleApi(object):
         return self._auth_handler.check_user_exists(user_id)
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, emails=[]):
+    def register(self, localpart, displayname=None):
         """Registers a new user with given localpart and optional
            displayname, email.
 
         Args:
             localpart (str): The localpart of the new user.
             displayname (str|None): The displayname of the new user.
-            emails (List[str]): List of emails to assign to the new user.
 
         Returns:
             Deferred: a 2-tuple of (user_id, access_token)
@@ -91,20 +90,6 @@ class ModuleApi(object):
         user_id, access_token = yield reg.register(
             localpart=localpart, default_display_name=displayname,
         )
-
-        # Bind email address with the registered identity service
-        for email in emails:
-            # generate threepid dict
-            threepid_dict = {
-                "medium": "email",
-                "address": email,
-                "validated_at": self.hs.get_clock(),
-            }
-
-            # Bind email to new account
-            yield reg._register_email_threepid(
-                user_id, threepid_dict, None, False,
-            )
 
         defer.returnValue((user_id, access_token))
 
