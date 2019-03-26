@@ -371,7 +371,7 @@ class FederationSender(object):
             return
 
         # First we queue up the new presence by user ID, so multiple presence
-        # updates in quick successtion are correctly handled
+        # updates in quick succession are correctly handled.
         # We only want to send presence for our own users, so lets always just
         # filter here just in case.
         self.pending_presence.update({
@@ -401,6 +401,23 @@ class FederationSender(object):
             logger.exception("Error sending presence states to servers")
         finally:
             self._processing_pending_presence = False
+
+    def send_presence_to_destinations(self, states, destinations):
+        """Send the given presence states to the given destinations.
+
+        Args:
+            states (list[UserPresenceState])
+            destinations (list[str])
+        """
+
+        if not states or not self.hs.config.use_presence:
+            # No-op if presence is disabled.
+            return
+
+        for destination in destinations:
+            if destination == self.server_name:
+                continue
+            self._get_per_destination_queue(destination).send_presence(states)
 
     @measure_func("txnqueue._process_presence")
     @defer.inlineCallbacks
