@@ -76,7 +76,7 @@ def rows_v2(server, json):
 
 
 def main():
-    config = yaml.load(open(sys.argv[1]))
+    config = yaml.safe_load(open(sys.argv[1]))
     valid_until = int(time.time() / (3600 * 24)) * 1000 * 3600 * 24
 
     server_name = config["server_name"]

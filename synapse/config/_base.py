@@ -137,7 +137,7 @@ class Config(object):
     @staticmethod
     def read_config_file(file_path):
         with open(file_path) as file_stream:
-            return yaml.load(file_stream)
+            return yaml.safe_load(file_stream)
 
     def invoke_all(self, name, *args, **kargs):
         results = []
@@ -214,14 +214,20 @@ class Config(object):
             " Defaults to the directory containing the last config file",
         )
 
+        obj = cls()
+
+        obj.invoke_all("add_arguments", config_parser)
+
         config_args = config_parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
-        obj = cls()
         obj.read_config_files(
             config_files, keys_directory=config_args.keys_directory, generate_keys=False
         )
+
+        obj.invoke_all("read_arguments", config_args)
+
         return obj
 
     @classmethod
@@ -312,7 +318,7 @@ class Config(object):
                     )
                     config_file.write(config_str)
 
-                config = yaml.load(config_str)
+                config = yaml.safe_load(config_str)
                 obj.invoke_all("generate_files", config)
 
                 print(
@@ -384,7 +390,7 @@ class Config(object):
             server_name=server_name,
             generate_secrets=False,
         )
-        config = yaml.load(config_string)
+        config = yaml.safe_load(config_string)
         config.pop("log_config")
         config.update(specified_config)
 
@@ -399,7 +405,10 @@ class Config(object):
             self.invoke_all("generate_files", config)
             return
 
-        self.invoke_all("read_config", config)
+        self.parse_config_dict(config)
+
+    def parse_config_dict(self, config_dict):
+        self.invoke_all("read_config", config_dict)
 
 
 def find_config_files(search_paths):

@@ -16,6 +16,8 @@ import re
 import string
 from collections import namedtuple
 
+import attr
+
 from synapse.api.errors import SynapseError
 
 
@@ -455,3 +457,13 @@ class ThirdPartyInstanceID(
     @classmethod
     def create(cls, appservice_id, network_id,):
         return cls(appservice_id=appservice_id, network_id=network_id)
+
+
+@attr.s(slots=True)
+class ReadReceipt(object):
+    """Information about a read-receipt"""
+    room_id = attr.ib()
+    receipt_type = attr.ib()
+    user_id = attr.ib()
+    event_ids = attr.ib()
+    data = attr.ib()

@@ -12,11 +12,15 @@ _trial_temp/
 _trial_temp*/
 
 # stuff that is likely to exist when you run a server locally
+/*.db
+/*.log
+/*.log.config
+/*.pid
 /*.signing.key
-/*.tls.crt
-/*.tls.key
-/uploads
+/env/
+/homeserver*.yaml
 /media_store/
+/uploads
 
 # IDEs
 /.idea/

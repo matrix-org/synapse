@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018-2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +29,7 @@ from twisted.internet import defer, reactor
 
 from synapse.api.constants import EventTypes, RoomVersions
 from synapse.api.errors import CodeMessageException, cs_error
-from synapse.config.server import ServerConfig
+from synapse.config.homeserver import HomeServerConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
@@ -43,6 +44,10 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
+#
+# When running under postgres, we first create a base database with the name
+# POSTGRES_BASE_DB and update it to the current schema. Then, for each test case, we
+# create another unique database, using the base database as a template.
 USE_POSTGRES_FOR_TESTS = os.environ.get("SYNAPSE_POSTGRES", False)
 LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", None)
@@ -50,28 +55,20 @@ POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", None)
 POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
+# the dbname we will connect to in order to create the base database.
+POSTGRES_DBNAME_FOR_INITIAL_CREATE = "postgres"
+
 
 def setupdb():
-
     # If we're using PostgreSQL, set up the db once
     if USE_POSTGRES_FOR_TESTS:
-        pgconfig = {
-            "name": "psycopg2",
-            "args": {
-                "database": POSTGRES_BASE_DB,
-                "user": POSTGRES_USER,
-                "host": POSTGRES_HOST,
-                "password": POSTGRES_PASSWORD,
-                "cp_min": 1,
-                "cp_max": 5,
-            },
-        }
-        config = Mock()
-        config.password_providers = []
-        config.database_config = pgconfig
-        db_engine = create_engine(pgconfig)
+        # create a PostgresEngine
+        db_engine = create_engine({"name": "psycopg2", "args": {}})
+
+        # connect to postgres to create the base database.
         db_conn = db_engine.module.connect(
-            user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+            user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD,
+            dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
         )
         db_conn.autocommit = True
         cur = db_conn.cursor()
@@ -96,7 +93,8 @@ def setupdb():
 
         def _cleanup():
             db_conn = db_engine.module.connect(
-                user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+                user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD,
+                dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             )
             db_conn.autocommit = True
             cur = db_conn.cursor()
@@ -111,14 +109,25 @@ def default_config(name):
     """
     Create a reasonable test config.
     """
-    config = Mock()
-    config.signing_key = [MockKey()]
+    config_dict = {
+        "server_name": name,
+        "media_store_path": "media",
+        "uploads_path": "uploads",
+
+        # the test signing key is just an arbitrary ed25519 key to keep the config
+        # parser happy
+        "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
+    }
+
+    config = HomeServerConfig()
+    config.parse_config_dict(config_dict)
+
+    # TODO: move this stuff into config_dict or get rid of it
     config.event_cache_size = 1
     config.enable_registration = True
     config.enable_registration_captcha = False
     config.macaroon_secret_key = "not even a little secret"
     config.expire_access_token = False
-    config.server_name = name
     config.trusted_third_party_id_servers = []
     config.room_invite_state_types = []
     config.password_providers = []
@@ -151,8 +160,14 @@ def default_config(name):
     config.admin_contact = None
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
-    config.rc_registration_request_burst_count = 3.0
-    config.rc_registration_requests_per_second = 0.17
+    config.rc_registration.per_second = 10000
+    config.rc_registration.burst_count = 10000
+    config.rc_login_address.per_second = 10000
+    config.rc_login_address.burst_count = 10000
+    config.rc_login_account.per_second = 10000
+    config.rc_login_account.burst_count = 10000
+    config.rc_login_failed_attempts.per_second = 10000
+    config.rc_login_failed_attempts.burst_count = 10000
     config.saml2_enabled = False
     config.public_baseurl = None
     config.default_identity_server = None
@@ -169,13 +184,6 @@ def default_config(name):
     # disable user directory updates, because they get done in the
     # background, which upsets the test runner.
     config.update_user_directory = False
-
-    def is_threepid_reserved(threepid):
-        return ServerConfig.is_threepid_reserved(
-            config.mau_limits_reserved_threepids, threepid
-        )
-
-    config.is_threepid_reserved.side_effect = is_threepid_reserved
 
     return config
 
@@ -270,7 +278,6 @@ def setup_test_homeserver(
             db_config=config.database_config,
             version_string="Synapse/tests",
             database_engine=db_engine,
-            room_list_handler=object(),
             tls_server_context_factory=Mock(),
             tls_client_options_factory=Mock(),
             reactor=reactor,
@@ -331,6 +338,8 @@ def setup_test_homeserver(
                 cleanup_func(cleanup)
 
         hs.setup()
+        if homeserverToUse.__name__ == "TestHomeServer":
+            hs.setup_master()
     else:
         hs = homeserverToUse(
             name,
@@ -339,7 +348,6 @@ def setup_test_homeserver(
             config=config,
             version_string="Synapse/tests",
             database_engine=db_engine,
-            room_list_handler=object(),
             tls_server_context_factory=Mock(),
             tls_client_options_factory=Mock(),
             reactor=reactor,

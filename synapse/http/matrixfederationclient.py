@@ -189,6 +189,58 @@ class MatrixFederationHttpClient(object):
         self._cooperator = Cooperator(scheduler=schedule)
 
     @defer.inlineCallbacks
+    def _send_request_with_optional_trailing_slash(
+        self,
+        request,
+        try_trailing_slash_on_400=False,
+        **send_request_args
+    ):
+        """Wrapper for _send_request which can optionally retry the request
+        upon receiving a combination of a 400 HTTP response code and a
+        'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <= v0.99.3
+        due to #3622.
+
+        Args:
+            request (MatrixFederationRequest): details of request to be sent
+            try_trailing_slash_on_400 (bool): Whether on receiving a 400
+                'M_UNRECOGNIZED' from the server to retry the request with a
+                trailing slash appended to the request path.
+            send_request_args (Dict): A dictionary of arguments to pass to
+                `_send_request()`.
+
+        Raises:
+            HttpResponseException: If we get an HTTP response code >= 300
+                (except 429).
+
+        Returns:
+            Deferred[Dict]: Parsed JSON response body.
+        """
+        try:
+            response = yield self._send_request(
+                request, **send_request_args
+            )
+        except HttpResponseException as e:
+            # Received an HTTP error > 300. Check if it meets the requirements
+            # to retry with a trailing slash
+            if not try_trailing_slash_on_400:
+                raise
+
+            if e.code != 400 or e.to_synapse_error().errcode != "M_UNRECOGNIZED":
+                raise
+
+            # Retry with a trailing slash if we received a 400 with
+            # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
+            # trailing slash on Synapse <= v0.99.3.
+            logger.info("Retrying request with trailing slash")
+            request.path += "/"
+
+            response = yield self._send_request(
+                request, **send_request_args
+            )
+
+        defer.returnValue(response)
+
+    @defer.inlineCallbacks
     def _send_request(
         self,
         request,
@@ -196,7 +248,7 @@ class MatrixFederationHttpClient(object):
         timeout=None,
         long_retries=False,
         ignore_backoff=False,
-        backoff_on_404=False
+        backoff_on_404=False,
     ):
         """
         Sends a request to the given server.
@@ -473,7 +525,8 @@ class MatrixFederationHttpClient(object):
                  json_data_callback=None,
                  long_retries=False, timeout=None,
                  ignore_backoff=False,
-                 backoff_on_404=False):
+                 backoff_on_404=False,
+                 try_trailing_slash_on_400=False):
         """ Sends the specifed json data using PUT
 
         Args:
@@ -493,7 +546,12 @@ class MatrixFederationHttpClient(object):
                 and try the request anyway.
             backoff_on_404 (bool): True if we should count a 404 response as
                 a failure of the server (and should therefore back off future
-                requests)
+                requests).
+            try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
+                response we should try appending a trailing slash to the end
+                of the request. Workaround for #3622 in Synapse <= v0.99.3. This
+                will be attempted before backing off if backing off has been
+                enabled.
 
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
@@ -509,7 +567,6 @@ class MatrixFederationHttpClient(object):
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
-
         request = MatrixFederationRequest(
             method="PUT",
             destination=destination,
@@ -519,17 +576,19 @@ class MatrixFederationHttpClient(object):
             json=data,
         )
 
-        response = yield self._send_request(
+        response = yield self._send_request_with_optional_trailing_slash(
             request,
+            try_trailing_slash_on_400,
+            backoff_on_404=backoff_on_404,
+            ignore_backoff=ignore_backoff,
             long_retries=long_retries,
             timeout=timeout,
-            ignore_backoff=ignore_backoff,
-            backoff_on_404=backoff_on_404,
         )
 
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
+
         defer.returnValue(body)
 
     @defer.inlineCallbacks
@@ -592,7 +651,8 @@ class MatrixFederationHttpClient(object):
 
     @defer.inlineCallbacks
     def get_json(self, destination, path, args=None, retry_on_dns_fail=True,
-                 timeout=None, ignore_backoff=False):
+                 timeout=None, ignore_backoff=False,
+                 try_trailing_slash_on_400=False):
         """ GETs some json from the given host homeserver and path
 
         Args:
@@ -606,6 +666,9 @@ class MatrixFederationHttpClient(object):
                 be retried.
             ignore_backoff (bool): true to ignore the historical backoff data
                 and try the request anyway.
+            try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
+                response we should try appending a trailing slash to the end of
+                the request. Workaround for #3622 in Synapse <= v0.99.3.
         Returns:
             Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
@@ -631,16 +694,19 @@ class MatrixFederationHttpClient(object):
             query=args,
         )
 
-        response = yield self._send_request(
+        response = yield self._send_request_with_optional_trailing_slash(
             request,
+            try_trailing_slash_on_400,
+            backoff_on_404=False,
+            ignore_backoff=ignore_backoff,
             retry_on_dns_fail=retry_on_dns_fail,
             timeout=timeout,
-            ignore_backoff=ignore_backoff,
         )
 
         body = yield _handle_json_response(
             self.hs.get_reactor(), self.default_timeout, request, response,
         )
+
         defer.returnValue(body)
 
     @defer.inlineCallbacks

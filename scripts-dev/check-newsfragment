@@ -31,8 +31,8 @@ echo
 # check that any new newsfiles on this branch end with a full stop.
 for f in `git diff --name-only FETCH_HEAD... -- changelog.d`; do
     lastchar=`tr -d '\n' < $f | tail -c 1`
-    if [ $lastchar != '.' ]; then
-        echo -e "\e[31mERROR: newsfragment $f does not end with a '.'\e[39m" >&2
+    if [ $lastchar != '.' -a $lastchar != '!' ]; then
+        echo -e "\e[31mERROR: newsfragment $f does not end with a '.' or '!'\e[39m" >&2
         exit 1
     fi
 done

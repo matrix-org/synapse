@@ -22,9 +22,13 @@ class UserDirectoryConfig(Config):
     """
 
     def read_config(self, config):
+        self.user_directory_search_enabled = True
         self.user_directory_search_all_users = False
         user_directory_config = config.get("user_directory", None)
         if user_directory_config:
+            self.user_directory_search_enabled = (
+                user_directory_config.get("enabled", True)
+            )
             self.user_directory_search_all_users = (
                 user_directory_config.get("search_all_users", False)
             )
@@ -33,6 +37,10 @@ class UserDirectoryConfig(Config):
         return """
         # User Directory configuration
         #
+        # 'enabled' defines whether users can search the user directory. If
+        # false then empty responses are returned to all queries. Defaults to
+        # true.
+        #
         # 'search_all_users' defines whether to search all users visible to your HS
         # when searching the user directory, rather than limiting to users visible
         # in public rooms.  Defaults to false.  If you set it True, you'll have to run
@@ -40,5 +48,6 @@ class UserDirectoryConfig(Config):
         # on your database to tell it to rebuild the user_directory search indexes.
         #
         #user_directory:
+        #  enabled: true
         #  search_all_users: false
         """

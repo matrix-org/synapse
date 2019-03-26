@@ -71,7 +71,8 @@ set this to the hostname of your server. For a more production-ready setup, you
 will probably want to specify your domain (`example.com`) rather than a
 matrix-specific hostname here (in the same way that your email address is
 probably `user@example.com` rather than `user@email.example.com`) - but
-doing so may require more advanced setup. - see [Setting up Federation](README.rst#setting-up-federation). Beware that the server name cannot be changed later.
+doing so may require more advanced setup: see [Setting up Federation](docs/federate.md).
+Beware that the server name cannot be changed later.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your Home Server to
@@ -374,9 +375,16 @@ To configure Synapse to expose an HTTPS port, you will need to edit
 * You will also need to uncomment the `tls_certificate_path` and
   `tls_private_key_path` lines under the `TLS` section. You can either
   point these settings at an existing certificate and key, or you can
-  enable Synapse's built-in ACME (Let's Encrypt) support.  Instructions
-  for having Synapse automatically provision and renew federation 
-  certificates through ACME can be found at [ACME.md](docs/ACME.md).
+  enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
+  for having Synapse automatically provision and renew federation
+  certificates through ACME can be found at [ACME.md](docs/ACME.md). If you
+  are using your own certificate, be sure to use a `.pem` file that includes
+  the full certificate chain including any intermediate certificates (for
+  instance, if using certbot, use `fullchain.pem` as your certificate, not
+  `cert.pem`).
+
+For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
+please take a look at `our guide <docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100>`_.
 
 ## Registering a user
 
