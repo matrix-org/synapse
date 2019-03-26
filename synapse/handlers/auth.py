@@ -726,7 +726,7 @@ class AuthHandler(BaseHandler):
     @defer.inlineCallbacks
     def check_password_provider_3pid(self, medium, address, password):
         """Check if a password provider is able to validate a thirdparty login
-        
+
         Args:
             medium (str): The medium of the 3pid (ex. email).
             address (str): The address of the 3pid (ex. jdoe@example.com).
