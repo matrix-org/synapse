@@ -755,7 +755,12 @@ class AuthHandler(BaseHandler):
             password (str): The password of the user.
 
         Returns:
-            Deferred[(str|None, None)]
+            Deferred[(str|None, func|None)]: A tuple of `(user_id,
+            callback)`. If authentication is successful, `user_id` is a `str`
+            containing the authenticated, canonical user ID. `callback` is
+            then either a function to be later run after the server has
+            completed login/registration, or `None`. If authentication was
+            unsuccessful, `user_id` and `callback` are both `None`.
         """
         for provider in self.password_providers:
             if hasattr(provider, "check_3pid_auth"):

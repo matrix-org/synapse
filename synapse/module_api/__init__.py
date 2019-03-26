@@ -80,7 +80,8 @@ class ModuleApi(object):
 
         Args:
             localpart (str): The localpart of the new user.
-            displayname (str|None): The displayname of the new user.
+            displayname (str|None): The displayname of the new user. If None,
+                the user's displayname will default to `localpart`.
 
         Returns:
             Deferred: a 2-tuple of (user_id, access_token)

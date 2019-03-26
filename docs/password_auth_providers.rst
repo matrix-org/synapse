@@ -84,9 +84,10 @@ Password auth provider classes may optionally provide the following methods.
 
     The method should return a Twisted ``Deferred`` object, which resolves to
     a ``str`` containing the user's (canonical) User ID if authentication was
-    successful, and ``None`` if not. The ``Deferred`` can also instead
-    resolve to a tuple of ``(str, callback)``, where ``callback`` is a
-    function that is run after login/registration has completed successfully.
+    successful, and ``None`` if not.
+
+    As with ``check_auth``, the ``Deferred`` may alternatively resolve to a
+    ``(user_id, callback)`` tuple.
 
 ``someprovider.check_password``\(*user_id*, *password*)
 
