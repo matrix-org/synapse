@@ -81,8 +81,9 @@ CONDITIONAL_REQUIREMENTS = {
 
 def list_requirements():
     deps = set(REQUIREMENTS)
-    for opt in CONDITIONAL_REQUIREMENTS.values():
-        deps = set(opt) | deps
+    for name, opts in CONDITIONAL_REQUIREMENTS.items():
+        if name not in ["systemd"]:
+            deps = set(opts) | deps
 
     return list(deps)
 
