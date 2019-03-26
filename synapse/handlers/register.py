@@ -153,6 +153,7 @@ class RegistrationHandler(BaseHandler):
         user_type=None,
         default_display_name=None,
         address=None,
+        bind_emails=[],
     ):
         """Registers a new client on the server.
 
@@ -172,6 +173,7 @@ class RegistrationHandler(BaseHandler):
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
             address (str|None): the IP address used to perform the registration.
+            bind_emails (List[str]): list of emails to bind to this account.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -260,6 +262,10 @@ class RegistrationHandler(BaseHandler):
                     attempts += 1
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
+
+        # Bind any specified emails to this account
+        for email in bind_emails:
+            yield self.bind_email_to_account(user_id, email)
 
         defer.returnValue((user_id, token))
 
@@ -405,6 +411,32 @@ class RegistrationHandler(BaseHandler):
                 raise RegistrationError(
                     403, "Third party identifier is not allowed"
                 )
+
+    @defer.inlineCallbacks
+    def bind_email_to_account(self, user_id, email, validated_at=None):
+        """Binds an email address with the registered identity service.
+
+        Args:
+            user_id (str): The user id of the user to bind the email to.
+            email (str): The email to bind.
+            validated_at (int|None): Time to mark emails validated at. If
+                `None`, the current time is used.
+
+        Returns:
+            Deferred
+        """
+
+        # generate threepid dict
+        threepid_dict = {
+            "medium": "email",
+            "address": email,
+            "validated_at": self.hs.get_clock().time_msec(),
+        }
+
+        # Bind email to new account
+        yield self._register_email_threepid(
+            user_id, threepid_dict, None, False,
+        )
 
     @defer.inlineCallbacks
     def bind_emails(self, user_id, threepidCreds):
