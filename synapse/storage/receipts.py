@@ -301,7 +301,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 args.append(limit)
             txn.execute(sql, args)
 
-            return txn.fetchall()
+            return (
+                r[0:5] + (json.loads(r[5]), ) for r in txn
+            )
         return self.runInteraction(
             "get_all_updated_receipts", get_all_updated_receipts_txn
         )

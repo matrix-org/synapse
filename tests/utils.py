@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2018-2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +45,10 @@ from synapse.util.logcontext import LoggingContext
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
+#
+# When running under postgres, we first create a base database with the name
+# POSTGRES_BASE_DB and update it to the current schema. Then, for each test case, we
+# create another unique database, using the base database as a template.
 USE_POSTGRES_FOR_TESTS = os.environ.get("SYNAPSE_POSTGRES", False)
 LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", None)
@@ -51,28 +56,20 @@ POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", None)
 POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
+# the dbname we will connect to in order to create the base database.
+POSTGRES_DBNAME_FOR_INITIAL_CREATE = "postgres"
+
 
 def setupdb():
-
     # If we're using PostgreSQL, set up the db once
     if USE_POSTGRES_FOR_TESTS:
-        pgconfig = {
-            "name": "psycopg2",
-            "args": {
-                "database": POSTGRES_BASE_DB,
-                "user": POSTGRES_USER,
-                "host": POSTGRES_HOST,
-                "password": POSTGRES_PASSWORD,
-                "cp_min": 1,
-                "cp_max": 5,
-            },
-        }
-        config = Mock()
-        config.password_providers = []
-        config.database_config = pgconfig
-        db_engine = create_engine(pgconfig)
+        # create a PostgresEngine
+        db_engine = create_engine({"name": "psycopg2", "args": {}})
+
+        # connect to postgres to create the base database.
         db_conn = db_engine.module.connect(
-            user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+            user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD,
+            dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
         )
         db_conn.autocommit = True
         cur = db_conn.cursor()
@@ -97,7 +94,8 @@ def setupdb():
 
         def _cleanup():
             db_conn = db_engine.module.connect(
-                user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD
+                user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD,
+                dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             )
             db_conn.autocommit = True
             cur = db_conn.cursor()
