@@ -264,13 +264,13 @@ class RegistrationHandler(BaseHandler):
             yield self._auto_join_rooms(user_id)
 
         # Bind any specified emails to this account
-        validated_at = self.hs.get_clock().time_msec()
+        current_time = self.hs.get_clock().time_msec()
         for email in bind_emails:
             # generate threepid dict
             threepid_dict = {
                 "medium": "email",
                 "address": email,
-                "validated_at": validated_at,
+                "validated_at": current_time,
             }
 
             # Bind email to new account
