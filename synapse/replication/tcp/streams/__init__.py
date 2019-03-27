@@ -25,12 +25,12 @@ Each stream is defined by the following information:
     update_function:    The function that returns a list of updates between two tokens
 """
 
-from . import _base
+from . import _base, events
 
 STREAMS_MAP = {
     stream.NAME: stream
     for stream in (
-        _base.EventsStream,
+        events.EventsStream,
         _base.BackfillStream,
         _base.PresenceStream,
         _base.TypingStream,

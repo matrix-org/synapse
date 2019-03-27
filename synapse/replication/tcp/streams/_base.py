@@ -26,13 +26,6 @@ logger = logging.getLogger(__name__)
 
 MAX_EVENTS_BEHIND = 10000
 
-EventStreamRow = namedtuple("EventStreamRow", (
-    "event_id",  # str
-    "room_id",  # str
-    "type",  # str
-    "state_key",  # str, optional
-    "redacts",  # str, optional
-))
 BackfillStreamRow = namedtuple("BackfillStreamRow", (
     "event_id",  # str
     "room_id",  # str
@@ -225,20 +218,6 @@ class Stream(object):
                 a ``ROW_TYPE`` instance
         """
         raise NotImplementedError()
-
-
-class EventsStream(Stream):
-    """We received a new event, or an event went from being an outlier to not
-    """
-    NAME = "events"
-    ROW_TYPE = EventStreamRow
-
-    def __init__(self, hs):
-        store = hs.get_datastore()
-        self.current_token = store.get_current_events_token
-        self.update_function = store.get_all_new_forward_event_rows
-
-        super(EventsStream, self).__init__(hs)
 
 
 class BackfillStream(Stream):
