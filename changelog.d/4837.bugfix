@@ -1,1 +1,0 @@
-Fix bug where synapse expected an un-specced `prev_state` field on state events.

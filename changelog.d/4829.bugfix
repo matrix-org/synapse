@@ -1,1 +1,0 @@
-Fix potential race in handling missing updates in device list updates.
