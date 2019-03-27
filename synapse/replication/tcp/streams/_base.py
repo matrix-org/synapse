@@ -115,6 +115,21 @@ class Stream(object):
     ROW_TYPE = None  # The type of the row
     _LIMITED = True  # Whether the update function takes a limit
 
+    @classmethod
+    def parse_row(cls, row):
+        """Parse a row received over replication
+
+        By default, assumes that the row data is an array object and passes its contents
+        to the constructor of the ROW_TYPE for this stream.
+
+        Args:
+            row: row data from the incoming RDATA command, after json decoding
+
+        Returns:
+            ROW_TYPE object for this stream
+        """
+        return cls.ROW_TYPE(*row)
+
     def __init__(self, hs):
         # The token from which we last asked for updates
         self.last_token = self.current_token()
