@@ -264,8 +264,19 @@ class RegistrationHandler(BaseHandler):
             yield self._auto_join_rooms(user_id)
 
         # Bind any specified emails to this account
+        validated_at = self.hs.get_clock().time_msec()
         for email in bind_emails:
-            yield self.bind_email_to_account(user_id, email)
+            # generate threepid dict
+            threepid_dict = {
+                "medium": "email",
+                "address": email,
+                "validated_at": validated_at,
+            }
+
+            # Bind email to new account
+            yield self._register_email_threepid(
+                user_id, threepid_dict, None, False,
+            )
 
         defer.returnValue((user_id, token))
 
@@ -411,32 +422,6 @@ class RegistrationHandler(BaseHandler):
                 raise RegistrationError(
                     403, "Third party identifier is not allowed"
                 )
-
-    @defer.inlineCallbacks
-    def bind_email_to_account(self, user_id, email, validated_at=None):
-        """Binds an email address with the registered identity service.
-
-        Args:
-            user_id (str): The user id of the user to bind the email to.
-            email (str): The email to bind.
-            validated_at (int|None): Time to mark emails validated at. If
-                `None`, the current time is used.
-
-        Returns:
-            Deferred
-        """
-
-        # generate threepid dict
-        threepid_dict = {
-            "medium": "email",
-            "address": email,
-            "validated_at": self.hs.get_clock().time_msec(),
-        }
-
-        # Bind email to new account
-        yield self._register_email_threepid(
-            user_id, threepid_dict, None, False,
-        )
 
     @defer.inlineCallbacks
     def bind_emails(self, user_id, threepidCreds):
