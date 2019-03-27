@@ -24,7 +24,7 @@ class StatsConfig(Config):
     """
 
     def read_config(self, config):
-        self.stats_enable = False
+        self.stats_enable = True
         self.stats_bucket_size = 86400
         self.stats_retention = sys.maxsize
         stats_config = config.get("stats", None)
