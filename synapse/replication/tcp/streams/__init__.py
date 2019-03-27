@@ -25,7 +25,7 @@ Each stream is defined by the following information:
     update_function:    The function that returns a list of updates between two tokens
 """
 
-from . import _base, events
+from . import _base, events, federation
 
 STREAMS_MAP = {
     stream.NAME: stream
@@ -41,7 +41,7 @@ STREAMS_MAP = {
         _base.PublicRoomsStream,
         _base.DeviceListsStream,
         _base.ToDeviceStream,
-        _base.FederationStream,
+        federation.FederationStream,
         _base.TagAccountDataStream,
         _base.AccountDataStream,
         _base.CurrentStateDeltaStream,
