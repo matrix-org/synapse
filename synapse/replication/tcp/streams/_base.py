@@ -112,7 +112,7 @@ class Stream(object):
     time it was called up until the point `advance_current_token` was called.
     """
     NAME = None  # The name of the stream
-    ROW_TYPE = None  # The type of the row
+    ROW_TYPE = None  # The type of the row. Used by the default impl of parse_row.
     _LIMITED = True  # Whether the update function takes a limit
 
     @classmethod
@@ -201,7 +201,7 @@ class Stream(object):
                 from_token, current_token,
             )
 
-        updates = [(row[0], self.ROW_TYPE(*row[1:])) for row in rows]
+        updates = [(row[0], row[1:]) for row in rows]
 
         # check we didn't get more rows than the limit.
         # doing it like this allows the update_function to be a generator.
