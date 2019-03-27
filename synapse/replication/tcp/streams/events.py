@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import heapq
 
 import attr
 
@@ -26,6 +27,7 @@ from ._base import Stream
 This stream contains rows of various types. Each row therefore contains a 'type'
 identifier before the real data. For example::
 
+    RDATA events batch ["state", ["!room:id", "m.type", "", "$event:id"]]
     RDATA events 12345 ["ev", ["$event:id", "!room:id", "m.type", null, null]]
 
 An "ev" row is sent for each new event. The fields in the data part are:
@@ -35,6 +37,14 @@ An "ev" row is sent for each new event. The fields in the data part are:
  * The type of the new event
  * The state key of the event, for state events
  * The event id of an event which is redacted by this event.
+
+A "state" row is sent whenever the "current state" in a room changes. The fields in the
+data part are:
+
+ * The room id for the state change
+ * The event type of the state which has changed
+ * The state_key of the state which has changed
+ * The event id of the new state
 
 """
 
@@ -77,10 +87,21 @@ class EventsStreamEventRow(BaseEventsStreamRow):
     redacts = attr.ib()    # str, optional
 
 
+@attr.s(slots=True, frozen=True)
+class EventsStreamCurrentStateRow(BaseEventsStreamRow):
+    TypeId = "state"
+
+    room_id = attr.ib()    # str
+    type = attr.ib()       # str
+    state_key = attr.ib()  # str
+    event_id = attr.ib()   # str, optional
+
+
 TypeToRow = {
     Row.TypeId: Row
     for Row in (
         EventsStreamEventRow,
+        EventsStreamCurrentStateRow,
     )
 }
 
@@ -105,7 +126,18 @@ class EventsStream(Stream):
             (row[0], EventsStreamEventRow.TypeId, row[1:])
             for row in event_rows
         )
-        defer.returnValue(event_updates)
+
+        state_rows = yield self._store.get_all_updated_current_state_deltas(
+            from_token, current_token, limit
+        )
+        state_updates = (
+            (row[0], EventsStreamCurrentStateRow.TypeId, row[1:])
+            for row in state_rows
+        )
+
+        all_updates = heapq.merge(event_updates, state_updates)
+
+        defer.returnValue(all_updates)
 
     @classmethod
     def parse_row(cls, row):

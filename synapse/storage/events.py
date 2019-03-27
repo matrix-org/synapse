@@ -2287,9 +2287,6 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
 
         defer.returnValue((int(res["topological_ordering"]), int(res["stream_ordering"])))
 
-    def get_max_current_state_delta_stream_id(self):
-        return self._stream_id_gen.get_current_token()
-
     def get_all_updated_current_state_deltas(self, from_token, to_token, limit):
         def get_all_updated_current_state_deltas_txn(txn):
             sql = """
