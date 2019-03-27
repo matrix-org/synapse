@@ -231,6 +231,7 @@ class MatrixFederationHttpClient(object):
             # Retry with a trailing slash if we received a 400 with
             # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
             # trailing slash on Synapse <= v0.99.3.
+            logger.info("Retrying request with trailing slash")
             request.path += "/"
 
             response = yield self._send_request(

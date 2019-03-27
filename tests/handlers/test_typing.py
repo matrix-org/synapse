@@ -180,7 +180,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
             "farm",
-            path="/_matrix/federation/v1/send/1000000/",
+            path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(
                 "m.typing",
                 content={
@@ -202,7 +202,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         (request, channel) = self.make_request(
             "PUT",
-            "/_matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(
                 "m.typing",
                 content={
@@ -258,7 +258,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
             "farm",
-            path="/_matrix/federation/v1/send/1000000/",
+            path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(
                 "m.typing",
                 content={
