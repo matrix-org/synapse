@@ -172,17 +172,35 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             {"highlight_count": 1, "notify_count": 2},
         )
 
+    def test_get_rooms_for_user_with_stream_ordering(self):
+        """Check that the cache on get_rooms_for_user_with_stream_ordering is invalidated
+        by rows in the events stream
+        """
+        self.persist(type="m.room.create", key="", creator=USER_ID)
+        self.persist(type="m.room.member", key=USER_ID, membership="join")
+        self.replicate()
+        self.check("get_rooms_for_user_with_stream_ordering", (USER_ID_2,), set())
+
+        j2 = self.persist(
+            type="m.room.member", sender=USER_ID_2, key=USER_ID_2, membership="join"
+        )
+        self.replicate()
+        self.check(
+            "get_rooms_for_user_with_stream_ordering",
+            (USER_ID_2,),
+            {(ROOM_ID, j2.internal_metadata.stream_ordering)},
+        )
+
     event_id = 0
 
     def persist(
         self,
         sender=USER_ID,
         room_id=ROOM_ID,
-        type={},
+        type="m.room.message",
         key=None,
         internal={},
         state=None,
-        reset_state=False,
         backfill=False,
         depth=None,
         prev_events=[],

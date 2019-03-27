@@ -986,6 +986,12 @@ class EventsStore(
                 if ev_type == EventTypes.Member
             )
 
+            for member in members_changed:
+                txn.call_after(
+                    self.get_rooms_for_user_with_stream_ordering.invalidate,
+                    (member,),
+                )
+
             self._invalidate_state_caches_and_stream(txn, room_id, members_changed)
 
     def _update_forward_extremities_txn(
