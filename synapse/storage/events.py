@@ -1988,9 +1988,8 @@ class EventsStore(
 
         logger.info("[purge] finding state groups that can be deleted")
 
-        state_groups_to_delete, remaining_state_groups = self._find_unreferenced_groups_during_purge(
-            txn, referenced_state_groups
-        )
+        _ = self._find_unreferenced_groups_during_purge(txn, referenced_state_groups)
+        state_groups_to_delete, remaining_state_groups = _
 
         logger.info(
             "[purge] found %i state groups to delete", len(state_groups_to_delete)
