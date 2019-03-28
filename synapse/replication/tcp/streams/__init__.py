@@ -44,7 +44,6 @@ STREAMS_MAP = {
         federation.FederationStream,
         _base.TagAccountDataStream,
         _base.AccountDataStream,
-        _base.CurrentStateDeltaStream,
         _base.GroupServerStream,
     )
 }
