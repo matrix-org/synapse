@@ -140,9 +140,10 @@ class StatsHandler(StateDeltasHandler):
             if event is None:
                 return
 
-            # quantise time to the nearest fbucket
+            # quantise time to the nearest bucket
+            now = yield self.store.get_received_ts(event_id)
             now = (
-                (event["origin_server_ts"] // 1000 // self.stats_bucket_size)
+                (now // 1000 // self.stats_bucket_size)
                 * self.stats_bucket_size
             )
 
