@@ -939,8 +939,7 @@ class PresenceHandler(object):
 
         @defer.inlineCallbacks
         def _process_presence():
-            if self._event_processing:
-                return
+            assert not self._event_processing
 
             self._event_processing = True
             try:
