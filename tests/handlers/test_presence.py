@@ -461,7 +461,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         self.reactor.pump([0])  # Wait for presence updates to be handled
 
-        # Test that a new server gets told about existing presence #
+        #
+        # Test that a new server gets told about existing presence
+        #
 
         self.federation_sender.reset_mock()
 
@@ -482,7 +484,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             destinations=["server2"], states=[expected_state]
         )
 
-        # Test that only the new server gets sent presence and not existing servers #
+        #
+        # Test that only the new server gets sent presence and not existing servers
+        #
 
         self.federation_sender.reset_mock()
         self._add_new_user(room_id, "@bob:server3")
@@ -517,7 +521,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         self.reactor.pump([0])  # Wait for presence updates to be handled
 
-        # Test that when a local join happens remote servers get told about it #
+        #
+        # Test that when a local join happens remote servers get told about it
+        #
 
         self.federation_sender.reset_mock()
 
@@ -547,7 +553,6 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         room_version = self.get_success(self.store.get_room_version(room_id))
 
-        # No we want to have other servers "join"
         builder = EventBuilder(
             state=self.state,
             auth=self.auth,
@@ -555,7 +560,6 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             clock=self.clock,
             hostname=hostname,
             signing_key=self.random_signing_key,
-
             format_version=room_version_to_event_format(room_version),
             room_id=room_id,
             type=EventTypes.Member,

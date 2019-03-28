@@ -934,6 +934,9 @@ class PresenceHandler(object):
         joining rooms and require being sent presence.
         """
 
+        if self._event_processing:
+            return
+
         @defer.inlineCallbacks
         def _process_presence():
             if self._event_processing:
@@ -993,58 +996,73 @@ class PresenceHandler(object):
                     # Ignore changes to join events.
                     continue
 
-            if self.is_mine_id(state_key):
-                # If this is a local user then we need to send their presence
-                # out to hosts in the room (who don't already have it)
+            yield self._on_user_joined_room(room_id, state_key)
 
-                # TODO: We should be able to filter the hosts down to those that
-                # haven't previously seen the user
+    @defer.inlineCallbacks
+    def _on_user_joined_room(self, room_id, user_id):
+        """Called when we detect a user joining the room via the current state
+        delta stream.
 
-                state = yield self.current_state_for_user(state_key)
-                hosts = yield self.state.get_current_hosts_in_room(room_id)
+        Args:
+            room_id (str)
+            user_id (str)
 
-                # Filter out ourselves.
-                hosts = set(host for host in hosts if host != self.server_name)
+        Returns:
+            Deferred
+        """
 
+        if self.is_mine_id(user_id):
+            # If this is a local user then we need to send their presence
+            # out to hosts in the room (who don't already have it)
+
+            # TODO: We should be able to filter the hosts down to those that
+            # haven't previously seen the user
+
+            state = yield self.current_state_for_user(user_id)
+            hosts = yield self.state.get_current_hosts_in_room(room_id)
+
+            # Filter out ourselves.
+            hosts = set(host for host in hosts if host != self.server_name)
+
+            self.federation.send_presence_to_destinations(
+                states=[state],
+                destinations=hosts,
+            )
+        else:
+            # A remote user has joined the room, so we need to:
+            #   1. Check if this is a new server in the room
+            #   2. If so send any presence they don't already have for
+            #      local users in the room.
+
+            # TODO: We should be able to filter the users down to those that
+            # the server hasn't previously seen
+
+            # TODO: Check that this is actually a new server joining the
+            # room.
+
+            user_ids = yield self.state.get_current_user_in_room(room_id)
+            user_ids = list(filter(self.is_mine_id, user_ids))
+
+            states = yield self.current_state_for_users(user_ids)
+
+            # Filter out old presence, i.e. offline presence states where
+            # the user hasn't been active for a week. We can change this
+            # depending on what we want the UX to be, but at the least we
+            # should filter out offline presence where the state is just the
+            # default state.
+            now = self.clock.time_msec()
+            states = [
+                state for state in states.values()
+                if state.state != PresenceState.OFFLINE
+                or now - state.last_active_ts < 7 * 24 * 60 * 60 * 1000
+                or state.status_msg is not None
+            ]
+
+            if states:
                 self.federation.send_presence_to_destinations(
-                    states=[state],
-                    destinations=hosts,
+                    states=states,
+                    destinations=[get_domain_from_id(user_id)],
                 )
-            else:
-                # A remote user has joined the room, so we need to:
-                #   1. Check if this is a new server in the room
-                #   2. If so send any presence they don't already have for
-                #      local users in the room.
-
-                # TODO: We should be able to filter the users down to those that
-                # the server hasn't previously seen
-
-                # TODO: Check that this is actually a new server joining the
-                # room.
-
-                user_ids = yield self.state.get_current_user_in_room(room_id)
-                user_ids = list(filter(self.is_mine_id, user_ids))
-
-                states = yield self.current_state_for_users(user_ids)
-
-                # Filter out old presence, i.e. offline presence states where
-                # the user hasn't been active for a week. We can change this
-                # depending on what we want the UX to be, but at the least we
-                # should filter out offline presence where the state is just the
-                # default state.
-                now = self.clock.time_msec()
-                states = [
-                    state for state in states.values()
-                    if state.state != PresenceState.OFFLINE
-                    or now - state.last_active_ts < 7 * 24 * 60 * 60 * 1000
-                    or state.status_msg is not None
-                ]
-
-                if states:
-                    self.federation.send_presence_to_destinations(
-                        states=states,
-                        destinations=[get_domain_from_id(state_key)],
-                    )
 
 
 def should_notify(old_state, new_state):
