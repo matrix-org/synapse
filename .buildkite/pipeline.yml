@@ -104,6 +104,8 @@ steps:
   - label: ":python: 2.7 / :postgres: 9.4"
     env:
       TRIAL_FLAGS: "-j 4"
+    agents:
+      queue: "medium"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
     plugins:
@@ -115,6 +117,8 @@ steps:
   - label: ":python: 2.7 / :postgres: 9.5"
     env:
       TRIAL_FLAGS: "-j 4"
+    agents:
+      queue: "medium"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py27-postgres,codecov'"
     plugins:
@@ -126,6 +130,8 @@ steps:
   - label: ":python: 3.5 / :postgres: 9.4"
     env:
       TRIAL_FLAGS: "-j 4"
+    agents:
+      queue: "medium"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
     plugins:
@@ -137,6 +143,8 @@ steps:
   - label: ":python: 3.5 / :postgres: 9.5"
     env:
       TRIAL_FLAGS: "-j 4"
+    agents:
+      queue: "medium"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py35-postgres,codecov'"
     plugins:
@@ -148,6 +156,8 @@ steps:
   - label: ":python: 3.7 / :postgres: 9.5"
     env:
       TRIAL_FLAGS: "-j 4"
+    agents:
+      queue: "medium"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
     plugins:
@@ -159,6 +169,8 @@ steps:
   - label: ":python: 3.7 / :postgres: 11"
     env:
       TRIAL_FLAGS: "-j 4"
+    agents:
+      queue: "medium"
     command:
       - "bash -c 'python -m pip install tox && python -m tox -e py37-postgres,codecov'"
     plugins:
