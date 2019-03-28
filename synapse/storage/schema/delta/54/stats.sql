@@ -78,6 +78,12 @@ CREATE TABLE media_stats (
 
 CREATE UNIQUE INDEX media_stats_ts ON media_stats(ts);
 
+CREATE TABLE room_stats_earliest_token (
+    room_id TEXT NOT NULL,
+    token BIGINT NOT NULL
+);
+
+CREATE UNIQUE INDEX room_stats_earliest_token_idx ON room_stats_earliest_token(room_id);
 
 -- Set up staging tables
 INSERT INTO background_updates (update_name, progress_json) VALUES

@@ -120,12 +120,25 @@ class StatsHandler(StateDeltasHandler):
             state_key = delta["state_key"]
             room_id = delta["room_id"]
             event_id = delta["event_id"]
+            stream_id = delta["stream_id"]
             prev_event_id = delta["prev_event_id"]
 
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
             if event_id is None:
                 return
+
+            token = self._simple_select_one_onecol(
+                "room_stats_earliest_token",
+                {"room_id": room_id},
+                retcol="token",
+                allow_none=True,
+            )
+
+            # If the earliest token to begin from is larger than our current
+            # stream ID, skip processing this delta.
+            if token is not None and token >= stream_id:
+                continue
 
             event = yield self.store.get_event(event_id)
             if event is None:

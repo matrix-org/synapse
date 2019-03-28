@@ -1842,42 +1842,42 @@ class EventsStore(StateGroupWorkerStore, EventFederationStore, EventsWorkerStore
             )
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
 
+    def _get_state_event_counts_txn(self, txn, room_id):
+        sql = (
+            "SELECT COUNT(*)"
+            " FROM state_events"
+            " WHERE room_id=?"
+        )
+        txn.execute(sql, (room_id,))
+        row = txn.fetchone()
+        return row[0] if row else 0
+
     def get_state_event_counts(self, room_id):
-        """Gets the total number of state events in the room
         """
+        Gets the total number of state events in the room
+        """
+        return self.runInteraction("get_state_event_counts", self._get_state_event_counts_txn, room_id)
 
-        def f(txn):
-            sql = (
-                "SELECT COUNT(*)"
-                " FROM state_events"
-                " WHERE room_id=?"
-            )
-            txn.execute(sql, (room_id,))
-            row = txn.fetchone()
-            return row[0] if row else 0
-
-        return self.runInteraction("get_state_event_counts", f)
+    def _get_event_counts_txn(self, txn, room_id, local_server):
+        sql = (
+            "SELECT sender LIKE ? AS local, COUNT(*)"
+            " FROM events"
+            " WHERE room_id=?"
+            " GROUP BY local"
+        )
+        txn.execute(sql, ("%%:" + local_server, room_id,))
+        rows = txn.fetchall()
+        results = {
+            ("local" if row[0] else "remote") : row[1]
+            for row in rows
+        }
+        return (results.get("local", 0), results.get("remote", 0))
 
     def get_event_counts(self, room_id, local_server):
-        """Gets the number of events in the room, split into local versus remote
         """
-
-        def f(txn):
-            sql = (
-                "SELECT sender LIKE ? AS local, COUNT(*)"
-                " FROM events"
-                " WHERE room_id=?"
-                " GROUP BY local"
-            )
-            txn.execute(sql, ("%%:" + local_server, room_id,))
-            rows = txn.fetchall()
-            results = {
-                ("local" if row[0] else "remote") : row[1]
-                for row in rows
-            }
-            return (results.get("local", 0), results.get("remote", 0))
-
-        return self.runInteraction("get_event_counts", f)
+        Gets the number of events in the room, split into local versus remote
+        """
+        return self.runInteraction("get_event_counts", self._get_event_counts_txn, room_id, local_server)
 
     def purge_history(
         self, room_id, token, delete_local_events,

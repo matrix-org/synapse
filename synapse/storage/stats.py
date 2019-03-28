@@ -236,35 +236,54 @@ class StatsStore(StateDeltasStore):
                 * 1000
             )
 
-            current_state_events = len(current_state_ids)
-            joined_members = yield self.get_user_count_in_room(room_id, Membership.JOIN)
-            invited_members = yield self.get_user_count_in_room(
-                room_id, Membership.INVITE
-            )
-            left_members = yield self.get_user_count_in_room(room_id, Membership.LEAVE)
-            banned_members = yield self.get_user_count_in_room(room_id, Membership.BAN)
-            state_events = yield self.get_state_event_counts(room_id)
-            (local_events, remote_events) = yield self.get_event_counts(
-                room_id, self.server_name
-            )
+            def _fetch_data(txn):
 
-            yield self.update_stats(
-                "room",
-                room_id,
-                now,
-                {
-                    "bucket_size": self.stats_bucket_size,
-                    "current_state_events": current_state_events,
-                    "joined_members": joined_members,
-                    "invited_members": invited_members,
-                    "left_members": left_members,
-                    "banned_members": banned_members,
-                    "state_events": state_events,
-                    "local_events": local_events,
-                    "remote_events": remote_events,
-                    "sent_events": local_events + remote_events,
-                },
-            )
+                # Get the current token of the room
+                current_token = self._get_max_stream_id_in_current_state_deltas_txn(txn)
+
+                current_state_events = len(current_state_ids)
+                joined_members = self._get_user_count_in_room_txn(
+                    txn, room_id, Membership.JOIN
+                )
+                invited_members = self._get_user_count_in_room_txn(
+                    txn, room_id, Membership.INVITE
+                )
+                left_members = self._get_user_count_in_room_txn(
+                    txn, room_id, Membership.LEAVE
+                )
+                banned_members = self._get_user_count_in_room_txn(
+                    txn, room_id, Membership.BAN
+                )
+                state_events = self._get_state_event_counts_txn(txn, room_id)
+                (local_events, remote_events) = self._get_event_counts_txn(
+                    txn, room_id, self.server_name
+                )
+
+                self._update_stats_txn(
+                    txn,
+                    "room",
+                    room_id,
+                    now,
+                    {
+                        "bucket_size": self.stats_bucket_size,
+                        "current_state_events": current_state_events,
+                        "joined_members": joined_members,
+                        "invited_members": invited_members,
+                        "left_members": left_members,
+                        "banned_members": banned_members,
+                        "state_events": state_events,
+                        "local_events": local_events,
+                        "remote_events": remote_events,
+                        "sent_events": local_events + remote_events,
+                    },
+                )
+                self._simple_insert_txn(
+                    txn,
+                    "room_stats_earliest_token",
+                    {"room_id": room_id, "token": current_token},
+                )
+
+            yield self.runInteraction("update_room_stats", _fetch_data)
 
             # We've finished a room. Delete it from the table.
             yield self._simple_delete_one(TEMP_TABLE + "_rooms", {"room_id": room_id})
@@ -283,14 +302,14 @@ class StatsStore(StateDeltasStore):
         """
         Delete all statistics records.
         """
+
         def _delete_all_stats_txn(txn):
             txn.execute("DELETE FROM room_state")
             txn.execute("DELETE FROM room_stats")
+            txn.execute("DELETE FROM room_stats_earliest_token")
             txn.execute("DELETE FROM user_stats")
 
-        return self.runInteraction(
-            "delete_all_stats", _delete_all_stats_txn
-        )
+        return self.runInteraction("delete_all_stats", _delete_all_stats_txn)
 
     def get_stats_stream_pos(self):
         return self._simple_select_one_onecol(
@@ -327,6 +346,14 @@ class StatsStore(StateDeltasStore):
             keyvalues={("%s_id" % stats_type): stats_id, "ts": ts},
             values=fields,
             desc="update_stats",
+        )
+
+    def _update_stats_txn(self, txn, stats_type, stats_id, ts, fields):
+        return self._simple_upsert_txn(
+            txn,
+            table=("%s_stats" % stats_type),
+            keyvalues={("%s_id" % stats_type): stats_id, "ts": ts},
+            values=fields,
         )
 
     def update_stats_delta(self, ts, bucket_size, stats_type, stats_id, field, value):
