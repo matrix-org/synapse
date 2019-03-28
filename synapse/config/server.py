@@ -110,6 +110,22 @@ class ServerConfig(Config):
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
 
+        self.federation_verify_certificates = config.get(
+            "federation_verify_certificates", False,
+        )
+
+        # Whitelist of domains to not verify certificates for
+        self.federation_certificate_verification_whitelist = None
+        federation_certificate_verification_whitelist = config.get(
+            "federation_certificate_verification_whitelist", None
+        )
+
+        # Store whitelisted domains in a hash for fast lookup
+        if federation_certificate_verification_whitelist is not None:
+            self.federation_certificate_verification_whitelist = {}
+            for domain in federation_certificate_verification_whitelist:
+                self.federation_certificate_verification_whitelist[domain] = True
+
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
@@ -338,6 +354,18 @@ class ServerConfig(Config):
         # will receive errors when searching for messages. Defaults to enabled.
         #
         #enable_search: false
+
+        # Whether to verify TLS certificates when sending federation traffic.
+        #
+        #federation_verify_certificates: true
+
+        # Prevent federation certificate validation on the following whitelist
+        # of domains. Only effective if federation_verify_certicates is true.
+        #
+        #federation_certificate_validation_whitelist:
+        #  - lon.example.com
+        #  - nyc.example.com
+        #  - syd.example.com
 
         # Restrict federation to the following whitelist of domains.
         # N.B. we recommend also firewalling your federation listener to limit

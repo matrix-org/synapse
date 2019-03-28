@@ -148,6 +148,7 @@ class MatrixFederationAgent(object):
         if self._tls_client_options_factory is None:
             tls_options = None
         else:
+            # TODO: Check the server we're sending to here and change verify value if necessary
             tls_options = self._tls_client_options_factory.get_options(
                 res.tls_server_name.decode("ascii")
             )
