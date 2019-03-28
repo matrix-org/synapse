@@ -647,8 +647,6 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
         assert_params_in_dict(params, ["new_password"])
         new_password = params['new_password']
 
-        logger.info("new_password: %r", new_password)
-
         yield self._set_password_handler.set_password(
             target_user_id, new_password, requester
         )
