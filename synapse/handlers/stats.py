@@ -82,7 +82,7 @@ class StatsHandler(StateDeltasHandler):
     def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
-            self.pos = yield self.store.get_user_directory_stream_pos()
+            self.pos = yield self.store.get_stats_stream_pos()
 
         # If still None then the initial background update hasn't happened yet
         if self.pos is None:
@@ -107,14 +107,6 @@ class StatsHandler(StateDeltasHandler):
         """
         Called with the state deltas to process
         """
-
-        # XXX: shouldn't this be the timestamp where the delta was emitted rather
-        # than received?
-        now = self.clock.time_msec()
-
-        # quantise time to the nearest bucket
-        now = int(now / (self.stats_bucket_size * 1000)) * self.stats_bucket_size * 1000
-
         for delta in deltas:
             typ = delta["type"]
             state_key = delta["state_key"]
@@ -126,9 +118,9 @@ class StatsHandler(StateDeltasHandler):
             logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
             if event_id is None:
-                return
+                continue
 
-            token = self._simple_select_one_onecol(
+            token = yield self.store._simple_select_one_onecol(
                 "room_stats_earliest_token",
                 {"room_id": room_id},
                 retcol="token",
@@ -138,11 +130,21 @@ class StatsHandler(StateDeltasHandler):
             # If the earliest token to begin from is larger than our current
             # stream ID, skip processing this delta.
             if token is not None and token >= stream_id:
+                logger.debug(
+                    "Ignoring: %s as earlier than this room's initial ingestion event",
+                    event_id,
+                )
                 continue
 
             event = yield self.store.get_event(event_id)
             if event is None:
                 return
+
+            # quantise time to the nearest fbucket
+            now = (
+                (event["origin_server_ts"] // 1000 // self.stats_bucket_size)
+                * self.stats_bucket_size
+            )
 
             if typ == EventTypes.Member:
                 # we could use _get_key_change here but it's a bit inefficient

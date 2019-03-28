@@ -41,10 +41,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.get_success(
             self.store._simple_insert(
                 "background_updates",
-                {
-                    "update_name": "populate_stats_createtables",
-                    "progress_json": "{}",
-                },
+                {"update_name": "populate_stats_createtables", "progress_json": "{}"},
             )
         )
         self.get_success(
@@ -87,6 +84,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             room_1, event_type="m.room.topic", body={"topic": "foo"}, tok=u1_token
         )
 
+        # Stats disabled, shouldn't have done anything
+        r = self.get_success(self.store.get_all_room_state())
+        self.assertEqual(len(r), 0)
+
         # Enable stats
         self.hs.config.stats_enable = True
         self.handler.stats_enable = True
@@ -101,3 +102,89 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["topic"], "foo")
+
+    @unittest.DEBUG
+    def test_initial_earliest_token(self):
+        """
+        Ingestion via notify_new_event will ignore tokens that the background
+        update have already processed.
+        """
+        self.reactor.advance(86401)
+
+        self.hs.config.stats_enable = False
+        self.handler.stats_enable = False
+
+        u1 = self.register_user("u1", "pass")
+        u1_token = self.login("u1", "pass")
+
+        u2 = self.register_user("u2", "pass")
+        u2_token = self.login("u2", "pass")
+
+        u3 = self.register_user("u3", "pass")
+        u3_token = self.login("u3", "pass")
+
+        room_1 = self.helper.create_room_as(u1, tok=u1_token)
+        self.helper.send_state(
+            room_1, event_type="m.room.topic", body={"topic": "foo"}, tok=u1_token
+        )
+
+        # Begin the ingestion by creating the temp tables. This will also store
+        # the position that the deltas should begin at, once they take over.
+        self.hs.config.stats_enable = True
+        self.handler.stats_enable = True
+        self.store._all_done = False
+        self.get_success(self.store.update_stats_stream_pos(None))
+
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {"update_name": "populate_stats_createtables", "progress_json": "{}"},
+            )
+        )
+
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
+
+        # Now, before the table is actually ingested, add some more events.
+        self.helper.invite(room=room_1, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room=room_1, user=u2, tok=u2_token)
+
+        # Now do the initial ingestion.
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {"update_name": "populate_stats_process_rooms", "progress_json": "{}"},
+            )
+        )
+        self.get_success(
+            self.store._simple_insert(
+                "background_updates",
+                {
+                    "update_name": "populate_stats_cleanup",
+                    "progress_json": "{}",
+                    "depends_on": "populate_stats_process_rooms",
+                },
+            )
+        )
+
+        self.store._all_done = False
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
+
+        self.reactor.advance(86401)
+
+        # Now add some more events, triggering ingestion. Because of the stream
+        # position being set to before the events sent in the middle, a simpler
+        # implementation would reprocess those events, and say there were four
+        # users, not three.
+        self.helper.invite(room=room_1, src=u1, targ=u3, tok=u1_token)
+        self.helper.join(room=room_1, user=u3, tok=u3_token)
+
+        # Get the deltas! There should be two -- day 1, and day 2.
+        r = self.get_success(self.store.get_deltas_for_room(room_1, 0))
+
+        # The oldest has 2 joined members
+        self.assertEqual(r[-1]["joined_members"], 2)
+
+        # The newest has 3
+        self.assertEqual(r[0]["joined_members"], 3)

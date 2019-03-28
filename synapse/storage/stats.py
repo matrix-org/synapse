@@ -23,7 +23,7 @@ from synapse.storage.state_deltas import StateDeltasStore
 logger = logging.getLogger(__name__)
 
 # these fields track relative numbers (e.g. number of events sent in this timeslice)
-RELATIVE_STATS_FIELDS = {"room": ("sent_events"), "user": ("sent_events")}
+RELATIVE_STATS_FIELDS = {"room": ("sent_events",), "user": ("sent_events",)}
 
 # these fields track rather than absolutes (e.g. total number of rooms on the server)
 ABSOLUTE_STATS_FIELDS = {
@@ -227,13 +227,12 @@ class StatsStore(StateDeltasStore):
                 },
             )
 
-            now = self.clock.time_msec()
+            now = self.hs.get_reactor().seconds()
 
             # quantise time to the nearest bucket
             now = (
-                int(now / (self.stats_bucket_size * 1000))
+                (now // self.stats_bucket_size)
                 * self.stats_bucket_size
-                * 1000
             )
 
             def _fetch_data(txn):
@@ -335,6 +334,14 @@ class StatsStore(StateDeltasStore):
             desc="update_room_state",
         )
 
+    def get_deltas_for_room(self, room_id, start, size=100):
+        return self._simple_select_list_paginate(
+            "room_stats",
+            {"room_id": room_id},
+            (("ts", "DESC"), size, start),
+            retcols=list(ABSOLUTE_STATS_FIELDS["room"]) + ["ts"],
+        )
+
     def get_all_room_state(self):
         return self._simple_select_list(
             "room_state", None, retcols=("name", "topic", "canonical_alias")
@@ -376,14 +383,23 @@ class StatsStore(StateDeltasStore):
                 # subsequent deltas arriving.
                 return
 
-            values = {key: rows[0][key] for key in ABSOLUTE_STATS_FIELDS[stats_type]}
-            values[id_col] = stats_id
-            values["ts"] = ts
-            values["bucket_size"] = bucket_size
-
+            current_ts = ts
             latest_ts = rows[0]["ts"]
-            if ts != latest_ts:
+            if current_ts < latest_ts:
+                # This one is in the past, but we're just encountering it now.
+                # Mark it as part of the current bucket.
+                current_ts = latest_ts
+            elif ts != latest_ts:
                 # we have to copy our absolute counters over to the new entry.
+                values = {key: rows[0][key] for key in ABSOLUTE_STATS_FIELDS[stats_type]}
+                values[id_col] = stats_id
+                values["ts"] = ts
+                values["bucket_size"] = bucket_size
+
+                # Set the relative fields to 0.
+                for val in RELATIVE_STATS_FIELDS[stats_type]:
+                    values[val] = 0
+
                 self._simple_insert_txn(txn, table=table, values=values)
 
             # actually update the new value
@@ -391,16 +407,16 @@ class StatsStore(StateDeltasStore):
                 self._simple_update_txn(
                     txn,
                     table=table,
-                    keyvalues={id_col: stats_id, "ts": ts},
+                    keyvalues={id_col: stats_id, "ts": current_ts},
                     updatevalues={field: value},
                 )
             else:
-                sql = ("UPDATE %s " " SET %s=%s+?" " WHERE %s=? AND ts=?") % (
+                sql = ("UPDATE %s " " SET %s=%s+? WHERE %s=? AND ts=?") % (
                     table,
                     field,
                     field,
                     id_col,
                 )
-                txn.execute(sql, (value, stats_id, ts))
+                txn.execute(sql, (value, stats_id, current_ts))
 
         return self.runInteraction("update_stats_delta", _update_stats_delta)

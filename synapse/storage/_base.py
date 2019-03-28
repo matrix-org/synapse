@@ -1463,6 +1463,10 @@ class SQLBaseStore(object):
             keyvalues (dict[str, Any] | None):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
+            pagevalues ([]):
+                order (str): order the select by this column
+                start (int): start number to begin the query from
+                limit (int): number of rows to reterive
             retcols (iterable[str]): the names of the columns to return
             order (str): order the select by this column
             start (int): start number to begin the query from
@@ -1497,21 +1501,28 @@ class SQLBaseStore(object):
             defer.Deferred: resolves to list[dict[str, Any]]
 
         """
+        if isinstance(pagevalues[0], (list, tuple)):
+            sort_column = pagevalues[0][0]
+            ordering = pagevalues[0][1]
+        else:
+            sort_column = pagevalues[0]
+            ordering = "ASC"
+
         if keyvalues:
             sql = "SELECT %s FROM %s WHERE %s ORDER BY %s" % (
                 ", ".join(retcols),
                 table,
                 " AND ".join("%s = ?" % (k,) for k in keyvalues),
-                " ? ASC LIMIT ? OFFSET ?"
+                sort_column + " " + ordering + " LIMIT ? OFFSET ?"
             )
-            txn.execute(sql, list(keyvalues.values()) + list(pagevalues))
+            txn.execute(sql, list(keyvalues.values()) + list(pagevalues[1:]))
         else:
             sql = "SELECT %s FROM %s ORDER BY %s" % (
                 ", ".join(retcols),
                 table,
-                " ? ASC LIMIT ? OFFSET ?"
+                sort_column + " " + ordering + " LIMIT ? OFFSET ?"
             )
-            txn.execute(sql, pagevalues)
+            txn.execute(sql, list(pagevalues[1:]))
 
         return cls.cursor_to_dict(txn)
 
