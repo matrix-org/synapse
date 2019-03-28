@@ -152,13 +152,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             " WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?"
         )
 
-        txn.execute(sql, (room_id, membership,))
+        txn.execute(sql, (room_id, membership))
         row = txn.fetchone()
         return row[0]
 
     @cached()
     def get_user_count_in_room(self, room_id, membership):
-        return self.runInteraction("get_users_in_room", self._get_user_count_in_room_txn, room_id, membership)
+        return self.runInteraction(
+            "get_users_in_room", self._get_user_count_in_room_txn, room_id, membership
+        )
 
     @cached()
     def get_invited_rooms_for_user(self, user_id):
