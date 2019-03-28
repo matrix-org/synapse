@@ -162,8 +162,10 @@ class Stream(object):
         until the `upto_token`
 
         Returns:
-            (list(ROW_TYPE), int): list of updates plus the token used as an
-                upper bound of the updates (i.e. the "current token")
+            Deferred[Tuple[List[Tuple[int, Any]], int]:
+                Resolves to a pair ``(updates, current_token)``, where ``updates`` is a
+                list of ``(token, row)`` entries. ``row`` will be json-serialised and
+                sent over the replication steam.
         """
         updates, current_token = yield self.get_updates_since(self.last_token)
         self.last_token = current_token
@@ -176,8 +178,10 @@ class Stream(object):
         stream updates
 
         Returns:
-            (list(ROW_TYPE), int): list of updates plus the token used as an
-                upper bound of the updates (i.e. the "current token")
+            Deferred[Tuple[List[Tuple[int, Any]], int]:
+                Resolves to a pair ``(updates, current_token)``, where ``updates`` is a
+                list of ``(token, row)`` entries. ``row`` will be json-serialised and
+                sent over the replication steam.
         """
         if from_token in ("NOW", "now"):
             defer.returnValue(([], self.upto_token))
