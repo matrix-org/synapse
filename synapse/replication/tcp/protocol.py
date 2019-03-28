@@ -605,7 +605,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         inbound_rdata_count.labels(stream_name).inc()
 
         try:
-            row = STREAMS_MAP[stream_name].ROW_TYPE(*cmd.row)
+            row = STREAMS_MAP[stream_name].parse_row(cmd.row)
         except Exception:
             logger.exception(
                 "[%s] Failed to parse RDATA: %r %r",
