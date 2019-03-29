@@ -68,6 +68,6 @@ class WellKnownResource(Resource):
             request.setHeader(b"Content-Type", b"text/plain")
             return b'.well-known not available'
 
-        logger.error("returning: %s", r)
+        logger.debug("returning: %s", r)
         request.setHeader(b"Content-Type", b"application/json")
         return json.dumps(r).encode("utf-8")
