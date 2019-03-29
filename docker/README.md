@@ -31,6 +31,7 @@ docker run \
     --mount type=volume,src=synapse-data,dst=/data \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \
     -e SYNAPSE_REPORT_STATS=yes \
+    -p 8448:8448 \
     matrixdotorg/synapse:latest
 ```
 
