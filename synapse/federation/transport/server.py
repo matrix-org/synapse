@@ -21,8 +21,8 @@ import re
 from twisted.internet import defer
 
 import synapse
-from synapse.api.constants import RoomVersions
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
+from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
@@ -513,7 +513,7 @@ class FederationV1InviteServlet(BaseFederationServlet):
         # state resolution algorithm, and we don't use that for processing
         # invites
         content = yield self.handler.on_invite_request(
-            origin, content, room_version=RoomVersions.V1,
+            origin, content, room_version=RoomVersions.V1.identifier,
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
