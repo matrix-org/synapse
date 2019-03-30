@@ -49,13 +49,17 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.db_pool.runWithConnection = runWithConnection
 
         config = Mock()
+        config._disable_native_upserts = True
         config.event_cache_size = 1
         config.database_config = {"name": "sqlite3"}
+        engine = create_engine(config.database_config)
+        fake_engine = Mock(wraps=engine)
+        fake_engine.can_native_upsert = False
         hs = TestHomeServer(
             "test",
             db_pool=self.db_pool,
             config=config,
-            database_engine=create_engine(config.database_config),
+            database_engine=fake_engine,
         )
 
         self.datastore = SQLBaseStore(None, hs)

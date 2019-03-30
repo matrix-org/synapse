@@ -48,6 +48,7 @@ from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.replication.tcp.streams.events import EventsStreamEventRow
 from synapse.rest.client.v1 import events
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.room import RoomInitialSyncRestServlet
@@ -369,7 +370,9 @@ class SyncReplicationHandler(ReplicationClientHandler):
                 # We shouldn't get multiple rows per token for events stream, so
                 # we don't need to optimise this for multiple rows.
                 for row in rows:
-                    event = yield self.store.get_event(row.event_id)
+                    if row.type != EventsStreamEventRow.TypeId:
+                        continue
+                    event = yield self.store.get_event(row.data.event_id)
                     extra_users = ()
                     if event.type == EventTypes.Member:
                         extra_users = (event.state_key,)
@@ -445,12 +448,7 @@ def start(config_options):
     )
 
     ss.setup()
-    ss.start_listening(config.worker_listeners)
-
-    def start():
-        ss.get_datastore().start_profiling()
-
-    reactor.callWhenRunning(start)
+    reactor.callWhenRunning(_base.start, ss, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-synchrotron", config)
 

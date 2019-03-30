@@ -16,6 +16,7 @@
 import logging
 
 from synapse.api.constants import EventTypes
+from synapse.replication.tcp.streams.events import EventsStreamEventRow
 from synapse.storage.event_federation import EventFederationWorkerStore
 from synapse.storage.event_push_actions import EventPushActionsWorkerStore
 from synapse.storage.events_worker import EventsWorkerStore
@@ -79,9 +80,12 @@ class SlavedEventStore(EventFederationWorkerStore,
         if stream_name == "events":
             self._stream_id_gen.advance(token)
             for row in rows:
+                if row.type != EventsStreamEventRow.TypeId:
+                    continue
+                data = row.data
                 self.invalidate_caches_for_event(
-                    token, row.event_id, row.room_id, row.type, row.state_key,
-                    row.redacts,
+                    token, data.event_id, data.room_id, data.type, data.state_key,
+                    data.redacts,
                     backfilled=False,
                 )
         elif stream_name == "backfill":

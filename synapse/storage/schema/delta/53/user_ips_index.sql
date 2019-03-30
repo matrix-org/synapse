@@ -13,9 +13,13 @@
  * limitations under the License.
  */
 
--- delete duplicates
+ -- analyze user_ips, to help ensure the correct indices are used
 INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('user_ips_remove_dupes', '{}');
+  ('user_ips_analyze', '{}');
+
+-- delete duplicates
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+  ('user_ips_remove_dupes', '{}', 'user_ips_analyze');
 
 -- add a new unique index to user_ips table
 INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES

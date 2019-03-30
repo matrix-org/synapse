@@ -1,5 +1,6 @@
 import synapse.api.auth
 import synapse.config.homeserver
+import synapse.federation.sender
 import synapse.federation.transaction_queue
 import synapse.federation.transport.client
 import synapse.handlers
@@ -7,9 +8,9 @@ import synapse.handlers.auth
 import synapse.handlers.deactivate_account
 import synapse.handlers.device
 import synapse.handlers.e2e_keys
+import synapse.handlers.message
 import synapse.handlers.room
 import synapse.handlers.room_member
-import synapse.handlers.message
 import synapse.handlers.set_password
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
@@ -62,7 +63,7 @@ class HomeServer(object):
     def get_set_password_handler(self) -> synapse.handlers.set_password.SetPasswordHandler:
         pass
 
-    def get_federation_sender(self) -> synapse.federation.transaction_queue.TransactionQueue:
+    def get_federation_sender(self) -> synapse.federation.sender.FederationSender:
         pass
 
     def get_federation_transport_client(self) -> synapse.federation.transport.client.TransportLayerClient:

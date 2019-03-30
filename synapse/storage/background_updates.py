@@ -52,7 +52,9 @@ class BackgroundUpdatePerformance(object):
         Returns:
             A duration in ms as a float
         """
-        if self.total_item_count == 0:
+        if self.avg_duration_ms == 0:
+            return 0
+        elif self.total_item_count == 0:
             return None
         else:
             # Use the exponential moving average so that we can adapt to
@@ -64,7 +66,9 @@ class BackgroundUpdatePerformance(object):
         Returns:
             A duration in ms as a float
         """
-        if self.total_item_count == 0:
+        if self.total_duration_ms == 0:
+            return 0
+        elif self.total_item_count == 0:
             return None
         else:
             return float(self.total_item_count) / float(self.total_duration_ms)
@@ -240,7 +244,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         * An integer count of the number of items to update in this batch.
 
         The handler should return a deferred integer count of items updated.
-        The hander is responsible for updating the progress of the update.
+        The handler is responsible for updating the progress of the update.
 
         Args:
             update_name(str): The name of the update that this code handles.

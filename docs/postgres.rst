@@ -49,6 +49,24 @@ As with Debian/Ubuntu, postgres support depends on the postgres python connector
     export PATH=/usr/pgsql-9.4/bin/:$PATH
     pip install psycopg2
 
+Tuning Postgres
+===============
+
+The default settings should be fine for most deployments. For larger scale
+deployments tuning some of the settings is recommended, details of which can be
+found at https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server.
+
+In particular, we've found tuning the following values helpful for performance:
+
+- ``shared_buffers``
+- ``effective_cache_size``
+- ``work_mem``
+- ``maintenance_work_mem``
+- ``autovacuum_work_mem``
+
+Note that the appropriate values for those fields depend on the amount of free
+memory the database host has available.
+
 Synapse config
 ==============
 
@@ -129,8 +147,8 @@ Once that has completed, change the synapse config to point at the PostgreSQL
 database configuration file ``homeserver-postgres.yaml``::
 
     ./synctl stop
-    mv homeserver.yaml homeserver-old-sqlite.yaml 
-    mv homeserver-postgres.yaml homeserver.yaml 
+    mv homeserver.yaml homeserver-old-sqlite.yaml
+    mv homeserver-postgres.yaml homeserver.yaml
     ./synctl start
 
 Synapse should now be running against PostgreSQL.

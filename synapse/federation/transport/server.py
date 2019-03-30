@@ -43,9 +43,20 @@ logger = logging.getLogger(__name__)
 class TransportLayerServer(JsonResource):
     """Handles incoming federation HTTP requests"""
 
-    def __init__(self, hs):
+    def __init__(self, hs, servlet_groups=None):
+        """Initialize the TransportLayerServer
+
+        Will by default register all servlets. For custom behaviour, pass in
+        a list of servlet_groups to register.
+
+        Args:
+            hs (synapse.server.HomeServer): homeserver
+            servlet_groups (list[str], optional): List of servlet groups to register.
+                Defaults to ``DEFAULT_SERVLET_GROUPS``.
+        """
         self.hs = hs
         self.clock = hs.get_clock()
+        self.servlet_groups = servlet_groups
 
         super(TransportLayerServer, self).__init__(hs, canonical_json=False)
 
@@ -67,6 +78,7 @@ class TransportLayerServer(JsonResource):
             resource=self,
             ratelimiter=self.ratelimiter,
             authenticator=self.authenticator,
+            servlet_groups=self.servlet_groups,
         )
 
 
@@ -300,7 +312,7 @@ class BaseFederationServlet(object):
 
 
 class FederationSendServlet(BaseFederationServlet):
-    PATH = "/send/(?P<transaction_id>[^/]*)/"
+    PATH = "/send/(?P<transaction_id>[^/]*)/?"
 
     def __init__(self, handler, server_name, **kwargs):
         super(FederationSendServlet, self).__init__(
@@ -366,7 +378,7 @@ class FederationSendServlet(BaseFederationServlet):
 
 
 class FederationEventServlet(BaseFederationServlet):
-    PATH = "/event/(?P<event_id>[^/]*)/"
+    PATH = "/event/(?P<event_id>[^/]*)/?"
 
     # This is when someone asks for a data item for a given server data_id pair.
     def on_GET(self, origin, content, query, event_id):
@@ -374,30 +386,30 @@ class FederationEventServlet(BaseFederationServlet):
 
 
 class FederationStateServlet(BaseFederationServlet):
-    PATH = "/state/(?P<context>[^/]*)/"
+    PATH = "/state/(?P<context>[^/]*)/?"
 
     # This is when someone asks for all data for a given context.
     def on_GET(self, origin, content, query, context):
         return self.handler.on_context_state_request(
             origin,
             context,
-            parse_string_from_args(query, "event_id", None),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 
 class FederationStateIdsServlet(BaseFederationServlet):
-    PATH = "/state_ids/(?P<room_id>[^/]*)/"
+    PATH = "/state_ids/(?P<room_id>[^/]*)/?"
 
     def on_GET(self, origin, content, query, room_id):
         return self.handler.on_state_ids_request(
             origin,
             room_id,
-            parse_string_from_args(query, "event_id", None),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 
 class FederationBackfillServlet(BaseFederationServlet):
-    PATH = "/backfill/(?P<context>[^/]*)/"
+    PATH = "/backfill/(?P<context>[^/]*)/?"
 
     def on_GET(self, origin, content, query, context):
         versions = [x.decode('ascii') for x in query[b"v"]]
@@ -469,7 +481,7 @@ class FederationSendLeaveServlet(BaseFederationServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, room_id, event_id):
-        content = yield self.handler.on_send_leave_request(origin, content)
+        content = yield self.handler.on_send_leave_request(origin, content, room_id)
         defer.returnValue((200, content))
 
 
@@ -487,7 +499,7 @@ class FederationSendJoinServlet(BaseFederationServlet):
     def on_PUT(self, origin, content, query, context, event_id):
         # TODO(paul): assert that context/event_id parsed from path actually
         #   match those given in content
-        content = yield self.handler.on_send_join_request(origin, content)
+        content = yield self.handler.on_send_join_request(origin, content, context)
         defer.returnValue((200, content))
 
 
@@ -724,7 +736,8 @@ class PublicRoomList(BaseFederationServlet):
 
         data = yield self.handler.get_local_public_room_list(
             limit, since_token,
-            network_tuple=network_tuple
+            network_tuple=network_tuple,
+            from_federation=True,
         )
         defer.returnValue((200, data))
 
@@ -746,7 +759,7 @@ class FederationVersionServlet(BaseFederationServlet):
 class FederationGroupsProfileServlet(BaseFederationServlet):
     """Get/set the basic profile of a group on behalf of a user
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/profile$"
+    PATH = "/groups/(?P<group_id>[^/]*)/profile"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -774,7 +787,7 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
 
 
 class FederationGroupsSummaryServlet(BaseFederationServlet):
-    PATH = "/groups/(?P<group_id>[^/]*)/summary$"
+    PATH = "/groups/(?P<group_id>[^/]*)/summary"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -792,7 +805,7 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
 class FederationGroupsRoomsServlet(BaseFederationServlet):
     """Get the rooms in a group on behalf of a user
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/rooms$"
+    PATH = "/groups/(?P<group_id>[^/]*)/rooms"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -810,7 +823,7 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
 class FederationGroupsAddRoomsServlet(BaseFederationServlet):
     """Add/remove room from group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)$"
+    PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, room_id):
@@ -842,7 +855,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
     """
     PATH = (
         "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
-        "/config/(?P<config_key>[^/]*)$"
+        "/config/(?P<config_key>[^/]*)"
     )
 
     @defer.inlineCallbacks
@@ -861,7 +874,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
 class FederationGroupsUsersServlet(BaseFederationServlet):
     """Get the users in a group on behalf of a user
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -879,7 +892,7 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
 class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
     """Get the users that have been invited to a group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/invited_users$"
+    PATH = "/groups/(?P<group_id>[^/]*)/invited_users"
 
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query, group_id):
@@ -897,7 +910,7 @@ class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
 class FederationGroupsInviteServlet(BaseFederationServlet):
     """Ask a group server to invite someone to the group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -915,7 +928,7 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
 class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
     """Accept an invitation from the group server
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -932,7 +945,7 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
 class FederationGroupsJoinServlet(BaseFederationServlet):
     """Attempt to join a group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -949,7 +962,7 @@ class FederationGroupsJoinServlet(BaseFederationServlet):
 class FederationGroupsRemoveUserServlet(BaseFederationServlet):
     """Leave or kick a user from the group
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
+    PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -967,7 +980,7 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
 class FederationGroupsLocalInviteServlet(BaseFederationServlet):
     """A group server has invited a local user
     """
-    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite$"
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -984,7 +997,7 @@ class FederationGroupsLocalInviteServlet(BaseFederationServlet):
 class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
     """A group server has removed a local user
     """
-    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove$"
+    PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -1001,7 +1014,7 @@ class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
 class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
     """A group or user's server renews their attestation
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)$"
+    PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)"
 
     @defer.inlineCallbacks
     def on_POST(self, origin, content, query, group_id, user_id):
@@ -1024,7 +1037,7 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
     PATH = (
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/categories/(?P<category_id>[^/]+))?"
-        "/rooms/(?P<room_id>[^/]*)$"
+        "/rooms/(?P<room_id>[^/]*)"
     )
 
     @defer.inlineCallbacks
@@ -1067,7 +1080,7 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
     """Get all categories for a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/$"
+        "/groups/(?P<group_id>[^/]*)/categories/?"
     )
 
     @defer.inlineCallbacks
@@ -1087,7 +1100,7 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
     """Add/remove/get a category in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
+        "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)"
     )
 
     @defer.inlineCallbacks
@@ -1137,7 +1150,7 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
     """Get roles in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/$"
+        "/groups/(?P<group_id>[^/]*)/roles/?"
     )
 
     @defer.inlineCallbacks
@@ -1157,7 +1170,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
     """Add/remove/get a role in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$"
+        "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)"
     )
 
     @defer.inlineCallbacks
@@ -1213,7 +1226,7 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
     PATH = (
         "/groups/(?P<group_id>[^/]*)/summary"
         "(/roles/(?P<role_id>[^/]+))?"
-        "/users/(?P<user_id>[^/]*)$"
+        "/users/(?P<user_id>[^/]*)"
     )
 
     @defer.inlineCallbacks
@@ -1256,7 +1269,7 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
     """Get roles in a group
     """
     PATH = (
-        "/get_groups_publicised$"
+        "/get_groups_publicised"
     )
 
     @defer.inlineCallbacks
@@ -1271,7 +1284,7 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
 class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
     """Sets whether a group is joinable without an invite or knock
     """
-    PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy$"
+    PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy"
 
     @defer.inlineCallbacks
     def on_PUT(self, origin, content, query, group_id):
@@ -1308,10 +1321,12 @@ FEDERATION_SERVLET_CLASSES = (
     FederationClientKeysClaimServlet,
     FederationThirdPartyInviteExchangeServlet,
     On3pidBindServlet,
-    OpenIdUserInfo,
     FederationVersionServlet,
 )
 
+OPENID_SERVLET_CLASSES = (
+    OpenIdUserInfo,
+)
 
 ROOM_LIST_CLASSES = (
     PublicRoomList,
@@ -1350,44 +1365,83 @@ GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )
 
+DEFAULT_SERVLET_GROUPS = (
+    "federation",
+    "room_list",
+    "group_server",
+    "group_local",
+    "group_attestation",
+    "openid",
+)
 
-def register_servlets(hs, resource, authenticator, ratelimiter):
-    for servletclass in FEDERATION_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_federation_server(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
 
-    for servletclass in ROOM_LIST_CLASSES:
-        servletclass(
-            handler=hs.get_room_list_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=None):
+    """Initialize and register servlet classes.
 
-    for servletclass in GROUP_SERVER_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_server_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    Will by default register all servlets. For custom behaviour, pass in
+    a list of servlet_groups to register.
 
-    for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_local_handler(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    Args:
+        hs (synapse.server.HomeServer): homeserver
+        resource (TransportLayerServer): resource class to register to
+        authenticator (Authenticator): authenticator to use
+        ratelimiter (util.ratelimitutils.FederationRateLimiter): ratelimiter to use
+        servlet_groups (list[str], optional): List of servlet groups to register.
+            Defaults to ``DEFAULT_SERVLET_GROUPS``.
+    """
+    if not servlet_groups:
+        servlet_groups = DEFAULT_SERVLET_GROUPS
 
-    for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
-        servletclass(
-            handler=hs.get_groups_attestation_renewer(),
-            authenticator=authenticator,
-            ratelimiter=ratelimiter,
-            server_name=hs.hostname,
-        ).register(resource)
+    if "federation" in servlet_groups:
+        for servletclass in FEDERATION_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_federation_server(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "openid" in servlet_groups:
+        for servletclass in OPENID_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_federation_server(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "room_list" in servlet_groups:
+        for servletclass in ROOM_LIST_CLASSES:
+            servletclass(
+                handler=hs.get_room_list_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_server" in servlet_groups:
+        for servletclass in GROUP_SERVER_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_server_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_local" in servlet_groups:
+        for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_local_handler(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)
+
+    if "group_attestation" in servlet_groups:
+        for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
+            servletclass(
+                handler=hs.get_groups_attestation_renewer(),
+                authenticator=authenticator,
+                ratelimiter=ratelimiter,
+                server_name=hs.hostname,
+            ).register(resource)

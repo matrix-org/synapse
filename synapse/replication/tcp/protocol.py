@@ -42,8 +42,8 @@ indicate which side is sending, these are *not* included on the wire::
     > POSITION backfill 1
     > POSITION caches 1
     > RDATA caches 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
-    > RDATA events 14 ["$149019767112vOHxz:localhost:8823",
-        "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]
+    > RDATA events 14 ["ev", ["$149019767112vOHxz:localhost:8823",
+        "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]]
     < PING 1490197675618
     > ERROR server stopping
     * connection closed by server *
@@ -223,14 +223,25 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             return
 
         # Now lets try and call on_<CMD_NAME> function
-        try:
-            run_as_background_process(
-                "replication-" + cmd.get_logcontext_id(),
-                getattr(self, "on_%s" % (cmd_name,)),
-                cmd,
-            )
-        except Exception:
-            logger.exception("[%s] Failed to handle line: %r", self.id(), line)
+        run_as_background_process(
+            "replication-" + cmd.get_logcontext_id(),
+            self.handle_command,
+            cmd,
+        )
+
+    def handle_command(self, cmd):
+        """Handle a command we have received over the replication stream.
+
+        By default delegates to on_<COMMAND>
+
+        Args:
+            cmd (synapse.replication.tcp.commands.Command): received command
+
+        Returns:
+            Deferred
+        """
+        handler = getattr(self, "on_%s" % (cmd.NAME,))
+        return handler(cmd)
 
     def close(self):
         logger.warn("[%s] Closing connection", self.id())
@@ -268,7 +279,17 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         if "\n" in string:
             raise Exception("Unexpected newline in command: %r", string)
 
-        self.sendLine(string.encode("utf-8"))
+        encoded_string = string.encode("utf-8")
+
+        if len(encoded_string) > self.MAX_LENGTH:
+            raise Exception(
+                "Failed to send command %s as too long (%d > %d)" % (
+                    cmd.NAME,
+                    len(encoded_string), self.MAX_LENGTH,
+                )
+            )
+
+        self.sendLine(encoded_string)
 
         self.last_sent_command = self.clock.time_msec()
 
@@ -354,24 +375,31 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             self.transport.unregisterProducer()
 
     def __str__(self):
+        addr = None
+        if self.transport:
+            addr = str(self.transport.getPeer())
         return "ReplicationConnection<name=%s,conn_id=%s,addr=%s>" % (
-            self.name, self.conn_id, self.addr,
+            self.name, self.conn_id, addr,
         )
 
     def id(self):
         return "%s-%s" % (self.name, self.conn_id)
+
+    def lineLengthExceeded(self, line):
+        """Called when we receive a line that is above the maximum line length
+        """
+        self.send_error("Line length exceeded")
 
 
 class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     VALID_INBOUND_COMMANDS = VALID_CLIENT_COMMANDS
     VALID_OUTBOUND_COMMANDS = VALID_SERVER_COMMANDS
 
-    def __init__(self, server_name, clock, streamer, addr):
+    def __init__(self, server_name, clock, streamer):
         BaseReplicationStreamProtocol.__init__(self, clock)  # Old style class
 
         self.server_name = server_name
         self.streamer = streamer
-        self.addr = addr
 
         # The streams the client has subscribed to and is up to date with
         self.replication_streams = set()
@@ -436,7 +464,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
     @defer.inlineCallbacks
     def subscribe_to_stream(self, stream_name, token):
-        """Subscribe the remote to a streams.
+        """Subscribe the remote to a stream.
 
         This invloves checking if they've missed anything and sending those
         updates down if they have. During that time new updates for the stream
@@ -463,10 +491,35 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
             # Now we can send any updates that came in while we were subscribing
             pending_rdata = self.pending_rdata.pop(stream_name, [])
+            updates = []
             for token, update in pending_rdata:
-                # Only send updates newer than the current token
-                if token > current_token:
+                # If the token is null, it is part of a batch update. Batches
+                # are multiple updates that share a single token. To denote
+                # this, the token is set to None for all tokens in the batch
+                # except for the last. If we find a None token, we keep looking
+                # through tokens until we find one that is not None and then
+                # process all previous updates in the batch as if they had the
+                # final token.
+                if token is None:
+                    # Store this update as part of a batch
+                    updates.append(update)
+                    continue
+
+                if token <= current_token:
+                    # This update or batch of updates is older than
+                    # current_token, dismiss it
+                    updates = []
+                    continue
+
+                updates.append(update)
+
+                # Send all updates that are part of this batch with the
+                # found token
+                for update in updates:
                     self.send_command(RdataCommand(stream_name, token, update))
+
+                # Clear stored updates
+                updates = []
 
             # They're now fully subscribed
             self.replication_streams.add(stream_name)
@@ -511,6 +564,11 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.server_name = server_name
         self.handler = handler
 
+        # Set of stream names that have been subscribe to, but haven't yet
+        # caught up with. This is used to track when the client has been fully
+        # connected to the remote.
+        self.streams_connecting = set()
+
         # Map of stream to batched updates. See RdataCommand for info on how
         # batching works.
         self.pending_batches = {}
@@ -533,6 +591,10 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         # We've now finished connecting to so inform the client handler
         self.handler.update_connection(self)
 
+        # This will happen if we don't actually subscribe to any streams
+        if not self.streams_connecting:
+            self.handler.finished_connecting()
+
     def on_SERVER(self, cmd):
         if cmd.data != self.server_name:
             logger.error("[%s] Connected to wrong remote: %r", self.id(), cmd.data)
@@ -543,7 +605,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         inbound_rdata_count.labels(stream_name).inc()
 
         try:
-            row = STREAMS_MAP[stream_name].ROW_TYPE(*cmd.row)
+            row = STREAMS_MAP[stream_name].parse_row(cmd.row)
         except Exception:
             logger.exception(
                 "[%s] Failed to parse RDATA: %r %r",
@@ -562,6 +624,12 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             return self.handler.on_rdata(stream_name, cmd.token, rows)
 
     def on_POSITION(self, cmd):
+        # When we get a `POSITION` command it means we've finished getting
+        # missing updates for the given stream, and are now up to date.
+        self.streams_connecting.discard(cmd.stream_name)
+        if not self.streams_connecting:
+            self.handler.finished_connecting()
+
         return self.handler.on_position(cmd.stream_name, cmd.token)
 
     def on_SYNC(self, cmd):
@@ -577,6 +645,8 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             "[%s] Subscribing to replication stream: %r from %r",
             self.id(), stream_name, token
         )
+
+        self.streams_connecting.add(stream_name)
 
         self.send_command(ReplicateCommand(stream_name, token))
 

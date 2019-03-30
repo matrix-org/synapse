@@ -35,6 +35,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
 from synapse.util import logcontext
@@ -98,6 +99,11 @@ class AuthHandler(BaseHandler):
                     if t not in login_types:
                         login_types.append(t)
         self._supported_login_types = login_types
+
+        self._account_ratelimiter = Ratelimiter()
+        self._failed_attempts_ratelimiter = Ratelimiter()
+
+        self._clock = self.hs.get_clock()
 
     @defer.inlineCallbacks
     def validate_user_via_ui_auth(self, requester, request_body, clientip):
@@ -568,7 +574,12 @@ class AuthHandler(BaseHandler):
         Returns:
             defer.Deferred: (unicode) canonical_user_id, or None if zero or
             multiple matches
+
+        Raises:
+            LimitExceededError if the ratelimiter's login requests count for this
+                user is too high too proceed.
         """
+        self.ratelimit_login_per_account(user_id)
         res = yield self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
             defer.returnValue(res[0])
@@ -634,6 +645,8 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem accessing the database
             SynapseError if there was a problem with the request
             LoginError if there was an authentication problem.
+            LimitExceededError if the ratelimiter's login requests count for this
+                user is too high too proceed.
         """
 
         if username.startswith('@'):
@@ -642,6 +655,8 @@ class AuthHandler(BaseHandler):
             qualified_user_id = UserID(
                 username, self.hs.hostname
             ).to_string()
+
+        self.ratelimit_login_per_account(qualified_user_id)
 
         login_type = login_submission.get("type")
         known_login_type = False
@@ -715,13 +730,56 @@ class AuthHandler(BaseHandler):
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
 
-        # unknown username or invalid password. We raise a 403 here, but note
-        # that if we're doing user-interactive login, it turns all LoginErrors
-        # into a 401 anyway.
+        # unknown username or invalid password.
+        self._failed_attempts_ratelimiter.ratelimit(
+            qualified_user_id.lower(), time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            update=True,
+        )
+
+        # We raise a 403 here, but note that if we're doing user-interactive
+        # login, it turns all LoginErrors into a 401 anyway.
         raise LoginError(
             403, "Invalid password",
             errcode=Codes.FORBIDDEN
         )
+
+    @defer.inlineCallbacks
+    def check_password_provider_3pid(self, medium, address, password):
+        """Check if a password provider is able to validate a thirdparty login
+
+        Args:
+            medium (str): The medium of the 3pid (ex. email).
+            address (str): The address of the 3pid (ex. jdoe@example.com).
+            password (str): The password of the user.
+
+        Returns:
+            Deferred[(str|None, func|None)]: A tuple of `(user_id,
+            callback)`. If authentication is successful, `user_id` is a `str`
+            containing the authenticated, canonical user ID. `callback` is
+            then either a function to be later run after the server has
+            completed login/registration, or `None`. If authentication was
+            unsuccessful, `user_id` and `callback` are both `None`.
+        """
+        for provider in self.password_providers:
+            if hasattr(provider, "check_3pid_auth"):
+                # This function is able to return a deferred that either
+                # resolves None, meaning authentication failure, or upon
+                # success, to a str (which is the user_id) or a tuple of
+                # (user_id, callback_func), where callback_func should be run
+                # after we've finished everything else
+                result = yield provider.check_3pid_auth(
+                    medium, address, password,
+                )
+                if result:
+                    # Check if the return value is a str or a tuple
+                    if isinstance(result, str):
+                        # If it's a str, set callback function to None
+                        result = (result, None)
+                    defer.returnValue(result)
+
+        defer.returnValue((None, None))
 
     @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
@@ -734,7 +792,12 @@ class AuthHandler(BaseHandler):
             user_id (unicode): complete @user:id
             password (unicode): the provided password
         Returns:
-            (unicode) the canonical_user_id, or None if unknown user / bad password
+            Deferred[unicode] the canonical_user_id, or Deferred[None] if
+                unknown user/bad password
+
+        Raises:
+            LimitExceededError if the ratelimiter's login requests count for this
+                user is too high too proceed.
         """
         lookupres = yield self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
@@ -763,6 +826,7 @@ class AuthHandler(BaseHandler):
             auth_api.validate_macaroon(macaroon, "login", True, user_id)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+        self.ratelimit_login_per_account(user_id)
         yield self.auth.check_auth_blocking(user_id)
         defer.returnValue(user_id)
 
@@ -933,6 +997,33 @@ class AuthHandler(BaseHandler):
             return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
+
+    def ratelimit_login_per_account(self, user_id):
+        """Checks whether the process must be stopped because of ratelimiting.
+
+        Checks against two ratelimiters: the generic one for login attempts per
+        account and the one specific to failed attempts.
+
+        Args:
+            user_id (unicode): complete @user:id
+
+        Raises:
+            LimitExceededError if one of the ratelimiters' login requests count
+                for this user is too high too proceed.
+        """
+        self._failed_attempts_ratelimiter.ratelimit(
+            user_id.lower(), time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            update=False,
+        )
+
+        self._account_ratelimiter.ratelimit(
+            user_id.lower(), time_now_s=self._clock.time(),
+            rate_hz=self.hs.config.rc_login_account.per_second,
+            burst_count=self.hs.config.rc_login_account.burst_count,
+            update=True,
+        )
 
 
 @attr.s

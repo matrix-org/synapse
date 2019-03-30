@@ -15,6 +15,7 @@
 
 from mock import Mock
 
+from twisted.internet import defer
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.test.proto_helpers import StringTransport
@@ -26,22 +27,93 @@ from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
 )
+from synapse.util.logcontext import LoggingContext
 
 from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
 
 
+def check_logcontext(context):
+    current = LoggingContext.current_context()
+    if current is not context:
+        raise AssertionError(
+            "Expected logcontext %s but was %s" % (context, current),
+        )
+
+
 class FederationClientTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-
         hs = self.setup_test_homeserver(reactor=reactor, clock=clock)
-        hs.tls_client_options_factory = None
         return hs
 
     def prepare(self, reactor, clock, homeserver):
-
-        self.cl = MatrixFederationHttpClient(self.hs)
+        self.cl = MatrixFederationHttpClient(self.hs, None)
         self.reactor.lookups["testserv"] = "1.2.3.4"
+
+    def test_client_get(self):
+        """
+        happy-path test of a GET request
+        """
+        @defer.inlineCallbacks
+        def do_request():
+            with LoggingContext("one") as context:
+                fetch_d = self.cl.get_json("testserv:8008", "foo/bar")
+
+                # Nothing happened yet
+                self.assertNoResult(fetch_d)
+
+                # should have reset logcontext to the sentinel
+                check_logcontext(LoggingContext.sentinel)
+
+                try:
+                    fetch_res = yield fetch_d
+                    defer.returnValue(fetch_res)
+                finally:
+                    check_logcontext(context)
+
+        test_d = do_request()
+
+        self.pump()
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 8008)
+
+        # complete the connection and wire it up to a fake transport
+        protocol = factory.buildProtocol(None)
+        transport = StringTransport()
+        protocol.makeConnection(transport)
+
+        # that should have made it send the request to the transport
+        self.assertRegex(transport.value(), b"^GET /foo/bar")
+        self.assertRegex(transport.value(), b"Host: testserv:8008")
+
+        # Deferred is still without a result
+        self.assertNoResult(test_d)
+
+        # Send it the HTTP response
+        res_json = '{ "a": 1 }'.encode('ascii')
+        protocol.dataReceived(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Server: Fake\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: %i\r\n"
+            b"\r\n"
+            b"%s" % (len(res_json), res_json)
+        )
+
+        self.pump()
+
+        res = self.successResultOf(test_d)
+
+        # check the response is as expected
+        self.assertEqual(res, {"a": 1})
 
     def test_dns_error(self):
         """
@@ -53,6 +125,28 @@ class FederationClientTests(HomeserverTestCase):
         f = self.failureResultOf(d)
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, DNSLookupError)
+
+    def test_client_connection_refused(self):
+        d = self.cl.get_json("testserv:8008", "foo/bar", timeout=10000)
+
+        self.pump()
+
+        # Nothing happened yet
+        self.assertNoResult(d)
+
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '1.2.3.4')
+        self.assertEqual(port, 8008)
+        e = Exception("go away")
+        factory.clientConnectionFailed(None, e)
+        self.pump(0.5)
+
+        f = self.failureResultOf(d)
+
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIs(f.value.inner_exception, e)
 
     def test_client_never_connect(self):
         """
@@ -173,6 +267,105 @@ class FederationClientTests(HomeserverTestCase):
         f = self.failureResultOf(d)
 
         self.assertIsInstance(f.value, TimeoutError)
+
+    def test_client_requires_trailing_slashes(self):
+        """
+        If a connection is made to a client but the client rejects it due to
+        requiring a trailing slash. We need to retry the request with a
+        trailing slash. Workaround for Synapse <= v0.99.3, explained in #3622.
+        """
+        d = self.cl.get_json(
+            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
+        )
+
+        # Send the request
+        self.pump()
+
+        # there should have been a call to connectTCP
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (_host, _port, factory, _timeout, _bindAddress) = clients[0]
+
+        # complete the connection and wire it up to a fake transport
+        client = factory.buildProtocol(None)
+        conn = StringTransport()
+        client.makeConnection(conn)
+
+        # that should have made it send the request to the connection
+        self.assertRegex(conn.value(), b"^GET /foo/bar")
+
+        # Clear the original request data before sending a response
+        conn.clear()
+
+        # Send the HTTP response
+        client.dataReceived(
+            b"HTTP/1.1 400 Bad Request\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 59\r\n"
+            b"\r\n"
+            b'{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}'
+        )
+
+        # We should get another request with a trailing slash
+        self.assertRegex(conn.value(), b"^GET /foo/bar/")
+
+        # Send a happy response this time
+        client.dataReceived(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 2\r\n"
+            b"\r\n"
+            b'{}'
+        )
+
+        # We should get a successful response
+        r = self.successResultOf(d)
+        self.assertEqual(r, {})
+
+    def test_client_does_not_retry_on_400_plus(self):
+        """
+        Another test for trailing slashes but now test that we don't retry on
+        trailing slashes on a non-400/M_UNRECOGNIZED response.
+
+        See test_client_requires_trailing_slashes() for context.
+        """
+        d = self.cl.get_json(
+            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
+        )
+
+        # Send the request
+        self.pump()
+
+        # there should have been a call to connectTCP
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (_host, _port, factory, _timeout, _bindAddress) = clients[0]
+
+        # complete the connection and wire it up to a fake transport
+        client = factory.buildProtocol(None)
+        conn = StringTransport()
+        client.makeConnection(conn)
+
+        # that should have made it send the request to the connection
+        self.assertRegex(conn.value(), b"^GET /foo/bar")
+
+        # Clear the original request data before sending a response
+        conn.clear()
+
+        # Send the HTTP response
+        client.dataReceived(
+            b"HTTP/1.1 404 Not Found\r\n"
+            b"Content-Type: application/json\r\n"
+            b"Content-Length: 2\r\n"
+            b"\r\n"
+            b"{}"
+        )
+
+        # We should not get another request
+        self.assertEqual(conn.value(), b"")
+
+        # We should get a 404 failure response
+        self.failureResultOf(d)
 
     def test_client_sends_body(self):
         self.cl.post_json(

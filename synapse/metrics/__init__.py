@@ -274,8 +274,6 @@ pending_calls_metric = Histogram(
 # Federation Metrics
 #
 
-sent_edus_counter = Counter("synapse_federation_client_sent_edus", "")
-
 sent_transactions_counter = Counter("synapse_federation_client_sent_transactions", "")
 
 events_processed_counter = Counter("synapse_federation_client_events_processed", "")

@@ -27,8 +27,8 @@ Depends:
  adduser,
  debconf,
  python3-distutils|libpython3-stdlib (<< 3.6),
- python3,
  ${misc:Depends},
+ ${synapse:pydepends},
 # some of our scripts use perl, but none of them are important,
 # so we put perl:Depends in Suggests rather than Depends.
 Suggests:

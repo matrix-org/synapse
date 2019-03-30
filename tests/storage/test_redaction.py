@@ -18,7 +18,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomVersions
 from synapse.types import RoomID, UserID
 
 from tests import unittest
@@ -52,6 +52,7 @@ class RedactionTestCase(unittest.TestCase):
         content = {"membership": membership}
         content.update(extra_content)
         builder = self.event_builder_factory.new(
+            RoomVersions.V1,
             {
                 "type": EventTypes.Member,
                 "sender": user.to_string(),
@@ -74,6 +75,7 @@ class RedactionTestCase(unittest.TestCase):
         self.depth += 1
 
         builder = self.event_builder_factory.new(
+            RoomVersions.V1,
             {
                 "type": EventTypes.Message,
                 "sender": user.to_string(),
@@ -94,6 +96,7 @@ class RedactionTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def inject_redaction(self, room, event_id, user, reason):
         builder = self.event_builder_factory.new(
+            RoomVersions.V1,
             {
                 "type": EventTypes.Redaction,
                 "sender": user.to_string(),

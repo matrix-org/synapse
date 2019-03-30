@@ -1,0 +1,1 @@
+Fix bug where blocked world-readable rooms were still peekable.

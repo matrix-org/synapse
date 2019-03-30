@@ -18,7 +18,7 @@ import nacl.signing
 from unpaddedbase64 import decode_base64
 
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.events.builder import EventBuilder
+from synapse.events import FrozenEvent
 
 from tests import unittest
 
@@ -40,20 +40,18 @@ class EventSigningTestCase(unittest.TestCase):
         self.signing_key.version = KEY_VER
 
     def test_sign_minimal(self):
-        builder = EventBuilder(
-            {
-                'event_id': "$0:domain",
-                'origin': "domain",
-                'origin_server_ts': 1000000,
-                'signatures': {},
-                'type': "X",
-                'unsigned': {'age_ts': 1000000},
-            }
-        )
+        event_dict = {
+            'event_id': "$0:domain",
+            'origin': "domain",
+            'origin_server_ts': 1000000,
+            'signatures': {},
+            'type': "X",
+            'unsigned': {'age_ts': 1000000},
+        }
 
-        add_hashes_and_signatures(builder, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
 
-        event = builder.build()
+        event = FrozenEvent(event_dict)
 
         self.assertTrue(hasattr(event, 'hashes'))
         self.assertIn('sha256', event.hashes)
@@ -71,23 +69,21 @@ class EventSigningTestCase(unittest.TestCase):
         )
 
     def test_sign_message(self):
-        builder = EventBuilder(
-            {
-                'content': {'body': "Here is the message content"},
-                'event_id': "$0:domain",
-                'origin': "domain",
-                'origin_server_ts': 1000000,
-                'type': "m.room.message",
-                'room_id': "!r:domain",
-                'sender': "@u:domain",
-                'signatures': {},
-                'unsigned': {'age_ts': 1000000},
-            }
-        )
+        event_dict = {
+            'content': {'body': "Here is the message content"},
+            'event_id': "$0:domain",
+            'origin': "domain",
+            'origin_server_ts': 1000000,
+            'type': "m.room.message",
+            'room_id': "!r:domain",
+            'sender': "@u:domain",
+            'signatures': {},
+            'unsigned': {'age_ts': 1000000},
+        }
 
-        add_hashes_and_signatures(builder, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
 
-        event = builder.build()
+        event = FrozenEvent(event_dict)
 
         self.assertTrue(hasattr(event, 'hashes'))
         self.assertIn('sha256', event.hashes)

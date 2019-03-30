@@ -38,8 +38,31 @@ def prune_event(event):
     This is used when we "redact" an event. We want to remove all fields that
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
+
+    Args:
+        event (FrozenEvent)
+
+    Returns:
+        FrozenEvent
     """
-    event_type = event.type
+    pruned_event_dict = prune_event_dict(event.get_dict())
+
+    from . import event_type_from_format_version
+    return event_type_from_format_version(event.format_version)(
+        pruned_event_dict, event.internal_metadata.get_dict()
+    )
+
+
+def prune_event_dict(event_dict):
+    """Redacts the event_dict in the same way as `prune_event`, except it
+    operates on dicts rather than event objects
+
+    Args:
+        event_dict (dict)
+
+    Returns:
+        dict: A copy of the pruned event dict
+    """
 
     allowed_keys = [
         "event_id",
@@ -59,13 +82,13 @@ def prune_event(event):
         "membership",
     ]
 
-    event_dict = event.get_dict()
+    event_type = event_dict["type"]
 
     new_content = {}
 
     def add_fields(*fields):
         for field in fields:
-            if field in event.content:
+            if field in event_dict["content"]:
                 new_content[field] = event_dict["content"][field]
 
     if event_type == EventTypes.Member:
@@ -98,17 +121,17 @@ def prune_event(event):
 
     allowed_fields["content"] = new_content
 
-    allowed_fields["unsigned"] = {}
+    unsigned = {}
+    allowed_fields["unsigned"] = unsigned
 
-    if "age_ts" in event.unsigned:
-        allowed_fields["unsigned"]["age_ts"] = event.unsigned["age_ts"]
-    if "replaces_state" in event.unsigned:
-        allowed_fields["unsigned"]["replaces_state"] = event.unsigned["replaces_state"]
+    event_unsigned = event_dict.get("unsigned", {})
 
-    return type(event)(
-        allowed_fields,
-        internal_metadata_dict=event.internal_metadata.get_dict()
-    )
+    if "age_ts" in event_unsigned:
+        unsigned["age_ts"] = event_unsigned["age_ts"]
+    if "replaces_state" in event_unsigned:
+        unsigned["replaces_state"] = event_unsigned["replaces_state"]
+
+    return allowed_fields
 
 
 def _copy_field(src, dst, field):
@@ -244,6 +267,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
     Returns:
         dict
     """
+
     # FIXME(erikj): To handle the case of presence events and the like
     if not isinstance(e, EventBase):
         return e
@@ -252,6 +276,8 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     # Should this strip out None's?
     d = {k: v for k, v in e.get_dict().items()}
+
+    d["event_id"] = e.event_id
 
     if "age_ts" in d["unsigned"]:
         d["unsigned"]["age"] = time_now_ms - d["unsigned"]["age_ts"]

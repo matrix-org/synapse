@@ -1,3 +1,16 @@
+# Dockerfile to build the matrixdotorg/synapse docker images.
+#
+# To build the image, run `docker build` command from the root of the
+# synapse repository:
+#
+#    docker build -f docker/Dockerfile .
+#
+# There is an optional PYTHON_VERSION build argument which sets the
+# version of python to build against: for example:
+#
+#    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
+#
+
 ARG PYTHON_VERSION=2
 
 ###
@@ -31,7 +44,10 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 
 # now install synapse and all of the python deps to /install.
 
-COPY . /synapse
+COPY synapse /synapse/synapse/
+COPY scripts /synapse/scripts/
+COPY MANIFEST.in README.rst setup.py synctl /synapse/
+
 RUN pip install --prefix="/install" --no-warn-script-location \
         /synapse[all]
 
@@ -56,6 +72,6 @@ COPY ./docker/conf /conf
 
 VOLUME ["/data"]
 
-EXPOSE 8008/tcp 8448/tcp
+EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]

@@ -31,10 +31,10 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(
             "blue",
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["send_message"]),
+            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
-        hs.get_ratelimiter().send_message.return_value = (True, 0)
+        hs.get_ratelimiter().can_do_action.return_value = (True, 0)
 
         return hs
 

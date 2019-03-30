@@ -79,9 +79,14 @@ CONDITIONAL_REQUIREMENTS = {
     # ConsentResource uses select_autoescape, which arrived in jinja 2.9
     "resources.consent": ["Jinja2>=2.9"],
 
+    # ACME support is required to provision TLS certificates from authorities
+    # that use the protocol, such as Let's Encrypt.
+    "acme": ["txacme>=0.9.2"],
+
     "saml2": ["pysaml2>=4.5.0"],
     "url_preview": ["lxml>=3.5.0"],
-    "test": ["mock>=2.0"],
+    "test": ["mock>=2.0", "parameterized"],
+    "sentry": ["sentry-sdk>=0.7.2"],
 }
 
 
@@ -139,9 +144,12 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
         for dependency in OPTS:
             try:
                 _get_distribution(dependency)
-            except VersionConflict:
+            except VersionConflict as e:
                 deps_needed.append(dependency)
-                errors.append("Needed %s but it was not installed" % (dependency,))
+                errors.append(
+                    "Needed optional %s, got %s==%s"
+                    % (dependency, e.dist.project_name, e.dist.version)
+                )
             except DistributionNotFound:
                 # If it's not found, we don't care
                 pass

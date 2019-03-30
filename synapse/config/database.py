@@ -49,7 +49,8 @@ class DatabaseConfig(Config):
     def default_config(self, data_dir_path, **kwargs):
         database_path = os.path.join(data_dir_path, "homeserver.db")
         return """\
-        # Database configuration
+        ## Database ##
+
         database:
           # The database engine name
           name: "sqlite3"
@@ -59,7 +60,8 @@ class DatabaseConfig(Config):
             database: "%(database_path)s"
 
         # Number of events to cache in memory.
-        event_cache_size: "10K"
+        #
+        #event_cache_size: 10K
         """ % locals()
 
     def read_arguments(self, args):

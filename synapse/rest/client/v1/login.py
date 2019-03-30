@@ -22,6 +22,7 @@ from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -94,9 +95,10 @@ class LoginRestServlet(ClientV1RestServlet):
         self.jwt_algorithm = hs.config.jwt_algorithm
         self.cas_enabled = hs.config.cas_enabled
         self.auth_handler = self.hs.get_auth_handler()
-        self.device_handler = self.hs.get_device_handler()
+        self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
+        self._address_ratelimiter = Ratelimiter()
 
     def on_GET(self, request):
         flows = []
@@ -129,6 +131,13 @@ class LoginRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        self._address_ratelimiter.ratelimit(
+            request.getClientIP(), time_now_s=self.hs.clock.time(),
+            rate_hz=self.hs.config.rc_login_address.per_second,
+            burst_count=self.hs.config.rc_login_address.burst_count,
+            update=True,
+        )
+
         login_submission = parse_json_object_from_request(request)
         try:
             if self.jwt_enabled and (login_submission["type"] ==
@@ -192,6 +201,24 @@ class LoginRestServlet(ClientV1RestServlet):
                 # We store all email addreses as lowercase in the DB.
                 # (See add_threepid in synapse/handlers/auth.py)
                 address = address.lower()
+
+            # Check for login providers that support 3pid login types
+            canonical_user_id, callback_3pid = (
+                yield self.auth_handler.check_password_provider_3pid(
+                    medium,
+                    address,
+                    login_submission["password"],
+                )
+            )
+            if canonical_user_id:
+                # Authentication through password provider and 3pid succeeded
+                result = yield self._register_device_with_callback(
+                    canonical_user_id, login_submission, callback_3pid,
+                )
+                defer.returnValue(result)
+
+            # No password providers were able to handle this 3pid
+            # Check local store
             user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
                 medium, address,
             )
@@ -214,21 +241,43 @@ class LoginRestServlet(ClientV1RestServlet):
         if "user" not in identifier:
             raise SynapseError(400, "User identifier is missing 'user' key")
 
-        auth_handler = self.auth_handler
-        canonical_user_id, callback = yield auth_handler.validate_login(
+        canonical_user_id, callback = yield self.auth_handler.validate_login(
             identifier["user"],
             login_submission,
         )
 
-        device_id = yield self._register_device(
-            canonical_user_id, login_submission,
+        result = yield self._register_device_with_callback(
+            canonical_user_id, login_submission, callback,
         )
-        access_token = yield auth_handler.get_access_token_for_user_id(
-            canonical_user_id, device_id,
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _register_device_with_callback(
+        self,
+        user_id,
+        login_submission,
+        callback=None,
+    ):
+        """ Registers a device with a given user_id. Optionally run a callback
+        function after registration has completed.
+
+        Args:
+            user_id (str): ID of the user to register.
+            login_submission (dict): Dictionary of login information.
+            callback (func|None): Callback function to run after registration.
+
+        Returns:
+            result (Dict[str,str]): Dictionary of account information after
+                successful registration.
+        """
+        device_id = login_submission.get("device_id")
+        initial_display_name = login_submission.get("initial_device_display_name")
+        device_id, access_token = yield self.registration_handler.register_device(
+            user_id, device_id, initial_display_name,
         )
 
         result = {
-            "user_id": canonical_user_id,
+            "user_id": user_id,
             "access_token": access_token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
@@ -246,10 +295,13 @@ class LoginRestServlet(ClientV1RestServlet):
         user_id = (
             yield auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
-        device_id = yield self._register_device(user_id, login_submission)
-        access_token = yield auth_handler.get_access_token_for_user_id(
-            user_id, device_id,
+
+        device_id = login_submission.get("device_id")
+        initial_display_name = login_submission.get("initial_device_display_name")
+        device_id, access_token = yield self.registration_handler.register_device(
+            user_id, device_id, initial_display_name,
         )
+
         result = {
             "user_id": user_id,  # may have changed
             "access_token": access_token,
@@ -283,14 +335,14 @@ class LoginRestServlet(ClientV1RestServlet):
             raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
 
         user_id = UserID(user, self.hs.hostname).to_string()
+
         auth_handler = self.auth_handler
         registered_user_id = yield auth_handler.check_user_exists(user_id)
         if registered_user_id:
-            device_id = yield self._register_device(
-                registered_user_id, login_submission
-            )
-            access_token = yield auth_handler.get_access_token_for_user_id(
-                registered_user_id, device_id,
+            device_id = login_submission.get("device_id")
+            initial_display_name = login_submission.get("initial_device_display_name")
+            device_id, access_token = yield self.registration_handler.register_device(
+                registered_user_id, device_id, initial_display_name,
             )
 
             result = {
@@ -299,12 +351,16 @@ class LoginRestServlet(ClientV1RestServlet):
                 "home_server": self.hs.hostname,
             }
         else:
-            # TODO: we should probably check that the register isn't going
-            # to fonx/change our user_id before registering the device
-            device_id = yield self._register_device(user_id, login_submission)
             user_id, access_token = (
                 yield self.handlers.registration_handler.register(localpart=user)
             )
+
+            device_id = login_submission.get("device_id")
+            initial_display_name = login_submission.get("initial_device_display_name")
+            device_id, access_token = yield self.registration_handler.register_device(
+                registered_user_id, device_id, initial_display_name,
+            )
+
             result = {
                 "user_id": user_id,  # may have changed
                 "access_token": access_token,
@@ -312,26 +368,6 @@ class LoginRestServlet(ClientV1RestServlet):
             }
 
         defer.returnValue(result)
-
-    def _register_device(self, user_id, login_submission):
-        """Register a device for a user.
-
-        This is called after the user's credentials have been validated, but
-        before the access token has been issued.
-
-        Args:
-            (str) user_id: full canonical @user:id
-            (object) login_submission: dictionary supplied to /login call, from
-               which we pull device_id and initial_device_name
-        Returns:
-            defer.Deferred: (str) device_id
-        """
-        device_id = login_submission.get("device_id")
-        initial_display_name = login_submission.get(
-            "initial_device_display_name")
-        return self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
-        )
 
 
 class CasRedirectServlet(RestServlet):
@@ -449,7 +485,7 @@ class SSOAuthHandler(object):
     def __init__(self, hs):
         self._hostname = hs.hostname
         self._auth_handler = hs.get_auth_handler()
-        self._registration_handler = hs.get_handlers().registration_handler
+        self._registration_handler = hs.get_registration_handler()
         self._macaroon_gen = hs.get_macaroon_generator()
 
     @defer.inlineCallbacks
