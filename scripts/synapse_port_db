@@ -811,7 +811,7 @@ class CursesProgress(Progress):
         middle_space = 1
 
         items = self.tables.items()
-        items.sort(key=lambda i: (i[1]["perc"], i[0]))
+        items = sorted(items, key = lambda i: (i[1]["perc"], i[0]))
 
         for i, (table, data) in enumerate(items):
             if i + 2 >= rows:
