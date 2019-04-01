@@ -1,1 +1,0 @@
-Fix `ClientReplicationStreamProtocol.__str__()`.
