@@ -203,7 +203,7 @@ tls.federation_certificate_verification_whitelist:
 
 If you would like to specify your own list of trusted Certificate
 Authorities, you can do so with the following option. **Note that this list
-will replace any certificates provided by your operating environment:**
+will replace any certificates provided by your operating environment.**
 
 ```
 tls.federation_custom_ca_list:
