@@ -159,11 +159,14 @@ class IdentityHandler(BaseHandler):
             Deferred[bool]: True on success, otherwise False if the identity
             server doesn't support unbinding
         """
-        id_servers = yield self.store.get_id_servers_user_bound(
-            user_id=mxid,
-            medium=threepid["medium"],
-            address=threepid["address"],
-        )
+        if threepid.get("id_server"):
+            id_servers = [threepid["id_server"]]
+        else:
+            id_servers = yield self.store.get_id_servers_user_bound(
+                user_id=mxid,
+                medium=threepid["medium"],
+                address=threepid["address"],
+            )
 
         # We don't know where to unbind, so we don't have a choice but to return
         if not id_servers:

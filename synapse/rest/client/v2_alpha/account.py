@@ -215,6 +215,7 @@ class DeactivateAccountRestServlet(RestServlet):
         )
         result = yield self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase,
+            id_server=body.get("id_server"),
         )
         if result:
             id_server_unbind_result = "success"
@@ -380,7 +381,7 @@ class ThreepidDeleteRestServlet(RestServlet):
 
         try:
             ret = yield self.auth_handler.delete_threepid(
-                user_id, body['medium'], body['address']
+                user_id, body['medium'], body['address'], body.get("id_server"),
             )
         except Exception:
             # NB. This endpoint should succeed if there is nothing to
