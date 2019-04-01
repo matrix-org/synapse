@@ -1,1 +1,0 @@
-Synapse is now permissive about trailing slashes on some of its federation endpoints, allowing zero or more to be present.

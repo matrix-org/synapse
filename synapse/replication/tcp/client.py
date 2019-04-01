@@ -105,13 +105,14 @@ class ReplicationClientHandler(object):
     def on_rdata(self, stream_name, token, rows):
         """Called to handle a batch of replication data with a given stream token.
 
-        By default this just pokes the slave store. Can be overriden in subclasses to
+        By default this just pokes the slave store. Can be overridden in subclasses to
         handle more.
 
         Args:
             stream_name (str): name of the replication stream for this batch of rows
             token (int): stream token for this batch of rows
-            rows (list): a list of Stream.ROW_TYPE objects.
+            rows (list): a list of Stream.ROW_TYPE objects as returned by
+                Stream.parse_row.
 
         Returns:
             Deferred|None

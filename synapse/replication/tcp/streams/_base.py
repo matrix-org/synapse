@@ -91,12 +91,6 @@ AccountDataStreamRow = namedtuple("AccountDataStream", (
     "data_type",  # str
     "data",  # dict
 ))
-CurrentStateDeltaStreamRow = namedtuple("CurrentStateDeltaStream", (
-    "room_id",  # str
-    "type",  # str
-    "state_key",  # str
-    "event_id",  # str, optional
-))
 GroupsStreamRow = namedtuple("GroupsStreamRow", (
     "group_id",  # str
     "user_id",  # str
@@ -112,8 +106,23 @@ class Stream(object):
     time it was called up until the point `advance_current_token` was called.
     """
     NAME = None  # The name of the stream
-    ROW_TYPE = None  # The type of the row
+    ROW_TYPE = None  # The type of the row. Used by the default impl of parse_row.
     _LIMITED = True  # Whether the update function takes a limit
+
+    @classmethod
+    def parse_row(cls, row):
+        """Parse a row received over replication
+
+        By default, assumes that the row data is an array object and passes its contents
+        to the constructor of the ROW_TYPE for this stream.
+
+        Args:
+            row: row data from the incoming RDATA command, after json decoding
+
+        Returns:
+            ROW_TYPE object for this stream
+        """
+        return cls.ROW_TYPE(*row)
 
     def __init__(self, hs):
         # The token from which we last asked for updates
@@ -186,7 +195,7 @@ class Stream(object):
                 from_token, current_token,
             )
 
-        updates = [(row[0], self.ROW_TYPE(*row[1:])) for row in rows]
+        updates = [(row[0], row[1:]) for row in rows]
 
         # check we didn't get more rows than the limit.
         # doing it like this allows the update_function to be a generator.
@@ -411,21 +420,6 @@ class AccountDataStream(Stream):
         )
 
         defer.returnValue(results)
-
-
-class CurrentStateDeltaStream(Stream):
-    """Current state for a room was changed
-    """
-    NAME = "current_state_deltas"
-    ROW_TYPE = CurrentStateDeltaStreamRow
-
-    def __init__(self, hs):
-        store = hs.get_datastore()
-
-        self.current_token = store.get_max_current_state_delta_stream_id
-        self.update_function = store.get_all_updated_current_state_deltas
-
-        super(CurrentStateDeltaStream, self).__init__(hs)
 
 
 class GroupServerStream(Stream):

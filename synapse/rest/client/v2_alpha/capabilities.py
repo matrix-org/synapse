@@ -16,7 +16,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import DEFAULT_ROOM_VERSION, RoomDisposition, RoomVersions
+from synapse.api.room_versions import DEFAULT_ROOM_VERSION, KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
@@ -48,12 +48,10 @@ class CapabilitiesRestServlet(RestServlet):
         response = {
             "capabilities": {
                 "m.room_versions": {
-                    "default": DEFAULT_ROOM_VERSION,
+                    "default": DEFAULT_ROOM_VERSION.identifier,
                     "available": {
-                        RoomVersions.V1: RoomDisposition.STABLE,
-                        RoomVersions.V2: RoomDisposition.STABLE,
-                        RoomVersions.STATE_V2_TEST: RoomDisposition.UNSTABLE,
-                        RoomVersions.V3: RoomDisposition.STABLE,
+                        v.identifier: v.disposition
+                        for v in KNOWN_ROOM_VERSIONS.values()
                     },
                 },
                 "m.change_password": {"enabled": change_password},

@@ -24,7 +24,8 @@ from frozendict import frozendict
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, RoomVersions
+from synapse.api.constants import EventTypes
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
 from synapse.events.snapshot import EventContext
 from synapse.state import v1, v2
 from synapse.util.async_helpers import Linearizer
@@ -603,21 +604,14 @@ def resolve_events_with_store(room_version, state_sets, event_map, state_res_sto
         Deferred[dict[(str, str), str]]:
             a map from (type, state_key) to event_id.
     """
-    if room_version == RoomVersions.V1:
+    v = KNOWN_ROOM_VERSIONS[room_version]
+    if v.state_res == StateResolutionVersions.V1:
         return v1.resolve_events_with_store(
             state_sets, event_map, state_res_store.get_events,
         )
-    elif room_version in (
-        RoomVersions.STATE_V2_TEST, RoomVersions.V2, RoomVersions.V3,
-    ):
+    else:
         return v2.resolve_events_with_store(
             room_version, state_sets, event_map, state_res_store,
-        )
-    else:
-        # This should only happen if we added a version but forgot to add it to
-        # the list above.
-        raise Exception(
-            "No state resolution algorithm defined for version %r" % (room_version,)
         )
 
 
