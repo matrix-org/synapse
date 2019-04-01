@@ -186,14 +186,14 @@ federation endpoints; other requests made to recaptcha, identity services
 etc. will be unaffected.
 
 ```
-tls.federation_verify_certificates = false
+federation_verify_certificates = false
 ```
 
 You can also only disable certificate validation for a specific set of
 homeservers:
 
 ```
-tls.federation_certificate_verification_whitelist:
+federation_certificate_verification_whitelist:
   - subdomain.my-server.org
   - example.org
   - 1.2.3.4
@@ -206,7 +206,7 @@ Authorities, you can do so with the following option. **Note that this list
 will replace any certificates provided by your operating environment.**
 
 ```
-tls.federation_custom_ca_list:
+federation_custom_ca_list:
   - myCA1.pem
   - myCA2.pem
 ```
