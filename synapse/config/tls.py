@@ -19,13 +19,12 @@ import warnings
 from datetime import datetime
 from hashlib import sha256
 
-from twisted.internet._sslverify import trustRootFromCertificates, Certificate
-
 import six
 
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
+from twisted.internet._sslverify import trustRootFromCertificates, Certificate
 
 from synapse.config._base import Config, ConfigError
 
@@ -100,21 +99,21 @@ class TlsConfig(Config):
             for ca_file in self.federation_custom_ca_list:
                 logger.debug("Reading custom CA certificate file: %s", ca_file)
                 with open(ca_file, 'rb') as f:
-                    cert_contents.append(ca_file.read())
-        except:
+                    cert_contents.append(f.read())
+        except Exception:
             logger.exception("Failed to read custom CA certificate off disk!")
             raise
 
         # Parse the CA certificates
         certs = []
         try:
-            for cert in certs:
+            for content in cert_contents:
                 logger.debug("Parsing custom CA certificate file: %s", ca_file)
-                cert_base = Certificate.loadPEM(content)
+                cert_base = Certificate.loadPEM(cert_contents)
                 certs.append(cert_base)
 
             trust_root = trustRootFromCertificates(certs)
-        except:
+        except Exception:
             logger.exception("Failed to parse custom CA certificate off disk!")
             raise
 
