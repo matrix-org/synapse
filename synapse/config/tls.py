@@ -19,6 +19,8 @@ import warnings
 from datetime import datetime
 from hashlib import sha256
 
+from twisted.internet._sslverify import trustRootFromCertificates, Certificate
+
 import six
 
 from unpaddedbase64 import encode_base64
@@ -69,6 +71,37 @@ class TlsConfig(Config):
             self._original_tls_fingerprints = []
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
+
+        # List of custom certificate authorities for TLS verification
+        self.federation_custom_ca_list = config.get(
+            "federation_custom_ca_list", [],
+        )
+
+        # Read in the CA certificates
+        cert_contents = []
+        try:
+            for ca_file in self.federation_custom_ca_list:
+                logger.debug("Reading custom CA certificate file: %s", ca_file)
+                with open(ca_file, 'rb') as f:
+                    cert_contents.append(ca_file.read())
+        except:
+            logger.exception("Failed to read custom CA certificate off disk!")
+            raise
+
+        # Parse the CA certificates
+        certs = []
+        try:
+            for cert in certs:
+                logger.debug("Parsing custom CA certificate file: %s", ca_file)
+                cert_base = Certificate.loadPEM(content)
+                certs.append(cert_base)
+
+            trust_root = trustRootFromCertificates(certs)
+        except:
+            logger.exception("Failed to parse custom CA certificate off disk!")
+            raise
+
+        self.federation_custom_ca_list = trust_root
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -191,6 +224,16 @@ class TlsConfig(Config):
         # PEM-encoded private key for TLS
         #
         #tls_private_key_path: "%(tls_private_key_path)s"
+
+        # List of custom certificate authorities for federation traffic.
+        #
+        # Note that this list will replace those that are provided by your
+        # operating environment. Certificates must be in PEM format.
+        #
+        #federation_custom_ca_list:
+        #  - myca1.pem
+        #  - myca2.pem
+        #  - myca3.pem
 
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.
