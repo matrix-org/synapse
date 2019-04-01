@@ -111,7 +111,7 @@ class TlsConfig(Config):
             except Exception:
                 logger.exception("Failed to parse custom CA certificate off disk!")
                 raise
-                
+
         self.federation_custom_ca_list = trustRootFromCertificates(certs)
 
         # This config option applies to non-federation HTTP clients
