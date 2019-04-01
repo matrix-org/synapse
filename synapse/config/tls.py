@@ -88,36 +88,31 @@ class TlsConfig(Config):
             for domain in federation_certificate_verification_whitelist:
                 self.federation_certificate_verification_whitelist[domain] = True
 
-        # List of custom certificate authorities for TLS verification
+        # List of custom certificate authorities for federation traffic validation
         self.federation_custom_ca_list = config.get(
             "federation_custom_ca_list", [],
         )
 
-        # Read in the CA certificates
-        cert_contents = []
-        try:
-            for ca_file in self.federation_custom_ca_list:
-                logger.debug("Reading custom CA certificate file: %s", ca_file)
-                with open(ca_file, 'rb') as f:
-                    cert_contents.append(f.read())
-        except Exception:
-            logger.exception("Failed to read custom CA certificate off disk!")
-            raise
-
-        # Parse the CA certificates
+        # Read in and parse custom CA certificates
         certs = []
-        try:
-            for content in cert_contents:
-                logger.debug("Parsing custom CA certificate file: %s", ca_file)
-                cert_base = Certificate.loadPEM(cert_contents)
+        for ca_file in self.federation_custom_ca_list:
+            logger.debug("Reading custom CA certificate file: %s", ca_file)
+            try:
+                with open(ca_file, 'rb') as f:
+                    content = f.read()
+            except Exception:
+                logger.exception("Failed to read custom CA certificate off disk!")
+                raise
+
+            # Parse the CA certificates
+            try:
+                cert_base = Certificate.loadPEM(content)
                 certs.append(cert_base)
-
-            trust_root = trustRootFromCertificates(certs)
-        except Exception:
-            logger.exception("Failed to parse custom CA certificate off disk!")
-            raise
-
-        self.federation_custom_ca_list = trust_root
+            except Exception:
+                logger.exception("Failed to parse custom CA certificate off disk!")
+                raise
+                
+        self.federation_custom_ca_list = trustRootFromCertificates(certs)
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
