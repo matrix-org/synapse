@@ -130,7 +130,7 @@ class ClientTLSOptionsFactory(object):
         self._config = config
         self._options_validate = CertificateOptions(
             # This option implies verify=True
-            trustRoot=self._config.federation_custom_ca_list,
+            trustRoot=config.federation_custom_ca_list,
         )
         self._options_novalidate = CertificateOptions(verify=False)
 
