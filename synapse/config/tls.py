@@ -72,6 +72,23 @@ class TlsConfig(Config):
 
         self.tls_fingerprints = list(self._original_tls_fingerprints)
 
+        # Whether to verify certificates on outbound federation traffic
+        self.federation_verify_certificates = config.get(
+            "federation_verify_certificates", False,
+        )
+
+        # Whitelist of domains to not verify certificates for
+        self.federation_certificate_verification_whitelist = None
+        federation_certificate_verification_whitelist = config.get(
+            "federation_certificate_verification_whitelist", None
+        )
+
+        # Store whitelisted domains in a hash for fast lookup
+        if federation_certificate_verification_whitelist is not None:
+            self.federation_certificate_verification_whitelist = {}
+            for domain in federation_certificate_verification_whitelist:
+                self.federation_certificate_verification_whitelist[domain] = True
+
         # List of custom certificate authorities for TLS verification
         self.federation_custom_ca_list = config.get(
             "federation_custom_ca_list", [],
@@ -225,15 +242,28 @@ class TlsConfig(Config):
         #
         #tls_private_key_path: "%(tls_private_key_path)s"
 
+        # Whether to verify TLS certificates when sending federation traffic.
+        #
+        #federation_verify_certificates: true
+
+        # Prevent federation certificate validation on the following whitelist
+        # of domains. Only effective if federation_verify_certicates is true.
+        #
+        #federation_certificate_validation_whitelist:
+        #  - lon.example.com
+        #  - nyc.example.com
+        #  - syd.example.com
+
+
         # List of custom certificate authorities for federation traffic.
         #
         # Note that this list will replace those that are provided by your
         # operating environment. Certificates must be in PEM format.
         #
         #federation_custom_ca_list:
-        #  - myca1.pem
-        #  - myca2.pem
-        #  - myca3.pem
+        #  - myCA1.pem
+        #  - myCA2.pem
+        #  - myCA3.pem
 
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.

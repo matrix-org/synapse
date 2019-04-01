@@ -177,6 +177,41 @@ You can do this with a `.well-known` file as follows:
        on `customer.example.net:8000` it correctly handles HTTP requests with
        Host header set to `customer.example.net:8000`.
 
+## Turning off certificate validation
+
+It is possible to turn off certificate validation for remote servers, but
+note that this must be explicitly enabled and is thus only suitable for
+private federations. This will only disable TLS certificate validation on
+federation endpoints; other requests made to recaptcha, identity services
+etc. will be unaffected.
+
+```
+tls.federation_verify_certificates = false
+```
+
+You can also only disable certificate validation for a specific set of
+homeservers:
+
+```
+tls.federation_certificate_verification_whitelist:
+  - subdomain.my-server.org
+  - example.org
+  - 1.2.3.4
+```
+
+## Specifying your own Certificate Authorities
+
+If you would like to specify your own list of trusted Certificate
+Authorities, you can do so with the following option. **Note that this list
+will replace any certificates provided by your operating environment:**
+
+```
+tls.federation_custom_ca_list:
+  - myCA1.pem
+  - myCA2.pem
+```
+
+Certificate files must be provided in PEM format.
 
 ## FAQ
 
