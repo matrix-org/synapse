@@ -132,6 +132,14 @@ class IdentityHandler(BaseHandler):
                 }
             )
             logger.debug("bound threepid %r to %s", creds, mxid)
+
+            # Remember where we bound the threepid
+            yield self.store.add_user_bound_threepid(
+                user_id=mxid,
+                medium=data["medium"],
+                address=data["address"],
+                id_server=id_server,
+            )
         except CodeMessageException as e:
             data = json.loads(e.msg)  # XXX WAT?
         defer.returnValue(data)
@@ -187,6 +195,13 @@ class IdentityHandler(BaseHandler):
                 url,
                 content,
                 headers,
+            )
+
+            yield self.store.remove_user_bound_threepid(
+                user_id=mxid,
+                medium=threepid["medium"],
+                address=threepid["address"],
+                id_server=id_server,
             )
         except HttpResponseException as e:
             if e.code in (400, 404, 501,):

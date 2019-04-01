@@ -328,6 +328,83 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="user_delete_threepids",
         )
 
+    def add_user_bound_threepid(self, user_id, medium, address, id_server):
+        """The server proxied a bind request to the given identity server on
+        behalf of the given user. We need to remember this in case the user
+        asks us to unbind the threepid.
+
+        Args:
+            user_id (str)
+            medium (str)
+            address (str)
+            id_server (str)
+
+        Returns:
+            Deferred
+        """
+        # We need to use an upsert, in case they user had already bound the
+        # threepid
+        return self._simple_upsert(
+            table="user_threepid_id_server",
+            keyvalues={
+                "user_id": user_id,
+                "medium": medium,
+                "address": address,
+                "id_server": id_server,
+            },
+            values={},
+            insertion_values={},
+            desc="add_user_bound_threepid",
+        )
+
+    def remove_user_bound_threepid(self, user_id, medium, address, id_server):
+        """The server proxied a bind request to the given identity server on
+        behalf of the given user. We need to remember this in case the user
+        asks us to unbind the threepid.
+
+        Args:
+            user_id (str)
+            medium (str)
+            address (str)
+            id_server (str)
+
+        Returns:
+            Deferred
+        """
+        return self._simple_delete(
+            table="user_threepid_id_server",
+            keyvalues={
+                "user_id": user_id,
+                "medium": medium,
+                "address": address,
+                "id_server": id_server,
+            },
+            desc="remove_user_bound_threepid",
+        )
+
+    def get_id_servers_user_bound(self, user_id, medium, address):
+        """Get the list of identity servers that the server proxied bind
+        requests to for given user and threepid
+
+        Args:
+            user_id (str)
+            medium (str)
+            address (str)
+
+        Returns:
+            Deferred[list[str]]: Resolves to a list of identity servers
+        """
+        return self._simple_select_onecol(
+            table="user_threepid_id_server",
+            keyvalues={
+                "user_id": user_id,
+                "medium": medium,
+                "address": address,
+            },
+            retcol="id_server",
+            desc="get_id_servers_user_bound",
+        )
+
 
 class RegistrationStore(RegistrationWorkerStore,
                         background_updates.BackgroundUpdateStore):
