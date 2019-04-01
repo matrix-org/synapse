@@ -24,7 +24,7 @@ import six
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import crypto
-from twisted.internet._sslverify import trustRootFromCertificates, Certificate
+from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
 
