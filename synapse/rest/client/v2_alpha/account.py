@@ -364,7 +364,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidDeleteRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/delete$", releases=())
+    PATTERNS = client_v2_patterns("/account/3pid/delete$")
 
     def __init__(self, hs):
         super(ThreepidDeleteRestServlet, self).__init__()
