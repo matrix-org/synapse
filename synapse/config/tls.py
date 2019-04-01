@@ -248,7 +248,6 @@ class TlsConfig(Config):
         #  - nyc.example.com
         #  - syd.example.com
 
-
         # List of custom certificate authorities for federation traffic.
         #
         # Note that this list will replace those that are provided by your

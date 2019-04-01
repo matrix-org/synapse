@@ -257,6 +257,29 @@ listeners:
 #
 #tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
 
+# Whether to verify TLS certificates when sending federation traffic.
+#
+#federation_verify_certificates: true
+
+# Prevent federation certificate validation on the following whitelist
+# of domains. Only effective if federation_verify_certicates is true.
+#
+#federation_certificate_validation_whitelist:
+#  - lon.example.com
+#  - nyc.example.com
+#  - syd.example.com
+
+
+# List of custom certificate authorities for federation traffic.
+#
+# Note that this list will replace those that are provided by your
+# operating environment. Certificates must be in PEM format.
+#
+#federation_custom_ca_list:
+#  - myCA1.pem
+#  - myCA2.pem
+#  - myCA3.pem
+
 # ACME support: This will configure Synapse to request a valid TLS certificate
 # for your configured `server_name` via Let's Encrypt.
 #
