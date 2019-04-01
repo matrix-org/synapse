@@ -127,18 +127,19 @@ class ClientTLSOptionsFactory(object):
     to remote servers for federation."""
 
     def __init__(self, config):
+        self._config = config
         self._options_validate = CertificateOptions(
             # This option implies verify=True
             trustRoot=config.federation_custom_ca_list,
         )
         self._options_novalidate = CertificateOptions(verify=False)
 
-    def get_options(self, host, config):
+    def get_options(self, host):
         # Use _makeContext so that we get a fresh OpenSSL CTX each time.
 
         # Check if certificate verification has been enabled
         if (config.federation_verify_certificates and
-                host not in config.federation_certificate_validation_whitelist):
+                host not in self._config.federation_certificate_validation_whitelist):
             # Require verification
             return ClientTLSOptions(host, self._options_validate._makeContext())
 
