@@ -433,6 +433,10 @@ class RegistrationStore(RegistrationWorkerStore,
         # clear the background update.
         self.register_noop_background_update("refresh_tokens_device_index")
 
+        self.register_background_update_handler(
+            "user_threepids_grandfather", self._bg_user_threepids_grandfather,
+        )
+
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
         """Adds an access token for the given user.
@@ -815,3 +819,34 @@ class RegistrationStore(RegistrationWorkerStore,
             allow_none=True,
             desc="get_users_pending_deactivation",
         )
+
+    @defer.inlineCallbacks
+    def _bg_user_threepids_grandfather(self, progress, batch_size):
+        """We now track which identity servers a user binds their 3PID to, so
+        we need to handle the case of existing bindings where we didn't track
+        this.
+
+        We do this by grandfathering in existing user threepids assuming that
+        they used one of the server configured trusted identity servers.
+        """
+
+        id_servers = set(self.config.trusted_third_party_id_servers)
+
+        def _bg_user_threepids_grandfather_txn(txn):
+            sql = """
+                INSERT INTO user_threepid_id_server
+                    (user_id, medium, address, id_server)
+                SELECT user_id, medium, address, ?
+                FROM user_threepids
+            """
+
+            txn.executemany(sql, [(id_server,) for id_server in id_servers])
+
+        if id_servers:
+            yield self.runInteraction(
+                "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn,
+            )
+
+        yield self._end_background_update("user_threepids_grandfather")
+
+        defer.returnValue(1)
