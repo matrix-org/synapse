@@ -159,21 +159,47 @@ class IdentityHandler(BaseHandler):
             Deferred[bool]: True on success, otherwise False if the identity
             server doesn't support unbinding
         """
-        logger.debug("unbinding threepid %r from %s", threepid, mxid)
-        if not self.trusted_id_servers:
-            logger.warn("Can't unbind threepid: no trusted ID servers set in config")
+        id_servers = yield self.store.get_id_servers_user_bound(
+            user_id=mxid,
+            medium=threepid["medium"],
+            address=threepid["address"],
+        )
+
+        # We don't know where to unbind, so we don't have a choice but to return
+        if not id_servers:
             defer.returnValue(False)
 
-        # We don't track what ID server we added 3pids on (perhaps we ought to)
-        # but we assume that any of the servers in the trusted list are in the
-        # same ID server federation, so we can pick any one of them to send the
-        # deletion request to.
-        id_server = next(iter(self.trusted_id_servers))
+        changed = True
+        for id_server in id_servers:
+            changed &= yield self.try_unbind_threepid_with_id_server(
+                mxid, threepid, id_server,
+            )
 
+        defer.returnValue(changed)
+
+    @defer.inlineCallbacks
+    def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
+        """Removes a binding from an identity server
+
+        Args:
+            mxid (str): Matrix user ID of binding to be removed
+            threepid (dict): Dict with medium & address of binding to be removed
+            id_server (str): Identity server to unbind from
+
+        Raises:
+            SynapseError: If we failed to contact the identity server
+
+        Returns:
+            Deferred[bool]: True on success, otherwise False if the identity
+            server doesn't support unbinding
+        """
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         content = {
             "mxid": mxid,
-            "threepid": threepid,
+            "threepid": {
+                "medium": threepid["medium"],
+                "address": threepid["address"],
+            },
         }
 
         # we abuse the federation http client to sign the request, but we have to send it
