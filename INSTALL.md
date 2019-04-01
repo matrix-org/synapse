@@ -384,7 +384,7 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   `cert.pem`).
 
 For those of you upgrading your TLS certificate in readiness for Synapse 1.0,
-please take a look at `our guide <docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100>`_.
+please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-certificates-for-compatibility-with-synapse-100).
 
 ## Registering a user
 
