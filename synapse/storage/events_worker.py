@@ -21,8 +21,9 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventFormatVersions, EventTypes
+from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError
+from synapse.api.room_versions import EventFormatVersions
 from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
 # these are only included to make the type annotations work
 from synapse.events.snapshot import EventContext  # noqa: F401

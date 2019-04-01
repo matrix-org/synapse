@@ -17,21 +17,17 @@ import attr
 
 from twisted.internet import defer
 
-from synapse.api.constants import (
+from synapse.api.constants import MAX_DEPTH
+from synapse.api.room_versions import (
     KNOWN_EVENT_FORMAT_VERSIONS,
     KNOWN_ROOM_VERSIONS,
-    MAX_DEPTH,
     EventFormatVersions,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.types import EventID
 from synapse.util.stringutils import random_string
 
-from . import (
-    _EventInternalMetadata,
-    event_type_from_format_version,
-    room_version_to_event_format,
-)
+from . import _EventInternalMetadata, event_type_from_format_version
 
 
 @attr.s(slots=True, cmp=False, frozen=True)
@@ -170,21 +166,34 @@ class EventBuilderFactory(object):
     def new(self, room_version, key_values):
         """Generate an event builder appropriate for the given room version
 
+        Deprecated: use for_room_version with a RoomVersion object instead
+
         Args:
-            room_version (str): Version of the room that we're creating an
-                event builder for
+            room_version (str): Version of the room that we're creating an event builder
+                for
             key_values (dict): Fields used as the basis of the new event
 
         Returns:
             EventBuilder
         """
-
-        # There's currently only the one event version defined
-        if room_version not in KNOWN_ROOM_VERSIONS:
+        v = KNOWN_ROOM_VERSIONS.get(room_version)
+        if not v:
             raise Exception(
                 "No event format defined for version %r" % (room_version,)
             )
+        return self.for_room_version(v, key_values)
 
+    def for_room_version(self, room_version, key_values):
+        """Generate an event builder appropriate for the given room version
+
+        Args:
+            room_version (synapse.api.room_versions.RoomVersion):
+                Version of the room that we're creating an event builder for
+            key_values (dict): Fields used as the basis of the new event
+
+        Returns:
+            EventBuilder
+        """
         return EventBuilder(
             store=self.store,
             state=self.state,
@@ -192,7 +201,7 @@ class EventBuilderFactory(object):
             clock=self.clock,
             hostname=self.hostname,
             signing_key=self.signing_key,
-            format_version=room_version_to_event_format(room_version),
+            format_version=room_version.event_format,
             type=key_values["type"],
             state_key=key_values.get("state_key"),
             room_id=key_values["room_id"],
@@ -222,7 +231,6 @@ def create_local_event_from_event_dict(clock, hostname, signing_key,
         FrozenEvent
     """
 
-    # There's currently only the one event version defined
     if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
         raise Exception(
             "No event format defined for version %r" % (format_version,)
