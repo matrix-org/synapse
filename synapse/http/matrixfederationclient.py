@@ -177,6 +177,7 @@ class MatrixFederationHttpClient(object):
         self.agent = MatrixFederationAgent(
             hs.get_reactor(),
             tls_client_options_factory,
+            hs.config,
         )
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
