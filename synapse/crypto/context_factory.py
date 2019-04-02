@@ -24,8 +24,8 @@ from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.internet.ssl import (
     CertificateOptions,
     ContextFactory,
-    platformTrust,
     OpenSSLCertificateAuthorities,
+    platformTrust,
 )
 from twisted.python.failure import Failure
 
