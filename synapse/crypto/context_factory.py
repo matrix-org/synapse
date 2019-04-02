@@ -21,7 +21,12 @@ from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import _defaultCurveName
 from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
-from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust, OpenSSLCertificateAuthorities
+from twisted.internet.ssl import (
+    CertificateOptions,
+    ContextFactory,
+    platformTrust,
+    OpenSSLCertificateAuthorities,
+)
 from twisted.python.failure import Failure
 
 logger = logging.getLogger(__name__)
