@@ -1355,11 +1355,6 @@ class SQLBaseStore(object):
             members_changed (iterable[str]): The user_ids of members that have
                 changed
         """
-        for member in members_changed:
-            self._attempt_to_invalidate_cache(
-                "get_rooms_for_user_with_stream_ordering", (member,),
-            )
-
         for host in set(get_domain_from_id(u) for u in members_changed):
             self._attempt_to_invalidate_cache(
                 "is_host_joined", (room_id, host,),
