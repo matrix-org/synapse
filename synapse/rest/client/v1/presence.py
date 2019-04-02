@@ -100,60 +100,60 @@ class PresenceListRestServlet(ClientV1RestServlet):
         super(PresenceListRestServlet, self).__init__(hs)
         self.presence_handler = hs.get_presence_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
-        user = UserID.from_string(user_id)
+    # @defer.inlineCallbacks
+    # def on_GET(self, request, user_id):
+    #     requester = yield self.auth.get_user_by_req(request)
+    #     user = UserID.from_string(user_id)
 
-        if not self.hs.is_mine(user):
-            raise SynapseError(400, "User not hosted on this Home Server")
+    #     if not self.hs.is_mine(user):
+    #         raise SynapseError(400, "User not hosted on this Home Server")
 
-        if requester.user != user:
-            raise SynapseError(400, "Cannot get another user's presence list")
+    #     if requester.user != user:
+    #         raise SynapseError(400, "Cannot get another user's presence list")
 
-        presence = yield self.presence_handler.get_presence_list(
-            observer_user=user, accepted=True
-        )
+    #     presence = yield self.presence_handler.get_presence_list(
+    #         observer_user=user, accepted=True
+    #     )
 
-        defer.returnValue((200, presence))
+    #     defer.returnValue((200, presence))
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
-        user = UserID.from_string(user_id)
+    # @defer.inlineCallbacks
+    # def on_POST(self, request, user_id):
+    #     requester = yield self.auth.get_user_by_req(request)
+    #     user = UserID.from_string(user_id)
 
-        if not self.hs.is_mine(user):
-            raise SynapseError(400, "User not hosted on this Home Server")
+    #     if not self.hs.is_mine(user):
+    #         raise SynapseError(400, "User not hosted on this Home Server")
 
-        if requester.user != user:
-            raise SynapseError(
-                400, "Cannot modify another user's presence list")
+    #     if requester.user != user:
+    #         raise SynapseError(
+    #             400, "Cannot modify another user's presence list")
 
-        content = parse_json_object_from_request(request)
+    #     content = parse_json_object_from_request(request)
 
-        if "invite" in content:
-            for u in content["invite"]:
-                if not isinstance(u, string_types):
-                    raise SynapseError(400, "Bad invite value.")
-                if len(u) == 0:
-                    continue
-                invited_user = UserID.from_string(u)
-                yield self.presence_handler.send_presence_invite(
-                    observer_user=user, observed_user=invited_user
-                )
+    #     if "invite" in content:
+    #         for u in content["invite"]:
+    #             if not isinstance(u, string_types):
+    #                 raise SynapseError(400, "Bad invite value.")
+    #             if len(u) == 0:
+    #                 continue
+    #             invited_user = UserID.from_string(u)
+    #             yield self.presence_handler.send_presence_invite(
+    #                 observer_user=user, observed_user=invited_user
+    #             )
 
-        if "drop" in content:
-            for u in content["drop"]:
-                if not isinstance(u, string_types):
-                    raise SynapseError(400, "Bad drop value.")
-                if len(u) == 0:
-                    continue
-                dropped_user = UserID.from_string(u)
-                yield self.presence_handler.drop(
-                    observer_user=user, observed_user=dropped_user
-                )
+    #     # if "drop" in content:
+    #     #     for u in content["drop"]:
+    #     #         if not isinstance(u, string_types):
+    #     #             raise SynapseError(400, "Bad drop value.")
+    #     #         if len(u) == 0:
+    #     #             continue
+    #     #         dropped_user = UserID.from_string(u)
+    #     #         yield self.presence_handler.drop(
+    #     #             observer_user=user, observed_user=dropped_user
+    #     #         )
 
-        defer.returnValue((200, {}))
+    #     defer.returnValue((200, {}))
 
     def on_OPTIONS(self, request):
         return (200, {})
