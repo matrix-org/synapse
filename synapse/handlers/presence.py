@@ -113,27 +113,6 @@ class PresenceHandler(object):
         federation_registry.register_edu_handler(
             "m.presence", self.incoming_presence
         )
-        # federation_registry.register_edu_handler(
-        #     "m.presence_invite",
-        #     lambda origin, content: self.invite_presence(
-        #         observed_user=UserID.from_string(content["observed_user"]),
-        #         observer_user=UserID.from_string(content["observer_user"]),
-        #     )
-        # )
-        # federation_registry.register_edu_handler(
-        #     "m.presence_accept",
-        #     lambda origin, content: self.accept_presence(
-        #         observed_user=UserID.from_string(content["observed_user"]),
-        #         observer_user=UserID.from_string(content["observer_user"]),
-        #     )
-        # )
-        # federation_registry.register_edu_handler(
-        #     "m.presence_deny",
-        #     lambda origin, content: self.deny_presence(
-        #         observed_user=UserID.from_string(content["observed_user"]),
-        #         observer_user=UserID.from_string(content["observer_user"]),
-        #     )
-        # )
 
         active_presence = self.store.take_presence_startup_info()
 
@@ -759,137 +738,6 @@ class PresenceHandler(object):
 
         yield self._update_states([prev_state.copy_and_replace(**new_fields)])
 
-    # @defer.inlineCallbacks
-    # def get_presence_list(self, observer_user, accepted=None):
-    #     """Returns the presence for all users in their presence list.
-    #     """
-    #     if not self.is_mine(observer_user):
-    #         raise SynapseError(400, "User is not hosted on this Home Server")
-
-    #     presence_list = yield self.store.get_presence_list(
-    #         observer_user.localpart, accepted=accepted
-    #     )
-
-    #     results = yield self.get_states(
-    #         target_user_ids=[row["observed_user_id"] for row in presence_list],
-    #         as_event=False,
-    #     )
-
-    #     now = self.clock.time_msec()
-    #     results[:] = [format_user_presence_state(r, now) for r in results]
-
-    #     is_accepted = {
-    #         row["observed_user_id"]: row["accepted"] for row in presence_list
-    #     }
-
-    #     for result in results:
-    #         result.update({
-    #             "accepted": is_accepted,
-    #         })
-
-    #     defer.returnValue(results)
-
-    # @defer.inlineCallbacks
-    # def send_presence_invite(self, observer_user, observed_user):
-    #     """Sends a presence invite.
-    #     """
-    #     yield self.store.add_presence_list_pending(
-    #         observer_user.localpart, observed_user.to_string()
-    #     )
-
-    #     if self.is_mine(observed_user):
-    #         yield self.invite_presence(observed_user, observer_user)
-    #     else:
-    #         yield self.federation.build_and_send_edu(
-    #             destination=observed_user.domain,
-    #             edu_type="m.presence_invite",
-    #             content={
-    #                 "observed_user": observed_user.to_string(),
-    #                 "observer_user": observer_user.to_string(),
-    #             }
-    #         )
-
-    # @defer.inlineCallbacks
-    # def invite_presence(self, observed_user, observer_user):
-    #     """Handles new presence invites.
-    #     """
-    #     if not self.is_mine(observed_user):
-    #         raise SynapseError(400, "User is not hosted on this Home Server")
-
-    #     # TODO: Don't auto accept
-    #     if self.is_mine(observer_user):
-    #         yield self.accept_presence(observed_user, observer_user)
-    #     else:
-    #         self.federation.build_and_send_edu(
-    #             destination=observer_user.domain,
-    #             edu_type="m.presence_accept",
-    #             content={
-    #                 "observed_user": observed_user.to_string(),
-    #                 "observer_user": observer_user.to_string(),
-    #             }
-    #         )
-
-    #         state_dict = yield self.get_state(observed_user, as_event=False)
-    #         state_dict = format_user_presence_state(state_dict, self.clock.time_msec())
-
-    #         self.federation.build_and_send_edu(
-    #             destination=observer_user.domain,
-    #             edu_type="m.presence",
-    #             content={
-    #                 "push": [state_dict]
-    #             }
-    #         )
-
-    # @defer.inlineCallbacks
-    # def accept_presence(self, observed_user, observer_user):
-    #     """Handles a m.presence_accept EDU. Mark a presence invite from a
-    #     local or remote user as accepted in a local user's presence list.
-    #     Starts polling for presence updates from the local or remote user.
-    #     Args:
-    #         observed_user(UserID): The user to update in the presence list.
-    #         observer_user(UserID): The owner of the presence list to update.
-    #     """
-    #     yield self.store.set_presence_list_accepted(
-    #         observer_user.localpart, observed_user.to_string()
-    #     )
-
-    # @defer.inlineCallbacks
-    # def deny_presence(self, observed_user, observer_user):
-    #     """Handle a m.presence_deny EDU. Removes a local or remote user from a
-    #     local user's presence list.
-    #     Args:
-    #         observed_user(UserID): The local or remote user to remove from the
-    #             list.
-    #         observer_user(UserID): The local owner of the presence list.
-    #     Returns:
-    #         A Deferred.
-    #     """
-    #     yield self.store.del_presence_list(
-    #         observer_user.localpart, observed_user.to_string()
-    #     )
-
-        # TODO(paul): Inform the user somehow?
-
-    # @defer.inlineCallbacks
-    # def drop(self, observed_user, observer_user):
-    #     """Remove a local or remote user from a local user's presence list and
-    #     unsubscribe the local user from updates that user.
-    #     Args:
-    #         observed_user(UserId): The local or remote user to remove from the
-    #             list.
-    #         observer_user(UserId): The local owner of the presence list.
-    #     Returns:
-    #         A Deferred.
-    #     """
-    #     if not self.is_mine(observer_user):
-    #         raise SynapseError(400, "User is not hosted on this Home Server")
-
-    #     yield self.store.del_presence_list(
-    #         observer_user.localpart, observed_user.to_string()
-    #     )
-
-    #     # TODO: Inform the remote that we've dropped the presence list.
-
     @defer.inlineCallbacks
     def is_visible(self, observed_user, observer_user):
         """Returns whether a user can see another user's presence.
@@ -903,10 +751,6 @@ class PresenceHandler(object):
 
         if observer_room_ids & observed_room_ids:
             defer.returnValue(True)
-
-        # accepted_observers = yield self.store.get_presence_list_observers_accepted(
-        #     observed_user.to_string()
-        # )
 
         defer.returnValue(False)
 
@@ -1204,10 +1048,6 @@ class PresenceEventSource(object):
         updates for
         """
         user_id = user.to_string()
-        # plist = yield self.store.get_presence_list_accepted(
-        #     user.localpart, on_invalidate=cache_context.invalidate,
-        # )
-        # users_interested_in = set(row["observed_user_id"] for row in plist)
         users_interested_in = set()
         users_interested_in.add(user_id)  # So that we receive our own presence
 
