@@ -18,10 +18,10 @@ import logging
 from zope.interface import implementer
 
 from OpenSSL import SSL, crypto
+from twisted.internet._sslverify import OpenSSLCertificateAuthorities, _defaultCurveName
 from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust
-from twisted.internet._sslverify import OpenSSLCertificateAuthorities, _defaultCurveName
 from twisted.python.failure import Failure
 
 logger = logging.getLogger(__name__)
