@@ -1253,10 +1253,6 @@ def get_interested_parties(store, states):
         for room_id in room_ids:
             room_ids_to_states.setdefault(room_id, []).append(state)
 
-        # plist = yield store.get_presence_list_observers_accepted(state.user_id)
-        # for u in plist:
-        #     users_to_states.setdefault(u, []).append(state)
-
         # Always notify self
         users_to_states.setdefault(state.user_id, []).append(state)
 
