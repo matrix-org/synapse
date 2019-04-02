@@ -110,6 +110,8 @@ class SlavedEventStore(EventFederationWorkerStore,
                 self.get_rooms_for_user_with_stream_ordering.invalidate(
                     (data.state_key, ),
                 )
+        else:
+            raise Exception("Unknown events stream row type %s" % (row.type, ))
 
     def invalidate_caches_for_event(self, stream_ordering, event_id, room_id,
                                     etype, state_key, redacts, backfilled):
