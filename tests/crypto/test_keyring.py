@@ -66,7 +66,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
             getattr(LoggingContext.current_context(), "request", None), expected
         )
 
-    @defer.inlineCallbacks
     def test_wait_for_previous_lookups(self):
         kr = keyring.Keyring(self.hs)
 
