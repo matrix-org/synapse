@@ -21,7 +21,7 @@ from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import _defaultCurveName
 from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
-from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust
+from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust, OpenSSLCertificateAuthorities
 from twisted.python.failure import Failure
 
 logger = logging.getLogger(__name__)
@@ -129,20 +129,21 @@ class ClientTLSOptionsFactory(object):
     def __init__(self, config):
         self._config = config
 
+        self._options_novalidate = CertificateOptions()
+
         # Check if we're using a custom list of a CA certificates
-        if config.federation_custom_ca_list is not None:
+        if isinstance(config.federation_custom_ca_list, OpenSSLCertificateAuthorities):
             self._options_validate = CertificateOptions(
                 # Use custom CA trusted root certs
                 trustRoot=config.federation_custom_ca_list,
             )
-        else:
-            # If not, verify using those provided by the operating environment
-            self._options_validate = CertificateOptions(
-                # Use CA root certs provided by OpenSSL
-                trustRoot=platformTrust(),
-            )
+            return
 
-        self._options_novalidate = CertificateOptions()
+        # If not, verify using those provided by the operating environment
+        self._options_validate = CertificateOptions(
+            # Use CA root certs provided by OpenSSL
+            trustRoot=platformTrust(),
+        )
 
     def get_options(self, host):
         # Use _makeContext so that we get a fresh OpenSSL CTX each time.
