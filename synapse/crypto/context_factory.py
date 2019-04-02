@@ -146,6 +146,7 @@ class ClientTLSOptionsFactory(object):
 
         # Check if certificate verification has been enabled
         if (self._config.federation_verify_certificates and
+                self._config.federation_certificate_validation_whitelist and
                 host not in self._config.federation_certificate_validation_whitelist):
             # Require verification
             return ClientTLSOptions(host, self._options_validate._makeContext())
