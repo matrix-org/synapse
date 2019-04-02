@@ -1830,7 +1830,7 @@ class EventsStore(
         return self.runInteraction("get_all_new_events", get_all_new_events_txn)
 
     def _get_state_event_counts_txn(self, txn, room_id):
-        sql = "SELECT COUNT(*)" " FROM state_events" " WHERE room_id=?"
+        sql = "SELECT COUNT(*) FROM state_events WHERE room_id=?"
         txn.execute(sql, (room_id,))
         row = txn.fetchone()
         return row[0] if row else 0

@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.storage.state_deltas import StateDeltasStore
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +348,15 @@ class StatsStore(StateDeltasStore):
             "room_state", None, retcols=("name", "topic", "canonical_alias")
         )
 
+    @cached
+    def get_earliest_token_for_room_stats(self, room_id):
+        return self._simple_select_one_onecol(
+            "room_stats_earliest_token",
+            {"room_id": room_id},
+            retcol="token",
+            allow_none=True,
+        )
+
     def update_stats(self, stats_type, stats_id, ts, fields):
         return self._simple_upsert(
             table=("%s_stats" % stats_type),
@@ -363,7 +373,7 @@ class StatsStore(StateDeltasStore):
             values=fields,
         )
 
-    def update_stats_delta(self, ts, bucket_size, stats_type, stats_id, field, value):
+    def update_stats_delta(self, ts, stats_type, stats_id, field, value):
         def _update_stats_delta(txn):
             table = "%s_stats" % stats_type
             id_col = "%s_id" % stats_type
@@ -394,7 +404,7 @@ class StatsStore(StateDeltasStore):
                 values = {key: rows[0][key] for key in ABSOLUTE_STATS_FIELDS[stats_type]}
                 values[id_col] = stats_id
                 values["ts"] = ts
-                values["bucket_size"] = bucket_size
+                values["bucket_size"] = self.stats_bucket_size
 
                 # Set the relative fields to 0.
                 for val in RELATIVE_STATS_FIELDS[stats_type]:

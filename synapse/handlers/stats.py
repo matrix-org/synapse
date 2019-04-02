@@ -120,12 +120,7 @@ class StatsHandler(StateDeltasHandler):
             if event_id is None:
                 continue
 
-            token = yield self.store._simple_select_one_onecol(
-                "room_stats_earliest_token",
-                {"room_id": room_id},
-                retcol="token",
-                allow_none=True,
-            )
+            token = yield self.store.get_earliest_token_for_room_stats(room_id)
 
             # If the earliest token to begin from is larger than our current
             # stream ID, skip processing this delta.
@@ -161,105 +156,96 @@ class StatsHandler(StateDeltasHandler):
                 if prev_event:
                     prev_membership = prev_event.content.get("membership")
 
-                if prev_membership != membership:
-                    if prev_membership == Membership.JOIN:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "joined_members",
-                            -1,
-                        )
-                    elif prev_membership == Membership.INVITE:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "invited_members",
-                            -1,
-                        )
-                    elif prev_membership == Membership.LEAVE:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "left_members",
-                            -1,
-                        )
-                    elif prev_membership == Membership.BAN:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "banned_members",
-                            -1,
-                        )
+                if prev_membership == membership:
+                    continue
 
-                    if membership == Membership.JOIN:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "joined_members",
-                            +1,
-                        )
-                    elif membership == Membership.INVITE:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "invited_members",
-                            +1,
-                        )
-                    elif membership == Membership.LEAVE:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "left_members",
-                            +1,
-                        )
-                    elif membership == Membership.BAN:
-                        yield self.store.update_stats_delta(
-                            now,
-                            self.stats_bucket_size,
-                            "room",
-                            room_id,
-                            "banned_members",
-                            +1,
-                        )
+                if prev_membership == Membership.JOIN:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "joined_members",
+                        -1,
+                    )
+                elif prev_membership == Membership.INVITE:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "invited_members",
+                        -1,
+                    )
+                elif prev_membership == Membership.LEAVE:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "left_members",
+                        -1,
+                    )
+                elif prev_membership == Membership.BAN:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "banned_members",
+                        -1,
+                    )
+
+                if membership == Membership.JOIN:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "joined_members",
+                        +1,
+                    )
+                elif membership == Membership.INVITE:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "invited_members",
+                        +1,
+                    )
+                elif membership == Membership.LEAVE:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "left_members",
+                        +1,
+                    )
+                elif membership == Membership.BAN:
+                    yield self.store.update_stats_delta(
+                        now,
+                        "room",
+                        room_id,
+                        "banned_members",
+                        +1,
+                    )
 
                 user_id = event.state_key
                 if self.is_mine_id(user_id):
                     # update user_stats as it's one of our users
                     public = yield self._is_public_room(room_id)
 
-                    if prev_membership != membership:
-                        if prev_membership == Membership.JOIN:
-                            yield self.store.update_stats_delta(
-                                now,
-                                self.stats_bucket_size,
-                                "user",
-                                user_id,
-                                "public_rooms" if public else "private_rooms",
-                                -1,
-                            )
-                        elif membership == Membership.JOIN:
-                            yield self.store.update_stats_delta(
-                                now,
-                                self.stats_bucket_size,
-                                "user",
-                                user_id,
-                                "public_rooms" if public else "private_rooms",
-                                +1,
-                            )
+                    if prev_membership == Membership.JOIN:
+                        yield self.store.update_stats_delta(
+                            now,
+                            "user",
+                            user_id,
+                            "public_rooms" if public else "private_rooms",
+                            -1,
+                        )
+                    elif membership == Membership.JOIN:
+                        yield self.store.update_stats_delta(
+                            now,
+                            "user",
+                            user_id,
+                            "public_rooms" if public else "private_rooms",
+                            +1,
+                        )
 
             elif typ == EventTypes.Create:
                 # Newly created room. Add it with all blank portions.
@@ -286,7 +272,7 @@ class StatsHandler(StateDeltasHandler):
                 )
                 if is_public is not None:
                     self.update_public_room_stats(
-                        now, self.stats_bucket_size, room_id, is_public
+                        now, room_id, is_public
                     )
 
             elif typ == EventTypes.RoomHistoryVisibility:
@@ -300,7 +286,7 @@ class StatsHandler(StateDeltasHandler):
                 )
                 if is_public is not None:
                     yield self.update_public_room_stats(
-                        now, self.stats_bucket_size, room_id, is_public
+                        now, room_id, is_public
                     )
 
             elif typ == EventTypes.Encryption:
@@ -325,25 +311,31 @@ class StatsHandler(StateDeltasHandler):
                 )
 
     @defer.inlineCallbacks
-    def update_public_room_stats(self, ts, bucket_size, room_id, is_public):
+    def update_public_room_stats(self, ts, room_id, is_public):
+        """
+        Increment/decrement a user's number of public rooms when a room they are
+        in changes to/from public visibility.
+
+        Args:
+            ts (int): Timestamp in seconds
+            room_id (str)
+            is_public (bool)
+        """
         # For now, blindly iterate over all local users in the room so that
         # we can handle the whole problem of copying buckets over as needed
-
         user_ids = yield self.store.get_users_in_room(room_id)
 
         for user_id in user_ids:
             if self.hs.is_mine(UserID.from_string(user_id)):
-                self.store.update_stats_delta(
+                yield self.store.update_stats_delta(
                     ts,
-                    bucket_size,
                     "user",
                     user_id,
                     "public_rooms",
                     +1 if is_public else -1,
                 )
-                self.store.update_stats_delta(
+                yield self.store.update_stats_delta(
                     ts,
-                    bucket_size,
                     "user",
                     user_id,
                     "private_rooms",
@@ -367,9 +359,3 @@ class StatsHandler(StateDeltasHandler):
             defer.returnValue(True)
         else:
             defer.returnValue(False)
-
-    @defer.inlineCallbacks
-    def _handle_local_user(self, user_id):
-        logger.debug("Adding new local user to stats, %r", user_id)
-
-        yield defer.succeed(1)
