@@ -111,15 +111,13 @@ class ServerConfig(Config):
         self.admin_contact = config.get("admin_contact", None)
 
         # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None
+        self.federation_domain_whitelist = {}
         federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", None
+            "federation_domain_whitelist", [],
         )
         # turn the whitelist into a hash for speed of lookup
-        if federation_domain_whitelist is not None:
-            self.federation_domain_whitelist = {}
-            for domain in federation_domain_whitelist:
-                self.federation_domain_whitelist[domain] = True
+        for domain in federation_domain_whitelist:
+            self.federation_domain_whitelist[domain] = True
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':

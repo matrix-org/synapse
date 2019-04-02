@@ -18,7 +18,10 @@ import logging
 from zope.interface import implementer
 
 from OpenSSL import SSL, crypto
-from twisted.internet._sslverify import OpenSSLCertificateAuthorities, _defaultCurveName
+from twisted.internet._sslverify import (
+    ClientTLSOptions as ClientTLSOptionsVerify,
+    _defaultCurveName,
+)
 from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust
@@ -132,7 +135,7 @@ class ClientTLSOptionsFactory(object):
         self._options_novalidate = CertificateOptions()
 
         # Check if we're using a custom list of a CA certificates
-        if isinstance(config.federation_custom_ca_list, OpenSSLCertificateAuthorities):
+        if config.federation_custom_ca_list is not None:
             self._options_validate = CertificateOptions(
                 # Use custom CA trusted root certs
                 trustRoot=config.federation_custom_ca_list,
@@ -152,7 +155,7 @@ class ClientTLSOptionsFactory(object):
         if (self._config.federation_verify_certificates and
                 host not in self._config.federation_certificate_validation_whitelist):
             # Require verification
-            return ClientTLSOptions(host, self._options_validate._makeContext())
+            return ClientTLSOptionsVerify(host, self._options_validate._makeContext())
 
         # Otherwise don't require verification
         return ClientTLSOptions(host, self._options_novalidate._makeContext())

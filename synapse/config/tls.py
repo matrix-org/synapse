@@ -77,16 +77,14 @@ class TlsConfig(Config):
         )
 
         # Whitelist of domains to not verify certificates for
-        self.federation_certificate_verification_whitelist = None
+        self.federation_certificate_verification_whitelist = {}
         federation_certificate_verification_whitelist = config.get(
-            "federation_certificate_verification_whitelist", None
+            "federation_certificate_verification_whitelist", [],
         )
 
         # Store whitelisted domains in a hash for fast lookup
-        if federation_certificate_verification_whitelist is not None:
-            self.federation_certificate_verification_whitelist = {}
-            for domain in federation_certificate_verification_whitelist:
-                self.federation_certificate_verification_whitelist[domain] = True
+        for domain in federation_certificate_verification_whitelist:
+            self.federation_certificate_verification_whitelist[domain] = True
 
         # List of custom certificate authorities for federation traffic validation
         self.federation_custom_ca_list = config.get(
@@ -102,7 +100,7 @@ class TlsConfig(Config):
                     with open(ca_file, 'rb') as f:
                         content = f.read()
                 except Exception:
-                    logger.exception("Failed to read custom CA certificate off disk!")
+                    logger.fatal("Failed to read custom CA certificate off disk!")
                     raise
 
                 # Parse the CA certificates
@@ -110,11 +108,10 @@ class TlsConfig(Config):
                     cert_base = Certificate.loadPEM(content)
                     certs.append(cert_base)
                 except Exception:
-                    logger.exception("Failed to parse custom CA certificate off disk!")
+                    logger.fatal("Failed to parse custom CA certificate off disk!")
                     raise
 
-            if len(certs) > 0:
-                self.federation_custom_ca_list = trustRootFromCertificates(certs)
+            self.federation_custom_ca_list = trustRootFromCertificates(certs)
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -146,14 +143,12 @@ class TlsConfig(Config):
             with open(self.tls_certificate_file, 'rb') as f:
                 cert_pem = f.read()
         except Exception:
-            logger.exception("Failed to read existing certificate off disk!")
-            raise
+            logger.fatal("Failed to read existing certificate off disk!")
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         except Exception:
-            logger.exception("Failed to parse existing certificate off disk!")
-            raise
+            logger.fatal("Failed to parse existing certificate off disk!")
 
         if not allow_self_signed:
             if tls_certificate.get_subject() == tls_certificate.get_issuer():
@@ -240,10 +235,18 @@ class TlsConfig(Config):
 
         # Whether to verify TLS certificates when sending federation traffic.
         #
+        # This currently defaults to `false`, however this will change in
+        # Synapse 1.0 when valid federation certificates will be required.
+        #
         #federation_verify_certificates: true
 
-        # Prevent federation certificate validation on the following whitelist
-        # of domains. Only effective if federation_verify_certicates is true.
+        # Skip federation certificate validation on the following whitelist of
+        # domains.
+        #
+        # Note that this should only be used within the context of private
+        # federation as it will otherwise break things.
+        #
+        # Only effective if federation_verify_certicates is `true`.
         #
         #federation_certificate_validation_whitelist:
         #  - lon.example.com

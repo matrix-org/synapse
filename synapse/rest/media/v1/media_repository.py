@@ -231,10 +231,7 @@ class MediaRepository(object):
             Deferred: Resolves once a response has successfully been written
                 to request
         """
-        if (
-            self.federation_domain_whitelist is not None and
-            server_name not in self.federation_domain_whitelist
-        ):
+        if (server_name not in self.federation_domain_whitelist):
             raise FederationDeniedError(server_name)
 
         self.mark_recently_accessed(server_name, media_id)
@@ -271,10 +268,7 @@ class MediaRepository(object):
         Returns:
             Deferred[dict]: The media_info of the file
         """
-        if (
-            self.federation_domain_whitelist is not None and
-            server_name not in self.federation_domain_whitelist
-        ):
+        if (server_name not in self.federation_domain_whitelist):
             raise FederationDeniedError(server_name)
 
         # We linearize here to ensure that we don't try and download remote
