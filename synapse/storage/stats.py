@@ -105,6 +105,7 @@ class StatsStore(StateDeltasStore):
         new_pos = yield self.get_max_stream_id_in_current_state_deltas()
         yield self.runInteraction("populate_stats_temp_build", _make_staging_area)
         yield self._simple_insert(TEMP_TABLE + "_position", {"position": new_pos})
+        self.get_earliest_token_for_room_stats.invalidate_all()
 
         yield self._end_background_update("populate_stats_createtables")
         defer.returnValue(1)
@@ -348,7 +349,7 @@ class StatsStore(StateDeltasStore):
             "room_state", None, retcols=("name", "topic", "canonical_alias")
         )
 
-    @cached
+    @cached()
     def get_earliest_token_for_room_stats(self, room_id):
         return self._simple_select_one_onecol(
             "room_stats_earliest_token",
