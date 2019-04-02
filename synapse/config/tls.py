@@ -90,29 +90,31 @@ class TlsConfig(Config):
 
         # List of custom certificate authorities for federation traffic validation
         self.federation_custom_ca_list = config.get(
-            "federation_custom_ca_list", [],
+            "federation_custom_ca_list", None,
         )
 
         # Read in and parse custom CA certificates
-        certs = []
-        for ca_file in self.federation_custom_ca_list:
-            logger.debug("Reading custom CA certificate file: %s", ca_file)
-            try:
-                with open(ca_file, 'rb') as f:
-                    content = f.read()
-            except Exception:
-                logger.exception("Failed to read custom CA certificate off disk!")
-                raise
+        if self.federation_custom_ca_list is not None:
+            certs = []
+            for ca_file in self.federation_custom_ca_list:
+                logger.debug("Reading custom CA certificate file: %s", ca_file)
+                try:
+                    with open(ca_file, 'rb') as f:
+                        content = f.read()
+                except Exception:
+                    logger.exception("Failed to read custom CA certificate off disk!")
+                    raise
 
-            # Parse the CA certificates
-            try:
-                cert_base = Certificate.loadPEM(content)
-                certs.append(cert_base)
-            except Exception:
-                logger.exception("Failed to parse custom CA certificate off disk!")
-                raise
+                # Parse the CA certificates
+                try:
+                    cert_base = Certificate.loadPEM(content)
+                    certs.append(cert_base)
+                except Exception:
+                    logger.exception("Failed to parse custom CA certificate off disk!")
+                    raise
 
-        self.federation_custom_ca_list = trustRootFromCertificates(certs)
+            if len(certs) > 0:
+                self.federation_custom_ca_list = trustRootFromCertificates(certs)
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)

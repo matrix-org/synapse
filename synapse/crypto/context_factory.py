@@ -128,10 +128,17 @@ class ClientTLSOptionsFactory(object):
 
     def __init__(self, config):
         self._config = config
-        self._options_validate = CertificateOptions(
-            # This option implies verify=True
-            trustRoot=config.federation_custom_ca_list,
-        )
+
+        # Check if we're using a custom list of a CA certificates
+        if config.federation_custom_ca_list is not None:
+            self._options_validate = CertificateOptions(
+                # This option implies verify=True
+                trustRoot=config.federation_custom_ca_list,
+            )
+        else:
+            # If not, verify using those provided by the operating environment
+            self._options_validate = CertificateOptions(verify=True)
+
         self._options_novalidate = CertificateOptions(verify=False)
 
     def get_options(self, host):

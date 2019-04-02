@@ -53,7 +53,7 @@ class MatrixFederationAgentTests(TestCase):
 
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=ClientTLSOptionsFactory(None),
+            tls_client_options_factory=ClientTLSOptionsFactory(#TODO How to deal with None config in tests???),
             _well_known_tls_policy=TrustingTLSPolicyForHTTPS(),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,
