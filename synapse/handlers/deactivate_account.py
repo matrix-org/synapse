@@ -77,6 +77,7 @@ class DeactivateAccountHandler(BaseHandler):
                     {
                         'medium': threepid['medium'],
                         'address': threepid['address'],
+                        'id_server': id_server,
                     },
                 )
                 identity_server_supports_unbinding &= result
