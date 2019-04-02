@@ -59,6 +59,7 @@ class MatrixFederationAgentTests(TestCase):
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=ClientTLSOptionsFactory(config),
+            config=config,
             _well_known_tls_policy=TrustingTLSPolicyForHTTPS(),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,
