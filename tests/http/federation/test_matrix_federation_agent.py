@@ -49,11 +49,16 @@ class MatrixFederationAgentTests(TestCase):
 
         self.mock_resolver = Mock()
 
+        config = Mock()
+        config.federation_custom_ca_list = None
+        config.federation_verify_certificates = False
+        config.federation_certificate_validation_whitelist = []
+
         self.well_known_cache = TTLCache("test_cache", timer=self.reactor.seconds)
 
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=ClientTLSOptionsFactory(None),
+            tls_client_options_factory=ClientTLSOptionsFactory(config),
             _well_known_tls_policy=TrustingTLSPolicyForHTTPS(),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,
