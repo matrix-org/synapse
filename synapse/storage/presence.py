@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import PresenceState
 from synapse.util import batch_iter
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
+from synapse.util.caches.descriptors import cached, cachedList
 
 from ._base import SQLBaseStore
 
