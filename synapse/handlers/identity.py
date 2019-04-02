@@ -227,23 +227,24 @@ class IdentityHandler(BaseHandler):
                 content,
                 headers,
             )
-
-            yield self.store.remove_user_bound_threepid(
-                user_id=mxid,
-                medium=threepid["medium"],
-                address=threepid["address"],
-                id_server=id_server,
-            )
+            changed = True
         except HttpResponseException as e:
+            changed = False
             if e.code in (400, 404, 501,):
                 # The remote server probably doesn't support unbinding (yet)
                 logger.warn("Received %d response while unbinding threepid", e.code)
-                defer.returnValue(False)
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(502, "Failed to contact identity server")
 
-        defer.returnValue(True)
+        yield self.store.remove_user_bound_threepid(
+            user_id=mxid,
+            medium=threepid["medium"],
+            address=threepid["address"],
+            id_server=id_server,
+        )
+
+        defer.returnValue(changed)
 
     @defer.inlineCallbacks
     def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):
