@@ -386,6 +386,36 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # Now return the first `limit`
         defer.returnValue(notifs[:limit])
 
+    def get_if_maybe_push_in_range_for_user(self, user_id, min_stream_ordering):
+        """A fast check to see if there might be something to push for the
+        user since the given stream ordering. May return false positives.
+
+        Useful to know whether to bother starting a pusher on start up or not.
+
+        Args:
+            user_id (str)
+            min_stream_ordering (int)
+
+        Returns:
+            Deferred[bool]: True if there may be push to process, False if
+            there definitely isn't.
+        """
+
+        def _get_if_maybe_push_in_range_for_user_txn(txn):
+            sql = """
+                SELECT 1 FROM event_push_actions
+                WHERE user_id = ? AND stream_ordering > ?
+                LIMIT 1
+            """
+
+            txn.execute(sql, (user_id, min_stream_ordering,))
+            return bool(txn.fetchone())
+
+        return self.runInteraction(
+            "get_if_maybe_push_in_range_for_user",
+            _get_if_maybe_push_in_range_for_user_txn,
+        )
+
     def add_push_actions_to_staging(self, event_id, user_id_actions):
         """Add the push actions for the event to the push action staging area.
 
