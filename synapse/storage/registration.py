@@ -358,9 +358,9 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
     def remove_user_bound_threepid(self, user_id, medium, address, id_server):
-        """The server proxied a bind request to the given identity server on
-        behalf of the given user. We need to remember this in case the user
-        asks us to unbind the threepid.
+        """The server proxied an unbind request to the given identity server on
+        behalf of the given user, so we remove the mapping of threepid to
+        identity server.
 
         Args:
             user_id (str)

@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
--- Tracks when
-CREATE TABlE user_threepid_id_server (
+-- Tracks which identity server a user bound their threepid via.
+CREATE TABLE user_threepid_id_server (
     user_id TEXT NOT NULL,
     medium TEXT NOT NULL,
     address TEXT NOT NULL,

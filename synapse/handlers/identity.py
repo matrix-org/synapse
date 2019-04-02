@@ -150,14 +150,16 @@ class IdentityHandler(BaseHandler):
 
         Args:
             mxid (str): Matrix user ID of binding to be removed
-            threepid (dict): Dict with medium & address of binding to be removed
+            threepid (dict): Dict with medium & address of binding to be
+                removed, and an optional id_server.
 
         Raises:
             SynapseError: If we failed to contact the identity server
 
         Returns:
             Deferred[bool]: True on success, otherwise False if the identity
-            server doesn't support unbinding
+            server doesn't support unbinding (or no identity server found to
+            contact).
         """
         if threepid.get("id_server"):
             id_servers = [threepid["id_server"]]
