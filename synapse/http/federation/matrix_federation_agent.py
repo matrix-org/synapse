@@ -79,11 +79,10 @@ class MatrixFederationAgent(object):
 
     def __init__(
         self, reactor, tls_client_options_factory,
-        config, _well_known_tls_policy=None,
+        _well_known_tls_policy=None,
         _srv_resolver=None,
         _well_known_cache=well_known_cache,
     ):
-        self.config = config
         self._reactor = reactor
         self._clock = Clock(reactor)
 
@@ -150,7 +149,7 @@ class MatrixFederationAgent(object):
             tls_options = None
         else:
             tls_options = self._tls_client_options_factory.get_options(
-                res.tls_server_name.decode("ascii"), self.config,
+                res.tls_server_name.decode("ascii"),
             )
 
         # make sure that the Host header is set correctly
