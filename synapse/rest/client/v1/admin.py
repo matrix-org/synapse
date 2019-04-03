@@ -499,7 +499,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         # desirable in case the first attempt at blocking the room failed below.
         yield self.store.block_room(room_id, requester_user_id)
 
-        users = yield self.state.get_current_user_in_room(room_id)
+        users = yield self.state.get_current_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
         for user_id in users:
