@@ -269,7 +269,7 @@ class MediaRepository(object):
         Returns:
             Deferred[dict]: The media_info of the file
         """
-        if (self.federation_domain_whitelist and
+        if (self.federation_domain_whitelist is not None and
                 server_name not in self.federation_domain_whitelist):
             raise FederationDeniedError(server_name)
 
