@@ -264,11 +264,10 @@ listeners:
 # Prevent federation certificate validation on the following whitelist
 # of domains. Only effective if federation_verify_certicates is true.
 #
-#federation_certificate_validation_whitelist:
+#federation_certificate_verification_whitelist:
 #  - lon.example.com
 #  - nyc.example.com
 #  - syd.example.com
-
 
 # List of custom certificate authorities for federation traffic.
 #
