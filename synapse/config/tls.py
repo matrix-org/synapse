@@ -93,6 +93,10 @@ class TlsConfig(Config):
 
         # Read in and parse custom CA certificates
         if self.federation_custom_ca_list is not None:
+            if self.federation_custom_ca_list:
+                raise ConfigError("federation_custom_ca_list specified without "
+                                  "any certificate files")
+
             certs = []
             for ca_file in self.federation_custom_ca_list:
                 logger.debug("Reading custom CA certificate file: %s", ca_file)
