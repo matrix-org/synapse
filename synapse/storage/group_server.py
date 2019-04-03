@@ -1150,3 +1150,40 @@ class GroupServerStore(SQLBaseStore):
 
     def get_group_stream_token(self):
         return self._group_updates_id_gen.get_current_token()
+
+    def delete_group(self, group_id):
+        """Deletes a group fully from the database.
+
+        Args:
+            group_id (str)
+
+        Returns:
+            Deferred
+        """
+
+        def _delete_group_txn(txn):
+            tables = [
+                "groups",
+                "group_users",
+                "group_invites",
+                "group_rooms",
+                "group_summary_rooms",
+                "group_summary_room_categories",
+                "group_room_categories",
+                "group_summary_users",
+                "group_summary_roles",
+                "group_roles",
+                "group_attestations_renewals",
+                "group_attestations_remote",
+            ]
+
+            for table in tables:
+                self._simple_delete_txn(
+                    txn,
+                    table=table,
+                    keyvalues={"group_id": group_id},
+                )
+
+        return self.runInteraction(
+            "delete_group", _delete_group_txn
+        )
