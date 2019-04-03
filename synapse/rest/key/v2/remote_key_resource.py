@@ -139,7 +139,8 @@ class RemoteKey(Resource):
 
         store_queries = []
         for server_name, key_ids in query.items():
-            if (server_name not in self.federation_domain_whitelist):
+            if (self.federation_domain_whitelist and
+                    server_name not in self.federation_domain_whitelist):
                 logger.debug("Federation denied with %s", server_name)
                 continue
 

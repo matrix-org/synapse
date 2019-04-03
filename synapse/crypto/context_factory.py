@@ -132,18 +132,18 @@ class ClientTLSOptionsFactory(object):
     def __init__(self, config):
         self._config = config
 
-        self._options_novalidate = CertificateOptions()
+        self._options_noverify = CertificateOptions()
 
         # Check if we're using a custom list of a CA certificates
         if config.federation_custom_ca_list is not None:
-            self._options_validate = CertificateOptions(
+            self._options_verify = CertificateOptions(
                 # Use custom CA trusted root certs
                 trustRoot=config.federation_custom_ca_list,
             )
             return
 
         # If not, verify using those provided by the operating environment
-        self._options_validate = CertificateOptions(
+        self._options_verify = CertificateOptions(
             # Use CA root certs provided by OpenSSL
             trustRoot=platformTrust(),
         )
@@ -152,10 +152,13 @@ class ClientTLSOptionsFactory(object):
         # Use _makeContext so that we get a fresh OpenSSL CTX each time.
 
         # Check if certificate verification has been enabled
-        if (self._config.federation_verify_certificates and
-                host not in self._config.federation_certificate_validation_whitelist):
-            # Require verification
-            return ClientTLSOptionsVerify(host, self._options_validate._makeContext())
+        if (self._config.federation_verify_certificates):
+            # and if the host is whitelisted against it
+            if (self._config.federation_certificate_verification_whitelist and
+                    host in self._config.federation_certificate_verification_whitelist):
+                return ClientTLSOptions(host, self._options_noverify._makeContext())
+
+            return ClientTLSOptionsVerify(host, self._options_verify._makeContext())
 
         # Otherwise don't require verification
-        return ClientTLSOptions(host, self._options_novalidate._makeContext())
+        return ClientTLSOptions(host, self._options_noverify._makeContext())

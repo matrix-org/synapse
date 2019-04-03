@@ -77,10 +77,13 @@ class TlsConfig(Config):
         )
 
         # Whitelist of domains to not verify certificates for
-        self.federation_certificate_verification_whitelist = {}
         federation_certificate_verification_whitelist = config.get(
             "federation_certificate_verification_whitelist", [],
         )
+
+        self.federation_certificate_verification_whitelist = None
+        if len(federation_certificate_verification_whitelist) > 0:
+            self.federation_certificate_verification_whitelist = {}
 
         # Store whitelisted domains in a hash for fast lookup
         for domain in federation_certificate_verification_whitelist:
