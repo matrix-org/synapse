@@ -96,20 +96,15 @@ class TlsConfig(Config):
             certs = []
             for ca_file in self.federation_custom_ca_list:
                 logger.debug("Reading custom CA certificate file: %s", ca_file)
-                try:
-                    with open(ca_file, 'rb') as f:
-                        content = f.read()
-                except Exception:
-                    logger.fatal("Failed to read custom CA certificate off disk")
-                    raise
+                content = self.read_file(ca_file)
 
                 # Parse the CA certificates
                 try:
                     cert_base = Certificate.loadPEM(content)
                     certs.append(cert_base)
-                except Exception:
-                    logger.fatal("Failed to parse custom CA certificate off disk")
-                    raise
+                except Exception as e:
+                    raise ConfigError("Error parsing custom CA certificate file %s: %s"
+                                      % (ca_file, e))
 
             self.federation_custom_ca_list = trustRootFromCertificates(certs)
 
