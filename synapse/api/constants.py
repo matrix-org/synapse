@@ -70,6 +70,7 @@ class EventTypes(object):
     ThirdPartyInvite = "m.room.third_party_invite"
     Encryption = "m.room.encryption"
     RelatedGroups = "m.room.related_groups"
+    Widgets = "im.vector.modular.widgets"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
