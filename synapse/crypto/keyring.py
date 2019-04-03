@@ -20,7 +20,6 @@ from collections import namedtuple
 from six import raise_from
 from six.moves import urllib
 
-import nacl.signing
 from signedjson.key import (
     decode_verify_key_bytes,
     encode_verify_key_base64,
@@ -43,6 +42,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.storage.keys import FetchKeyResult
 from synapse.util import logcontext, unwrapFirstError
 from synapse.util.logcontext import (
     LoggingContext,
@@ -307,11 +307,15 @@ class Keyring(object):
                         # complete this VerifyKeyRequest.
                         result_keys = results.get(server_name, {})
                         for key_id in verify_request.key_ids:
-                            key = result_keys.get(key_id)
-                            if key:
+                            fetch_key_result = result_keys.get(key_id)
+                            if fetch_key_result:
                                 with PreserveLoggingContext():
                                     verify_request.deferred.callback(
-                                        (server_name, key_id, key)
+                                        (
+                                            server_name,
+                                            key_id,
+                                            fetch_key_result.verify_key,
+                                        )
                                     )
                                 break
                         else:
@@ -348,12 +352,12 @@ class Keyring(object):
     def get_keys_from_store(self, server_name_and_key_ids):
         """
         Args:
-            server_name_and_key_ids (iterable(Tuple[str, iterable[str]]):
+            server_name_and_key_ids (iterable[Tuple[str, iterable[str]]]):
                 list of (server_name, iterable[key_id]) tuples to fetch keys for
 
         Returns:
-            Deferred: resolves to dict[str, dict[str, VerifyKey|None]]: map from
-                server_name -> key_id -> VerifyKey
+            Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult|None]]]:
+                map from server_name -> key_id -> FetchKeyResult
         """
         keys_to_fetch = (
             (server_name, key_id)
@@ -430,6 +434,18 @@ class Keyring(object):
     def get_server_verify_key_v2_indirect(
         self, server_names_and_key_ids, perspective_name, perspective_keys
     ):
+        """
+        Args:
+            server_names_and_key_ids (iterable[Tuple[str, iterable[str]]]):
+                list of (server_name, iterable[key_id]) tuples to fetch keys for
+            perspective_name (str): name of the notary server to query for the keys
+            perspective_keys (dict[str, VerifyKey]): map of key_id->key for the
+                notary server
+
+        Returns:
+            Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult]]]: map
+                from server_name -> key_id -> FetchKeyResult
+        """
         # TODO(mark): Set the minimum_valid_until_ts to that needed by
         # the events being validated or the current time if validating
         # an incoming request.
@@ -506,7 +522,7 @@ class Keyring(object):
 
     @defer.inlineCallbacks
     def get_server_verify_key_v2_direct(self, server_name, key_ids):
-        keys = {}  # type: dict[str, nacl.signing.VerifyKey]
+        keys = {}  # type: dict[str, FetchKeyResult]
 
         for requested_key_id in key_ids:
             if requested_key_id in keys:
@@ -583,9 +599,9 @@ class Keyring(object):
                 actually in the response
 
         Returns:
-            Deferred[dict[str, nacl.signing.VerifyKey]]:
-                map from key_id to key object
+            Deferred[dict[str, FetchKeyResult]]: map from key_id to result object
         """
+        ts_valid_until_ms = response_json[u"valid_until_ts"]
 
         # start by extracting the keys from the response, since they may be required
         # to validate the signature on the response.
@@ -595,7 +611,9 @@ class Keyring(object):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
                 verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_keys[key_id] = verify_key
+                verify_keys[key_id] = FetchKeyResult(
+                    verify_key=verify_key, valid_until_ts=ts_valid_until_ms
+                )
 
         # TODO: improve this signature checking
         server_name = response_json["server_name"]
@@ -606,7 +624,7 @@ class Keyring(object):
                 )
 
             verify_signed_json(
-                response_json, server_name, verify_keys[key_id]
+                response_json, server_name, verify_keys[key_id].verify_key
             )
 
         for key_id, key_data in response_json["old_verify_keys"].items():
@@ -614,7 +632,9 @@ class Keyring(object):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
                 verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_keys[key_id] = verify_key
+                verify_keys[key_id] = FetchKeyResult(
+                    verify_key=verify_key, valid_until_ts=key_data["expired_ts"]
+                )
 
         # re-sign the json with our own key, so that it is ready if we are asked to
         # give it out as a notary server
@@ -623,7 +643,6 @@ class Keyring(object):
         )
 
         signed_key_json_bytes = encode_canonical_json(signed_key_json)
-        ts_valid_until_ms = signed_key_json[u"valid_until_ts"]
 
         # for reasons I don't quite understand, we store this json for the key ids we
         # requested, as well as those we got.
