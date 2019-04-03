@@ -161,10 +161,10 @@ class StateHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
-    def get_current_user_in_room(self, room_id, latest_event_ids=None):
+    def get_current_users_in_room(self, room_id, latest_event_ids=None):
         if not latest_event_ids:
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
-        logger.debug("calling resolve_state_groups from get_current_user_in_room")
+        logger.debug("calling resolve_state_groups from get_current_users_in_room")
         entry = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
         joined_users = yield self.store.get_joined_users_from_state(room_id, entry)
         defer.returnValue(joined_users)

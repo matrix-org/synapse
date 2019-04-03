@@ -1049,11 +1049,11 @@ class SyncHandler(object):
             # TODO: Be more clever than this, i.e. remove users who we already
             # share a room with?
             for room_id in newly_joined_rooms:
-                joined_users = yield self.state.get_current_user_in_room(room_id)
+                joined_users = yield self.state.get_current_users_in_room(room_id)
                 newly_joined_users.update(joined_users)
 
             for room_id in newly_left_rooms:
-                left_users = yield self.state.get_current_user_in_room(room_id)
+                left_users = yield self.state.get_current_users_in_room(room_id)
                 newly_left_users.update(left_users)
 
             # TODO: Check that these users are actually new, i.e. either they
@@ -1213,7 +1213,7 @@ class SyncHandler(object):
 
         extra_users_ids = set(newly_joined_users)
         for room_id in newly_joined_rooms:
-            users = yield self.state.get_current_user_in_room(room_id)
+            users = yield self.state.get_current_users_in_room(room_id)
             extra_users_ids.update(users)
         extra_users_ids.discard(user.to_string())
 
@@ -1855,7 +1855,7 @@ class SyncHandler(object):
             extrems = yield self.store.get_forward_extremeties_for_room(
                 room_id, stream_ordering,
             )
-            users_in_room = yield self.state.get_current_user_in_room(
+            users_in_room = yield self.state.get_current_users_in_room(
                 room_id, extrems,
             )
             if user_id in users_in_room:

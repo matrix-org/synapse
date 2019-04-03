@@ -883,7 +883,7 @@ class PresenceHandler(object):
             # TODO: Check that this is actually a new server joining the
             # room.
 
-            user_ids = yield self.state.get_current_user_in_room(room_id)
+            user_ids = yield self.state.get_current_users_in_room(room_id)
             user_ids = list(filter(self.is_mine_id, user_ids))
 
             states = yield self.current_state_for_users(user_ids)

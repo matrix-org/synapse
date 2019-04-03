@@ -167,7 +167,7 @@ class RoomListHandler(BaseHandler):
                 if not latest_event_ids:
                     return
 
-                joined_users = yield self.state_handler.get_current_user_in_room(
+                joined_users = yield self.state_handler.get_current_users_in_room(
                     room_id, latest_event_ids,
                 )
 
