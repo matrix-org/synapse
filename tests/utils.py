@@ -136,9 +136,9 @@ def default_config(name):
     config.worker_app = None
     config.email_enable_notifs = False
     config.block_non_admin_invites = False
-    config.federation_domain_whitelist = []
-    config.federation_certificate_verification_whitelist = []
-    config.federation_custom_ca_list = []
+    config.federation_domain_whitelist = None
+    config.federation_certificate_verification_whitelist = None
+    config.federation_custom_ca_list = None
     config.federation_verify_certificates = False
     config.federation_rc_reject_limit = 10
     config.federation_rc_sleep_limit = 10
