@@ -132,6 +132,14 @@ class IdentityHandler(BaseHandler):
                 }
             )
             logger.debug("bound threepid %r to %s", creds, mxid)
+
+            # Remember where we bound the threepid
+            yield self.store.add_user_bound_threepid(
+                user_id=mxid,
+                medium=data["medium"],
+                address=data["address"],
+                id_server=id_server,
+            )
         except CodeMessageException as e:
             data = json.loads(e.msg)  # XXX WAT?
         defer.returnValue(data)
@@ -142,7 +150,46 @@ class IdentityHandler(BaseHandler):
 
         Args:
             mxid (str): Matrix user ID of binding to be removed
+            threepid (dict): Dict with medium & address of binding to be
+                removed, and an optional id_server.
+
+        Raises:
+            SynapseError: If we failed to contact the identity server
+
+        Returns:
+            Deferred[bool]: True on success, otherwise False if the identity
+            server doesn't support unbinding (or no identity server found to
+            contact).
+        """
+        if threepid.get("id_server"):
+            id_servers = [threepid["id_server"]]
+        else:
+            id_servers = yield self.store.get_id_servers_user_bound(
+                user_id=mxid,
+                medium=threepid["medium"],
+                address=threepid["address"],
+            )
+
+        # We don't know where to unbind, so we don't have a choice but to return
+        if not id_servers:
+            defer.returnValue(False)
+
+        changed = True
+        for id_server in id_servers:
+            changed &= yield self.try_unbind_threepid_with_id_server(
+                mxid, threepid, id_server,
+            )
+
+        defer.returnValue(changed)
+
+    @defer.inlineCallbacks
+    def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
+        """Removes a binding from an identity server
+
+        Args:
+            mxid (str): Matrix user ID of binding to be removed
             threepid (dict): Dict with medium & address of binding to be removed
+            id_server (str): Identity server to unbind from
 
         Raises:
             SynapseError: If we failed to contact the identity server
@@ -151,21 +198,13 @@ class IdentityHandler(BaseHandler):
             Deferred[bool]: True on success, otherwise False if the identity
             server doesn't support unbinding
         """
-        logger.debug("unbinding threepid %r from %s", threepid, mxid)
-        if not self.trusted_id_servers:
-            logger.warn("Can't unbind threepid: no trusted ID servers set in config")
-            defer.returnValue(False)
-
-        # We don't track what ID server we added 3pids on (perhaps we ought to)
-        # but we assume that any of the servers in the trusted list are in the
-        # same ID server federation, so we can pick any one of them to send the
-        # deletion request to.
-        id_server = next(iter(self.trusted_id_servers))
-
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
         content = {
             "mxid": mxid,
-            "threepid": threepid,
+            "threepid": {
+                "medium": threepid["medium"],
+                "address": threepid["address"],
+            },
         }
 
         # we abuse the federation http client to sign the request, but we have to send it
@@ -188,16 +227,24 @@ class IdentityHandler(BaseHandler):
                 content,
                 headers,
             )
+            changed = True
         except HttpResponseException as e:
+            changed = False
             if e.code in (400, 404, 501,):
                 # The remote server probably doesn't support unbinding (yet)
                 logger.warn("Received %d response while unbinding threepid", e.code)
-                defer.returnValue(False)
             else:
                 logger.error("Failed to unbind threepid on identity server: %s", e)
                 raise SynapseError(502, "Failed to contact identity server")
 
-        defer.returnValue(True)
+        yield self.store.remove_user_bound_threepid(
+            user_id=mxid,
+            medium=threepid["medium"],
+            address=threepid["address"],
+            id_server=id_server,
+        )
+
+        defer.returnValue(changed)
 
     @defer.inlineCallbacks
     def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):

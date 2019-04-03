@@ -121,9 +121,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
-        def get_current_user_in_room(room_id):
+        def get_current_users_in_room(room_id):
             return set(str(u) for u in self.room_members)
-        hs.get_state_handler().get_current_user_in_room = get_current_user_in_room
+        hs.get_state_handler().get_current_users_in_room = get_current_users_in_room
 
         self.datastore.get_user_directory_stream_pos.return_value = (
             # we deliberately return a non-None stream pos to avoid doing an initial_spam
