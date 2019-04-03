@@ -259,23 +259,16 @@ listeners:
 
 # Whether to verify TLS certificates when sending federation traffic.
 #
-# This currently defaults to `false`, however this will change in
-# Synapse 1.0 when valid federation certificates will be required.
-#
 #federation_verify_certificates: true
 
-# Skip federation certificate validation on the following whitelist of
-# domains.
-#
-# Note that this should only be used within the context of private
-# federation as it will otherwise break things.
-#
-# Only effective if federation_verify_certicates is `true`.
+# Prevent federation certificate validation on the following whitelist
+# of domains. Only effective if federation_verify_certicates is true.
 #
 #federation_certificate_validation_whitelist:
 #  - lon.example.com
 #  - nyc.example.com
 #  - syd.example.com
+
 
 # List of custom certificate authorities for federation traffic.
 #

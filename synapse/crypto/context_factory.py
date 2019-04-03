@@ -131,7 +131,6 @@ class ClientTLSOptionsFactory(object):
 
     def __init__(self, config):
         self._config = config
-
         self._options_noverify = CertificateOptions()
 
         # Check if we're using a custom list of a CA certificates

@@ -242,15 +242,15 @@ class TlsConfig(Config):
         #
         #federation_verify_certificates: true
 
-        # Skip federation certificate validation on the following whitelist of
-        # domains.
+        # Skip federation certificate verification on the following whitelist
+        # of domains.
         #
         # Note that this should only be used within the context of private
         # federation as it will otherwise break things.
         #
         # Only effective if federation_verify_certicates is `true`.
         #
-        #federation_certificate_validation_whitelist:
+        #federation_certificate_verification_whitelist:
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com
