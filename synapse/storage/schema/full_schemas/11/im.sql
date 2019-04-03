@@ -14,7 +14,7 @@
  */
 
  /* We used to create a tables called room_hosts and feedback,
- * but these are no longer used and are removed in delta 54.
+ * but these are no longer used and are removed in delta 55.
  */
 
 CREATE TABLE IF NOT EXISTS events(
