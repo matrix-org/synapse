@@ -47,6 +47,8 @@ ABSOLUTE_STATS_FIELDS = {
     ),
 }
 
+TYPE_TO_ROOM = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
+
 TEMP_TABLE = "_temp_populate_stats"
 
 
@@ -145,21 +147,20 @@ class StatsStore(StateDeltasStore):
             yield self.delete_all_stats()
 
         def _get_next_batch(txn):
+            # Only fetch 250 rooms, so we don't fetch too many at once, even
+            # if those 250 rooms have less than batch_size state events.
             sql = """
-                SELECT room_id FROM %s
+                SELECT room_id, events FROM %s_rooms
                 ORDER BY events DESC
-                LIMIT %s
+                LIMIT 250
             """ % (
-                TEMP_TABLE + "_rooms",
-                str(batch_size),
+                TEMP_TABLE,
             )
             txn.execute(sql)
             rooms_to_work_on = txn.fetchall()
 
             if not rooms_to_work_on:
                 return None
-
-            rooms_to_work_on = [x[0] for x in rooms_to_work_on]
 
             # Get how many are left to process, so we can give status on how
             # far we are in processing
@@ -182,7 +183,10 @@ class StatsStore(StateDeltasStore):
             % (len(rooms_to_work_on), progress["remaining"])
         )
 
-        for room_id in rooms_to_work_on:
+        # Number of state events we've processed by going through each room
+        processed_event_count = 0
+
+        for room_id, event_count in rooms_to_work_on:
 
             current_state_ids = yield self.get_current_state_ids(room_id)
 
@@ -232,10 +236,7 @@ class StatsStore(StateDeltasStore):
             now = self.hs.get_reactor().seconds()
 
             # quantise time to the nearest bucket
-            now = (
-                (now // self.stats_bucket_size)
-                * self.stats_bucket_size
-            )
+            now = (now // self.stats_bucket_size) * self.stats_bucket_size
 
             def _fetch_data(txn):
 
@@ -297,7 +298,13 @@ class StatsStore(StateDeltasStore):
                 progress,
             )
 
-        defer.returnValue(len(rooms_to_work_on))
+            processed_event_count += event_count
+
+            if processed_event_count > batch_size:
+                # Don't process any more rooms, we've hit our batch size.
+                defer.returnValue(processed_event_count)
+
+        defer.returnValue(processed_event_count)
 
     def delete_all_stats(self):
         """
@@ -340,8 +347,11 @@ class StatsStore(StateDeltasStore):
         return self._simple_select_list_paginate(
             "room_stats",
             {"room_id": room_id},
-            (("ts", "DESC"), size, start),
+            "ts",
+            start,
+            size,
             retcols=list(ABSOLUTE_STATS_FIELDS["room"]) + ["ts"],
+            order_direction="DESC",
         )
 
     def get_all_room_state(self):
@@ -351,6 +361,12 @@ class StatsStore(StateDeltasStore):
 
     @cached()
     def get_earliest_token_for_room_stats(self, room_id):
+        """
+        Fetch the "earliest token". This is used by the room stats delta
+        processor to ignore deltas that have been processed between the
+        start of the background task and any particular room's stats
+        being calculated.
+        """
         return self._simple_select_one_onecol(
             "room_stats_earliest_token",
             {"room_id": room_id},
@@ -359,25 +375,23 @@ class StatsStore(StateDeltasStore):
         )
 
     def update_stats(self, stats_type, stats_id, ts, fields):
+        table, id_col = TYPE_TO_ROOM[stats_type]
         return self._simple_upsert(
-            table=("%s_stats" % stats_type),
-            keyvalues={("%s_id" % stats_type): stats_id, "ts": ts},
+            table=table,
+            keyvalues={id_col: stats_id, "ts": ts},
             values=fields,
             desc="update_stats",
         )
 
     def _update_stats_txn(self, txn, stats_type, stats_id, ts, fields):
+        table, id_col = TYPE_TO_ROOM[stats_type]
         return self._simple_upsert_txn(
-            txn,
-            table=("%s_stats" % stats_type),
-            keyvalues={("%s_id" % stats_type): stats_id, "ts": ts},
-            values=fields,
+            txn, table=table, keyvalues={id_col: stats_id, "ts": ts}, values=fields
         )
 
     def update_stats_delta(self, ts, stats_type, stats_id, field, value):
         def _update_stats_delta(txn):
-            table = "%s_stats" % stats_type
-            id_col = "%s_id" % stats_type
+            table, id_col = TYPE_TO_ROOM[stats_type]
 
             sql = (
                 "SELECT * FROM %s"
@@ -402,7 +416,9 @@ class StatsStore(StateDeltasStore):
                 current_ts = latest_ts
             elif ts != latest_ts:
                 # we have to copy our absolute counters over to the new entry.
-                values = {key: rows[0][key] for key in ABSOLUTE_STATS_FIELDS[stats_type]}
+                values = {
+                    key: rows[0][key] for key in ABSOLUTE_STATS_FIELDS[stats_type]
+                }
                 values[id_col] = stats_id
                 values["ts"] = ts
                 values["bucket_size"] = self.stats_bucket_size
@@ -422,7 +438,7 @@ class StatsStore(StateDeltasStore):
                     updatevalues={field: value},
                 )
             else:
-                sql = ("UPDATE %s " " SET %s=%s+? WHERE %s=? AND ts=?") % (
+                sql = ("UPDATE %s SET %s=%s+? WHERE %s=? AND ts=?") % (
                     table,
                     field,
                     field,
