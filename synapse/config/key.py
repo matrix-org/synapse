@@ -42,7 +42,8 @@ class KeyConfig(Config):
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])
         else:
-            self.signing_key = self.read_signing_key(config["signing_key_path"])
+            self.signing_key_path = config["signing_key_path"]
+            self.signing_key = self.read_signing_key(self.signing_key_path)
 
         self.old_signing_keys = self.read_old_signing_keys(
             config.get("old_signing_keys", {})

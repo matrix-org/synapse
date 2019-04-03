@@ -69,6 +69,7 @@ class EventTypes(object):
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
     Encryption = "m.room.encryption"
+    RelatedGroups = "m.room.related_groups"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
