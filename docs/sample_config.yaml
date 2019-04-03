@@ -661,6 +661,11 @@ uploads_path: "DATADIR/uploads"
 #
 #register_mxid_from_3pid: email
 
+# Uncomment to set the display name of new users to their email address,
+# rather than using the default heuristic.
+#
+#register_just_use_email_for_display_name: true
+
 # Mandate that users are only allowed to associate certain formats of
 # 3PIDs with accounts on this server.
 #
