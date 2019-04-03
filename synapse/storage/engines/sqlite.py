@@ -82,9 +82,10 @@ class Sqlite3Engine(object):
 
 # Following functions taken from: https://github.com/coleifer/peewee
 
+
 def _parse_match_info(buf):
     bufsize = len(buf)
-    return [struct.unpack('@I', buf[i:i + 4])[0] for i in range(0, bufsize, 4)]
+    return [struct.unpack('@I', buf[i : i + 4])[0] for i in range(0, bufsize, 4)]
 
 
 def _rank(raw_match_info):
@@ -98,7 +99,7 @@ def _rank(raw_match_info):
         phrase_info_idx = 2 + (phrase_num * c * 3)
         for col_num in range(c):
             col_idx = phrase_info_idx + (col_num * 3)
-            x1, x2 = match_info[col_idx:col_idx + 2]
+            x1, x2 = match_info[col_idx : col_idx + 2]
             if x1 > 0:
                 score += float(x1) / x2
     return score

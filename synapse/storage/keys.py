@@ -56,12 +56,13 @@ class KeyStore(SQLBaseStore):
             desc="get_server_certificate",
         )
         tls_certificate = OpenSSL.crypto.load_certificate(
-            OpenSSL.crypto.FILETYPE_ASN1, tls_certificate_bytes,
+            OpenSSL.crypto.FILETYPE_ASN1, tls_certificate_bytes
         )
         defer.returnValue(tls_certificate)
 
-    def store_server_certificate(self, server_name, from_server, time_now_ms,
-                                 tls_certificate):
+    def store_server_certificate(
+        self, server_name, from_server, time_now_ms, tls_certificate
+    ):
         """Stores the TLS X.509 certificate for the given server
         Args:
             server_name (str): The name of the server.
@@ -75,10 +76,7 @@ class KeyStore(SQLBaseStore):
         fingerprint = hashlib.sha256(tls_certificate_bytes).hexdigest()
         return self._simple_upsert(
             table="server_tls_certificates",
-            keyvalues={
-                "server_name": server_name,
-                "fingerprint": fingerprint,
-            },
+            keyvalues={"server_name": server_name, "fingerprint": fingerprint},
             values={
                 "from_server": from_server,
                 "ts_added_ms": time_now_ms,
@@ -91,19 +89,14 @@ class KeyStore(SQLBaseStore):
     def _get_server_verify_key(self, server_name, key_id):
         verify_key_bytes = yield self._simple_select_one_onecol(
             table="server_signature_keys",
-            keyvalues={
-                "server_name": server_name,
-                "key_id": key_id,
-            },
+            keyvalues={"server_name": server_name, "key_id": key_id},
             retcol="verify_key",
             desc="_get_server_verify_key",
             allow_none=True,
         )
 
         if verify_key_bytes:
-            defer.returnValue(decode_verify_key_bytes(
-                key_id, bytes(verify_key_bytes)
-            ))
+            defer.returnValue(decode_verify_key_bytes(key_id, bytes(verify_key_bytes)))
 
     @defer.inlineCallbacks
     def get_server_verify_keys(self, server_name, key_ids):
@@ -123,8 +116,9 @@ class KeyStore(SQLBaseStore):
                 keys[key_id] = key
         defer.returnValue(keys)
 
-    def store_server_verify_key(self, server_name, from_server, time_now_ms,
-                                verify_key):
+    def store_server_verify_key(
+        self, server_name, from_server, time_now_ms, verify_key
+    ):
         """Stores a NACL verification key for the given server.
         Args:
             server_name (str): The name of the server.
@@ -139,10 +133,7 @@ class KeyStore(SQLBaseStore):
             self._simple_upsert_txn(
                 txn,
                 table="server_signature_keys",
-                keyvalues={
-                    "server_name": server_name,
-                    "key_id": key_id,
-                },
+                keyvalues={"server_name": server_name, "key_id": key_id},
                 values={
                     "from_server": from_server,
                     "ts_added_ms": time_now_ms,
@@ -150,14 +141,14 @@ class KeyStore(SQLBaseStore):
                 },
             )
             txn.call_after(
-                self._get_server_verify_key.invalidate,
-                (server_name, key_id)
+                self._get_server_verify_key.invalidate, (server_name, key_id)
             )
 
         return self.runInteraction("store_server_verify_key", _txn)
 
-    def store_server_keys_json(self, server_name, key_id, from_server,
-                               ts_now_ms, ts_expires_ms, key_json_bytes):
+    def store_server_keys_json(
+        self, server_name, key_id, from_server, ts_now_ms, ts_expires_ms, key_json_bytes
+    ):
         """Stores the JSON bytes for a set of keys from a server
         The JSON should be signed by the originating server, the intermediate
         server, and by this server. Updates the value for the
@@ -200,6 +191,7 @@ class KeyStore(SQLBaseStore):
             Dict mapping (server_name, key_id, source) triplets to dicts with
             "ts_valid_until_ms" and "key_json" keys.
         """
+
         def _get_server_keys_json_txn(txn):
             results = {}
             for server_name, key_id, from_server in server_keys:
@@ -222,6 +214,5 @@ class KeyStore(SQLBaseStore):
                 )
                 results[(server_name, key_id, from_server)] = rows
             return results
-        return self.runInteraction(
-            "get_server_keys_json", _get_server_keys_json_txn
-        )
+
+        return self.runInteraction("get_server_keys_json", _get_server_keys_json_txn)

@@ -23,7 +23,7 @@ class PostgresEngine(object):
         self.module = database_module
         self.module.extensions.register_type(self.module.extensions.UNICODE)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
-        self._version = None   # unknown as yet
+        self._version = None  # unknown as yet
 
     def check_database(self, txn):
         txn.execute("SHOW SERVER_ENCODING")
@@ -31,8 +31,7 @@ class PostgresEngine(object):
         if rows and rows[0][0] != "UTF8":
             raise IncorrectDatabaseSetup(
                 "Database has incorrect encoding: '%s' instead of 'UTF8'\n"
-                "See docs/postgres.rst for more information."
-                % (rows[0][0],)
+                "See docs/postgres.rst for more information." % (rows[0][0],)
             )
 
     def convert_param_style(self, sql):
@@ -103,12 +102,6 @@ class PostgresEngine(object):
 
         # https://www.postgresql.org/docs/current/libpq-status.html#LIBPQ-PQSERVERVERSION
         if numver >= 100000:
-            return "%i.%i" % (
-                numver / 10000, numver % 10000,
-            )
+            return "%i.%i" % (numver / 10000, numver % 10000)
         else:
-            return "%i.%i.%i" % (
-                numver / 10000,
-                (numver % 10000) / 100,
-                numver % 100,
-            )
+            return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)

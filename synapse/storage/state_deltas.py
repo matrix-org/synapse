@@ -21,10 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 class StateDeltasStore(SQLBaseStore):
-
     def get_current_state_deltas(self, prev_stream_id):
         prev_stream_id = int(prev_stream_id)
-        if not self._curr_state_delta_stream_cache.has_any_entity_changed(prev_stream_id):
+        if not self._curr_state_delta_stream_cache.has_any_entity_changed(
+            prev_stream_id
+        ):
             return []
 
         def get_current_state_deltas_txn(txn):
@@ -58,7 +59,7 @@ class StateDeltasStore(SQLBaseStore):
                 WHERE ? < stream_id AND stream_id <= ?
                 ORDER BY stream_id ASC
             """
-            txn.execute(sql, (prev_stream_id, max_stream_id,))
+            txn.execute(sql, (prev_stream_id, max_stream_id))
             return self.cursor_to_dict(txn)
 
         return self.runInteraction(
