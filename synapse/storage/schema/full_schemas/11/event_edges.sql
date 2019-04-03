@@ -15,7 +15,7 @@
 
 /* We used to create a tables called event_destinations and
  * state_forward_extremities, but these are no longer used and are removed in
- * delta 55.
+ * delta 54.
  */
 
 CREATE TABLE IF NOT EXISTS event_forward_extremities(

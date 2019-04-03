@@ -15,7 +15,7 @@
 
 
 /* We used to create a table called current_state_resets, but this is no
- * longer used and is removed in delta 55.
+ * longer used and is removed in delta 54.
  */
 
 /* The outlier events that have aquired a state group typically through

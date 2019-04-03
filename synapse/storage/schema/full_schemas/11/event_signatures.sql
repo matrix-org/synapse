@@ -14,7 +14,7 @@
  */
 
 /* We used to create a tables called event_content_hashes, event_signatures and
- * event_edge_hashes, but these are no longer used and are removed in delta 55.
+ * event_edge_hashes, but these are no longer used and are removed in delta 54.
  */
 
 CREATE TABLE IF NOT EXISTS event_reference_hashes (
