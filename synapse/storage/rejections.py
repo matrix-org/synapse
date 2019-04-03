@@ -36,9 +36,7 @@ class RejectionsStore(SQLBaseStore):
         return self._simple_select_one_onecol(
             table="rejections",
             retcol="reason",
-            keyvalues={
-                "event_id": event_id,
-            },
+            keyvalues={"event_id": event_id},
             allow_none=True,
             desc="get_rejection_reason",
         )
