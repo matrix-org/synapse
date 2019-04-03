@@ -1179,14 +1179,10 @@ class EventsStore(
             "events",
             "event_auth",
             "event_json",
-            "event_content_hashes",
-            "event_destinations",
-            "event_edge_hashes",
             "event_edges",
             "event_forward_extremities",
             "event_reference_hashes",
             "event_search",
-            "event_signatures",
             "event_to_state_groups",
             "guest_access",
             "history_visibility",
@@ -1857,16 +1853,12 @@ class EventsStore(
         # Tables that should be pruned:
         #     event_auth
         #     event_backward_extremities
-        #     event_content_hashes
-        #     event_destinations
-        #     event_edge_hashes
         #     event_edges
         #     event_forward_extremities
         #     event_json
         #     event_push_actions
         #     event_reference_hashes
         #     event_search
-        #     event_signatures
         #     event_to_state_groups
         #     events
         #     rejections
@@ -2065,14 +2057,10 @@ class EventsStore(
             "events",
             "event_json",
             "event_auth",
-            "event_content_hashes",
-            "event_destinations",
-            "event_edge_hashes",
             "event_edges",
             "event_forward_extremities",
             "event_reference_hashes",
             "event_search",
-            "event_signatures",
             "rejections",
         ):
             logger.info("[purge] removing events from %s", table)

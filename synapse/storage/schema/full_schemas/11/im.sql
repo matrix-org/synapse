@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 
+ /* We used to create a tables called room_hosts and feedback,
+ * but these are no longer used and are removed in delta 54.
+ */
+
 CREATE TABLE IF NOT EXISTS events(
     stream_ordering INTEGER PRIMARY KEY AUTOINCREMENT,
     topological_ordering BIGINT NOT NULL,
@@ -82,14 +86,6 @@ CREATE INDEX room_memberships_event_id ON room_memberships (event_id);
 CREATE INDEX room_memberships_room_id ON room_memberships (room_id);
 CREATE INDEX room_memberships_user_id ON room_memberships (user_id);
 
-CREATE TABLE IF NOT EXISTS feedback(
-    event_id TEXT NOT NULL,
-    feedback_type TEXT,
-    target_event_id TEXT,
-    sender TEXT,
-    room_id TEXT
-);
-
 CREATE TABLE IF NOT EXISTS topics(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
@@ -113,11 +109,3 @@ CREATE TABLE IF NOT EXISTS rooms(
     is_public BOOL,
     creator TEXT
 );
-
-CREATE TABLE IF NOT EXISTS room_hosts(
-    room_id TEXT NOT NULL,
-    host TEXT NOT NULL,
-    UNIQUE (room_id, host)
-);
-
-CREATE INDEX room_hosts_room_id ON room_hosts (room_id);
