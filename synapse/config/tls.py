@@ -100,7 +100,7 @@ class TlsConfig(Config):
                     with open(ca_file, 'rb') as f:
                         content = f.read()
                 except Exception:
-                    logger.fatal("Failed to read custom CA certificate off disk!")
+                    logger.fatal("Failed to read custom CA certificate off disk")
                     raise
 
                 # Parse the CA certificates
@@ -108,7 +108,7 @@ class TlsConfig(Config):
                     cert_base = Certificate.loadPEM(content)
                     certs.append(cert_base)
                 except Exception:
-                    logger.fatal("Failed to parse custom CA certificate off disk!")
+                    logger.fatal("Failed to parse custom CA certificate off disk")
                     raise
 
             self.federation_custom_ca_list = trustRootFromCertificates(certs)
@@ -143,12 +143,12 @@ class TlsConfig(Config):
             with open(self.tls_certificate_file, 'rb') as f:
                 cert_pem = f.read()
         except Exception:
-            logger.fatal("Failed to read existing certificate off disk!")
+            logger.fatal("Failed to read existing certificate off disk")
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         except Exception:
-            logger.fatal("Failed to parse existing certificate off disk!")
+            logger.fatal("Failed to parse existing certificate off disk")
 
         if not allow_self_signed:
             if tls_certificate.get_subject() == tls_certificate.get_issuer():
