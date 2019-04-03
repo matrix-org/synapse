@@ -652,7 +652,7 @@ class Keyring(object):
                     self.store.store_server_keys_json,
                     server_name=server_name,
                     key_id=key_id,
-                    from_server=server_name,
+                    from_server=from_server,
                     ts_now_ms=time_now_ms,
                     ts_expires_ms=ts_valid_until_ms,
                     key_json_bytes=signed_key_json_bytes,
