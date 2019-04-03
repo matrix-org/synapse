@@ -42,6 +42,9 @@ class RegistrationConfig(Config):
 
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
+        self.register_just_use_email_for_display_name = config.get(
+            "register_just_use_email_for_display_name", False,
+        )
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config.get(
@@ -110,6 +113,11 @@ class RegistrationConfig(Config):
         # users failing to register if they don't specify the right kind of 3pid.
         #
         #register_mxid_from_3pid: email
+
+        # Uncomment to set the display name of new users to their email address,
+        # rather than using the default heuristic.
+        #
+        #register_just_use_email_for_display_name: true
 
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.

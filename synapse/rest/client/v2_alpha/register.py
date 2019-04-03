@@ -454,21 +454,24 @@ class RegisterRestServlet(RestServlet):
                                 # something else went wrong.
                                 break
 
-                    # XXX: a nasty heuristic to turn an email address into
-                    # a displayname, as part of register_mxid_from_3pid
-                    parts = address.replace('.', ' ').split('@')
-                    org_parts = parts[1].split(' ')
-
-                    if org_parts[-2] == "matrix" and org_parts[-1] == "org":
-                        org = "Tchap Admin"
-                    elif org_parts[-2] == "gouv" and org_parts[-1] == "fr":
-                        org = org_parts[-3] if len(org_parts) > 2 else org_parts[-2]
+                    if self.config.register_just_use_email_for_display_name:
+                        desired_display_name = address
                     else:
-                        org = org_parts[-2]
+                        # XXX: a nasty heuristic to turn an email address into
+                        # a displayname, as part of register_mxid_from_3pid
+                        parts = address.replace('.', ' ').split('@')
+                        org_parts = parts[1].split(' ')
 
-                    desired_display_name = (
-                        capwords(parts[0]) + " [" + capwords(org) + "]"
-                    )
+                        if org_parts[-2] == "matrix" and org_parts[-1] == "org":
+                            org = "Tchap Admin"
+                        elif org_parts[-2] == "gouv" and org_parts[-1] == "fr":
+                            org = org_parts[-3] if len(org_parts) > 2 else org_parts[-2]
+                        else:
+                            org = org_parts[-2]
+
+                        desired_display_name = (
+                            capwords(parts[0]) + " [" + capwords(org) + "]"
+                        )
                 elif (
                     self.hs.config.register_mxid_from_3pid == 'msisdn' and
                     LoginType.MSISDN in auth_result
