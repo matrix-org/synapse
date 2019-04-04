@@ -693,6 +693,10 @@ uploads_path: "DATADIR/uploads"
 #
 #disable_3pid_changes: False
 
+# Enable 3PIDs lookup requests to identity servers from this server.
+#
+#enable_3pid_lookup: true
+
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
 #

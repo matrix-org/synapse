@@ -40,6 +40,7 @@ class RegistrationConfig(Config):
 
         self.disable_3pid_changes = config.get("disable_3pid_changes", False)
 
+        self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
         self.register_just_use_email_for_display_name = config.get(
@@ -145,6 +146,10 @@ class RegistrationConfig(Config):
         # their accounts.
         #
         #disable_3pid_changes: False
+
+        # Enable 3PIDs lookup requests to identity servers from this server.
+        #
+        #enable_3pid_lookup: true
 
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.

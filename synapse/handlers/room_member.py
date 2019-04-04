@@ -71,6 +71,7 @@ class RoomMemberHandler(object):
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
         self.rewrite_identity_server_urls = self.config.rewrite_identity_server_urls
+        self._enable_lookup = hs.config.enable_3pid_lookup
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -808,6 +809,10 @@ class RoomMemberHandler(object):
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
+        if not self._enable_lookup:
+            raise SynapseError(
+                403, "Looking up third-party identifiers is denied from this server",
+            )
         try:
             target = self._get_id_server_target(id_server)
             data = yield self.simple_http_client.get_json(
