@@ -18,6 +18,8 @@ import calendar
 import logging
 import time
 
+from twisted.internet import defer
+
 from synapse.api.constants import PresenceState
 from synapse.storage.devices import DeviceStore
 from synapse.storage.user_erasure_store import UserErasureStore
@@ -453,6 +455,7 @@ class DataStore(
             desc="get_users",
         )
 
+    @defer.inlineCallbacks
     def get_users_paginate(self, order, start, limit):
         """Function to reterive a paginated list of users from
         users list. This will return a json object, which contains
@@ -465,16 +468,19 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to json object {list[dict[str, Any]], count}
         """
-        is_guest = 0
-        i_start = (int)(start)
-        i_limit = (int)(limit)
-        return self.get_user_list_paginate(
+        users = yield self.runInteraction(
+            "get_users_paginate",
+            self._simple_select_list_paginate_txn,
             table="users",
-            keyvalues={"is_guest": is_guest},
-            pagevalues=[order, i_limit, i_start],
+            keyvalues={"is_guest": False},
+            orderby=order,
+            start=start,
+            limit=limit,
             retcols=["name", "password_hash", "is_guest", "admin"],
-            desc="get_users_paginate",
         )
+        count = yield self.runInteraction("get_users_paginate", self.get_user_count_txn)
+        retval = {"users": users, "total": count}
+        defer.returnValue(retval)
 
     def search_users(self, term):
         """Function to search users list for one or more users with

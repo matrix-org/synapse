@@ -595,7 +595,7 @@ class SQLBaseStore(object):
 
         Args:
             table (str): The table to upsert into
-            keyvalues (dict): The unique key tables and their new values
+            keyvalues (dict): The unique key columns and their new values
             values (dict): The nonunique columns and their new values
             insertion_values (dict): additional key/values to use only when
                 inserting
@@ -627,7 +627,7 @@ class SQLBaseStore(object):
 
                 # presumably we raced with another transaction: let's retry.
                 logger.warn(
-                    "%s when upserting into %s; retrying: %s", e.__name__, table, e
+                    "IntegrityError when upserting into %s; retrying: %s", table, e
                 )
 
     def _simple_upsert_txn(
@@ -1398,21 +1398,31 @@ class SQLBaseStore(object):
             return 0
 
     def _simple_select_list_paginate(
-        self, table, keyvalues, pagevalues, retcols, desc="_simple_select_list_paginate"
+        self,
+        table,
+        keyvalues,
+        orderby,
+        start,
+        limit,
+        retcols,
+        order_direction="ASC",
+        desc="_simple_select_list_paginate",
     ):
-        """Executes a SELECT query on the named table with start and limit,
+        """
+        Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
         returning the result as a list of dicts.
 
         Args:
             table (str): the table name
-            keyvalues (dict[str, Any] | None):
+            keyvalues (dict[str, T] | None):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
+            orderby (str): Column to order the results by.
+            start (int): Index to begin the query at.
+            limit (int): Number of results to return.
             retcols (iterable[str]): the names of the columns to return
-            order (str): order the select by this column
-            start (int): start number to begin the query from
-            limit (int): number of rows to reterive
+            order_direction (str): Whether the results should be ordered "ASC" or "DESC".
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
@@ -1421,15 +1431,27 @@ class SQLBaseStore(object):
             self._simple_select_list_paginate_txn,
             table,
             keyvalues,
-            pagevalues,
+            orderby,
+            start,
+            limit,
             retcols,
+            order_direction=order_direction,
         )
 
     @classmethod
     def _simple_select_list_paginate_txn(
-        cls, txn, table, keyvalues, pagevalues, retcols
+        cls,
+        txn,
+        table,
+        keyvalues,
+        orderby,
+        start,
+        limit,
+        retcols,
+        order_direction="ASC",
     ):
-        """Executes a SELECT query on the named table with start and limit,
+        """
+        Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
         returning the result as a list of dicts.
 
@@ -1439,64 +1461,30 @@ class SQLBaseStore(object):
             keyvalues (dict[str, T] | None):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
-            pagevalues ([]):
-                order (str): order the select by this column
-                start (int): start number to begin the query from
-                limit (int): number of rows to reterive
+            orderby (str): Column to order the results by.
+            start (int): Index to begin the query at.
+            limit (int): Number of results to return.
             retcols (iterable[str]): the names of the columns to return
+            order_direction (str): Whether the results should be ordered "ASC" or "DESC".
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
 
         """
         if keyvalues:
-            sql = "SELECT %s FROM %s WHERE %s ORDER BY %s" % (
-                ", ".join(retcols),
-                table,
-                " AND ".join("%s = ?" % (k,) for k in keyvalues),
-                " ? ASC LIMIT ? OFFSET ?",
-            )
-            txn.execute(sql, list(keyvalues.values()) + list(pagevalues))
+            where_clause = "WHERE " + " AND ".join("%s = ?" % (k,) for k in keyvalues)
         else:
-            sql = "SELECT %s FROM %s ORDER BY %s" % (
-                ", ".join(retcols),
-                table,
-                " ? ASC LIMIT ? OFFSET ?",
-            )
-            txn.execute(sql, pagevalues)
+            where_clause = ""
+
+        sql = "SELECT %s FROM %s %s ORDER BY %s %s LIMIT ? OFFSET ?" % (
+            ", ".join(retcols),
+            table,
+            where_clause,
+            orderby,
+            order_direction,
+        )
+        txn.execute(sql, list(keyvalues.values()) + [limit, start])
 
         return cls.cursor_to_dict(txn)
-
-    @defer.inlineCallbacks
-    def get_user_list_paginate(
-        self, table, keyvalues, pagevalues, retcols, desc="get_user_list_paginate"
-    ):
-        """Get a list of users from start row to a limit number of rows. This will
-        return a json object with users and total number of users in users list.
-
-        Args:
-            table (str): the table name
-            keyvalues (dict[str, Any] | None):
-                column names and values to select the rows with, or None to not
-                apply a WHERE clause.
-            pagevalues ([]):
-                order (str): order the select by this column
-                start (int): start number to begin the query from
-                limit (int): number of rows to reterive
-            retcols (iterable[str]): the names of the columns to return
-        Returns:
-            defer.Deferred: resolves to json object {list[dict[str, Any]], count}
-        """
-        users = yield self.runInteraction(
-            desc,
-            self._simple_select_list_paginate_txn,
-            table,
-            keyvalues,
-            pagevalues,
-            retcols,
-        )
-        count = yield self.runInteraction(desc, self.get_user_count_txn)
-        retval = {"users": users, "total": count}
-        defer.returnValue(retval)
 
     def get_user_count_txn(self, txn):
         """Get a total number of registered users in the users list.
