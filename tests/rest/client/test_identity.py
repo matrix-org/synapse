@@ -13,14 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import hashlib
-import hmac
 import json
 
-from mock import Mock
-
-from synapse.api.constants import UserTypes
-from synapse.rest.client.v1 import admin, room, login
+from synapse.rest.client.v1 import admin, login, room
 
 from tests import unittest
 
@@ -47,7 +42,9 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
 
-        request, channel = self.make_request(b"POST", "/createRoom", b"{}", access_token=tok)
+        request, channel = self.make_request(
+            b"POST", "/createRoom", b"{}", access_token=tok,
+        )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
@@ -61,6 +58,8 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         request_url = (
             "/rooms/%s/invite" % (room_id)
         ).encode('ascii')
-        request, channel = self.make_request(b"POST", request_url, request_data, access_token=tok)
+        request, channel = self.make_request(
+            b"POST", request_url, request_data, access_token=tok,
+        )
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
