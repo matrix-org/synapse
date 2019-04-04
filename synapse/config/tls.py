@@ -90,18 +90,19 @@ class TlsConfig(Config):
             self.federation_certificate_verification_whitelist[domain] = True
 
         # List of custom certificate authorities for federation traffic validation
-        self.federation_custom_ca_list = config.get(
+        custom_ca_list = config.get(
             "federation_custom_ca_list", None,
         )
 
         # Read in and parse custom CA certificates
-        if self.federation_custom_ca_list is not None:
-            if self.federation_custom_ca_list:
+        self.federation_ca_trust_root = None
+        if custom_ca_list is not None:
+            if len(custom_ca_list) == 0:
                 raise ConfigError("federation_custom_ca_list specified without "
                                   "any certificate files")
 
             certs = []
-            for ca_file in self.federation_custom_ca_list:
+            for ca_file in custom_ca_list:
                 logger.debug("Reading custom CA certificate file: %s", ca_file)
                 content = self.read_file(ca_file)
 
@@ -113,7 +114,7 @@ class TlsConfig(Config):
                     raise ConfigError("Error parsing custom CA certificate file %s: %s"
                                       % (ca_file, e))
 
-            self.federation_custom_ca_list = trustRootFromCertificates(certs)
+            self.federation_ca_trust_root = trustRootFromCertificates(certs)
 
         # This config option applies to non-federation HTTP clients
         # (e.g. for talking to recaptcha, identity servers, and such)
@@ -144,13 +145,15 @@ class TlsConfig(Config):
         try:
             with open(self.tls_certificate_file, 'rb') as f:
                 cert_pem = f.read()
-        except Exception:
-            logger.fatal("Failed to read existing certificate off disk")
+        except Exception as e:
+            raise ConfigError("Failed to read existing certificate file %s: %s"
+                              % (self.tls_certificate_file, e))
 
         try:
             tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
-        except Exception:
-            logger.fatal("Failed to parse existing certificate off disk")
+        except Exception as e:
+            raise ConfigError("Failed to parse existing certificate file %s: %s"
+                              % (self.tls_certificate_file, e))
 
         if not allow_self_signed:
             if tls_certificate.get_subject() == tls_certificate.get_issuer():
@@ -245,8 +248,8 @@ class TlsConfig(Config):
         # Skip federation certificate verification on the following whitelist
         # of domains.
         #
-        # Note that this should only be used within the context of private
-        # federation as it will otherwise break things.
+        # This setting should only normally be used within a private network of
+        # homeservers.
         #
         # Only effective if federation_verify_certicates is `true`.
         #
@@ -256,6 +259,9 @@ class TlsConfig(Config):
         #  - syd.example.com
 
         # List of custom certificate authorities for federation traffic.
+        #
+        # This setting should only normally be used within a private network of
+        # homeservers.
         #
         # Note that this list will replace those that are provided by your
         # operating environment. Certificates must be in PEM format.
