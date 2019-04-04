@@ -116,12 +116,12 @@ class ServerConfig(Config):
         )
 
         self.federation_domain_whitelist = None
-        if len(federation_domain_whitelist) > 0:
+        if federation_domain_whitelist is not None:
+            # turn the whitelist into a hash for speed of lookup
             self.federation_domain_whitelist = {}
 
-        # turn the whitelist into a hash for speed of lookup
-        for domain in federation_domain_whitelist:
-            self.federation_domain_whitelist[domain] = True
+            for domain in federation_domain_whitelist:
+                self.federation_domain_whitelist[domain] = True
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
