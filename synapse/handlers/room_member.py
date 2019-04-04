@@ -70,7 +70,8 @@ class RoomMemberHandler(object):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
-        self.rewrite_identity_server_urls = config.get("rewrite_identity_server_urls", {}) 
+        self.rewrite_identity_server_urls = self.config.get("rewrite_identity_server_urls", {})
+
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
         """Try and join a room that this server is not in
@@ -779,10 +780,11 @@ class RoomMemberHandler(object):
                 inviter,
                 txn_id=txn_id
             )
+
     def _get_id_server_target(self, id_server):
         """Looks up an id_server's actual http endpoint
 
-        Args: 
+        Args:
             id_server (str): the server name to lookup.
 
         Returns:
@@ -792,7 +794,6 @@ class RoomMemberHandler(object):
             return self.rewrite_identity_server_urls[id_server]
 
         return id_server
-
 
     @defer.inlineCallbacks
     def _lookup_3pid(self, id_server, medium, address):
