@@ -421,6 +421,9 @@ class RoomMemberHandler(object):
             room_id, latest_event_ids=latest_event_ids,
         )
 
+        # TODO: Refactor into dictionary of explicitly allowed transitions
+        # between old and new state, with specific error messages for some
+        # transitions and generic otherwise
         old_state_id = current_state_ids.get((EventTypes.Member, target.to_string()))
         if old_state_id:
             old_state = yield self.store.get_event(old_state_id, allow_none=True)
