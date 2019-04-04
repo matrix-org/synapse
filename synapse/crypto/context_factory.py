@@ -145,11 +145,11 @@ class ClientTLSOptionsFactory(object):
         should_verify = self._config.federation_verify_certificates
 
         # Check if we've disabled certificate verification for this host
-        if (
-            should_verify and
-            host in self._config.federation_certificate_verification_whitelist
-        ):
-            should_verify = False
+        if should_verify:
+            for regex in self._config.federation_certificate_verification_whitelist:
+                if regex.match(host):
+                    should_verify = False
+                    break
 
         if should_verify:
             return ClientTLSOptions(host, self._options_verify._makeContext())

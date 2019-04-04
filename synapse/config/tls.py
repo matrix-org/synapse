@@ -27,6 +27,7 @@ from OpenSSL import crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
+from synapse.util import glob_to_regex
 
 logger = logging.getLogger(__name__)
 
@@ -77,14 +78,16 @@ class TlsConfig(Config):
         )
 
         # Whitelist of domains to not verify certificates for
-        federation_certificate_verification_whitelist = config.get(
+        fed_whitelist_entries = config.get(
             "federation_certificate_verification_whitelist", [],
         )
 
-        # Store whitelisted domains in a hash for fast lookup
-        self.federation_certificate_verification_whitelist = {}
-        for domain in federation_certificate_verification_whitelist:
-            self.federation_certificate_verification_whitelist[domain] = True
+        # Support globs (*) in whitelist values
+        self.federation_certificate_verification_whitelist = []
+        for entry in fed_whitelist_entries:
+            # Convert globs to regex
+            entry_regex = glob_to_regex(entry)
+            self.federation_certificate_verification_whitelist.append(entry_regex)
 
         # List of custom certificate authorities for federation traffic validation
         custom_ca_list = config.get(
@@ -252,8 +255,8 @@ class TlsConfig(Config):
         #
         #federation_certificate_verification_whitelist:
         #  - lon.example.com
-        #  - nyc.example.com
-        #  - syd.example.com
+        #  - *.domain.com
+        #  - *.onion
 
         # List of custom certificate authorities for federation traffic.
         #

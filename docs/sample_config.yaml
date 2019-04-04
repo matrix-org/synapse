@@ -274,8 +274,8 @@ listeners:
 #
 #federation_certificate_verification_whitelist:
 #  - lon.example.com
-#  - nyc.example.com
-#  - syd.example.com
+#  - *.domain.com
+#  - *.onion
 
 # List of custom certificate authorities for federation traffic.
 #
