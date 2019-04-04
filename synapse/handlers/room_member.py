@@ -70,6 +70,7 @@ class RoomMemberHandler(object):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
+        self.rewrite_identity_server_urls = self.config.rewrite_identity_server_urls
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -780,6 +781,20 @@ class RoomMemberHandler(object):
                 txn_id=txn_id
             )
 
+    def _get_id_server_target(self, id_server):
+        """Looks up an id_server's actual http endpoint
+
+        Args:
+            id_server (str): the server name to lookup.
+
+        Returns:
+            the http endpoint to connect to.
+        """
+        if id_server in self.rewrite_identity_server_urls:
+            return self.rewrite_identity_server_urls[id_server]
+
+        return id_server
+
     @defer.inlineCallbacks
     def _lookup_3pid(self, id_server, medium, address):
         """Looks up a 3pid in the passed identity server.
@@ -794,8 +809,9 @@ class RoomMemberHandler(object):
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
         try:
+            target = self._get_id_server_target(id_server)
             data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),
+                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, target,),
                 {
                     "medium": medium,
                     "address": address,
@@ -817,9 +833,10 @@ class RoomMemberHandler(object):
         if server_hostname not in data["signatures"]:
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
+            target = self._get_id_server_target(server_hostname)
             key_data = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/pubkey/%s" %
-                (id_server_scheme, server_hostname, key_name,),
+                (id_server_scheme, target, key_name,),
             )
             if "public_key" not in key_data:
                 raise AuthError(401, "No public key named %s from %s" %
@@ -956,8 +973,9 @@ class RoomMemberHandler(object):
                     user.
         """
 
+        target = self._get_id_server_target(id_server)
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
-            id_server_scheme, id_server,
+            id_server_scheme, target,
         )
 
         invite_config = {
@@ -997,7 +1015,7 @@ class RoomMemberHandler(object):
             fallback_public_key = {
                 "public_key": data["public_key"],
                 "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-                    id_server_scheme, id_server,
+                    id_server_scheme, target,
                 ),
             }
         else:
