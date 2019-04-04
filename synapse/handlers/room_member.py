@@ -70,7 +70,9 @@ class RoomMemberHandler(object):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
-        self.rewrite_identity_server_urls = self.config.get("rewrite_identity_server_urls", {})
+        self.rewrite_identity_server_urls = self.config.get(
+            "rewrite_identity_server_urls", {}
+        )
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
