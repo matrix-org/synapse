@@ -21,6 +21,7 @@ from mock import Mock
 
 from synapse.api.constants import UserTypes
 from synapse.rest.client.v1 import admin, events, login, room
+from synapse.rest.client.v2_alpha import groups
 
 from tests import unittest
 
@@ -490,3 +491,126 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             expect_code, int(channel.result["code"]), msg=channel.result["body"],
         )
+
+
+class DeleteGroupTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        groups.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        self.other_user = self.register_user("user", "pass")
+        self.other_user_token = self.login("user", "pass")
+
+    def test_delete_group(self):
+        # Create a new group
+        request, channel = self.make_request(
+            "POST",
+            "/create_group".encode('ascii'),
+            access_token=self.admin_user_tok,
+            content={
+                "localpart": "test",
+            }
+        )
+
+        self.render(request)
+        self.assertEqual(
+            200, int(channel.result["code"]), msg=channel.result["body"],
+        )
+
+        group_id = channel.json_body["group_id"]
+
+        self._check_group(group_id, expect_code=200)
+
+        # Invite/join another user
+
+        url = "/groups/%s/admin/users/invite/%s" % (group_id, self.other_user)
+        request, channel = self.make_request(
+            "PUT",
+            url.encode('ascii'),
+            access_token=self.admin_user_tok,
+            content={}
+        )
+        self.render(request)
+        self.assertEqual(
+            200, int(channel.result["code"]), msg=channel.result["body"],
+        )
+
+        url = "/groups/%s/self/accept_invite" % (group_id,)
+        request, channel = self.make_request(
+            "PUT",
+            url.encode('ascii'),
+            access_token=self.other_user_token,
+            content={}
+        )
+        self.render(request)
+        self.assertEqual(
+            200, int(channel.result["code"]), msg=channel.result["body"],
+        )
+
+        # Check other user knows they're in the group
+        self.assertIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
+        self.assertIn(group_id, self._get_groups_user_is_in(self.other_user_token))
+
+        # Now delete the group
+        url = "/admin/delete_group/" + group_id
+        request, channel = self.make_request(
+            "POST",
+            url.encode('ascii'),
+            access_token=self.admin_user_tok,
+            content={
+                "localpart": "test",
+            }
+        )
+
+        self.render(request)
+        self.assertEqual(
+            200, int(channel.result["code"]), msg=channel.result["body"],
+        )
+
+        # Check group returns 404
+        self._check_group(group_id, expect_code=404)
+
+        # Check users don't think they're in the group
+        self.assertNotIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
+        self.assertNotIn(group_id, self._get_groups_user_is_in(self.other_user_token))
+
+    def _check_group(self, group_id, expect_code):
+        """Assert that trying to fetch the given group results in the given
+        HTTP status code
+        """
+
+        url = "/groups/%s/profile" % (group_id,)
+        request, channel = self.make_request(
+            "GET",
+            url.encode('ascii'),
+            access_token=self.admin_user_tok,
+        )
+
+        self.render(request)
+        self.assertEqual(
+            expect_code, int(channel.result["code"]), msg=channel.result["body"],
+        )
+
+    def _get_groups_user_is_in(self, access_token):
+        """Returns the list of groups the user is in (given their access token)
+        """
+        request, channel = self.make_request(
+            "GET",
+            "/joined_groups".encode('ascii'),
+            access_token=access_token,
+        )
+
+        self.render(request)
+        self.assertEqual(
+            200, int(channel.result["code"]), msg=channel.result["body"],
+        )
+
+        return channel.json_body["groups"]

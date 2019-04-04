@@ -194,7 +194,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                     room_id
                 )
 
-                users_with_profile = yield state.get_current_user_in_room(room_id)
+                users_with_profile = yield state.get_current_users_in_room(room_id)
                 user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.

@@ -37,9 +37,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
     def __init__(self, db_conn, hs):
 
         self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen",
-            keylen=4,
-            max_entries=50000 * CACHE_SIZE_FACTOR,
+            name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
         )
 
         super(ClientIpStore, self).__init__(db_conn, hs)
@@ -66,13 +64,11 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         )
 
         self.register_background_update_handler(
-            "user_ips_analyze",
-            self._analyze_user_ip,
+            "user_ips_analyze", self._analyze_user_ip
         )
 
         self.register_background_update_handler(
-            "user_ips_remove_dupes",
-            self._remove_user_ip_dupes,
+            "user_ips_remove_dupes", self._remove_user_ip_dupes
         )
 
         # Register a unique index
@@ -86,8 +82,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         # Drop the old non-unique index
         self.register_background_update_handler(
-            "user_ips_drop_nonunique_index",
-            self._remove_user_ip_nonunique,
+            "user_ips_drop_nonunique_index", self._remove_user_ip_nonunique
         )
 
         # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
@@ -104,9 +99,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
     def _remove_user_ip_nonunique(self, progress, batch_size):
         def f(conn):
             txn = conn.cursor()
-            txn.execute(
-                "DROP INDEX IF EXISTS user_ips_user_ip"
-            )
+            txn.execute("DROP INDEX IF EXISTS user_ips_user_ip")
             txn.close()
 
         yield self.runWithConnection(f)
@@ -124,9 +117,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         def user_ips_analyze(txn):
             txn.execute("ANALYZE user_ips")
 
-        yield self.runInteraction(
-            "user_ips_analyze", user_ips_analyze
-        )
+        yield self.runInteraction("user_ips_analyze", user_ips_analyze)
 
         yield self._end_background_update("user_ips_analyze")
 
@@ -151,7 +142,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 LIMIT 1
                 OFFSET ?
                 """,
-                (begin_last_seen, batch_size)
+                (begin_last_seen, batch_size),
             )
             row = txn.fetchone()
             if row:
@@ -169,7 +160,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
 
         logger.info(
             "Scanning for duplicate 'user_ips' rows in range: %s <= last_seen < %s",
-            begin_last_seen, end_last_seen,
+            begin_last_seen,
+            end_last_seen,
         )
 
         def remove(txn):
@@ -207,8 +199,10 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                 INNER JOIN user_ips USING (user_id, access_token, ip)
                 GROUP BY user_id, access_token, ip
                 HAVING count(*) > 1
-                """.format(clause),
-                args
+                """.format(
+                    clause
+                ),
+                args,
             )
             res = txn.fetchall()
 
@@ -254,7 +248,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     DELETE FROM user_ips
                     WHERE user_id = ? AND access_token = ? AND ip = ? AND last_seen < ?
                     """,
-                    (user_id, access_token, ip, last_seen)
+                    (user_id, access_token, ip, last_seen),
                 )
                 if txn.rowcount == count - 1:
                     # We deleted all but one of the duplicate rows, i.e. there
@@ -263,7 +257,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     continue
                 elif txn.rowcount >= count:
                     raise Exception(
-                        "We deleted more duplicate rows from 'user_ips' than expected",
+                        "We deleted more duplicate rows from 'user_ips' than expected"
                     )
 
                 # The previous step didn't delete enough rows, so we fallback to
@@ -275,7 +269,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     DELETE FROM user_ips
                     WHERE user_id = ? AND access_token = ? AND ip = ?
                     """,
-                    (user_id, access_token, ip)
+                    (user_id, access_token, ip),
                 )
 
                 # Add in one to be the last_seen
@@ -285,7 +279,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
                     (user_id, access_token, ip, device_id, user_agent, last_seen)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (user_id, access_token, ip, device_id, user_agent, last_seen)
+                    (user_id, access_token, ip, device_id, user_agent, last_seen),
                 )
 
             self._background_update_progress_txn(
@@ -300,8 +294,9 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         defer.returnValue(batch_size)
 
     @defer.inlineCallbacks
-    def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id,
-                         now=None):
+    def insert_client_ip(
+        self, user_id, access_token, ip, user_agent, device_id, now=None
+    ):
         if not now:
             now = int(self._clock.time_msec())
         key = (user_id, access_token, ip)
@@ -329,13 +324,10 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             to_update = self._batch_row_update
             self._batch_row_update = {}
             return self.runInteraction(
-                "_update_client_ips_batch", self._update_client_ips_batch_txn,
-                to_update,
+                "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
             )
 
-        return run_as_background_process(
-            "update_client_ips", update,
-        )
+        return run_as_background_process("update_client_ips", update)
 
     def _update_client_ips_batch_txn(self, txn, to_update):
         if "user_ips" in self._unsafe_to_upsert_tables or (
@@ -383,7 +375,8 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         res = yield self.runInteraction(
             "get_last_client_ip_by_device",
             self._get_last_client_ip_by_device_txn,
-            user_id, device_id,
+            user_id,
+            device_id,
             retcols=(
                 "user_id",
                 "access_token",
@@ -416,7 +409,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         bindings = []
         if device_id is None:
             where_clauses.append("user_id = ?")
-            bindings.extend((user_id, ))
+            bindings.extend((user_id,))
         else:
             where_clauses.append("(user_id = ? AND device_id = ?)")
             bindings.extend((user_id, device_id))
@@ -428,9 +421,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             "SELECT MAX(last_seen) mls, user_id, device_id FROM user_ips "
             "WHERE %(where)s "
             "GROUP BY user_id, device_id"
-        ) % {
-            "where": " OR ".join(where_clauses),
-        }
+        ) % {"where": " OR ".join(where_clauses)}
 
         sql = (
             "SELECT %(retcols)s FROM user_ips "
@@ -462,9 +453,7 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
         rows = yield self._simple_select_list(
             table="user_ips",
             keyvalues={"user_id": user_id},
-            retcols=[
-                "access_token", "ip", "user_agent", "last_seen"
-            ],
+            retcols=["access_token", "ip", "user_agent", "last_seen"],
             desc="get_user_ip_and_agents",
         )
 
@@ -472,12 +461,14 @@ class ClientIpStore(background_updates.BackgroundUpdateStore):
             ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
             for row in rows
         )
-        defer.returnValue(list(
-            {
-                "access_token": access_token,
-                "ip": ip,
-                "user_agent": user_agent,
-                "last_seen": last_seen,
-            }
-            for (access_token, ip), (user_agent, last_seen) in iteritems(results)
-        ))
+        defer.returnValue(
+            list(
+                {
+                    "access_token": access_token,
+                    "ip": ip,
+                    "user_agent": user_agent,
+                    "last_seen": last_seen,
+                }
+                for (access_token, ip), (user_agent, last_seen) in iteritems(results)
+            )
+        )

@@ -39,16 +39,6 @@ class SlavedPresenceStore(BaseSlavedStore):
     _get_presence_for_user = PresenceStore.__dict__["_get_presence_for_user"]
     get_presence_for_users = PresenceStore.__dict__["get_presence_for_users"]
 
-    # XXX: This is a bit broken because we don't persist the accepted list in a
-    # way that can be replicated. This means that we don't have a way to
-    # invalidate the cache correctly.
-    get_presence_list_accepted = PresenceStore.__dict__[
-        "get_presence_list_accepted"
-    ]
-    get_presence_list_observers_accepted = PresenceStore.__dict__[
-        "get_presence_list_observers_accepted"
-    ]
-
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()
 

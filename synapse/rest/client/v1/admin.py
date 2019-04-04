@@ -499,7 +499,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         # desirable in case the first attempt at blocking the room failed below.
         yield self.store.block_room(room_id, requester_user_id)
 
-        users = yield self.state.get_current_user_in_room(room_id)
+        users = yield self.state.get_current_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
         for user_id in users:
@@ -784,6 +784,31 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class DeleteGroupAdminRestServlet(ClientV1RestServlet):
+    """Allows deleting of local groups
+    """
+    PATTERNS = client_path_patterns("/admin/delete_group/(?P<group_id>[^/]*)")
+
+    def __init__(self, hs):
+        super(DeleteGroupAdminRestServlet, self).__init__(hs)
+        self.group_server = hs.get_groups_server_handler()
+        self.is_mine_id = hs.is_mine_id
+
+    @defer.inlineCallbacks
+    def on_POST(self, request, group_id):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        if not self.is_mine_id(group_id):
+            raise SynapseError(400, "Can only delete local groups")
+
+        yield self.group_server.delete_group(group_id, requester.user.to_string())
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
@@ -799,3 +824,4 @@ def register_servlets(hs, http_server):
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
+    DeleteGroupAdminRestServlet(hs).register(http_server)
