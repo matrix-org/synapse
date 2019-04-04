@@ -495,7 +495,7 @@ class Keyring(object):
                 )
 
             processed_response = yield self.process_v2_response(
-                perspective_name, response, only_from_server=False
+                perspective_name, response
             )
             server_name = response["server_name"]
 
@@ -543,6 +543,11 @@ class Keyring(object):
                     or server_name not in response[u"signatures"]):
                 raise KeyLookupError("Key response not signed by remote server")
 
+            if response["server_name"] != server_name:
+                raise KeyLookupError("Expected a response for server %r not %r" % (
+                    server_name, response["server_name"]
+                ))
+
             response_keys = yield self.process_v2_response(
                 from_server=server_name,
                 requested_ids=[requested_key_id],
@@ -560,7 +565,7 @@ class Keyring(object):
 
     @defer.inlineCallbacks
     def process_v2_response(
-        self, from_server, response_json, requested_ids=[], only_from_server=True
+        self, from_server, response_json, requested_ids=[],
     ):
         """Parse a 'Server Keys' structure from the result of a /key request
 
@@ -585,10 +590,6 @@ class Keyring(object):
             requested_ids (iterable[str]): a list of the key IDs that were requested.
                 We will store the json for these key ids as well as any that are
                 actually in the response
-
-            only_from_server (bool): if True, we will check that the server_name in the
-                the response (ie, the server which originated the key) matches
-                from_server.
 
         Returns:
             Deferred[dict[str, nacl.signing.VerifyKey]]:
@@ -616,13 +617,6 @@ class Keyring(object):
                 old_verify_keys[key_id] = verify_key
 
         server_name = response_json["server_name"]
-        if only_from_server:
-            if server_name != from_server:
-                raise KeyLookupError(
-                    "Expected a response for server %r not %r" % (
-                        from_server, server_name
-                    )
-                )
         for key_id in response_json["signatures"].get(server_name, {}):
             if key_id not in response_json["verify_keys"]:
                 raise KeyLookupError(
