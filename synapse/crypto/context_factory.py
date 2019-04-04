@@ -142,13 +142,12 @@ class ClientTLSOptionsFactory(object):
         # Use _makeContext so that we get a fresh OpenSSL CTX each time.
 
         # Check if certificate verification has been enabled
-        if (self._config.federation_verify_certificates):
-            # and if the host is whitelisted against it
-            if (self._config.federation_certificate_verification_whitelist and
-                    host in self._config.federation_certificate_verification_whitelist):
-                return ClientTLSOptionsNoVerify(host, self._options_noverify._makeContext())
+        should_verify = self._config.federation_verify_certificates
 
+        # Check if we've disabled certificate verification for this host
+        if should_verify and host in self._config.federation_certificate_verification_whitelist:
+            should_verify = False
+
+        if should_verify:
             return ClientTLSOptions(host, self._options_verify._makeContext())
-
-        # Otherwise don't require verification
         return ClientTLSOptionsNoVerify(host, self._options_noverify._makeContext())
