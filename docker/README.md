@@ -60,8 +60,7 @@ Synapse requires a valid TLS certificate. You can do one of the following:
  * Provide your own certificate and key (as
    `${DATA_PATH}/${SYNAPSE_SERVER_NAME}.tls.crt` and
    `${DATA_PATH}/${SYNAPSE_SERVER_NAME}.tls.key`, or elsewhere by providing an
-   entire config as `${SYNAPSE_CONFIG_PATH}`). In this case, you should forward
-   traffic to port 8448 in the container, for example with `-p 443:8448`.
+   entire config as `${SYNAPSE_CONFIG_PATH}`).
 
  * Use a reverse proxy to terminate incoming TLS, and forward the plain http
    traffic to port 8008 in the container. In this case you should set `-e
@@ -139,7 +138,7 @@ Database specific values (will use SQLite if not set):
   **NOTE**: You are highly encouraged to use postgresql! Please use the compose
   file to make it easier to deploy.
 * `POSTGRES_USER` - The user for the synapse postgres database. [default:
-  `synapse`]
+  `matrix`]
 
 Mail server specific values (will not send emails if not set):
 
