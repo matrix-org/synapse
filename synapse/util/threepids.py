@@ -49,8 +49,8 @@ def check_3pid_allowed(hs, medium, address):
 
         # Check if this user is intended to register for this homeserver
         if (
-            data['hs'] != hs.config.server_name
-            and data['shadow_hs'] != hs.config.server_name
+            data.get('hs') != hs.config.server_name
+            and data.get('shadow_hs') != hs.config.server_name
         ):
             defer.returnValue(False)
 
