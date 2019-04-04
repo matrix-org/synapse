@@ -16,6 +16,7 @@ import time
 
 from mock import Mock
 
+import canonicaljson
 import signedjson.key
 import signedjson.sign
 
@@ -49,6 +50,9 @@ class MockPerspectiveServer(object):
                 key_id: {"key": signedjson.key.encode_verify_key_base64(verify_key)}
             },
         }
+        return self.get_signed_response(res)
+
+    def get_signed_response(self, res):
         signedjson.sign.sign_json(res, self.server_name, self.key)
         return res
 
@@ -263,6 +267,69 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         response["server_name"] = "OTHER_SERVER"
         self.get_failure(
             kr.get_keys_from_server(server_name_and_key_ids), KeyLookupError
+        )
+
+    def test_get_keys_from_perspectives(self):
+        # arbitrarily advance the clock a bit
+        self.reactor.advance(100)
+
+        SERVER_NAME = "server2"
+        kr = keyring.Keyring(self.hs)
+        testkey = signedjson.key.generate_signing_key("ver1")
+        testverifykey = signedjson.key.get_verify_key(testkey)
+        testverifykey_id = "ed25519:ver1"
+        VALID_UNTIL_TS = 200 * 1000
+
+        # valid response
+        response = {
+            "server_name": SERVER_NAME,
+            "old_verify_keys": {},
+            "valid_until_ts": VALID_UNTIL_TS,
+            "verify_keys": {
+                testverifykey_id: {
+                    "key": signedjson.key.encode_verify_key_base64(testverifykey)
+                }
+            },
+        }
+
+        persp_resp = {
+            "server_keys": [self.mock_perspective_server.get_signed_response(response)]
+        }
+
+        def post_json(destination, path, data, **kwargs):
+            self.assertEqual(destination, self.mock_perspective_server.server_name)
+            self.assertEqual(path, "/_matrix/key/v2/query")
+
+            # check that the request is for the expected key
+            q = data["server_keys"]
+            self.assertEqual(list(q[SERVER_NAME].keys()), ["key1"])
+            return persp_resp
+
+        self.http_client.post_json.side_effect = post_json
+
+        server_name_and_key_ids = [(SERVER_NAME, ("key1",))]
+        keys = self.get_success(kr.get_keys_from_perspectives(server_name_and_key_ids))
+        self.assertIn(SERVER_NAME, keys)
+        k = keys[SERVER_NAME][testverifykey_id]
+        self.assertEqual(k, testverifykey)
+        self.assertEqual(k.alg, "ed25519")
+        self.assertEqual(k.version, "ver1")
+
+        # check that the perspectives store is correctly updated
+        lookup_triplet = (SERVER_NAME, testverifykey_id, None)
+        key_json = self.get_success(
+            self.hs.get_datastore().get_server_keys_json([lookup_triplet])
+        )
+        res = key_json[lookup_triplet]
+        self.assertEqual(len(res), 1)
+        res = res[0]
+        self.assertEqual(res["key_id"], testverifykey_id)
+        self.assertEqual(res["ts_added_ms"], self.reactor.seconds() * 1000)
+        self.assertEqual(res["ts_valid_until_ms"], VALID_UNTIL_TS)
+
+        self.assertEqual(
+            bytes(res["key_json"]),
+            canonicaljson.encode_canonical_json(persp_resp["server_keys"][0]),
         )
 
 
