@@ -1468,8 +1468,10 @@ class SQLBaseStore(object):
             order_direction (str): Whether the results should be ordered "ASC" or "DESC".
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
-
         """
+        if order_direction not in ["ASC", "DESC"]:
+            raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
+
         if keyvalues:
             where_clause = "WHERE " + " AND ".join("%s = ?" % (k,) for k in keyvalues)
         else:
