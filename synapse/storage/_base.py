@@ -1435,7 +1435,7 @@ class SQLBaseStore(object):
             start,
             limit,
             retcols,
-            order_direction=order_direction
+            order_direction=order_direction,
         )
 
     @classmethod
@@ -1468,8 +1468,10 @@ class SQLBaseStore(object):
             order_direction (str): Whether the results should be ordered "ASC" or "DESC".
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
-
         """
+        if order_direction not in ["ASC", "DESC"]:
+            raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
+
         if keyvalues:
             where_clause = "WHERE " + " AND ".join("%s = ?" % (k,) for k in keyvalues)
         else:
@@ -1485,46 +1487,6 @@ class SQLBaseStore(object):
         txn.execute(sql, list(keyvalues.values()) + [limit, start])
 
         return cls.cursor_to_dict(txn)
-
-    @defer.inlineCallbacks
-    def get_user_list_paginate(
-        self,
-        table,
-        keyvalues,
-        orderby,
-        start,
-        limit,
-        retcols,
-        desc="get_user_list_paginate",
-    ):
-        """Get a list of users from start row to a limit number of rows. This will
-        return a json object with users and total number of users in users list.
-
-        Args:
-            table (str): the table name
-            keyvalues (dict[str, T] | None):
-                column names and values to select the rows with, or None to not
-                apply a WHERE clause.
-            orderby (str): Column to order the results by.
-            start (int): Index to begin the query at.
-            limit (int): Number of results to return.
-            retcols (iterable[str]): the names of the columns to return
-        Returns:
-            defer.Deferred[dict[list[dict], int]]
-        """
-        users = yield self.runInteraction(
-            desc,
-            self._simple_select_list_paginate_txn,
-            table,
-            keyvalues,
-            orderby,
-            start,
-            limit,
-            retcols,
-        )
-        count = yield self.runInteraction(desc, self.get_user_count_txn)
-        retval = {"users": users, "total": count}
-        defer.returnValue(retval)
 
     def get_user_count_txn(self, txn):
         """Get a total number of registered users in the users list.
