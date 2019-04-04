@@ -23,6 +23,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.crypto import keyring
+from synapse.crypto.keyring import KeyLookupError
 from synapse.util import logcontext
 from synapse.util.logcontext import LoggingContext
 
@@ -201,6 +202,68 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         d = _verify_json_for_server(kr, "server9", json1)
         self.assertFalse(d.called)
         self.get_success(d)
+
+    def test_get_keys_from_server(self):
+        # arbitrarily advance the clock a bit
+        self.reactor.advance(100)
+
+        SERVER_NAME = "server2"
+        kr = keyring.Keyring(self.hs)
+        testkey = signedjson.key.generate_signing_key("ver1")
+        testverifykey = signedjson.key.get_verify_key(testkey)
+        testverifykey_id = "ed25519:ver1"
+        VALID_UNTIL_TS = 1000
+
+        # valid response
+        response = {
+            "server_name": SERVER_NAME,
+            "old_verify_keys": {},
+            "valid_until_ts": VALID_UNTIL_TS,
+            "verify_keys": {
+                testverifykey_id: {
+                    "key": signedjson.key.encode_verify_key_base64(testverifykey)
+                }
+            },
+        }
+        signedjson.sign.sign_json(response, SERVER_NAME, testkey)
+
+        def get_json(destination, path, **kwargs):
+            self.assertEqual(destination, SERVER_NAME)
+            self.assertEqual(path, "/_matrix/key/v2/server/key1")
+            return response
+
+        self.http_client.get_json.side_effect = get_json
+
+        server_name_and_key_ids = [(SERVER_NAME, ("key1",))]
+        keys = self.get_success(kr.get_keys_from_server(server_name_and_key_ids))
+        k = keys[SERVER_NAME][testverifykey_id]
+        self.assertEqual(k, testverifykey)
+        self.assertEqual(k.alg, "ed25519")
+        self.assertEqual(k.version, "ver1")
+
+        # check that the perspectives store is correctly updated
+        lookup_triplet = (SERVER_NAME, testverifykey_id, None)
+        key_json = self.get_success(
+            self.hs.get_datastore().get_server_keys_json([lookup_triplet])
+        )
+        res = key_json[lookup_triplet]
+        self.assertEqual(len(res), 1)
+        res = res[0]
+        self.assertEqual(res["key_id"], testverifykey_id)
+        self.assertEqual(res["from_server"], SERVER_NAME)
+        self.assertEqual(res["ts_added_ms"], self.reactor.seconds() * 1000)
+        self.assertEqual(res["ts_valid_until_ms"], VALID_UNTIL_TS)
+
+        # we expect it to be encoded as canonical json *before* it hits the db
+        self.assertEqual(
+            bytes(res["key_json"]), canonicaljson.encode_canonical_json(response)
+        )
+
+        # change the server name: it should cause a rejection
+        response["server_name"] = "OTHER_SERVER"
+        self.get_failure(
+            kr.get_keys_from_server(server_name_and_key_ids), KeyLookupError
+        )
 
 
 @defer.inlineCallbacks
