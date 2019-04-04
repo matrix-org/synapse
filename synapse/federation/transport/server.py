@@ -127,8 +127,10 @@ class Authenticator(object):
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin, {})[key] = sig
 
-        if (self.federation_domain_whitelist is not None and
-                origin not in self.federation_domain_whitelist):
+        if (
+            self.federation_domain_whitelist is not None and
+            origin not in self.federation_domain_whitelist
+        ):
             raise FederationDeniedError(origin)
 
         if not json_request["signatures"]:

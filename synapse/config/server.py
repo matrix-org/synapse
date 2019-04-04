@@ -112,7 +112,7 @@ class ServerConfig(Config):
 
         # FIXME: federation_domain_whitelist needs sytests
         federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", [],
+            "federation_domain_whitelist", None,
         )
 
         self.federation_domain_whitelist = None
