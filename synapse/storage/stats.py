@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # these fields track relative numbers (e.g. number of events sent in this timeslice)
 RELATIVE_STATS_FIELDS = {"room": ("sent_events",), "user": ("sent_events",)}
 
-# these fields track rather than absolutes (e.g. total number of rooms on the server)
+# these fields track absolutes (e.g. total number of rooms on the server)
 ABSOLUTE_STATS_FIELDS = {
     "room": (
         "current_state_events",
