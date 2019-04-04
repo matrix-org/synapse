@@ -2,7 +2,7 @@
 
 ## TLS ##
 
-{% if not SYNAPSE_NO_TLS == '1' %}
+{% if not SYNAPSE_NO_TLS %}
 
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
@@ -26,7 +26,7 @@ log_config: "/compiled/log.config"
 ## Ports ##
 
 listeners:
-  {% if not SYNAPSE_NO_TLS == '1' %}
+  {% if not SYNAPSE_NO_TLS %}
   -
     port: 8448
     bind_addresses: ['::']
