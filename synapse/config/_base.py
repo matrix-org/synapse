@@ -137,7 +137,7 @@ class Config(object):
     @staticmethod
     def read_config_file(file_path):
         with open(file_path) as file_stream:
-            return yaml.load(file_stream)
+            return yaml.safe_load(file_stream)
 
     def invoke_all(self, name, *args, **kargs):
         results = []
@@ -318,7 +318,7 @@ class Config(object):
                     )
                     config_file.write(config_str)
 
-                config = yaml.load(config_str)
+                config = yaml.safe_load(config_str)
                 obj.invoke_all("generate_files", config)
 
                 print(
@@ -390,7 +390,7 @@ class Config(object):
             server_name=server_name,
             generate_secrets=False,
         )
-        config = yaml.load(config_string)
+        config = yaml.safe_load(config_string)
         config.pop("log_config")
         config.update(specified_config)
 

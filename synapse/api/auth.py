@@ -614,13 +614,13 @@ class Auth(object):
 
         Returns:
             True if the the sender is allowed to redact the target event if the
-            target event was created by them.
+                target event was created by them.
             False if the sender is allowed to redact the target event with no
-            further checks.
+                further checks.
 
         Raises:
             AuthError if the event sender is definitely not allowed to redact
-            the target event.
+                the target event.
         """
         return event_auth.check_redaction(room_version, event, auth_events)
 
@@ -736,9 +736,9 @@ class Auth(object):
 
         Returns:
             Deferred[tuple[str, str|None]]: Resolves to the current membership of
-            the user in the room and the membership event ID of the user. If
-            the user is not in the room and never has been, then
-            `(Membership.JOIN, None)` is returned.
+                the user in the room and the membership event ID of the user. If
+                the user is not in the room and never has been, then
+                `(Membership.JOIN, None)` is returned.
         """
 
         try:
@@ -770,13 +770,13 @@ class Auth(object):
 
         Args:
             user_id(str|None): If present, checks for presence against existing
-            MAU cohort
+                MAU cohort
 
             threepid(dict|None): If present, checks for presence against configured
-            reserved threepid. Used in cases where the user is trying register
-            with a MAU blocked server, normally they would be rejected but their
-            threepid is on the reserved list. user_id and
-            threepid should never be set at the same time.
+                reserved threepid. Used in cases where the user is trying register
+                with a MAU blocked server, normally they would be rejected but their
+                threepid is on the reserved list. user_id and
+                threepid should never be set at the same time.
         """
 
         # Never fail an auth check for the server notices users or support user

@@ -20,7 +20,7 @@ import json
 from mock import Mock
 
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v1 import admin, events, login, room
 
 from tests import unittest
 
@@ -359,7 +359,9 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
+        events.register_servlets,
         room.register_servlets,
+        room.register_deprecated_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
@@ -426,3 +428,65 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
             self.store.get_users_in_room(room_id),
         )
         self.assertEqual([], users_in_room)
+
+    @unittest.DEBUG
+    def test_shutdown_room_block_peek(self):
+        """Test that a world_readable room can no longer be peeked into after
+        it has been shut down.
+        """
+
+        self.event_creation_handler._block_events_without_consent_error = None
+
+        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
+
+        # Enable world readable
+        url = "rooms/%s/state/m.room.history_visibility" % (room_id,)
+        request, channel = self.make_request(
+            "PUT",
+            url.encode('ascii'),
+            json.dumps({"history_visibility": "world_readable"}),
+            access_token=self.other_user_token,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Test that the admin can still send shutdown
+        url = "admin/shutdown_room/" + room_id
+        request, channel = self.make_request(
+            "POST",
+            url.encode('ascii'),
+            json.dumps({"new_room_user_id": self.admin_user}),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Assert we can no longer peek into the room
+        self._assert_peek(room_id, expect_code=403)
+
+    def _assert_peek(self, room_id, expect_code):
+        """Assert that the admin user can (or cannot) peek into the room.
+        """
+
+        url = "rooms/%s/initialSync" % (room_id,)
+        request, channel = self.make_request(
+            "GET",
+            url.encode('ascii'),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(
+            expect_code, int(channel.result["code"]), msg=channel.result["body"],
+        )
+
+        url = "events?timeout=0&room_id=" + room_id
+        request, channel = self.make_request(
+            "GET",
+            url.encode('ascii'),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(
+            expect_code, int(channel.result["code"]), msg=channel.result["body"],
+        )

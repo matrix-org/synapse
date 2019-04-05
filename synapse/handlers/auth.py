@@ -746,6 +746,42 @@ class AuthHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
+    def check_password_provider_3pid(self, medium, address, password):
+        """Check if a password provider is able to validate a thirdparty login
+
+        Args:
+            medium (str): The medium of the 3pid (ex. email).
+            address (str): The address of the 3pid (ex. jdoe@example.com).
+            password (str): The password of the user.
+
+        Returns:
+            Deferred[(str|None, func|None)]: A tuple of `(user_id,
+            callback)`. If authentication is successful, `user_id` is a `str`
+            containing the authenticated, canonical user ID. `callback` is
+            then either a function to be later run after the server has
+            completed login/registration, or `None`. If authentication was
+            unsuccessful, `user_id` and `callback` are both `None`.
+        """
+        for provider in self.password_providers:
+            if hasattr(provider, "check_3pid_auth"):
+                # This function is able to return a deferred that either
+                # resolves None, meaning authentication failure, or upon
+                # success, to a str (which is the user_id) or a tuple of
+                # (user_id, callback_func), where callback_func should be run
+                # after we've finished everything else
+                result = yield provider.check_3pid_auth(
+                    medium, address, password,
+                )
+                if result:
+                    # Check if the return value is a str or a tuple
+                    if isinstance(result, str):
+                        # If it's a str, set callback function to None
+                        result = (result, None)
+                    defer.returnValue(result)
+
+        defer.returnValue((None, None))
+
+    @defer.inlineCallbacks
     def _check_local_password(self, user_id, password):
         """Authenticate a user against the local password database.
 
@@ -756,7 +792,8 @@ class AuthHandler(BaseHandler):
             user_id (unicode): complete @user:id
             password (unicode): the provided password
         Returns:
-            (unicode) the canonical_user_id, or None if unknown user / bad password
+            Deferred[unicode] the canonical_user_id, or Deferred[None] if
+                unknown user/bad password
 
         Raises:
             LimitExceededError if the ratelimiter's login requests count for this

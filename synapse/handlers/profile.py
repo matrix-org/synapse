@@ -233,8 +233,14 @@ class BaseProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def set_displayname(self, target_user, requester, new_displayname, by_admin=False):
-        """target_user is the UserID whose displayname is to be changed;
-        requester is the authenticated user attempting to make this change."""
+        """Set the displayname of a user
+
+        Args:
+            target_user (UserID): the user whose displayname is to be changed.
+            requester (Requester): The user attempting to make this change.
+            new_displayname (str): The displayname to give this user.
+            by_admin (bool): Whether this change was made by an administrator.
+        """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this Home Server")
 

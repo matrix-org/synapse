@@ -22,7 +22,7 @@ from tests import unittest
 
 class RoomDirectoryConfigTestCase(unittest.TestCase):
     def test_alias_creation_acl(self):
-        config = yaml.load("""
+        config = yaml.safe_load("""
         alias_creation_rules:
             - user_id: "*bob*"
               alias: "*"
@@ -74,7 +74,7 @@ class RoomDirectoryConfigTestCase(unittest.TestCase):
         ))
 
     def test_room_publish_acl(self):
-        config = yaml.load("""
+        config = yaml.safe_load("""
         alias_creation_rules: []
 
         room_list_publication_rules:

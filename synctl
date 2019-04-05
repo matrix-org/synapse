@@ -164,7 +164,7 @@ def main():
         sys.exit(1)
 
     with open(configfile) as stream:
-        config = yaml.load(stream)
+        config = yaml.safe_load(stream)
 
     pidfile = config["pid_file"]
     cache_factor = config.get("synctl_cache_factor")
@@ -206,7 +206,7 @@ def main():
     workers = []
     for worker_configfile in worker_configfiles:
         with open(worker_configfile) as stream:
-            worker_config = yaml.load(stream)
+            worker_config = yaml.safe_load(stream)
         worker_app = worker_config["worker_app"]
         if worker_app == "synapse.app.homeserver":
             # We need to special case all of this to pick up options that may

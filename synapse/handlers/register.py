@@ -172,7 +172,7 @@ class RegistrationHandler(BaseHandler):
               api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
-            address (str|None): the IP address used to perform the regitration.
+            address (str|None): the IP address used to perform the registration.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -719,7 +719,7 @@ class RegistrationHandler(BaseHandler):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
-            address (str|None): the IP address used to perform the regitration.
+            address (str|None): the IP address used to perform the registration.
 
         Returns:
             Deferred
@@ -817,9 +817,9 @@ class RegistrationHandler(BaseHandler):
             access_token (str|None): The access token of the newly logged in
                 device, or None if `inhibit_login` enabled.
             bind_email (bool): Whether to bind the email with the identity
-                server
+                server.
             bind_msisdn (bool): Whether to bind the msisdn with the identity
-                server
+                server.
         """
         if self.hs.config.worker_app:
             yield self._post_registration_client(
@@ -861,7 +861,7 @@ class RegistrationHandler(BaseHandler):
         """A user consented to the terms on registration
 
         Args:
-            user_id (str): The user ID that consented
+            user_id (str): The user ID that consented.
             consent_version (str): version of the policy the user has
                 consented to.
         """

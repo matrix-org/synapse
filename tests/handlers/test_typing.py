@@ -180,7 +180,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
             "farm",
-            path="/_matrix/federation/v1/send/1000000/",
+            path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(
                 "m.typing",
                 content={
@@ -192,6 +192,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             json_data_callback=ANY,
             long_retries=True,
             backoff_on_404=True,
+            try_trailing_slash_on_400=True,
         )
 
     def test_started_typing_remote_recv(self):
@@ -201,7 +202,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         (request, channel) = self.make_request(
             "PUT",
-            "/_matrix/federation/v1/send/1000000/",
+            "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(
                 "m.typing",
                 content={
@@ -257,7 +258,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
             "farm",
-            path="/_matrix/federation/v1/send/1000000/",
+            path="/_matrix/federation/v1/send/1000000",
             data=_expect_edu_transaction(
                 "m.typing",
                 content={
@@ -269,6 +270,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             json_data_callback=ANY,
             long_retries=True,
             backoff_on_404=True,
+            try_trailing_slash_on_400=True,
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)

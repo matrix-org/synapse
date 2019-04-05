@@ -1,1 +1,0 @@
-Fix bug in shutdown room admin API where it would fail if a user in the room hadn't consented to the privacy policy.
