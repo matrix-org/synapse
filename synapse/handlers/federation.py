@@ -2586,7 +2586,7 @@ class FederationHandler(BaseHandler):
         if not invite_event:
             raise AuthError(403, "Could not find invite")
 
-        logger.info("Checking auth on event %r", event.content)
+        logger.debug("Checking auth on event %r", event.content)
 
         last_exception = None
         # for each public key in the 3pid invite event
@@ -2598,7 +2598,7 @@ class FederationHandler(BaseHandler):
                         if not key_name.startswith("ed25519:"):
                             continue
 
-                        logger.info(
+                        logger.debug(
                             "Attempting to verify sig with key %s from %r "
                             "against pubkey %r",
                             key_name, server, public_key_object,
@@ -2611,7 +2611,7 @@ class FederationHandler(BaseHandler):
                                 decode_base64(public_key)
                             )
                             verify_signed_json(signed, server, verify_key)
-                            logger.info(
+                            logger.debug(
                                 "Successfully verified sig with key %s from %r "
                                 "against pubkey %r",
                                 key_name, server, public_key_object,
