@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-/* We used to create a tables called event_destinations and
+/* We used to create tables called event_destinations and
  * state_forward_extremities, but these are no longer used and are removed in
  * delta 54.
  */

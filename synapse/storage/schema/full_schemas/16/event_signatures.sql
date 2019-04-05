@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
- /* We used to create a tables called event_content_hashes and event_edge_hashes,
+ /* We used to create tables called event_content_hashes and event_edge_hashes,
   * but these are no longer used and are removed in delta 54.
   */
 

@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-/* We used to create a tables called room_hosts and feedback,
+/* We used to create tables called room_hosts and feedback,
  * but these are no longer used and are removed in delta 54.
  */
 
