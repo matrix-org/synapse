@@ -251,8 +251,9 @@ class TlsConfig(Config):
         # Skip federation certificate verification on the following whitelist
         # of domains.
         #
-        # This setting should only normally be used within a private network of
-        # homeservers.
+        # This setting should only be used in very specific cases, such as
+        # federation over Tor hidden services and similar. For private networks
+        # of homeservers, you likely want to use a private CA instead.
         #
         # Only effective if federation_verify_certicates is `true`.
         #
