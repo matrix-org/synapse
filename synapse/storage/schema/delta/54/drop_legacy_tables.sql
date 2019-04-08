@@ -1,4 +1,4 @@
-/* Copyright 2014-2016 OpenMarket Ltd
+/* Copyright 2019 New Vector Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,18 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS room_aliases(
-    room_alias TEXT NOT NULL,
-    room_id TEXT NOT NULL
-);
+DROP TABLE IF EXISTS application_services;
+DROP TABLE IF EXISTS application_services_regex;
+DROP TABLE IF EXISTS transaction_id_to_pdu;
+DROP TABLE IF EXISTS stats_reporting;
+DROP TABLE IF EXISTS current_state_resets;
+DROP TABLE IF EXISTS event_content_hashes;
+DROP TABLE IF EXISTS event_destinations;
+DROP TABLE IF EXISTS event_edge_hashes;
+DROP TABLE IF EXISTS event_signatures;
+DROP TABLE IF EXISTS feedback;
+DROP TABLE IF EXISTS room_hosts;
+DROP TABLE IF EXISTS state_forward_extremities;
 
-CREATE TABLE IF NOT EXISTS room_alias_servers(
-    room_alias TEXT NOT NULL,
-    server TEXT NOT NULL
-);
+
+
