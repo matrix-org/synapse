@@ -13,14 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import hashlib
 import logging
 
 import six
 
 from signedjson.key import decode_verify_key_bytes
 
-import OpenSSL
 from twisted.internet import defer
 
 from synapse.util.caches.descriptors import cachedInlineCallbacks
@@ -38,53 +36,8 @@ else:
 
 
 class KeyStore(SQLBaseStore):
-    """Persistence for signature verification keys and tls X.509 certificates
+    """Persistence for signature verification keys
     """
-
-    @defer.inlineCallbacks
-    def get_server_certificate(self, server_name):
-        """Retrieve the TLS X.509 certificate for the given server
-        Args:
-            server_name (bytes): The name of the server.
-        Returns:
-            (OpenSSL.crypto.X509): The tls certificate.
-        """
-        tls_certificate_bytes, = yield self._simple_select_one(
-            table="server_tls_certificates",
-            keyvalues={"server_name": server_name},
-            retcols=("tls_certificate",),
-            desc="get_server_certificate",
-        )
-        tls_certificate = OpenSSL.crypto.load_certificate(
-            OpenSSL.crypto.FILETYPE_ASN1, tls_certificate_bytes
-        )
-        defer.returnValue(tls_certificate)
-
-    def store_server_certificate(
-        self, server_name, from_server, time_now_ms, tls_certificate
-    ):
-        """Stores the TLS X.509 certificate for the given server
-        Args:
-            server_name (str): The name of the server.
-            from_server (str): Where the certificate was looked up
-            time_now_ms (int): The time now in milliseconds
-            tls_certificate (OpenSSL.crypto.X509): The X.509 certificate.
-        """
-        tls_certificate_bytes = OpenSSL.crypto.dump_certificate(
-            OpenSSL.crypto.FILETYPE_ASN1, tls_certificate
-        )
-        fingerprint = hashlib.sha256(tls_certificate_bytes).hexdigest()
-        return self._simple_upsert(
-            table="server_tls_certificates",
-            keyvalues={"server_name": server_name, "fingerprint": fingerprint},
-            values={
-                "from_server": from_server,
-                "ts_added_ms": time_now_ms,
-                "tls_certificate": db_binary_type(tls_certificate_bytes),
-            },
-            desc="store_server_certificate",
-        )
-
     @cachedInlineCallbacks()
     def _get_server_verify_key(self, server_name, key_id):
         verify_key_bytes = yield self._simple_select_one_onecol(

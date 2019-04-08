@@ -27,8 +27,5 @@ class SlavedKeyStore(BaseSlavedStore):
     get_server_verify_keys = __func__(DataStore.get_server_verify_keys)
     store_server_verify_key = __func__(DataStore.store_server_verify_key)
 
-    get_server_certificate = __func__(DataStore.get_server_certificate)
-    store_server_certificate = __func__(DataStore.store_server_certificate)
-
     get_server_keys_json = __func__(DataStore.get_server_keys_json)
     store_server_keys_json = __func__(DataStore.store_server_keys_json)
