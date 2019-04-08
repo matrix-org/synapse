@@ -236,6 +236,9 @@ listeners:
 #  - medium: 'email'
 #    address: 'reserved_user@example.com'
 
+# Used by phonehome stats to group together related servers.
+#server_context: context
+
 
 ## TLS ##
 
