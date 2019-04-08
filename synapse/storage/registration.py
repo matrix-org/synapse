@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import re
+import datetime
 
 from six.moves import range
 
@@ -85,6 +86,26 @@ class RegistrationWorkerStore(SQLBaseStore):
             self._query_for_auth,
             token
         )
+
+    @defer.inlineCallbacks
+    def get_expiration_ts_for_user(self, user):
+        """Get the expiration timestamp for the account bearing a given user ID.
+
+        Args:
+            user (str): The ID of the user.
+        Returns:
+            defer.Deferred: None, if the account has no expiration timestamp,
+            otherwise int representation of the timestamp (as a number of
+            seconds since epoch).
+        """
+        res = yield self._simple_select_one_onecol(
+            table="account_validity",
+            keyvalues={"user_id": user.to_string()},
+            retcol="expiration_ts",
+            allow_none=True,
+            desc="get_expiration_date_for_user",
+        )
+        defer.returnValue(int(res))
 
     @defer.inlineCallbacks
     def is_server_admin(self, user):
@@ -356,6 +377,10 @@ class RegistrationStore(RegistrationWorkerStore,
         # clear the background update.
         self.register_noop_background_update("refresh_tokens_device_index")
 
+        self._account_validity_period_s = int(datetime.timedelta(
+            weeks=hs.config.validity_period
+        ).total_seconds())
+
     @defer.inlineCallbacks
     def add_access_token_to_user(self, user_id, token, device_id=None):
         """Adds an access token for the given user.
@@ -483,6 +508,20 @@ class RegistrationStore(RegistrationWorkerStore,
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
+                    }
+                )
+
+            # Set an expiration date on this account as long as the configured
+            # validity_period isn't 0.
+            if self._account_validity_period_s != 0:
+                time_now_s = int(self.clock.time())
+                expiration_ts = time_now_s + self._account_validity_period_s
+                self._simple_insert_txn(
+                    txn,
+                    "account_validity",
+                    values={
+                        "user_id": user_id,
+                        "expiration_ts": expiration_ts,
                     }
                 )
         except self.database_engine.module.IntegrityError:

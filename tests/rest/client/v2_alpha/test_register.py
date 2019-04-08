@@ -1,15 +1,18 @@
+import datetime
 import json
 
 from synapse.api.constants import LoginType
+from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v2_alpha.register import register_servlets
+from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v2_alpha import register, sync
 
 from tests import unittest
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
-    servlets = [register_servlets]
+    servlets = [register.register_servlets]
 
     def make_homeserver(self, reactor, clock):
 
@@ -181,3 +184,48 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
+
+
+class AccountValidityTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        register.register_servlets,
+        admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config.enable_registration = True
+        config.validity_period = 1
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def test_validity_period(self):
+        self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        # The specific endpoint doesn't matter, all we need is an authenticated
+        # endpoint.
+        request, channel = self.make_request(
+            b"GET", "/sync", access_token=tok,
+        )
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(
+            datetime.timedelta(weeks=self.hs.config.validity_period).total_seconds(),
+        )
+
+        request, channel = self.make_request(
+            b"GET", "/sync", access_token=tok,
+        )
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEquals(
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result,
+        )

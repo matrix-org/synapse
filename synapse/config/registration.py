@@ -31,6 +31,8 @@ class RegistrationConfig(Config):
                 strtobool(str(config["disable_registration"]))
             )
 
+        self.validity_period = config.get("validity_period", 0)
+
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.registration_shared_secret = config.get("registration_shared_secret")
@@ -74,6 +76,11 @@ class RegistrationConfig(Config):
         # Enable registration for new users.
         #
         #enable_registration: false
+
+        # Optional time duration (in weeks) after which a new account is denied
+        # access. 0 means no expiration.
+        #
+        #validity_period: 0
 
         # The user must provide all of the below types of 3PID when registering.
         #
