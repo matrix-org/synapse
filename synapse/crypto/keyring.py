@@ -301,13 +301,12 @@ class Keyring(object):
                         # complete this VerifyKeyRequest.
                         result_keys = results.get(server_name, {})
                         for key_id in verify_request.key_ids:
-                            if key_id in result_keys:
+                            key = result_keys.get(key_id)
+                            if key:
                                 with PreserveLoggingContext():
-                                    verify_request.deferred.callback((
-                                        server_name,
-                                        key_id,
-                                        result_keys[key_id],
-                                    ))
+                                    verify_request.deferred.callback(
+                                        (server_name, key_id, key)
+                                    )
                                 break
                         else:
                             # The else block is only reached if the loop above
@@ -341,27 +340,24 @@ class Keyring(object):
     @defer.inlineCallbacks
     def get_keys_from_store(self, server_name_and_key_ids):
         """
-
         Args:
-            server_name_and_key_ids (list[(str, iterable[str])]):
+            server_name_and_key_ids (iterable(Tuple[str, iterable[str]]):
                 list of (server_name, iterable[key_id]) tuples to fetch keys for
 
         Returns:
-            Deferred: resolves to dict[str, dict[str, VerifyKey]]: map from
+            Deferred: resolves to dict[str, dict[str, VerifyKey|None]]: map from
                 server_name -> key_id -> VerifyKey
         """
-        res = yield logcontext.make_deferred_yieldable(defer.gatherResults(
-            [
-                run_in_background(
-                    self.store.get_server_verify_keys,
-                    server_name, key_ids,
-                ).addCallback(lambda ks, server: (server, ks), server_name)
-                for server_name, key_ids in server_name_and_key_ids
-            ],
-            consumeErrors=True,
-        ).addErrback(unwrapFirstError))
-
-        defer.returnValue(dict(res))
+        keys_to_fetch = (
+            (server_name, key_id)
+            for server_name, key_ids in server_name_and_key_ids
+            for key_id in key_ids
+        )
+        res = yield self.store.get_server_verify_keys(keys_to_fetch)
+        keys = {}
+        for (server_name, key_id), key in res.items():
+            keys.setdefault(server_name, {})[key_id] = key
+        defer.returnValue(keys)
 
     @defer.inlineCallbacks
     def get_keys_from_perspectives(self, server_name_and_key_ids):
