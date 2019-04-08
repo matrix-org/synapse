@@ -188,8 +188,8 @@ class KeyStore(SQLBaseStore):
         Args:
             server_keys (list): List of (server_name, key_id, source) triplets.
         Returns:
-            Dict mapping (server_name, key_id, source) triplets to dicts with
-            "ts_valid_until_ms" and "key_json" keys.
+            Deferred[dict[Tuple[str, str, str|None], list[dict]]]:
+                Dict mapping (server_name, key_id, source) triplets to lists of dicts
         """
 
         def _get_server_keys_json_txn(txn):

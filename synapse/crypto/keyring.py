@@ -20,6 +20,7 @@ from collections import namedtuple
 from six import raise_from
 from six.moves import urllib
 
+import nacl.signing
 from signedjson.key import (
     decode_verify_key_bytes,
     encode_verify_key_base64,
@@ -494,11 +495,11 @@ class Keyring(object):
                 )
 
             processed_response = yield self.process_v2_response(
-                perspective_name, response, only_from_server=False
+                perspective_name, response
             )
+            server_name = response["server_name"]
 
-            for server_name, response_keys in processed_response.items():
-                keys.setdefault(server_name, {}).update(response_keys)
+            keys.setdefault(server_name, {}).update(processed_response)
 
         yield logcontext.make_deferred_yieldable(defer.gatherResults(
             [
@@ -517,7 +518,7 @@ class Keyring(object):
 
     @defer.inlineCallbacks
     def get_server_verify_key_v2_direct(self, server_name, key_ids):
-        keys = {}
+        keys = {}  # type: dict[str, nacl.signing.VerifyKey]
 
         for requested_key_id in key_ids:
             if requested_key_id in keys:
@@ -542,6 +543,11 @@ class Keyring(object):
                     or server_name not in response[u"signatures"]):
                 raise KeyLookupError("Key response not signed by remote server")
 
+            if response["server_name"] != server_name:
+                raise KeyLookupError("Expected a response for server %r not %r" % (
+                    server_name, response["server_name"]
+                ))
+
             response_keys = yield self.process_v2_response(
                 from_server=server_name,
                 requested_ids=[requested_key_id],
@@ -550,24 +556,45 @@ class Keyring(object):
 
             keys.update(response_keys)
 
-        yield logcontext.make_deferred_yieldable(defer.gatherResults(
-            [
-                run_in_background(
-                    self.store_keys,
-                    server_name=key_server_name,
-                    from_server=server_name,
-                    verify_keys=verify_keys,
-                )
-                for key_server_name, verify_keys in keys.items()
-            ],
-            consumeErrors=True
-        ).addErrback(unwrapFirstError))
-
-        defer.returnValue(keys)
+        yield self.store_keys(
+            server_name=server_name,
+            from_server=server_name,
+            verify_keys=keys,
+        )
+        defer.returnValue({server_name: keys})
 
     @defer.inlineCallbacks
-    def process_v2_response(self, from_server, response_json,
-                            requested_ids=[], only_from_server=True):
+    def process_v2_response(
+        self, from_server, response_json, requested_ids=[],
+    ):
+        """Parse a 'Server Keys' structure from the result of a /key request
+
+        This is used to parse either the entirety of the response from
+        GET /_matrix/key/v2/server, or a single entry from the list returned by
+        POST /_matrix/key/v2/query.
+
+        Checks that each signature in the response that claims to come from the origin
+        server is valid. (Does not check that there actually is such a signature, for
+        some reason.)
+
+        Stores the json in server_keys_json so that it can be used for future responses
+        to /_matrix/key/v2/query.
+
+        Args:
+            from_server (str): the name of the server producing this result: either
+                the origin server for a /_matrix/key/v2/server request, or the notary
+                for a /_matrix/key/v2/query.
+
+            response_json (dict): the json-decoded Server Keys response object
+
+            requested_ids (iterable[str]): a list of the key IDs that were requested.
+                We will store the json for these key ids as well as any that are
+                actually in the response
+
+        Returns:
+            Deferred[dict[str, nacl.signing.VerifyKey]]:
+                map from key_id to key object
+        """
         time_now_ms = self.clock.time_msec()
         response_keys = {}
         verify_keys = {}
@@ -589,15 +616,7 @@ class Keyring(object):
                 verify_key.time_added = time_now_ms
                 old_verify_keys[key_id] = verify_key
 
-        results = {}
         server_name = response_json["server_name"]
-        if only_from_server:
-            if server_name != from_server:
-                raise KeyLookupError(
-                    "Expected a response for server %r not %r" % (
-                        from_server, server_name
-                    )
-                )
         for key_id in response_json["signatures"].get(server_name, {}):
             if key_id not in response_json["verify_keys"]:
                 raise KeyLookupError(
@@ -643,9 +662,7 @@ class Keyring(object):
             consumeErrors=True,
         ).addErrback(unwrapFirstError))
 
-        results[server_name] = response_keys
-
-        defer.returnValue(results)
+        defer.returnValue(response_keys)
 
     def store_keys(self, server_name, from_server, verify_keys):
         """Store a collection of verify keys for a given server
