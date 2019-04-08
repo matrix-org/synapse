@@ -98,6 +98,9 @@ class TlsConfig(Config):
         self.federation_ca_trust_root = None
         if custom_ca_list is not None:
             if len(custom_ca_list) == 0:
+                # A trustroot cannot be generated without any CA certificates.
+                # Raise an error if this option has been specified without any
+                # corresponding certificates.
                 raise ConfigError("federation_custom_ca_list specified without "
                                   "any certificate files")
 
