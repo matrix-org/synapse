@@ -24,7 +24,5 @@ DROP TABLE IF EXISTS event_edge_hashes;
 DROP TABLE IF EXISTS event_signatures;
 DROP TABLE IF EXISTS feedback;
 DROP TABLE IF EXISTS room_hosts;
+DROP TABLE IF EXISTS server_tls_certificates;
 DROP TABLE IF EXISTS state_forward_extremities;
-
-
-
