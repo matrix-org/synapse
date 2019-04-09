@@ -37,7 +37,13 @@ class StatsConfig(Config):
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
-        # Stats configuration
+        # Local statistics collection. Used in populating the room directory.
+        #
+        # 'bucket_size' controls how large each statistics timeslice is, in
+        # seconds. For example, 86400 will set it to one day collection buckets.
+        #
+        # 'retention' controls how long historical statistics will be kept for,
+        # in seconds.
         #
         # stats:
         #    enable: true
