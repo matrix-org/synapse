@@ -15,6 +15,7 @@
 
 import logging
 
+from synapse.http.server import finish_request, set_cors_headers
 from synapse.http.servlet import RestServlet
 from synapse.rest.client.v2_alpha._base import client_patterns
 
@@ -33,9 +34,7 @@ class LogoutRestServlet(RestServlet):
     def on_OPTIONS(self, request):
         return 200, {}
 
-    async def on_POST(self, request):
-        requester = await self.auth.get_user_by_req(request)
-
+    async def _logout(self, requester, request):
         if requester.device_id is None:
             # the acccess token wasn't associated with a device.
             # Just delete the access token
@@ -45,6 +44,11 @@ class LogoutRestServlet(RestServlet):
             await self._device_handler.delete_device(
                 requester.user.to_string(), requester.device_id
             )
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+
+        await self._logout(requester, request)
 
         return 200, {}
 
@@ -74,6 +78,37 @@ class LogoutAllRestServlet(RestServlet):
         return 200, {}
 
 
+class SAMLLogoutServlet(LogoutRestServlet):
+    def __init__(self, hs):
+        super().__init__(hs)
+        self._saml_handler = hs.get_saml_handler()
+
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        # Logout from the synapse server
+        await self._logout(requester, request)
+        # Try to use the SAML logout endpoint.
+        # It may fail if the user logged in via m.login.password
+        # TODO: find a way to know is the user logged in via
+        # m.login.password or via m.login.sso / .token
+        logout_url = self._saml_handler.create_logout_request(
+            requester.user.to_string(),
+            self.auth.get_access_token_from_request(request),
+        )
+        if logout_url:
+            set_cors_headers(request)
+            request.redirect(logout_url)
+            finish_request(request)
+            # We've already sent the response, so return None to stop
+            # JsonResource sending another.
+            return None
+
+        return 200, {}
+
+
 def register_servlets(hs, http_server):
-    LogoutRestServlet(hs).register(http_server)
+    if hs.config.saml2_enabled:
+        SAMLLogoutServlet(hs).register(http_server)
+    else:
+        LogoutRestServlet(hs).register(http_server)
     LogoutAllRestServlet(hs).register(http_server)

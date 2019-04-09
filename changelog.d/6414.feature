@@ -1,0 +1,1 @@
+Implementing SAML Single Logout (SLO).

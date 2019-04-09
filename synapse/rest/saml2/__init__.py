@@ -16,6 +16,7 @@ import logging
 
 from twisted.web.resource import Resource
 
+from synapse.rest.saml2.logout_resource import SAML2LogoutResource
 from synapse.rest.saml2.metadata_resource import SAML2MetadataResource
 from synapse.rest.saml2.response_resource import SAML2ResponseResource
 
@@ -27,3 +28,4 @@ class SAML2Resource(Resource):
         Resource.__init__(self)
         self.putChild(b"metadata.xml", SAML2MetadataResource(hs))
         self.putChild(b"authn_response", SAML2ResponseResource(hs))
+        self.putChild(b"logout", SAML2LogoutResource(hs))

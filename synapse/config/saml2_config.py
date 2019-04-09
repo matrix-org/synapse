@@ -187,6 +187,7 @@ class SAML2Config(Config):
 
         metadata_url = public_baseurl + "_matrix/saml2/metadata.xml"
         response_url = public_baseurl + "_matrix/saml2/authn_response"
+        logout_url = public_baseurl + "_matrix/saml2/logout"
         return {
             "entityid": metadata_url,
             "service": {
@@ -194,7 +195,10 @@ class SAML2Config(Config):
                     "endpoints": {
                         "assertion_consumer_service": [
                             (response_url, saml2.BINDING_HTTP_POST)
-                        ]
+                        ],
+                        "single_logout_service": [
+                            (logout_url, saml2.BINDING_HTTP_REDIRECT)
+                        ],
                     },
                     "required_attributes": list(required_attributes),
                     "optional_attributes": list(optional_attributes),
