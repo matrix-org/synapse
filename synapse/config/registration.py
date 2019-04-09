@@ -20,6 +20,15 @@ from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string_with_symbols
 
 
+class AccountValidityConfig(Config):
+    def __init__(self, config):
+        self.enabled = (len(config) > 0)
+
+        period = config.get("period", None)
+        if period:
+            self.period = self.parse_duration(period)
+
+
 class RegistrationConfig(Config):
 
     def read_config(self, config):
@@ -30,6 +39,8 @@ class RegistrationConfig(Config):
             self.enable_registration = not bool(
                 strtobool(str(config["disable_registration"]))
             )
+
+        self.account_validity = AccountValidityConfig(config.get("account_validity", {}))
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
@@ -75,6 +86,12 @@ class RegistrationConfig(Config):
         # Enable registration for new users.
         #
         #enable_registration: false
+
+        # Optional account validity parameter. This allows for, e.g., accounts to
+        # be denied any request after a given period.
+        #
+        #account_validity:
+        #  period: 6w
 
         # The user must provide all of the below types of 3PID when registering.
         #

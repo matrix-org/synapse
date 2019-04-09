@@ -646,6 +646,12 @@ uploads_path: "DATADIR/uploads"
 #
 #enable_registration: false
 
+# Optional account validity parameter. This allows for, e.g., accounts to
+# be denied any request after a given period.
+#
+#account_validity:
+#  period: 6w
+
 # The user must provide all of the below types of 3PID when registering.
 #
 #registrations_require_3pid:

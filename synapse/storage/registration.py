@@ -86,6 +86,26 @@ class RegistrationWorkerStore(SQLBaseStore):
             "get_user_by_access_token", self._query_for_auth, token
         )
 
+    @cachedInlineCallbacks()
+    def get_expiration_ts_for_user(self, user):
+        """Get the expiration timestamp for the account bearing a given user ID.
+
+        Args:
+            user (str): The ID of the user.
+        Returns:
+            defer.Deferred: None, if the account has no expiration timestamp,
+            otherwise int representation of the timestamp (as a number of
+            milliseconds since epoch).
+        """
+        res = yield self._simple_select_one_onecol(
+            table="account_validity",
+            keyvalues={"user_id": user.to_string()},
+            retcol="expiration_ts_ms",
+            allow_none=True,
+            desc="get_expiration_date_for_user",
+        )
+        defer.returnValue(res)
+
     @defer.inlineCallbacks
     def is_server_admin(self, user):
         res = yield self._simple_select_one_onecol(
@@ -425,6 +445,8 @@ class RegistrationStore(
             columns=["creation_ts"],
         )
 
+        self._account_validity = hs.config.account_validity
+
         # we no longer use refresh tokens, but it's possible that some people
         # might have a background update queued to build this index. Just
         # clear the background update.
@@ -560,6 +582,18 @@ class RegistrationStore(
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
                     },
+                )
+
+            if self._account_validity.enabled:
+                now_ms = self.clock.time_msec()
+                expiration_ts = now_ms + self._account_validity.period
+                self._simple_insert_txn(
+                    txn,
+                    "account_validity",
+                    values={
+                        "user_id": user_id,
+                        "expiration_ts_ms": expiration_ts,
+                    }
                 )
         except self.database_engine.module.IntegrityError:
             raise StoreError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
