@@ -13,8 +13,10 @@
  * limitations under the License.
  */
 
-DROP TABLE IF EXISTS application_services;
+-- we need to do this first due to foreign constraints
 DROP TABLE IF EXISTS application_services_regex;
+
+DROP TABLE IF EXISTS application_services;
 DROP TABLE IF EXISTS transaction_id_to_pdu;
 DROP TABLE IF EXISTS stats_reporting;
 DROP TABLE IF EXISTS current_state_resets;
