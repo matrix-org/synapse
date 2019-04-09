@@ -394,8 +394,7 @@ class BaseV2KeyFetcher(object):
         POST /_matrix/key/v2/query.
 
         Checks that each signature in the response that claims to come from the origin
-        server is valid. (Does not check that there actually is such a signature, for
-        some reason.)
+        server is valid, and that there is at least one such signature.
 
         Stores the json in server_keys_json so that it can be used for future responses
         to /_matrix/key/v2/query.
@@ -430,16 +429,25 @@ class BaseV2KeyFetcher(object):
                     verify_key=verify_key, valid_until_ts=ts_valid_until_ms
                 )
 
-        # TODO: improve this signature checking
         server_name = response_json["server_name"]
+        verified = False
         for key_id in response_json["signatures"].get(server_name, {}):
-            if key_id not in verify_keys:
+            # each of the keys used for the signature must be present in the response
+            # json.
+            key = verify_keys.get(key_id)
+            if not key:
                 raise KeyLookupError(
-                    "Key response must include verification keys for all signatures"
+                    "Key response is signed by key id %s:%s but that key is not "
+                    "present in the response" % (server_name, key_id)
                 )
 
-            verify_signed_json(
-                response_json, server_name, verify_keys[key_id].verify_key
+            verify_signed_json(response_json, server_name, key.verify_key)
+            verified = True
+
+        if not verified:
+            raise KeyLookupError(
+                "Key response for %s is not signed by the origin server"
+                % (server_name,)
             )
 
         for key_id, key_data in response_json["old_verify_keys"].items():
@@ -676,12 +684,6 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 raise_from(KeyLookupError("Failed to connect to remote server"), e)
             except HttpResponseException as e:
                 raise_from(KeyLookupError("Remote server returned an error"), e)
-
-            if (
-                u"signatures" not in response
-                or server_name not in response[u"signatures"]
-            ):
-                raise KeyLookupError("Key response not signed by remote server")
 
             if response["server_name"] != server_name:
                 raise KeyLookupError(
