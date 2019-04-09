@@ -17,7 +17,6 @@ import logging
 from io import BytesIO
 
 import PIL.Image as Image
-import PIL.ImageOps as ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,22 @@ class Thumbnailer(object):
     def __init__(self, input_path):
         self.image = Image.open(input_path)
         try:
-            self.image = ImageOps.exif_transpose(self.image)
+            # We don't use ImageOps.exif_transpose since it crashes with big EXIF
+            image_exif = self.image._getexif()
+            image_orientation = image_exif.get(0x0112)
+            transpose_method = {
+                2: Image.FLIP_LEFT_RIGHT,
+                3: Image.ROTATE_180,
+                4: Image.FLIP_TOP_BOTTOM,
+                5: Image.TRANSPOSE,
+                6: Image.ROTATE_270,
+                7: Image.TRANSVERSE,
+                8: Image.ROTATE_90
+            }.get(image_orientation)
+            if transpose_method is not None:
+                self.image = self.image.transpose(transpose_method)
+                # We don't need EXIF any more
+                self.image.info["exif"] = None
         except:
             # A lot of parsing errors can happen when parsing EXIF
             pass
