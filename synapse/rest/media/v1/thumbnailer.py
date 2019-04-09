@@ -17,6 +17,7 @@ import logging
 from io import BytesIO
 
 import PIL.Image as Image
+import PIL.ImageOps as ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,11 @@ class Thumbnailer(object):
 
     def __init__(self, input_path):
         self.image = Image.open(input_path)
+        try:
+            self.image = ImageOps.exif_transpose(self.image)
+        except:
+            # A lot of parsing errors can happen when parsing EXIF
+            pass
         self.width, self.height = self.image.size
 
     def aspect(self, max_width, max_height):
