@@ -122,6 +122,30 @@ class ServerConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
+        self.federation_ip_range_blacklist = config.get(
+            "federation_ip_range_blacklist", None,
+        )
+        if self.federation_ip_range_blacklist is not None:
+            # Import IPSet
+            try:
+                from netaddr import IPSet
+            except ImportError:
+                raise ConfigError(
+                    "Missing netaddr library. This is required to use "
+                    "federation_ip_range_blacklist"
+                )
+
+            # Attempt to create an IPSet from the given ranges
+            try:
+                self.federation_ip_range_blacklist = IPSet(
+                    self.federation_ip_range_blacklist
+                )
+            except Exception as e:
+                raise ConfigError(
+                    "Invalid range(s) provided in "
+                    "federation_ip_range_blacklist: %s" % e
+                )
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -350,6 +374,20 @@ class ServerConfig(Config):
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com
+
+        # Prevent federation requests from being sent to the following
+        # blacklist IP address CIDR ranges.
+        #
+        #federation_ip_range_blacklist:
+        #  - '127.0.0.0/8'
+        #  - '10.0.0.0/8'
+        #  - '172.16.0.0/12'
+        #  - '192.168.0.0/16'
+        #  - '100.64.0.0/10'
+        #  - '169.254.0.0/16'
+        #  - '::1/128'
+        #  - 'fe80::/64'
+        #  - 'fc00::/7'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

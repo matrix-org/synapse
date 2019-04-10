@@ -78,7 +78,7 @@ class FederationClientTests(HomeserverTestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        # Make sure treq is trying to connect
+        # Make sure the req is trying to connect
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, factory, _timeout, _bindAddress) = clients[0]
@@ -210,6 +210,77 @@ class FederationClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
+
+    def test_client_ip_range_blacklist(self):
+        """Ensure that Synapse does not try to connect to blacklisted IPs"""
+        # Set up the ip_range blacklist
+        from netaddr import IPSet
+
+        self.hs.config.federation_ip_range_blacklist = IPSet([
+            "127.0.0.0/8",
+            "fe80::/64",
+        ])
+        self.reactor.lookups["internal"] = "127.0.0.1"
+        self.reactor.lookups["internalv6"] = "fe80:0db8:85a3::8a2e:0370:7334"
+        self.reactor.lookups["fine"] = "10.20.30.40"
+        cl = MatrixFederationHttpClient(self.hs, None)
+
+        # Try making a GET request to a blacklisted IP
+        # --------------------------------------------
+        @defer.inlineCallbacks
+        def do_request():
+            with LoggingContext("one") as context:
+                fetch_d = cl.get_json("internal:8008", "foo/bar")
+
+                # Nothing happened yet
+                self.assertNoResult(fetch_d)
+
+                # should have reset logcontext to the sentinel
+                check_logcontext(LoggingContext.sentinel)
+
+                try:
+                    fetch_res = yield fetch_d
+                    defer.returnValue(fetch_res)
+                finally:
+                    check_logcontext(context)
+
+        d = do_request()
+        self.pump()
+
+        # Nothing has happened yet
+        self.assertNoResult(d)
+
+        # Check that it is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, factory, _timeout, _bindAddress) = clients[0]
+        self.assertEqual(host, '127.0.0.1')
+        self.assertEqual(port, 8008)
+
+        # complete the connection and wire it up to a fake transport
+        protocol = factory.buildProtocol(None)
+        transport = StringTransport()
+        protocol.makeConnection(transport)
+
+        self.assertRegex(transport.value(), b"^GET /foo/bar")
+        self.assertRegex(transport.value(), b"Host: internal:8008")
+
+        # Deferred does not have a result
+        self.assertNoResult(d)
+
+        # Send it the HTTP response
+        protocol.dataReceived(
+            (b"HTTP/1.1 200 OK\r\n"
+             b"Content-Type: application/json\r\n"
+             b"Server: Fake\r\n"
+             b"Content-Length: 2\r\n\r\n"
+             b"{}")
+        )
+
+        self.pump()
+
+        # No result should have been received
+        self.assertNoResult(d)
 
     def test_client_gets_headers(self):
         """
