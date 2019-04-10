@@ -236,6 +236,9 @@ listeners:
 #  - medium: 'email'
 #    address: 'reserved_user@example.com'
 
+# Used by phonehome stats to group together related servers.
+#server_context: context
+
 
 ## TLS ##
 
@@ -642,6 +645,12 @@ uploads_path: "DATADIR/uploads"
 # Enable registration for new users.
 #
 #enable_registration: false
+
+# Optional account validity parameter. This allows for, e.g., accounts to
+# be denied any request after a given period.
+#
+#account_validity:
+#  period: 6w
 
 # The user must provide all of the below types of 3PID when registering.
 #

@@ -324,6 +324,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(res), 1)
         res = res[0]
         self.assertEqual(res["key_id"], testverifykey_id)
+        self.assertEqual(res["from_server"], self.mock_perspective_server.server_name)
         self.assertEqual(res["ts_added_ms"], self.reactor.seconds() * 1000)
         self.assertEqual(res["ts_valid_until_ms"], VALID_UNTIL_TS)
 
