@@ -31,7 +31,6 @@ from synapse.util.logcontext import LoggingContext
 
 from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
-from tests import unittest
 
 
 def check_logcontext(context):
