@@ -22,7 +22,7 @@ from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
-from synapse.api.errors import RequestSendFailed
+from synapse.api.errors import RequestSendFailed, SynapseError
 from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
@@ -31,6 +31,7 @@ from synapse.util.logcontext import LoggingContext
 
 from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
+from tests import unittest
 
 
 def check_logcontext(context):
@@ -211,6 +212,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
 
+    @unittest.DEBUG
     def test_client_ip_range_blacklist(self):
         """Ensure that Synapse does not try to connect to blacklisted IPs"""
         # Set up the ip_range blacklist
@@ -221,12 +223,12 @@ class FederationClientTests(HomeserverTestCase):
             "fe80::/64",
         ])
         self.reactor.lookups["internal"] = "127.0.0.1"
-        self.reactor.lookups["internalv6"] = "fe80:0db8:85a3::8a2e:0370:7334"
+        self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
         self.reactor.lookups["fine"] = "10.20.30.40"
         cl = MatrixFederationHttpClient(self.hs, None)
 
-        # Try making a GET request to a blacklisted IP
-        # --------------------------------------------
+        # Try making a GET request to a blacklisted IPv4 address
+        # ------------------------------------------------------
         @defer.inlineCallbacks
         def do_request():
             with LoggingContext("one") as context:
@@ -244,43 +246,77 @@ class FederationClientTests(HomeserverTestCase):
                 finally:
                     check_logcontext(context)
 
+        # Make the request
         d = do_request()
         self.pump()
 
         # Nothing has happened yet
         self.assertNoResult(d)
 
-        # Check that it is trying to connect
+        # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients
-        self.assertEqual(len(clients), 1)
-        (host, port, factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, '127.0.0.1')
-        self.assertEqual(port, 8008)
+        self.assertEqual(len(clients), 0)
 
-        # complete the connection and wire it up to a fake transport
-        protocol = factory.buildProtocol(None)
-        transport = StringTransport()
-        protocol.makeConnection(transport)
+        # Try making a POST request to a blacklisted IPv6 address
+        # -------------------------------------------------------
+        @defer.inlineCallbacks
+        def do_request():
+            with LoggingContext("one") as context:
+                fetch_d = cl.post_json("internalv6:8008", "foo/bar")
 
-        self.assertRegex(transport.value(), b"^GET /foo/bar")
-        self.assertRegex(transport.value(), b"Host: internal:8008")
+                # Nothing happened yet
+                self.assertNoResult(fetch_d)
 
-        # Deferred does not have a result
-        self.assertNoResult(d)
+                # should have reset logcontext to the sentinel
+                check_logcontext(LoggingContext.sentinel)
 
-        # Send it the HTTP response
-        protocol.dataReceived(
-            (b"HTTP/1.1 200 OK\r\n"
-             b"Content-Type: application/json\r\n"
-             b"Server: Fake\r\n"
-             b"Content-Length: 2\r\n\r\n"
-             b"{}")
-        )
+                try:
+                    fetch_res = yield fetch_d
+                    defer.returnValue(fetch_res)
+                finally:
+                    check_logcontext(context)
 
+        # Make the request
+        d = do_request()
         self.pump()
 
-        # No result should have been received
+        # Nothing has happened yet
         self.assertNoResult(d)
+
+        # Check that it was unable to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 0)
+
+
+        # Try making a GET request to a non-blacklisted IPv4 address
+        # ----------------------------------------------------------
+        @defer.inlineCallbacks
+        def do_request():
+            with LoggingContext("one") as context:
+                fetch_d = cl.post_json("fine:8008", "foo/bar")
+
+                # Nothing happened yet
+                self.assertNoResult(fetch_d)
+
+                # should have reset logcontext to the sentinel
+                check_logcontext(LoggingContext.sentinel)
+
+                try:
+                    fetch_res = yield fetch_d
+                    defer.returnValue(fetch_res)
+                finally:
+                    check_logcontext(context)
+
+        # Make the request
+        d = do_request()
+        self.pump()
+
+        # Nothing has happened yet
+        self.assertNoResult(d)
+
+        # Check that it was able to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
 
     def test_client_gets_headers(self):
         """

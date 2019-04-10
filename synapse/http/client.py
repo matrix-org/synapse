@@ -101,7 +101,9 @@ class IPBlacklistingResolver(object):
 
             @staticmethod
             def addressResolved(address):
+                logger.info("[LAMP] host: %s", address.host)
                 ip_address = IPAddress(address.host)
+                logger.info("[LAMP] ip_address: %s", ip_address)
 
                 if check_against_blacklist(
                     ip_address, self._ip_whitelist, self._ip_blacklist
@@ -109,14 +111,14 @@ class IPBlacklistingResolver(object):
                     logger.info(
                         "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
                     )
-                    raise SynapseError(403, "IP address blocked by IP blacklist entry")
-
-                addresses.append(address)
+                else:
+                    addresses.append(address)
 
             @staticmethod
             def resolutionComplete():
                 d.callback(addresses)
 
+        logger.info("[LAMP] Resolve host name: %s", hostname)
         self._reactor.nameResolver.resolveHostName(
             EndpointReceiver, hostname, portNumber=portNumber
         )
