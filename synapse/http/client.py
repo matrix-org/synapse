@@ -112,7 +112,8 @@ class IPBlacklistingResolver(object):
                         "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
                     )
                     if not self._from_federation:
-                        raise SynapseError(403, "IP address blocked by IP blacklist entry")
+                        raise SynapseError(403,
+                                           "IP address blocked by IP blacklist entry")
                     return
 
                 addresses.append(address)
