@@ -111,6 +111,8 @@ class IPBlacklistingResolver(object):
                     logger.info(
                         "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
                     )
+                    # Only raise a 403 if this request originated from a
+                    # client-server call
                     if not self._from_federation:
                         raise SynapseError(403,
                                            "IP address blocked by IP blacklist entry")
