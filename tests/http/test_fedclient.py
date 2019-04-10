@@ -22,7 +22,7 @@ from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
-from synapse.api.errors import RequestSendFailed, SynapseError
+from synapse.api.errors import RequestSendFailed
 from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
@@ -212,7 +212,6 @@ class FederationClientTests(HomeserverTestCase):
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
 
-    @unittest.DEBUG
     def test_client_ip_range_blacklist(self):
         """Ensure that Synapse does not try to connect to blacklisted IPs"""
         # Set up the ip_range blacklist
@@ -286,7 +285,6 @@ class FederationClientTests(HomeserverTestCase):
         # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 0)
-
 
         # Try making a GET request to a non-blacklisted IPv4 address
         # ----------------------------------------------------------
