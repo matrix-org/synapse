@@ -182,6 +182,7 @@ class MatrixFederationHttpClient(object):
             # filters out blacklisted IP addresses, to prevent DNS rebinding.
             nameResolver = IPBlacklistingResolver(
                 real_reactor, None, hs.config.federation_ip_range_blacklist,
+                federation=True,
             )
 
             @implementer(IReactorPluggableNameResolver)

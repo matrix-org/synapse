@@ -76,16 +76,18 @@ class IPBlacklistingResolver(object):
     addresses, preventing DNS rebinding attacks on URL preview.
     """
 
-    def __init__(self, reactor, ip_whitelist, ip_blacklist):
+    def __init__(self, reactor, ip_whitelist, ip_blacklist, federation=False):
         """
         Args:
             reactor (twisted.internet.reactor)
             ip_whitelist (netaddr.IPSet)
             ip_blacklist (netaddr.IPSet)
+            federation (bool): this resolver is for federation traffic
         """
         self._reactor = reactor
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
+        self._from_federation = federation
 
     def resolveHostName(self, recv, hostname, portNumber=0):
 
@@ -101,9 +103,7 @@ class IPBlacklistingResolver(object):
 
             @staticmethod
             def addressResolved(address):
-                logger.info("[LAMP] host: %s", address.host)
                 ip_address = IPAddress(address.host)
-                logger.info("[LAMP] ip_address: %s", ip_address)
 
                 if check_against_blacklist(
                     ip_address, self._ip_whitelist, self._ip_blacklist
@@ -111,14 +111,16 @@ class IPBlacklistingResolver(object):
                     logger.info(
                         "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
                     )
-                else:
-                    addresses.append(address)
+                    if not self._from_federation:
+                        raise SynapseError(403, "IP address blocked by IP blacklist entry")
+                    return
+
+                addresses.append(address)
 
             @staticmethod
             def resolutionComplete():
                 d.callback(addresses)
 
-        logger.info("[LAMP] Resolve host name: %s", hostname)
         self._reactor.nameResolver.resolveHostName(
             EndpointReceiver, hostname, portNumber=portNumber
         )
