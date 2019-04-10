@@ -179,8 +179,8 @@ class StatsStore(StateDeltasStore):
             defer.returnValue(1)
 
         logger.info(
-            "Processing the next %d rooms of %d remaining"
-            % (len(rooms_to_work_on), progress["remaining"])
+            "Processing the next %d rooms of %d remaining",
+            (len(rooms_to_work_on), progress["remaining"]),
         )
 
         # Number of state events we've processed by going through each room
@@ -336,6 +336,11 @@ class StatsStore(StateDeltasStore):
         )
 
     def update_room_state(self, room_id, fields):
+        """
+        Args:
+            room_id (str)
+            fields (dict[str:Any])
+        """
         return self._simple_upsert(
             table="room_state",
             keyvalues={"room_id": room_id},
@@ -344,13 +349,30 @@ class StatsStore(StateDeltasStore):
         )
 
     def get_deltas_for_room(self, room_id, start, size=100):
+        """
+        Get statistics deltas for a given room.
+
+        Args:
+            room_id (str)
+            start (int): Pagination start. Number of entries, not timestamp.
+            size (int): How many entries to return.
+
+        Returns:
+            Deferred[list[dict]], where the dict has the keys of
+            ABSOLUTE_STATS_FIELDS["room"], RELATIVE_STATS_FIELDS["room"],
+            and "ts".
+        """
         return self._simple_select_list_paginate(
             "room_stats",
             {"room_id": room_id},
             "ts",
             start,
             size,
-            retcols=list(ABSOLUTE_STATS_FIELDS["room"]) + ["ts"],
+            retcols=(
+                list(ABSOLUTE_STATS_FIELDS["room"])
+                + RELATIVE_STATS_FIELDS["room"]
+                + ["ts"]
+            ),
             order_direction="DESC",
         )
 
@@ -366,6 +388,9 @@ class StatsStore(StateDeltasStore):
         processor to ignore deltas that have been processed between the
         start of the background task and any particular room's stats
         being calculated.
+
+        Returns:
+            Deferred[int]
         """
         return self._simple_select_one_onecol(
             "room_stats_earliest_token",

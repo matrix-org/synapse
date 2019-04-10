@@ -591,3 +591,57 @@ class EventsWorkerStore(SQLBaseStore):
             return res
 
         return self.runInteraction("get_rejection_reasons", f)
+
+    def _get_state_event_counts_txn(self, txn, room_id):
+        """
+        See get_state_event_counts.
+        """
+        sql = "SELECT COUNT(*) FROM state_events WHERE room_id=?"
+        txn.execute(sql, (room_id,))
+        row = txn.fetchone()
+        return row[0] if row else 0
+
+    def get_state_event_counts(self, room_id):
+        """
+        Gets the total number of state events in a room.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[int]
+        """
+        return self.runInteraction(
+            "get_state_event_counts", self._get_state_event_counts_txn, room_id
+        )
+
+    def _get_event_counts_txn(self, txn, room_id, local_server):
+        """
+        See get_event_counts.
+        """
+        sql = (
+            "SELECT sender LIKE ? AS local, COUNT(*)"
+            " FROM events"
+            " WHERE room_id=?"
+            " GROUP BY local"
+        )
+        txn.execute(sql, ("%%:" + local_server, room_id))
+        rows = txn.fetchall()
+        results = {("local" if row[0] else "remote"): row[1] for row in rows}
+        return (results.get("local", 0), results.get("remote", 0))
+
+    def get_event_counts(self, room_id, local_server):
+        """
+        Gets the number of events in the room, split into local versus remote.
+
+        Args:
+            room_id (str)
+            local_server (str): The server to consider 'local'.
+
+        Returns:
+            Deferred[dict[str, int]], where the dict has two keys, "local" and
+            "remote", and the current number of events for each.
+        """
+        return self.runInteraction(
+            "get_event_counts", self._get_event_counts_txn, room_id, local_server
+        )

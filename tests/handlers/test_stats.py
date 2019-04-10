@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.rest.client.v1 import admin, login, room
 
 from tests import unittest
-from mock import Mock
 
 
 class StatsRoomTests(unittest.HomeserverTestCase):

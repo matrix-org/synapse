@@ -143,6 +143,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return self.runInteraction("get_room_summary", _get_room_summary_txn)
 
     def _get_user_count_in_room_txn(self, txn, room_id, membership):
+        """
+        See get_user_count_in_room.
+        """
         sql = (
             "SELECT count(*) FROM room_memberships as m"
             " INNER JOIN current_state_events as c"
@@ -156,8 +159,17 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         row = txn.fetchone()
         return row[0]
 
-    @cached()
     def get_user_count_in_room(self, room_id, membership):
+        """
+        Get the user count in a room with a particular membership.
+
+        Args:
+            room_id (str)
+            membership (Membership)
+
+        Returns:
+            Deferred[int]
+        """
         return self.runInteraction(
             "get_users_in_room", self._get_user_count_in_room_txn, room_id, membership
         )
