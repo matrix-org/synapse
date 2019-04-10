@@ -62,10 +62,15 @@ else:
         
         # Convert SYNAPSE_NO_TLS to boolean if exists
         if "SYNAPSE_NO_TLS" in environ:
-            if str.lower(environ["SYNAPSE_NO_TLS"]) in ("true", "on", "1", "yes"):
+            tlsanswerstring = str.lower(environ["SYNAPSE_NO_TLS"])
+            if tlsanswerstring in ("true", "on", "1", "yes"):
                 environ["SYNAPSE_NO_TLS"] = True
             else:
-                environ["SYNAPSE_NO_TLS"] = False
+                if tlsanswerstring in ("false", "off", "0", "no"):
+                    environ["SYNAPSE_NO_TLS"] = False
+                else:
+                    print("Environment variable \"SYNAPSE_NO_TLS\" found but value \"" + tlsanswerstring + "\" unrecognized; exiting.")
+                    sys.exit(2)
 
         convert("/conf/homeserver.yaml", config_path, environ)
         convert("/conf/log.config", "/compiled/log.config", environ)
