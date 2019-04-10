@@ -370,7 +370,7 @@ class StatsStore(StateDeltasStore):
             size,
             retcols=(
                 list(ABSOLUTE_STATS_FIELDS["room"])
-                + RELATIVE_STATS_FIELDS["room"]
+                + list(RELATIVE_STATS_FIELDS["room"])
                 + ["ts"]
             ),
             order_direction="DESC",
