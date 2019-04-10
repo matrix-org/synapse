@@ -153,7 +153,7 @@ class StatsHandler(StateDeltasHandler):
                     ).content
 
                 membership = event_content.get("membership", Membership.LEAVE)
-                prev_membership = prev_event_content.get("membership")
+                prev_membership = prev_event_content.get("membership", Membership.LEAVE)
 
                 if prev_membership == membership:
                     continue
@@ -174,6 +174,10 @@ class StatsHandler(StateDeltasHandler):
                     yield self.store.update_stats_delta(
                         now, "room", room_id, "banned_members", -1
                     )
+                else:
+                    err = "%s is not a valid prev_membership" % (repr(prev_membership),)
+                    logger.error(err)
+                    raise ValueError(err)
 
                 if membership == Membership.JOIN:
                     yield self.store.update_stats_delta(
@@ -191,6 +195,10 @@ class StatsHandler(StateDeltasHandler):
                     yield self.store.update_stats_delta(
                         now, "room", room_id, "banned_members", +1
                     )
+                else:
+                    err = "%s is not a valid membership" % (repr(membership),)
+                    logger.error(err)
+                    raise ValueError(err)
 
                 user_id = state_key
                 if self.is_mine_id(user_id):

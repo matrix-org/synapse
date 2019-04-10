@@ -13,9 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
 from synapse.rest.client.v1 import admin, login, room
 
 from tests import unittest
+from mock import Mock
 
 
 class StatsRoomTests(unittest.HomeserverTestCase):
@@ -103,7 +107,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["topic"], "foo")
 
-    @unittest.DEBUG
     def test_initial_earliest_token(self):
         """
         Ingestion via notify_new_event will ignore tokens that the background
@@ -188,3 +191,59 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # The newest has 3
         self.assertEqual(r[0]["joined_members"], 3)
+
+    def test_incorrect_state_transition(self):
+        """
+        If the state transition is not one of (JOIN, INVITE, LEAVE, BAN) to
+        (JOIN, INVITE, LEAVE, BAN), an error is raised.
+        """
+        events = {
+            "a1": {"membership": Membership.LEAVE},
+            "a2": {"membership": "not a real thing"},
+        }
+
+        def get_event(event_id):
+            m = Mock()
+            m.content = events[event_id]
+            d = defer.Deferred()
+            self.reactor.callLater(0.0, d.callback, m)
+            return d
+
+        def get_received_ts(event_id):
+            return defer.succeed(1)
+
+        self.store.get_received_ts = get_received_ts
+        self.store.get_event = get_event
+
+        deltas = [
+            {
+                "type": EventTypes.Member,
+                "state_key": "some_user",
+                "room_id": "room",
+                "event_id": "a1",
+                "prev_event_id": "a2",
+                "stream_id": "bleb",
+            }
+        ]
+
+        f = self.get_failure(self.handler._handle_deltas(deltas), ValueError)
+        self.assertEqual(
+            f.value.args[0], "'not a real thing' is not a valid prev_membership"
+        )
+
+        # And the other way...
+        deltas = [
+            {
+                "type": EventTypes.Member,
+                "state_key": "some_user",
+                "room_id": "room",
+                "event_id": "a2",
+                "prev_event_id": "a1",
+                "stream_id": "bleb",
+            }
+        ]
+
+        f = self.get_failure(self.handler._handle_deltas(deltas), ValueError)
+        self.assertEqual(
+            f.value.args[0], "'not a real thing' is not a valid membership"
+        )
