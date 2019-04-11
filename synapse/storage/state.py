@@ -433,7 +433,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id (str)
 
         Returns:
-            Deferred[unicode|None]: predecessor room id
+            Deferred[unicode|None]: predecessor room id, or None if a
+            predecessor is not found
 
         Raises:
             NotFoundError if the room is unknown
@@ -443,6 +444,33 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         # Return predecessor if present
         defer.returnValue(create_event.content.get("predecessor", None))
+
+    @defer.inlineCallbacks
+    def get_room_tombstone(self, room_id):
+        """Get the tombstone event of an upgraded room if one exists.
+        Otherwise return None.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[FrozenEvent|None]: the tombstone event, or None if a
+            tombstone event was not found
+
+        Raises:
+            NotFoundError if the room is unknown
+        """
+        # Retrieve the room's tombstone event if it exists
+        state_ids = yield self.get_current_state_ids(room_id)
+        tombstone_id = state_ids.get((EventTypes.Tombstone, ""))
+
+        # If we can't find the tombstone, assume we've hit a dead end
+        if not tombstone_id:
+            defer.returnValue(None)
+
+        # Retrieve the room's tombstone event and return
+        tombstone_event = yield self.get_event(tombstone_id)
+        defer.returnValue(tombstone_event)
 
     @defer.inlineCallbacks
     def get_create_event_for_room(self, room_id):

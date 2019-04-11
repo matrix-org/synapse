@@ -76,7 +76,9 @@ class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def upgrade_room(self, requester, old_room_id, new_version):
-        """Replace a room with a new room with a different version
+        """Replace a room with a new room with a different version. Will
+        raise an exception if the room has already been upgraded, or in
+        currently in the process of being upgraded.
 
         Args:
             requester (synapse.types.Requester): the user requesting the upgrade
@@ -85,12 +87,22 @@ class RoomCreationHandler(BaseHandler):
 
         Returns:
             Deferred[unicode]: the new room id
+
+        Raises:
+            NotFoundError if the room is unknown
+            SynapseError if this room has already been upgraded
         """
         yield self.ratelimit(requester)
 
         user_id = requester.user.to_string()
 
         with (yield self._upgrade_linearizer.queue(old_room_id)):
+            # Check that this room has not already been upgraded
+            tombstone = yield self.store.get_room_tombstone(old_room_id)
+
+            if tombstone is not None:
+                raise SynapseError(400, "This room has already been upgraded")
+
             # start by allocating a new room id
             r = yield self.store.get_room(old_room_id)
             if r is None:
