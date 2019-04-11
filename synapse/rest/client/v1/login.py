@@ -440,7 +440,7 @@ class CasTicketServlet(ClientV1RestServlet):
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
         return self._sso_auth_handler.on_successful_auth(
-            user, request, client_redirect_url, attributes["authenticationMethod"]
+            user, request, client_redirect_url
         )
 
     def parse_cas_response(self, cas_response_body):
