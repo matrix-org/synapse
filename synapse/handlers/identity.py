@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018, 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -279,4 +279,40 @@ class IdentityHandler(BaseHandler):
             defer.returnValue(data)
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
+            raise e.to_synapse_error()
+
+    @defer.inlineCallbacks
+    def lookup_3pid(self, id_server, medium, address):
+        """Make a lookup request to an identity server
+
+        Args:
+            id_server (str): The identity server to send the request to.
+            medium (str): The medium of the 3PID to look up.
+            address (str): The address of the 3PID to look up.
+
+        Returns:
+            Deferred[Dict[str, str|int|Dict]]: The result of the lookup. See
+            https://matrix.org/docs/spec/identity_service/r0.1.0.html#id15
+            for details
+        """
+        if not self._should_trust_id_server(id_server):
+            raise SynapseError(
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
+            )
+
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
+        try:
+            data = yield self.http_client.get_json(
+                "https://%s%s?medium=%s&address=%s" % (
+                    id_server, "/_matrix/identity/api/v1/lookup",
+                    medium, address
+                )
+            )
+            defer.returnValue(data)
+        except HttpResponseException as e:
+            logger.info("Proxied lookup failed: %r", e)
             raise e.to_synapse_error()

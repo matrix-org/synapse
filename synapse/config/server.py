@@ -569,6 +569,7 @@ KNOWN_RESOURCES = (
     'replication',
     'static',
     'webclient',
+    'identity',
 )
 
 

@@ -33,6 +33,7 @@ CONTENT_REPO_PREFIX = "/_matrix/content"
 SERVER_KEY_V2_PREFIX = "/_matrix/key/v2"
 MEDIA_PREFIX = "/_matrix/media/r0"
 LEGACY_MEDIA_PREFIX = "/_matrix/media/v1"
+IDENTITY_PREFIX = "/_matrix/identity/api/v1"
 
 
 class ConsentURIBuilder(object):
