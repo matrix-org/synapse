@@ -377,6 +377,7 @@ class CasRedirectServlet(RestServlet):
         super(CasRedirectServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url.encode('ascii')
         self.cas_service_url = hs.config.cas_service_url.encode('ascii')
+        self.hs = hs
 
     def on_GET(self, request):
         args = request.args
@@ -387,8 +388,9 @@ class CasRedirectServlet(RestServlet):
         }).encode('ascii')
         hs_redirect_url = (self.cas_service_url +
                            b"/_matrix/client/api/v1/login/cas/ticket")
+        self.hs.config.cas_service_url_complete = b"%s?%s" % (hs_redirect_url, client_redirect_url_param)
         service_param = urllib.parse.urlencode({
-            b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)
+            b"service": self.hs.config.cas_service_url_complete
         }).encode('ascii')
         request.redirect(b"%s/login?%s" % (self.cas_server_url, service_param))
         finish_request(request)
@@ -411,7 +413,7 @@ class CasTicketServlet(ClientV1RestServlet):
         uri = self.cas_server_url + "/proxyValidate"
         args = {
             "ticket": parse_string(request, "ticket", required=True),
-            "service": self.cas_service_url
+            "service": self.hs.config.cas_service_url_complete
         }
         try:
             body = yield http_client.get_raw(uri, args)
@@ -438,7 +440,7 @@ class CasTicketServlet(ClientV1RestServlet):
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
         return self._sso_auth_handler.on_successful_auth(
-            user, request, client_redirect_url,
+            user, request, client_redirect_url, attributes["authenticationMethod"]
         )
 
     def parse_cas_response(self, cas_response_body):
