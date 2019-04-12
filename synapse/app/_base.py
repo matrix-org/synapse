@@ -22,6 +22,7 @@ import traceback
 import psutil
 from daemonize import Daemonize
 
+import twisted.names
 from twisted.internet import defer, error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
@@ -127,6 +128,10 @@ def start_reactor(
             change_resource_limit(soft_file_limit)
             if gc_thresholds:
                 gc.set_threshold(*gc_thresholds)
+
+            # change the default resolver to avoid blocking getaddrinfo calls
+            reactor.installResolver(twisted.names.client)
+
             reactor.run()
 
     if daemonize:
