@@ -1,0 +1,1 @@
+Replace blocking getaddrinfo hostname resolver with the non-blocking resolver from twisted.names.client.
