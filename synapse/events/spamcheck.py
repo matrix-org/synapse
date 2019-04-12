@@ -47,7 +47,7 @@ class SpamChecker(object):
         return self.spam_checker.check_event_for_spam(event)
 
     def user_may_invite(self, inviter_userid, invitee_userid, third_party_invite,
-                        room_id, new_room):
+                        room_id, new_room, published_room):
         """Checks if a given user may send an invite
 
         If this method returns false, the invite will be rejected.
@@ -60,9 +60,12 @@ class SpamChecker(object):
             third_party_invite (dict|None): If a third party invite then is a
                 dict containing the medium and address of the invitee.
             room_id (str)
-            new_room (bool): Wether the user is being invited to the room as
+            new_room (bool): Whether the user is being invited to the room as
                 part of a room creation, if so the invitee would have been
                 included in the call to `user_may_create_room`.
+            published_room (bool): Whether the room the user is being invited
+                to has been published in the local homeserver's public room
+                directory.
 
         Returns:
             bool: True if the user may send an invite, otherwise False
@@ -72,6 +75,7 @@ class SpamChecker(object):
 
         return self.spam_checker.user_may_invite(
             inviter_userid, invitee_userid, third_party_invite, room_id, new_room,
+            published_room,
         )
 
     def user_may_create_room(self, userid, invite_list, third_party_invite_list,

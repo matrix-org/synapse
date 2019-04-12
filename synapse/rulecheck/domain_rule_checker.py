@@ -46,6 +46,10 @@ class DomainRuleChecker(object):
           # domain mapping rules above.
           can_only_invite_during_room_creation: false
 
+          # Prevent local users from inviting users from certain domains to
+          # rooms published in the room directory.
+          domains_prevented_from_being_invited_to_published_rooms: []
+
           # Allow third party invites
           can_invite_by_third_party_id: true
 
@@ -68,6 +72,9 @@ class DomainRuleChecker(object):
         self.can_invite_by_third_party_id = config.get(
             "can_invite_by_third_party_id", True,
         )
+        self.domains_prevented_from_being_invited_to_published_rooms = config.get(
+            "domains_prevented_from_being_invited_to_published_rooms", [],
+        )
 
     def check_event_for_spam(self, event):
         """Implements synapse.events.SpamChecker.check_event_for_spam
@@ -75,7 +82,7 @@ class DomainRuleChecker(object):
         return False
 
     def user_may_invite(self, inviter_userid, invitee_userid, third_party_invite,
-                        room_id, new_room):
+                        room_id, new_room, published_room=False):
         """Implements synapse.events.SpamChecker.user_may_invite
         """
         if self.can_only_invite_during_room_creation and not new_room:
@@ -94,6 +101,12 @@ class DomainRuleChecker(object):
 
         if inviter_domain not in self.domain_mapping:
             return self.default
+
+        if (
+            published_room and
+            invitee_domain in self.domains_prevented_from_being_invited_to_published_rooms
+        ):
+            return False
 
         return invitee_domain in self.domain_mapping[inviter_domain]
 

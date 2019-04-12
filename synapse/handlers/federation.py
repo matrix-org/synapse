@@ -1345,9 +1345,12 @@ class FederationHandler(BaseHandler):
         if self.hs.config.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
+        is_published = yield self.store.is_room_published(event.room_id)
+
         if not self.spam_checker.user_may_invite(
             event.sender, event.state_key, None,
             room_id=event.room_id, new_room=False,
+            published_room=is_published,
         ):
             raise SynapseError(
                 403, "This user is not permitted to send invites to this server/user"
