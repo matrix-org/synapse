@@ -70,6 +70,7 @@ class RoomCreationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self.currently_upgrading_rooms = {}
 
         # linearizer to stop two upgrades happening at once
         self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
@@ -89,6 +90,12 @@ class RoomCreationHandler(BaseHandler):
         yield self.ratelimit(requester)
 
         user_id = requester.user.to_string()
+
+        if old_room_id in self.currently_upgrading_rooms:
+            raise SynapseError(
+                400, "An upgrade for this room is currently in progress."
+            )
+        self.currently_upgrading_rooms[old_room_id] = True
 
         with (yield self._upgrade_linearizer.queue(old_room_id)):
             # start by allocating a new room id
@@ -148,6 +155,8 @@ class RoomCreationHandler(BaseHandler):
             yield self._update_upgraded_room_pls(
                 requester, old_room_id, new_room_id, old_room_state,
             )
+
+            del self.currently_upgrading_rooms[old_room_id]
 
             defer.returnValue(new_room_id)
 
