@@ -47,9 +47,9 @@ class Thumbnailer(object):
                 self.image = self.image.transpose(transpose_method)
                 # We don't need EXIF any more
                 self.image.info["exif"] = None
-        except Exception:
+        except Exception as e:
             # A lot of parsing errors can happen when parsing EXIF
-            pass
+            logger.debug("Error parsing image EXIF information: %s", e)
         self.width, self.height = self.image.size
 
     def aspect(self, max_width, max_height):
