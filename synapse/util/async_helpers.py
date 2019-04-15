@@ -448,6 +448,7 @@ def timeout_deferred(deferred, timeout, reactor, on_timeout_cancel=None):
             new_d.callback(val)
 
     def failure_cb(val):
+        logger.error(val.getTraceback())
         if not new_d.called:
             new_d.errback(val)
 
