@@ -22,6 +22,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
+from synapse.util.async_helpers import concurrently_execute
 
 logger = logging.getLogger(__name__)
 
@@ -895,6 +896,78 @@ class GroupsServerHandler(object):
         defer.returnValue({
             "group_id": group_id,
         })
+
+    @defer.inlineCallbacks
+    def delete_group(self, group_id, requester_user_id):
+        """Deletes a group, kicking out all current members.
+
+        Only group admins or server admins can call this request
+
+        Args:
+            group_id (str)
+            request_user_id (str)
+
+        Returns:
+            Deferred
+        """
+
+        yield self.check_group_is_ours(
+            group_id, requester_user_id,
+            and_exists=True,
+        )
+
+        # Only server admins or group admins can delete groups.
+
+        is_admin = yield self.store.is_user_admin_in_group(
+            group_id, requester_user_id
+        )
+
+        if not is_admin:
+            is_admin = yield self.auth.is_server_admin(
+                UserID.from_string(requester_user_id),
+            )
+
+        if not is_admin:
+            raise SynapseError(403, "User is not an admin")
+
+        # Before deleting the group lets kick everyone out of it
+        users = yield self.store.get_users_in_group(
+            group_id, include_private=True,
+        )
+
+        @defer.inlineCallbacks
+        def _kick_user_from_group(user_id):
+            if self.hs.is_mine_id(user_id):
+                groups_local = self.hs.get_groups_local_handler()
+                yield groups_local.user_removed_from_group(group_id, user_id, {})
+            else:
+                yield self.transport_client.remove_user_from_group_notification(
+                    get_domain_from_id(user_id), group_id, user_id, {}
+                )
+                yield self.store.maybe_delete_remote_profile_cache(user_id)
+
+        # We kick users out in the order of:
+        #   1. Non-admins
+        #   2. Other admins
+        #   3. The requester
+        #
+        # This is so that if the deletion fails for some reason other admins or
+        # the requester still has auth to retry.
+        non_admins = []
+        admins = []
+        for u in users:
+            if u["user_id"] == requester_user_id:
+                continue
+            if u["is_admin"]:
+                admins.append(u["user_id"])
+            else:
+                non_admins.append(u["user_id"])
+
+        yield concurrently_execute(_kick_user_from_group, non_admins, 10)
+        yield concurrently_execute(_kick_user_from_group, admins, 10)
+        yield _kick_user_from_group(requester_user_id)
+
+        yield self.store.delete_group(group_id)
 
 
 def _parse_join_policy_from_contents(content):

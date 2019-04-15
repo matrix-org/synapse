@@ -13,6 +13,11 @@
  * limitations under the License.
  */
 
+/* We used to create tables called event_destinations and
+ * state_forward_extremities, but these are no longer used and are removed in
+ * delta 54.
+ */
+
 CREATE TABLE IF NOT EXISTS event_forward_extremities(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
@@ -53,31 +58,6 @@ CREATE TABLE IF NOT EXISTS room_depth(
 );
 
 CREATE INDEX room_depth_room ON room_depth(room_id);
-
-
-create TABLE IF NOT EXISTS event_destinations(
-    event_id TEXT NOT NULL,
-    destination TEXT NOT NULL,
-    delivered_ts BIGINT DEFAULT 0, -- or 0 if not delivered
-    UNIQUE (event_id, destination)
-);
-
-CREATE INDEX event_destinations_id ON event_destinations(event_id);
-
-
-CREATE TABLE IF NOT EXISTS state_forward_extremities(
-    event_id TEXT NOT NULL,
-    room_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    state_key TEXT NOT NULL,
-    UNIQUE (event_id, room_id)
-);
-
-CREATE INDEX st_extrem_keys ON state_forward_extremities(
-    room_id, type, state_key
-);
-CREATE INDEX st_extrem_id ON state_forward_extremities(event_id);
-
 
 CREATE TABLE IF NOT EXISTS event_auth(
     event_id TEXT NOT NULL,

@@ -44,8 +44,7 @@ class ProfileWorkerStore(SQLBaseStore):
 
         defer.returnValue(
             ProfileInfo(
-                avatar_url=profile['avatar_url'],
-                display_name=profile['displayname'],
+                avatar_url=profile['avatar_url'], display_name=profile['displayname']
             )
         )
 
@@ -118,7 +117,7 @@ class ProfileWorkerStore(SQLBaseStore):
         return self._simple_select_one(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
-            retcols=("displayname", "avatar_url",),
+            retcols=("displayname", "avatar_url"),
             allow_none=True,
             desc="get_from_remote_profile_cache",
         )
@@ -212,6 +211,7 @@ class ProfileStore(ProfileWorkerStore):
     def get_remote_profile_cache_entries_that_expire(self, last_checked):
         """Get all users who haven't been checked since `last_checked`
         """
+
         def _get_remote_profile_cache_entries_that_expire_txn(txn):
             sql = """
                 SELECT user_id, displayname, avatar_url

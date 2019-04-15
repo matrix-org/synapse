@@ -218,7 +218,7 @@ class TypingHandler(object):
     @defer.inlineCallbacks
     def _push_remote(self, member, typing):
         try:
-            users = yield self.state.get_current_user_in_room(member.room_id)
+            users = yield self.state.get_current_users_in_room(member.room_id)
             self._member_last_federation_poke[member] = self.clock.time_msec()
 
             now = self.clock.time_msec()
@@ -261,7 +261,7 @@ class TypingHandler(object):
             )
             return
 
-        users = yield self.state.get_current_user_in_room(room_id)
+        users = yield self.state.get_current_users_in_room(room_id)
         domains = set(get_domain_from_id(u) for u in users)
 
         if self.server_name in domains:

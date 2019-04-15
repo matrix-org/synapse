@@ -365,6 +365,7 @@ class FakeTransport(object):
     disconnected = False
     buffer = attr.ib(default=b'')
     producer = attr.ib(default=None)
+    autoflush = attr.ib(default=True)
 
     def getPeer(self):
         return None
@@ -415,31 +416,44 @@ class FakeTransport(object):
     def write(self, byt):
         self.buffer = self.buffer + byt
 
-        def _write():
-            if not self.buffer:
-                # nothing to do. Don't write empty buffers: it upsets the
-                # TLSMemoryBIOProtocol
-                return
-
-            if self.disconnected:
-                return
-            logger.info("%s->%s: %s", self._protocol, self.other, self.buffer)
-
-            if getattr(self.other, "transport") is not None:
-                try:
-                    self.other.dataReceived(self.buffer)
-                    self.buffer = b""
-                except Exception as e:
-                    logger.warning("Exception writing to protocol: %s", e)
-                return
-
-            self._reactor.callLater(0.0, _write)
-
         # always actually do the write asynchronously. Some protocols (notably the
         # TLSMemoryBIOProtocol) get very confused if a read comes back while they are
         # still doing a write. Doing a callLater here breaks the cycle.
-        self._reactor.callLater(0.0, _write)
+        if self.autoflush:
+            self._reactor.callLater(0.0, self.flush)
 
     def writeSequence(self, seq):
         for x in seq:
             self.write(x)
+
+    def flush(self, maxbytes=None):
+        if not self.buffer:
+            # nothing to do. Don't write empty buffers: it upsets the
+            # TLSMemoryBIOProtocol
+            return
+
+        if self.disconnected:
+            return
+
+        if getattr(self.other, "transport") is None:
+            # the other has no transport yet; reschedule
+            if self.autoflush:
+                self._reactor.callLater(0.0, self.flush)
+            return
+
+        if maxbytes is not None:
+            to_write = self.buffer[:maxbytes]
+        else:
+            to_write = self.buffer
+
+        logger.info("%s->%s: %s", self._protocol, self.other, to_write)
+
+        try:
+            self.other.dataReceived(to_write)
+        except Exception as e:
+            logger.warning("Exception writing to protocol: %s", e)
+            return
+
+        self.buffer = self.buffer[len(to_write):]
+        if self.buffer and self.autoflush:
+            self._reactor.callLater(0.0, self.flush)

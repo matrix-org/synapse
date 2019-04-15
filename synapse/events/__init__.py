@@ -21,7 +21,7 @@ import six
 
 from unpaddedbase64 import encode_base64
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS, EventFormatVersions, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -351,18 +351,13 @@ def room_version_to_event_format(room_version):
     Returns:
         int
     """
-    if room_version not in KNOWN_ROOM_VERSIONS:
+    v = KNOWN_ROOM_VERSIONS.get(room_version)
+
+    if not v:
         # We should have already checked version, so this should not happen
         raise RuntimeError("Unrecognized room version %s" % (room_version,))
 
-    if room_version in (
-        RoomVersions.V1, RoomVersions.V2, RoomVersions.STATE_V2_TEST,
-    ):
-        return EventFormatVersions.V1
-    elif room_version in (RoomVersions.V3,):
-        return EventFormatVersions.V2
-    else:
-        raise RuntimeError("Unrecognized room version %s" % (room_version,))
+    return v.event_format
 
 
 def event_type_from_format_version(format_version):

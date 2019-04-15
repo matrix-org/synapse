@@ -35,9 +35,12 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         self.reserved_users = ()
         # Do not add more reserved users than the total allowable number
         self._new_transaction(
-            dbconn, "initialise_mau_threepids", [], [],
+            dbconn,
+            "initialise_mau_threepids",
+            [],
+            [],
             self._initialise_reserved_users,
-            hs.config.mau_limits_reserved_threepids[:self.hs.config.max_mau_value],
+            hs.config.mau_limits_reserved_threepids[: self.hs.config.max_mau_value],
         )
 
     def _initialise_reserved_users(self, txn, threepids):
@@ -51,10 +54,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         reserved_user_list = []
 
         for tp in threepids:
-            user_id = self.get_user_id_by_threepid_txn(
-                txn,
-                tp["medium"], tp["address"]
-            )
+            user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])
 
             if user_id:
                 is_support = self.is_support_user_txn(txn, user_id)
@@ -62,9 +62,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                     self.upsert_monthly_active_user_txn(txn, user_id)
                     reserved_user_list.append(user_id)
             else:
-                logger.warning(
-                    "mau limit reserved threepid %s not found in db" % tp
-                )
+                logger.warning("mau limit reserved threepid %s not found in db" % tp)
         self.reserved_users = tuple(reserved_user_list)
 
     @defer.inlineCallbacks
@@ -75,12 +73,11 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         Returns:
             Deferred[]
         """
+
         def _reap_users(txn):
             # Purge stale users
 
-            thirty_days_ago = (
-                int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
-            )
+            thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
             query_args = [thirty_days_ago]
             base_sql = "DELETE FROM monthly_active_users WHERE timestamp < ?"
 
@@ -158,6 +155,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             txn.execute(sql)
             count, = txn.fetchone()
             return count
+
         return self.runInteraction("count_users", _count_users)
 
     @defer.inlineCallbacks
@@ -198,14 +196,11 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             return
 
         yield self.runInteraction(
-            "upsert_monthly_active_user", self.upsert_monthly_active_user_txn,
-            user_id
+            "upsert_monthly_active_user", self.upsert_monthly_active_user_txn, user_id
         )
 
         user_in_mau = self.user_last_seen_monthly_active.cache.get(
-            (user_id,),
-            None,
-            update_metrics=False
+            (user_id,), None, update_metrics=False
         )
         if user_in_mau is None:
             self.get_monthly_active_count.invalidate(())
@@ -247,12 +242,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
         is_insert = self._simple_upsert_txn(
             txn,
             table="monthly_active_users",
-            keyvalues={
-                "user_id": user_id,
-            },
-            values={
-                "timestamp": int(self._clock.time_msec()),
-            },
+            keyvalues={"user_id": user_id},
+            values={"timestamp": int(self._clock.time_msec())},
         )
 
         return is_insert
@@ -268,15 +259,13 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
         """
 
-        return(self._simple_select_one_onecol(
+        return self._simple_select_one_onecol(
             table="monthly_active_users",
-            keyvalues={
-                "user_id": user_id,
-            },
+            keyvalues={"user_id": user_id},
             retcol="timestamp",
             allow_none=True,
             desc="user_last_seen_monthly_active",
-        ))
+        )
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):
