@@ -24,7 +24,8 @@ from frozendict import frozendict
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, RoomVersions
+from synapse.api.constants import EventTypes
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
 from synapse.events.snapshot import EventContext
 from synapse.state import v1, v2
 from synapse.util.async_helpers import Linearizer
@@ -160,10 +161,21 @@ class StateHandler(object):
         defer.returnValue(state)
 
     @defer.inlineCallbacks
-    def get_current_user_in_room(self, room_id, latest_event_ids=None):
+    def get_current_users_in_room(self, room_id, latest_event_ids=None):
+        """
+        Get the users who are currently in a room.
+
+        Args:
+            room_id (str): The ID of the room.
+            latest_event_ids (List[str]|None): Precomputed list of latest
+                event IDs. Will be computed if None.
+        Returns:
+            Deferred[Dict[str,ProfileInfo]]: Dictionary of user IDs to their
+                profileinfo.
+        """
         if not latest_event_ids:
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
-        logger.debug("calling resolve_state_groups from get_current_user_in_room")
+        logger.debug("calling resolve_state_groups from get_current_users_in_room")
         entry = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
         joined_users = yield self.store.get_joined_users_from_state(room_id, entry)
         defer.returnValue(joined_users)
@@ -603,21 +615,14 @@ def resolve_events_with_store(room_version, state_sets, event_map, state_res_sto
         Deferred[dict[(str, str), str]]:
             a map from (type, state_key) to event_id.
     """
-    if room_version == RoomVersions.V1:
+    v = KNOWN_ROOM_VERSIONS[room_version]
+    if v.state_res == StateResolutionVersions.V1:
         return v1.resolve_events_with_store(
             state_sets, event_map, state_res_store.get_events,
         )
-    elif room_version in (
-        RoomVersions.STATE_V2_TEST, RoomVersions.V2, RoomVersions.V3,
-    ):
+    else:
         return v2.resolve_events_with_store(
             room_version, state_sets, event_map, state_res_store,
-        )
-    else:
-        # This should only happen if we added a version but forgot to add it to
-        # the list above.
-        raise Exception(
-            "No state resolution algorithm defined for version %r" % (room_version,)
         )
 
 

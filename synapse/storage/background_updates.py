@@ -94,16 +94,13 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._all_done = False
 
     def start_doing_background_updates(self):
-        run_as_background_process(
-            "background_updates", self._run_background_updates,
-        )
+        run_as_background_process("background_updates", self._run_background_updates)
 
     @defer.inlineCallbacks
     def _run_background_updates(self):
         logger.info("Starting background schema updates")
         while True:
-            yield self.hs.get_clock().sleep(
-                self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.)
+            yield self.hs.get_clock().sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
 
             try:
                 result = yield self.do_next_background_update(
@@ -187,8 +184,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def _do_background_update(self, update_name, desired_duration_ms):
-        logger.info("Starting update batch on background update '%s'",
-                    update_name)
+        logger.info("Starting update batch on background update '%s'", update_name)
 
         update_handler = self._background_update_handlers[update_name]
 
@@ -210,7 +206,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         progress_json = yield self._simple_select_one_onecol(
             "background_updates",
             keyvalues={"update_name": update_name},
-            retcol="progress_json"
+            retcol="progress_json",
         )
 
         progress = json.loads(progress_json)
@@ -224,7 +220,9 @@ class BackgroundUpdateStore(SQLBaseStore):
         logger.info(
             "Updating %r. Updated %r items in %rms."
             " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r, batch_size=%r)",
-            update_name, items_updated, duration_ms,
+            update_name,
+            items_updated,
+            duration_ms,
             performance.total_items_per_ms(),
             performance.average_items_per_ms(),
             performance.total_item_count,
@@ -264,6 +262,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         Args:
             update_name (str): Name of update
         """
+
         @defer.inlineCallbacks
         def noop_update(progress, batch_size):
             yield self._end_background_update(update_name)
@@ -271,10 +270,16 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         self.register_background_update_handler(update_name, noop_update)
 
-    def register_background_index_update(self, update_name, index_name,
-                                         table, columns, where_clause=None,
-                                         unique=False,
-                                         psql_only=False):
+    def register_background_index_update(
+        self,
+        update_name,
+        index_name,
+        table,
+        columns,
+        where_clause=None,
+        unique=False,
+        psql_only=False,
+    ):
         """Helper for store classes to do a background index addition
 
         To use:
@@ -320,7 +325,7 @@ class BackgroundUpdateStore(SQLBaseStore):
                     "name": index_name,
                     "table": table,
                     "columns": ", ".join(columns),
-                    "where_clause": "WHERE " + where_clause if where_clause else ""
+                    "where_clause": "WHERE " + where_clause if where_clause else "",
                 }
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
@@ -387,7 +392,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         return self._simple_insert(
             "background_updates",
-            {"update_name": update_name, "progress_json": progress_json}
+            {"update_name": update_name, "progress_json": progress_json},
         )
 
     def _end_background_update(self, update_name):

@@ -1,4 +1,4 @@
-/* Copyright 2014-2016 OpenMarket Ltd
+/* Copyright 2019 New Vector Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,8 +12,5 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-CREATE TABLE IF NOT EXISTS profiles(
-    user_id TEXT NOT NULL,
-    displayname TEXT,
-    avatar_url TEXT
-);
+
+DROP TABLE IF EXISTS presence_list;

@@ -18,14 +18,6 @@ DROP INDEX IF EXISTS room_memberships_event_id;
 CREATE UNIQUE INDEX room_memberships_event_id ON room_memberships(event_id);
 
 --
-DELETE FROM feedback WHERE rowid not in (
-    SELECT MIN(rowid) FROM feedback GROUP BY event_id
-);
-
-DROP INDEX IF EXISTS feedback_event_id;
-CREATE UNIQUE INDEX feedback_event_id ON feedback(event_id);
-
---
 DELETE FROM topics WHERE rowid not in (
     SELECT MIN(rowid) FROM topics GROUP BY event_id
 );

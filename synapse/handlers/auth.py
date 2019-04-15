@@ -912,7 +912,7 @@ class AuthHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def delete_threepid(self, user_id, medium, address):
+    def delete_threepid(self, user_id, medium, address, id_server=None):
         """Attempts to unbind the 3pid on the identity servers and deletes it
         from the local database.
 
@@ -920,6 +920,10 @@ class AuthHandler(BaseHandler):
             user_id (str)
             medium (str)
             address (str)
+            id_server (str|None): Use the given identity server when unbinding
+                any threepids. If None then will attempt to unbind using the
+                identity server specified when binding (if known).
+
 
         Returns:
             Deferred[bool]: Returns True if successfully unbound the 3pid on
@@ -937,6 +941,7 @@ class AuthHandler(BaseHandler):
             {
                 'medium': medium,
                 'address': address,
+                'id_server': id_server,
             },
         )
 

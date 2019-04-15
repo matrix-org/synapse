@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Defines all the valid streams that clients can subscribe to, and the format
-of the rows returned by each stream.
 
-Each stream is defined by the following information:
-
-    stream name:        The name of the stream
-    row type:           The type that is used to serialise/deserialse the row
-    current_token:      The function that returns the current token for the stream
-    update_function:    The function that returns a list of updates between two tokens
-"""
 import itertools
 import logging
 from collections import namedtuple
@@ -34,14 +26,6 @@ logger = logging.getLogger(__name__)
 
 MAX_EVENTS_BEHIND = 10000
 
-
-EventStreamRow = namedtuple("EventStreamRow", (
-    "event_id",  # str
-    "room_id",  # str
-    "type",  # str
-    "state_key",  # str, optional
-    "redacts",  # str, optional
-))
 BackfillStreamRow = namedtuple("BackfillStreamRow", (
     "event_id",  # str
     "room_id",  # str
@@ -96,10 +80,6 @@ DeviceListsStreamRow = namedtuple("DeviceListsStreamRow", (
 ToDeviceStreamRow = namedtuple("ToDeviceStreamRow", (
     "entity",  # str
 ))
-FederationStreamRow = namedtuple("FederationStreamRow", (
-    "type",  # str, the type of data as defined in the BaseFederationRows
-    "data",  # dict, serialization of a federation.send_queue.BaseFederationRow
-))
 TagAccountDataStreamRow = namedtuple("TagAccountDataStreamRow", (
     "user_id",  # str
     "room_id",  # str
@@ -110,12 +90,6 @@ AccountDataStreamRow = namedtuple("AccountDataStream", (
     "room_id",  # str
     "data_type",  # str
     "data",  # dict
-))
-CurrentStateDeltaStreamRow = namedtuple("CurrentStateDeltaStream", (
-    "room_id",  # str
-    "type",  # str
-    "state_key",  # str
-    "event_id",  # str, optional
 ))
 GroupsStreamRow = namedtuple("GroupsStreamRow", (
     "group_id",  # str
@@ -132,8 +106,23 @@ class Stream(object):
     time it was called up until the point `advance_current_token` was called.
     """
     NAME = None  # The name of the stream
-    ROW_TYPE = None  # The type of the row
+    ROW_TYPE = None  # The type of the row. Used by the default impl of parse_row.
     _LIMITED = True  # Whether the update function takes a limit
+
+    @classmethod
+    def parse_row(cls, row):
+        """Parse a row received over replication
+
+        By default, assumes that the row data is an array object and passes its contents
+        to the constructor of the ROW_TYPE for this stream.
+
+        Args:
+            row: row data from the incoming RDATA command, after json decoding
+
+        Returns:
+            ROW_TYPE object for this stream
+        """
+        return cls.ROW_TYPE(*row)
 
     def __init__(self, hs):
         # The token from which we last asked for updates
@@ -162,8 +151,10 @@ class Stream(object):
         until the `upto_token`
 
         Returns:
-            (list(ROW_TYPE), int): list of updates plus the token used as an
-                upper bound of the updates (i.e. the "current token")
+            Deferred[Tuple[List[Tuple[int, Any]], int]:
+                Resolves to a pair ``(updates, current_token)``, where ``updates`` is a
+                list of ``(token, row)`` entries. ``row`` will be json-serialised and
+                sent over the replication steam.
         """
         updates, current_token = yield self.get_updates_since(self.last_token)
         self.last_token = current_token
@@ -176,8 +167,10 @@ class Stream(object):
         stream updates
 
         Returns:
-            (list(ROW_TYPE), int): list of updates plus the token used as an
-                upper bound of the updates (i.e. the "current token")
+            Deferred[Tuple[List[Tuple[int, Any]], int]:
+                Resolves to a pair ``(updates, current_token)``, where ``updates`` is a
+                list of ``(token, row)`` entries. ``row`` will be json-serialised and
+                sent over the replication steam.
         """
         if from_token in ("NOW", "now"):
             defer.returnValue(([], self.upto_token))
@@ -202,7 +195,7 @@ class Stream(object):
                 from_token, current_token,
             )
 
-        updates = [(row[0], self.ROW_TYPE(*row[1:])) for row in rows]
+        updates = [(row[0], row[1:]) for row in rows]
 
         # check we didn't get more rows than the limit.
         # doing it like this allows the update_function to be a generator.
@@ -230,20 +223,6 @@ class Stream(object):
                 a ``ROW_TYPE`` instance
         """
         raise NotImplementedError()
-
-
-class EventsStream(Stream):
-    """We received a new event, or an event went from being an outlier to not
-    """
-    NAME = "events"
-    ROW_TYPE = EventStreamRow
-
-    def __init__(self, hs):
-        store = hs.get_datastore()
-        self.current_token = store.get_current_events_token
-        self.update_function = store.get_all_new_forward_event_rows
-
-        super(EventsStream, self).__init__(hs)
 
 
 class BackfillStream(Stream):
@@ -400,22 +379,6 @@ class ToDeviceStream(Stream):
         super(ToDeviceStream, self).__init__(hs)
 
 
-class FederationStream(Stream):
-    """Data to be sent over federation. Only available when master has federation
-    sending disabled.
-    """
-    NAME = "federation"
-    ROW_TYPE = FederationStreamRow
-
-    def __init__(self, hs):
-        federation_sender = hs.get_federation_sender()
-
-        self.current_token = federation_sender.get_current_token
-        self.update_function = federation_sender.get_replication_rows
-
-        super(FederationStream, self).__init__(hs)
-
-
 class TagAccountDataStream(Stream):
     """Someone added/removed a tag for a room
     """
@@ -459,21 +422,6 @@ class AccountDataStream(Stream):
         defer.returnValue(results)
 
 
-class CurrentStateDeltaStream(Stream):
-    """Current state for a room was changed
-    """
-    NAME = "current_state_deltas"
-    ROW_TYPE = CurrentStateDeltaStreamRow
-
-    def __init__(self, hs):
-        store = hs.get_datastore()
-
-        self.current_token = store.get_max_current_state_delta_stream_id
-        self.update_function = store.get_all_updated_current_state_deltas
-
-        super(CurrentStateDeltaStream, self).__init__(hs)
-
-
 class GroupServerStream(Stream):
     NAME = "groups"
     ROW_TYPE = GroupsStreamRow
@@ -485,26 +433,3 @@ class GroupServerStream(Stream):
         self.update_function = store.get_all_groups_changes
 
         super(GroupServerStream, self).__init__(hs)
-
-
-STREAMS_MAP = {
-    stream.NAME: stream
-    for stream in (
-        EventsStream,
-        BackfillStream,
-        PresenceStream,
-        TypingStream,
-        ReceiptsStream,
-        PushRulesStream,
-        PushersStream,
-        CachesStream,
-        PublicRoomsStream,
-        DeviceListsStream,
-        ToDeviceStream,
-        FederationStream,
-        TagAccountDataStream,
-        AccountDataStream,
-        CurrentStateDeltaStream,
-        GroupServerStream,
-    )
-}
