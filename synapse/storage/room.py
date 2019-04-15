@@ -199,7 +199,7 @@ class RoomWorkerStore(SQLBaseStore):
         # Get room information
         room_info = yield self.get_room(room_id)
         if not room_info:
-            return False
+            defer.returnValue(False)
 
         # Check the is_public value
         defer.returnValue(room_info.get("is_public", False))
