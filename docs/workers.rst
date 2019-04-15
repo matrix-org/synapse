@@ -229,6 +229,9 @@ following regular expressions::
     ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
+
+Additionally, the following REST endpoints can be handled for GET requests::
+
     ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
 
 Additionally, the following REST endpoints can be handled, but all requests must

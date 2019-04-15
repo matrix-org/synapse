@@ -39,9 +39,13 @@ class PushRuleRestServlet(ClientV1RestServlet):
         super(PushRuleRestServlet, self).__init__(hs)
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
+        self._is_worker = hs.config.worker_app is not None
 
     @defer.inlineCallbacks
     def on_PUT(self, request):
+        if self._is_worker:
+            raise Exception("Cannot handle PUT /push_rules on worker")
+
         spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
         try:
             priority_class = _priority_class_from_spec(spec)
@@ -103,6 +107,9 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_DELETE(self, request):
+        if self._is_worker:
+            raise Exception("Cannot handle DELETE /push_rules on worker")
+
         spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
 
         requester = yield self.auth.get_user_by_req(request)
