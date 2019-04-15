@@ -377,7 +377,9 @@ class MatrixFederationHttpClient(object):
                     except DNSLookupError as e:
                         raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
                     except Exception as e:
+                        import traceback
                         logger.info("Failed to send request: %s", e)
+                        logger.info(traceback.format_exc())
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
                     logger.info(

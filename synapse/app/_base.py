@@ -26,6 +26,7 @@ from twisted.internet import error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
+import twisted.names
 from synapse.app import check_bind_error
 from synapse.crypto import context_factory
 from synapse.util import PreserveLoggingContext
@@ -124,6 +125,9 @@ def start_reactor(
             change_resource_limit(soft_file_limit)
             if gc_thresholds:
                 gc.set_threshold(*gc_thresholds)
+
+            reactor.installResolver(twisted.names.client)
+
             reactor.run()
 
     if daemonize:
