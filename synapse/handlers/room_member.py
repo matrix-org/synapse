@@ -1024,6 +1024,18 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         )
         yield self._user_joined_room(user, room_id)
 
+        # Check we don't want to instantly leave.
+
+        if True:
+            yield self.update_membership(
+                requester=user.to_string(),
+                target=user.to_string(),
+                room_id=room_id,
+                action="leave"
+            )
+            raise SynapseError(code=400, msg="Room too large", errcode=Codes.RESOURCE_LIMIT_EXCEEDED)
+
+
     @defer.inlineCallbacks
     def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
         """Implements RoomMemberHandler._remote_reject_invite
