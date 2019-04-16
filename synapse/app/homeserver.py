@@ -647,6 +647,7 @@ def run(hs):
         daemonize=hs.config.daemonize,
         cpu_affinity=hs.config.cpu_affinity,
         print_pidfile=hs.config.print_pidfile,
+        no_getaddrinfo=hs.config.no_getaddrinfo,
         logger=logger,
     )
 
