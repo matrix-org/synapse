@@ -95,8 +95,8 @@ CONDITIONAL_REQUIREMENTS = {
 
 def list_requirements():
     deps = set(REQUIREMENTS)
-    for opts in CONDITIONAL_REQUIREMENTS.items():
-        deps = set(opts) | deps
+    for opt in CONDITIONAL_REQUIREMENTS.values():
+        deps = set(opt) | deps
 
     return list(deps)
 
