@@ -426,11 +426,14 @@ class RoomMemberHandler(object):
                     )
                     block_invite = True
 
+                is_published = yield self.store.is_room_published(room_id)
+
                 if not self.spam_checker.user_may_invite(
                     requester.user.to_string(), target.to_string(),
                     third_party_invite=None,
                     room_id=room_id,
                     new_room=new_room,
+                    published_room=is_published,
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True
@@ -758,6 +761,8 @@ class RoomMemberHandler(object):
             id_server, medium, address
         )
 
+        is_published = yield self.store.is_room_published(room_id)
+
         if not self.spam_checker.user_may_invite(
             requester.user.to_string(), invitee,
             third_party_invite={
@@ -766,6 +771,7 @@ class RoomMemberHandler(object):
             },
             room_id=room_id,
             new_room=new_room,
+            published_room=is_published,
         ):
             logger.info("Blocking invite due to spam checker")
             raise SynapseError(

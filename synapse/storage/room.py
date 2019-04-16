@@ -171,6 +171,24 @@ class RoomWorkerStore(SQLBaseStore):
             desc="is_room_blocked",
         )
 
+    @defer.inlineCallbacks
+    def is_room_published(self, room_id):
+        """Check whether a room has been published in the local public room
+        directory.
+
+        Args:
+            room_id (str)
+        Returns:
+            bool: Whether the room is currently published in the room directory
+        """
+        # Get room information
+        room_info = yield self.get_room(room_id)
+        if not room_info:
+            defer.returnValue(False)
+
+        # Check the is_public value
+        defer.returnValue(room_info.get("is_public", False))
+
     @cachedInlineCallbacks(max_entries=10000)
     def get_ratelimit_for_user(self, user_id):
         """Check if there are any overrides for ratelimiting for the given

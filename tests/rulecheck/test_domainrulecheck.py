@@ -32,6 +32,7 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
                 "source_one": ["target_one", "target_two"],
                 "source_two": ["target_two"],
             },
+            "domains_prevented_from_being_invited_to_published_rooms": ["target_two"]
         }
         check = DomainRuleChecker(config)
         self.assertTrue(
@@ -47,6 +48,20 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         self.assertTrue(
             check.user_may_invite(
                 "test:source_two", "test:target_two", None, "room", False
+            )
+        )
+
+        # User can invite internal user to a published room
+        self.assertTrue(
+            check.user_may_invite(
+                "test:source_one", "test1:target_one", None, "room", False, True,
+            )
+        )
+
+        # User can invite external user to a non-published room
+        self.assertTrue(
+            check.user_may_invite(
+                "test:source_one", "test:target_two", None, "room", False, False,
             )
         )
 
@@ -78,6 +93,13 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         self.assertFalse(
             check.user_may_invite(
                 "test:source_four", "test:target_one", None, "room", False
+            )
+        )
+
+        # User cannot invite external user to a published room
+        self.assertTrue(
+            check.user_may_invite(
+                "test:source_one", "test:target_two", None, "room", False, True,
             )
         )
 
