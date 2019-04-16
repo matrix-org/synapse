@@ -19,16 +19,12 @@ import logging
 
 from six.moves import http_client
 
-from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json
-from unpaddedbase64 import decode_base64
-
 from twisted.internet import defer
 
 import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, ProxiedRequestError, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -64,6 +60,7 @@ class RoomMemberHandler(object):
         self.registration_handler = hs.get_registration_handler()
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.identity_handler = hs.get_handlers().identity_handler
 
         self.member_linearizer = Linearizer(name="member")
 
@@ -71,7 +68,6 @@ class RoomMemberHandler(object):
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
         self.rewrite_identity_server_urls = self.config.rewrite_identity_server_urls
-        self._enable_lookup = hs.config.enable_3pid_lookup
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -824,49 +820,12 @@ class RoomMemberHandler(object):
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
-        if not self._enable_lookup:
-            raise SynapseError(
-                403, "Looking up third-party identifiers is denied from this server",
-            )
         try:
-            target = self._get_id_server_target(id_server)
-            data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, target,),
-                {
-                    "medium": medium,
-                    "address": address,
-                }
-            )
-
-            if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                yield self._verify_any_signature(data, id_server)
-                defer.returnValue(data["mxid"])
-
-        except IOError as e:
+            data = yield self.identity_handler.lookup_3pid(id_server, medium, address)
+            defer.returnValue(data.get("mxid"))
+        except ProxiedRequestError as e:
             logger.warn("Error from identity server lookup: %s" % (e,))
             defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def _verify_any_signature(self, data, server_hostname):
-        if server_hostname not in data["signatures"]:
-            raise AuthError(401, "No signature from server %s" % (server_hostname,))
-        for key_name, signature in data["signatures"][server_hostname].items():
-            target = self._get_id_server_target(server_hostname)
-            key_data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/pubkey/%s" %
-                (id_server_scheme, target, key_name,),
-            )
-            if "public_key" not in key_data:
-                raise AuthError(401, "No public key named %s from %s" %
-                                (key_name, server_hostname,))
-            verify_signed_json(
-                data,
-                server_hostname,
-                decode_verify_key_bytes(key_name, decode_base64(key_data["public_key"]))
-            )
-            return
 
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(
