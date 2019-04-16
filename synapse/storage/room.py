@@ -171,7 +171,7 @@ class RoomWorkerStore(SQLBaseStore):
             desc="is_room_blocked",
         )
 
-    @cachedInlineCallbacks(max_entries=10000)
+    @defer.inlineCallbacks
     def is_room_published(self, room_id):
         """Check whether a room has been published in the local public room
         directory.
