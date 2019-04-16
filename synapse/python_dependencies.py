@@ -92,13 +92,16 @@ CONDITIONAL_REQUIREMENTS = {
     "sentry": ["sentry-sdk>=0.7.2"],
 }
 
+ALL_OPTIONAL_REQUIREMENTS = set()
+
+for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
+    # Exclude systemd as it's a system-based requirement.
+    if name not in ["systemd"]:
+        ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
+
 
 def list_requirements():
-    deps = set(REQUIREMENTS)
-    for opts in CONDITIONAL_REQUIREMENTS.items():
-        deps = set(opts) | deps
-
-    return list(deps)
+    return list(set(REQUIREMENTS) | ALL_OPTIONAL_REQUIREMENTS)
 
 
 class DependencyException(Exception):
