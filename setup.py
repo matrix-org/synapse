@@ -90,8 +90,10 @@ CONDITIONAL_REQUIREMENTS = dependencies['CONDITIONAL_REQUIREMENTS']
 # Make `pip install matrix-synapse[all]` install all the optional dependencies.
 ALL_OPTIONAL_REQUIREMENTS = set()
 
-for optional_deps in CONDITIONAL_REQUIREMENTS.values():
-    ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
+for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
+    # Exclude systemd as it's a system-based requirement.
+    if name not in ["systemd"]:
+        ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
 
 CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 
