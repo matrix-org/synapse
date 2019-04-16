@@ -20,13 +20,19 @@
 import logging
 
 from canonicaljson import json
+from signedjson.key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json
+from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
 from synapse.api.errors import (
+    AuthError,
     CodeMessageException,
     Codes,
     HttpResponseException,
+    ProxiedRequestError,
+    RequestSendFailed,
     SynapseError,
 )
 
@@ -48,6 +54,7 @@ class IdentityHandler(BaseHandler):
             hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
         )
         self.rewrite_identity_server_urls = hs.config.rewrite_identity_server_urls
+        self._enable_lookup = hs.config.enable_3pid_lookup
 
     def _should_trust_id_server(self, id_server):
         if id_server not in self.trusted_id_servers:
@@ -283,36 +290,71 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def lookup_3pid(self, id_server, medium, address):
-        """Make a lookup request to an identity server
+        """Looks up a 3pid in the passed identity server.
 
         Args:
-            id_server (str): The identity server to send the request to.
-            medium (str): The medium of the 3PID to look up.
-            address (str): The address of the 3PID to look up.
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
 
         Returns:
-            Deferred[Dict[str, str|int|Dict]]: The result of the lookup. See
+            Deferred[dict]: The result of the lookup. See
             https://matrix.org/docs/spec/identity_service/r0.1.0.html#id15
             for details
         """
-        if not self._should_trust_id_server(id_server):
+        if not self._enable_lookup:
             raise SynapseError(
-                400, "Untrusted ID server '%s'" % id_server,
-                Codes.SERVER_NOT_TRUSTED
+                403, "Looking up third-party identifiers is denied from this server",
             )
 
-        # if we have a rewrite rule set for the identity server,
-        # apply it now.
-        if id_server in self.rewrite_identity_server_urls:
-            id_server = self.rewrite_identity_server_urls[id_server]
+        target = self.rewrite_identity_server_urls.get(id_server, id_server)
+
         try:
             data = yield self.http_client.get_json(
-                "https://%s%s?medium=%s&address=%s" % (
-                    id_server, "/_matrix/identity/api/v1/lookup",
-                    medium, address
-                )
+                "https://%s/_matrix/identity/api/v1/lookup" % (target,),
+                {
+                    "medium": medium,
+                    "address": address,
+                }
             )
-            defer.returnValue(data)
+
+            if "mxid" in data:
+                if "signatures" not in data:
+                    raise AuthError(401, "No signatures on 3pid binding")
+                yield self._verify_any_signature(data, id_server)
+
         except HttpResponseException as e:
             logger.info("Proxied lookup failed: %r", e)
             raise e.to_synapse_error()
+        except RequestSendFailed as e:
+            logger.info("Failed to contact %r: %s", id_server, e)
+            raise ProxiedRequestError(503, "Failed to contact homeserver")
+
+        defer.returnValue(data)
+
+    @defer.inlineCallbacks
+    def _verify_any_signature(self, data, server_hostname):
+        if server_hostname not in data["signatures"]:
+            raise AuthError(401, "No signature from server %s" % (server_hostname,))
+
+        for key_name, signature in data["signatures"][server_hostname].items():
+            target = self.rewrite_identity_server_urls.get(
+                server_hostname, server_hostname,
+            )
+
+            key_data = yield self.http_client.get_json(
+                "https://%s/_matrix/identity/api/v1/pubkey/%s" %
+                (target, key_name,),
+            )
+            if "public_key" not in key_data:
+                raise AuthError(401, "No public key named %s from %s" %
+                                (key_name, server_hostname,))
+            verify_signed_json(
+                data,
+                server_hostname,
+                decode_verify_key_bytes(key_name, decode_base64(key_data["public_key"]))
+            )
+            return
+
+        raise AuthError(401, "No signature from server %s" % (server_hostname,))
