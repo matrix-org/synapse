@@ -64,8 +64,10 @@ class Auth(object):
         self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
         register_cache("cache", "token_cache", self.token_cache)
 
+        self._account_validity = hs.config.account_validity
+
     @defer.inlineCallbacks
-    def check_from_context(self, event, context, do_sig_check=True):
+    def check_from_context(self, room_version, event, context, do_sig_check=True):
         prev_state_ids = yield context.get_prev_state_ids(self.store)
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True,
@@ -74,12 +76,16 @@ class Auth(object):
         auth_events = {
             (e.type, e.state_key): e for e in itervalues(auth_events)
         }
-        self.check(event, auth_events=auth_events, do_sig_check=do_sig_check)
+        self.check(
+            room_version, event,
+            auth_events=auth_events, do_sig_check=do_sig_check,
+        )
 
-    def check(self, event, auth_events, do_sig_check=True):
+    def check(self, room_version, event, auth_events, do_sig_check=True):
         """ Checks if this event is correctly authed.
 
         Args:
+            room_version (str): version of the room
             event: the event being checked.
             auth_events (dict: event-key -> event): the existing room state.
 
@@ -88,7 +94,9 @@ class Auth(object):
             True if the auth checks pass.
         """
         with Measure(self.clock, "auth.check"):
-            event_auth.check(event, auth_events, do_sig_check=do_sig_check)
+            event_auth.check(
+                room_version, event, auth_events, do_sig_check=do_sig_check
+            )
 
     @defer.inlineCallbacks
     def check_joined_room(self, room_id, user_id, current_state=None):
@@ -219,6 +227,16 @@ class Auth(object):
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
+
+            # Deny the request if the user account has expired.
+            if self._account_validity.enabled:
+                expiration_ts = yield self.store.get_expiration_ts_for_user(user)
+                if self.clock.time_msec() >= expiration_ts:
+                    raise AuthError(
+                        403,
+                        "User account has expired",
+                        errcode=Codes.EXPIRED_ACCOUNT,
+                    )
 
             # device_id may not be present if get_user_by_access_token has been
             # stubbed out.
@@ -545,17 +563,6 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     @defer.inlineCallbacks
-    def add_auth_events(self, builder, context):
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
-        auth_ids = yield self.compute_auth_events(builder, prev_state_ids)
-
-        auth_events_entries = yield self.store.add_event_hashes(
-            auth_ids
-        )
-
-        builder.auth_events = auth_events_entries
-
-    @defer.inlineCallbacks
     def compute_auth_events(self, event, current_state_ids, for_verification=False):
         if event.type == EventTypes.Create:
             defer.returnValue([])
@@ -571,7 +578,7 @@ class Auth(object):
         key = (EventTypes.JoinRules, "", )
         join_rule_event_id = current_state_ids.get(key)
 
-        key = (EventTypes.Member, event.user_id, )
+        key = (EventTypes.Member, event.sender, )
         member_event_id = current_state_ids.get(key)
 
         key = (EventTypes.Create, "", )
@@ -621,20 +628,20 @@ class Auth(object):
 
         defer.returnValue(auth_ids)
 
-    def check_redaction(self, event, auth_events):
+    def check_redaction(self, room_version, event, auth_events):
         """Check whether the event sender is allowed to redact the target event.
 
         Returns:
             True if the the sender is allowed to redact the target event if the
-            target event was created by them.
+                target event was created by them.
             False if the sender is allowed to redact the target event with no
-            further checks.
+                further checks.
 
         Raises:
             AuthError if the event sender is definitely not allowed to redact
-            the target event.
+                the target event.
         """
-        return event_auth.check_redaction(event, auth_events)
+        return event_auth.check_redaction(room_version, event, auth_events)
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id, user):
@@ -748,9 +755,9 @@ class Auth(object):
 
         Returns:
             Deferred[tuple[str, str|None]]: Resolves to the current membership of
-            the user in the room and the membership event ID of the user. If
-            the user is not in the room and never has been, then
-            `(Membership.JOIN, None)` is returned.
+                the user in the room and the membership event ID of the user. If
+                the user is not in the room and never has been, then
+                `(Membership.JOIN, None)` is returned.
         """
 
         try:
@@ -782,20 +789,22 @@ class Auth(object):
 
         Args:
             user_id(str|None): If present, checks for presence against existing
-            MAU cohort
+                MAU cohort
 
             threepid(dict|None): If present, checks for presence against configured
-            reserved threepid. Used in cases where the user is trying register
-            with a MAU blocked server, normally they would be rejected but their
-            threepid is on the reserved list. user_id and
-            threepid should never be set at the same time.
+                reserved threepid. Used in cases where the user is trying register
+                with a MAU blocked server, normally they would be rejected but their
+                threepid is on the reserved list. user_id and
+                threepid should never be set at the same time.
         """
 
         # Never fail an auth check for the server notices users or support user
         # This can be a problem where event creation is prohibited due to blocking
-        is_support = yield self.store.is_support_user(user_id)
-        if user_id == self.hs.config.server_notices_mxid or is_support:
-            return
+        if user_id is not None:
+            if user_id == self.hs.config.server_notices_mxid:
+                return
+            if (yield self.store.is_support_user(user_id)):
+                return
 
         if self.hs.config.hs_disabled:
             raise ResourceLimitError(
@@ -819,7 +828,9 @@ class Auth(object):
             elif threepid:
                 # If the user does not exist yet, but is signing up with a
                 # reserved threepid then pass auth check
-                if is_threepid_reserved(self.hs.config, threepid):
+                if is_threepid_reserved(
+                    self.hs.config.mau_limits_reserved_threepids, threepid
+                ):
                     return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()

@@ -35,10 +35,7 @@ class FilteringStore(SQLBaseStore):
 
         def_json = yield self._simple_select_one_onecol(
             table="user_filters",
-            keyvalues={
-                "user_id": user_localpart,
-                "filter_id": filter_id,
-            },
+            keyvalues={"user_id": user_localpart, "filter_id": filter_id},
             retcol="filter_json",
             allow_none=False,
             desc="get_user_filter",
@@ -61,10 +58,7 @@ class FilteringStore(SQLBaseStore):
             if filter_id_response is not None:
                 return filter_id_response[0]
 
-            sql = (
-                "SELECT MAX(filter_id) FROM user_filters "
-                "WHERE user_id = ?"
-            )
+            sql = "SELECT MAX(filter_id) FROM user_filters " "WHERE user_id = ?"
             txn.execute(sql, (user_localpart,))
             max_id = txn.fetchone()[0]
             if max_id is None:

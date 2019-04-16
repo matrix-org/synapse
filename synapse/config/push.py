@@ -51,11 +51,11 @@ class PushConfig(Config):
         # notification request includes the content of the event (other details
         # like the sender are still included). For `event_id_only` push, it
         # has no effect.
-
+        #
         # For modern android devices the notification content will still appear
         # because it is loaded by the app. iPhone, however will send a
         # notification saying only that a message arrived and who it came from.
         #
         #push:
-        #   include_content: true
+        #  include_content: true
         """

@@ -52,11 +52,12 @@ class PusherFactory(object):
             logger.info("defined email pusher type")
 
     def create_pusher(self, pusherdict):
-        logger.info("trying to create_pusher for %r", pusherdict)
-
-        if pusherdict['kind'] in self.pusher_types:
-            logger.info("found pusher")
-            return self.pusher_types[pusherdict['kind']](self.hs, pusherdict)
+        kind = pusherdict['kind']
+        f = self.pusher_types.get(kind, None)
+        if not f:
+            return None
+        logger.debug("creating %s pusher for %r", kind, pusherdict)
+        return f(self.hs, pusherdict)
 
     def _create_email_pusher(self, _hs, pusherdict):
         app_name = self._app_name_from_pusherdict(pusherdict)

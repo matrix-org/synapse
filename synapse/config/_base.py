@@ -137,7 +137,7 @@ class Config(object):
     @staticmethod
     def read_config_file(file_path):
         with open(file_path) as file_stream:
-            return yaml.load(file_stream)
+            return yaml.safe_load(file_stream)
 
     def invoke_all(self, name, *args, **kargs):
         results = []
@@ -180,9 +180,7 @@ class Config(object):
         Returns:
             str: the yaml config file
         """
-        default_config = "# vim:ft=yaml\n"
-
-        default_config += "\n\n".join(
+        default_config = "\n\n".join(
             dedent(conf)
             for conf in self.invoke_all(
                 "default_config",
@@ -216,14 +214,20 @@ class Config(object):
             " Defaults to the directory containing the last config file",
         )
 
+        obj = cls()
+
+        obj.invoke_all("add_arguments", config_parser)
+
         config_args = config_parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
-        obj = cls()
         obj.read_config_files(
             config_files, keys_directory=config_args.keys_directory, generate_keys=False
         )
+
+        obj.invoke_all("read_arguments", config_args)
+
         return obj
 
     @classmethod
@@ -257,7 +261,7 @@ class Config(object):
             "--keys-directory",
             metavar="DIRECTORY",
             help="Used with 'generate-*' options to specify where files such as"
-            " certs and signing keys should be stored in, unless explicitly"
+            " signing keys should be stored, unless explicitly"
             " specified in the config.",
         )
         config_parser.add_argument(
@@ -297,31 +301,33 @@ class Config(object):
                         "Must specify a server_name to a generate config for."
                         " Pass -H server.name."
                     )
+
+                config_str = obj.generate_config(
+                    config_dir_path=config_dir_path,
+                    data_dir_path=os.getcwd(),
+                    server_name=server_name,
+                    report_stats=(config_args.report_stats == "yes"),
+                    generate_secrets=True,
+                )
+
                 if not cls.path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
                 with open(config_path, "w") as config_file:
-                    config_str = obj.generate_config(
-                        config_dir_path=config_dir_path,
-                        data_dir_path=os.getcwd(),
-                        server_name=server_name,
-                        report_stats=(config_args.report_stats == "yes"),
-                        generate_secrets=True,
+                    config_file.write(
+                        "# vim:ft=yaml\n\n"
                     )
-                    config = yaml.load(config_str)
-                    obj.invoke_all("generate_files", config)
                     config_file.write(config_str)
+
+                config = yaml.safe_load(config_str)
+                obj.invoke_all("generate_files", config)
+
                 print(
                     (
                         "A config file has been generated in %r for server name"
-                        " %r with corresponding SSL keys and self-signed"
-                        " certificates. Please review this file and customise it"
+                        " %r. Please review this file and customise it"
                         " to your needs."
                     )
                     % (config_path, server_name)
-                )
-                print(
-                    "If this server name is incorrect, you will need to"
-                    " regenerate the SSL certificates"
                 )
                 return
             else:
@@ -367,7 +373,7 @@ class Config(object):
         if not keys_directory:
             keys_directory = os.path.dirname(config_files[-1])
 
-        config_dir_path = os.path.abspath(keys_directory)
+        self.config_dir_path = os.path.abspath(keys_directory)
 
         specified_config = {}
         for config_file in config_files:
@@ -379,12 +385,12 @@ class Config(object):
 
         server_name = specified_config["server_name"]
         config_string = self.generate_config(
-            config_dir_path=config_dir_path,
+            config_dir_path=self.config_dir_path,
             data_dir_path=os.getcwd(),
             server_name=server_name,
             generate_secrets=False,
         )
-        config = yaml.load(config_string)
+        config = yaml.safe_load(config_string)
         config.pop("log_config")
         config.update(specified_config)
 
@@ -399,7 +405,10 @@ class Config(object):
             self.invoke_all("generate_files", config)
             return
 
-        self.invoke_all("read_config", config)
+        self.parse_config_dict(config)
+
+    def parse_config_dict(self, config_dict):
+        self.invoke_all("read_config", config_dict)
 
 
 def find_config_files(search_paths):

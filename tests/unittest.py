@@ -31,38 +31,14 @@ from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
-from synapse.util.logcontext import LoggingContext, LoggingContextFilter
+from synapse.util.logcontext import LoggingContext
 
 from tests.server import get_clock, make_request, render, setup_test_homeserver
+from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
 setupdb()
-
-# Set up putting Synapse's logs into Trial's.
-rootLogger = logging.getLogger()
-
-log_format = (
-    "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s"
-)
-
-
-class ToTwistedHandler(logging.Handler):
-    tx_log = twisted.logger.Logger()
-
-    def emit(self, record):
-        log_entry = self.format(record)
-        log_level = record.levelname.lower().replace('warning', 'warn')
-        self.tx_log.emit(
-            twisted.logger.LogLevel.levelWithName(log_level),
-            log_entry.replace("{", r"(").replace("}", r")"),
-        )
-
-
-handler = ToTwistedHandler()
-formatter = logging.Formatter(log_format)
-handler.setFormatter(formatter)
-handler.addFilter(LoggingContextFilter(request=""))
-rootLogger.addHandler(handler)
+setup_logging()
 
 
 def around(target):
@@ -96,7 +72,7 @@ class TestCase(unittest.TestCase):
 
         method = getattr(self, methodName)
 
-        level = getattr(method, "loglevel", getattr(self, "loglevel", logging.ERROR))
+        level = getattr(method, "loglevel", getattr(self, "loglevel", None))
 
         @around(self)
         def setUp(orig):
@@ -114,7 +90,7 @@ class TestCase(unittest.TestCase):
                 )
 
             old_level = logging.getLogger().level
-            if old_level != level:
+            if level is not None and old_level != level:
 
                 @around(self)
                 def tearDown(orig):
@@ -122,7 +98,8 @@ class TestCase(unittest.TestCase):
                     logging.getLogger().setLevel(old_level)
                     return ret
 
-            logging.getLogger().setLevel(level)
+                logging.getLogger().setLevel(level)
+
             return orig()
 
         @around(self)
@@ -285,6 +262,7 @@ class HomeserverTestCase(TestCase):
         access_token=None,
         request=SynapseRequest,
         shorthand=True,
+        federation_auth_origin=None,
     ):
         """
         Create a SynapseRequest at the path using the method and containing the
@@ -298,15 +276,18 @@ class HomeserverTestCase(TestCase):
             a dict.
             shorthand: Whether to try and be helpful and prefix the given URL
             with the usual REST API path, if it doesn't contain it.
+            federation_auth_origin (bytes|None): if set to not-None, we will add a fake
+                Authorization header pretenting to be the given server name.
 
         Returns:
-            A synapse.http.site.SynapseRequest.
+            Tuple[synapse.http.site.SynapseRequest, channel]
         """
         if isinstance(content, dict):
             content = json.dumps(content).encode('utf8')
 
         return make_request(
-            self.reactor, method, path, content, access_token, request, shorthand
+            self.reactor, method, path, content, access_token, request, shorthand,
+            federation_auth_origin,
         )
 
     def render(self, request):
@@ -333,7 +314,18 @@ class HomeserverTestCase(TestCase):
         """
         kwargs = dict(kwargs)
         kwargs.update(self._hs_args)
-        return setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        if "config" not in kwargs:
+            config = self.default_config()
+            kwargs["config"] = config
+        hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
+        stor = hs.get_datastore()
+
+        # Run the database background updates.
+        if hasattr(stor, "do_next_background_update"):
+            while not self.get_success(stor.has_completed_background_updates()):
+                self.get_success(stor.do_next_background_update(1))
+
+        return hs
 
     def pump(self, by=0.0):
         """
@@ -341,11 +333,20 @@ class HomeserverTestCase(TestCase):
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(self, d):
+    def get_success(self, d, by=0.0):
+        if not isinstance(d, Deferred):
+            return d
+        self.pump(by=by)
+        return self.successResultOf(d)
+
+    def get_failure(self, d, exc):
+        """
+        Run a Deferred and get a Failure from it. The failure must be of the type `exc`.
+        """
         if not isinstance(d, Deferred):
             return d
         self.pump()
-        return self.successResultOf(d)
+        return self.failureResultOf(d, exc)
 
     def register_user(self, username, password, admin=False):
         """
@@ -409,7 +410,7 @@ class HomeserverTestCase(TestCase):
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
         )
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.result)
 
         access_token = channel.json_body["access_token"]
         return access_token

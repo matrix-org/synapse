@@ -5,20 +5,20 @@ Before upgrading check if any special steps are required to upgrade from the
 what you currently have installed to current version of synapse. The extra
 instructions that may be required are listed later in this document.
 
-1. If synapse was installed in a virtualenv then active that virtualenv before
-   upgrading. If synapse is installed in a virtualenv in ``~/.synapse/`` then
+1. If synapse was installed in a virtualenv then activate that virtualenv before
+   upgrading. If synapse is installed in a virtualenv in ``~/synapse/env`` then
    run:
 
    .. code:: bash
 
-       source ~/.synapse/bin/activate
+       source ~/synapse/env/bin/activate
 
 2. If synapse was installed using pip then upgrade to the latest version by
    running:
 
    .. code:: bash
 
-       pip install --upgrade --process-dependency-links matrix-synapse
+       pip install --upgrade matrix-synapse[all]
 
        # restart synapse
        synctl restart
@@ -31,14 +31,15 @@ instructions that may be required are listed later in this document.
 
        # Pull the latest version of the master branch.
        git pull
-       # Update the versions of synapse's python dependencies.
-       python synapse/python_dependencies.py | xargs pip install --upgrade
+
+       # Update synapse and its python dependencies.
+       pip install --upgrade .[all]
 
        # restart synapse
        ./synctl restart
 
 
-To check whether your update was sucessful, you can check the Server header
+To check whether your update was successful, you can check the Server header
 returned by the Client-Server API:
 
 .. code:: bash
@@ -47,6 +48,16 @@ returned by the Client-Server API:
     # You may need to specify a port (eg, :8448) if your server is not
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
+
+Upgrading to v0.99.0
+====================
+
+Please be aware that, before Synapse v1.0 is released around March 2019, you
+will need to replace any self-signed certificates with those verified by a
+root CA. Information on how to do so can be found at `the ACME docs
+<docs/ACME.md>`_.
+
+For more information on configuring TLS certificates see the `FAQ <docs/MSC1711_certificates_FAQ.md>`_.
 
 Upgrading to v0.34.0
 ====================

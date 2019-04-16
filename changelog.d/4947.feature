@@ -1,0 +1,1 @@
+Add ability for password provider modules to bind email addresses to users upon registration.

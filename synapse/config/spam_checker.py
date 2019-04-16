@@ -28,8 +28,8 @@ class SpamCheckerConfig(Config):
 
     def default_config(self, **kwargs):
         return """\
-        # spam_checker:
-        #     module: "my_custom_project.SuperSpamChecker"
-        #     config:
-        #         example_option: 'things'
+        #spam_checker:
+        #  module: "my_custom_project.SuperSpamChecker"
+        #  config:
+        #    example_option: 'things'
         """

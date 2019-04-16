@@ -19,7 +19,9 @@ import logging
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.push import PusherConfigException
 from synapse.push.pusher import PusherFactory
+from synapse.util.async_helpers import concurrently_execute
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +142,10 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def on_new_notifications(self, min_stream_id, max_stream_id):
+        if not self.pushers:
+            # nothing to do here.
+            return
+
         try:
             users_affected = yield self.store.get_push_action_users_in_range(
                 min_stream_id, max_stream_id
@@ -155,6 +161,10 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def on_new_receipts(self, min_stream_id, max_stream_id, affected_room_ids):
+        if not self.pushers:
+            # nothing to do here.
+            return
+
         try:
             # Need to subtract 1 from the minimum because the lower bound here
             # is not inclusive
@@ -188,7 +198,7 @@ class PusherPool:
                 p = r
 
         if p:
-            self._start_pusher(p)
+            yield self._start_pusher(p)
 
     @defer.inlineCallbacks
     def _start_pushers(self):
@@ -199,10 +209,14 @@ class PusherPool:
         """
         pushers = yield self.store.get_all_pushers()
         logger.info("Starting %d pushers", len(pushers))
-        for pusherdict in pushers:
-            self._start_pusher(pusherdict)
+
+        # Stagger starting up the pushers so we don't completely drown the
+        # process on start up.
+        yield concurrently_execute(self._start_pusher, pushers, 10)
+
         logger.info("Started pushers")
 
+    @defer.inlineCallbacks
     def _start_pusher(self, pusherdict):
         """Start the given pusher
 
@@ -214,6 +228,15 @@ class PusherPool:
         """
         try:
             p = self.pusher_factory.create_pusher(pusherdict)
+        except PusherConfigException as e:
+            logger.warning(
+                "Pusher incorrectly configured user=%s, appid=%s, pushkey=%s: %s",
+                pusherdict.get('user_name'),
+                pusherdict.get('app_id'),
+                pusherdict.get('pushkey'),
+                e,
+            )
+            return
         except Exception:
             logger.exception("Couldn't start a pusher: caught Exception")
             return
@@ -230,7 +253,22 @@ class PusherPool:
         if appid_pushkey in byuser:
             byuser[appid_pushkey].on_stop()
         byuser[appid_pushkey] = p
-        p.on_started()
+
+        # Check if there *may* be push to process. We do this as this check is a
+        # lot cheaper to do than actually fetching the exact rows we need to
+        # push.
+        user_id = pusherdict["user_name"]
+        last_stream_ordering = pusherdict["last_stream_ordering"]
+        if last_stream_ordering:
+            have_notifs = yield self.store.get_if_maybe_push_in_range_for_user(
+                user_id, last_stream_ordering,
+            )
+        else:
+            # We always want to default to starting up the pusher rather than
+            # risk missing push.
+            have_notifs = True
+
+        p.on_started(have_notifs)
 
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_id):

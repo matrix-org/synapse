@@ -18,12 +18,9 @@ import platform
 
 from ._base import IncorrectDatabaseSetup
 from .postgres import PostgresEngine
-from .sqlite3 import Sqlite3Engine
+from .sqlite import Sqlite3Engine
 
-SUPPORTED_MODULE = {
-    "sqlite3": Sqlite3Engine,
-    "psycopg2": PostgresEngine,
-}
+SUPPORTED_MODULE = {"sqlite3": Sqlite3Engine, "psycopg2": PostgresEngine}
 
 
 def create_engine(database_config):
@@ -32,15 +29,12 @@ def create_engine(database_config):
 
     if engine_class:
         # pypy requires psycopg2cffi rather than psycopg2
-        if (name == "psycopg2" and
-                platform.python_implementation() == "PyPy"):
+        if name == "psycopg2" and platform.python_implementation() == "PyPy":
             name = "psycopg2cffi"
         module = importlib.import_module(name)
         return engine_class(module, database_config)
 
-    raise RuntimeError(
-        "Unsupported database engine '%s'" % (name,)
-    )
+    raise RuntimeError("Unsupported database engine '%s'" % (name,))
 
 
 __all__ = ["create_engine", "IncorrectDatabaseSetup"]

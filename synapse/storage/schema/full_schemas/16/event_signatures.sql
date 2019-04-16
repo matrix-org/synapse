@@ -13,15 +13,9 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS event_content_hashes (
-    event_id TEXT,
-    algorithm TEXT,
-    hash bytea,
-    UNIQUE (event_id, algorithm)
-);
-
-CREATE INDEX event_content_hashes_id ON event_content_hashes(event_id);
-
+ /* We used to create tables called event_content_hashes and event_edge_hashes,
+  * but these are no longer used and are removed in delta 54.
+  */
 
 CREATE TABLE IF NOT EXISTS event_reference_hashes (
     event_id TEXT,
@@ -42,14 +36,3 @@ CREATE TABLE IF NOT EXISTS event_signatures (
 );
 
 CREATE INDEX event_signatures_id ON event_signatures(event_id);
-
-
-CREATE TABLE IF NOT EXISTS event_edge_hashes(
-    event_id TEXT,
-    prev_event_id TEXT,
-    algorithm TEXT,
-    hash bytea,
-    UNIQUE (event_id, prev_event_id, algorithm)
-);
-
-CREATE INDEX event_edge_hashes_id ON event_edge_hashes(event_id);

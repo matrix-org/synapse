@@ -22,7 +22,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -30,8 +30,8 @@ from synapse.api.errors import (
     NotFoundError,
     SynapseError,
 )
+from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import ConsentURIBuilder
-from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -192,7 +192,7 @@ class MessageHandler(object):
                     "Getting joined members after leaving is not implemented"
                 )
 
-        users_with_profile = yield self.state.get_current_user_in_room(room_id)
+        users_with_profile = yield self.state.get_current_users_in_room(room_id)
 
         # If this is an AS, double check that they are allowed to see the members.
         # This can either be because the AS user is in the room or because there
@@ -244,12 +244,19 @@ class EventCreationHandler(object):
 
         self.spam_checker = hs.get_spam_checker()
 
-        if self.config.block_events_without_consent_error is not None:
+        self._block_events_without_consent_error = (
+            self.config.block_events_without_consent_error
+        )
+
+        # we need to construct a ConsentURIBuilder here, as it checks that the necessary
+        # config options, but *only* if we have a configuration for which we are
+        # going to need it.
+        if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
     @defer.inlineCallbacks
     def create_event(self, requester, event_dict, token_id=None, txn_id=None,
-                     prev_events_and_hashes=None):
+                     prev_events_and_hashes=None, require_consent=True):
         """
         Given a dict from a client, create a new event.
 
@@ -270,6 +277,9 @@ class EventCreationHandler(object):
                 where *hashes* is a map from algorithm to hash.
 
                 If None, they will be requested from the database.
+
+            require_consent (bool): Whether to check if the requester has
+                consented to privacy policy.
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
@@ -278,9 +288,17 @@ class EventCreationHandler(object):
         """
         yield self.auth.check_auth_blocking(requester.user.to_string())
 
-        builder = self.event_builder_factory.new(event_dict)
+        if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
+            room_version = event_dict["content"]["room_version"]
+        else:
+            try:
+                room_version = yield self.store.get_room_version(event_dict["room_id"])
+            except NotFoundError:
+                raise AuthError(403, "Unknown room")
 
-        self.validator.validate_new(builder)
+        builder = self.event_builder_factory.new(room_version, event_dict)
+
+        self.validator.validate_builder(builder)
 
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
@@ -303,7 +321,7 @@ class EventCreationHandler(object):
                     )
 
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
-        if not is_exempt:
+        if require_consent and not is_exempt:
             yield self.assert_accepted_privacy_policy(requester)
 
         if token_id is not None:
@@ -317,6 +335,8 @@ class EventCreationHandler(object):
             requester=requester,
             prev_events_and_hashes=prev_events_and_hashes,
         )
+
+        self.validator.validate_new(event)
 
         defer.returnValue((event, context))
 
@@ -369,7 +389,7 @@ class EventCreationHandler(object):
         Raises:
             ConsentNotGivenError: if the user has not given consent yet
         """
-        if self.config.block_events_without_consent_error is None:
+        if self._block_events_without_consent_error is None:
             return
 
         # exempt AS users from needing consent
@@ -396,7 +416,7 @@ class EventCreationHandler(object):
         consent_uri = self._consent_uri_builder.build_user_consent_uri(
             requester.user.localpart,
         )
-        msg = self.config.block_events_without_consent_error % {
+        msg = self._block_events_without_consent_error % {
             'consent_uri': consent_uri,
         }
         raise ConsentNotGivenError(
@@ -427,10 +447,11 @@ class EventCreationHandler(object):
 
         if event.is_state():
             prev_state = yield self.deduplicate_state_event(event, context)
-            logger.info(
-                "Not bothering to persist duplicate state event %s", event.event_id,
-            )
             if prev_state is not None:
+                logger.info(
+                    "Not bothering to persist state event %s duplicated by %s",
+                    event.event_id, prev_state.event_id,
+                )
                 defer.returnValue(prev_state)
 
         yield self.handle_new_client_event(
@@ -535,40 +556,19 @@ class EventCreationHandler(object):
             prev_events_and_hashes = \
                 yield self.store.get_prev_events_for_room(builder.room_id)
 
-        if prev_events_and_hashes:
-            depth = max([d for _, _, d in prev_events_and_hashes]) + 1
-            # we cap depth of generated events, to ensure that they are not
-            # rejected by other servers (and so that they can be persisted in
-            # the db)
-            depth = min(depth, MAX_DEPTH)
-        else:
-            depth = 1
-
         prev_events = [
             (event_id, prev_hashes)
             for event_id, prev_hashes, _ in prev_events_and_hashes
         ]
 
-        builder.prev_events = prev_events
-        builder.depth = depth
-
-        context = yield self.state.compute_event_context(builder)
+        event = yield builder.build(
+            prev_event_ids=[p for p, _ in prev_events],
+        )
+        context = yield self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service
 
-        if builder.is_state():
-            builder.prev_state = yield self.store.add_event_hashes(
-                context.prev_state_events
-            )
-
-        yield self.auth.add_auth_events(builder, context)
-
-        signing_key = self.hs.config.signing_key[0]
-        add_hashes_and_signatures(
-            builder, self.server_name, signing_key
-        )
-
-        event = builder.build()
+        self.validator.validate_new(event)
 
         logger.debug(
             "Created event %s",
@@ -603,8 +603,15 @@ class EventCreationHandler(object):
             extra_users (list(UserID)): Any extra users to notify about event
         """
 
+        if event.is_state() and (event.type, event.state_key) == (EventTypes.Create, ""):
+            room_version = event.content.get(
+                "room_version", RoomVersions.V1.identifier
+            )
+        else:
+            room_version = yield self.store.get_room_version(event.room_id)
+
         try:
-            yield self.auth.check_from_context(event, context)
+            yield self.auth.check_from_context(room_version, event, context)
         except AuthError as err:
             logger.warn("Denying new event %r because %s", event, err)
             raise err
@@ -752,7 +759,8 @@ class EventCreationHandler(object):
             auth_events = {
                 (e.type, e.state_key): e for e in auth_events.values()
             }
-            if self.auth.check_redaction(event, auth_events=auth_events):
+            room_version = yield self.store.get_room_version(event.room_id)
+            if self.auth.check_redaction(room_version, event, auth_events=auth_events):
                 original_event = yield self.store.get_event(
                     event.redacts,
                     check_redacted=False,
@@ -765,6 +773,9 @@ class EventCreationHandler(object):
                         403,
                         "You don't have permission to redact events"
                     )
+
+                # We've already checked.
+                event.internal_metadata.recheck_redaction = False
 
         if event.type == EventTypes.Create:
             prev_state_ids = yield context.get_prev_state_ids(self.store)

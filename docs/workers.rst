@@ -26,9 +26,8 @@ Configuration
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. Note that this includes
-requests made to the federation port. The caveats regarding running a
-reverse-proxy on the federation port still apply (see
-https://github.com/matrix-org/synapse/blob/master/README.rst#reverse-proxying-the-federation-port).
+requests made to the federation port. See `<reverse_proxy.rst>`_ for
+information on setting up a reverse proxy.
 
 To enable workers, you need to add two replication listeners to the master
 synapse, e.g.::
@@ -183,6 +182,7 @@ endpoints matching the following regular expressions::
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/send/
+    ^/_matrix/key/v2/query
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
@@ -223,6 +223,22 @@ following regular expressions::
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
+    ^/_matrix/client/(api/v1|r0|unstable)/login$
+    ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
+    ^/_matrix/client/versions$
+    ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
+
+Additionally, the following REST endpoints can be handled for GET requests::
+
+    ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
+
+Additionally, the following REST endpoints can be handled, but all requests must
+be routed to the same instance::
+
+    ^/_matrix/client/(r0|unstable)/register$
+
 
 ``synapse.app.user_dir``
 ~~~~~~~~~~~~~~~~~~~~~~~~

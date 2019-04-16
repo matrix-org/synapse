@@ -52,18 +52,18 @@ class PasswordAuthProviderConfig(Config):
 
     def default_config(self, **kwargs):
         return """\
-        # password_providers:
-        #     - module: "ldap_auth_provider.LdapAuthProvider"
-        #       config:
-        #         enabled: true
-        #         uri: "ldap://ldap.example.com:389"
-        #         start_tls: true
-        #         base: "ou=users,dc=example,dc=com"
-        #         attributes:
-        #            uid: "cn"
-        #            mail: "email"
-        #            name: "givenName"
-        #         #bind_dn:
-        #         #bind_password:
-        #         #filter: "(objectClass=posixAccount)"
+        #password_providers:
+        #    - module: "ldap_auth_provider.LdapAuthProvider"
+        #      config:
+        #        enabled: true
+        #        uri: "ldap://ldap.example.com:389"
+        #        start_tls: true
+        #        base: "ou=users,dc=example,dc=com"
+        #        attributes:
+        #           uid: "cn"
+        #           mail: "email"
+        #           name: "givenName"
+        #        #bind_dn:
+        #        #bind_password:
+        #        #filter: "(objectClass=posixAccount)"
         """

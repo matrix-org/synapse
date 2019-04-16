@@ -1,67 +1,46 @@
+import datetime
 import json
 
-from mock import Mock
-
-from twisted.python import failure
-
-from synapse.api.errors import InteractiveAuthIncompleteError
-from synapse.rest.client.v2_alpha.register import register_servlets
+from synapse.api.constants import LoginType
+from synapse.api.errors import Codes
+from synapse.appservice import ApplicationService
+from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v2_alpha import register, sync
 
 from tests import unittest
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
-    servlets = [register_servlets]
+    servlets = [register.register_servlets]
 
     def make_homeserver(self, reactor, clock):
 
         self.url = b"/_matrix/client/r0/register"
 
-        self.appservice = None
-        self.auth = Mock(
-            get_appservice_by_req=Mock(side_effect=lambda x: self.appservice)
-        )
-
-        self.auth_result = failure.Failure(InteractiveAuthIncompleteError(None))
-        self.auth_handler = Mock(
-            check_auth=Mock(side_effect=lambda x, y, z: self.auth_result),
-            get_session_data=Mock(return_value=None),
-        )
-        self.registration_handler = Mock()
-        self.identity_handler = Mock()
-        self.login_handler = Mock()
-        self.device_handler = Mock()
-        self.device_handler.check_device_registered = Mock(return_value="FAKE")
-
-        self.datastore = Mock(return_value=Mock())
-        self.datastore.get_current_state_deltas = Mock(return_value=[])
-
-        # do the dance to hook it up to the hs global
-        self.handlers = Mock(
-            registration_handler=self.registration_handler,
-            identity_handler=self.identity_handler,
-            login_handler=self.login_handler,
-        )
         self.hs = self.setup_test_homeserver()
-        self.hs.get_auth = Mock(return_value=self.auth)
-        self.hs.get_handlers = Mock(return_value=self.handlers)
-        self.hs.get_auth_handler = Mock(return_value=self.auth_handler)
-        self.hs.get_device_handler = Mock(return_value=self.device_handler)
-        self.hs.get_datastore = Mock(return_value=self.datastore)
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
+        self.hs.config.enable_registration_captcha = False
+        self.hs.config.allow_guest_access = True
 
         return self.hs
 
     def test_POST_appservice_registration_valid(self):
-        user_id = "@kermit:muppet"
-        token = "kermits_access_token"
-        self.appservice = {"id": "1234"}
-        self.registration_handler.appservice_register = Mock(return_value=user_id)
-        self.auth_handler.get_access_token_for_user_id = Mock(return_value=token)
-        request_data = json.dumps({"username": "kermit"})
+        user_id = "@as_user_kermit:test"
+        as_token = "i_am_an_app_service"
+
+        appservice = ApplicationService(
+            as_token, self.hs.config.server_name,
+            id="1234",
+            namespaces={
+                "users": [{"regex": r"@as_user.*", "exclusive": True}],
+            },
+        )
+
+        self.hs.get_datastore().services_cache.append(appservice)
+        request_data = json.dumps({"username": "as_user_kermit"})
 
         request, channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
@@ -71,7 +50,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
         det_data = {
             "user_id": user_id,
-            "access_token": token,
             "home_server": self.hs.hostname,
         }
         self.assertDictContainsSubset(det_data, channel.json_body)
@@ -103,39 +81,30 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["error"], "Invalid username")
 
     def test_POST_user_valid(self):
-        user_id = "@kermit:muppet"
-        token = "kermits_access_token"
+        user_id = "@kermit:test"
         device_id = "frogfone"
-        request_data = json.dumps(
-            {"username": "kermit", "password": "monkey", "device_id": device_id}
-        )
-        self.registration_handler.check_username = Mock(return_value=True)
-        self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
-        self.registration_handler.register = Mock(return_value=(user_id, None))
-        self.auth_handler.get_access_token_for_user_id = Mock(return_value=token)
-        self.device_handler.check_device_registered = Mock(return_value=device_id)
-
+        params = {
+            "username": "kermit",
+            "password": "monkey",
+            "device_id": device_id,
+            "auth": {"type": LoginType.DUMMY},
+        }
+        request_data = json.dumps(params)
         request, channel = self.make_request(b"POST", self.url, request_data)
         self.render(request)
 
         det_data = {
             "user_id": user_id,
-            "access_token": token,
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
-        self.auth_handler.get_login_tuple_for_user_id(
-            user_id, device_id=device_id, initial_device_display_name=None
-        )
 
     def test_POST_disabled_registration(self):
         self.hs.config.enable_registration = False
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
-        self.registration_handler.check_username = Mock(return_value=True)
         self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
-        self.registration_handler.register = Mock(return_value=("@user:id", "t"))
 
         request, channel = self.make_request(b"POST", self.url, request_data)
         self.render(request)
@@ -144,16 +113,13 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["error"], "Registration has been disabled")
 
     def test_POST_guest_registration(self):
-        user_id = "a@b"
         self.hs.config.macaroon_secret_key = "test"
         self.hs.config.allow_guest_access = True
-        self.registration_handler.register = Mock(return_value=(user_id, None))
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
 
         det_data = {
-            "user_id": user_id,
             "home_server": self.hs.hostname,
             "device_id": "guest_device",
         }
@@ -168,3 +134,97 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
+
+    def test_POST_ratelimiting_guest(self):
+        self.hs.config.rc_registration.burst_count = 5
+        self.hs.config.rc_registration.per_second = 0.17
+
+        for i in range(0, 6):
+            url = self.url + b"?kind=guest"
+            request, channel = self.make_request(b"POST", url, b"{}")
+            self.render(request)
+
+            if i == 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(retry_after_ms / 1000.)
+
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def test_POST_ratelimiting(self):
+        self.hs.config.rc_registration.burst_count = 5
+        self.hs.config.rc_registration.per_second = 0.17
+
+        for i in range(0, 6):
+            params = {
+                "username": "kermit" + str(i),
+                "password": "monkey",
+                "device_id": "frogfone",
+                "auth": {"type": LoginType.DUMMY},
+            }
+            request_data = json.dumps(params)
+            request, channel = self.make_request(b"POST", self.url, request_data)
+            self.render(request)
+
+            if i == 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(retry_after_ms / 1000.)
+
+        request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+
+class AccountValidityTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        register.register_servlets,
+        admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config.enable_registration = True
+        config.account_validity.enabled = True
+        config.account_validity.period = 604800000  # Time in ms for 1 week
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def test_validity_period(self):
+        self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        # The specific endpoint doesn't matter, all we need is an authenticated
+        # endpoint.
+        request, channel = self.make_request(
+            b"GET", "/sync", access_token=tok,
+        )
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
+
+        request, channel = self.make_request(
+            b"GET", "/sync", access_token=tok,
+        )
+        self.render(request)
+
+        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEquals(
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result,
+        )

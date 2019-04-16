@@ -61,15 +61,16 @@ class RoomMemberHandler(object):
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.directory_handler = hs.get_handlers().directory_handler
-        self.registration_handler = hs.get_handlers().registration_handler
+        self.registration_handler = hs.get_registration_handler()
         self.profile_handler = hs.get_profile_handler()
-        self.event_creation_hander = hs.get_event_creation_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
 
         self.member_linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
+        self._enable_lookup = hs.config.enable_3pid_lookup
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -160,7 +161,10 @@ class RoomMemberHandler(object):
         txn_id=None,
         ratelimit=True,
         content=None,
+        require_consent=True,
     ):
+        user_id = target.to_string()
+
         if content is None:
             content = {}
 
@@ -168,14 +172,14 @@ class RoomMemberHandler(object):
         if requester.is_guest:
             content["kind"] = "guest"
 
-        event, context = yield self.event_creation_hander.create_event(
+        event, context = yield self.event_creation_handler.create_event(
             requester,
             {
                 "type": EventTypes.Member,
                 "content": content,
                 "room_id": room_id,
                 "sender": requester.user.to_string(),
-                "state_key": target.to_string(),
+                "state_key": user_id,
 
                 # For backwards compatibility:
                 "membership": membership,
@@ -183,17 +187,18 @@ class RoomMemberHandler(object):
             token_id=requester.access_token_id,
             txn_id=txn_id,
             prev_events_and_hashes=prev_events_and_hashes,
+            require_consent=require_consent,
         )
 
         # Check if this event matches the previous membership event for the user.
-        duplicate = yield self.event_creation_hander.deduplicate_state_event(
+        duplicate = yield self.event_creation_handler.deduplicate_state_event(
             event, context,
         )
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
             defer.returnValue(duplicate)
 
-        yield self.event_creation_hander.handle_new_client_event(
+        yield self.event_creation_handler.handle_new_client_event(
             requester,
             event,
             context,
@@ -204,12 +209,12 @@ class RoomMemberHandler(object):
         prev_state_ids = yield context.get_prev_state_ids(self.store)
 
         prev_member_event_id = prev_state_ids.get(
-            (EventTypes.Member, target.to_string()),
+            (EventTypes.Member, user_id),
             None
         )
 
         if event.membership == Membership.JOIN:
-            # Only fire user_joined_room if the user has acutally joined the
+            # Only fire user_joined_room if the user has actually joined the
             # room. Don't bother if the user is just changing their profile
             # info.
             newly_joined = True
@@ -218,6 +223,22 @@ class RoomMemberHandler(object):
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 yield self._user_joined_room(target, room_id)
+
+            # Copy over direct message status and room tags if this is a join
+            # on an upgraded room
+
+            # Check if this is an upgraded room
+            predecessor = yield self.store.get_room_predecessor(room_id)
+
+            if predecessor:
+                # It is an upgraded room. Copy over old tags
+                self.copy_room_tags_and_direct_to_room(
+                    predecessor["room_id"], room_id, user_id,
+                )
+                # Move over old push rules
+                self.store.move_push_rules_from_room_to_room_for_user(
+                    predecessor["room_id"], room_id, user_id,
+                )
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
@@ -225,6 +246,55 @@ class RoomMemberHandler(object):
                     yield self._user_left_room(target, room_id)
 
         defer.returnValue(event)
+
+    @defer.inlineCallbacks
+    def copy_room_tags_and_direct_to_room(
+        self,
+        old_room_id,
+        new_room_id,
+        user_id,
+    ):
+        """Copies the tags and direct room state from one room to another.
+
+        Args:
+            old_room_id (str)
+            new_room_id (str)
+            user_id (str)
+
+        Returns:
+            Deferred[None]
+        """
+        # Retrieve user account data for predecessor room
+        user_account_data, _ = yield self.store.get_account_data_for_user(
+            user_id,
+        )
+
+        # Copy direct message state if applicable
+        direct_rooms = user_account_data.get("m.direct", {})
+
+        # Check which key this room is under
+        if isinstance(direct_rooms, dict):
+            for key, room_id_list in direct_rooms.items():
+                if old_room_id in room_id_list and new_room_id not in room_id_list:
+                    # Add new room_id to this key
+                    direct_rooms[key].append(new_room_id)
+
+                    # Save back to user's m.direct account data
+                    yield self.store.add_account_data_for_user(
+                        user_id, "m.direct", direct_rooms,
+                    )
+                    break
+
+        # Copy room tags if applicable
+        room_tags = yield self.store.get_tags_for_room(
+            user_id, old_room_id,
+        )
+
+        # Copy each room tag to the new room
+        for tag, tag_content in room_tags.items():
+            yield self.store.add_tag_to_room(
+                user_id, new_room_id, tag, tag_content
+            )
 
     @defer.inlineCallbacks
     def update_membership(
@@ -238,6 +308,7 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            require_consent=True,
     ):
         key = (room_id,)
 
@@ -252,6 +323,7 @@ class RoomMemberHandler(object):
                 third_party_signed=third_party_signed,
                 ratelimit=ratelimit,
                 content=content,
+                require_consent=require_consent,
             )
 
         defer.returnValue(result)
@@ -268,6 +340,7 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            require_consent=True,
     ):
         content_specified = bool(content)
         if content is None:
@@ -349,6 +422,9 @@ class RoomMemberHandler(object):
             room_id, latest_event_ids=latest_event_ids,
         )
 
+        # TODO: Refactor into dictionary of explicitly allowed transitions
+        # between old and new state, with specific error messages for some
+        # transitions and generic otherwise
         old_state_id = current_state_ids.get((EventTypes.Member, target.to_string()))
         if old_state_id:
             old_state = yield self.store.get_event(old_state_id, allow_none=True)
@@ -374,6 +450,9 @@ class RoomMemberHandler(object):
                 if same_sender and same_membership and same_content:
                     defer.returnValue(old_state)
 
+            if old_membership in ["ban", "leave"] and action == "kick":
+                raise AuthError(403, "The target user is not in the room")
+
             # we don't allow people to reject invites to the server notice
             # room, but they can leave it once they are joined.
             if (
@@ -387,6 +466,9 @@ class RoomMemberHandler(object):
                         "You cannot reject this invite",
                         errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
                     )
+        else:
+            if action == "kick":
+                raise AuthError(403, "The target user is not in the room")
 
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
 
@@ -449,6 +531,7 @@ class RoomMemberHandler(object):
             ratelimit=ratelimit,
             prev_events_and_hashes=prev_events_and_hashes,
             content=content,
+            require_consent=require_consent,
         )
         defer.returnValue(res)
 
@@ -493,7 +576,7 @@ class RoomMemberHandler(object):
         else:
             requester = synapse.types.create_requester(target_user)
 
-        prev_event = yield self.event_creation_hander.deduplicate_state_event(
+        prev_event = yield self.event_creation_handler.deduplicate_state_event(
             event, context,
         )
         if prev_event is not None:
@@ -513,7 +596,7 @@ class RoomMemberHandler(object):
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
 
-        yield self.event_creation_hander.handle_new_client_event(
+        yield self.event_creation_handler.handle_new_client_event(
             requester,
             event,
             context,
@@ -527,7 +610,7 @@ class RoomMemberHandler(object):
         )
 
         if event.membership == Membership.JOIN:
-            # Only fire user_joined_room if the user has acutally joined the
+            # Only fire user_joined_room if the user has actually joined the
             # room. Don't bother if the user is just changing their profile
             # info.
             newly_joined = True
@@ -656,6 +739,10 @@ class RoomMemberHandler(object):
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
+        if not self._enable_lookup:
+            raise SynapseError(
+                403, "Looking up third-party identifiers is denied from this server",
+            )
         try:
             data = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),
@@ -755,7 +842,7 @@ class RoomMemberHandler(object):
             )
         )
 
-        yield self.event_creation_hander.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.ThirdPartyInvite,
@@ -877,7 +964,8 @@ class RoomMemberHandler(object):
         # first member event?
         create_event_id = current_state_ids.get(("m.room.create", ""))
         if len(current_state_ids) == 1 and create_event_id:
-            defer.returnValue(self.hs.is_mine_id(create_event_id))
+            # We can only get here if we're in the process of creating the room
+            defer.returnValue(True)
 
         for etype, state_key in current_state_ids:
             if etype != EventTypes.Member or not self.hs.is_mine_id(state_key):

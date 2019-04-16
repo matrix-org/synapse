@@ -32,9 +32,25 @@ if six.PY3:
 
 logger = logging.getLogger(__name__)
 
-http_push_processed_counter = Counter("synapse_http_httppusher_http_pushes_processed", "")
+http_push_processed_counter = Counter(
+    "synapse_http_httppusher_http_pushes_processed",
+    "Number of push notifications successfully sent",
+)
 
-http_push_failed_counter = Counter("synapse_http_httppusher_http_pushes_failed", "")
+http_push_failed_counter = Counter(
+    "synapse_http_httppusher_http_pushes_failed",
+    "Number of push notifications which failed",
+)
+
+http_badges_processed_counter = Counter(
+    "synapse_http_httppusher_badge_updates_processed",
+    "Number of badge updates successfully sent",
+)
+
+http_badges_failed_counter = Counter(
+    "synapse_http_httppusher_badge_updates_failed",
+    "Number of badge updates which failed",
+)
 
 
 class HttpPusher(object):
@@ -81,6 +97,11 @@ class HttpPusher(object):
             pusherdict['pushkey'],
         )
 
+        if self.data is None:
+            raise PusherConfigException(
+                "data can not be null for HTTP pusher"
+            )
+
         if 'url' not in self.data:
             raise PusherConfigException(
                 "'url' required in data for HTTP pusher"
@@ -91,8 +112,16 @@ class HttpPusher(object):
         self.data_minus_url.update(self.data)
         del self.data_minus_url['url']
 
-    def on_started(self):
-        self._start_processing()
+    def on_started(self, should_check_for_notifs):
+        """Called when this pusher has been started.
+
+        Args:
+            should_check_for_notifs (bool): Whether we should immediately
+                check for push to send. Set to False only if it's known there
+                is nothing to send
+        """
+        if should_check_for_notifs:
+            self._start_processing()
 
     def on_new_notifications(self, min_stream_ordering, max_stream_ordering):
         self.max_stream_ordering = max(max_stream_ordering, self.max_stream_ordering or 0)
@@ -333,10 +362,10 @@ class HttpPusher(object):
             defer.returnValue([])
         try:
             resp = yield self.http_client.post_json_get_json(self.url, notification_dict)
-        except Exception:
-            logger.warn(
-                "Failed to push event %s to %s",
-                event.event_id, self.name, exc_info=True,
+        except Exception as e:
+            logger.warning(
+                "Failed to push event %s to %s: %s %s",
+                event.event_id, self.name, type(e), e,
             )
             defer.returnValue(False)
         rejected = []
@@ -346,6 +375,10 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _send_badge(self, badge):
+        """
+        Args:
+            badge (int): number of unread messages
+        """
         logger.info("Sending updated badge count %d to %s", badge, self.name)
         d = {
             'notification': {
@@ -366,14 +399,11 @@ class HttpPusher(object):
             }
         }
         try:
-            resp = yield self.http_client.post_json_get_json(self.url, d)
-        except Exception:
-            logger.warn(
-                "Failed to send badge count to %s",
-                self.name, exc_info=True,
+            yield self.http_client.post_json_get_json(self.url, d)
+            http_badges_processed_counter.inc()
+        except Exception as e:
+            logger.warning(
+                "Failed to send badge count to %s: %s %s",
+                self.name, type(e), e,
             )
-            defer.returnValue(False)
-        rejected = []
-        if 'rejected' in resp:
-            rejected = resp['rejected']
-        defer.returnValue(rejected)
+            http_badges_failed_counter.inc()

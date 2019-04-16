@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ import json
 import logging
 
 from twisted.web.resource import Resource
+
+from synapse.http.server import set_cors_headers
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,7 @@ class WellKnownResource(Resource):
         self._well_known_builder = WellKnownBuilder(hs)
 
     def render_GET(self, request):
+        set_cors_headers(request)
         r = self._well_known_builder.get_well_known()
         if not r:
             request.setResponseCode(404)

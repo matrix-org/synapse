@@ -23,6 +23,7 @@ from twisted.internet import defer
 from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
+from synapse.api.room_versions import RoomVersions
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +275,13 @@ def _resolve_auth_events(events, auth_events):
         auth_events[(prev_event.type, prev_event.state_key)] = prev_event
         try:
             # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
+            event_auth.check(
+                RoomVersions.V1.identifier,
+                event,
+                auth_events,
+                do_sig_check=False,
+                do_size_check=False,
+            )
             prev_event = event
         except AuthError:
             return prev_event
@@ -286,7 +293,13 @@ def _resolve_normal_events(events, auth_events):
     for event in _ordered_events(events):
         try:
             # The signatures have already been checked at this point
-            event_auth.check(event, auth_events, do_sig_check=False, do_size_check=False)
+            event_auth.check(
+                RoomVersions.V1.identifier,
+                event,
+                auth_events,
+                do_sig_check=False,
+                do_size_check=False,
+            )
             return event
         except AuthError:
             pass
