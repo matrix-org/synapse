@@ -32,7 +32,6 @@ from synapse.api.errors import (
     Codes,
     HttpResponseException,
     ProxiedRequestError,
-    RequestSendFailed,
     SynapseError,
 )
 
@@ -304,7 +303,7 @@ class IdentityHandler(BaseHandler):
             for details
         """
         if not self._enable_lookup:
-            raise SynapseError(
+            raise AuthError(
                 403, "Looking up third-party identifiers is denied from this server",
             )
 
@@ -327,7 +326,7 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied lookup failed: %r", e)
             raise e.to_synapse_error()
-        except RequestSendFailed as e:
+        except IOError as e:
             logger.info("Failed to contact %r: %s", id_server, e)
             raise ProxiedRequestError(503, "Failed to contact homeserver")
 

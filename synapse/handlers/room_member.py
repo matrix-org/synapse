@@ -24,7 +24,7 @@ from twisted.internet import defer
 import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, ProxiedRequestError, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -808,7 +808,7 @@ class RoomMemberHandler(object):
         try:
             data = yield self.identity_handler.lookup_3pid(id_server, medium, address)
             defer.returnValue(data.get("mxid"))
-        except Exception as e:
+        except ProxiedRequestError as e:
             logger.warn("Error from identity server lookup: %s" % (e,))
             defer.returnValue(None)
 
