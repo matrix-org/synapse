@@ -786,6 +786,44 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
+class AccountValidityRenewServlet(ClientV1RestServlet):
+    PATTERNS = client_path_patterns("/admin/account_validity/validity$")
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(AccountValidityRenewServlet, self).__init__(hs)
+
+        self.hs = hs
+        self.account_activity_handler = hs.get_account_validity_handler()
+        self.auth = hs.get_auth()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request)
+        is_admin = yield self.auth.is_server_admin(requester.user)
+
+        if not is_admin:
+            raise AuthError(403, "You are not a server admin")
+
+        body = parse_json_object_from_request(request)
+
+        if "user_id" not in body:
+            raise SynapseError(400, "Missing property 'user_id' in the request body")
+
+        expiration_ts = yield self.account_activity_handler.renew_account_for_user(
+            body["user_id"], body.get("expiration_ts"),
+            not body.get("enable_renewal_emails", True),
+        )
+
+        res = {
+            "expiration_ts": expiration_ts,
+        }
+        defer.returnValue((200, res))
+
+
 def register_servlets(hs, http_server):
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
@@ -801,3 +839,4 @@ def register_servlets(hs, http_server):
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
+    AccountValidityRenewServlet(hs).register(http_server)

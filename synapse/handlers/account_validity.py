@@ -91,6 +91,11 @@ class AccountValidityHandler(object):
                 )
 
     @defer.inlineCallbacks
+    def send_renewal_email_to_user(self, user_id):
+        expiration_ts = yield self.store.get_expiration_ts_for_user(user_id)
+        yield self._send_renewal_email(user_id, expiration_ts)
+
+    @defer.inlineCallbacks
     def _send_renewal_email(self, user_id, expiration_ts):
         """Sends out a renewal email to every email address attached to the given user
         with a unique link allowing them to renew their account.
@@ -217,12 +222,32 @@ class AccountValidityHandler(object):
             renewal_token (str): Token sent with the renewal request.
         """
         user_id = yield self.store.get_user_from_renewal_token(renewal_token)
-
         logger.debug("Renewing an account for user %s", user_id)
+        yield self.renew_account_for_user(user_id)
 
-        new_expiration_date = self.clock.time_msec() + self._account_validity.period
+    @defer.inlineCallbacks
+    def renew_account_for_user(self, user_id, expiration_ts=None, email_sent=False):
+        """Renews the account attached to a given user by pushing back the
+        expiration date by the current validity period in the server's
+        configuration.
 
-        yield self.store.renew_account_for_user(
+        Args:
+            renewal_token (str): Token sent with the renewal request.
+            expiration_ts (int): New expiration date. Defaults to now + validity period.
+            email_sent (bool): Whether an email has been sent for this validity period.
+                Defaults to False.
+
+        Returns:
+            defer.Deferred[int]: New expiration date for this account, as a timestamp
+                in milliseconds since epoch.
+        """
+        if expiration_ts is None:
+            expiration_ts = self.clock.time_msec() + self._account_validity.period
+
+        yield self.store.set_account_validity_for_user(
             user_id=user_id,
-            new_expiration_ts=new_expiration_date,
+            expiration_ts=expiration_ts,
+            email_sent=email_sent,
         )
+
+        defer.returnValue(expiration_ts)
