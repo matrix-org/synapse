@@ -22,8 +22,6 @@ from mock import Mock
 
 from canonicaljson import json
 
-import twisted
-import twisted.logger
 from twisted.internet.defer import Deferred
 from twisted.trial import unittest
 

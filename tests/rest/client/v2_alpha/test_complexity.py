@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
 from synapse.rest.client.v1 import admin, login, room
 from synapse.rest.client.v2_alpha import room_complexity
 
@@ -66,4 +64,3 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
         self.assertTrue(complexity > 1, complexity)
-
