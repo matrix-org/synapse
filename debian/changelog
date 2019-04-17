@@ -1,3 +1,10 @@
+matrix-synapse-py3 (0.99.3+nmu1) UNRELEASED; urgency=medium
+
+  [ Christoph Müller ]
+  * Configure the systemd units to have a log identifier of `matrix-synapse`
+
+ -- Christoph Müller <iblzm@hotmail.de>  Wed, 17 Apr 2019 16:17:32 +0200
+
 matrix-synapse-py3 (0.99.3) stable; urgency=medium
 
   [ Richard van der Hoff ]
