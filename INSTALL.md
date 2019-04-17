@@ -275,7 +275,7 @@ For Debian 8 (Jessie):
 ```
 sudo apt install -y lsb-release wget apt-transport-https
 sudo wget -O /etc/apt/trusted.gpg.d/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
-echo "deb [signed-by=AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
+echo "deb [signed-by=5586CCC0CBBBEFC7A25811ADF473DD4473365DE1] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
 sudo apt update
 sudo apt install matrix-synapse-py3
