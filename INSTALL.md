@@ -257,13 +257,13 @@ https://github.com/spantaleev/matrix-docker-ansible-deploy
 #### Matrix.org packages
 
 Matrix.org provides Debian/Ubuntu packages of the latest stable version of
-Synapse via https://matrix.org/packages/debian/. To use them:
+Synapse via https://packages.matrix.org/debian/. To use them:
 
 ```
 sudo apt install -y lsb-release curl apt-transport-https
-echo "deb https://matrix.org/packages/debian `lsb_release -cs` main" |
+echo "deb https://packages.matrix.org/debian `lsb_release -cs` main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
-curl "https://matrix.org/packages/debian/repo-key.asc" |
+curl "https://packages.matrix.org/debian/repo-key.asc" |
     sudo apt-key add -
 sudo apt update
 sudo apt install matrix-synapse-py3
