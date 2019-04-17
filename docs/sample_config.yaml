@@ -239,6 +239,13 @@ listeners:
 # Used by phonehome stats to group together related servers.
 #server_context: context
 
+# Resource-constrained Homeserver Settings
+#
+# Requires _joins to be set to True.
+#
+#limit_large_remote_room_joins: False
+#limit_large_remote_room_complexity: 1.0
+
 
 ## TLS ##
 
