@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet
 
@@ -39,6 +39,7 @@ class AccountValidityRenewServlet(RestServlet):
 
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -58,5 +59,33 @@ class AccountValidityRenewServlet(RestServlet):
         defer.returnValue(None)
 
 
+class AccountValiditySendMailServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account_validity/send_mail$")
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(AccountValiditySendMailServlet, self).__init__()
+
+        self.hs = hs
+        self.account_activity_handler = hs.get_account_validity_handler()
+        self.auth = hs.get_auth()
+        self.account_validity = self.hs.config.account_validity
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        if not self.account_validity.renew_by_email_enabled:
+            raise AuthError(403, "Account renewal via email is disabled on this server.")
+
+        requester = yield self.auth.get_user_by_req(request)
+        user_id = requester.user.to_string()
+        yield self.account_activity_handler.send_renewal_email_to_user(user_id)
+
+        defer.returnValue((200, {}))
+
+
 def register_servlets(hs, http_server):
     AccountValidityRenewServlet(hs).register(http_server)
+    AccountValiditySendMailServlet(hs).register(http_server)

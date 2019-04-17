@@ -108,25 +108,30 @@ class RegistrationWorkerStore(SQLBaseStore):
         defer.returnValue(res)
 
     @defer.inlineCallbacks
-    def renew_account_for_user(self, user_id, new_expiration_ts):
-        """Updates the account validity table with a new timestamp for a given
-        user, removes the existing renewal token from this user, and unsets the
-        flag indicating that an email has been sent for renewing this account.
+    def set_account_validity_for_user(self, user_id, expiration_ts, email_sent,
+                                      renewal_token=None):
+        """Updates the account validity properties of the given account, with the
+        given values.
 
         Args:
-            user_id (str): ID of the user whose account validity to renew.
-            new_expiration_ts: New expiration date, as a timestamp in milliseconds
+            user_id (str): ID of the account to update properties for.
+            expiration_ts (int): New expiration date, as a timestamp in milliseconds
                 since epoch.
+            email_sent (bool): True means a renewal email has been sent for this
+                account and there's no need to send another one for the current validity
+                period.
+            renewal_token (str): Renewal token the user can use to extend the validity
+                of their account. Defaults to no token.
         """
-        def renew_account_for_user_txn(txn):
+        def set_account_validity_for_user_txn(txn):
             self._simple_update_txn(
                 txn=txn,
                 table="account_validity",
                 keyvalues={"user_id": user_id},
                 updatevalues={
-                    "expiration_ts_ms": new_expiration_ts,
-                    "email_sent": False,
-                    "renewal_token": None,
+                    "expiration_ts_ms": expiration_ts,
+                    "email_sent": email_sent,
+                    "renewal_token": renewal_token,
                 },
             )
             self._invalidate_cache_and_stream(
@@ -134,8 +139,8 @@ class RegistrationWorkerStore(SQLBaseStore):
             )
 
         yield self.runInteraction(
-            "renew_account_for_user",
-            renew_account_for_user_txn,
+            "set_account_validity_for_user",
+            set_account_validity_for_user_txn,
         )
 
     @defer.inlineCallbacks

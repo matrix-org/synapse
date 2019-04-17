@@ -232,7 +232,7 @@ class Auth(object):
             if self._account_validity.enabled:
                 user_id = user.to_string()
                 expiration_ts = yield self.store.get_expiration_ts_for_user(user_id)
-                if expiration_ts and self.clock.time_msec() >= expiration_ts:
+                if expiration_ts is not None and self.clock.time_msec() >= expiration_ts:
                     raise AuthError(
                         403,
                         "User account has expired",
