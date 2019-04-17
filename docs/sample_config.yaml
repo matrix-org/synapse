@@ -236,6 +236,9 @@ listeners:
 #  - medium: 'email'
 #    address: 'reserved_user@example.com'
 
+# Used by phonehome stats to group together related servers.
+#server_context: context
+
 
 ## TLS ##
 
@@ -690,6 +693,10 @@ uploads_path: "DATADIR/uploads"
 #    pattern: '.*@vector\.im'
 #  - medium: msisdn
 #    pattern: '\+44'
+
+# Enable 3PIDs lookup requests to identity servers from this server.
+#
+#enable_3pid_lookup: true
 
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.

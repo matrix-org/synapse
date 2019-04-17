@@ -60,6 +60,7 @@ class RegistrationConfig(Config):
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
+        self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -149,6 +150,10 @@ class RegistrationConfig(Config):
         #    pattern: '.*@vector\\.im'
         #  - medium: msisdn
         #    pattern: '\\+44'
+
+        # Enable 3PIDs lookup requests to identity servers from this server.
+        #
+        #enable_3pid_lookup: true
 
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.

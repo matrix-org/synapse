@@ -15,8 +15,9 @@
 
 from six import string_types
 
-from synapse.api.constants import EventFormatVersions, EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
+from synapse.api.room_versions import EventFormatVersions
 from synapse.types import EventID, RoomID, UserID
 
 
