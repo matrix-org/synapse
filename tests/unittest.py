@@ -76,10 +76,6 @@ class TestCase(unittest.TestCase):
 
         @around(self)
         def setUp(orig):
-            # enable debugging of delayed calls - this means that we get a
-            # traceback when a unit test exits leaving things on the reactor.
-            twisted.internet.base.DelayedCall.debug = True
-
             # if we're not starting in the sentinel logcontext, then to be honest
             # all future bets are off.
             if LoggingContext.current_context() is not LoggingContext.sentinel:

@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
@@ -49,7 +47,7 @@ class RoomComplexityRestServlet(RestServlet):
 
         # Call this one "v1", so we can introduce new ones as we want to develop
         # it.
-        complexity_v1 = math.round(state_events / 500, 2)
+        complexity_v1 = round(state_events / 500, 2)
 
         defer.returnValue((200, {"v1": complexity_v1}))
 

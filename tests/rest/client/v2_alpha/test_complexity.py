@@ -20,6 +20,7 @@ from synapse.rest.client.v2_alpha import room_complexity
 
 from tests import unittest
 
+
 class RoomComplexityTests(unittest.HomeserverTestCase):
 
     servlets = [
@@ -30,4 +31,39 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
     ]
 
     def test_complexity_simple(self):
+
+        u1 = self.register_user("u1", "pass")
+        u1_token = self.login("u1", "pass")
+
+        room_1 = self.helper.create_room_as(u1, tok=u1_token)
+        self.helper.send_state(
+            room_1, event_type="m.room.topic", body={"topic": "foo"}, tok=u1_token
+        )
+
+        # Get the room complexity
+        request, channel = self.make_request(
+            "GET", "/_matrix/client/unstable/rooms/%s/complexity" % (room_1,)
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code)
+        complexity = channel.json_body["v1"]
+        self.assertTrue(complexity > 0, complexity)
+
+        # Make more events -- over the threshold
+        for i in range(500):
+            self.helper.send_state(
+                room_1,
+                event_type="m.room.topic",
+                body={"topic": "foo%s" % (i,)},
+                tok=u1_token,
+            )
+
+        # Get the room complexity again -- make sure it's above 1
+        request, channel = self.make_request(
+            "GET", "/_matrix/client/unstable/rooms/%s/complexity" % (room_1,)
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code)
+        complexity = channel.json_body["v1"]
+        self.assertTrue(complexity > 1, complexity)
 
