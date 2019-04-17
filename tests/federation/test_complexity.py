@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
+from synapse.federation.transport import server
 from synapse.rest.client.v1 import admin, login, room
-from synapse.rest.client.v2_alpha import room_complexity
+from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
 
@@ -25,8 +28,17 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
-        room_complexity.register_servlets,
     ]
+
+    def prepare(self, reactor, clock, homeserver):
+        class Authenticator(object):
+            def authenticate_request(self, request, content):
+                return defer.succeed("otherserver.nottld")
+
+        ratelimiter = FederationRateLimiter(clock, 1, 10000, 0, 10000, 10000)
+        server.register_servlets(
+            homeserver, self.resource, Authenticator(), ratelimiter
+        )
 
     def test_complexity_simple(self):
 
@@ -40,7 +52,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         # Get the room complexity
         request, channel = self.make_request(
-            "GET", "/_matrix/client/unstable/rooms/%s/complexity" % (room_1,)
+            "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
         self.render(request)
         self.assertEquals(200, channel.code)
@@ -58,7 +70,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         # Get the room complexity again -- make sure it's above 1
         request, channel = self.make_request(
-            "GET", "/_matrix/client/unstable/rooms/%s/complexity" % (room_1,)
+            "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
         self.render(request)
         self.assertEquals(200, channel.code)
