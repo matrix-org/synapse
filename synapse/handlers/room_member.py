@@ -1012,6 +1012,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
+        if self.hs.config.limit_large_room_joins:
+            # Go fetch the room complexity here...
+            complexity_fetched = True
+
         # We don't do an auth check if we are doing an invite
         # join dance for now, since we're kinda implicitly checking
         # that we are allowed to join when we decide whether or not we
@@ -1024,18 +1028,23 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         )
         yield self._user_joined_room(user, room_id)
 
-        # Check we don't want to instantly leave.
-        if True:
-            yield self.update_membership(
-                requester=user.to_string(),
-                target=user.to_string(),
-                room_id=room_id,
-                action="leave"
-            )
-            raise SynapseError(
-                code=400, msg="Room too large",
-                errcode=Codes.RESOURCE_LIMIT_EXCEEDED
-            )
+        # Check the room we just joined wasn't too large, if we didn't fetch the
+        # complexity of it before.
+        if self.hs.config.limit_large_room_joins:
+            if not complexity_fetched:
+                # We don't know the room complexity, so let's take a look.
+
+                # xxx: don't always leave
+                yield self.update_membership(
+                    requester=user.to_string(),
+                    target=user.to_string(),
+                    room_id=room_id,
+                    action="leave"
+                )
+                raise SynapseError(
+                    code=400, msg="Room too large",
+                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED
+                )
 
     @defer.inlineCallbacks
     def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):

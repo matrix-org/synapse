@@ -170,6 +170,12 @@ class ServerConfig(Config):
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
+        # Resource-constrained Homeserver Configuration
+        self.limit_large_room_joins = config.get("limit_large_remote_room_joins", False)
+        self.limit_large_room_complexity = config.get(
+            "limit_large_remote_room_complexity", 1.0
+        )
+
         bind_port = config.get("bind_port")
         if bind_port:
             if config.get("no_tls", False):
@@ -488,6 +494,13 @@ class ServerConfig(Config):
 
         # Used by phonehome stats to group together related servers.
         #server_context: context
+
+        # Resource-constrained Homeserver Settings
+        #
+        # Requires _joins to be set to True.
+        #
+        #limit_large_remote_room_joins: False
+        #limit_large_remote_room_complexity: 1.0
         """ % locals()
 
     def read_arguments(self, args):
