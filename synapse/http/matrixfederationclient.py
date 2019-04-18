@@ -286,7 +286,7 @@ class MatrixFederationHttpClient(object):
         if (
             self.hs.config.federation_domain_whitelist is not None and
             request.destination not in self.hs.config.federation_domain_whitelist
-        ):
+        ) or not self.hs.config.database_enable_federation:
             raise FederationDeniedError(request.destination)
 
         limiter = yield synapse.util.retryutils.get_retry_limiter(

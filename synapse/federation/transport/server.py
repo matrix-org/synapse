@@ -98,6 +98,7 @@ class Authenticator(object):
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.database_enable_federation = hs.config.database_enable_federation
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     @defer.inlineCallbacks
@@ -130,7 +131,7 @@ class Authenticator(object):
         if (
             self.federation_domain_whitelist is not None and
             origin not in self.federation_domain_whitelist
-        ):
+        ) or not self.database_enable_federation:
             raise FederationDeniedError(origin)
 
         if not json_request["signatures"]:
