@@ -42,7 +42,7 @@ class DatabaseConfig(Config):
                 "check_same_thread": False,
             })
 
-            args = database_config.get("args", {})
+            args = self.database_config.get("args", {})
             self.database_enable_federation = args.get("enable_federation", False)
         else:
             raise RuntimeError("Unsupported database type '%s'" % (name,))
