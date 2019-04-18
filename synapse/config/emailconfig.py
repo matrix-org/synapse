@@ -71,8 +71,12 @@ class EmailConfig(Config):
             self.email_notif_from = email_config["notif_from"]
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
-            self.email_expiry_template_html = email_config["expiry_template_html"]
-            self.email_expiry_template_text = email_config["expiry_template_text"]
+            self.email_expiry_template_html = email_config.get(
+                "expiry_template_html", "notice_expiry.html",
+            )
+            self.email_expiry_template_text = email_config.get(
+                "expiry_template_text", "notice_expiry.txt",
+            )
 
             template_dir = email_config.get("template_dir")
             # we need an absolute path, because we change directory after starting (and
