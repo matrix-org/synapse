@@ -31,6 +31,9 @@ from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
+MAX_DISPLAYNAME_LEN = 128
+MAX_AVATARURL_LEN = 128
+
 
 class BaseProfileHandler(BaseHandler):
     """Handles fetching and updating user profile information.
@@ -80,6 +83,10 @@ class BaseProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
+                if len(result.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
+                    raise SynapseError(404, "Displayname is too long", Codes.UNKNONW)
+                if len(result.get("avatar_url", "")) > MAX_AVATARURL_LEN:
+                    raise SynapseError(404, "Avatar_url is too long", Codes.UNKNONW)
                 defer.returnValue(result)
             except CodeMessageException as e:
                 if e.code != 404:
@@ -142,6 +149,9 @@ class BaseProfileHandler(BaseHandler):
                 if e.code != 404:
                     logger.exception("Failed to get displayname")
                 raise
+            
+            if len(result.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
+                raise SynapseError(404, "Displayname is too long", Codes.UNKNONW)
 
             defer.returnValue(result["displayname"])
 
@@ -156,10 +166,13 @@ class BaseProfileHandler(BaseHandler):
             by_admin (bool): Whether this change was made by an administrator.
         """
         if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "User is not hosted on this Home Server")
+            raise SynapseError(403, "User is not hosted on this Home Server")
 
         if not by_admin and target_user != requester.user:
-            raise AuthError(400, "Cannot set another user's displayname")
+            raise AuthError(403, "Cannot set another user's displayname")
+            
+        if len(new_displayname) > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(400, "Displayname is too long", Codes.UNKNONW)
 
         if new_displayname == '':
             new_displayname = None
@@ -185,7 +198,7 @@ class BaseProfileHandler(BaseHandler):
                 )
             except StoreError as e:
                 if e.code == 404:
-                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+                    raise SynapseError(400, "Profile was not found", Codes.NOT_FOUND)
                 raise
             defer.returnValue(avatar_url)
         else:
@@ -204,6 +217,9 @@ class BaseProfileHandler(BaseHandler):
                     logger.exception("Failed to get avatar_url")
                 raise
 
+            if len(result.get("avatar_url", "")) > MAX_AVATARURL_LEN:
+                raise SynapseError(400, "Avatar_url is too long", Codes.UNKNONW)
+
             defer.returnValue(result["avatar_url"])
 
     @defer.inlineCallbacks
@@ -216,6 +232,10 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
+            
+        if len(new_avatar_url) > MAX_AVATARURL_LEN:
+            raise SynapseError(400, "Avatar_url is too long", Codes.UNKNONW)
+            
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url
         )
@@ -251,6 +271,12 @@ class BaseProfileHandler(BaseHandler):
             if e.code == 404:
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
             raise
+
+        if len(response.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(400, "Displayname is too long", Codes.UNKNONW)
+
+        if len(response.get("avatar_url", "")) > MAX_AVATARURL_LEN:
+            raise SynapseError(400, "Avatar_url is too long", Codes.UNKNONW)
 
         defer.returnValue(response)
 
@@ -335,6 +361,11 @@ class MasterProfileHandler(BaseProfileHandler):
                     user_id, displayname, avatar_url
                 )
                 continue
+            
+            if len(profile.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
+                raise SynapseError(400, "Displayname is too long", Codes.UNKNONW)
+            if len(profile.get("avatar_url", "")) > MAX_AVATARURL_LEN:
+                raise SynapseError(400, "Avatar_url is too long", Codes.UNKNONW)
 
             new_name = profile.get("displayname")
             new_avatar = profile.get("avatar_url")
