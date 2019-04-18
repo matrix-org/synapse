@@ -186,6 +186,8 @@ def default_config(name):
     # background, which upsets the test runner.
     config.update_user_directory = False
 
+    config.database_enable_federation = True
+
     return config
 
 
@@ -243,7 +245,6 @@ def setup_test_homeserver(
         }
     else:
         config.database_config = {
-            "enable_federation": True,
             "name": "sqlite3",
             "args": {
                 "database": ":memory:",
