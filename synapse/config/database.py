@@ -35,7 +35,7 @@ class DatabaseConfig(Config):
         name = self.database_config.get("name", None)
         if name == "psycopg2":
             self.database_enable_federation = self.database_config.get(
-                "enable_federation", True,
+                "enable_federation_can_cause_bad_perfs_with_sqlite", True,
             )
         elif name == "sqlite3":
             self.database_config.setdefault("args", {}).update({
@@ -45,7 +45,7 @@ class DatabaseConfig(Config):
             })
 
             self.database_enable_federation = self.database_config.get(
-                "enable_federation", False,
+                "enable_federation_can_cause_bad_perfs_with_sqlite", False,
             )
         else:
             raise RuntimeError("Unsupported database type '%s'" % (name,))
@@ -71,7 +71,7 @@ class DatabaseConfig(Config):
           # rooms. This option defaults to False when using SQLite and True
           # otherwise.
           #
-          #enable_federation = True
+          #enable_federation_can_cause_bad_perfs_with_sqlite = True
 
           # The database engine name
           name: "sqlite3"
