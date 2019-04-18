@@ -244,7 +244,7 @@ def setup_test_homeserver(
     else:
         config.database_config = {
             "name": "sqlite3",
-            "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
+            "args": {"enable_federation": True, "database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
 
     db_engine = create_engine(config.database_config)
