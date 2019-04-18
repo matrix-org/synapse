@@ -34,7 +34,9 @@ class DatabaseConfig(Config):
 
         name = self.database_config.get("name", None)
         if name == "psycopg2":
-            self.database_enable_federation = True
+            self.database_enable_federation = self.database_config.get(
+                "enable_federation", True,
+            )
         elif name == "sqlite3":
             self.database_config.setdefault("args", {}).update({
                 "cp_min": 1,
@@ -42,7 +44,7 @@ class DatabaseConfig(Config):
                 "check_same_thread": False,
             })
 
-            self.database_enable_federation = self.database_config["args"].pop(
+            self.database_enable_federation = self.database_config.get(
                 "enable_federation", False,
             )
         else:
@@ -56,24 +58,25 @@ class DatabaseConfig(Config):
         ## Database ##
 
         database:
+          # Using SQLite induces a severe degradation in performances,
+          # especially when using federation. SQLite should only be used for
+          # personal testing and production instances should use PostgreSQL
+          # instead. You can find documentation on setting up PostgreSQL with
+          # Synapse here:
+          # https://github.com/matrix-org/synapse/blob/master/docs/postgres.rst
+          #
+          # If you want to use federation with SQLite regardless, you can
+          # uncomment the line below, but be aware that it can make Synapse
+          # very laggy and malfunctioning, especially when joining large
+          # rooms. This option defaults to False when using SQLite and True
+          # otherwise.
+          #
+          #enable_federation = True
+
           # The database engine name
           name: "sqlite3"
           # Arguments to pass to the engine
           args:
-            # Using SQLite induces a severe degradation in performances,
-            # especially when using federation. SQLite should only be used for
-            # personal testing and production instances should use PostgreSQL
-            # instead. You can find documentation on setting up PostgreSQL with
-            # Synapse here:
-            # https://github.com/matrix-org/synapse/blob/master/docs/postgres.rst
-            #
-            # If you want to use federation with SQLite regardless, you can
-            # uncomment the line below, but be aware that it can make Synapse
-            # very laggy and malfunctioning, especially when joining large
-            # rooms. This option defaults to False.
-            #
-            #enable_federation = True
-
             # Path to the database
             database: "%(database_path)s"
 
