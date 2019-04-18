@@ -60,7 +60,7 @@ class DatabaseConfig(Config):
         database:
           # Using SQLite induces a severe degradation in performances,
           # especially when using federation. SQLite should only be used for
-          # personal testing and production instances should use PostgreSQL
+          # personal testing. Production instances should use PostgreSQL
           # instead. You can find documentation on setting up PostgreSQL with
           # Synapse here:
           # https://github.com/matrix-org/synapse/blob/master/docs/postgres.rst
