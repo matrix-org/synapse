@@ -275,7 +275,7 @@ class MediaRepository(object):
         if (
             self.federation_domain_whitelist is not None and
             server_name not in self.federation_domain_whitelist
-        ) or not self.database_enable_federation::
+        ) or not self.database_enable_federation:
             raise FederationDeniedError(server_name)
 
         # We linearize here to ensure that we don't try and download remote
