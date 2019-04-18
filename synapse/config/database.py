@@ -34,13 +34,16 @@ class DatabaseConfig(Config):
 
         name = self.database_config.get("name", None)
         if name == "psycopg2":
-            pass
+            self.database_enable_federation = True
         elif name == "sqlite3":
             self.database_config.setdefault("args", {}).update({
                 "cp_min": 1,
                 "cp_max": 1,
                 "check_same_thread": False,
             })
+
+            args = database_config.get("args", {})
+            self.database_enable_federation = args.get("enable_federation", False)
         else:
             raise RuntimeError("Unsupported database type '%s'" % (name,))
 
@@ -56,6 +59,20 @@ class DatabaseConfig(Config):
           name: "sqlite3"
           # Arguments to pass to the engine
           args:
+            # Using SQLite induces a severe degradation in performances,
+            # especially when using federation. SQLite should only be used for
+            # personal testing and production instances should use PostgreSQL
+            # instead. You can find documentation on setting up PostgreSQL with
+            # Synapse here:
+            # https://github.com/matrix-org/synapse/blob/master/docs/postgres.rst
+            #
+            # If you want to use federation with SQLite regardless, you can
+            # uncomment the line below, but be aware that it can make Synapse
+            # very laggy and malfunctioning, especially when joining large
+            # rooms. This option defaults to False.
+            #
+            #enable_federation = True
+
             # Path to the database
             database: "%(database_path)s"
 
