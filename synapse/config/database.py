@@ -67,7 +67,7 @@ class DatabaseConfig(Config):
           #
           # If you want to use federation with SQLite regardless, you can
           # uncomment the line below, but be aware that it can make Synapse
-          # very laggy and malfunctioning, especially when joining large
+          # malfunction and be very laggy, especially when joining large
           # rooms. This option defaults to False when using SQLite and True
           # otherwise.
           #
