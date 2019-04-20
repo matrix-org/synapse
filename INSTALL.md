@@ -104,7 +104,7 @@ Installing prerequisites on Ubuntu or Debian:
 ```
 sudo apt-get install build-essential python3-dev libffi-dev \
                      python-pip python-setuptools sqlite3 \
-                     libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev python-virtualenv libjpeg-dev libxslt1-dev libpq-dev
 ```
 
 #### ArchLinux
