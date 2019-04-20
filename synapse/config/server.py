@@ -71,6 +71,10 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # whether to require users to authenticate in order to query /profile
+        # endpoints via CS API. this is a workaround in advance of MSC1301 landing
+        self.auth_profile_reqs = config.get("auth_profile_reqs", True)
+
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
         # errors when attempting to search for messages.
@@ -317,6 +321,10 @@ class ServerConfig(Config):
         # Set to false to disable presence tracking on this homeserver.
         #
         #use_presence: false
+
+        # whether to require users to authenticate in order to query /profile
+        # endpoints via CS API. this is a workaround in advance of MSC1301 landing
+        #auth_profile_reqs: false
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
