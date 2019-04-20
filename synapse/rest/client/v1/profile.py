@@ -31,6 +31,8 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        if self.hs.config.auth_profile_reqs:
+            yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         displayname = yield self.profile_handler.get_displayname(
@@ -74,6 +76,8 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        if self.hs.config.auth_profile_reqs:
+            yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         avatar_url = yield self.profile_handler.get_avatar_url(
@@ -116,6 +120,8 @@ class ProfileRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        if self.hs.config.auth_profile_reqs:
+            yield self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
 
         displayname = yield self.profile_handler.get_displayname(
