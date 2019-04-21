@@ -69,6 +69,10 @@ pid_file: DATADIR/homeserver.pid
 #
 #use_presence: false
 
+# whether to require users to authenticate in order to query /profile
+# endpoints via CS API. this is a workaround in advance of MSC1301 landing
+#auth_profile_reqs: false
+
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
 #gc_thresholds: [700, 10, 10]
