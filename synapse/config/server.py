@@ -77,7 +77,7 @@ class ServerConfig(Config):
 
         # whether to require users to authenticate in order to query /publicRooms
         # endpoints via CS API. this is a workaround in advance of
-        # https://github.com/matrix-org/matrix-doc/issues/612 beinig solved
+        # https://github.com/matrix-org/matrix-doc/issues/612 being solved
         self.auth_public_rooms = config.get("auth_public_rooms", False)
 
         # whether to enable search. If disabled, new entries will not be inserted
@@ -333,7 +333,7 @@ class ServerConfig(Config):
 
         # whether to require users to authenticate in order to query /publicRooms
         # endpoints via CS API. this is a workaround in advance of
-        # https://github.com/matrix-org/matrix-doc/issues/612 beinig solved
+        # https://github.com/matrix-org/matrix-doc/issues/612 being solved
         #auth_public_rooms: false
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
