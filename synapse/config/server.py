@@ -73,7 +73,7 @@ class ServerConfig(Config):
 
         # whether to require users to authenticate in order to query /profile
         # endpoints via CS API. this is a workaround in advance of MSC1301 landing
-        self.auth_profile_reqs = config.get("auth_profile_reqs", True)
+        self.auth_profile_reqs = config.get("auth_profile_reqs", False)
 
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
