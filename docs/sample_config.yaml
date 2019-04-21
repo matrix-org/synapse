@@ -73,6 +73,11 @@ pid_file: DATADIR/homeserver.pid
 # endpoints via CS API. this is a workaround in advance of MSC1301 landing
 #auth_profile_reqs: false
 
+# whether to require users to authenticate in order to query /publicRooms
+# endpoints via CS API. this is a workaround in advance of
+# https://github.com/matrix-org/matrix-doc/issues/612 beinig solved
+#auth_public_rooms: false
+
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
 #gc_thresholds: [700, 10, 10]
