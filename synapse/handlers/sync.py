@@ -583,17 +583,18 @@ class SyncHandler(object):
         )
 
         # if the room has a name or canonical_alias set, we can skip
-        # calculating heroes.
+        # calculating heroes. Empty strings are falsey, so we check
+        # for the "name" value and default to an empty string.
         if name_id:
             name = yield self.store.get_event(name_id, allow_none=True)
-            if name and name.content and name.content.name:
+            if name and name.content and "name" in name.content and name.content.get("name", ""):
                 defer.returnValue(summary)
 
         if canonical_alias_id:
             canonical_alias = yield self.store.get_event(
                 canonical_alias_id, allow_none=True,
             )
-            if canonical_alias and canonical_alias.content and canonical_alias.content.alias:
+            if canonical_alias and canonical_alias.content and canonical_alias.content.get("alias", ""):
                 defer.returnValue(summary)
 
         joined_user_ids = [
