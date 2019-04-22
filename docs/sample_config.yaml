@@ -910,6 +910,11 @@ password_config:
    #
    #enabled: false
 
+   # set to false if you do not want to authenticate
+   # against the local db (when using other password_providers
+   #
+   localdb_enabled: true
+
    # Uncomment and change to a secret random string for extra security.
    # DO NOT CHANGE THIS AFTER INITIAL SETUP!
    #
