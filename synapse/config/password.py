@@ -26,6 +26,7 @@ class PasswordConfig(Config):
             password_config = {}
 
         self.password_enabled = password_config.get("enabled", True)
+        self.password_localdb_enabled = password_config.get("localdb_enabled", True)
         self.password_pepper = password_config.get("pepper", "")
 
     def default_config(self, config_dir_path, server_name, **kwargs):
@@ -34,6 +35,11 @@ class PasswordConfig(Config):
            # Uncomment to disable password login
            #
            #enabled: false
+
+           # set to false if you do not want to authenticate
+           # against the local db (when using other password_providers
+           #
+           localdb_enabled: true
 
            # Uncomment and change to a secret random string for extra security.
            # DO NOT CHANGE THIS AFTER INITIAL SETUP!
