@@ -583,19 +583,17 @@ class SyncHandler(object):
         )
 
         # if the room has a name or canonical_alias set, we can skip
-        # calculating heroes.  we assume that if the event has contents, it'll
-        # be a valid name or canonical_alias - i.e. we're checking that they
-        # haven't been "deleted" by blatting {} over the top.
+        # calculating heroes.
         if name_id:
             name = yield self.store.get_event(name_id, allow_none=True)
-            if name and name.content:
+            if name and name.content and name.content.name:
                 defer.returnValue(summary)
 
         if canonical_alias_id:
             canonical_alias = yield self.store.get_event(
                 canonical_alias_id, allow_none=True,
             )
-            if canonical_alias and canonical_alias.content:
+            if canonical_alias and canonical_alias.content and canonical_alias.content.alias:
                 defer.returnValue(summary)
 
         joined_user_ids = [
