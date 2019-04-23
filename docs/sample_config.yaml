@@ -69,14 +69,17 @@ pid_file: DATADIR/homeserver.pid
 #
 #use_presence: false
 
-# whether to require users to authenticate in order to query /profile
-# endpoints via CS API. this is a workaround in advance of MSC1301 landing
-#auth_profile_reqs: false
+# Whether to require authentication to retrieve profile data (avatars,
+# display names) of other users through the client API. Defaults to
+# 'False'.
+#
+#require_auth_for_profile_requests: True
 
-# whether to require users to authenticate in order to query /publicRooms
-# endpoints via CS API. this is a workaround in advance of
-# https://github.com/matrix-org/matrix-doc/issues/612 being solved
-#auth_public_rooms: false
+# If set to 'True', requires authentication to access the server's
+# public rooms directory through the client API, and forbids any other
+# homeserver to fetch it via federation. Defaults to 'False'.
+#
+#restrict_public_rooms_to_local_users: True
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
