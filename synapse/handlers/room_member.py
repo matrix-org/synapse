@@ -25,8 +25,7 @@ from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
-import synapse.server
-import synapse.types
+from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.types import RoomID, UserID
@@ -574,7 +573,7 @@ class RoomMemberHandler(object):
             )
             assert self.hs.is_mine(sender), "Sender must be our own: %s" % (sender,)
         else:
-            requester = synapse.types.create_requester(target_user)
+            requester = types.create_requester(target_user)
 
         prev_event = yield self.event_creation_handler.deduplicate_state_event(
             event, context,
@@ -1004,7 +1003,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         # filter ourselves out of remote_room_hosts: do_invite_join ignores it
         # and if it is the only entry we'd like to return a 404 rather than a
         # 500.
-
+        print(user)
         remote_room_hosts = [
             host for host in remote_room_hosts if host != self.hs.hostname
         ]
@@ -1014,7 +1013,23 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         if self.hs.config.limit_large_room_joins:
             # Go fetch the room complexity here...
-            complexity_fetched = True
+            complexity_fetched = False
+            complexity = yield self.federation_handler.get_room_complexity(
+                remote_room_hosts, room_id
+            )
+
+            max_complexity = self.hs.config.limit_large_room_joins_complexity
+
+            if complexity:
+                if complexity["v1"] > max_complexity:
+                    msg = "Room too large (preflight) -- %d > %d" % (
+                        complexity["v1"], max_complexity
+                    )
+                    raise SynapseError(
+                        code=400, msg=msg,
+                        errcode=Codes.RESOURCE_LIMIT_EXCEEDED
+                    )
+                complexity_fetched = True
 
         # We don't do an auth check if we are doing an invite
         # join dance for now, since we're kinda implicitly checking
@@ -1034,10 +1049,16 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             if not complexity_fetched:
                 # We don't know the room complexity, so let's take a look.
 
+                requester = types.create_requester(
+                    user, None, False, None
+                )
+
+                print(user, requester)
+
                 # xxx: don't always leave
                 yield self.update_membership(
-                    requester=user.to_string(),
-                    target=user.to_string(),
+                    requester=requester,
+                    target=user,
                     room_id=room_id,
                     action="leave"
                 )

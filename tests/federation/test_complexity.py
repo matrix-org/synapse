@@ -13,10 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mock import Mock
+
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError, Codes
 from synapse.federation.transport import server
 from synapse.rest.client.v1 import admin, login, room
+from synapse.types import UserID
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
@@ -76,3 +80,72 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
         self.assertTrue(complexity > 1, complexity)
+
+    def test_join_too_large(self):
+
+        self.hs.config.limit_large_room_joins = True
+        self.hs.config.limit_large_room_joins_complexity = 1
+
+        u1 = self.register_user("u1", "pass")
+
+        handler = self.hs.get_room_member_handler()
+        fed_transport = self.hs.get_federation_transport_client()
+
+        # Mock out some things, because we don't want to test the whole join
+        fed_transport.client.get_json = Mock(return_value=defer.succeed({"v1": 9999}))
+        handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
+
+        d = handler._remote_join(
+            None,
+            ["otherserver.example"],
+            "roomid",
+            UserID(u1, domain=self.hs.hostname),
+            {"membership": "join"},
+        )
+
+        self.pump()
+
+        # The request failed with a SynapseError saying the resource limit was
+        # exceeded.
+        f = self.get_failure(d, SynapseError)
+        self.assertEqual(f.value.code, 400)
+        self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+
+    def test_join_too_large_once_joined(self):
+
+        self.hs.config.limit_large_room_joins = True
+        self.hs.config.limit_large_room_joins_complexity = 1
+
+        u1 = self.register_user("u1", "pass")
+        u1_token = self.login("u1", "pass")
+
+        # Ok, this might seem a bit weird -- I want to test that we actually
+        # leave the room, but I don't want to simulate two servers. So, we make
+        # a local room, which we say we're joining remotely, even if there's no
+        # remote, because we mock that out. Then, we'll leave the (actually
+        # local) room, which will be propagated over federation in a real
+        # scenario.
+        room_1 = self.helper.create_room_as(u1, tok=u1_token)
+
+        handler = self.hs.get_room_member_handler()
+        fed_transport = self.hs.get_federation_transport_client()
+
+        # Mock out some things, because we don't want to test the whole join
+        fed_transport.client.get_json = Mock(return_value=defer.succeed(None))
+        handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
+
+        d = handler._remote_join(
+            None,
+            ["otherserver.example"],
+            room_1,
+            UserID.from_string(u1),
+            {"membership": "join"},
+        )
+
+        self.pump()
+
+        # The request failed with a SynapseError saying the resource limit was
+        # exceeded.
+        f = self.get_failure(d, SynapseError)
+        self.assertEqual(f.value.code, 400)
+        self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
