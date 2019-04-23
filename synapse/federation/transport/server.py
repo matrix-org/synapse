@@ -134,7 +134,7 @@ class Authenticator(object):
         ):
             raise FederationDeniedError(origin)
 
-        if "publicRooms" in request.path and self.deny_public_rooms:
+        if b"publicRooms" in request.path and self.deny_public_rooms:
             raise FederationDeniedError(origin)
 
         if not json_request["signatures"]:

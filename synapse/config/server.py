@@ -73,7 +73,9 @@ class ServerConfig(Config):
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API.
-        self.require_auth_for_profile_requests = config.get("require_auth_for_profile_requests", False)
+        self.require_auth_for_profile_requests = config.get(
+            "require_auth_for_profile_requests", False,
+        )
 
         # If set to 'True', requires authentication to access the server's
         # public rooms directory through the client API, and forbids any other
