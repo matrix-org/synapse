@@ -17,7 +17,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import Codes, SynapseError
 from synapse.federation.transport import server
 from synapse.rest.client.v1 import admin, login, room
 from synapse.types import UserID
