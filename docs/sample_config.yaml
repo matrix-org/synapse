@@ -101,6 +101,17 @@ pid_file: DATADIR/homeserver.pid
 #  - nyc.example.com
 #  - syd.example.com
 
+# Restricts access to the server's public rooms directory over
+# federation to a whitelist of homeservers. If this is set to an empty
+# array ('[]'), forbids any homeserver to fetch the server's public
+# rooms directory. If not specified, the default is to whitelist
+# everything.
+#
+#public_rooms_over_federation_whitelist:
+#  - lon.example.com
+#  - nyc.example.com
+#  - syd.example.com
+
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
 #

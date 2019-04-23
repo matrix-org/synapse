@@ -122,6 +122,16 @@ class ServerConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
+        self.public_rooms_over_federation_whitelist = None
+        public_rooms_over_federation_whitelist = config.get(
+            "public_rooms_over_federation_whitelist", None
+        )
+        # turn the whitelist into a hash for speed of lookup
+        if public_rooms_over_federation_whitelist is not None:
+            self.public_rooms_over_federation_whitelist = {}
+            for domain in public_rooms_over_federation_whitelist:
+                self.public_rooms_over_federation_whitelist[domain] = True
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -347,6 +357,17 @@ class ServerConfig(Config):
         # default is to whitelist everything.
         #
         #federation_domain_whitelist:
+        #  - lon.example.com
+        #  - nyc.example.com
+        #  - syd.example.com
+
+        # Restricts access to the server's public rooms directory over
+        # federation to a whitelist of homeservers. If this is set to an empty
+        # array ('[]'), forbids any homeserver to fetch the server's public
+        # rooms directory. If not specified, the default is to whitelist
+        # everything.
+        #
+        #public_rooms_over_federation_whitelist:
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com

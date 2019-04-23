@@ -98,6 +98,7 @@ class Authenticator(object):
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.public_rooms_whitelist = hs.config.public_rooms_over_federation_whitelist
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     @defer.inlineCallbacks
@@ -130,6 +131,15 @@ class Authenticator(object):
         if (
             self.federation_domain_whitelist is not None and
             origin not in self.federation_domain_whitelist
+        ):
+            raise FederationDeniedError(origin)
+
+        # Special case the public rooms directory since it has another dedicated
+        # whitelist.
+        if (
+            "publicRooms" in request.path and
+            self.public_rooms_whitelist is not None and
+            origin not in self.public_rooms_whitelist
         ):
             raise FederationDeniedError(origin)
 
