@@ -114,7 +114,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
     def test_join_too_large_once_joined(self):
 
         self.hs.config.limit_large_room_joins = True
-        self.hs.config.limit_large_room_joins_complexity = 1
+        self.hs.config.limit_large_room_joins_complexity = 0.05
 
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -126,6 +126,15 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         # local) room, which will be propagated over federation in a real
         # scenario.
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
+
+        # Make more events -- over the threshold
+        for i in range(50):
+            self.helper.send_state(
+                room_1,
+                event_type="m.room.topic",
+                body={"topic": "foo%s" % (i,)},
+                tok=u1_token,
+            )
 
         handler = self.hs.get_room_member_handler()
         fed_transport = self.hs.get_federation_transport_client()

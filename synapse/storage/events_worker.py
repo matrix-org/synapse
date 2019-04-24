@@ -604,11 +604,32 @@ class EventsWorkerStore(SQLBaseStore):
     def get_state_event_counts(self, room_id):
         """
         Gets the total number of state events in a room.
+
         Args:
             room_id (str)
+
         Returns:
             Deferred[int]
         """
         return self.runInteraction(
             "get_state_event_counts", self._get_state_event_counts_txn, room_id
         )
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, room_id):
+        """
+        Get the complexity of a room.
+
+        Args:
+            room_id (str)
+
+        Returns:
+            Deferred[dict[str:int]] of complexity version to complexity.
+        """
+        state_events = yield self.get_state_event_counts(room_id)
+
+        # Call this one "v1", so we can introduce new ones as we want to develop
+        # it.
+        complexity_v1 = round(state_events / 500, 2)
+
+        defer.returnValue({"v1": complexity_v1})

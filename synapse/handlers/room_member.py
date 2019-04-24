@@ -1048,24 +1048,26 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if self.hs.config.limit_large_room_joins:
             if not complexity_fetched:
                 # We don't know the room complexity, so let's take a look.
+                complexity = yield self.store.get_room_complexity(room_id)
 
-                requester = types.create_requester(
-                    user, None, False, None
-                )
+                if complexity["v1"] > max_complexity:
+                    requester = types.create_requester(
+                        user, None, False, None
+                    )
 
-                print(user, requester)
-
-                # xxx: don't always leave
-                yield self.update_membership(
-                    requester=requester,
-                    target=user,
-                    room_id=room_id,
-                    action="leave"
-                )
-                raise SynapseError(
-                    code=400, msg="Room too large",
-                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED
-                )
+                    yield self.update_membership(
+                        requester=requester,
+                        target=user,
+                        room_id=room_id,
+                        action="leave"
+                    )
+                    msg = "Room too large (postflight) -- %d > %d" % (
+                        complexity["v1"], max_complexity
+                    )
+                    raise SynapseError(
+                        code=400, msg=msg,
+                        errcode=Codes.RESOURCE_LIMIT_EXCEEDED
+                    )
 
     @defer.inlineCallbacks
     def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):

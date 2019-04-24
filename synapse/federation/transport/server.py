@@ -1319,13 +1319,8 @@ class RoomComplexityServlet(BaseFederationServlet):
         if not is_public:
             raise SynapseError(404, "Room not found", errcode=Codes.INVALID_PARAM)
 
-        state_events = yield store.get_state_event_counts(room_id)
-
-        # Call this one "v1", so we can introduce new ones as we want to develop
-        # it.
-        complexity_v1 = round(state_events / 500, 2)
-
-        defer.returnValue((200, {"v1": complexity_v1}))
+        complexity = yield store.get_room_complexity()
+        defer.returnValue((200, complexity))
 
 
 FEDERATION_SERVLET_CLASSES = (
