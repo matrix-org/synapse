@@ -1003,7 +1003,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         # filter ourselves out of remote_room_hosts: do_invite_join ignores it
         # and if it is the only entry we'd like to return a 404 rather than a
         # 500.
-        print(user)
         remote_room_hosts = [
             host for host in remote_room_hosts if host != self.hs.hostname
         ]
