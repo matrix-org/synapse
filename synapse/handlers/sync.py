@@ -595,7 +595,7 @@ class SyncHandler(object):
                 canonical_alias_id, allow_none=True,
             )
             if (canonical_alias and canonical_alias.content
-                and canonical_alias.content.get("alias", "")):
+                    and canonical_alias.content.get("alias", "")):
                 defer.returnValue(summary)
 
         joined_user_ids = [
