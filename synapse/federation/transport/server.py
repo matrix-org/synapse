@@ -1319,7 +1319,7 @@ class RoomComplexityServlet(BaseFederationServlet):
         if not is_public:
             raise SynapseError(404, "Room not found", errcode=Codes.INVALID_PARAM)
 
-        complexity = yield store.get_room_complexity()
+        complexity = yield store.get_room_complexity(room_id)
         defer.returnValue((200, complexity))
 
 
