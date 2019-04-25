@@ -120,11 +120,9 @@ class Keyring(object):
 
             key_ids = signature_ids(json_object, server_name)
             if not key_ids:
-                logger.warn("Request from %s: no supported signature keys",
-                            server_name)
                 deferred = defer.fail(SynapseError(
                     400,
-                    "Not signed with a supported algorithm",
+                    "Not signed by %s" % (server_name, ),
                     Codes.UNAUTHORIZED,
                 ))
             else:
