@@ -39,6 +39,7 @@ from synapse.util.logcontext import LoggingContext
 from tests.http import ServerTLSContext
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
 from tests.unittest import TestCase
+from tests.utils import default_config
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class MatrixFederationAgentTests(TestCase):
 
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=ClientTLSOptionsFactory(None),
+            tls_client_options_factory=ClientTLSOptionsFactory(default_config("test")),
             _well_known_tls_policy=TrustingTLSPolicyForHTTPS(),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,

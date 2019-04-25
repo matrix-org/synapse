@@ -260,6 +260,40 @@ listeners:
 #
 #tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
 
+# Whether to verify TLS certificates when sending federation traffic.
+#
+# This currently defaults to `false`, however this will change in
+# Synapse 1.0 when valid federation certificates will be required.
+#
+#federation_verify_certificates: true
+
+# Skip federation certificate verification on the following whitelist
+# of domains.
+#
+# This setting should only be used in very specific cases, such as
+# federation over Tor hidden services and similar. For private networks
+# of homeservers, you likely want to use a private CA instead.
+#
+# Only effective if federation_verify_certicates is `true`.
+#
+#federation_certificate_verification_whitelist:
+#  - lon.example.com
+#  - *.domain.com
+#  - *.onion
+
+# List of custom certificate authorities for federation traffic.
+#
+# This setting should only normally be used within a private network of
+# homeservers.
+#
+# Note that this list will replace those that are provided by your
+# operating environment. Certificates must be in PEM format.
+#
+#federation_custom_ca_list:
+#  - myCA1.pem
+#  - myCA2.pem
+#  - myCA3.pem
+
 # ACME support: This will configure Synapse to request a valid TLS certificate
 # for your configured `server_name` via Let's Encrypt.
 #
