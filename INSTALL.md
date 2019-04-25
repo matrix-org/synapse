@@ -281,6 +281,8 @@ sudo apt update
 sudo apt install matrix-synapse-py3
 ```
 
+The fingerprint of the repository signing key is AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058.
+
 **Note**: if you followed a previous version of these instructions which
 recommended using `apt-key add` to add an old key from
 `https://matrix.org/packages/debian/`, you should note that this key has been
