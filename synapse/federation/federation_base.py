@@ -274,7 +274,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
             "event id %s: unable to verify signature for sender %s: %s",
             pdu_to_check.pdu.event_id,
             pdu_to_check.sender_domain,
-            e,
+            e.getErrorMessage(),
         )
         return e
 
@@ -305,7 +305,7 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
             logger.warning(
                 "event id %s: unable to verify signature for event id domain: %s",
                 pdu_to_check.pdu.event_id,
-                e,
+                e.getErrorMessage(),
             )
             return e
 
