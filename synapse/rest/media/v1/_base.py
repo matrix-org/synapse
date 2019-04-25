@@ -191,6 +191,10 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         # in that case.
         logger.warning("Failed to write to consumer: %s %s", type(e), e)
 
+        # Unregister the producer, if it has one, so Twisted doesn't complain
+        if request.producer:
+            request.unregisterProducer()
+
     finish_request(request)
 
 
