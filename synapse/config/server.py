@@ -64,7 +64,7 @@ class ServerConfig(Config):
                 "enable_federation_can_cause_bad_perfs_with_sqlite"
             ]
         except KeyError:
-            if config.get("database", {"name":"sqlite3"}).get("name") == "sqlite3":
+            if config.get("database", {"name": "sqlite3"}).get("name") == "sqlite3":
                 self.enable_federation = False
             else:
                 self.enable_federation = True
