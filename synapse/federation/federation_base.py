@@ -270,13 +270,14 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
     ])
 
     def sender_err(e, pdu_to_check):
-        logger.warning(
-            "event id %s: unable to verify signature for sender %s: %s",
+        errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
             pdu_to_check.pdu.event_id,
             pdu_to_check.sender_domain,
             e.getErrorMessage(),
         )
-        return e
+        # XX not really sure if these are the right codes, but they are what
+        # we've done for ages
+        raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
 
     for p, d in zip(pdus_to_check_sender, more_deferreds):
         d.addErrback(sender_err, p)
@@ -302,12 +303,14 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
         ])
 
         def event_err(e, pdu_to_check):
-            logger.warning(
-                "event id %s: unable to verify signature for event id domain: %s",
-                pdu_to_check.pdu.event_id,
-                e.getErrorMessage(),
+            errmsg = (
+                "event id %s: unable to verify signature for event id domain: %s" % (
+                    pdu_to_check.pdu.event_id,
+                    e.getErrorMessage(),
+                )
             )
-            return e
+            # XX as above: not really sure if these are the right codes
+            raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
 
         for p, d in zip(pdus_to_check_event_id, more_deferreds):
             d.addErrback(event_err, p)
