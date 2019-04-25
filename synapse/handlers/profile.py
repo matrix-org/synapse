@@ -301,16 +301,17 @@ class BaseProfileHandler(BaseHandler):
             try:
                 requester_rooms = yield self.store.get_rooms_for_user(requester)
                 target_user_rooms = yield self.store.get_rooms_for_user(target_user)
+
+                # Check if the length of the intersection between the room lists
+                # for both users is 0.
+                if not len(requester_rooms.intersection(target_user_rooms)):
+                    raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
             except StoreError as e:
                 if e.code == 404:
                     # This likely means that one of the users doesn't exist,
                     # so we act as if we couldn't find the profile.
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
-        # Check if the length of the intersection between the room lists
-        # for both users is 0.
-        if not len(requester_rooms.intersection(target_user_rooms)):
-            raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
 
 
 class MasterProfileHandler(BaseProfileHandler):
