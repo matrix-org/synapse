@@ -114,11 +114,13 @@ class ServerConfig(Config):
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", None
+            "federation_domain_whitelist", None,
         )
-        # turn the whitelist into a hash for speed of lookup
+
         if federation_domain_whitelist is not None:
+            # turn the whitelist into a hash for speed of lookup
             self.federation_domain_whitelist = {}
+
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 

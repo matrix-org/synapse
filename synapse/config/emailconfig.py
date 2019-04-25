@@ -71,6 +71,12 @@ class EmailConfig(Config):
             self.email_notif_from = email_config["notif_from"]
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
+            self.email_expiry_template_html = email_config.get(
+                "expiry_template_html", "notice_expiry.html",
+            )
+            self.email_expiry_template_text = email_config.get(
+                "expiry_template_text", "notice_expiry.txt",
+            )
 
             template_dir = email_config.get("template_dir")
             # we need an absolute path, because we change directory after starting (and
@@ -120,7 +126,7 @@ class EmailConfig(Config):
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
-        # Enable sending emails for notification events
+        # Enable sending emails for notification events or expiry notices
         # Defining a custom URL for Riot is only needed if email notifications
         # should contain links to a self-hosted installation of Riot; when set
         # the "app_name" setting is ignored.
@@ -142,6 +148,9 @@ class EmailConfig(Config):
         #   #template_dir: res/templates
         #   notif_template_html: notif_mail.html
         #   notif_template_text: notif_mail.txt
+        #   # Templates for account expiry notices.
+        #   expiry_template_html: notice_expiry.html
+        #   expiry_template_text: notice_expiry.txt
         #   notif_for_new_users: True
         #   riot_base_url: "http://localhost/riot"
         """
