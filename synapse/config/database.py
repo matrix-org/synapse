@@ -58,7 +58,7 @@ class DatabaseConfig(Config):
         ## Database ##
 
         database:
-          # Using SQLite induces a severe degradation in performances,
+          # Using SQLite induces a severe degradation in performance,
           # especially when using federation. SQLite should only be used for
           # personal testing. Production instances should use PostgreSQL
           # instead. You can find documentation on setting up PostgreSQL with
