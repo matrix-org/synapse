@@ -84,7 +84,7 @@ class MediaRepository(object):
         self.recently_accessed_locals = set()
 
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
-        self.database_enable_federation = hs.config.database_enable_federation
+        self.enable_federation = hs.config.enable_federation
 
         # List of StorageProviders where we should search for media and
         # potentially upload to.
@@ -235,7 +235,7 @@ class MediaRepository(object):
         if (
             self.federation_domain_whitelist is not None and
             server_name not in self.federation_domain_whitelist
-        ) or not self.database_enable_federation:
+        ) or not self.enable_federation:
             raise FederationDeniedError(server_name)
 
         self.mark_recently_accessed(server_name, media_id)
@@ -275,7 +275,7 @@ class MediaRepository(object):
         if (
             self.federation_domain_whitelist is not None and
             server_name not in self.federation_domain_whitelist
-        ) or not self.database_enable_federation:
+        ) or not self.enable_federation:
             raise FederationDeniedError(server_name)
 
         # We linearize here to ensure that we don't try and download remote

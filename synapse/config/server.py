@@ -59,6 +59,16 @@ class ServerConfig(Config):
         # "disable" federation
         self.send_federation = config.get("send_federation", True)
 
+        try:
+            self.enable_federation = config[
+                "enable_federation_can_cause_bad_perfs_with_sqlite"
+            ]
+        except KeyError:
+            if config.get("database", {"name":"sqlite3"}).get("name") == "sqlite3":
+                self.enable_federation = False
+            else:
+                self.enable_federation = True
+
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
 
@@ -490,6 +500,20 @@ class ServerConfig(Config):
 
         # Used by phonehome stats to group together related servers.
         #server_context: context
+
+        # Using SQLite with Synapse induces a severe degradation in performances
+        # compared to using PostgreSQL. SQLite should only be used for personal
+        # testing. Production instances should use PostgreSQL instead. You can
+        # find documentation on setting up PostgreSQL with Synapse here:
+        # https://github.com/matrix-org/synapse/blob/master/docs/postgres.rst
+        #
+        # If you want to use federation with SQLite regardless, you can
+        # uncomment the line below, but be aware that it can make Synapse
+        # malfunction and be very laggy, especially when joining large rooms.
+        # This option defaults to 'false' when using SQLite and 'true'
+        # otherwise.
+        #
+        #enable_federation_can_cause_bad_perfs_with_sqlite = true
         """ % locals()
 
     def read_arguments(self, args):
