@@ -1,1 +1,1 @@
-Adds auth_profile_reqs option to require access_token to GET /profile endpoints on CS API
+Add an configuration option to require authentication on /publicRooms and /profile endpoints.
