@@ -31,6 +31,8 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester = None
+
         if self.hs.config.require_auth_for_profile_requests:
             requester = yield self.auth.get_user_by_req(request)
 
@@ -77,6 +79,8 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester = None
+
         if self.hs.config.require_auth_for_profile_requests:
             requester = yield self.auth.get_user_by_req(request)
 
@@ -122,6 +126,8 @@ class ProfileRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester = None
+
         if self.hs.config.require_auth_for_profile_requests:
             requester = yield self.auth.get_user_by_req(request)
 
