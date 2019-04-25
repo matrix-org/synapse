@@ -333,15 +333,15 @@ class ServerConfig(Config):
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
-        # 'False'.
+        # 'false'.
         #
-        #require_auth_for_profile_requests: True
+        #require_auth_for_profile_requests: true
 
-        # If set to 'True', requires authentication to access the server's
+        # If set to 'true', requires authentication to access the server's
         # public rooms directory through the client API, and forbids any other
-        # homeserver to fetch it via federation. Defaults to 'False'.
+        # homeserver to fetch it via federation. Defaults to 'false'.
         #
-        #restrict_public_rooms_to_local_users: True
+        #restrict_public_rooms_to_local_users: true
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
