@@ -429,6 +429,7 @@ class FederationClientTests(HomeserverTestCase):
 
         self.assertTrue(conn.disconnecting)
 
+
 class FederationDisabledClientTests(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
