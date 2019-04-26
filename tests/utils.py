@@ -186,7 +186,7 @@ def default_config(name):
     # background, which upsets the test runner.
     config.update_user_directory = False
 
-    config.database_enable_federation = True
+    config.enable_federation = True
 
     return config
 
