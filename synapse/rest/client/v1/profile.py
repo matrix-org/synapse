@@ -39,7 +39,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         user = UserID.from_string(user_id)
 
         displayname = yield self.profile_handler.get_displayname(
-            user, requester=requester.user,
+            user, requester=requester,
         )
 
         ret = {}
@@ -87,7 +87,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         user = UserID.from_string(user_id)
 
         avatar_url = yield self.profile_handler.get_avatar_url(
-            user, requester=requester.user,
+            user, requester=requester,
         )
 
         ret = {}
@@ -129,15 +129,15 @@ class ProfileRestServlet(ClientV1RestServlet):
         requester = None
 
         if self.hs.config.require_auth_for_profile_requests:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = yield self.auth.get_user_by_req(request).user
 
         user = UserID.from_string(user_id)
 
         displayname = yield self.profile_handler.get_displayname(
-            user, requester=requester.user,
+            user, requester=requester,
         )
         avatar_url = yield self.profile_handler.get_avatar_url(
-            user, requester=requester.user,
+            user, requester=requester,
         )
 
         ret = {}
