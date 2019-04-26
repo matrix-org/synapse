@@ -156,8 +156,9 @@ class RegistrationError(SynapseError):
 
 
 class FederationDeniedError(SynapseError):
-    """An error raised when the server tries to federate with a server which
-    is not on its federation whitelist.
+    """An error raised when the server tries to federate with a server which is
+    not on its federation whitelist or when federation is disabled in the
+    configuration.
 
     Attributes:
         destination (str): The destination which has been denied
@@ -165,8 +166,9 @@ class FederationDeniedError(SynapseError):
 
     def __init__(self, destination):
         """Raised by federation client or server to indicate that we are
-        are deliberately not attempting to contact a given server because it is
-        not on our federation whitelist.
+        deliberately not attempting to contact a given server because it is not
+        on our federation whitelist or federation is disabled in the
+        configuration.
 
         Args:
             destination (str): the domain in question
