@@ -33,6 +33,8 @@ from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
+from ._base import BaseHandler
+
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
@@ -71,6 +73,11 @@ class RoomMemberHandler(object):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
+
+        # This is only used to get at ratelimit function, and
+        # maybe_kick_guest_users. It's fine there are multiple of these as
+        # it doesn't store state.
+        self.base_handler = BaseHandler(hs)
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -721,6 +728,9 @@ class RoomMemberHandler(object):
                     403, "Invites have been disabled on this server",
                     Codes.FORBIDDEN,
                 )
+
+        # Check whether we'll be ratelimited
+        yield self.base_handler.ratelimit(requester, update=False)
 
         invitee = yield self._lookup_3pid(
             id_server, medium, address
