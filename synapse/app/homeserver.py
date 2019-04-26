@@ -518,6 +518,7 @@ def run(hs):
             uptime = 0
 
         stats["homeserver"] = hs.config.server_name
+        stats["server_context"] = hs.config.server_context
         stats["timestamp"] = now
         stats["uptime_seconds"] = uptime
         version = sys.version_info
@@ -558,7 +559,6 @@ def run(hs):
 
         stats["database_engine"] = hs.get_datastore().database_engine_name
         stats["database_server_version"] = hs.get_datastore().get_server_version()
-
         logger.info("Reporting stats to matrix.org: %s" % (stats,))
         try:
             yield hs.get_simple_http_client().put_json(

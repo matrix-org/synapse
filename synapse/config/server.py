@@ -37,6 +37,7 @@ class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
+        self.server_context = config.get("server_context", None)
 
         try:
             parse_and_validate_server_name(self.server_name)
@@ -113,11 +114,13 @@ class ServerConfig(Config):
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", None
+            "federation_domain_whitelist", None,
         )
-        # turn the whitelist into a hash for speed of lookup
+
         if federation_domain_whitelist is not None:
+            # turn the whitelist into a hash for speed of lookup
             self.federation_domain_whitelist = {}
+
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
@@ -484,6 +487,9 @@ class ServerConfig(Config):
         #mau_limit_reserved_threepids:
         #  - medium: 'email'
         #    address: 'reserved_user@example.com'
+
+        # Used by phonehome stats to group together related servers.
+        #server_context: context
         """ % locals()
 
     def read_arguments(self, args):

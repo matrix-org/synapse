@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <style type="text/css">
+            {% include 'mail.css' without context %}
+            {% include "mail-%s.css" % app_name ignore missing without context %}
+            {% include 'mail-expiry.css' without context %}
+        </style>
+    </head>
+    <body>
+        <table id="page">
+            <tr>
+                <td> </td>
+                <td id="inner">
+                    <table class="header">
+                        <tr>
+                            <td>
+                                <div class="salutation">Hi {{ display_name }},</div>
+                            </td>
+                            <td class="logo">
+                                {% if app_name == "Riot" %}
+                                    <img src="http://riot.im/img/external/riot-logo-email.png" width="83" height="83" alt="[Riot]"/>
+                                {% elif app_name == "Vector" %}
+                                    <img src="http://matrix.org/img/vector-logo-email.png" width="64" height="83" alt="[Vector]"/>
+                                {% else %}
+                                    <img src="http://matrix.org/img/matrix-120x51.png" width="120" height="51" alt="[matrix]"/>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                          <td colspan="2">
+                            <div class="noticetext">Your account will expire on {{ expiration_ts|format_ts("%d-%m-%Y") }}. This means that you will lose access to your account after this date.</div>
+                            <div class="noticetext">To extend the validity of your account, please click on the link bellow (or copy and paste it into a new browser tab):</div>
+                            <div class="noticetext"><a href="{{ url }}">{{ url }}</a></div>
+                          </td>
+                        </tr>
+                    </table>
+                </td>
+                <td> </td>
+            </tr>
+        </table>
+    </body>
+</html>
