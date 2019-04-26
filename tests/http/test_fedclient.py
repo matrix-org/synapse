@@ -22,7 +22,7 @@ from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
-from synapse.api.errors import RequestSendFailed
+from synapse.api.errors import FederationDeniedError, RequestSendFailed
 from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
@@ -428,3 +428,21 @@ class FederationClientTests(HomeserverTestCase):
         self.pump(120)
 
         self.assertTrue(conn.disconnecting)
+
+class FederationDisabledClientTests(HomeserverTestCase):
+
+    def make_homeserver(self, reactor, clock):
+        config = self.default_config()
+        config.enable_federation = False
+        hs = self.setup_test_homeserver(config=config)
+        return hs
+
+    def prepare(self, reactor, clock, homeserver):
+        self.cl = MatrixFederationHttpClient(self.hs, None)
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+
+    def test_federation_denied(self):
+        self.assertFailure(
+            self.cl.get_json("testserv:8008", "foo/bar"),
+            FederationDeniedError,
+        )
