@@ -39,7 +39,7 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         user = UserID.from_string(user_id)
 
         displayname = yield self.profile_handler.get_displayname(
-            user, requester=requester,
+            user, requester=requester.user,
         )
 
         ret = {}
@@ -87,7 +87,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         user = UserID.from_string(user_id)
 
         avatar_url = yield self.profile_handler.get_avatar_url(
-            user, requester=requester,
+            user, requester=requester.user,
         )
 
         ret = {}
@@ -134,10 +134,10 @@ class ProfileRestServlet(ClientV1RestServlet):
         user = UserID.from_string(user_id)
 
         displayname = yield self.profile_handler.get_displayname(
-            user, requester=requester,
+            user, requester=requester.user,
         )
         avatar_url = yield self.profile_handler.get_avatar_url(
-            user, requester=requester,
+            user, requester=requester.user,
         )
 
         ret = {}

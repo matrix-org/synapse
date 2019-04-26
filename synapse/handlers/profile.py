@@ -51,9 +51,7 @@ class BaseProfileHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
 
     @defer.inlineCallbacks
-    def get_profile(self, user_id, requester=None):
-        yield self.check_profile_query_allowed(user_id, requester)
-
+    def get_profile(self, user_id):
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
@@ -292,6 +290,20 @@ class BaseProfileHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def check_profile_query_allowed(self, target_user, requester=None):
+        """Checks whether a profile query is allowed. If the
+        'require_auth_for_profile_requests' config flag is set to True and a
+        'requester' is provided, the query is only allowed if the two users
+        share a room.
+
+        Args:
+            target_user (UserID): The owner of the queried profile.
+            requester (None|UserID): The user querying for the profile.
+
+        Raises:
+            SynapseError(403): The two users share no room, or ne user couldn't
+                be found to be in any room the server is in, and therefore the query
+                is denied.
+        """
         # Implementation of MSC1301: don't allow looking up profiles if the
         # requester isn't in the same room as the target. We expect requester to
         # be None when this function is called outside of a profile query, e.g.
@@ -299,8 +311,12 @@ class BaseProfileHandler(BaseHandler):
         # lookup.
         if self.hs.config.require_auth_for_profile_requests and requester:
             try:
-                requester_rooms = yield self.store.get_rooms_for_user(requester)
-                target_user_rooms = yield self.store.get_rooms_for_user(target_user)
+                requester_rooms = yield self.store.get_rooms_for_user(
+                    requester.to_string()
+                )
+                target_user_rooms = yield self.store.get_rooms_for_user(
+                    target_user.to_string(),
+                )
 
                 # Check if the length of the intersection between the room lists
                 # for both users is 0.
@@ -310,7 +326,7 @@ class BaseProfileHandler(BaseHandler):
                 if e.code == 404:
                     # This likely means that one of the users doesn't exist,
                     # so we act as if we couldn't find the profile.
-                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
+                    raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
                 raise
 
 
