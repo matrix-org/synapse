@@ -274,7 +274,8 @@ class MatrixFederationHttpClient(object):
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
             FederationDeniedError: If this destination  is not on our
-                federation whitelist
+                federation whitelist or federation is disabled in the server's
+                configuration.
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
@@ -563,7 +564,8 @@ class MatrixFederationHttpClient(object):
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
             FederationDeniedError: If this destination  is not on our
-                federation whitelist
+                federation whitelist or federation is disabled in the server's
+                configuration.
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
@@ -619,7 +621,8 @@ class MatrixFederationHttpClient(object):
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
             FederationDeniedError: If this destination  is not on our
-                federation whitelist
+                federation whitelist or federation is disabled in the server's
+                configuration.
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
@@ -679,7 +682,8 @@ class MatrixFederationHttpClient(object):
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
             FederationDeniedError: If this destination  is not on our
-                federation whitelist
+                federation whitelist or federation is disabled in the server's
+                configuration.
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
@@ -734,7 +738,8 @@ class MatrixFederationHttpClient(object):
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
             FederationDeniedError: If this destination  is not on our
-                federation whitelist
+                federation whitelist or federation is disabled in the server's
+                configuration.
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
@@ -780,7 +785,8 @@ class MatrixFederationHttpClient(object):
             NotRetryingDestination: If we are not yet ready to retry this
                 server.
             FederationDeniedError: If this destination  is not on our
-                federation whitelist
+                federation whitelist or federation is disabled in the server's
+                configuration.
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
