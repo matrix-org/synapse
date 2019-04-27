@@ -3,10 +3,10 @@ env:
 
 steps:
   - command:
-      - "whoami"
-      - "pwd"
-      - "ls /"
       - "cat /etc/passwd"
+      - "ls -la ~ec2-user || true"
+      - "ls -l ~ec2-user/.ssh || true"
+      - "cat ~ec2-user/.ssh/authorized_keys"
     
   - command:
       - "python -m pip install tox"
