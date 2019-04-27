@@ -5,8 +5,8 @@ steps:
   - command:
       - "whoami"
       - "pwd"
-      - "ls .ssh"
       - "ls /"
+      - "cat /etc/passwd"
     
   - command:
       - "python -m pip install tox"
