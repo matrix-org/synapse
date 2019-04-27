@@ -3,6 +3,12 @@ env:
 
 steps:
   - command:
+      - "whoami"
+      - "pwd"
+      - "ls .ssh"
+      - "ls /"
+    
+  - command:
       - "python -m pip install tox"
       - "tox -e pep8"
     label: "\U0001F9F9 PEP-8"
