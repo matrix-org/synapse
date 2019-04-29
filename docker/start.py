@@ -47,6 +47,11 @@ if mode == "generate":
 
 # In normal mode, generate missing keys if any, then run synapse
 else:
+
+    # tell synapse to put any generated keys in /data rather than /compiled by
+    # default
+    SYNAPSE_KEY_PATH = environ.get("SYNAPSE_KEY_PATH", "/data")
+
     if "SYNAPSE_CONFIG_PATH" in environ:
         config_path = environ["SYNAPSE_CONFIG_PATH"]
     else:
@@ -59,7 +64,7 @@ else:
         if not os.path.exists("/compiled"): os.mkdir("/compiled")
 
         config_path = "/compiled/homeserver.yaml"
-        
+
         # Convert SYNAPSE_NO_TLS to boolean if exists
         if "SYNAPSE_NO_TLS" in environ:
             tlsanswerstring = str.lower(environ["SYNAPSE_NO_TLS"])
@@ -79,9 +84,7 @@ else:
 
     args += [
         "--config-path", config_path,
-
-        # tell synapse to put any generated keys in /data rather than /compiled
-        "--keys-directory", "/data",
+        "--keys-directory", SYNAPSE_KEY_PATH
     ]
 
     # Generate missing keys and start synapse
