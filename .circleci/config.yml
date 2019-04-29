@@ -16,7 +16,7 @@ jobs:
       - checkout
       - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_BRANCH} --build-arg PYTHON_VERSION=3.7 .
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}
+      - run: docker push matrixdotorg/synapse:${CIRCLE_BRANCH}
   dockerhubuploadlatest:
     machine: true
     steps:
