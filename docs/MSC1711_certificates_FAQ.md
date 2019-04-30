@@ -177,7 +177,6 @@ You can do this with a `.well-known` file as follows:
        on `customer.example.net:8000` it correctly handles HTTP requests with
        Host header set to `customer.example.net:8000`.
 
-
 ## FAQ
 
 ### Synapse 0.99.0 has just been released, what do I need to do right now?

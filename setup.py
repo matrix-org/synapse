@@ -86,13 +86,9 @@ long_description = read_file(("README.rst",))
 
 REQUIREMENTS = dependencies['REQUIREMENTS']
 CONDITIONAL_REQUIREMENTS = dependencies['CONDITIONAL_REQUIREMENTS']
+ALL_OPTIONAL_REQUIREMENTS = dependencies['ALL_OPTIONAL_REQUIREMENTS']
 
 # Make `pip install matrix-synapse[all]` install all the optional dependencies.
-ALL_OPTIONAL_REQUIREMENTS = set()
-
-for optional_deps in CONDITIONAL_REQUIREMENTS.values():
-    ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
-
 CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,6 +68,6 @@ class WellKnownResource(Resource):
             request.setHeader(b"Content-Type", b"text/plain")
             return b'.well-known not available'
 
-        logger.error("returning: %s", r)
+        logger.debug("returning: %s", r)
         request.setHeader(b"Content-Type", b"application/json")
         return json.dumps(r).encode("utf-8")
