@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018, 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -508,6 +508,31 @@ class ThreepidLookupRestServlet(RestServlet):
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
         ret = yield self.identity_handler.lookup_3pid(id_server, medium, address)
+
+        respond_with_json(200, ret)
+
+
+class ThreepidBulkLookupRestServlet(RestServlet):
+    PATTERNS = client_v2_patterns("/account/3pid/bulk_lookup$")
+
+    def __init__(self, hs):
+        super(ThreepidLookupRestServlet, self).__init__()
+        self.config = hs.config
+        self.auth = hs.get_auth()
+        self.identity_handler = IdentityHandler(hs)
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        """Proxy a /_matrix/identity/api/v1/bulk_lookup request to an identity
+        server
+        """
+        yield self.auth.get_user_by_req(request)
+
+        body = parse_json_object_from_request(request)
+
+        # Proxy the request to the identity server. lookup_3pid handles checking
+        # if the lookup is allowed so we don't need to do it here.
+        ret = yield self.identity_handler.bulk_lookup_3pid(id_server, body["threepids"])
 
         respond_with_json(200, ret)
 

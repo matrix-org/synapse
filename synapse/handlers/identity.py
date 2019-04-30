@@ -347,7 +347,7 @@ class IdentityHandler(BaseHandler):
 
         Returns:
             Deferred[dict]: The result of the lookup. See
-            https://matrix.org/docs/spec/identity_service/r0.1.0.html#id15
+            https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
             for details
         """
         if not self._enable_lookup:
@@ -369,6 +369,50 @@ class IdentityHandler(BaseHandler):
             if "mxid" in data:
                 if "signatures" not in data:
                     raise AuthError(401, "No signatures on 3pid binding")
+                yield self._verify_any_signature(data, id_server)
+
+        except HttpResponseException as e:
+            logger.info("Proxied lookup failed: %r", e)
+            raise e.to_synapse_error()
+        except IOError as e:
+            logger.info("Failed to contact %r: %s", id_server, e)
+            raise ProxiedRequestError(503, "Failed to contact homeserver")
+
+        defer.returnValue(data)
+
+    @defer.inlineCallbacks
+    def bulk_lookup_3pid(self, id_server, threepids):
+        """Looks up a 3pid in the passed identity server.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            threepids ([[str, str]]): The third party identifiers to lookup, as
+                a list of 2-string sized lists ([medium, address]).
+
+        Returns:
+            Deferred[dict]: The result of the lookup. See
+            https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
+            for details
+        """
+        if not self._enable_lookup:
+            raise AuthError(
+                403, "Looking up third-party identifiers is denied from this server",
+            )
+
+        target = self.rewrite_identity_server_urls.get(id_server, id_server)
+
+        try:
+            data = yield self.http_client.get_json(
+                "https://%s/_matrix/identity/api/v1/lookup" % (target,),
+                {
+                    "threepids": threepids,
+                }
+            )
+
+            if "mxid" in data:
+                if "signatures" not in data:
+                    raise AuthError(401, "No signatures on 3pid bindings")
                 yield self._verify_any_signature(data, id_server)
 
         except HttpResponseException as e:
