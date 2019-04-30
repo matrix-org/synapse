@@ -16,6 +16,7 @@
 import json
 
 from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v2_alpha import account
 
 from tests import unittest
 
@@ -23,6 +24,7 @@ from tests import unittest
 class IdentityTestCase(unittest.HomeserverTestCase):
 
     servlets = [
+        account.register_servlets,
         admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
@@ -36,12 +38,13 @@ class IdentityTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    def test_3pid_lookup_disabled(self):
-        self.register_user("kermit", "monkey")
-        tok = self.login("kermit", "monkey")
+    def prepare(self, reactor, clock, hs):
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
 
+    def test_3pid_invite_disabled(self):
         request, channel = self.make_request(
-            b"POST", "/createRoom", b"{}", access_token=tok,
+            b"POST", "/createRoom", b"{}", access_token=self.tok,
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
@@ -57,7 +60,35 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             "/rooms/%s/invite" % (room_id)
         ).encode('ascii')
         request, channel = self.make_request(
-            b"POST", request_url, request_data, access_token=tok,
+            b"POST", request_url, request_data, access_token=self.tok,
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
+
+    def test_3pid_lookup_disabled(self):
+        url = "/_matrix/client/unstable/account/3pid/lookup?id_server=testis&medium=email&address=foo@bar.baz"
+        request, channel = self.make_request("GET", url, access_token=self.tok)
+        self.render(request)
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+
+    def test_3pid_bulk_lookup_disabled(self):
+        url = "/_matrix/client/unstable/account/3pid/bulk_lookup"
+        data = {
+            "id_server": "testis",
+            "threepids": [
+                [
+                    "email",
+                    "foo@bar.baz"
+                ],
+                [
+                    "email",
+                    "john.doe@matrix.org"
+                ]
+            ]
+        }
+        request_data = json.dumps(data)
+        request, channel = self.make_request(
+            "POST", url, request_data, access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.result["code"], b"403", channel.result)
