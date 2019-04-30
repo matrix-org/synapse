@@ -248,6 +248,9 @@ listeners:
 #  - medium: 'email'
 #    address: 'reserved_user@example.com'
 
+# Used by phonehome stats to group together related servers.
+#server_context: context
+
 
 ## TLS ##
 
@@ -268,6 +271,40 @@ listeners:
 # PEM-encoded private key for TLS
 #
 #tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
+
+# Whether to verify TLS certificates when sending federation traffic.
+#
+# This currently defaults to `false`, however this will change in
+# Synapse 1.0 when valid federation certificates will be required.
+#
+#federation_verify_certificates: true
+
+# Skip federation certificate verification on the following whitelist
+# of domains.
+#
+# This setting should only be used in very specific cases, such as
+# federation over Tor hidden services and similar. For private networks
+# of homeservers, you likely want to use a private CA instead.
+#
+# Only effective if federation_verify_certicates is `true`.
+#
+#federation_certificate_verification_whitelist:
+#  - lon.example.com
+#  - *.domain.com
+#  - *.onion
+
+# List of custom certificate authorities for federation traffic.
+#
+# This setting should only normally be used within a private network of
+# homeservers.
+#
+# Note that this list will replace those that are provided by your
+# operating environment. Certificates must be in PEM format.
+#
+#federation_custom_ca_list:
+#  - myCA1.pem
+#  - myCA2.pem
+#  - myCA3.pem
 
 # ACME support: This will configure Synapse to request a valid TLS certificate
 # for your configured `server_name` via Let's Encrypt.
@@ -655,6 +692,32 @@ uploads_path: "DATADIR/uploads"
 #
 #enable_registration: false
 
+# Optional account validity configuration. This allows for accounts to be denied
+# any request after a given period.
+#
+# ``enabled`` defines whether the account validity feature is enabled. Defaults
+# to False.
+#
+# ``period`` allows setting the period after which an account is valid
+# after its registration. When renewing the account, its validity period
+# will be extended by this amount of time. This parameter is required when using
+# the account validity feature.
+#
+# ``renew_at`` is the amount of time before an account's expiry date at which
+# Synapse will send an email to the account's email address with a renewal link.
+# This needs the ``email`` and ``public_baseurl`` configuration sections to be
+# filled.
+#
+# ``renew_email_subject`` is the subject of the email sent out with the renewal
+# link. ``%(app)s`` can be used as a placeholder for the ``app_name`` parameter
+# from the ``email`` section.
+#
+#account_validity:
+#  enabled: True
+#  period: 6w
+#  renew_at: 1w
+#  renew_email_subject: "Renew your %(app)s account"
+
 # The user must provide all of the below types of 3PID when registering.
 #
 #registrations_require_3pid:
@@ -676,6 +739,10 @@ uploads_path: "DATADIR/uploads"
 #    pattern: '.*@vector\.im'
 #  - medium: msisdn
 #    pattern: '\+44'
+
+# Enable 3PIDs lookup requests to identity servers from this server.
+#
+#enable_3pid_lookup: true
 
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
@@ -896,7 +963,7 @@ password_config:
 
 
 
-# Enable sending emails for notification events
+# Enable sending emails for notification events or expiry notices
 # Defining a custom URL for Riot is only needed if email notifications
 # should contain links to a self-hosted installation of Riot; when set
 # the "app_name" setting is ignored.
@@ -918,6 +985,9 @@ password_config:
 #   #template_dir: res/templates
 #   notif_template_html: notif_mail.html
 #   notif_template_text: notif_mail.txt
+#   # Templates for account expiry notices.
+#   expiry_template_html: notice_expiry.html
+#   expiry_template_text: notice_expiry.txt
 #   notif_for_new_users: True
 #   riot_base_url: "http://localhost/riot"
 

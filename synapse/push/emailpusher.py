@@ -72,8 +72,15 @@ class EmailPusher(object):
 
         self._is_processing = False
 
-    def on_started(self):
-        if self.mailer is not None:
+    def on_started(self, should_check_for_notifs):
+        """Called when this pusher has been started.
+
+        Args:
+            should_check_for_notifs (bool): Whether we should immediately
+                check for push to send. Set to False only if it's known there
+                is nothing to send
+        """
+        if should_check_for_notifs and self.mailer is not None:
             self._start_processing()
 
     def on_stop(self):

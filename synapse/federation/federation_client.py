@@ -25,18 +25,18 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import (
-    KNOWN_ROOM_VERSIONS,
-    EventTypes,
-    Membership,
-    RoomVersions,
-)
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
     FederationDeniedError,
     HttpResponseException,
     SynapseError,
+)
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    RoomVersions,
 )
 from synapse.events import builder, room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -570,7 +570,7 @@ class FederationClient(FederationBase):
             Deferred[tuple[str, FrozenEvent, int]]: resolves to a tuple of
             `(origin, event, event_format)` where origin is the remote
             homeserver which generated the event, and event_format is one of
-            `synapse.api.constants.EventFormatVersions`.
+            `synapse.api.room_versions.EventFormatVersions`.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
@@ -592,7 +592,7 @@ class FederationClient(FederationBase):
 
             # Note: If not supplied, the room version may be either v1 or v2,
             # however either way the event format version will be v1.
-            room_version = ret.get("room_version", RoomVersions.V1)
+            room_version = ret.get("room_version", RoomVersions.V1.identifier)
             event_format = room_version_to_event_format(room_version)
 
             pdu_dict = ret.get("event", None)
@@ -695,7 +695,9 @@ class FederationClient(FederationBase):
             room_version = None
             for e in state:
                 if (e.type, e.state_key) == (EventTypes.Create, ""):
-                    room_version = e.content.get("room_version", RoomVersions.V1)
+                    room_version = e.content.get(
+                        "room_version", RoomVersions.V1.identifier
+                    )
                     break
 
             if room_version is None:
@@ -802,11 +804,10 @@ class FederationClient(FederationBase):
                     raise err
 
                 # Otherwise, we assume that the remote server doesn't understand
-                # the v2 invite API.
-
-                if room_version in (RoomVersions.V1, RoomVersions.V2):
-                    pass  # We'll fall through
-                else:
+                # the v2 invite API. That's ok provided the room uses old-style event
+                # IDs.
+                v = KNOWN_ROOM_VERSIONS.get(room_version)
+                if v.event_format != EventFormatVersions.V1:
                     raise SynapseError(
                         400,
                         "User's homeserver does not support this room version",

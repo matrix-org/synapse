@@ -410,7 +410,7 @@ class HomeserverTestCase(TestCase):
             "POST", "/_matrix/client/r0/login", json.dumps(body).encode('utf8')
         )
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, channel.result)
 
         access_token = channel.json_body["access_token"]
         return access_token
