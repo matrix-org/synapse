@@ -15,13 +15,17 @@
 
 import json
 
+from mock import Mock
+
+from twisted.internet import defer
+
 from synapse.rest.client.v1 import admin, login, room
 from synapse.rest.client.v2_alpha import account
 
 from tests import unittest
 
 
-class IdentityTestCase(unittest.HomeserverTestCase):
+class IdentityDisabledTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         account.register_servlets,
@@ -66,7 +70,8 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
 
     def test_3pid_lookup_disabled(self):
-        url = "/_matrix/client/unstable/account/3pid/lookup?id_server=testis&medium=email&address=foo@bar.baz"
+        url = ("/_matrix/client/unstable/account/3pid/lookup"
+               "?id_server=testis&medium=email&address=foo@bar.baz")
         request, channel = self.make_request("GET", url, access_token=self.tok)
         self.render(request)
         self.assertEqual(channel.result["code"], b"403", channel.result)
@@ -92,3 +97,120 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(channel.result["code"], b"403", channel.result)
+
+
+class IdentityEnabledTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        account.register_servlets,
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+
+        config = self.default_config()
+        config.enable_3pid_lookup = True
+
+        mock_http_client = Mock(spec=[
+            "get_json",
+            "post_json",
+        ])
+        mock_http_client.get_json.return_value = defer.succeed((200, "{}"))
+        mock_http_client.post_json.return_value = defer.succeed((200, "{}"))
+
+        self.hs = self.setup_test_homeserver(
+            config=config,
+            simple_http_client=mock_http_client,
+        )
+
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+    def test_3pid_invite_enabled(self):
+        request, channel = self.make_request(
+            b"POST", "/createRoom", b"{}", access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+        room_id = channel.json_body["room_id"]
+
+        params = {
+            "id_server": "testis",
+            "medium": "email",
+            "address": "test@example.com",
+        }
+        request_data = json.dumps(params)
+        request_url = (
+            "/rooms/%s/invite" % (room_id)
+        ).encode('ascii')
+        request, channel = self.make_request(
+            b"POST", request_url, request_data, access_token=self.tok,
+        )
+        self.render(request)
+
+        get_json = self.hs.get_simple_http_client().get_json
+        get_json.assert_called_once_with(
+            "https://testis/_matrix/identity/api/v1/lookup",
+            {
+                "address": "test@example.com",
+                "medium": "email",
+            },
+        )
+
+    def test_3pid_lookup_enabled(self):
+        url = ("/_matrix/client/unstable/account/3pid/lookup"
+               "?id_server=testis&medium=email&address=foo@bar.baz")
+        request, channel = self.make_request("GET", url, access_token=self.tok)
+        self.render(request)
+
+        get_json = self.hs.get_simple_http_client().get_json
+        get_json.assert_called_once_with(
+            "https://testis/_matrix/identity/api/v1/lookup",
+            {
+                "address": "foo@bar.baz",
+                "medium": "email",
+            },
+        )
+
+    def test_3pid_bulk_lookup_enabled(self):
+        url = "/_matrix/client/unstable/account/3pid/bulk_lookup"
+        data = {
+            "id_server": "testis",
+            "threepids": [
+                [
+                    "email",
+                    "foo@bar.baz"
+                ],
+                [
+                    "email",
+                    "john.doe@matrix.org"
+                ]
+            ]
+        }
+        request_data = json.dumps(data)
+        request, channel = self.make_request(
+            "POST", url, request_data, access_token=self.tok,
+        )
+        self.render(request)
+
+        post_json = self.hs.get_simple_http_client().post_json
+        post_json.assert_called_once_with(
+            "https://testis/_matrix/identity/api/v1/bulk_lookup",
+            {
+                "threepids": [
+                    [
+                        "email",
+                        "foo@bar.baz"
+                    ],
+                    [
+                        "email",
+                        "john.doe@matrix.org"
+                    ]
+                ],
+            },
+        )
