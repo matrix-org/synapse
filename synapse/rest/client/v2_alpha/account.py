@@ -26,6 +26,7 @@ from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
+    parse_string,
 )
 from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
@@ -487,7 +488,7 @@ class ThreepidLookupRestServlet(RestServlet):
         super(ThreepidLookupRestServlet, self).__init__()
         self.config = hs.config
         self.auth = hs.get_auth()
-        self.identity_handler = IdentityHandler(hs)
+        self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -516,10 +517,10 @@ class ThreepidBulkLookupRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/3pid/bulk_lookup$")
 
     def __init__(self, hs):
-        super(ThreepidLookupRestServlet, self).__init__()
+        super(ThreepidBulkLookupRestServlet, self).__init__()
         self.config = hs.config
         self.auth = hs.get_auth()
-        self.identity_handler = IdentityHandler(hs)
+        self.identity_handler = hs.get_handlers().identity_handler
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -532,7 +533,9 @@ class ThreepidBulkLookupRestServlet(RestServlet):
 
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
-        ret = yield self.identity_handler.bulk_lookup_3pid(id_server, body["threepids"])
+        ret = yield self.identity_handler.bulk_lookup_3pid(
+            body["id_server"], body["threepids"],
+        )
 
         respond_with_json(200, ret)
 
