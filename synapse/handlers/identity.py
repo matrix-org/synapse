@@ -403,8 +403,8 @@ class IdentityHandler(BaseHandler):
         target = self.rewrite_identity_server_urls.get(id_server, id_server)
 
         try:
-            data = yield self.http_client.get_json(
-                "https://%s/_matrix/identity/api/v1/lookup" % (target,),
+            data = yield self.http_client.post_json(
+                "https://%s/_matrix/identity/api/v1/bulk_lookup" % (target,),
                 {
                     "threepids": threepids,
                 }
