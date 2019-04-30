@@ -510,7 +510,7 @@ class ThreepidLookupRestServlet(RestServlet):
         # if the lookup is allowed so we don't need to do it here.
         ret = yield self.identity_handler.lookup_3pid(id_server, medium, address)
 
-        respond_with_json(200, ret)
+        defer.returnValue((200, ret))
 
 
 class ThreepidBulkLookupRestServlet(RestServlet):
@@ -537,7 +537,7 @@ class ThreepidBulkLookupRestServlet(RestServlet):
             body["id_server"], body["threepids"],
         )
 
-        respond_with_json(200, ret)
+        defer.returnValue((200, ret))
 
 
 class WhoamiRestServlet(RestServlet):
