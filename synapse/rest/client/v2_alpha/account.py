@@ -522,7 +522,7 @@ class ThreepidBulkLookupRestServlet(RestServlet):
         self.identity_handler = IdentityHandler(hs)
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_POST(self, request):
         """Proxy a /_matrix/identity/api/v1/bulk_lookup request to an identity
         server
         """
