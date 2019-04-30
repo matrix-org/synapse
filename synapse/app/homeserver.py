@@ -40,7 +40,6 @@ from synapse import events
 from synapse.api.urls import (
     CONTENT_REPO_PREFIX,
     FEDERATION_PREFIX,
-    IDENTITY_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_PREFIX,
     SERVER_KEY_V2_PREFIX,
@@ -63,7 +62,6 @@ from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
-from synapse.rest.identity.v1 import IdentityApiV1Resource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.well_known import WellKnownResource
@@ -228,9 +226,6 @@ class SynapseHomeServer(HomeServer):
                 raise ConfigError(
                     "'media' resource conflicts with enable_media_repo=False",
                 )
-
-        if name in ["identity"]:
-            resources[IDENTITY_PREFIX] = IdentityApiV1Resource(self)
 
         if name in ["keys", "federation"]:
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
