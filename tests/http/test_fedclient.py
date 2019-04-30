@@ -78,7 +78,7 @@ class FederationClientTests(HomeserverTestCase):
         # Nothing happened yet
         self.assertNoResult(test_d)
 
-        # Make sure the req is trying to connect
+        # Make sure treq is trying to connect
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, factory, _timeout, _bindAddress) = clients[0]

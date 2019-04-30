@@ -176,42 +176,35 @@ class MatrixFederationHttpClient(object):
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
 
-        if hs.config.federation_ip_range_blacklist is not None:
-            real_reactor = hs.get_reactor()
-            # If we have an IP blacklist, we need to use a DNS resolver which
-            # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            nameResolver = IPBlacklistingResolver(
-                real_reactor, None, hs.config.federation_ip_range_blacklist,
-                federation=True,
-            )
+        real_reactor = hs.get_reactor()
 
-            @implementer(IReactorPluggableNameResolver)
-            class Reactor(object):
-                def __getattr__(_self, attr):
-                    if attr == "nameResolver":
-                        return nameResolver
-                    else:
-                        return getattr(real_reactor, attr)
+        # We need to use a DNS resolver which filters out blacklisted IP
+        # addresses, to prevent DNS rebinding.
+        nameResolver = IPBlacklistingResolver(
+            real_reactor, None, hs.config.federation_ip_range_blacklist,
+            federation=True,
+        )
 
-            self.reactor = Reactor()
+        @implementer(IReactorPluggableNameResolver)
+        class Reactor(object):
+            def __getattr__(_self, attr):
+                if attr == "nameResolver":
+                    return nameResolver
+                else:
+                    return getattr(real_reactor, attr)
 
-            self.agent = MatrixFederationAgent(
-                self.reactor,
-                tls_client_options_factory,
-            )
+        self.reactor = Reactor()
 
-            # Prevent direct connections to blacklisted IP addresses
-            self.agent = BlacklistingAgentWrapper(
-                self.agent, self.reactor,
-                ip_blacklist=hs.config.federation_ip_range_blacklist,
-            )
-        else:
-            self.reactor = hs.get_reactor()
+        self.agent = MatrixFederationAgent(
+            self.reactor,
+            tls_client_options_factory,
+        )
 
-            self.agent = MatrixFederationAgent(
-                self.reactor,
-                tls_client_options_factory,
-            )
+        # Prevent direct connections to blacklisted IP addresses
+        self.agent = BlacklistingAgentWrapper(
+            self.agent, self.reactor,
+            ip_blacklist=hs.config.federation_ip_range_blacklist,
+        )
 
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()

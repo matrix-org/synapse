@@ -102,7 +102,8 @@ pid_file: DATADIR/homeserver.pid
 #  - syd.example.com
 
 # Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges.
+# blacklist IP address CIDR ranges. If this option is not specified, or
+# specified with an empty list, no ip range blacklist will be enforced.
 #
 #federation_ip_range_blacklist:
 #  - '127.0.0.0/8'

@@ -17,6 +17,8 @@
 import logging
 import os.path
 
+from netaddr import IPSet
+
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
 
@@ -123,28 +125,19 @@ class ServerConfig(Config):
                 self.federation_domain_whitelist[domain] = True
 
         self.federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", None,
+            "federation_ip_range_blacklist", [],
         )
-        if self.federation_ip_range_blacklist is not None:
-            # Import IPSet
-            try:
-                from netaddr import IPSet
-            except ImportError:
-                raise ConfigError(
-                    "Missing netaddr library. This is required to use "
-                    "federation_ip_range_blacklist"
-                )
 
-            # Attempt to create an IPSet from the given ranges
-            try:
-                self.federation_ip_range_blacklist = IPSet(
-                    self.federation_ip_range_blacklist
-                )
-            except Exception as e:
-                raise ConfigError(
-                    "Invalid range(s) provided in "
-                    "federation_ip_range_blacklist: %s" % e
-                )
+        # Attempt to create an IPSet from the given ranges
+        try:
+            self.federation_ip_range_blacklist = IPSet(
+                self.federation_ip_range_blacklist
+            )
+        except Exception as e:
+            raise ConfigError(
+                "Invalid range(s) provided in "
+                "federation_ip_range_blacklist: %s" % e
+            )
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -376,7 +369,8 @@ class ServerConfig(Config):
         #  - syd.example.com
 
         # Prevent federation requests from being sent to the following
-        # blacklist IP address CIDR ranges.
+        # blacklist IP address CIDR ranges. If this option is not specified, or
+        # specified with an empty list, no ip range blacklist will be enforced.
         #
         #federation_ip_range_blacklist:
         #  - '127.0.0.0/8'
