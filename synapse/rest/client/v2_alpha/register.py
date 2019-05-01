@@ -391,6 +391,13 @@ class RegisterRestServlet(RestServlet):
         # the user-facing checks will probably already have happened in
         # /register/email/requestToken when we requested a 3pid, but that's not
         # guaranteed.
+        #
+        # Also check that we're not trying to register a 3pid that's already
+        # been registered.
+        #
+        # This has probably happened in /register/email/requestToken as well,
+        # but if a user hits this endpoint twice then clicks on each link from
+        # the two activation emails, they would register the same 3pid twice.
 
         if auth_result:
             for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
@@ -404,6 +411,17 @@ class RegisterRestServlet(RestServlet):
                             "Third party identifiers (email/phone numbers)" +
                             " are not authorized on this server",
                             Codes.THREEPID_DENIED,
+                        )
+
+                    existingUid = yield self.store.get_user_id_by_threepid(
+                        medium, address,
+                    )
+
+                    if existingUid is not None:
+                        raise SynapseError(
+                            400,
+                            "%s is already in use" % medium,
+                            Codes.THREEPID_IN_USE,
                         )
 
         if registered_user_id is not None:

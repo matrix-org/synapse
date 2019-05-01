@@ -44,7 +44,11 @@ class PusherFactory(object):
         if hs.config.email_enable_notifs:
             self.mailers = {}  # app_name -> Mailer
 
-            templates = load_jinja2_templates(hs.config)
+            templates = load_jinja2_templates(
+                config=hs.config,
+                template_html_name=hs.config.email_notif_template_html,
+                template_text_name=hs.config.email_notif_template_text,
+            )
             self.notif_template_html, self.notif_template_text = templates
 
             self.pusher_types["email"] = self._create_email_pusher

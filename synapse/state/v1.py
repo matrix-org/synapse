@@ -21,8 +21,9 @@ from six import iteritems, iterkeys, itervalues
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, RoomVersions
+from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
+from synapse.api.room_versions import RoomVersions
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +276,9 @@ def _resolve_auth_events(events, auth_events):
         try:
             # The signatures have already been checked at this point
             event_auth.check(
-                RoomVersions.V1, event, auth_events,
+                RoomVersions.V1.identifier,
+                event,
+                auth_events,
                 do_sig_check=False,
                 do_size_check=False,
             )
@@ -291,7 +294,9 @@ def _resolve_normal_events(events, auth_events):
         try:
             # The signatures have already been checked at this point
             event_auth.check(
-                RoomVersions.V1, event, auth_events,
+                RoomVersions.V1.identifier,
+                event,
+                auth_events,
                 do_sig_check=False,
                 do_size_check=False,
             )

@@ -58,15 +58,11 @@ BOOLEAN_COLUMNS = {
 
 
 APPEND_ONLY_TABLES = [
-    "event_content_hashes",
     "event_reference_hashes",
-    "event_signatures",
-    "event_edge_hashes",
     "events",
     "event_json",
     "state_events",
     "room_memberships",
-    "feedback",
     "topics",
     "room_names",
     "rooms",
@@ -88,7 +84,6 @@ APPEND_ONLY_TABLES = [
     "event_search",
     "presence_stream",
     "push_rules_stream",
-    "current_state_resets",
     "ex_outlier_stream",
     "cache_invalidation_stream",
     "public_room_list_stream",
@@ -811,7 +806,7 @@ class CursesProgress(Progress):
         middle_space = 1
 
         items = self.tables.items()
-        items.sort(key=lambda i: (i[1]["perc"], i[0]))
+        items = sorted(items, key=lambda i: (i[1]["perc"], i[0]))
 
         for i, (table, data) in enumerate(items):
             if i + 2 >= rows:

@@ -43,12 +43,15 @@ class DeactivateAccountHandler(BaseHandler):
         hs.get_reactor().callWhenRunning(self._start_user_parting)
 
     @defer.inlineCallbacks
-    def deactivate_account(self, user_id, erase_data):
+    def deactivate_account(self, user_id, erase_data, id_server=None):
         """Deactivate a user's account
 
         Args:
             user_id (str): ID of user to be deactivated
             erase_data (bool): whether to GDPR-erase the user's data
+            id_server (str|None): Use the given identity server when unbinding
+                any threepids. If None then will attempt to unbind using the
+                identity server specified when binding (if known).
 
         Returns:
             Deferred[bool]: True if identity server supports removing
@@ -74,6 +77,7 @@ class DeactivateAccountHandler(BaseHandler):
                     {
                         'medium': threepid['medium'],
                         'address': threepid['address'],
+                        'id_server': id_server,
                     },
                 )
                 identity_server_supports_unbinding &= result
