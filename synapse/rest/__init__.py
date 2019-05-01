@@ -58,8 +58,14 @@ from synapse.rest.client.v2_alpha import (
 
 
 class ClientRestResource(JsonResource):
-    """A resource for version 1 of the matrix client API."""
+    """Matrix Client API REST resource.
 
+    This gets mounted at various points under /_matrix/client, including:
+       * /_matrix/client/r0
+       * /_matrix/client/api/v1
+       * /_matrix/client/unstable
+       * etc
+    """
     def __init__(self, hs):
         JsonResource.__init__(self, hs, canonical_json=False)
         self.register_servlets(self, hs)
@@ -82,7 +88,6 @@ class ClientRestResource(JsonResource):
         presence.register_servlets(hs, client_resource)
         directory.register_servlets(hs, client_resource)
         voip.register_servlets(hs, client_resource)
-        admin.register_servlets(hs, client_resource)
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
         logout.register_servlets(hs, client_resource)
@@ -111,3 +116,6 @@ class ClientRestResource(JsonResource):
         room_upgrade_rest_servlet.register_servlets(hs, client_resource)
         capabilities.register_servlets(hs, client_resource)
         account_validity.register_servlets(hs, client_resource)
+
+        # moving to /_synapse/admin
+        admin.register_servlets(hs, client_resource)

@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import logging
 import platform
+import re
 
 from six import text_type
 from six.moves import http_client
@@ -27,6 +28,7 @@ from twisted.internet import defer
 import synapse
 from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.server import JsonResource
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -37,13 +39,33 @@ from synapse.http.servlet import (
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
 
-from .base import client_path_patterns
-
 logger = logging.getLogger(__name__)
 
 
+def historical_admin_path_patterns(path_regex):
+    """Returns the list of patterns for an admin endpoint, including historical ones
+
+    This is a backwards-compatibility hack. Previously, the Admin API was exposed at
+    various paths under /_matrix/client. This function returns a list of patterns
+    matching those paths (as well as the new one), so that existing scripts which rely
+    on the endpoints being available there are not broken.
+
+    Note that this should only be used for existing endpoints: new ones should just
+    register for the /_synapse/admin path.
+    """
+    return list(
+        re.compile(prefix + path_regex)
+        for prefix in (
+            "^/_synapse/admin/v1",
+            "^/_matrix/client/api/v1/admin",
+            "^/_matrix/client/unstable/admin",
+            "^/_matrix/client/r0/admin"
+        )
+    )
+
+
 class UsersRestServlet(RestServlet):
-    PATTERNS = client_path_patterns("/admin/users/(?P<user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
         self.hs = hs
@@ -72,7 +94,7 @@ class UsersRestServlet(RestServlet):
 
 
 class VersionServlet(RestServlet):
-    PATTERNS = client_path_patterns("/admin/server_version")
+    PATTERNS = historical_admin_path_patterns("/server_version")
 
     def __init__(self, hs):
         self.auth = hs.get_auth()
@@ -100,7 +122,7 @@ class UserRegisterServlet(RestServlet):
          nonces (dict[str, int]): The nonces that we will accept. A dict of
              nonce to the time it was generated, in int seconds.
     """
-    PATTERNS = client_path_patterns("/admin/register")
+    PATTERNS = historical_admin_path_patterns("/register")
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
@@ -231,7 +253,7 @@ class UserRegisterServlet(RestServlet):
 
 
 class WhoisRestServlet(RestServlet):
-    PATTERNS = client_path_patterns("/admin/whois/(?P<user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/whois/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
         self.hs = hs
@@ -257,7 +279,7 @@ class WhoisRestServlet(RestServlet):
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
-    PATTERNS = client_path_patterns("/admin/purge_media_cache")
+    PATTERNS = historical_admin_path_patterns("/purge_media_cache")
 
     def __init__(self, hs):
         self.media_repository = hs.get_media_repository()
@@ -280,8 +302,8 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
 
 class PurgeHistoryRestServlet(RestServlet):
-    PATTERNS = client_path_patterns(
-        "/admin/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
+    PATTERNS = historical_admin_path_patterns(
+        "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
 
     def __init__(self, hs):
@@ -377,8 +399,8 @@ class PurgeHistoryRestServlet(RestServlet):
 
 
 class PurgeHistoryStatusRestServlet(RestServlet):
-    PATTERNS = client_path_patterns(
-        "/admin/purge_history_status/(?P<purge_id>[^/]+)"
+    PATTERNS = historical_admin_path_patterns(
+        "/purge_history_status/(?P<purge_id>[^/]+)"
     )
 
     def __init__(self, hs):
@@ -406,7 +428,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
 
 
 class DeactivateAccountRestServlet(RestServlet):
-    PATTERNS = client_path_patterns("/admin/deactivate/(?P<target_user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/deactivate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
@@ -449,7 +471,7 @@ class ShutdownRoomRestServlet(RestServlet):
     to a new room created by `new_room_user_id` and kicked users will be auto
     joined to the new room.
     """
-    PATTERNS = client_path_patterns("/admin/shutdown_room/(?P<room_id>[^/]+)")
+    PATTERNS = historical_admin_path_patterns("/shutdown_room/(?P<room_id>[^/]+)")
 
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
@@ -574,7 +596,7 @@ class QuarantineMediaInRoom(RestServlet):
     """Quarantines all media in a room so that no one can download it via
     this server.
     """
-    PATTERNS = client_path_patterns("/admin/quarantine_media/(?P<room_id>[^/]+)")
+    PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -597,7 +619,7 @@ class QuarantineMediaInRoom(RestServlet):
 class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room.
     """
-    PATTERNS = client_path_patterns("/admin/room/(?P<room_id>[^/]+)/media")
+    PATTERNS = historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -627,7 +649,7 @@ class ResetPasswordRestServlet(RestServlet):
         Returns:
             200 OK with empty object if success otherwise an error.
         """
-    PATTERNS = client_path_patterns("/admin/reset_password/(?P<target_user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -666,7 +688,7 @@ class GetUsersPaginatedRestServlet(RestServlet):
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
         """
-    PATTERNS = client_path_patterns("/admin/users_paginate/(?P<target_user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/users_paginate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -749,7 +771,7 @@ class SearchUsersRestServlet(RestServlet):
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
     """
-    PATTERNS = client_path_patterns("/admin/search_users/(?P<target_user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -789,7 +811,7 @@ class SearchUsersRestServlet(RestServlet):
 class DeleteGroupAdminRestServlet(RestServlet):
     """Allows deleting of local groups
     """
-    PATTERNS = client_path_patterns("/admin/delete_group/(?P<group_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/delete_group/(?P<group_id>[^/]*)")
 
     def __init__(self, hs):
         self.group_server = hs.get_groups_server_handler()
@@ -812,7 +834,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
 
 
 class AccountValidityRenewServlet(RestServlet):
-    PATTERNS = client_path_patterns("/admin/account_validity/validity$")
+    PATTERNS = historical_admin_path_patterns("/account_validity/validity$")
 
     def __init__(self, hs):
         """
@@ -845,6 +867,14 @@ class AccountValidityRenewServlet(RestServlet):
             "expiration_ts": expiration_ts,
         }
         defer.returnValue((200, res))
+
+
+class AdminRestResource(JsonResource):
+    """The REST resource which gets mounted at /_synapse/admin"""
+
+    def __init__(self, hs):
+        JsonResource.__init__(self, hs, canonical_json=False)
+        register_servlets(hs, self)
 
 
 def register_servlets(hs, http_server):
