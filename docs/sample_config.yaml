@@ -246,12 +246,11 @@ listeners:
 # https://github.com/matrix-org/synapse/blob/master/docs/postgres.rst
 #
 # If you want to use federation with SQLite regardless, you can
-# uncomment the line below, but be aware that it can make Synapse
-# malfunction and be very laggy, especially when joining large rooms.
-# This option defaults to 'false' when using SQLite and 'true'
-# otherwise.
+# uncomment the line below. This option defaults to 'false' when using
+# SQLite and 'true' otherwise. It is ignored when using PostgreSQL.
 #
-#enable_federation_can_cause_bad_perfs_with_sqlite = true
+#
+#enable_federation_with_sqlite_can_cause_bad_perfs = true
 
 
 ## TLS ##

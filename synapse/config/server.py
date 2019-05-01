@@ -59,15 +59,16 @@ class ServerConfig(Config):
         # "disable" federation
         self.send_federation = config.get("send_federation", True)
 
-        try:
-            self.enable_federation = config[
-                "enable_federation_can_cause_bad_perfs_with_sqlite"
-            ]
-        except KeyError:
-            if config.get("database", {"name": "sqlite3"}).get("name") == "sqlite3":
-                self.enable_federation = False
-            else:
-                self.enable_federation = True
+        # Whether to enable federation with SQLite. Can cause bad performance.
+        # Ignored when not using SQLite (in which case federation is always
+        # enabled unless federation_domain_whitelist is an empty list).
+        if config.get("database", {"name": "sqlite3"}).get("name") == "sqlite3":
+            self.enable_federation = config.get(
+                "enable_federation_with_sqlite_can_cause_bad_perfs",
+                False,
+            )
+        else:
+            self.enable_federation = True
 
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
@@ -508,12 +509,11 @@ class ServerConfig(Config):
         # https://github.com/matrix-org/synapse/blob/master/docs/postgres.rst
         #
         # If you want to use federation with SQLite regardless, you can
-        # uncomment the line below, but be aware that it can make Synapse
-        # malfunction and be very laggy, especially when joining large rooms.
-        # This option defaults to 'false' when using SQLite and 'true'
-        # otherwise.
+        # uncomment the line below. This option defaults to 'false' when using
+        # SQLite and 'true' otherwise. It is ignored when using PostgreSQL.
         #
-        #enable_federation_can_cause_bad_perfs_with_sqlite = true
+        #
+        #enable_federation_with_sqlite_can_cause_bad_perfs = true
         """ % locals()
 
     def read_arguments(self, args):

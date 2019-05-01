@@ -118,6 +118,8 @@ def default_config(name):
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
+
+        "enable_federation_with_sqlite_can_cause_bad_perfs": True,
     }
 
     config = HomeServerConfig()
@@ -185,8 +187,6 @@ def default_config(name):
     # disable user directory updates, because they get done in the
     # background, which upsets the test runner.
     config.update_user_directory = False
-
-    config.enable_federation = True
 
     return config
 
