@@ -28,6 +28,7 @@ import synapse
 from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
+    RestServlet,
     assert_params_in_dict,
     parse_integer,
     parse_json_object_from_request,
@@ -36,16 +37,17 @@ from synapse.http.servlet import (
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
 
-from .base import ClientV1RestServlet, client_path_patterns
+from .base import client_path_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class UsersRestServlet(ClientV1RestServlet):
+class UsersRestServlet(RestServlet):
     PATTERNS = client_path_patterns("/admin/users/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
-        super(UsersRestServlet, self).__init__(hs)
+        self.hs = hs
+        self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
@@ -69,8 +71,11 @@ class UsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class VersionServlet(ClientV1RestServlet):
+class VersionServlet(RestServlet):
     PATTERNS = client_path_patterns("/admin/server_version")
+
+    def __init__(self, hs):
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -88,7 +93,7 @@ class VersionServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class UserRegisterServlet(ClientV1RestServlet):
+class UserRegisterServlet(RestServlet):
     """
     Attributes:
          NONCE_TIMEOUT (int): Seconds until a generated nonce won't be accepted
@@ -99,7 +104,6 @@ class UserRegisterServlet(ClientV1RestServlet):
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
-        super(UserRegisterServlet, self).__init__(hs)
         self.handlers = hs.get_handlers()
         self.reactor = hs.get_reactor()
         self.nonces = {}
@@ -226,11 +230,12 @@ class UserRegisterServlet(ClientV1RestServlet):
         defer.returnValue((200, result))
 
 
-class WhoisRestServlet(ClientV1RestServlet):
+class WhoisRestServlet(RestServlet):
     PATTERNS = client_path_patterns("/admin/whois/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
-        super(WhoisRestServlet, self).__init__(hs)
+        self.hs = hs
+        self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
@@ -251,12 +256,12 @@ class WhoisRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class PurgeMediaCacheRestServlet(ClientV1RestServlet):
+class PurgeMediaCacheRestServlet(RestServlet):
     PATTERNS = client_path_patterns("/admin/purge_media_cache")
 
     def __init__(self, hs):
         self.media_repository = hs.get_media_repository()
-        super(PurgeMediaCacheRestServlet, self).__init__(hs)
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -274,7 +279,7 @@ class PurgeMediaCacheRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class PurgeHistoryRestServlet(ClientV1RestServlet):
+class PurgeHistoryRestServlet(RestServlet):
     PATTERNS = client_path_patterns(
         "/admin/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
@@ -285,9 +290,9 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
         Args:
             hs (synapse.server.HomeServer)
         """
-        super(PurgeHistoryRestServlet, self).__init__(hs)
         self.pagination_handler = hs.get_pagination_handler()
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id):
@@ -371,7 +376,7 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
         }))
 
 
-class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
+class PurgeHistoryStatusRestServlet(RestServlet):
     PATTERNS = client_path_patterns(
         "/admin/purge_history_status/(?P<purge_id>[^/]+)"
     )
@@ -382,8 +387,8 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
         Args:
             hs (synapse.server.HomeServer)
         """
-        super(PurgeHistoryStatusRestServlet, self).__init__(hs)
         self.pagination_handler = hs.get_pagination_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, purge_id):
@@ -400,12 +405,12 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
         defer.returnValue((200, purge_status.asdict()))
 
 
-class DeactivateAccountRestServlet(ClientV1RestServlet):
+class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = client_path_patterns("/admin/deactivate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
-        super(DeactivateAccountRestServlet, self).__init__(hs)
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
@@ -438,7 +443,7 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         }))
 
 
-class ShutdownRoomRestServlet(ClientV1RestServlet):
+class ShutdownRoomRestServlet(RestServlet):
     """Shuts down a room by removing all local users from the room and blocking
     all future invites and joins to the room. Any local aliases will be repointed
     to a new room created by `new_room_user_id` and kicked users will be auto
@@ -452,12 +457,13 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
     )
 
     def __init__(self, hs):
-        super(ShutdownRoomRestServlet, self).__init__(hs)
+        self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
@@ -564,15 +570,15 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         }))
 
 
-class QuarantineMediaInRoom(ClientV1RestServlet):
+class QuarantineMediaInRoom(RestServlet):
     """Quarantines all media in a room so that no one can download it via
     this server.
     """
     PATTERNS = client_path_patterns("/admin/quarantine_media/(?P<room_id>[^/]+)")
 
     def __init__(self, hs):
-        super(QuarantineMediaInRoom, self).__init__(hs)
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
@@ -588,13 +594,12 @@ class QuarantineMediaInRoom(ClientV1RestServlet):
         defer.returnValue((200, {"num_quarantined": num_quarantined}))
 
 
-class ListMediaInRoom(ClientV1RestServlet):
+class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room.
     """
     PATTERNS = client_path_patterns("/admin/room/(?P<room_id>[^/]+)/media")
 
     def __init__(self, hs):
-        super(ListMediaInRoom, self).__init__(hs)
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -609,7 +614,7 @@ class ListMediaInRoom(ClientV1RestServlet):
         defer.returnValue((200, {"local": local_mxcs, "remote": remote_mxcs}))
 
 
-class ResetPasswordRestServlet(ClientV1RestServlet):
+class ResetPasswordRestServlet(RestServlet):
     """Post request to allow an administrator reset password for a user.
     This needs user to have administrator access in Synapse.
         Example:
@@ -626,7 +631,6 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        super(ResetPasswordRestServlet, self).__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
         self._set_password_handler = hs.get_set_password_handler()
@@ -653,7 +657,7 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class GetUsersPaginatedRestServlet(ClientV1RestServlet):
+class GetUsersPaginatedRestServlet(RestServlet):
     """Get request to get specific number of users from Synapse.
     This needs user to have administrator access in Synapse.
         Example:
@@ -666,7 +670,6 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        super(GetUsersPaginatedRestServlet, self).__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
@@ -736,7 +739,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class SearchUsersRestServlet(ClientV1RestServlet):
+class SearchUsersRestServlet(RestServlet):
     """Get request to search user table for specific users according to
     search term.
     This needs user to have administrator access in Synapse.
@@ -750,7 +753,6 @@ class SearchUsersRestServlet(ClientV1RestServlet):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        super(SearchUsersRestServlet, self).__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
@@ -784,15 +786,15 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class DeleteGroupAdminRestServlet(ClientV1RestServlet):
+class DeleteGroupAdminRestServlet(RestServlet):
     """Allows deleting of local groups
     """
     PATTERNS = client_path_patterns("/admin/delete_group/(?P<group_id>[^/]*)")
 
     def __init__(self, hs):
-        super(DeleteGroupAdminRestServlet, self).__init__(hs)
         self.group_server = hs.get_groups_server_handler()
         self.is_mine_id = hs.is_mine_id
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, group_id):
@@ -809,7 +811,7 @@ class DeleteGroupAdminRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class AccountValidityRenewServlet(ClientV1RestServlet):
+class AccountValidityRenewServlet(RestServlet):
     PATTERNS = client_path_patterns("/admin/account_validity/validity$")
 
     def __init__(self, hs):
@@ -817,8 +819,6 @@ class AccountValidityRenewServlet(ClientV1RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(AccountValidityRenewServlet, self).__init__(hs)
-
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
