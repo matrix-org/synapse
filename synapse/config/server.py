@@ -333,7 +333,9 @@ class ServerConfig(Config):
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
-        # 'false'.
+        # 'false'. Note that profile data is also available via the federation
+        # API, so this setting is of limited value if federation is enabled on
+        # the server.
         #
         #require_auth_for_profile_requests: true
 

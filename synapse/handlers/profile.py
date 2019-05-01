@@ -116,9 +116,7 @@ class BaseProfileHandler(BaseHandler):
             defer.returnValue(profile or {})
 
     @defer.inlineCallbacks
-    def get_displayname(self, target_user, requester=None):
-        yield self.check_profile_query_allowed(target_user, requester)
-
+    def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):
             try:
                 displayname = yield self.store.get_profile_displayname(
@@ -180,9 +178,7 @@ class BaseProfileHandler(BaseHandler):
         yield self._update_join_states(requester, target_user)
 
     @defer.inlineCallbacks
-    def get_avatar_url(self, target_user, requester=None):
-        yield self.check_profile_query_allowed(target_user, requester)
-
+    def get_avatar_url(self, target_user):
         if self.hs.is_mine(target_user):
             try:
                 avatar_url = yield self.store.get_profile_avatar_url(
@@ -309,25 +305,26 @@ class BaseProfileHandler(BaseHandler):
         # be None when this function is called outside of a profile query, e.g.
         # when building a membership event. In this case, we must allow the
         # lookup.
-        if self.hs.config.require_auth_for_profile_requests and requester:
-            try:
-                requester_rooms = yield self.store.get_rooms_for_user(
-                    requester.to_string()
-                )
-                target_user_rooms = yield self.store.get_rooms_for_user(
-                    target_user.to_string(),
-                )
+        if not (self.hs.config.require_auth_for_profile_requests and requester):
+            return
 
-                # Check if the length of the intersection between the room lists
-                # for both users is 0.
-                if not len(requester_rooms.intersection(target_user_rooms)):
-                    raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
-            except StoreError as e:
-                if e.code == 404:
-                    # This likely means that one of the users doesn't exist,
-                    # so we act as if we couldn't find the profile.
-                    raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
-                raise
+        try:
+            requester_rooms = yield self.store.get_rooms_for_user(
+                requester.to_string()
+            )
+            target_user_rooms = yield self.store.get_rooms_for_user(
+                target_user.to_string(),
+            )
+
+            # Check if the room lists have no elements in common.
+            if requester_rooms.isdisjoint(target_user_rooms):
+                raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
+        except StoreError as e:
+            if e.code == 404:
+                # This likely means that one of the users doesn't exist,
+                # so we act as if we couldn't find the profile.
+                raise SynapseError(403, "Profile isn't available", Codes.FORBIDDEN)
+            raise
 
 
 class MasterProfileHandler(BaseProfileHandler):

@@ -39,9 +39,9 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
         user = UserID.from_string(user_id)
 
-        displayname = yield self.profile_handler.get_displayname(
-            user, requester=requester_user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        displayname = yield self.profile_handler.get_displayname(user)
 
         ret = {}
         if displayname is not None:
@@ -88,9 +88,9 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
         user = UserID.from_string(user_id)
 
-        avatar_url = yield self.profile_handler.get_avatar_url(
-            user, requester=requester_user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        avatar_url = yield self.profile_handler.get_avatar_url(user, requester_user)
 
         ret = {}
         if avatar_url is not None:
@@ -136,12 +136,10 @@ class ProfileRestServlet(ClientV1RestServlet):
 
         user = UserID.from_string(user_id)
 
-        displayname = yield self.profile_handler.get_displayname(
-            user, requester=requester_user,
-        )
-        avatar_url = yield self.profile_handler.get_avatar_url(
-            user, requester=requester_user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        displayname = yield self.profile_handler.get_displayname(user)
+        avatar_url = yield self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if displayname is not None:
