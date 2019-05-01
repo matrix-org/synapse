@@ -501,7 +501,7 @@ class ServerConfig(Config):
         # Used by phonehome stats to group together related servers.
         #server_context: context
 
-        # Using SQLite with Synapse induces a severe degradation in performances
+        # Using SQLite with Synapse induces a severe degradation in performance
         # compared to using PostgreSQL. SQLite should only be used for personal
         # testing. Production instances should use PostgreSQL instead. You can
         # find documentation on setting up PostgreSQL with Synapse here:
