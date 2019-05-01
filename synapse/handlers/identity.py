@@ -420,7 +420,7 @@ class IdentityHandler(BaseHandler):
             raise e.to_synapse_error()
         except IOError as e:
             logger.info("Failed to contact %r: %s", id_server, e)
-            raise ProxiedRequestError(503, "Failed to contact homeserver")
+            raise ProxiedRequestError(503, "Failed to contact identity server")
 
         defer.returnValue(data)
 
