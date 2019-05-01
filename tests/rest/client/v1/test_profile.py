@@ -193,7 +193,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def test_not_in_shared_room(self):
         self.ensure_requester_left_room()
 
-        self.try_fetch_profile(403, self.requester_tok)
+        self.try_fetch_profile(403, access_token=self.requester_tok)
 
     def test_in_shared_room(self):
         self.ensure_requester_left_room()
@@ -207,9 +207,27 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
         self.try_fetch_profile(200, self.requester_tok)
 
     def try_fetch_profile(self, expected_code, access_token=None):
+        self.request_profile(
+            expected_code,
+            access_token=access_token
+        )
+
+        self.request_profile(
+            expected_code,
+            url_suffix="/displayname",
+            access_token=access_token,
+        )
+
+        self.request_profile(
+            expected_code,
+            url_suffix="/avatar_url",
+            access_token=access_token,
+        )
+
+    def request_profile(self, expected_code, url_suffix="", access_token=None):
         request, channel = self.make_request(
             "GET",
-            self.profile_url,
+            self.profile_url + url_suffix,
             access_token=access_token,
         )
         self.render(request)
