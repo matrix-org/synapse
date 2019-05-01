@@ -90,7 +90,7 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
         yield self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        avatar_url = yield self.profile_handler.get_avatar_url(user, requester_user)
+        avatar_url = yield self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if avatar_url is not None:
