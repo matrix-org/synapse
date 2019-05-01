@@ -62,7 +62,7 @@ class ServerConfig(Config):
         # Whether to enable federation with SQLite. Can cause bad performance.
         # Ignored when not using SQLite (in which case federation is always
         # enabled unless federation_domain_whitelist is an empty list).
-        if config.get("database", {"name": "sqlite3"}).get("name") == "sqlite3":
+        if config.get("database", {}).get("name", "sqlite3") == "sqlite3":
             self.enable_federation = config.get(
                 "enable_federation_with_sqlite_can_cause_bad_perfs",
                 False,
