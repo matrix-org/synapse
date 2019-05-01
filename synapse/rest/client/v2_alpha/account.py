@@ -501,7 +501,7 @@ class ThreepidLookupRestServlet(RestServlet):
         query_params = request.args
         assert_params_in_dict(query_params, [b"medium", b"address", b"id_server"])
 
-        # Retrieve address and medium from the request parameters
+        # Retrieve needed information from query parameters
         medium = parse_string(request, "medium")
         address = parse_string(request, "address")
         id_server = parse_string(request, "id_server")
