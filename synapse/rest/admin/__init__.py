@@ -773,7 +773,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        assert_user_is_admin(self.auth, requester.user)
+        yield assert_user_is_admin(self.auth, requester.user)
 
         if not self.is_mine_id(group_id):
             raise SynapseError(400, "Can only delete local groups")
