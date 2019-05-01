@@ -42,6 +42,7 @@ class ProfileTestCase(unittest.TestCase):
                 "set_displayname",
                 "get_avatar_url",
                 "set_avatar_url",
+                "check_profile_query_allowed",
             ]
         )
 
