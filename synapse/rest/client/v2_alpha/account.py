@@ -497,7 +497,7 @@ class ThreepidLookupRestServlet(RestServlet):
         """
         yield self.auth.get_user_by_req(request)
 
-        # Extract query parameters
+        # Verify query parameters
         query_params = request.args
         assert_params_in_dict(query_params, [b"medium", b"address", b"id_server"])
 
