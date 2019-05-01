@@ -18,8 +18,9 @@ from mock import Mock
 
 from twisted.internet import defer
 
+import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
-from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v1 import login
 
 from tests import unittest
 
@@ -205,7 +206,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
 class ClientIpAuthTestCase(unittest.HomeserverTestCase):
 
-    servlets = [admin.register_servlets, login.register_servlets]
+    servlets = [synapse.rest.admin.register_servlets, login.register_servlets]
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver()

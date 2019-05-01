@@ -13,11 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import synapse.rest.admin
 from synapse.http.server import JsonResource
 from synapse.rest.client import versions
 from synapse.rest.client.v1 import (
-    admin,
     directory,
     events,
     initial_sync,
@@ -118,4 +117,4 @@ class ClientRestResource(JsonResource):
         account_validity.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
-        admin.register_servlets(hs, client_resource)
+        synapse.rest.admin.register_servlets(hs, client_resource)

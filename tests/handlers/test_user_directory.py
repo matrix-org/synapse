@@ -14,8 +14,9 @@
 # limitations under the License.
 from mock import Mock
 
+import synapse.rest.admin
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.storage.roommember import ProfileInfo
 
@@ -29,7 +30,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets,
         room.register_servlets,
     ]
 
@@ -327,7 +328,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         user_directory.register_servlets,
         room.register_servlets,
         login.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
