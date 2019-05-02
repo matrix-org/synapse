@@ -4,10 +4,11 @@ import os
 
 import pkg_resources
 
+import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import account_validity, register, sync
 
 from tests import unittest
@@ -198,7 +199,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         register.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets,
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
@@ -307,7 +308,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
     skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         register.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets,
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,

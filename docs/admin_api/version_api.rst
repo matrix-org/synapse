@@ -8,7 +8,7 @@ contains Synapse version information).
 
 The api is::
 
-    GET /_matrix/client/r0/admin/server_version
+    GET /_synapse/admin/v1/server_version
 
 including an ``access_token`` of a server admin.
 
