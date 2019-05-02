@@ -21,6 +21,7 @@ from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
+from netaddr import IPSet
 
 from synapse.api.errors import RequestSendFailed, SynapseError
 from synapse.http.matrixfederationclient import (
@@ -213,9 +214,8 @@ class FederationClientTests(HomeserverTestCase):
 
     def test_client_ip_range_blacklist(self):
         """Ensure that Synapse does not try to connect to blacklisted IPs"""
-        # Set up the ip_range blacklist
-        from netaddr import IPSet
 
+        # Set up the ip_range blacklist
         self.hs.config.federation_ip_range_blacklist = IPSet([
             "127.0.0.0/8",
             "fe80::/64",
