@@ -710,8 +710,9 @@ class RoomMemberHandler(object):
                     Codes.FORBIDDEN,
                 )
 
-        # Check whether we'll be ratelimited
-        yield self.base_handler.ratelimit(requester, update=False)
+        # We need to rate limit *before* we send out any 3PID invites, so we
+        # can't just rely on the standard ratelimiting of events.
+        yield self.base_handler.ratelimit(requester)
 
         invitee = yield self._lookup_3pid(
             id_server, medium, address
