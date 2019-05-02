@@ -97,7 +97,7 @@ class DirectoryHandler(BaseHandler):
         Returns:
             Deferred
         """
-
+        # noop
         user_id = requester.user.to_string()
 
         service = requester.app_service
