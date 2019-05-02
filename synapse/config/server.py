@@ -134,6 +134,12 @@ class ServerConfig(Config):
         # sending out any replication updates.
         self.replication_torture_level = config.get("replication_torture_level")
 
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to True.
+        self.require_membership_for_aliases = config.get(
+            "require_membership_for_aliases", True,
+        )
+
         self.listeners = []
         for listener in config.get("listeners", []):
             if not isinstance(listener.get("port", None), int):
@@ -490,6 +496,11 @@ class ServerConfig(Config):
 
         # Used by phonehome stats to group together related servers.
         #server_context: context
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to 'true'.
+        #
+        #require_membership_for_aliases: false
         """ % locals()
 
     def read_arguments(self, args):

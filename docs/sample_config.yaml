@@ -239,6 +239,11 @@ listeners:
 # Used by phonehome stats to group together related servers.
 #server_context: context
 
+# Whether to require a user to be in the room to add an alias to it.
+# Defaults to 'true'.
+#
+#require_membership_for_aliases: false
+
 
 ## TLS ##
 
