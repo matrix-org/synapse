@@ -37,6 +37,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
+from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
 
@@ -813,16 +814,26 @@ class AccountValidityRenewServlet(RestServlet):
         }
         defer.returnValue((200, res))
 
+########################################################################################
+#
+# please don't add more servlets here: this file is already long and unwieldy. Put
+# them in separate files within the 'admin' package.
+#
+########################################################################################
+
 
 class AdminRestResource(JsonResource):
     """The REST resource which gets mounted at /_synapse/admin"""
 
     def __init__(self, hs):
         JsonResource.__init__(self, hs, canonical_json=False)
-        register_servlets(hs, self)
+
+        register_servlets_for_client_rest_resource(hs, self)
+        SendServerNoticeServlet(hs).register(self)
 
 
-def register_servlets(hs, http_server):
+def register_servlets_for_client_rest_resource(hs, http_server):
+    """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
@@ -839,3 +850,5 @@ def register_servlets(hs, http_server):
     VersionServlet(hs).register(http_server)
     DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
+    # don't add more things here: new servlets should only be exposed on
+    # /_synapse/admin so should not go here. Instead register them in AdminRestResource.

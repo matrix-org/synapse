@@ -30,7 +30,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
     ]
 
@@ -328,7 +328,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         user_directory.register_servlets,
         room.register_servlets,
         login.register_servlets,
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
     ]
 
     def make_homeserver(self, reactor, clock):

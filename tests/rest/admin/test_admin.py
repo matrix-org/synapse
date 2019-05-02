@@ -30,7 +30,7 @@ from tests import unittest
 class VersionTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
     ]
 
@@ -63,7 +63,7 @@ class VersionTestCase(unittest.HomeserverTestCase):
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
 
-    servlets = [synapse.rest.admin.register_servlets]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
 
@@ -359,7 +359,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
 class ShutdownRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         events.register_servlets,
         room.register_servlets,
@@ -496,7 +496,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
 class DeleteGroupTestCase(unittest.HomeserverTestCase):
     servlets = [
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         groups.register_servlets,
     ]

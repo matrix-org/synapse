@@ -27,7 +27,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
     servlets = [
         auth.register_servlets,
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         register.register_servlets,
     ]
     hijack_auth = False

@@ -117,4 +117,6 @@ class ClientRestResource(JsonResource):
         account_validity.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
-        synapse.rest.admin.register_servlets(hs, client_resource)
+        synapse.rest.admin.register_servlets_for_client_rest_resource(
+            hs, client_resource
+        )

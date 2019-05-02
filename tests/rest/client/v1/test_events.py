@@ -29,7 +29,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
     servlets = [
         events.register_servlets,
         room.register_servlets,
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
     ]
 

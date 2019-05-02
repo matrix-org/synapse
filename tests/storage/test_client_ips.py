@@ -206,7 +206,10 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
 
 class ClientIpAuthTestCase(unittest.HomeserverTestCase):
 
-    servlets = [synapse.rest.admin.register_servlets, login.register_servlets]
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+    ]
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver()

@@ -11,7 +11,7 @@ LOGIN_URL = b"/_matrix/client/r0/login"
 class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
     ]
 
