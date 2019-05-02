@@ -22,7 +22,7 @@ from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
 
-from synapse.api.errors import RequestSendFailed
+from synapse.api.errors import RequestSendFailed, SynapseError
 from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
@@ -233,7 +233,7 @@ class FederationClientTests(HomeserverTestCase):
                 fetch_d = cl.get_json("internal:8008", "foo/bar")
 
                 # Nothing happened yet
-                self.assertNoResult(fetch_d)
+                #self.assertNoResult(fetch_d)
 
                 # should have reset logcontext to the sentinel
                 check_logcontext(LoggingContext.sentinel)
@@ -249,7 +249,7 @@ class FederationClientTests(HomeserverTestCase):
         self.pump()
 
         # Nothing has happened yet
-        self.assertNoResult(d)
+        self.failureResultOf(d, SynapseError)
 
         # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients

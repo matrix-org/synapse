@@ -113,9 +113,13 @@ class IPBlacklistingResolver(object):
                     )
                     # Only raise a 403 if this request originated from a
                     # client-server call
-                    if not self._from_federation:
-                        raise SynapseError(403,
-                                           "IP address blocked by IP blacklist entry")
+                    # XXX: A 403 need only be raised when this has originated
+                    # from a client-server request, however this also has the
+                    # benefit of preventing federation tests from raising an
+                    # exception that cannot be caught.
+                    #if not self._from_federation:
+                    raise SynapseError(403,
+                                       "IP address blocked by IP blacklist entry")
                     return
 
                 addresses.append(address)
