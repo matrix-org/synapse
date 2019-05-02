@@ -23,7 +23,7 @@ from tests import unittest
 class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         capabilities.register_servlets,
         login.register_servlets,
     ]

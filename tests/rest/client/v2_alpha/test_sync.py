@@ -73,7 +73,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
 class SyncTypingTests(unittest.HomeserverTestCase):
 
     servlets = [
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
         sync.register_servlets,

@@ -32,7 +32,7 @@ except Exception:
 class ConsentResourceTestCase(unittest.HomeserverTestCase):
     skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
-        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
