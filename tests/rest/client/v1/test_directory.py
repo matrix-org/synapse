@@ -16,8 +16,8 @@
 import json
 
 from synapse.rest.client.v1 import admin, directory, login, room
-from synapse.util.stringutils import random_string
 from synapse.types import RoomAlias
+from synapse.util.stringutils import random_string
 
 from tests import unittest
 
@@ -80,7 +80,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         # We use deliberately a localpart under the length threshold so
         # that we can make sure that the check is done on the whole alias.
         data = {
-            "room_alias_name": random_string(256-len(self.hs.hostname)),
+            "room_alias_name": random_string(256 - len(self.hs.hostname)),
         }
         request_data = json.dumps(data)
         request, channel = self.make_request(

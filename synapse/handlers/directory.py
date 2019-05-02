@@ -19,7 +19,7 @@ import string
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, MAX_ALIAS_LENGTH
+from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
