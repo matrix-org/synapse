@@ -340,7 +340,6 @@ class EventCreationHandler(object):
                         "You must be in the room to create an alias for it",
                     )
 
-
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
         if require_consent and not is_exempt:
             yield self.assert_accepted_privacy_policy(requester)
