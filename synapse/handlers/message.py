@@ -22,7 +22,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, MAX_ALIAS_LENGTH, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -228,6 +228,7 @@ class EventCreationHandler(object):
         self.ratelimiter = hs.get_ratelimiter()
         self.notifier = hs.get_notifier()
         self.config = hs.config
+        self.require_membership_for_aliases = hs.config.require_membership_for_aliases
 
         self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
 
@@ -319,6 +320,26 @@ class EventCreationHandler(object):
                         "Failed to get profile information for %r: %s",
                         target, e
                     )
+
+        if builder.type == EventTypes.Aliases:
+            if "aliases" in builder.content:
+                for alias in builder.content["aliases"]:
+                    if len(alias) > MAX_ALIAS_LENGTH:
+                        raise SynapseError(
+                            400,
+                            ("Can't create aliases longer than"
+                             " %s characters" % MAX_ALIAS_LENGTH),
+                            Codes.INVALID_PARAM,
+                        )
+
+            if self.require_membership_for_aliases:
+                rooms_for_user = yield self.store.get_rooms_for_user(builder.sender)
+                if builder.room_id not in rooms_for_user:
+                    raise AuthError(
+                        403,
+                        "You must be in the room to create an alias for it",
+                    )
+
 
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
         if require_consent and not is_exempt:
