@@ -1,4 +1,4 @@
-/* Copyright 2014-2016 OpenMarket Ltd
+/* Copyright 2019 New Vector Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,15 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS room_aliases(
-    room_alias TEXT NOT NULL,
-    room_id TEXT NOT NULL
+DROP TABLE IF EXISTS account_validity;
+
+-- Track what users are in public rooms.
+CREATE TABLE IF NOT EXISTS account_validity (
+    user_id TEXT PRIMARY KEY,
+    expiration_ts_ms BIGINT NOT NULL,
+    email_sent BOOLEAN NOT NULL,
+    renewal_token TEXT
 );
 
-CREATE TABLE IF NOT EXISTS room_alias_servers(
-    room_alias TEXT NOT NULL,
-    server TEXT NOT NULL
-);
+CREATE INDEX account_validity_email_sent_idx ON account_validity(email_sent, expiration_ts_ms)
+CREATE UNIQUE INDEX account_validity_renewal_string_idx ON account_validity(renewal_token)

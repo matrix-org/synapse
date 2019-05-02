@@ -37,6 +37,7 @@ class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
+        self.server_context = config.get("server_context", None)
 
         try:
             parse_and_validate_server_name(self.server_name)
@@ -113,11 +114,13 @@ class ServerConfig(Config):
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", None
+            "federation_domain_whitelist", None,
         )
-        # turn the whitelist into a hash for speed of lookup
+
         if federation_domain_whitelist is not None:
+            # turn the whitelist into a hash for speed of lookup
             self.federation_domain_whitelist = {}
+
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
@@ -130,6 +133,12 @@ class ServerConfig(Config):
         # for testing. The value defines the number of milliseconds to pause before
         # sending out any replication updates.
         self.replication_torture_level = config.get("replication_torture_level")
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to True.
+        self.require_membership_for_aliases = config.get(
+            "require_membership_for_aliases", True,
+        )
 
         self.listeners = []
         for listener in config.get("listeners", []):
@@ -385,8 +394,8 @@ class ServerConfig(Config):
         #
         # Valid resource names are:
         #
-        #   client: the client-server API (/_matrix/client). Also implies 'media' and
-        #       'static'.
+        #   client: the client-server API (/_matrix/client), and the synapse admin
+        #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
         #   consent: user consent forms (/_matrix/consent). See
         #       docs/consent_tracking.md.
@@ -484,6 +493,14 @@ class ServerConfig(Config):
         #mau_limit_reserved_threepids:
         #  - medium: 'email'
         #    address: 'reserved_user@example.com'
+
+        # Used by phonehome stats to group together related servers.
+        #server_context: context
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to 'true'.
+        #
+        #require_membership_for_aliases: false
         """ % locals()
 
     def read_arguments(self, args):
