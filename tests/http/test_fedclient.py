@@ -233,7 +233,7 @@ class FederationClientTests(HomeserverTestCase):
                 fetch_d = cl.get_json("internal:8008", "foo/bar")
 
                 # Nothing happened yet
-                #self.assertNoResult(fetch_d)
+                self.assertNoResult(fetch_d)
 
                 # should have reset logcontext to the sentinel
                 check_logcontext(LoggingContext.sentinel)
@@ -249,7 +249,7 @@ class FederationClientTests(HomeserverTestCase):
         self.pump()
 
         # Nothing has happened yet
-        self.failureResultOf(d, SynapseError)
+        self.assertNoResult(d)
 
         # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients

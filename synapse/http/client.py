@@ -76,7 +76,7 @@ class IPBlacklistingResolver(object):
     addresses, preventing DNS rebinding attacks on URL preview.
     """
 
-    def __init__(self, reactor, ip_whitelist, ip_blacklist, federation=False):
+    def __init__(self, reactor, ip_whitelist, ip_blacklist):
         """
         Args:
             reactor (twisted.internet.reactor)
@@ -87,7 +87,6 @@ class IPBlacklistingResolver(object):
         self._reactor = reactor
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
-        self._from_federation = federation
 
     def resolveHostName(self, recv, hostname, portNumber=0):
 
