@@ -92,8 +92,30 @@ class IPBlacklistingResolver(object):
     def resolveHostName(self, recv, hostname, portNumber=0):
 
         r = recv()
-        d = defer.Deferred()
         addresses = []
+
+        def _callback():
+            r.resolutionBegan(None)
+
+            has_bad_ip = False
+            for i in addresses:
+                ip_address = IPAddress(i.host)
+
+                if check_against_blacklist(
+                    ip_address, self._ip_whitelist, self._ip_blacklist
+                ):
+                    logger.info(
+                        "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
+                    )
+                    has_bad_ip = True
+
+            # if we have a blacklisted IP, we'd like to raise an error to block the
+            # request, but all we can really do from here is claim that there were no
+            # valid results.
+            if not has_bad_ip:
+                for i in addresses:
+                    r.addressResolved(i)
+            r.resolutionComplete()
 
         @provider(IResolutionReceiver)
         class EndpointReceiver(object):
@@ -103,42 +125,15 @@ class IPBlacklistingResolver(object):
 
             @staticmethod
             def addressResolved(address):
-                ip_address = IPAddress(address.host)
-
-                if check_against_blacklist(
-                    ip_address, self._ip_whitelist, self._ip_blacklist
-                ):
-                    logger.info(
-                        "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
-                    )
-                    # Only raise a 403 if this request originated from a
-                    # client-server call
-                    # XXX: A 403 need only be raised when this has originated
-                    # from a client-server request, however this also has the
-                    # benefit of preventing federation tests from raising an
-                    # exception that cannot be caught.
-                    #if not self._from_federation:
-                    raise SynapseError(403,
-                                       "IP address blocked by IP blacklist entry")
-                    return
-
                 addresses.append(address)
 
             @staticmethod
             def resolutionComplete():
-                d.callback(addresses)
+                _callback()
 
         self._reactor.nameResolver.resolveHostName(
             EndpointReceiver, hostname, portNumber=portNumber
         )
-
-        def _callback(addrs):
-            r.resolutionBegan(None)
-            for i in addrs:
-                r.addressResolved(i)
-            r.resolutionComplete()
-
-        d.addCallback(_callback)
 
         return r
 
