@@ -36,6 +36,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
 
@@ -75,15 +76,7 @@ class UsersRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
-
-        # To allow all users to get the users list
-        # if not is_admin and target_user != auth_user:
-        #     raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
@@ -101,11 +94,7 @@ class VersionServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         ret = {
             'server_version': get_version_string(synapse),
@@ -265,10 +254,9 @@ class WhoisRestServlet(RestServlet):
         target_user = UserID.from_string(user_id)
         requester = yield self.auth.get_user_by_req(request)
         auth_user = requester.user
-        is_admin = yield self.auth.is_server_admin(requester.user)
 
-        if not is_admin and target_user != auth_user:
-            raise AuthError(403, "You are not a server admin")
+        if target_user != auth_user:
+            yield assert_user_is_admin(self.auth, auth_user)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
@@ -287,11 +275,7 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         before_ts = parse_integer(request, "before_ts", required=True)
         logger.info("before_ts: %r", before_ts)
@@ -318,11 +302,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
 
@@ -414,11 +394,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, purge_id):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         purge_status = self.pagination_handler.get_purge_status(purge_id)
         if purge_status is None:
@@ -436,6 +412,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
+        yield assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
@@ -446,11 +423,6 @@ class DeactivateAccountRestServlet(RestServlet):
             )
 
         UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
 
         result = yield self._deactivate_account_handler.deactivate_account(
             target_user_id, erase,
@@ -490,9 +462,7 @@ class ShutdownRoomRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_user_is_admin(self.auth, requester.user)
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ["new_room_user_id"])
@@ -605,9 +575,7 @@ class QuarantineMediaInRoom(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_user_is_admin(self.auth, requester.user)
 
         num_quarantined = yield self.store.quarantine_media_ids_in_room(
             room_id, requester.user.to_string(),
@@ -662,12 +630,10 @@ class ResetPasswordRestServlet(RestServlet):
         """Post request to allow an administrator reset password for a user.
         This needs user to have administrator access in Synapse.
         """
-        UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        yield assert_user_is_admin(self.auth, requester.user)
 
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        UserID.from_string(target_user_id)
 
         params = parse_json_object_from_request(request)
         assert_params_in_dict(params, ["new_password"])
@@ -701,16 +667,9 @@ class GetUsersPaginatedRestServlet(RestServlet):
         """Get request to get specific number of users from Synapse.
         This needs user to have administrator access in Synapse.
         """
+        yield assert_requester_is_admin(self.auth, request)
+
         target_user = UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
-
-        # To allow all users to get the users list
-        # if not is_admin and target_user != auth_user:
-        #     raise AuthError(403, "You are not a server admin")
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
@@ -741,12 +700,8 @@ class GetUsersPaginatedRestServlet(RestServlet):
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
         """
+        yield assert_requester_is_admin(self.auth, request)
         UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
 
         order = "name"  # order by name in user table
         params = parse_json_object_from_request(request)
@@ -785,12 +740,9 @@ class SearchUsersRestServlet(RestServlet):
         search term.
         This needs user to have a administrator access in Synapse.
         """
-        target_user = UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        yield assert_requester_is_admin(self.auth, request)
 
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        target_user = UserID.from_string(target_user_id)
 
         # To allow all users to get the users list
         # if not is_admin and target_user != auth_user:
@@ -821,10 +773,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_user_is_admin(self.auth, requester.user)
 
         if not self.is_mine_id(group_id):
             raise SynapseError(400, "Can only delete local groups")
@@ -847,11 +796,7 @@ class AccountValidityRenewServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request)
 
