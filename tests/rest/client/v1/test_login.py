@@ -1,6 +1,7 @@
 import json
 
-from synapse.rest.client.v1 import admin, login
+import synapse.rest.admin
+from synapse.rest.client.v1 import login
 
 from tests import unittest
 
@@ -10,7 +11,7 @@ LOGIN_URL = b"/_matrix/client/r0/login"
 class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets,
         login.register_servlets,
     ]
 

@@ -15,7 +15,8 @@
 
 import json
 
-from synapse.rest.client.v1 import admin, login, room
+import synapse.rest.admin
+from synapse.rest.client.v1 import login, room
 
 from tests import unittest
 
@@ -23,7 +24,7 @@ from tests import unittest
 class IdentityTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets,
         room.register_servlets,
         login.register_servlets,
     ]

@@ -136,8 +136,8 @@ pid_file: DATADIR/homeserver.pid
 #
 # Valid resource names are:
 #
-#   client: the client-server API (/_matrix/client). Also implies 'media' and
-#       'static'.
+#   client: the client-server API (/_matrix/client), and the synapse admin
+#       API (/_synapse/admin). Also implies 'media' and 'static'.
 #
 #   consent: user consent forms (/_matrix/consent). See
 #       docs/consent_tracking.md.
@@ -251,6 +251,11 @@ listeners:
 #
 #
 #enable_federation_with_sqlite_can_cause_bad_perfs = true
+
+# Whether to require a user to be in the room to add an alias to it.
+# Defaults to 'true'.
+#
+#require_membership_for_aliases: false
 
 
 ## TLS ##
