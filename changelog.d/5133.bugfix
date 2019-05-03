@@ -1,0 +1,1 @@
+Switch to using a cryptographically-secure random number generator for token strings, ensuring they cannot be predicted by an attacker. Thanks to @opnsec for for identifying and responsibly disclosing this issue!
