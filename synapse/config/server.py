@@ -394,8 +394,8 @@ class ServerConfig(Config):
         #
         # Valid resource names are:
         #
-        #   client: the client-server API (/_matrix/client). Also implies 'media' and
-        #       'static'.
+        #   client: the client-server API (/_matrix/client), and the synapse admin
+        #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
         #   consent: user consent forms (/_matrix/consent). See
         #       docs/consent_tracking.md.
