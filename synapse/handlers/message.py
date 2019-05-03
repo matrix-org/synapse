@@ -337,6 +337,11 @@ class EventCreationHandler(object):
             prev_events_and_hashes=prev_events_and_hashes,
         )
 
+        # In an ideal world we wouldn't need the second part of this condition. However,
+        # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
+        # behaviour, and this code is evaluated each time a new m.room.aliases event is
+        # created, which includes hitting a /directory route, therefore not including it
+        # would render the similar check in synapse.handlers.directory pointless.
         if builder.type == EventTypes.Aliases and self.require_membership_for_aliases:
             # Ideally we'd do this check in event_auth.check(), however this function
             # describes a spec'd algorithm and this limitation is lacking from the spec,
