@@ -1,3 +1,12 @@
+Synapse 0.99.3.2 (2019-05-03)
+=============================
+
+Internal Changes
+----------------
+
+- Ensure that we have `urllib3` <1.25, to resolve incompatibility with `requests`. ([\#5135](https://github.com/matrix-org/synapse/issues/5135))
+
+
 Synapse 0.99.3.1 (2019-05-03)
 =============================
 
