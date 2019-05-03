@@ -279,8 +279,11 @@ class ContentRepositoryConfig(Config):
         # synapse to issue arbitrary GET requests to your internal services,
         # causing serious security issues.
         #
-        # This must be specified if url_preview_enabled. It is recommended that you
-        # uncomment the following list as a starting point.
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
+        #
+        # This must be specified if url_preview_enabled is set. It is recommended that
+        # you uncomment the following list as a starting point.
         #
         #url_preview_ip_range_blacklist:
         #  - '127.0.0.0/8'
