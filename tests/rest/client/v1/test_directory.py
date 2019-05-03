@@ -15,7 +15,8 @@
 
 import json
 
-from synapse.rest.client.v1 import admin, directory, login, room
+from synapse.rest.admin import register_servlets
+from synapse.rest.client.v1 import directory, login, room
 from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string
 
@@ -25,7 +26,7 @@ from tests import unittest
 class DirectoryTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        register_servlets,
         directory.register_servlets,
         login.register_servlets,
         room.register_servlets,
