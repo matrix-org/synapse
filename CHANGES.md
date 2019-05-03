@@ -1,8 +1,10 @@
 Synapse 0.99.3.1 (2019-05-03)
 =============================
 
-Bugfixes
---------
+Security update
+---------------
+
+This release includes two security fixes:
 
 - Switch to using a cryptographically-secure random number generator for token strings, ensuring they cannot be predicted by an attacker. Thanks to @opnsec for identifying and responsibly disclosing this issue! ([\#5133](https://github.com/matrix-org/synapse/issues/5133))
 - Blacklist 0.0.0.0 and :: by default for URL previews. Thanks to @opnsec for identifying and responsibly disclosing this issue too! ([\#5134](https://github.com/matrix-org/synapse/issues/5134))
