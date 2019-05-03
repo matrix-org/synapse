@@ -31,6 +31,7 @@ from six.moves import urllib_parse as urlparse
 from canonicaljson import json
 
 from twisted.internet import defer
+from twisted.internet.error import DNSLookupError
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
@@ -331,6 +332,14 @@ class PreviewUrlResource(Resource):
             except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
                 logger.warn("Error downloading %s: %r", url, e)
+
+                if isinstance(e, DNSLookupError):
+                    # DNS lookup returned no results
+                    # Note: This will also be the case if the found IP address is blacklisted
+                    raise SynapseError(
+                        404, "No results found", Codes.UNKNOWN
+                    )
+
                 raise SynapseError(
                     500, "Failed to download content: %s" % (
                         traceback.format_exception_only(sys.exc_info()[0], e),

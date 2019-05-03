@@ -297,12 +297,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'No results found',
             },
         )
 
@@ -318,12 +318,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'No results found',
             },
         )
 
@@ -339,14 +339,14 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'No results found',
             },
         )
+        self.assertEqual(channel.code, 404)
 
     def test_blacklisted_ip_range_direct(self):
         """
@@ -358,12 +358,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'No results found',
             },
         )
 
@@ -414,12 +414,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         request.render(self.preview_url)
         self.pump()
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'No results found',
             },
         )
 
@@ -439,12 +439,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'No results found',
             },
         )
 
@@ -460,11 +460,11 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 404)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'No results found',
             },
         )

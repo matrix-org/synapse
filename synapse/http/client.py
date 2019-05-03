@@ -82,7 +82,6 @@ class IPBlacklistingResolver(object):
             reactor (twisted.internet.reactor)
             ip_whitelist (netaddr.IPSet)
             ip_blacklist (netaddr.IPSet)
-            federation (bool): this resolver is for federation traffic
         """
         self._reactor = reactor
         self._ip_whitelist = ip_whitelist
@@ -104,7 +103,7 @@ class IPBlacklistingResolver(object):
                     ip_address, self._ip_whitelist, self._ip_blacklist
                 ):
                     logger.info(
-                        "Dropped %s from DNS resolution to %s" % (ip_address, hostname)
+                        "Dropped %s from DNS resolution to %s due to blacklist" % (ip_address, hostname)
                     )
                     has_bad_ip = True
 
@@ -165,9 +164,9 @@ class BlacklistingAgentWrapper(Agent):
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
                 logger.info(
-                    "Blocking access to %s because of blacklist" % (ip_address,)
+                    "Blocking access to %s because of blacklist. Returning 0 results" % (ip_address,)
                 )
-                e = SynapseError(403, "IP address blocked by IP blacklist entry")
+                e = SynapseError(404, "No results found")
                 return defer.fail(Failure(e))
         except Exception:
             # Not an IP
