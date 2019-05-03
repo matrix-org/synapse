@@ -335,7 +335,8 @@ class PreviewUrlResource(Resource):
 
                 if isinstance(e, DNSLookupError):
                     # DNS lookup returned no results
-                    # Note: This will also be the case if the found IP address is blacklisted
+                    # Note: This will also be the case if the found IP address
+                    # is blacklisted
                     raise SynapseError(
                         404, "No results found", Codes.UNKNOWN
                     )
