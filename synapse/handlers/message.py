@@ -321,25 +321,6 @@ class EventCreationHandler(object):
                         target, e
                     )
 
-        if builder.type == EventTypes.Aliases:
-            if "aliases" in builder.content:
-                for alias in builder.content["aliases"]:
-                    if len(alias) > MAX_ALIAS_LENGTH:
-                        raise SynapseError(
-                            400,
-                            ("Can't create aliases longer than"
-                             " %s characters" % MAX_ALIAS_LENGTH),
-                            Codes.INVALID_PARAM,
-                        )
-
-            if self.require_membership_for_aliases:
-                rooms_for_user = yield self.store.get_rooms_for_user(builder.sender)
-                if builder.room_id not in rooms_for_user:
-                    raise AuthError(
-                        403,
-                        "You must be in the room to create an alias for it",
-                    )
-
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
         if require_consent and not is_exempt:
             yield self.assert_accepted_privacy_policy(requester)
@@ -355,6 +336,20 @@ class EventCreationHandler(object):
             requester=requester,
             prev_events_and_hashes=prev_events_and_hashes,
         )
+
+        if builder.type == EventTypes.Aliases and self.require_membership_for_aliases:
+            # Ideally we'd do this check in event_auth.check(), however this function
+            # describes a spec'd algorithm and this limitation is lacking from the spec,
+            # so we're doing it outside of check(). When/if this additional constraint
+            # gets added to the spec, this check should be moved to event_auth.check().
+            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
+            prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+            if not prev_event or prev_event.membership != Membership.JOIN:
+                raise AuthError(
+                    403,
+                    "You must be in the room to create an alias for it",
+                )
 
         self.validator.validate_new(event)
 
