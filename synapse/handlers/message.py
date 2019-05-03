@@ -337,7 +337,7 @@ class EventCreationHandler(object):
             prev_events_and_hashes=prev_events_and_hashes,
         )
 
-        if builder.type == EventTypes.Aliases:
+        if builder.type == EventTypes.Aliases and self.require_membership_for_aliases:
             # Ideally we'd do this check in event_auth.check(), however this function
             # describes a spec'd algorithm and this limitation is lacking from the spec,
             # so we're doing it outside of check(). When/if this additional constraint
