@@ -99,6 +99,9 @@ class FederationClientTests(HomeserverTestCase):
         # Deferred is still without a result
         self.assertNoResult(test_d)
 
+        # Ensure deferred resolves
+        yield test_d
+
         # Send it the HTTP response
         res_json = '{ "a": 1 }'.encode('ascii')
         protocol.dataReceived(
