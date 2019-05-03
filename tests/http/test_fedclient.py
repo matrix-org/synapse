@@ -15,13 +15,14 @@
 
 from mock import Mock
 
+from netaddr import IPSet
+
 from twisted.internet import defer
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
 from twisted.test.proto_helpers import StringTransport
 from twisted.web.client import ResponseNeverReceived
 from twisted.web.http import HTTPChannel
-from netaddr import IPSet
 
 from synapse.api.errors import RequestSendFailed, SynapseError
 from synapse.http.matrixfederationclient import (
