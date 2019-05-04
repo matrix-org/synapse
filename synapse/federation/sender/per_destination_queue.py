@@ -217,17 +217,21 @@ class PerDestinationQueue(object):
                 pending_edus = []
 
                 pending_edus.extend(self._get_rr_edus(force_flush=False))
+                pending_edus.extend(device_message_edus[:99])
 
                 # We can only include at most 100 EDUs per transactions
-                pending_edus.extend(self._pop_pending_edus(100 - len(pending_edus)))
+                # But we should keep one slot free for presence
+                to_remove = []
+                for key, val in self._pending_edus_keyed.items():
+                    if (len(pending_edus) >= 99): break
+                    pending_edus.append(val)
+                    to_remove.append(key)
 
-                pending_edus.extend(
-                    self._pending_edus_keyed.values()
-                )
+                for key in to_remove:
+                    del self._pending_edus_keyed[key]
 
-                self._pending_edus_keyed = {}
 
-                pending_edus.extend(device_message_edus)
+                pending_edus.extend(self._pop_pending_edus(99 - len(pending_edus)))
 
                 pending_presence = self._pending_presence
                 self._pending_presence = {}
