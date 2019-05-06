@@ -575,10 +575,11 @@ class EventsStore(
 
         def _get_events(txn, batch):
             sql = """
-            SELECT prev_event_id
+            SELECT prev_event_id, internal_metadata
             FROM event_edges
                 INNER JOIN events USING (event_id)
                 LEFT JOIN rejections USING (event_id)
+                LEFT JOIN event_json USING (event_id)
             WHERE
                 prev_event_id IN (%s)
                 AND NOT events.outlier
@@ -588,7 +589,11 @@ class EventsStore(
             )
 
             txn.execute(sql, batch)
-            results.extend(r[0] for r in txn)
+            results.extend(
+                r[0]
+                for r in txn
+                if not json.loads(r[1]).get("soft_failed")
+            )
 
         for chunk in batch_iter(event_ids, 100):
             yield self.runInteraction("_get_events_which_are_prevs", _get_events, chunk)
