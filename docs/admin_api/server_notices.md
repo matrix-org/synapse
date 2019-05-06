@@ -36,7 +36,7 @@ You can optionally include the following additional parameters:
 * `state_key`: Setting this will result in a state event being sent.
 
 
-Once the notice has been sent, the APU will return the following response:
+Once the notice has been sent, the API will return the following response:
 
 ```json
 {
