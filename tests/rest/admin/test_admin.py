@@ -21,6 +21,8 @@ from mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
+from synapse.http.server import JsonResource
+from synapse.rest.admin import VersionServlet
 from synapse.rest.client.v1 import events, login, room
 from synapse.rest.client.v2_alpha import groups
 
@@ -28,16 +30,15 @@ from tests import unittest
 
 
 class VersionTestCase(unittest.HomeserverTestCase):
+    url = '/_synapse/admin/v1/server_version'
 
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        login.register_servlets,
-    ]
-
-    url = '/_matrix/client/r0/admin/server_version'
+    def create_test_json_resource(self):
+        resource = JsonResource(self.hs)
+        VersionServlet(self.hs).register(resource)
+        return resource
 
     def test_version_string(self):
-        request, channel = self.make_request("GET", self.url)
+        request, channel = self.make_request("GET", self.url, shorthand=False)
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]),
