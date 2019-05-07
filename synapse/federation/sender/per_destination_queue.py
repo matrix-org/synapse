@@ -216,23 +216,9 @@ class PerDestinationQueue(object):
 
                 pending_edus = []
 
-                pending_edus.extend(self._get_rr_edus(force_flush=False))
-                pending_edus.extend(device_message_edus[:99])
-
                 # We can only include at most 100 EDUs per transactions
-                # But we should keep one slot free for presence
-                to_remove = []
-                for key, val in self._pending_edus_keyed.items():
-                    if (len(pending_edus) >= 99): break
-                    pending_edus.append(val)
-                    to_remove.append(key)
-
-                for key in to_remove:
-                    del self._pending_edus_keyed[key]
-
-
-                pending_edus.extend(self._pop_pending_edus(99 - len(pending_edus)))
-
+                # rr_edus and pending_presence take at most one slot each
+                pending_edus.extend(self._get_rr_edus(force_flush=False))
                 pending_presence = self._pending_presence
                 self._pending_presence = {}
                 if pending_presence:
@@ -251,6 +237,12 @@ class PerDestinationQueue(object):
                             },
                         )
                     )
+
+                pending_edus.extend(device_message_edus) # @FIXME Size not yet limited
+                pending_edus.extend(self._pop_pending_edus(100 - len(pending_edus)))
+                while len(pending_edus) < 100:
+                    _, val = self._pending_edus_keyed.popitem()
+                    pending_edus.append(val)
 
                 if pending_pdus:
                     logger.debug("TX [%s] len(pending_pdus_by_dest[dest]) = %d",
@@ -351,26 +343,11 @@ class PerDestinationQueue(object):
 
     @defer.inlineCallbacks
     def _get_new_device_messages(self):
-        last_device_stream_id = self._last_device_stream_id
-        to_device_stream_id = self._store.get_to_device_stream_token()
-        contents, stream_id = yield self._store.get_new_device_msgs_for_remote(
-            self._destination, last_device_stream_id, to_device_stream_id
-        )
-        edus = [
-            Edu(
-                origin=self._server_name,
-                destination=self._destination,
-                edu_type="m.direct_to_device",
-                content=content,
-            )
-            for content in contents
-        ]
-
         last_device_list = self._last_device_list_stream_id
         now_stream_id, results = yield self._store.get_devices_by_remote(
             self._destination, last_device_list
         )
-        edus.extend(
+        edus = [
             Edu(
                 origin=self._server_name,
                 destination=self._destination,
@@ -378,5 +355,21 @@ class PerDestinationQueue(object):
                 content=content,
             )
             for content in results
+        ]
+
+        last_device_stream_id = self._last_device_stream_id
+        to_device_stream_id = self._store.get_to_device_stream_token()
+        contents, stream_id = yield self._store.get_new_device_msgs_for_remote(
+            self._destination, last_device_stream_id, to_device_stream_id, 98 - len(edus)
         )
+        edus.extend(
+            Edu(
+                origin=self._server_name,
+                destination=self._destination,
+                edu_type="m.direct_to_device",
+                content=content,
+            )
+            for content in contents
+        )
+
         defer.returnValue((edus, stream_id, now_stream_id))
