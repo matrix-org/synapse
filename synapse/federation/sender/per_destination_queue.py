@@ -238,7 +238,7 @@ class PerDestinationQueue(object):
                         )
                     )
 
-                pending_edus.extend(device_message_edus) # @FIXME Size not yet limited
+                pending_edus.extend(device_message_edus)
                 pending_edus.extend(self._pop_pending_edus(100 - len(pending_edus)))
                 while len(pending_edus) < 100:
                     _, val = self._pending_edus_keyed.popitem()
