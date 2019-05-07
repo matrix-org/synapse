@@ -531,6 +531,8 @@ class ThreepidBulkLookupRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
+        assert_params_in_dict(body, ["threepids", "id_server"])
+
         # Proxy the request to the identity server. lookup_3pid handles checking
         # if the lookup is allowed so we don't need to do it here.
         ret = yield self.identity_handler.bulk_lookup_3pid(

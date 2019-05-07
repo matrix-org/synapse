@@ -115,10 +115,10 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
 
         mock_http_client = Mock(spec=[
             "get_json",
-            "post_json",
+            "post_json_get_json",
         ])
         mock_http_client.get_json.return_value = defer.succeed((200, "{}"))
-        mock_http_client.post_json.return_value = defer.succeed((200, "{}"))
+        mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
 
         self.hs = self.setup_test_homeserver(
             config=config,
@@ -198,7 +198,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
 
-        post_json = self.hs.get_simple_http_client().post_json
+        post_json = self.hs.get_simple_http_client().post_json_get_json
         post_json.assert_called_once_with(
             "https://testis/_matrix/identity/api/v1/bulk_lookup",
             {
