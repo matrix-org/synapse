@@ -410,11 +410,6 @@ class IdentityHandler(BaseHandler):
                 }
             )
 
-            if "threepids" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid bindings")
-                yield self._verify_any_signature(data, id_server)
-
         except HttpResponseException as e:
             logger.info("Proxied lookup failed: %r", e)
             raise e.to_synapse_error()
