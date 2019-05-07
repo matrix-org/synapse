@@ -410,7 +410,7 @@ class IdentityHandler(BaseHandler):
                 }
             )
 
-            if "mxid" in data:
+            if "threepids" in data:
                 if "signatures" not in data:
                     raise AuthError(401, "No signatures on 3pid bindings")
                 yield self._verify_any_signature(data, id_server)
