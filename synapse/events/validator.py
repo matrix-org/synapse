@@ -63,7 +63,7 @@ class EventValidator(object):
                         raise SynapseError(
                             400,
                             ("Can't create aliases longer than"
-                             " %s characters" % MAX_ALIAS_LENGTH),
+                             " %d characters" % (MAX_ALIAS_LENGTH,)),
                             Codes.INVALID_PARAM,
                         )
 

@@ -339,18 +339,28 @@ class EventCreationHandler(object):
 
         # In an ideal world we wouldn't need the second part of this condition. However,
         # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
-        # behaviour, and this code is evaluated each time a new m.room.aliases event is
-        # created, which includes hitting a /directory route, therefore not including it
-        # would render the similar check in synapse.handlers.directory pointless.
+        # behaviour. Another reason is that this code is also evaluated each time a new
+        # m.room.aliases event is created, which includes hitting a /directory route.
+        # Therefore not including this condition here would render the similar one in
+        # synapse.handlers.directory pointless.
         if builder.type == EventTypes.Aliases and self.require_membership_for_aliases:
-            # Ideally we'd do this check in event_auth.check(), however this function
-            # describes a spec'd algorithm and this limitation is lacking from the spec,
-            # so we're doing it outside of check(). When/if this additional constraint
-            # gets added to the spec, this check should be moved to event_auth.check().
+            # Ideally we'd do the membership check in event_auth.check(), which
+            # describes a spec'd algorithm for authenticating events received over
+            # federation as well as those created locally. As of room v3, aliases events
+            # can be created by users that are not in the room, therefore we have to
+            # tolerate them in event_auth.check().
             prev_state_ids = yield context.get_prev_state_ids(self.store)
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
             if not prev_event or prev_event.membership != Membership.JOIN:
+                logger.warning(
+                    ("Attempt to send `m.room.aliases` in room %s by user %s but"
+                     " membership is %s"),
+                    event.room_id,
+                    event.sender,
+                    prev_event.membership if prev_event else None,
+                )
+
                 raise AuthError(
                     403,
                     "You must be in the room to create an alias for it",
