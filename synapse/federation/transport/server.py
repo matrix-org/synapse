@@ -98,7 +98,6 @@ class Authenticator(object):
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
-        self.deny_public_rooms = hs.config.restrict_public_rooms_to_local_users
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     @defer.inlineCallbacks
@@ -132,9 +131,6 @@ class Authenticator(object):
             self.federation_domain_whitelist is not None and
             origin not in self.federation_domain_whitelist
         ):
-            raise FederationDeniedError(origin)
-
-        if b"publicRooms" in request.path and self.deny_public_rooms:
             raise FederationDeniedError(origin)
 
         if not json_request["signatures"]:
@@ -720,8 +716,17 @@ class PublicRoomList(BaseFederationServlet):
 
     PATH = "/publicRooms"
 
+    def __init__(self, handler, authenticator, ratelimiter, server_name, deny_access):
+        super(PublicRoomList, self).__init__(
+            handler, authenticator, ratelimiter, server_name,
+        )
+        self.deny_access = deny_access
+
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
+        if self.deny_access:
+            raise FederationDeniedError(origin)
+
         limit = parse_integer_from_args(query, "limit", 0)
         since_token = parse_string_from_args(query, "since", None)
         include_all_networks = parse_boolean_from_args(
@@ -1421,6 +1426,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
+                deny_access=hs.config.restrict_public_rooms_to_local_users,
             ).register(resource)
 
     if "group_server" in servlet_groups:
