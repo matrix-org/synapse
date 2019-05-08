@@ -532,9 +532,13 @@ class ServerConfig(Config):
 
         # Resource-constrained Homeserver Settings
         #
-        # Requires _joins to be set to True.
+        # If limit_large_remote_room_joins is True, the room complexity will be
+        # checked before a user joins a new remote room. If it is above
+        # limit_large_remote_room_complexity, it will disallow joining or
+        # instantly leave.
         #
-        #limit_large_remote_room_joins: False
+        # Uncomment the below lines to enable:
+        #limit_large_remote_room_joins: True
         #limit_large_remote_room_complexity: 1.0
 
         # Whether to require a user to be in the room to add an alias to it.
