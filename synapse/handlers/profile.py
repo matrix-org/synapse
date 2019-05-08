@@ -305,7 +305,7 @@ class BaseProfileHandler(BaseHandler):
         # be None when this function is called outside of a profile query, e.g.
         # when building a membership event. In this case, we must allow the
         # lookup.
-        if not (self.hs.config.require_auth_for_profile_requests and requester):
+        if not self.hs.config.require_auth_for_profile_requests or not requester:
             return
 
         try:
