@@ -134,6 +134,12 @@ class ServerConfig(Config):
         # sending out any replication updates.
         self.replication_torture_level = config.get("replication_torture_level")
 
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to True.
+        self.require_membership_for_aliases = config.get(
+            "require_membership_for_aliases", True,
+        )
+
         self.listeners = []
         for listener in config.get("listeners", []):
             if not isinstance(listener.get("port", None), int):
@@ -394,8 +400,8 @@ class ServerConfig(Config):
         #
         # Valid resource names are:
         #
-        #   client: the client-server API (/_matrix/client). Also implies 'media' and
-        #       'static'.
+        #   client: the client-server API (/_matrix/client), and the synapse admin
+        #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
         #   consent: user consent forms (/_matrix/consent). See
         #       docs/consent_tracking.md.
@@ -503,6 +509,11 @@ class ServerConfig(Config):
         #
         #limit_large_remote_room_joins: False
         #limit_large_remote_room_complexity: 1.0
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to 'true'.
+        #
+        #require_membership_for_aliases: false
         """ % locals()
 
     def read_arguments(self, args):

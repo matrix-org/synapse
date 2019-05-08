@@ -1,3 +1,15 @@
+matrix-synapse-py3 (0.99.3.2) stable; urgency=medium
+
+  * New synapse release 0.99.3.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 18:56:20 +0100
+
+matrix-synapse-py3 (0.99.3.1) stable; urgency=medium
+
+  * New synapse release 0.99.3.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 16:02:43 +0100
+
 matrix-synapse-py3 (0.99.3) stable; urgency=medium
 
   [ Richard van der Hoff ]

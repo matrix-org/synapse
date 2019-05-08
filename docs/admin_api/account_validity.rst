@@ -13,7 +13,7 @@ This API extends the validity of an account by as much time as configured in the
 
 The API is::
 
-    POST /_matrix/client/unstable/account_validity/send_mail
+    POST /_synapse/admin/v1/account_validity/validity
 
 with the following body:
 

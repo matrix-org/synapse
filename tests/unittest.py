@@ -175,10 +175,7 @@ class HomeserverTestCase(TestCase):
             raise Exception("A homeserver wasn't returned, but %r" % (self.hs,))
 
         # Register the resources
-        self.resource = JsonResource(self.hs)
-
-        for servlet in self.servlets:
-            servlet(self.hs, self.resource)
+        self.resource = self.create_test_json_resource()
 
         from tests.rest.client.v1.utils import RestHelper
 
@@ -223,6 +220,23 @@ class HomeserverTestCase(TestCase):
         """
         hs = self.setup_test_homeserver()
         return hs
+
+    def create_test_json_resource(self):
+        """
+        Create a test JsonResource, with the relevant servlets registerd to it
+
+        The default implementation calls each function in `servlets` to do the
+        registration.
+
+        Returns:
+            JsonResource:
+        """
+        resource = JsonResource(self.hs)
+
+        for servlet in self.servlets:
+            servlet(self.hs, resource)
+
+        return resource
 
     def default_config(self, name="test"):
         """

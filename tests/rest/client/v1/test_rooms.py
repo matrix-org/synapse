@@ -22,8 +22,9 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
 
+import synapse.rest.admin
 from synapse.api.constants import Membership
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v1 import login, room
 
 from tests import unittest
 
@@ -803,7 +804,7 @@ class RoomMessageListTestCase(RoomBase):
 
 class RoomSearchTestCase(unittest.HomeserverTestCase):
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import logging
 import platform
+import re
 
 from six import text_type
 from six.moves import http_client
@@ -27,39 +28,56 @@ from twisted.internet import defer
 import synapse
 from synapse.api.constants import Membership, UserTypes
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.server import JsonResource
 from synapse.http.servlet import (
+    RestServlet,
     assert_params_in_dict,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.rest.admin._base import assert_requester_is_admin, assert_user_is_admin
+from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.types import UserID, create_requester
 from synapse.util.versionstring import get_version_string
-
-from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class UsersRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/admin/users/(?P<user_id>[^/]*)")
+def historical_admin_path_patterns(path_regex):
+    """Returns the list of patterns for an admin endpoint, including historical ones
+
+    This is a backwards-compatibility hack. Previously, the Admin API was exposed at
+    various paths under /_matrix/client. This function returns a list of patterns
+    matching those paths (as well as the new one), so that existing scripts which rely
+    on the endpoints being available there are not broken.
+
+    Note that this should only be used for existing endpoints: new ones should just
+    register for the /_synapse/admin path.
+    """
+    return list(
+        re.compile(prefix + path_regex)
+        for prefix in (
+            "^/_synapse/admin/v1",
+            "^/_matrix/client/api/v1/admin",
+            "^/_matrix/client/unstable/admin",
+            "^/_matrix/client/r0/admin"
+        )
+    )
+
+
+class UsersRestServlet(RestServlet):
+    PATTERNS = historical_admin_path_patterns("/users/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
-        super(UsersRestServlet, self).__init__(hs)
+        self.hs = hs
+        self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
         target_user = UserID.from_string(user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
-
-        # To allow all users to get the users list
-        # if not is_admin and target_user != auth_user:
-        #     raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
@@ -69,37 +87,30 @@ class UsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class VersionServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/admin/server_version")
+class VersionServlet(RestServlet):
+    PATTERNS = (re.compile("^/_synapse/admin/v1/server_version$"), )
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
-
-        ret = {
+    def __init__(self, hs):
+        self.res = {
             'server_version': get_version_string(synapse),
             'python_version': platform.python_version(),
         }
 
-        defer.returnValue((200, ret))
+    def on_GET(self, request):
+        return 200, self.res
 
 
-class UserRegisterServlet(ClientV1RestServlet):
+class UserRegisterServlet(RestServlet):
     """
     Attributes:
          NONCE_TIMEOUT (int): Seconds until a generated nonce won't be accepted
          nonces (dict[str, int]): The nonces that we will accept. A dict of
              nonce to the time it was generated, in int seconds.
     """
-    PATTERNS = client_path_patterns("/admin/register")
+    PATTERNS = historical_admin_path_patterns("/register")
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
-        super(UserRegisterServlet, self).__init__(hs)
         self.handlers = hs.get_handlers()
         self.reactor = hs.get_reactor()
         self.nonces = {}
@@ -226,11 +237,12 @@ class UserRegisterServlet(ClientV1RestServlet):
         defer.returnValue((200, result))
 
 
-class WhoisRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/admin/whois/(?P<user_id>[^/]*)")
+class WhoisRestServlet(RestServlet):
+    PATTERNS = historical_admin_path_patterns("/whois/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
-        super(WhoisRestServlet, self).__init__(hs)
+        self.hs = hs
+        self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
     @defer.inlineCallbacks
@@ -238,10 +250,9 @@ class WhoisRestServlet(ClientV1RestServlet):
         target_user = UserID.from_string(user_id)
         requester = yield self.auth.get_user_by_req(request)
         auth_user = requester.user
-        is_admin = yield self.auth.is_server_admin(requester.user)
 
-        if not is_admin and target_user != auth_user:
-            raise AuthError(403, "You are not a server admin")
+        if target_user != auth_user:
+            yield assert_user_is_admin(self.auth, auth_user)
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only whois a local user")
@@ -251,20 +262,16 @@ class WhoisRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class PurgeMediaCacheRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/admin/purge_media_cache")
+class PurgeMediaCacheRestServlet(RestServlet):
+    PATTERNS = historical_admin_path_patterns("/purge_media_cache")
 
     def __init__(self, hs):
         self.media_repository = hs.get_media_repository()
-        super(PurgeMediaCacheRestServlet, self).__init__(hs)
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         before_ts = parse_integer(request, "before_ts", required=True)
         logger.info("before_ts: %r", before_ts)
@@ -274,9 +281,9 @@ class PurgeMediaCacheRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class PurgeHistoryRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns(
-        "/admin/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
+class PurgeHistoryRestServlet(RestServlet):
+    PATTERNS = historical_admin_path_patterns(
+        "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
 
     def __init__(self, hs):
@@ -285,17 +292,13 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
         Args:
             hs (synapse.server.HomeServer)
         """
-        super(PurgeHistoryRestServlet, self).__init__(hs)
         self.pagination_handler = hs.get_pagination_handler()
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id, event_id):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
 
@@ -371,9 +374,9 @@ class PurgeHistoryRestServlet(ClientV1RestServlet):
         }))
 
 
-class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns(
-        "/admin/purge_history_status/(?P<purge_id>[^/]+)"
+class PurgeHistoryStatusRestServlet(RestServlet):
+    PATTERNS = historical_admin_path_patterns(
+        "/purge_history_status/(?P<purge_id>[^/]+)"
     )
 
     def __init__(self, hs):
@@ -382,16 +385,12 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
         Args:
             hs (synapse.server.HomeServer)
         """
-        super(PurgeHistoryStatusRestServlet, self).__init__(hs)
         self.pagination_handler = hs.get_pagination_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, purge_id):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         purge_status = self.pagination_handler.get_purge_status(purge_id)
         if purge_status is None:
@@ -400,15 +399,16 @@ class PurgeHistoryStatusRestServlet(ClientV1RestServlet):
         defer.returnValue((200, purge_status.asdict()))
 
 
-class DeactivateAccountRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/admin/deactivate/(?P<target_user_id>[^/]*)")
+class DeactivateAccountRestServlet(RestServlet):
+    PATTERNS = historical_admin_path_patterns("/deactivate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
-        super(DeactivateAccountRestServlet, self).__init__(hs)
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, target_user_id):
+        yield assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request, allow_empty_body=True)
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
@@ -419,11 +419,6 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
             )
 
         UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
 
         result = yield self._deactivate_account_handler.deactivate_account(
             target_user_id, erase,
@@ -438,13 +433,13 @@ class DeactivateAccountRestServlet(ClientV1RestServlet):
         }))
 
 
-class ShutdownRoomRestServlet(ClientV1RestServlet):
+class ShutdownRoomRestServlet(RestServlet):
     """Shuts down a room by removing all local users from the room and blocking
     all future invites and joins to the room. Any local aliases will be repointed
     to a new room created by `new_room_user_id` and kicked users will be auto
     joined to the new room.
     """
-    PATTERNS = client_path_patterns("/admin/shutdown_room/(?P<room_id>[^/]+)")
+    PATTERNS = historical_admin_path_patterns("/shutdown_room/(?P<room_id>[^/]+)")
 
     DEFAULT_MESSAGE = (
         "Sharing illegal content on this server is not permitted and rooms in"
@@ -452,19 +447,18 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
     )
 
     def __init__(self, hs):
-        super(ShutdownRoomRestServlet, self).__init__(hs)
+        self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_user_is_admin(self.auth, requester.user)
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ["new_room_user_id"])
@@ -564,22 +558,20 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         }))
 
 
-class QuarantineMediaInRoom(ClientV1RestServlet):
+class QuarantineMediaInRoom(RestServlet):
     """Quarantines all media in a room so that no one can download it via
     this server.
     """
-    PATTERNS = client_path_patterns("/admin/quarantine_media/(?P<room_id>[^/]+)")
+    PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
 
     def __init__(self, hs):
-        super(QuarantineMediaInRoom, self).__init__(hs)
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, room_id):
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_user_is_admin(self.auth, requester.user)
 
         num_quarantined = yield self.store.quarantine_media_ids_in_room(
             room_id, requester.user.to_string(),
@@ -588,13 +580,12 @@ class QuarantineMediaInRoom(ClientV1RestServlet):
         defer.returnValue((200, {"num_quarantined": num_quarantined}))
 
 
-class ListMediaInRoom(ClientV1RestServlet):
+class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room.
     """
-    PATTERNS = client_path_patterns("/admin/room/(?P<room_id>[^/]+)/media")
+    PATTERNS = historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media")
 
     def __init__(self, hs):
-        super(ListMediaInRoom, self).__init__(hs)
         self.store = hs.get_datastore()
 
     @defer.inlineCallbacks
@@ -609,11 +600,11 @@ class ListMediaInRoom(ClientV1RestServlet):
         defer.returnValue((200, {"local": local_mxcs, "remote": remote_mxcs}))
 
 
-class ResetPasswordRestServlet(ClientV1RestServlet):
+class ResetPasswordRestServlet(RestServlet):
     """Post request to allow an administrator reset password for a user.
     This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/reset_password/
+            http://localhost:8008/_synapse/admin/v1/reset_password/
             @user:to_reset_password?access_token=admin_access_token
         JsonBodyToSend:
             {
@@ -622,11 +613,10 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
         Returns:
             200 OK with empty object if success otherwise an error.
         """
-    PATTERNS = client_path_patterns("/admin/reset_password/(?P<target_user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/reset_password/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        super(ResetPasswordRestServlet, self).__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
         self._set_password_handler = hs.get_set_password_handler()
@@ -636,12 +626,10 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
         """Post request to allow an administrator reset password for a user.
         This needs user to have administrator access in Synapse.
         """
-        UserID.from_string(target_user_id)
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        yield assert_user_is_admin(self.auth, requester.user)
 
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        UserID.from_string(target_user_id)
 
         params = parse_json_object_from_request(request)
         assert_params_in_dict(params, ["new_password"])
@@ -653,20 +641,19 @@ class ResetPasswordRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class GetUsersPaginatedRestServlet(ClientV1RestServlet):
+class GetUsersPaginatedRestServlet(RestServlet):
     """Get request to get specific number of users from Synapse.
     This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/users_paginate/
+            http://localhost:8008/_synapse/admin/v1/users_paginate/
             @admin:user?access_token=admin_access_token&start=0&limit=10
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
         """
-    PATTERNS = client_path_patterns("/admin/users_paginate/(?P<target_user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/users_paginate/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        super(GetUsersPaginatedRestServlet, self).__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
@@ -676,16 +663,9 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
         """Get request to get specific number of users from Synapse.
         This needs user to have administrator access in Synapse.
         """
+        yield assert_requester_is_admin(self.auth, request)
+
         target_user = UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
-
-        # To allow all users to get the users list
-        # if not is_admin and target_user != auth_user:
-        #     raise AuthError(403, "You are not a server admin")
 
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
@@ -706,7 +686,7 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
         """Post request to get specific number of users from Synapse..
         This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/users_paginate/
+            http://localhost:8008/_synapse/admin/v1/users_paginate/
             @admin:user?access_token=admin_access_token
         JsonBodyToSend:
             {
@@ -716,12 +696,8 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
         """
+        yield assert_requester_is_admin(self.auth, request)
         UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
 
         order = "name"  # order by name in user table
         params = parse_json_object_from_request(request)
@@ -736,21 +712,20 @@ class GetUsersPaginatedRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class SearchUsersRestServlet(ClientV1RestServlet):
+class SearchUsersRestServlet(RestServlet):
     """Get request to search user table for specific users according to
     search term.
     This needs user to have administrator access in Synapse.
         Example:
-            http://localhost:8008/_matrix/client/api/v1/admin/search_users/
+            http://localhost:8008/_synapse/admin/v1/search_users/
             @admin:user?access_token=admin_access_token&term=alice
         Returns:
             200 OK with json object {list[dict[str, Any]], count} or empty object.
     """
-    PATTERNS = client_path_patterns("/admin/search_users/(?P<target_user_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
-        super(SearchUsersRestServlet, self).__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
@@ -761,12 +736,9 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         search term.
         This needs user to have a administrator access in Synapse.
         """
-        target_user = UserID.from_string(target_user_id)
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        yield assert_requester_is_admin(self.auth, request)
 
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        target_user = UserID.from_string(target_user_id)
 
         # To allow all users to get the users list
         # if not is_admin and target_user != auth_user:
@@ -784,23 +756,20 @@ class SearchUsersRestServlet(ClientV1RestServlet):
         defer.returnValue((200, ret))
 
 
-class DeleteGroupAdminRestServlet(ClientV1RestServlet):
+class DeleteGroupAdminRestServlet(RestServlet):
     """Allows deleting of local groups
     """
-    PATTERNS = client_path_patterns("/admin/delete_group/(?P<group_id>[^/]*)")
+    PATTERNS = historical_admin_path_patterns("/delete_group/(?P<group_id>[^/]*)")
 
     def __init__(self, hs):
-        super(DeleteGroupAdminRestServlet, self).__init__(hs)
         self.group_server = hs.get_groups_server_handler()
         self.is_mine_id = hs.is_mine_id
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request, group_id):
         requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_user_is_admin(self.auth, requester.user)
 
         if not self.is_mine_id(group_id):
             raise SynapseError(400, "Can only delete local groups")
@@ -809,27 +778,21 @@ class DeleteGroupAdminRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class AccountValidityRenewServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/admin/account_validity/validity$")
+class AccountValidityRenewServlet(RestServlet):
+    PATTERNS = historical_admin_path_patterns("/account_validity/validity$")
 
     def __init__(self, hs):
         """
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(AccountValidityRenewServlet, self).__init__(hs)
-
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
-        is_admin = yield self.auth.is_server_admin(requester.user)
-
-        if not is_admin:
-            raise AuthError(403, "You are not a server admin")
+        yield assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request)
 
@@ -846,8 +809,27 @@ class AccountValidityRenewServlet(ClientV1RestServlet):
         }
         defer.returnValue((200, res))
 
+########################################################################################
+#
+# please don't add more servlets here: this file is already long and unwieldy. Put
+# them in separate files within the 'admin' package.
+#
+########################################################################################
 
-def register_servlets(hs, http_server):
+
+class AdminRestResource(JsonResource):
+    """The REST resource which gets mounted at /_synapse/admin"""
+
+    def __init__(self, hs):
+        JsonResource.__init__(self, hs, canonical_json=False)
+
+        register_servlets_for_client_rest_resource(hs, self)
+        SendServerNoticeServlet(hs).register(self)
+        VersionServlet(hs).register(self)
+
+
+def register_servlets_for_client_rest_resource(hs, http_server):
+    """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
     PurgeMediaCacheRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
@@ -861,6 +843,7 @@ def register_servlets(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
-    VersionServlet(hs).register(http_server)
     DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
+    # don't add more things here: new servlets should only be exposed on
+    # /_synapse/admin so should not go here. Instead register them in AdminRestResource.
