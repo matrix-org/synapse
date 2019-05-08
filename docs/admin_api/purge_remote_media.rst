@@ -6,7 +6,7 @@ media.
 
 The API is::
 
-    POST /_matrix/client/r0/admin/purge_media_cache?before_ts=<unix_timestamp_in_ms>&access_token=<access_token>
+    POST /_synapse/admin/v1/purge_media_cache?before_ts=<unix_timestamp_in_ms>&access_token=<access_token>
 
     {}
 

@@ -16,8 +16,8 @@
 
 from twisted.internet.defer import succeed
 
+import synapse.rest.admin
 from synapse.api.constants import LoginType
-from synapse.rest.client.v1 import admin
 from synapse.rest.client.v2_alpha import auth, register
 
 from tests import unittest
@@ -27,7 +27,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
     servlets = [
         auth.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         register.register_servlets,
     ]
     hijack_auth = False

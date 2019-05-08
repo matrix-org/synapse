@@ -22,8 +22,9 @@ from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
 
+import synapse.rest.admin
 from synapse.api.constants import Membership
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v1 import login, room
 
 from tests import unittest
 
@@ -803,7 +804,7 @@ class RoomMessageListTestCase(RoomBase):
 
 class RoomSearchTestCase(unittest.HomeserverTestCase):
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -903,3 +904,35 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             context["profile_info"][self.other_user_id]["displayname"], "otheruser"
         )
+
+
+class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+
+        self.url = b"/_matrix/client/r0/publicRooms"
+
+        config = self.default_config()
+        config.restrict_public_rooms_to_local_users = True
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def test_restricted_no_auth(self):
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        self.assertEqual(channel.code, 401, channel.result)
+
+    def test_restricted_auth(self):
+        self.register_user("user", "pass")
+        tok = self.login("user", "pass")
+
+        request, channel = self.make_request("GET", self.url, access_token=tok)
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
