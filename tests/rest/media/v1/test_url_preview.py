@@ -297,12 +297,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'No results found',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -318,12 +318,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'No results found',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -343,10 +343,10 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'No results found',
+                'error': 'IP address blocked by IP blacklist entry',
             },
         )
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 403)
 
     def test_blacklisted_ip_range_direct(self):
         """
@@ -358,12 +358,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'No results found',
+                'error': 'IP address blocked by IP blacklist entry',
             },
         )
 
@@ -414,12 +414,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         request.render(self.preview_url)
         self.pump()
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'No results found',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -439,12 +439,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'No results found',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -460,11 +460,11 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 404)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'No results found',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
