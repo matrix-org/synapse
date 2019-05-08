@@ -118,7 +118,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         defer.returnValue(count)
 
     def get_new_device_msgs_for_remote(
-        self, destination, last_stream_id, current_stream_id, limit=100
+        self, destination, last_stream_id, current_stream_id, limit
     ):
         """
         Args:

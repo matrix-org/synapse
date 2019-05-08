@@ -33,6 +33,9 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import UserPresenceState
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 
+# This is defined in the Matrix spec and enforced by the receiver.
+MAX_EDUS_PER_TRANSACTION = 100
+
 logger = logging.getLogger(__name__)
 
 
@@ -197,7 +200,8 @@ class PerDestinationQueue(object):
             pending_pdus = []
             while True:
                 device_message_edus, device_stream_id, dev_list_id = (
-                    yield self._get_new_device_messages()
+                    # We have to keep 2 free slots for presence and rr_edus
+                    yield self._get_new_device_messages(MAX_EDUS_PER_TRANSACTION - 2)
                 )
 
                 # BEGIN CRITICAL SECTION
@@ -239,8 +243,8 @@ class PerDestinationQueue(object):
                     )
 
                 pending_edus.extend(device_message_edus)
-                pending_edus.extend(self._pop_pending_edus(100 - len(pending_edus)))
-                while len(pending_edus) < 100:
+                pending_edus.extend(self._pop_pending_edus(MAX_EDUS_PER_TRANSACTION - len(pending_edus)))
+                while len(pending_edus) < MAX_EDUS_PER_TRANSACTION and self._pending_edus_keyed:
                     _, val = self._pending_edus_keyed.popitem()
                     pending_edus.append(val)
 
@@ -255,7 +259,7 @@ class PerDestinationQueue(object):
 
                 # if we've decided to send a transaction anyway, and we have room, we
                 # may as well send any pending RRs
-                if len(pending_edus) < 100:
+                if len(pending_edus) < MAX_EDUS_PER_TRANSACTION:
                     pending_edus.extend(self._get_rr_edus(force_flush=True))
 
                 # END CRITICAL SECTION
@@ -342,8 +346,9 @@ class PerDestinationQueue(object):
         return pending_edus
 
     @defer.inlineCallbacks
-    def _get_new_device_messages(self):
+    def _get_new_device_messages(self, limit):
         last_device_list = self._last_device_list_stream_id
+        # Will return at most 20 entries
         now_stream_id, results = yield self._store.get_devices_by_remote(
             self._destination, last_device_list
         )
@@ -360,7 +365,7 @@ class PerDestinationQueue(object):
         last_device_stream_id = self._last_device_stream_id
         to_device_stream_id = self._store.get_to_device_stream_token()
         contents, stream_id = yield self._store.get_new_device_msgs_for_remote(
-            self._destination, last_device_stream_id, to_device_stream_id, 98 - len(edus)
+            self._destination, last_device_stream_id, to_device_stream_id, limit - len(edus)
         )
         edus.extend(
             Edu(
