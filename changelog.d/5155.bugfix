@@ -1,0 +1,1 @@
+Prevent an exception from being raised in a IResolutionReceiver and use a more generic error message for blacklisted URL previews.

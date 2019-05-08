@@ -31,8 +31,8 @@ from six.moves import urllib_parse as urlparse
 from canonicaljson import json
 
 from twisted.internet import defer
-from twisted.web.resource import Resource
 from twisted.internet.error import DNSLookupError
+from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
