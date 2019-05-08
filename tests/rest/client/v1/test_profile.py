@@ -20,7 +20,8 @@ from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
-from synapse.rest.client.v1 import admin, login, profile, room
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, profile, room
 
 from tests import unittest
 
@@ -161,7 +162,7 @@ class ProfileTestCase(unittest.TestCase):
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         profile.register_servlets,
         room.register_servlets,
