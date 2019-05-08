@@ -909,7 +909,7 @@ class RoomSearchTestCase(unittest.HomeserverTestCase):
 class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
