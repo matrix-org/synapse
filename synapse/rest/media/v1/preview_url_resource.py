@@ -329,17 +329,17 @@ class PreviewUrlResource(Resource):
                 # handler will return a SynapseError to the client instead of
                 # blank data or a 500.
                 raise
+            except DNSLookupError:
+                # DNS lookup returned no results
+                # Note: This will also be the case if one of the resolved IP
+                # addresses is blacklisted
+                raise SynapseError(
+                    502, "DNS resolution failure during URL preview generation",
+                    Codes.UNKNOWN
+                )
             except Exception as e:
                 # FIXME: pass through 404s and other error messages nicely
                 logger.warn("Error downloading %s: %r", url, e)
-
-                if isinstance(e, DNSLookupError):
-                    # DNS lookup returned no results
-                    # Note: This will also be the case if the found IP address
-                    # is blacklisted
-                    raise SynapseError(
-                        404, "No results found", Codes.UNKNOWN
-                    )
 
                 raise SynapseError(
                     500, "Failed to download content: %s" % (

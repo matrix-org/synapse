@@ -228,93 +228,59 @@ class FederationClientTests(HomeserverTestCase):
 
         # Try making a GET request to a blacklisted IPv4 address
         # ------------------------------------------------------
-        @defer.inlineCallbacks
-        def do_request():
-            with LoggingContext("one") as context:
-                fetch_d = cl.get_json("internal:8008", "foo/bar")
-
-                # Nothing happened yet
-                self.assertNoResult(fetch_d)
-
-                # should have reset logcontext to the sentinel
-                check_logcontext(LoggingContext.sentinel)
-
-                try:
-                    fetch_res = yield fetch_d
-                    defer.returnValue(fetch_res)
-                finally:
-                    check_logcontext(context)
-
         # Make the request
-        d = do_request()
-        self.pump()
+        d = cl.get_json("internal:8008", "foo/bar", timeout=10000)
 
-        # Nothing has happened yet
+        # Nothing happened yet
         self.assertNoResult(d)
+
+        self.pump(120)
 
         # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 0)
+
+        f = self.failureResultOf(d)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
 
         # Try making a POST request to a blacklisted IPv6 address
         # -------------------------------------------------------
-        @defer.inlineCallbacks
-        def do_request():
-            with LoggingContext("one") as context:
-                fetch_d = cl.post_json("internalv6:8008", "foo/bar")
-
-                # Nothing happened yet
-                self.assertNoResult(fetch_d)
-
-                # should have reset logcontext to the sentinel
-                check_logcontext(LoggingContext.sentinel)
-
-                try:
-                    fetch_res = yield fetch_d
-                    defer.returnValue(fetch_res)
-                finally:
-                    check_logcontext(context)
-
         # Make the request
-        d = do_request()
-        self.pump()
+        d = cl.post_json("internalv6:8008", "foo/bar", timeout=10000)
 
         # Nothing has happened yet
         self.assertNoResult(d)
+
+        # Move the reactor forwards
+        self.pump(120)
 
         # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 0)
 
+        # Check that it was due to a blacklisted DNS lookup
+        f = self.failureResultOf(d, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
+
         # Try making a GET request to a non-blacklisted IPv4 address
         # ----------------------------------------------------------
-        @defer.inlineCallbacks
-        def do_request():
-            with LoggingContext("one") as context:
-                fetch_d = cl.post_json("fine:8008", "foo/bar")
-
-                # Nothing happened yet
-                self.assertNoResult(fetch_d)
-
-                # should have reset logcontext to the sentinel
-                check_logcontext(LoggingContext.sentinel)
-
-                try:
-                    fetch_res = yield fetch_d
-                    defer.returnValue(fetch_res)
-                finally:
-                    check_logcontext(context)
-
         # Make the request
-        d = do_request()
-        self.pump()
+        d = cl.post_json("fine:8008", "foo/bar", timeout=10000)
 
         # Nothing has happened yet
         self.assertNoResult(d)
 
+        # Move the reactor forwards
+        self.pump(120)
+
         # Check that it was able to resolve the address
         clients = self.reactor.tcpClients
-        self.assertEqual(len(clients), 1)
+        self.assertNotEqual(len(clients), 0)
+
+        # Connection will still fail as this IP address does not resolve to anything
+        f = self.failureResultOf(d, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, ConnectingCancelledError)
 
     def test_client_gets_headers(self):
         """

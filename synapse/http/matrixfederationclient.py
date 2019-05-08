@@ -199,7 +199,8 @@ class MatrixFederationHttpClient(object):
             tls_client_options_factory,
         )
 
-        # Prevent direct connections to blacklisted IP addresses
+        # Use a BlacklistingAgentWrapper to prevent circumventing the IP
+        # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
             self.agent, self.reactor,
             ip_blacklist=hs.config.federation_ip_range_blacklist,
