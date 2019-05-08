@@ -19,7 +19,8 @@ from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.federation.transport import server
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, room
 from synapse.types import UserID
 from synapse.util.ratelimitutils import FederationRateLimiter
 
