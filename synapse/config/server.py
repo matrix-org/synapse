@@ -72,6 +72,19 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API.
+        self.require_auth_for_profile_requests = config.get(
+            "require_auth_for_profile_requests", False,
+        )
+
+        # If set to 'True', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation.
+        self.restrict_public_rooms_to_local_users = config.get(
+            "restrict_public_rooms_to_local_users", False,
+        )
+
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
         # errors when attempting to search for messages.
@@ -332,6 +345,20 @@ class ServerConfig(Config):
         # Set to false to disable presence tracking on this homeserver.
         #
         #use_presence: false
+
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API. Defaults to
+        # 'false'. Note that profile data is also available via the federation
+        # API, so this setting is of limited value if federation is enabled on
+        # the server.
+        #
+        #require_auth_for_profile_requests: true
+
+        # If set to 'true', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation. Defaults to 'false'.
+        #
+        #restrict_public_rooms_to_local_users: true
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
