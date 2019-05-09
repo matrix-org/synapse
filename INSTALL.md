@@ -419,7 +419,8 @@ users. This can be done as follows:
 
 ```
 $ source ~/synapse/env/bin/activate
-$ synctl start # if not already running
+$ synctl start # if not already running (installed from source)
+$ service matrix-synapse start # if not already running (installed from pre-built package)
 $ register_new_matrix_user -c homeserver.yaml http://localhost:8008
 New user localpart: erikj
 Password:
