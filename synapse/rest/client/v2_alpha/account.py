@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018, 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 
 from six.moves import http_client
 
@@ -26,6 +27,7 @@ from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
+    parse_string,
 )
 from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
@@ -480,6 +482,65 @@ class ThreepidDeleteRestServlet(RestServlet):
         )
 
 
+class ThreepidLookupRestServlet(RestServlet):
+    PATTERNS = [re.compile("^/_matrix/client/unstable/account/3pid/lookup$")]
+
+    def __init__(self, hs):
+        super(ThreepidLookupRestServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_GET(self, request):
+        """Proxy a /_matrix/identity/api/v1/lookup request to an identity
+        server
+        """
+        yield self.auth.get_user_by_req(request)
+
+        # Verify query parameters
+        query_params = request.args
+        assert_params_in_dict(query_params, [b"medium", b"address", b"id_server"])
+
+        # Retrieve needed information from query parameters
+        medium = parse_string(request, "medium")
+        address = parse_string(request, "address")
+        id_server = parse_string(request, "id_server")
+
+        # Proxy the request to the identity server. lookup_3pid handles checking
+        # if the lookup is allowed so we don't need to do it here.
+        ret = yield self.identity_handler.lookup_3pid(id_server, medium, address)
+
+        defer.returnValue((200, ret))
+
+
+class ThreepidBulkLookupRestServlet(RestServlet):
+    PATTERNS = [re.compile("^/_matrix/client/unstable/account/3pid/bulk_lookup$")]
+
+    def __init__(self, hs):
+        super(ThreepidBulkLookupRestServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.identity_handler = hs.get_handlers().identity_handler
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        """Proxy a /_matrix/identity/api/v1/bulk_lookup request to an identity
+        server
+        """
+        yield self.auth.get_user_by_req(request)
+
+        body = parse_json_object_from_request(request)
+
+        assert_params_in_dict(body, ["threepids", "id_server"])
+
+        # Proxy the request to the identity server. lookup_3pid handles checking
+        # if the lookup is allowed so we don't need to do it here.
+        ret = yield self.identity_handler.bulk_lookup_3pid(
+            body["id_server"], body["threepids"],
+        )
+
+        defer.returnValue((200, ret))
+
+
 class WhoamiRestServlet(RestServlet):
     PATTERNS = client_v2_patterns("/account/whoami$")
 
@@ -503,4 +564,6 @@ def register_servlets(hs, http_server):
     MsisdnThreepidRequestTokenRestServlet(hs).register(http_server)
     ThreepidRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
+    ThreepidLookupRestServlet(hs).register(http_server)
+    ThreepidBulkLookupRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
