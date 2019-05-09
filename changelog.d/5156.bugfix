@@ -1,0 +1,1 @@
+Prevent federation device list updates breaking when processing multiple updates at once.
