@@ -388,7 +388,7 @@ class IdentityHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def bulk_lookup_3pid(self, id_server, threepids):
-        """Looks up a 3pid in the passed identity server.
+        """Looks up given 3pids in the passed identity server.
 
         Args:
             id_server (str): The server name (including port, if required)

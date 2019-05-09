@@ -26,6 +26,7 @@ from tests import unittest
 
 
 class IdentityDisabledTestCase(unittest.HomeserverTestCase):
+    """Tests that 3PID lookup attempts fail when the HS's config disallows them."""
 
     servlets = [
         account.register_servlets,
@@ -104,6 +105,7 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
 
 
 class IdentityEnabledTestCase(unittest.HomeserverTestCase):
+    """Tests that 3PID lookup attempts succeed when the HS's config allows them."""
 
     servlets = [
         account.register_servlets,

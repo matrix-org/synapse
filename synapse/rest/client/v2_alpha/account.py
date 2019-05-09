@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 
 from six.moves import http_client
 
@@ -482,11 +483,10 @@ class ThreepidDeleteRestServlet(RestServlet):
 
 
 class ThreepidLookupRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/lookup$")
+    PATTERNS = [re.compile("^/_matrix/client/unstable/account/3pid/lookup$")]
 
     def __init__(self, hs):
         super(ThreepidLookupRestServlet, self).__init__()
-        self.config = hs.config
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_handlers().identity_handler
 
@@ -514,11 +514,10 @@ class ThreepidLookupRestServlet(RestServlet):
 
 
 class ThreepidBulkLookupRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/bulk_lookup$")
+    PATTERNS = [re.compile("^/_matrix/client/unstable/account/3pid/bulk_lookup$")]
 
     def __init__(self, hs):
         super(ThreepidBulkLookupRestServlet, self).__init__()
-        self.config = hs.config
         self.auth = hs.get_auth()
         self.identity_handler = hs.get_handlers().identity_handler
 
