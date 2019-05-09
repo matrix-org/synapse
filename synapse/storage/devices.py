@@ -105,19 +105,40 @@ class DeviceWorkerStore(SQLBaseStore):
         # If when culling the list we end up with no devices afterwards, we consider the
         # device update to be too large, and simply skip the stream_id - the rationale
         # being that such a large device list update is likely an error.
+        #
+        # Note: The code below assumes this value is at least 1
         maximum_devices = 100
         sql = """
-            SELECT user_id, device_id, max(stream_id) FROM device_lists_outbound_pokes
+            SELECT user_id, device_id, stream_id FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
-            GROUP BY user_id, device_id
             ORDER BY stream_id
             LIMIT %d
         """ % (maximum_devices + 1)
         txn.execute(sql, (destination, from_stream_id, now_stream_id, False))
 
-        updates = [r for r in txn]
+        duplicate_updates = [r for r in txn]
 
-        # TODO: Does this actually do what we want it to do?
+        # Return if there are no updates to send out
+        if len(duplicate_updates) == 0:
+            return (now_stream_id, [])
+
+        # Perform the equivalent of a GROUP BY
+        # Iterate through the updates list and copy any non-duplicate
+        # (user_id, device_id) entries
+        updates = [duplicate_updates[0]]
+        for i in range(1, len(duplicate_updates)): 
+            update = duplicate_updates[i]
+            prev_update = duplicate_updates[i-1]
+
+            if (update[0], update[1]) == (prev_update[0], prev_update[1]):
+                # This is a duplicate, don't copy it over
+                # However if its stream_id is higher, copy that to the new list
+                if update[3] > prev_update[3]:
+                    updates[-1][3] = update[3]
+                continue
+
+            # Not a duplicate, copy over
+            updates.append(update)
 
         # Check if the last and second-to-last row's stream_id's are the same
         offending_stream_id = None
