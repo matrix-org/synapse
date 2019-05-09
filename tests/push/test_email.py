@@ -19,7 +19,8 @@ import pkg_resources
 
 from twisted.internet.defer import Deferred
 
-from synapse.rest.client.v1 import admin, login, room
+import synapse.rest.admin
+from synapse.rest.client.v1 import login, room
 
 from tests.unittest import HomeserverTestCase
 
@@ -33,7 +34,7 @@ class EmailPusherTests(HomeserverTestCase):
 
     skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]

@@ -19,28 +19,26 @@ import json
 
 from mock import Mock
 
+import synapse.rest.admin
 from synapse.api.constants import UserTypes
-from synapse.rest.client.v1 import admin, events, login, room
+from synapse.http.server import JsonResource
+from synapse.rest.admin import VersionServlet
+from synapse.rest.client.v1 import events, login, room
 from synapse.rest.client.v2_alpha import groups
 
 from tests import unittest
 
 
 class VersionTestCase(unittest.HomeserverTestCase):
+    url = '/_synapse/admin/v1/server_version'
 
-    servlets = [
-        admin.register_servlets,
-        login.register_servlets,
-    ]
-
-    url = '/_matrix/client/r0/admin/server_version'
+    def create_test_json_resource(self):
+        resource = JsonResource(self.hs)
+        VersionServlet(self.hs).register(resource)
+        return resource
 
     def test_version_string(self):
-        self.register_user("admin", "pass", admin=True)
-        self.admin_token = self.login("admin", "pass")
-
-        request, channel = self.make_request("GET", self.url,
-                                             access_token=self.admin_token)
+        request, channel = self.make_request("GET", self.url, shorthand=False)
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]),
@@ -48,21 +46,10 @@ class VersionTestCase(unittest.HomeserverTestCase):
         self.assertEqual({'server_version', 'python_version'},
                          set(channel.json_body.keys()))
 
-    def test_inaccessible_to_non_admins(self):
-        self.register_user("unprivileged-user", "pass", admin=False)
-        user_token = self.login("unprivileged-user", "pass")
-
-        request, channel = self.make_request("GET", self.url,
-                                             access_token=user_token)
-        self.render(request)
-
-        self.assertEqual(403, int(channel.result['code']),
-                         msg=channel.result['body'])
-
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
 
-    servlets = [admin.register_servlets]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
 
@@ -358,7 +345,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
 class ShutdownRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         events.register_servlets,
         room.register_servlets,
@@ -495,7 +482,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
 class DeleteGroupTestCase(unittest.HomeserverTestCase):
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         groups.register_servlets,
     ]
