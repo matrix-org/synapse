@@ -362,6 +362,8 @@ class PerDestinationQueue(object):
             for content in results
         ]
 
+        assert len(edus) <= limit, "get_devices_by_remote returned too many EDUs"
+
         last_device_stream_id = self._last_device_stream_id
         to_device_stream_id = self._store.get_to_device_stream_token()
         contents, stream_id = yield self._store.get_new_device_msgs_for_remote(
