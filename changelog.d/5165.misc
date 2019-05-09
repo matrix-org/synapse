@@ -1,0 +1,11 @@
+Changed:
+```
+$ synctl start # if not already running
+```
+To:
+```
+$ synctl start # if not already running (installed from source)
+$ service matrix-synapse start # if not already running (installed from pre-built package)
+```
+For easier install instructions for those installing from the pre-built package.
+Credit: Richvdh for suggesting it. Zach Smith for editing the INSTALL.md file.
