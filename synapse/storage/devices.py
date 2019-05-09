@@ -97,20 +97,48 @@ class DeviceWorkerStore(SQLBaseStore):
     def _get_devices_by_remote_txn(
         self, txn, destination, from_stream_id, now_stream_id
     ):
+        # We retrieve n+1 devices from the list of outbound pokes were n is our
+        # maximum. We then check if the very last device has the same stream_id as the
+        # second-to-last device. If so, then we ignore all devices with that stream_id
+        # and only send the devices with a lower stream_id.
+        #
+        # If when culling the list we end up with no devices afterwards, we consider the
+        # device update to be too large, and simply skip the stream_id - the rationale
+        # being that such a large device list update is likely an error.
+        maximum_devices = 100
         sql = """
             SELECT user_id, device_id, max(stream_id) FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
             GROUP BY user_id, device_id
-            LIMIT 20
-        """
+            ORDER BY stream_id
+            LIMIT %d
+        """ % (maximum_devices + 1)
         txn.execute(sql, (destination, from_stream_id, now_stream_id, False))
 
-        # maps (user_id, device_id) -> stream_id
-        query_map = {(r[0], r[1]): r[2] for r in txn}
-        if not query_map:
-            return (now_stream_id, [])
+        updates = [r for r in txn]
 
-        if len(query_map) >= 20:
+        # TODO: Does this actually do what we want it to do?
+
+        # Check if the last and second-to-last row's stream_id's are the same
+        offending_stream_id = None
+        if (
+            len(updates) > maximum_devices and
+            updates[-1][2] == updates[-2][2]
+        ):
+            offending_stream_id = updates[-1][2]
+
+        # maps (user_id, device_id) -> stream_id
+        # as long as their stream_id does not match that of the last row
+        query_map = {
+            (r[0], r[1]): r[2] for r in updates
+            if r[2] is not offending_stream_id
+        }
+
+        # If we ended up not being left over with any device updates to send
+        # out, then skip this stream_id
+        if len(query_map) == 0:
+            return (now_stream_id + 1, [])
+        elif len(query_map) >= maximum_devices:
             now_stream_id = max(stream_id for stream_id in itervalues(query_map))
 
         devices = self._get_e2e_device_keys_txn(
