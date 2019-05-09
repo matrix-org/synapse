@@ -126,7 +126,7 @@ class DeviceWorkerStore(SQLBaseStore):
         # Iterate through the updates list and copy any non-duplicate
         # (user_id, device_id) entries
         updates = [duplicate_updates[0]]
-        for i in range(1, len(duplicate_updates)): 
+        for i in range(1, len(duplicate_updates)):
             update = duplicate_updates[i]
             prev_update = duplicate_updates[i-1]
 
