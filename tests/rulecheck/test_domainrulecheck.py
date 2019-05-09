@@ -164,6 +164,9 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
+        config.trusted_third_party_id_servers = [
+            "localhost",
+        ]
 
         config.spam_checker = (
             DomainRuleChecker,

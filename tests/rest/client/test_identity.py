@@ -40,7 +40,7 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
         config.enable_3pid_lookup = False
         config.trusted_third_party_id_servers = [
-            "testis"
+            "testis",
         ]
 
         self.hs = self.setup_test_homeserver(config=config)
@@ -119,7 +119,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
         config.enable_3pid_lookup = True
         config.trusted_third_party_id_servers = [
-            "testis"
+            "testis",
         ]
 
         mock_http_client = Mock(spec=[
