@@ -350,6 +350,12 @@ class IdentityHandler(BaseHandler):
             https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
             for details
         """
+        if not self._should_trust_id_server(id_server):
+            raise SynapseError(
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
+            )
+
         if not self._enable_lookup:
             raise AuthError(
                 403, "Looking up third-party identifiers is denied from this server",
@@ -395,6 +401,12 @@ class IdentityHandler(BaseHandler):
             https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
             for details
         """
+        if not self._should_trust_id_server(id_server):
+            raise SynapseError(
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
+            )
+
         if not self._enable_lookup:
             raise AuthError(
                 403, "Looking up third-party identifiers is denied from this server",
