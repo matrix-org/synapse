@@ -128,7 +128,7 @@ class DeviceWorkerStore(SQLBaseStore):
         updates = [duplicate_updates[0]]
         for i in range(1, len(duplicate_updates)):
             update = duplicate_updates[i]
-            prev_update = duplicate_updates[i-1]
+            prev_update = duplicate_updates[i - 1]
 
             if (update[0], update[1]) == (prev_update[0], prev_update[1]):
                 # This is a duplicate, don't copy it over
