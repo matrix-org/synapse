@@ -35,6 +35,7 @@ from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
+from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
@@ -185,6 +186,7 @@ class HomeServer(object):
         'sendmail',
         'registration_handler',
         'account_validity_handler',
+        'event_client_serializer',
     ]
 
     REQUIRED_ON_MASTER_STARTUP = [
@@ -510,6 +512,9 @@ class HomeServer(object):
 
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
+
+    def build_event_client_serializer(self):
+        return EventClientSerializer(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
