@@ -42,7 +42,7 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config["public_baseurl"] = ""
+        config["public_baseurl"] = "aaaa"
         config["form_secret"] = "123abc"
 
         # Make some temporary templates...

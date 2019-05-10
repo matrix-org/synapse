@@ -134,7 +134,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             "store_remote": True,
             "config": {"directory": self.storage_path},
         }
-        config.media_storage_providers = [provider_config]
+        config["media_storage_providers"] = [provider_config]
 
         hs = self.setup_test_homeserver(config=config, http_client=client)
 

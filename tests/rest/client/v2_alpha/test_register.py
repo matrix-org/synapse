@@ -321,6 +321,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             return
 
         config["email"] = {
+            "enable_notifs": True,
             "template_dir": os.path.abspath(
                 pkg_resources.resource_filename('synapse', 'res/templates')
             ),
