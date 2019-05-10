@@ -37,7 +37,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.update_user_directory = True
+        config["update_user_directory"] = True
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, hs):
@@ -333,7 +333,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
-        config.update_user_directory = True
+        config["update_user_directory"] = True
         hs = self.setup_test_homeserver(config=config)
 
         self.config = hs.config

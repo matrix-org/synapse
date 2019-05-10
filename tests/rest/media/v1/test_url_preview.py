@@ -91,7 +91,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "config": {"directory": self.storage_path},
         }
 
-        config.media_storage_providers = [provider_config]
+        config["media_storage_providers"] = [provider_config]
 
         hs = self.setup_test_homeserver(config=config)
 

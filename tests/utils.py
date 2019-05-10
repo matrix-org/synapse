@@ -110,7 +110,7 @@ def setupdb():
         atexit.register(_cleanup)
 
 
-def default_config(name):
+def default_config(name, parse=False):
     """
     Create a reasonable test config.
     """
@@ -178,6 +178,11 @@ def default_config(name):
         "update_user_directory": False,
     }
 
+    if parse:
+        config = HomeServerConfig()
+        config.parse_config_dict(config_dict)
+        return config
+
     return config_dict
 
 
@@ -212,9 +217,7 @@ def setup_test_homeserver(
         from twisted.internet import reactor
 
     if config is None:
-        config_dict = default_config(name)
-        config = HomeServerConfig()
-        config.parse_config_dict(config_dict)
+        config = default_config(name, parse=True)
 
     config.ldap_enabled = False
 

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+
 import synapse.rest.admin
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
@@ -42,14 +43,14 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
             "server_notice_content": {
                 "msgtype": "m.text",
                 "body": self.consent_notice_message,
-            }
+            },
         }
         config["public_baseurl"] = "https://example.com/"
         config["form_secret"] = "123abc"
 
         config["server_notices"] = {
             "system_mxid_localpart": "notices",
-            "system_mxid_display_name":  "test display name",
+            "system_mxid_display_name": "test display name",
             "system_mxid_avatar_url": None,
             "room_name": "Server Notices",
         }

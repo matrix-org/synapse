@@ -37,8 +37,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config = self.default_config("test")
 
         # some of the tests rely on us having a user consent version
-        hs_config.user_consent_version = "test_consent_version"
-        hs_config.max_mau_value = 50
+        hs_config["user_consent"] = {"version": "test_consent_version"}
+        hs_config["max_mau_value"] = 50
 
         hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
         return hs
