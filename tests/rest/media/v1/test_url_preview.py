@@ -71,19 +71,17 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         os.mkdir(self.storage_path)
 
         config = self.default_config()
-        config.url_preview_enabled = True
-        config.max_spider_size = 9999999
-        config.url_preview_ip_range_blacklist = IPSet(
-            (
-                "192.168.1.1",
-                "1.0.0.0/8",
-                "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-                "2001:800::/21",
-            )
+        config["url_preview_enabled"] = True
+        config["max_spider_size"] = 9999999
+        config["url_preview_ip_range_blacklist"] = (
+            "192.168.1.1",
+            "1.0.0.0/8",
+            "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+            "2001:800::/21",
         )
-        config.url_preview_ip_range_whitelist = IPSet(("1.1.1.1",))
-        config.url_preview_url_blacklist = []
-        config.media_store_path = self.storage_path
+        config["url_preview_ip_range_whitelist"] = ("1.1.1.1",)
+        config["url_preview_url_blacklist"] = []
+        config["media_store_path"] = self.storage_path
 
         provider_config = {
             "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
@@ -93,11 +91,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "config": {"directory": self.storage_path},
         }
 
-        loaded = list(load_module(provider_config)) + [
-            MediaStorageProviderConfig(False, False, False)
-        ]
-
-        config.media_storage_providers = [loaded]
+        config.media_storage_providers = [provider_config]
 
         hs = self.setup_test_homeserver(config=config)
 

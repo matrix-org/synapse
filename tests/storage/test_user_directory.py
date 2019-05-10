@@ -36,9 +36,7 @@ class UserDirectoryStoreTestCase(unittest.TestCase):
         yield self.store.update_profile_in_user_dir(ALICE, "alice", None)
         yield self.store.update_profile_in_user_dir(BOB, "bob", None)
         yield self.store.update_profile_in_user_dir(BOBBY, "bobby", None)
-        yield self.store.add_users_in_public_rooms(
-            "!room:id", (ALICE, BOB)
-        )
+        yield self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB))
 
     @defer.inlineCallbacks
     def test_search_user_dir(self):

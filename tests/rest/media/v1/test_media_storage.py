@@ -123,9 +123,9 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         os.mkdir(self.storage_path)
 
         config = self.default_config()
-        config.media_store_path = self.storage_path
-        config.thumbnail_requirements = {}
-        config.max_image_pixels = 2000000
+        config["media_store_path"] = self.storage_path
+        config["thumbnail_requirements"] = {}
+        config["max_image_pixels"] = 2000000
 
         provider_config = {
             "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
@@ -134,12 +134,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             "store_remote": True,
             "config": {"directory": self.storage_path},
         }
-
-        loaded = list(load_module(provider_config)) + [
-            MediaStorageProviderConfig(False, False, False)
-        ]
-
-        config.media_storage_providers = [loaded]
+        config.media_storage_providers = [provider_config]
 
         hs = self.setup_test_homeserver(config=config, http_client=client)
 
