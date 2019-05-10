@@ -5,7 +5,7 @@ This API returns information about a specific user account.
 
 The api is::
 
-    GET /_matrix/client/r0/admin/whois/<user_id>
+    GET /_synapse/admin/v1/whois/<user_id>
 
 including an ``access_token`` of a server admin.
 
@@ -50,7 +50,7 @@ references to it).
 
 The api is::
 
-    POST /_matrix/client/r0/admin/deactivate/<user_id>
+    POST /_synapse/admin/v1/deactivate/<user_id>
 
 with a body of:
 
@@ -73,7 +73,7 @@ Changes the password of another user.
 
 The api is::
 
-    POST /_matrix/client/r0/admin/reset_password/<user_id>
+    POST /_synapse/admin/v1/reset_password/<user_id>
 
 with a body of:
 

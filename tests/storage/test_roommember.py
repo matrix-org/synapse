@@ -58,7 +58,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
                 "state_key": user.to_string(),
                 "room_id": room.to_string(),
                 "content": {"membership": membership},
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(

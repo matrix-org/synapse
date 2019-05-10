@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@
 
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2**63 - 1
+
+# the maximum length for a room alias is 255 characters
+MAX_ALIAS_LENGTH = 255
 
 
 class Membership(object):

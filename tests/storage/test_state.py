@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 class StateStoreTestCase(tests.unittest.TestCase):
-
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
@@ -57,7 +56,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
                 "state_key": state_key,
                 "room_id": room.to_string(),
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -83,15 +82,14 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.room, self.u_alice, EventTypes.Name, '', {"name": "test room"}
         )
 
-        state_group_map = yield self.store.get_state_groups_ids(self.room, [e2.event_id])
+        state_group_map = yield self.store.get_state_groups_ids(
+            self.room, [e2.event_id]
+        )
         self.assertEqual(len(state_group_map), 1)
         state_map = list(state_group_map.values())[0]
         self.assertDictEqual(
             state_map,
-            {
-                (EventTypes.Create, ''): e1.event_id,
-                (EventTypes.Name, ''): e2.event_id,
-            },
+            {(EventTypes.Create, ''): e1.event_id, (EventTypes.Name, ''): e2.event_id},
         )
 
     @defer.inlineCallbacks
@@ -103,15 +101,11 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.room, self.u_alice, EventTypes.Name, '', {"name": "test room"}
         )
 
-        state_group_map = yield self.store.get_state_groups(
-            self.room, [e2.event_id])
+        state_group_map = yield self.store.get_state_groups(self.room, [e2.event_id])
         self.assertEqual(len(state_group_map), 1)
         state_list = list(state_group_map.values())[0]
 
-        self.assertEqual(
-            {ev.event_id for ev in state_list},
-            {e1.event_id, e2.event_id},
-        )
+        self.assertEqual({ev.event_id for ev in state_list}, {e1.event_id, e2.event_id})
 
     @defer.inlineCallbacks
     def test_get_state_for_event(self):
@@ -147,9 +141,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
         )
 
         # check we get the full state as of the final event
-        state = yield self.store.get_state_for_event(
-            e5.event_id,
-        )
+        state = yield self.store.get_state_for_event(e5.event_id)
 
         self.assertIsNotNone(e4)
 
@@ -194,7 +186,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             state_filter=StateFilter(
                 types={EventTypes.Member: {self.u_alice.to_string()}},
                 include_others=True,
-            )
+            ),
         )
 
         self.assertStateMapEqual(
@@ -208,9 +200,9 @@ class StateStoreTestCase(tests.unittest.TestCase):
 
         # check that we can grab everything except members
         state = yield self.store.get_state_for_event(
-            e5.event_id, state_filter=StateFilter(
-                types={EventTypes.Member: set()},
-                include_others=True,
+            e5.event_id,
+            state_filter=StateFilter(
+                types={EventTypes.Member: set()}, include_others=True
             ),
         )
 
@@ -229,10 +221,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
         # test _get_state_for_group_using_cache correctly filters out members
         # with types=[]
         (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache, group,
+            self.store._state_group_cache,
+            group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()},
-                include_others=True,
+                types={EventTypes.Member: set()}, include_others=True
             ),
         )
 
@@ -249,8 +241,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()},
-                include_others=True,
+                types={EventTypes.Member: set()}, include_others=True
             ),
         )
 
@@ -263,8 +254,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None},
-                include_others=True,
+                types={EventTypes.Member: None}, include_others=True
             ),
         )
 
@@ -281,8 +271,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None},
-                include_others=True,
+                types={EventTypes.Member: None}, include_others=True
             ),
         )
 
@@ -302,8 +291,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}},
-                include_others=True,
+                types={EventTypes.Member: {e5.state_key}}, include_others=True
             ),
         )
 
@@ -320,8 +308,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}},
-                include_others=True,
+                types={EventTypes.Member: {e5.state_key}}, include_others=True
             ),
         )
 
@@ -334,8 +321,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}},
-                include_others=False,
+                types={EventTypes.Member: {e5.state_key}}, include_others=False
             ),
         )
 
@@ -384,10 +370,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
         # with types=[]
         room_id = self.room.to_string()
         (state_dict, is_all) = yield self.store._get_state_for_group_using_cache(
-            self.store._state_group_cache, group,
+            self.store._state_group_cache,
+            group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()},
-                include_others=True,
+                types={EventTypes.Member: set()}, include_others=True
             ),
         )
 
@@ -399,8 +385,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()},
-                include_others=True,
+                types={EventTypes.Member: set()}, include_others=True
             ),
         )
 
@@ -413,8 +398,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None},
-                include_others=True,
+                types={EventTypes.Member: None}, include_others=True
             ),
         )
 
@@ -425,8 +409,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None},
-                include_others=True,
+                types={EventTypes.Member: None}, include_others=True
             ),
         )
 
@@ -445,8 +428,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}},
-                include_others=True,
+                types={EventTypes.Member: {e5.state_key}}, include_others=True
             ),
         )
 
@@ -457,8 +439,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}},
-                include_others=True,
+                types={EventTypes.Member: {e5.state_key}}, include_others=True
             ),
         )
 
@@ -471,8 +452,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}},
-                include_others=False,
+                types={EventTypes.Member: {e5.state_key}}, include_others=False
             ),
         )
 
@@ -483,8 +463,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             self.store._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}},
-                include_others=False,
+                types={EventTypes.Member: {e5.state_key}}, include_others=False
             ),
         )
 

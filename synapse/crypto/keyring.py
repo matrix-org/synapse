@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017, 2018 New Vector Ltd.
+# Copyright 2017, 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -114,39 +114,53 @@ class Keyring(object):
                 server_name. The deferreds run their callbacks in the sentinel
                 logcontext.
         """
+        # a list of VerifyKeyRequests
         verify_requests = []
+        handle = preserve_fn(_handle_key_deferred)
 
-        for server_name, json_object in server_and_json:
+        def process(server_name, json_object):
+            """Process an entry in the request list
 
+            Given a (server_name, json_object) pair from the request list,
+            adds a key request to verify_requests, and returns a deferred which will
+            complete or fail (in the sentinel context) when verification completes.
+            """
             key_ids = signature_ids(json_object, server_name)
+
             if not key_ids:
-                logger.warn("Request from %s: no supported signature keys",
-                            server_name)
-                deferred = defer.fail(SynapseError(
-                    400,
-                    "Not signed with a supported algorithm",
-                    Codes.UNAUTHORIZED,
-                ))
-            else:
-                deferred = defer.Deferred()
+                return defer.fail(
+                    SynapseError(
+                        400,
+                        "Not signed by %s" % (server_name,),
+                        Codes.UNAUTHORIZED,
+                    )
+                )
 
             logger.debug("Verifying for %s with key_ids %s",
                          server_name, key_ids)
 
+            # add the key request to the queue, but don't start it off yet.
             verify_request = VerifyKeyRequest(
-                server_name, key_ids, json_object, deferred
+                server_name, key_ids, json_object, defer.Deferred(),
             )
-
             verify_requests.append(verify_request)
 
-        run_in_background(self._start_key_lookups, verify_requests)
+            # now run _handle_key_deferred, which will wait for the key request
+            # to complete and then do the verification.
+            #
+            # We want _handle_key_request to log to the right context, so we
+            # wrap it with preserve_fn (aka run_in_background)
+            return handle(verify_request)
 
-        # Pass those keys to handle_key_deferred so that the json object
-        # signatures can be verified
-        handle = preserve_fn(_handle_key_deferred)
-        return [
-            handle(rq) for rq in verify_requests
+        results = [
+            process(server_name, json_object)
+            for server_name, json_object in server_and_json
         ]
+
+        if verify_requests:
+            run_in_background(self._start_key_lookups, verify_requests)
+
+        return results
 
     @defer.inlineCallbacks
     def _start_key_lookups(self, verify_requests):

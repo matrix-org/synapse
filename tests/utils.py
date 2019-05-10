@@ -69,7 +69,9 @@ def setupdb():
 
         # connect to postgres to create the base database.
         db_conn = db_engine.module.connect(
-            user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD,
+            user=POSTGRES_USER,
+            host=POSTGRES_HOST,
+            password=POSTGRES_PASSWORD,
             dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
         )
         db_conn.autocommit = True
@@ -95,7 +97,9 @@ def setupdb():
 
         def _cleanup():
             db_conn = db_engine.module.connect(
-                user=POSTGRES_USER, host=POSTGRES_HOST, password=POSTGRES_PASSWORD,
+                user=POSTGRES_USER,
+                host=POSTGRES_HOST,
+                password=POSTGRES_PASSWORD,
                 dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             )
             db_conn.autocommit = True
@@ -115,7 +119,6 @@ def default_config(name):
         "server_name": name,
         "media_store_path": "media",
         "uploads_path": "uploads",
-
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",

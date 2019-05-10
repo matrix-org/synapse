@@ -1,0 +1,1 @@
+Limit the number of EDUs in transactions to 100 as expected by synapse. Thanks to @superboum for this work!
