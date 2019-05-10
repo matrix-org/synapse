@@ -130,7 +130,6 @@ class ServerConfig(Config):
             "federation_ip_range_blacklist", [],
         )
 
-
         # Attempt to create an IPSet from the given ranges
         try:
             self.federation_ip_range_blacklist = IPSet(
