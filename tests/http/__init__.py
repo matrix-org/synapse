@@ -24,14 +24,12 @@ def get_test_cert_file():
     #
     # openssl req -x509 -newkey rsa:4096 -keyout server.pem  -out server.pem -days 36500 \
     #     -nodes -subj '/CN=testserv'
-    return os.path.join(
-        os.path.dirname(__file__),
-        'server.pem',
-    )
+    return os.path.join(os.path.dirname(__file__), 'server.pem')
 
 
 class ServerTLSContext(object):
     """A TLS Context which presents our test cert."""
+
     def __init__(self):
         self.filename = get_test_cert_file()
 

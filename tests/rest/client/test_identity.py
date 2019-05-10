@@ -44,7 +44,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         tok = self.login("kermit", "monkey")
 
         request, channel = self.make_request(
-            b"POST", "/createRoom", b"{}", access_token=tok,
+            b"POST", "/createRoom", b"{}", access_token=tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
@@ -56,11 +56,9 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             "address": "test@example.com",
         }
         request_data = json.dumps(params)
-        request_url = (
-            "/rooms/%s/invite" % (room_id)
-        ).encode('ascii')
+        request_url = ("/rooms/%s/invite" % (room_id)).encode('ascii')
         request, channel = self.make_request(
-            b"POST", request_url, request_data, access_token=tok,
+            b"POST", request_url, request_data, access_token=tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)

@@ -96,7 +96,7 @@ class DeviceWorkerStore(SQLBaseStore):
         )
 
     def _get_devices_by_remote_txn(
-        self, txn, destination, from_stream_id, now_stream_id, limit=100
+        self, txn, destination, from_stream_id, now_stream_id, limit
     ):
         # We retrieve n+1 devices from the list of outbound pokes were n is our
         # maximum. We then check if the very last device has the same stream_id as the
@@ -116,7 +116,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """ % (limit + 1)
         txn.execute(sql, (destination, from_stream_id, now_stream_id, False))
 
-        duplicate_updates = [r for r in txn]
+        duplicate_updates = list(txn)
 
         # Return if there are no updates to send out
         if len(duplicate_updates) == 0:

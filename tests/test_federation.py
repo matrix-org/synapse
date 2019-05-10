@@ -1,4 +1,3 @@
-
 from mock import Mock
 
 from twisted.internet.defer import maybeDeferred, succeed
