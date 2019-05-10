@@ -364,7 +364,7 @@ class PerDestinationQueue(object):
 
         last_device_list = self._last_device_list_stream_id
         now_stream_id, results = yield self._store.get_devices_by_remote(
-            self._destination, last_device_list
+            self._destination, last_device_list, MAX_EDUS_PER_TRANSACTION
         )
         edus.extend(
             Edu(
