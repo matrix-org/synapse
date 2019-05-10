@@ -130,11 +130,15 @@ class ServerConfig(Config):
             "federation_ip_range_blacklist", [],
         )
 
+
         # Attempt to create an IPSet from the given ranges
         try:
             self.federation_ip_range_blacklist = IPSet(
                 self.federation_ip_range_blacklist
             )
+
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
         except Exception as e:
             raise ConfigError(
                 "Invalid range(s) provided in "
@@ -373,6 +377,9 @@ class ServerConfig(Config):
         # Prevent federation requests from being sent to the following
         # blacklist IP address CIDR ranges. If this option is not specified, or
         # specified with an empty list, no ip range blacklist will be enforced.
+        #
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
         #
         federation_ip_range_blacklist:
           - '127.0.0.0/8'
