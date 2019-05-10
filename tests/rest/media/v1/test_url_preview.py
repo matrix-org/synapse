@@ -16,7 +16,6 @@
 import os
 
 import attr
-from netaddr import IPSet
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -24,9 +23,6 @@ from twisted.internet.error import DNSLookupError
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol
 from twisted.web._newclient import ResponseDone
-
-from synapse.config.repository import MediaStorageProviderConfig
-from synapse.util.module_loader import load_module
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -67,9 +63,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        self.storage_path = self.mktemp()
-        os.mkdir(self.storage_path)
-
         config = self.default_config()
         config["url_preview_enabled"] = True
         config["max_spider_size"] = 9999999
@@ -81,7 +74,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         config["url_preview_ip_range_whitelist"] = ("1.1.1.1",)
         config["url_preview_url_blacklist"] = []
-        config["media_store_path"] = self.storage_path
+
+        self.storage_path = self.mktemp()
+        self.media_store_path = self.mktemp()
+        os.mkdir(self.storage_path)
+        os.mkdir(self.media_store_path)
+        config["media_store_path"] = self.media_store_path
 
         provider_config = {
             "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",

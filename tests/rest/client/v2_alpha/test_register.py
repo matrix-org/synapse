@@ -325,15 +325,18 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             "template_dir": os.path.abspath(
                 pkg_resources.resource_filename('synapse', 'res/templates')
             ),
-            "email_expiry_template_html": "notice_expiry.html",
-            "email_expiry_template_text": "notice_expiry.txt",
-            "email_smtp_host": "127.0.0.1",
-            "email_smtp_port": 20,
+            "expiry_template_html": "notice_expiry.html",
+            "expiry_template_text": "notice_expiry.txt",
+            "notif_template_html": "notif_mail.html",
+            "notif_template_text": "notif_mail.txt",
+            "smtp_host": "127.0.0.1",
+            "smtp_port": 20,
             "require_transport_security": False,
-            "email_smtp_user": None,
-            "email_smtp_pass": None,
-            "email_notif_from": "test@example.com",
+            "smtp_user": None,
+            "smtp_pass": None,
+            "notif_from": "test@example.com",
         }
+        config["public_baseurl"] = "aaa"
 
         self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
 
