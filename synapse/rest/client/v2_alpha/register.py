@@ -345,7 +345,7 @@ class RegisterRestServlet(RestServlet):
         if self.hs.config.enable_registration_captcha:
             # only support 3PIDless registration if no 3PIDs are required
             if not require_email and not require_msisdn:
-                flows.extend([[LoginType.RECAPTCHA]])
+                flows.extend([[LoginType.RECAPTCHA, LoginType.DUMMY]])
             # only support the email-only flow if we don't require MSISDN 3PIDs
             if not require_msisdn:
                 flows.extend([[LoginType.EMAIL_IDENTITY, LoginType.RECAPTCHA]])
