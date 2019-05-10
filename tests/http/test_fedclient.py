@@ -234,7 +234,7 @@ class FederationClientTests(HomeserverTestCase):
         # Nothing happened yet
         self.assertNoResult(d)
 
-        self.pump(120)
+        self.pump(1)
 
         # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients
@@ -253,7 +253,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertNoResult(d)
 
         # Move the reactor forwards
-        self.pump(120)
+        self.pump(1)
 
         # Check that it was unable to resolve the address
         clients = self.reactor.tcpClients
@@ -272,7 +272,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertNoResult(d)
 
         # Move the reactor forwards
-        self.pump(120)
+        self.pump(1)
 
         # Check that it was able to resolve the address
         clients = self.reactor.tcpClients
