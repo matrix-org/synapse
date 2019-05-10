@@ -22,6 +22,7 @@ from synapse.util.logcontext import LoggingContextFilter
 
 class ToTwistedHandler(logging.Handler):
     """logging handler which sends the logs to the twisted log"""
+
     tx_log = twisted.logger.Logger()
 
     def emit(self, record):
@@ -40,9 +41,7 @@ def setup_logging():
     """
     root_logger = logging.getLogger()
 
-    log_format = (
-        "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s"
-    )
+    log_format = "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s"
 
     handler = ToTwistedHandler()
     formatter = logging.Formatter(log_format)

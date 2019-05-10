@@ -169,7 +169,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 self.http_client.post_json.return_value = defer.Deferred()
 
                 res_deferreds_2 = kr.verify_json_objects_for_server(
-                    [("server10", json1, )]
+                    [("server10", json1)]
                 )
                 res_deferreds_2[0].addBoth(self.check_context, None)
                 yield logcontext.make_deferred_yieldable(res_deferreds_2[0])
@@ -345,6 +345,7 @@ def _verify_json_for_server(keyring, server_name, json_object):
     """thin wrapper around verify_json_for_server which makes sure it is wrapped
     with the patched defer.inlineCallbacks.
     """
+
     @defer.inlineCallbacks
     def v():
         rv1 = yield keyring.verify_json_for_server(server_name, json_object)
