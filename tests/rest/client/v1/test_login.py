@@ -37,10 +37,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         for i in range(0, 6):
             params = {
                 "type": "m.login.password",
-                "identifier": {
-                    "type": "m.id.user",
-                    "user": "kermit" + str(i),
-                },
+                "identifier": {"type": "m.id.user", "user": "kermit" + str(i)},
                 "password": "monkey",
             }
             request_data = json.dumps(params)
@@ -57,14 +54,11 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
 
-        self.reactor.advance(retry_after_ms / 1000.)
+        self.reactor.advance(retry_after_ms / 1000.0)
 
         params = {
             "type": "m.login.password",
-            "identifier": {
-                "type": "m.id.user",
-                "user": "kermit" + str(i),
-            },
+            "identifier": {"type": "m.id.user", "user": "kermit" + str(i)},
             "password": "monkey",
         }
         request_data = json.dumps(params)
@@ -82,10 +76,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         for i in range(0, 6):
             params = {
                 "type": "m.login.password",
-                "identifier": {
-                    "type": "m.id.user",
-                    "user": "kermit",
-                },
+                "identifier": {"type": "m.id.user", "user": "kermit"},
                 "password": "monkey",
             }
             request_data = json.dumps(params)
@@ -102,14 +93,11 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
 
-        self.reactor.advance(retry_after_ms / 1000.)
+        self.reactor.advance(retry_after_ms / 1000.0)
 
         params = {
             "type": "m.login.password",
-            "identifier": {
-                "type": "m.id.user",
-                "user": "kermit",
-            },
+            "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "monkey",
         }
         request_data = json.dumps(params)
@@ -127,10 +115,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         for i in range(0, 6):
             params = {
                 "type": "m.login.password",
-                "identifier": {
-                    "type": "m.id.user",
-                    "user": "kermit",
-                },
+                "identifier": {"type": "m.id.user", "user": "kermit"},
                 "password": "notamonkey",
             }
             request_data = json.dumps(params)
@@ -147,14 +132,11 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # than 1min.
         self.assertTrue(retry_after_ms < 6000)
 
-        self.reactor.advance(retry_after_ms / 1000.)
+        self.reactor.advance(retry_after_ms / 1000.0)
 
         params = {
             "type": "m.login.password",
-            "identifier": {
-                "type": "m.id.user",
-                "user": "kermit",
-            },
+            "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "notamonkey",
         }
         request_data = json.dumps(params)
