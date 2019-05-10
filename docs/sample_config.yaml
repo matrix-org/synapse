@@ -105,6 +105,9 @@ pid_file: DATADIR/homeserver.pid
 # blacklist IP address CIDR ranges. If this option is not specified, or
 # specified with an empty list, no ip range blacklist will be enforced.
 #
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
 federation_ip_range_blacklist:
   - '127.0.0.0/8'
   - '10.0.0.0/8'
