@@ -36,9 +36,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
         config = self.default_config()
 
-        config.enable_registration_captcha = True
-        config.recaptcha_public_key = "brokencake"
-        config.registrations_require_3pid = []
+        config["enable_registration_captcha"] = True
+        config["recaptcha_public_key"] = "brokencake"
+        config["registrations_require_3pid"] = []
 
         hs = self.setup_test_homeserver(config=config)
         return hs

@@ -36,9 +36,9 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.enable_registration_captcha = False
-        config.enable_registration = True
-        config.auto_join_rooms = []
+        config["enable_registration_captcha"] = False
+        config["enable_registration"] = True
+        config["auto_join_rooms"] = []
 
         hs = self.setup_test_homeserver(
             config=config, ratelimiter=NonCallableMock(spec_set=["can_do_action"])
