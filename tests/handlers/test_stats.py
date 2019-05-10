@@ -18,7 +18,8 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, room
 
 from tests import unittest
 
@@ -26,7 +27,7 @@ from tests import unittest
 class StatsRoomTests(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
