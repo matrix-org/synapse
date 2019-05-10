@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from synapse.rest.client.v1 import admin, login, room
+import synapse.rest.admin
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
@@ -23,7 +23,7 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
 
     servlets = [
         sync.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         room.register_servlets,
     ]

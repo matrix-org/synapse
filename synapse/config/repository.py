@@ -186,16 +186,20 @@ class ContentRepositoryConfig(Config):
             except ImportError:
                 raise ConfigError(MISSING_NETADDR)
 
-            if "url_preview_ip_range_blacklist" in config:
-                self.url_preview_ip_range_blacklist = IPSet(
-                    config["url_preview_ip_range_blacklist"]
-                )
-            else:
+            if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(
                     "For security, you must specify an explicit target IP address "
                     "blacklist in url_preview_ip_range_blacklist for url previewing "
                     "to work"
                 )
+
+            self.url_preview_ip_range_blacklist = IPSet(
+                config["url_preview_ip_range_blacklist"]
+            )
+
+            # we always blacklist '0.0.0.0' and '::', which are supposed to be
+            # unroutable addresses.
+            self.url_preview_ip_range_blacklist.update(['0.0.0.0', '::'])
 
             self.url_preview_ip_range_whitelist = IPSet(
                 config.get("url_preview_ip_range_whitelist", ())
@@ -260,11 +264,12 @@ class ContentRepositoryConfig(Config):
         #thumbnail_sizes:
 %(formatted_thumbnail_sizes)s
 
-        # Is the preview URL API enabled?  If enabled, you *must* specify
-        # an explicit url_preview_ip_range_blacklist of IPs that the spider is
-        # denied from accessing.
+        # Is the preview URL API enabled?
         #
-        #url_preview_enabled: false
+        # 'false' by default: uncomment the following to enable it (and specify a
+        # url_preview_ip_range_blacklist blacklist).
+        #
+        #url_preview_enabled: true
 
         # List of IP address CIDR ranges that the URL preview spider is denied
         # from accessing.  There are no defaults: you must explicitly
@@ -273,6 +278,12 @@ class ContentRepositoryConfig(Config):
         # to connect to, otherwise anyone in any Matrix room could cause your
         # synapse to issue arbitrary GET requests to your internal services,
         # causing serious security issues.
+        #
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
+        #
+        # This must be specified if url_preview_enabled is set. It is recommended that
+        # you uncomment the following list as a starting point.
         #
         #url_preview_ip_range_blacklist:
         #  - '127.0.0.0/8'
@@ -284,7 +295,7 @@ class ContentRepositoryConfig(Config):
         #  - '::1/128'
         #  - 'fe80::/64'
         #  - 'fc00::/7'
-        #
+
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.
         # This is useful for specifying exceptions to wide-ranging blacklisted

@@ -1,0 +1,1 @@
+Move admin APIs to `/_synapse/admin/v1`. (The old paths are retained for backwards-compatibility, for now).

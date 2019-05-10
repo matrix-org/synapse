@@ -20,7 +20,8 @@ from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
-from synapse.rest.client.v1 import profile
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, profile, room
 
 from tests import unittest
 
@@ -42,6 +43,7 @@ class ProfileTestCase(unittest.TestCase):
                 "set_displayname",
                 "get_avatar_url",
                 "set_avatar_url",
+                "check_profile_query_allowed",
             ]
         )
 
@@ -155,3 +157,77 @@ class ProfileTestCase(unittest.TestCase):
         self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
         self.assertEquals(mocked_set.call_args[0][2], "http://my.server/pic.gif")
+
+
+class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        profile.register_servlets,
+        room.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+
+        config = self.default_config()
+        config.require_auth_for_profile_requests = True
+        self.hs = self.setup_test_homeserver(config=config)
+
+        return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        # User owning the requested profile.
+        self.owner = self.register_user("owner", "pass")
+        self.owner_tok = self.login("owner", "pass")
+        self.profile_url = "/profile/%s" % (self.owner)
+
+        # User requesting the profile.
+        self.requester = self.register_user("requester", "pass")
+        self.requester_tok = self.login("requester", "pass")
+
+        self.room_id = self.helper.create_room_as(self.owner, tok=self.owner_tok)
+
+    def test_no_auth(self):
+        self.try_fetch_profile(401)
+
+    def test_not_in_shared_room(self):
+        self.ensure_requester_left_room()
+
+        self.try_fetch_profile(403, access_token=self.requester_tok)
+
+    def test_in_shared_room(self):
+        self.ensure_requester_left_room()
+
+        self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
+
+        self.try_fetch_profile(200, self.requester_tok)
+
+    def try_fetch_profile(self, expected_code, access_token=None):
+        self.request_profile(expected_code, access_token=access_token)
+
+        self.request_profile(
+            expected_code, url_suffix="/displayname", access_token=access_token
+        )
+
+        self.request_profile(
+            expected_code, url_suffix="/avatar_url", access_token=access_token
+        )
+
+    def request_profile(self, expected_code, url_suffix="", access_token=None):
+        request, channel = self.make_request(
+            "GET", self.profile_url + url_suffix, access_token=access_token
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+
+    def ensure_requester_left_room(self):
+        try:
+            self.helper.leave(
+                room=self.room_id, user=self.requester, tok=self.requester_tok
+            )
+        except AssertionError:
+            # We don't care whether the leave request didn't return a 200 (e.g.
+            # if the user isn't already in the room), because we only want to
+            # make sure the user isn't in the room.
+            pass

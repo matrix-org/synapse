@@ -38,9 +38,7 @@ from tests.unittest import HomeserverTestCase
 def check_logcontext(context):
     current = LoggingContext.current_context()
     if current is not context:
-        raise AssertionError(
-            "Expected logcontext %s but was %s" % (context, current),
-        )
+        raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 
 
 class FederationClientTests(HomeserverTestCase):
@@ -56,6 +54,7 @@ class FederationClientTests(HomeserverTestCase):
         """
         happy-path test of a GET request
         """
+
         @defer.inlineCallbacks
         def do_request():
             with LoggingContext("one") as context:
@@ -177,8 +176,7 @@ class FederationClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(
-            f.value.inner_exception,
-            (ConnectingCancelledError, TimeoutError),
+            f.value.inner_exception, (ConnectingCancelledError, TimeoutError)
         )
 
     def test_client_connect_no_response(self):
@@ -287,9 +285,7 @@ class FederationClientTests(HomeserverTestCase):
         Once the client gets the headers, _request returns successfully.
         """
         request = MatrixFederationRequest(
-            method="GET",
-            destination="testserv:8008",
-            path="foo/bar",
+            method="GET", destination="testserv:8008", path="foo/bar"
         )
         d = self.cl._send_request(request, timeout=10000)
 
@@ -329,8 +325,10 @@ class FederationClientTests(HomeserverTestCase):
 
         # Send it the HTTP response
         client.dataReceived(
-            (b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-             b"Server: Fake\r\n\r\n")
+            (
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                b"Server: Fake\r\n\r\n"
+            )
         )
 
         # Push by enough to time it out
@@ -345,9 +343,7 @@ class FederationClientTests(HomeserverTestCase):
         requiring a trailing slash. We need to retry the request with a
         trailing slash. Workaround for Synapse <= v0.99.3, explained in #3622.
         """
-        d = self.cl.get_json(
-            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
-        )
+        d = self.cl.get_json("testserv:8008", "foo/bar", try_trailing_slash_on_400=True)
 
         # Send the request
         self.pump()
@@ -400,9 +396,7 @@ class FederationClientTests(HomeserverTestCase):
 
         See test_client_requires_trailing_slashes() for context.
         """
-        d = self.cl.get_json(
-            "testserv:8008", "foo/bar", try_trailing_slash_on_400=True,
-        )
+        d = self.cl.get_json("testserv:8008", "foo/bar", try_trailing_slash_on_400=True)
 
         # Send the request
         self.pump()
@@ -439,10 +433,7 @@ class FederationClientTests(HomeserverTestCase):
         self.failureResultOf(d)
 
     def test_client_sends_body(self):
-        self.cl.post_json(
-            "testserv:8008", "foo/bar", timeout=10000,
-            data={"a": "b"}
-        )
+        self.cl.post_json("testserv:8008", "foo/bar", timeout=10000, data={"a": "b"})
 
         self.pump()
 

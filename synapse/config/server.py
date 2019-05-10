@@ -74,6 +74,19 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API.
+        self.require_auth_for_profile_requests = config.get(
+            "require_auth_for_profile_requests", False,
+        )
+
+        # If set to 'True', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation.
+        self.restrict_public_rooms_to_local_users = config.get(
+            "restrict_public_rooms_to_local_users", False,
+        )
+
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
         # errors when attempting to search for messages.
@@ -153,6 +166,12 @@ class ServerConfig(Config):
         # for testing. The value defines the number of milliseconds to pause before
         # sending out any replication updates.
         self.replication_torture_level = config.get("replication_torture_level")
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to True.
+        self.require_membership_for_aliases = config.get(
+            "require_membership_for_aliases", True,
+        )
 
         self.listeners = []
         for listener in config.get("listeners", []):
@@ -341,6 +360,20 @@ class ServerConfig(Config):
         #
         #use_presence: false
 
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API. Defaults to
+        # 'false'. Note that profile data is also available via the federation
+        # API, so this setting is of limited value if federation is enabled on
+        # the server.
+        #
+        #require_auth_for_profile_requests: true
+
+        # If set to 'true', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation. Defaults to 'false'.
+        #
+        #restrict_public_rooms_to_local_users: true
+
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
         #gc_thresholds: [700, 10, 10]
@@ -426,8 +459,8 @@ class ServerConfig(Config):
         #
         # Valid resource names are:
         #
-        #   client: the client-server API (/_matrix/client). Also implies 'media' and
-        #       'static'.
+        #   client: the client-server API (/_matrix/client), and the synapse admin
+        #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
         #   consent: user consent forms (/_matrix/consent). See
         #       docs/consent_tracking.md.
@@ -528,6 +561,11 @@ class ServerConfig(Config):
 
         # Used by phonehome stats to group together related servers.
         #server_context: context
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to 'true'.
+        #
+        #require_membership_for_aliases: false
         """ % locals()
 
     def read_arguments(self, args):

@@ -4,10 +4,11 @@ import os
 
 import pkg_resources
 
+import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import account_validity, register, sync
 
 from tests import unittest
@@ -40,11 +41,10 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         as_token = "i_am_an_app_service"
 
         appservice = ApplicationService(
-            as_token, self.hs.config.server_name,
+            as_token,
+            self.hs.config.server_name,
             id="1234",
-            namespaces={
-                "users": [{"regex": r"@as_user.*", "exclusive": True}],
-            },
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
         )
 
         self.hs.get_datastore().services_cache.append(appservice)
@@ -56,10 +56,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        det_data = {
-            "user_id": user_id,
-            "home_server": self.hs.hostname,
-        }
+        det_data = {"user_id": user_id, "home_server": self.hs.hostname}
         self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_appservice_registration_invalid(self):
@@ -127,10 +124,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
 
-        det_data = {
-            "home_server": self.hs.hostname,
-            "device_id": "guest_device",
-        }
+        det_data = {"home_server": self.hs.hostname, "device_id": "guest_device"}
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
 
@@ -158,7 +152,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.reactor.advance(retry_after_ms / 1000.)
+        self.reactor.advance(retry_after_ms / 1000.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
@@ -186,7 +180,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.reactor.advance(retry_after_ms / 1000.)
+        self.reactor.advance(retry_after_ms / 1000.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
@@ -198,7 +192,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         register.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
@@ -220,23 +214,19 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
 
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
-            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result,
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
 
     def test_manual_renewal(self):
@@ -252,21 +242,17 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         admin_tok = self.login("admin", "adminpassword")
 
         url = "/_matrix/client/unstable/admin/account_validity/validity"
-        params = {
-            "user_id": user_id,
-        }
+        params = {"user_id": user_id}
         request_data = json.dumps(params)
         request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok,
+            b"POST", url, request_data, access_token=admin_tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -285,20 +271,18 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         }
         request_data = json.dumps(params)
         request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok,
+            b"POST", url, request_data, access_token=admin_tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
-            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result,
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
 
 
@@ -307,7 +291,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
     skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         register.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
@@ -357,10 +341,15 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # We need to manually add an email address otherwise the handler will do
         # nothing.
         now = self.hs.clock.time_msec()
-        self.get_success(self.store.user_add_threepid(
-            user_id=user_id, medium="email", address="kermit@example.com",
-            validated_at=now, added_at=now,
-        ))
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
 
         # Move 6 days forward. This should trigger a renewal email to be sent.
         self.reactor.advance(datetime.timedelta(days=6).total_seconds())
@@ -378,9 +367,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # our access token should be denied from now, otherwise they should
         # succeed.
         self.reactor.advance(datetime.timedelta(days=3).total_seconds())
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -392,13 +379,19 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # We need to manually add an email address otherwise the handler will do
         # nothing.
         now = self.hs.clock.time_msec()
-        self.get_success(self.store.user_add_threepid(
-            user_id=user_id, medium="email", address="kermit@example.com",
-            validated_at=now, added_at=now,
-        ))
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
 
         request, channel = self.make_request(
-            b"POST", "/_matrix/client/unstable/account_validity/send_mail",
+            b"POST",
+            "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,
         )
         self.render(request)
