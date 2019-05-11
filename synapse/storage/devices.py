@@ -133,7 +133,7 @@ class DeviceWorkerStore(SQLBaseStore):
         # If we ended up not being left over with any device updates to send
         # out, then skip this stream_id
         if len(query_map) == 0:
-            return (now_stream_id + 1, [])
+            defer.returnValue((now_stream_id + 1, []))
         elif len(query_map) >= limit:
             now_stream_id = max(stream_id for stream_id in itervalues(query_map))
 
