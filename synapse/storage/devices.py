@@ -89,7 +89,7 @@ class DeviceWorkerStore(SQLBaseStore):
         if not has_changed:
             return (now_stream_id, [])
 
-        updates = self.runInteraction(
+        updates = yield self.runInteraction(
             "get_devices_by_remote",
             self._get_devices_by_remote_txn,
             destination,
