@@ -72,6 +72,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         defer.returnValue({d["device_id"]: d for d in devices})
 
+    @defer.inlineCallbacks
     def get_devices_by_remote(self, destination, from_stream_id, limit=100):
         """Get stream of updates to send to remote servers
 
@@ -100,7 +101,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # Return if there are no updates
         if len(updates) == 0:
-            return (now_stream_id, [])
+            defer.returnValue((now_stream_id, []))
 
         # Check if the last and second-to-last row's stream_id's are the same
         offending_stream_id = None
@@ -136,14 +137,17 @@ class DeviceWorkerStore(SQLBaseStore):
         elif len(query_map) >= limit:
             now_stream_id = max(stream_id for stream_id in itervalues(query_map))
 
-        return self.runInteraction(
+        max_stream_id_and_results = yield self.runInteraction(
             "_get_max_stream_id_for_devices_txn",
             self._get_max_stream_id_for_devices_txn,
+            destination,
             from_stream_id,
             now_stream_id,
             query_map,
             limit,
         )
+
+        defer.returnValue(max_stream_id_and_results)
 
     def _get_devices_by_remote_txn(
         self, txn, destination, from_stream_id, now_stream_id, limit
