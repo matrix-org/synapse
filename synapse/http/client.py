@@ -165,7 +165,8 @@ class BlacklistingAgentWrapper(Agent):
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
                 logger.info(
-                    "Blocking access to %s because of blacklist" % (ip_address,)
+                    "Blocking access to %s due to blacklist" %
+                    (ip_address,)
                 )
                 e = SynapseError(403, "IP address blocked by IP blacklist entry")
                 return defer.fail(Failure(e))
@@ -263,9 +264,6 @@ class SimpleHttpClient(object):
             uri (str): URI to query.
             data (bytes): Data to send in the request body, if applicable.
             headers (t.w.http_headers.Headers): Request headers.
-
-        Raises:
-            SynapseError: If the IP is blacklisted.
         """
         # A small wrapper around self.agent.request() so we can easily attach
         # counters to it
