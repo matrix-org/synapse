@@ -40,24 +40,31 @@ class Thumbnailer(object):
 
     def __init__(self, input_path):
         self.image = Image.open(input_path)
-        transpose_method = None
-
+        self.width, self.height = self.image.size
+        self.transpose_method = None
         try:
             # We don't use ImageOps.exif_transpose since it crashes with big EXIF
             image_exif = self.image._getexif()
             if image_exif is not None:
                 image_orientation = image_exif.get(EXIF_ORIENTATION_TAG)
-                transpose_method = EXIF_TRANSPOSE_MAPPINGS.get(image_orientation)
+                self.transpose_method = EXIF_TRANSPOSE_MAPPINGS.get(image_orientation)
         except Exception as e:
             # A lot of parsing errors can happen when parsing EXIF
             logger.info("Error parsing image EXIF information: %s", e)
 
-        if transpose_method is not None:
-            self.image = self.image.transpose(transpose_method)
+    def transpose(self):
+        """Transpose the image using its EXIF Orientation tag
+
+        Returns:
+            Tuple[int, int]: A 2-Tuple containing the new image size (width, height) in pixels.
+        """
+        if self.transpose_method is not None:
+            self.image = self.image.transpose(self.transpose_method)
+            self.width, self.height = self.image.size
+            self.transpose_method = None
             # We don't need EXIF any more
             self.image.info["exif"] = None
-
-        self.width, self.height = self.image.size
+        return self.image.size
 
     def aspect(self, max_width, max_height):
         """Calculate the largest size that preserves aspect ratio which
