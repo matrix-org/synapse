@@ -46,6 +46,12 @@ pid_file: DATADIR/homeserver.pid
 #
 #cpu_affinity: 0xFFFFFFFF
 
+# Whether to use the default system resolver (getaddrinfo) instead of the twisted
+# asynchronous dns resolver. Using the async resolver can potentially improve
+# performance, but may also behave different from getaddrinfo.
+# Defaults to True. Uncomment to use the twisted resolver instead.
+#use_getaddrinfo_for_dns: False
+
 # The path to the web client which will be served at /_matrix/client/
 # if 'webclient' is configured under the 'listeners' configuration.
 #

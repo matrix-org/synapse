@@ -71,7 +71,7 @@ def start_worker_reactor(appname, config):
         daemonize=config.worker_daemonize,
         cpu_affinity=config.worker_cpu_affinity,
         print_pidfile=config.print_pidfile,
-        no_getaddrinfo=config.no_getaddrinfo,
+        use_getaddrinfo_for_dns=config.use_getaddrinfo_for_dns,
         logger=logger,
     )
 
@@ -84,7 +84,7 @@ def start_reactor(
         daemonize,
         cpu_affinity,
         print_pidfile,
-        no_getaddrinfo,
+        use_getaddrinfo_for_dns,
         logger,
 ):
     """ Run the reactor in the main process
@@ -99,7 +99,7 @@ def start_reactor(
         pid_file (str): name of pid file to write to if daemonize is True
         daemonize (bool): true to run the reactor in a background process
         cpu_affinity (int|None): cpu affinity mask
-        no_getaddrinfo (bool): use async hostname resolver instead of getaddrinfo
+        use_getaddrinfo_for_dns (bool): use getaddrinfo instead of async resolver
         print_pidfile (bool): whether to print the pid file, if daemonize is True
         logger (logging.Logger): logger instance to pass to Daemonize
     """
@@ -132,7 +132,7 @@ def start_reactor(
             if gc_thresholds:
                 gc.set_threshold(*gc_thresholds)
 
-            if no_getaddrinfo:
+            if use_getaddrinfo_for_dns:
                 reactor.installResolver(twisted.names.client)
 
             reactor.run()

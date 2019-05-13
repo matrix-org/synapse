@@ -56,9 +56,11 @@ class ServerConfig(Config):
         self.public_baseurl = config.get("public_baseurl")
         self.cpu_affinity = config.get("cpu_affinity")
 
-        # Whether to use the asynchronous DNS resolver instead of getaddrinfo.
-        # This can potentially improve performance.
-        self.no_getaddrinfo = config.get("no_getaddrinfo", False)
+        # Whether to use the getaddrinfo instead of the asynchronous DNS
+        # resolver. Disabling this can potentially improve performance.
+        self.use_getaddrinfo_for_dns = config.get(
+            "use_getaddrinfo_for_dns", True
+        )
 
         # Whether to send federation traffic out in this process. This only
         # applies to some federation traffic, and so shouldn't be used to
