@@ -27,9 +27,11 @@ import treq
 from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
+from zope.interface import implementer
 
 from twisted.internet import defer, protocol
 from twisted.internet.error import DNSLookupError
+from twisted.internet.interfaces import IReactorPluggableNameResolver
 from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
@@ -44,6 +46,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http import QuieterFileBodyProducer
+from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.logcontext import make_deferred_yieldable
@@ -172,19 +175,44 @@ class MatrixFederationHttpClient(object):
         self.hs = hs
         self.signing_key = hs.config.signing_key[0]
         self.server_name = hs.hostname
-        reactor = hs.get_reactor()
+
+        real_reactor = hs.get_reactor()
+
+        # We need to use a DNS resolver which filters out blacklisted IP
+        # addresses, to prevent DNS rebinding.
+        nameResolver = IPBlacklistingResolver(
+            real_reactor, None, hs.config.federation_ip_range_blacklist,
+        )
+
+        @implementer(IReactorPluggableNameResolver)
+        class Reactor(object):
+            def __getattr__(_self, attr):
+                if attr == "nameResolver":
+                    return nameResolver
+                else:
+                    return getattr(real_reactor, attr)
+
+        self.reactor = Reactor()
 
         self.agent = MatrixFederationAgent(
-            hs.get_reactor(),
+            self.reactor,
             tls_client_options_factory,
         )
+
+        # Use a BlacklistingAgentWrapper to prevent circumventing the IP
+        # blacklist via IP literals in server names
+        self.agent = BlacklistingAgentWrapper(
+            self.agent, self.reactor,
+            ip_blacklist=hs.config.federation_ip_range_blacklist,
+        )
+
         self.clock = hs.get_clock()
         self._store = hs.get_datastore()
         self.version_string_bytes = hs.version_string.encode('ascii')
         self.default_timeout = 60
 
         def schedule(x):
-            reactor.callLater(_EPSILON, x)
+            self.reactor.callLater(_EPSILON, x)
 
         self._cooperator = Cooperator(scheduler=schedule)
 
@@ -370,7 +398,7 @@ class MatrixFederationHttpClient(object):
                             request_deferred = timeout_deferred(
                                 request_deferred,
                                 timeout=_sec_timeout,
-                                reactor=self.hs.get_reactor(),
+                                reactor=self.reactor,
                             )
 
                             response = yield request_deferred
@@ -397,7 +425,7 @@ class MatrixFederationHttpClient(object):
                         d = timeout_deferred(
                             d,
                             timeout=_sec_timeout,
-                            reactor=self.hs.get_reactor(),
+                            reactor=self.reactor,
                         )
 
                         try:
@@ -586,7 +614,7 @@ class MatrixFederationHttpClient(object):
         )
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
+            self.reactor, self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
@@ -645,7 +673,7 @@ class MatrixFederationHttpClient(object):
             _sec_timeout = self.default_timeout
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), _sec_timeout, request, response,
+            self.reactor, _sec_timeout, request, response,
         )
         defer.returnValue(body)
 
@@ -704,7 +732,7 @@ class MatrixFederationHttpClient(object):
         )
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
+            self.reactor, self.default_timeout, request, response,
         )
 
         defer.returnValue(body)
@@ -753,7 +781,7 @@ class MatrixFederationHttpClient(object):
         )
 
         body = yield _handle_json_response(
-            self.hs.get_reactor(), self.default_timeout, request, response,
+            self.reactor, self.default_timeout, request, response,
         )
         defer.returnValue(body)
 
@@ -801,7 +829,7 @@ class MatrixFederationHttpClient(object):
 
         try:
             d = _readBodyToFile(response, output_stream, max_size)
-            d.addTimeout(self.default_timeout, self.hs.get_reactor())
+            d.addTimeout(self.default_timeout, self.reactor)
             length = yield make_deferred_yieldable(d)
         except Exception as e:
             logger.warn(
