@@ -77,7 +77,7 @@ class _PerHostRatelimiter(object):
         self.sleep_limit = config.sleep_limit
         self.sleep_sec = config.sleep_delay / 1000.0
         self.reject_limit = config.reject_limit
-        self.concurrent_requests = config.concurrent_requests
+        self.concurrent_requests = config.concurrent
 
         # request_id objects for requests which have been slept
         self.sleeping_requests = set()

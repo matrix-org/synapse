@@ -30,9 +30,9 @@ class FederationRateLimitConfig(object):
         "concurrent": 3,
     }
 
-    def __init__(self, config):
+    def __init__(self, **kwargs):
         for i in self._items_and_default.keys():
-            setattr(self, i, config.get(i) or self._items_and_default[i])
+            setattr(self, i, kwargs.get(i) or self._items_and_default[i])
 
 
 class RatelimitConfig(Config):
@@ -55,10 +55,10 @@ class RatelimitConfig(Config):
         # Load the new-style federation config, if it exists. Otherwise, fall
         # back to the old method.
         if "federation_rc" in config:
-            self.rc_federation = FederationRateLimitConfig(config["rc_federation"])
+            self.rc_federation = FederationRateLimitConfig(**config["rc_federation"])
         else:
             self.rc_federation = FederationRateLimitConfig(
-                {
+                **{
                     "window_size": config.get("federation_rc_window_size"),
                     "sleep_limit": config.get("federation_rc_sleep_limit"),
                     "sleep_delay": config.get("federation_rc_sleep_delay"),

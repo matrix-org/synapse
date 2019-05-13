@@ -31,6 +31,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
@@ -153,16 +154,18 @@ class UsernameAvailabilityRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
-            # Time window of 2s
-            window_size=2000,
-            # Artificially delay requests if rate > sleep_limit/window_size
-            sleep_limit=1,
-            # Amount of artificial delay to apply
-            sleep_msec=1000,
-            # Error with 429 if more than reject_limit requests are queued
-            reject_limit=1,
-            # Allow 1 request at a time
-            concurrent_requests=1,
+            FederationRateLimitConfig(
+                # Time window of 2s
+                window_size=2000,
+                # Artificially delay requests if rate > sleep_limit/window_size
+                sleep_limit=1,
+                # Amount of artificial delay to apply
+                sleep_msec=1000,
+                # Error with 429 if more than reject_limit requests are queued
+                reject_limit=1,
+                # Allow 1 request at a time
+                concurrent_requests=1,
+            )
         )
 
     @defer.inlineCallbacks
