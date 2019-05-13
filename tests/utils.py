@@ -152,7 +152,12 @@ def default_config(name, parse=False):
         "mau_stats_only": False,
         "mau_limits_reserved_threepids": [],
         "admin_contact": None,
-        "rc_federation": {"reject_limit": 10, "sleep_limit": 10, "sleep_delay": 10, "concurrent": 10},
+        "rc_federation": {
+            "reject_limit": 10,
+            "sleep_limit": 10,
+            "sleep_delay": 10,
+            "concurrent": 10,
+        },
         "rc_message": {"per_second": 10000, "burst_count": 10000},
         "rc_registration": {"per_second": 10000, "burst_count": 10000},
         "rc_login": {
@@ -371,8 +376,7 @@ def register_federation_servlets(hs, resource):
         resource=resource,
         authenticator=federation_server.Authenticator(hs),
         ratelimiter=FederationRateLimiter(
-            hs.get_clock(),
-            config=hs.config.rc_federation,
+            hs.get_clock(), config=hs.config.rc_federation
         ),
     )
 
