@@ -32,7 +32,8 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
                 "source_one": ["target_one", "target_two"],
                 "source_two": ["target_two"],
             },
-            "domains_prevented_from_being_invited_to_published_rooms": ["target_two"]
+            "domains_prevented_from_being_invited_to_published_rooms": ["target_two"],
+            "can_invite_by_third_party_id_to_published_rooms": True,
         }
         check = DomainRuleChecker(config)
         self.assertTrue(
@@ -62,6 +63,28 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         self.assertTrue(
             check.user_may_invite(
                 "test:source_one", "test:target_two", None, "room", False, False,
+            )
+        )
+
+        # User can invite another user to a published room via a 3PID invite
+        self.assertTrue(
+            check.user_may_invite(
+                "test:source_one", "test1:target_one", {
+                    "medium": "email",
+                    "address": "test1@target_one",
+                },
+                "room", False, True,
+            )
+        )
+
+        # User can invite another user to a non-published room via a 3PID invite
+        self.assertTrue(
+            check.user_may_invite(
+                "test:source_one", "test1:target_one", {
+                    "medium": "email",
+                    "address": "test1@target_one",
+                },
+                "room", False, False,
             )
         )
 
@@ -100,6 +123,28 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         self.assertTrue(
             check.user_may_invite(
                 "test:source_one", "test:target_two", None, "room", False, True,
+            )
+        )
+
+        # User cannot invite another user to a published room via a 3PID invite
+        self.assertFalse(
+            check.user_may_invite(
+                "test:source_one", "test1:target_one", {
+                    "medium": "email",
+                    "address": "test1@target_one",
+                },
+                "room", False, True,
+            )
+        )
+
+        # User can invite another user to a non-published room via a 3PID invite
+        self.assertTrue(
+            check.user_may_invite(
+                "test:source_one", "test1:target_one", {
+                    "medium": "email",
+                    "address": "test1@target_one",
+                },
+                "room", False, False,
             )
         )
 

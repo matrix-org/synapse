@@ -53,6 +53,9 @@ class DomainRuleChecker(object):
           # Allow third party invites
           can_invite_by_third_party_id: true
 
+          # Allow third party invites to rooms published in the room directory.
+          can_invite_by_third_party_id_to_published_rooms: false
+
     Don't forget to consider if you can invite users from your own domain.
     """
 
@@ -75,6 +78,9 @@ class DomainRuleChecker(object):
         self.domains_prevented_from_being_invited_to_published_rooms = config.get(
             "domains_prevented_from_being_invited_to_published_rooms", [],
         )
+        self.can_invite_by_third_party_id_to_published_rooms = config.get(
+            "can_invite_by_third_party_id_to_published_rooms", False,
+        )
 
     def check_event_for_spam(self, event):
         """Implements synapse.events.SpamChecker.check_event_for_spam
@@ -89,6 +95,12 @@ class DomainRuleChecker(object):
             return False
 
         if not self.can_invite_by_third_party_id and third_party_invite:
+            return False
+
+        if (
+            published_room and third_party_invite is not None and
+            not self.can_invite_by_third_party_id_to_published_rooms
+        ):
             return False
 
         # This is a third party invite (without a bound mxid), so unless we have
