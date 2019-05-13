@@ -20,6 +20,16 @@ import PIL.Image as Image
 
 logger = logging.getLogger(__name__)
 
+EXIF_ORIENTATION_TAG = 0x0112
+EXIF_TRANSPOSE_MAPPINGS = {
+    2: Image.FLIP_LEFT_RIGHT,
+    3: Image.ROTATE_180,
+    4: Image.FLIP_TOP_BOTTOM,
+    5: Image.TRANSPOSE,
+    6: Image.ROTATE_270,
+    7: Image.TRANSVERSE,
+    8: Image.ROTATE_90
+}
 
 class Thumbnailer(object):
 
@@ -30,26 +40,23 @@ class Thumbnailer(object):
 
     def __init__(self, input_path):
         self.image = Image.open(input_path)
+        transpose_method = None
+
         try:
             # We don't use ImageOps.exif_transpose since it crashes with big EXIF
             image_exif = self.image._getexif()
-            image_orientation = image_exif.get(0x0112)
-            transpose_method = {
-                2: Image.FLIP_LEFT_RIGHT,
-                3: Image.ROTATE_180,
-                4: Image.FLIP_TOP_BOTTOM,
-                5: Image.TRANSPOSE,
-                6: Image.ROTATE_270,
-                7: Image.TRANSVERSE,
-                8: Image.ROTATE_90
-            }.get(image_orientation)
-            if transpose_method is not None:
-                self.image = self.image.transpose(transpose_method)
-                # We don't need EXIF any more
-                self.image.info["exif"] = None
+            if image_exif is not None:
+                image_orientation = image_exif.get(EXIF_ORIENTATION_TAG)
+                transpose_method = EXIF_TRANSPOSE_MAPPINGS.get(image_orientation)
         except Exception as e:
             # A lot of parsing errors can happen when parsing EXIF
-            logger.debug("Error parsing image EXIF information: %s", e)
+            logger.info("Error parsing image EXIF information: %s", e)
+
+        if transpose_method is not None:
+            self.image = self.image.transpose(transpose_method)
+            # We don't need EXIF any more
+            self.image.info["exif"] = None
+
         self.width, self.height = self.image.size
 
     def aspect(self, max_width, max_height):
