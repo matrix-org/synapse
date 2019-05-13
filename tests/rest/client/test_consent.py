@@ -42,15 +42,18 @@ class ConsentResourceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.user_consent_version = "1"
-        config.public_baseurl = ""
-        config.form_secret = "123abc"
+        config["public_baseurl"] = "aaaa"
+        config["form_secret"] = "123abc"
 
         # Make some temporary templates...
         temp_consent_path = self.mktemp()
         os.mkdir(temp_consent_path)
         os.mkdir(os.path.join(temp_consent_path, 'en'))
-        config.user_consent_template_dir = os.path.abspath(temp_consent_path)
+
+        config["user_consent"] = {
+            "version": "1",
+            "template_dir": os.path.abspath(temp_consent_path),
+        }
 
         with open(os.path.join(temp_consent_path, "en/1.html"), 'w') as f:
             f.write("{{version}},{{has_consented}}")

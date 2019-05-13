@@ -34,7 +34,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
-        config.require_membership_for_aliases = True
+        config["require_membership_for_aliases"] = True
 
         self.hs = self.setup_test_homeserver(config=config)
 

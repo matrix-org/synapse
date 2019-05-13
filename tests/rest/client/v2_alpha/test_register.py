@@ -201,9 +201,11 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
         # Test for account expiring after a week.
-        config.enable_registration = True
-        config.account_validity.enabled = True
-        config.account_validity.period = 604800000  # Time in ms for 1 week
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+        }
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -299,14 +301,17 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
+
         # Test for account expiring after a week and renewal emails being sent 2
         # days before expiry.
-        config.enable_registration = True
-        config.account_validity.enabled = True
-        config.account_validity.renew_by_email_enabled = True
-        config.account_validity.period = 604800000  # Time in ms for 1 week
-        config.account_validity.renew_at = 172800000  # Time in ms for 2 days
-        config.account_validity.renew_email_subject = "Renew your account"
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+            "renew_at": 172800000,  # Time in ms for 2 days
+            "renew_by_email_enabled": True,
+            "renew_email_subject": "Renew your account",
+        }
 
         # Email config.
         self.email_attempts = []
@@ -315,17 +320,23 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             self.email_attempts.append((args, kwargs))
             return
 
-        config.email_template_dir = os.path.abspath(
-            pkg_resources.resource_filename('synapse', 'res/templates')
-        )
-        config.email_expiry_template_html = "notice_expiry.html"
-        config.email_expiry_template_text = "notice_expiry.txt"
-        config.email_smtp_host = "127.0.0.1"
-        config.email_smtp_port = 20
-        config.require_transport_security = False
-        config.email_smtp_user = None
-        config.email_smtp_pass = None
-        config.email_notif_from = "test@example.com"
+        config["email"] = {
+            "enable_notifs": True,
+            "template_dir": os.path.abspath(
+                pkg_resources.resource_filename('synapse', 'res/templates')
+            ),
+            "expiry_template_html": "notice_expiry.html",
+            "expiry_template_text": "notice_expiry.txt",
+            "notif_template_html": "notif_mail.html",
+            "notif_template_text": "notif_mail.txt",
+            "smtp_host": "127.0.0.1",
+            "smtp_port": 20,
+            "require_transport_security": False,
+            "smtp_user": None,
+            "smtp_pass": None,
+            "notif_from": "test@example.com",
+        }
+        config["public_baseurl"] = "aaa"
 
         self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
 
