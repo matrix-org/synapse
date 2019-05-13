@@ -54,7 +54,7 @@ class HTTPPusherTests(HomeserverTestCase):
         m.post_json_get_json = post_json_get_json
 
         config = self.default_config()
-        config.start_pushers = True
+        config["start_pushers"] = True
 
         hs = self.setup_test_homeserver(config=config, simple_http_client=m)
 
