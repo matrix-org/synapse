@@ -69,10 +69,10 @@ class TermsTestCase(unittest.HomeserverTestCase):
                             "name": "My Cool Privacy Policy",
                             "url": "https://example.org/_matrix/consent?v=1.0",
                         },
-                        "version": "1.0"
-                    },
-                },
-            },
+                        "version": "1.0",
+                    }
+                }
+            }
         }
         self.assertIsInstance(channel.json_body["params"], dict)
         self.assertDictContainsSubset(channel.json_body["params"], expected_params)

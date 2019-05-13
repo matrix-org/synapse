@@ -78,9 +78,8 @@ class TestCase(unittest.TestCase):
             # all future bets are off.
             if LoggingContext.current_context() is not LoggingContext.sentinel:
                 self.fail(
-                    "Test starting with non-sentinel logging context %s" % (
-                        LoggingContext.current_context(),
-                    )
+                    "Test starting with non-sentinel logging context %s"
+                    % (LoggingContext.current_context(),)
                 )
 
             old_level = logging.getLogger().level
@@ -294,7 +293,13 @@ class HomeserverTestCase(TestCase):
             content = json.dumps(content).encode('utf8')
 
         return make_request(
-            self.reactor, method, path, content, access_token, request, shorthand,
+            self.reactor,
+            method,
+            path,
+            content,
+            access_token,
+            request,
+            shorthand,
             federation_auth_origin,
         )
 
