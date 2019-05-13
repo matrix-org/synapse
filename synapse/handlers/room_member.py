@@ -935,7 +935,7 @@ class RoomMemberHandler(object):
         }
 
         if self.config.invite_3pid_guest:
-            guest_access_token, guest_user_id = yield self.get_or_register_3pid_guest(
+            guest_user_id, guest_access_token = yield self.get_or_register_3pid_guest(
                 requester=requester,
                 medium=medium,
                 address=address,
