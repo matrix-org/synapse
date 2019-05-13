@@ -171,7 +171,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.require_auth_for_profile_requests = True
+        config["require_auth_for_profile_requests"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -199,37 +199,24 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def test_in_shared_room(self):
         self.ensure_requester_left_room()
 
-        self.helper.join(
-            room=self.room_id,
-            user=self.requester,
-            tok=self.requester_tok,
-        )
+        self.helper.join(room=self.room_id, user=self.requester, tok=self.requester_tok)
 
         self.try_fetch_profile(200, self.requester_tok)
 
     def try_fetch_profile(self, expected_code, access_token=None):
+        self.request_profile(expected_code, access_token=access_token)
+
         self.request_profile(
-            expected_code,
-            access_token=access_token
+            expected_code, url_suffix="/displayname", access_token=access_token
         )
 
         self.request_profile(
-            expected_code,
-            url_suffix="/displayname",
-            access_token=access_token,
-        )
-
-        self.request_profile(
-            expected_code,
-            url_suffix="/avatar_url",
-            access_token=access_token,
+            expected_code, url_suffix="/avatar_url", access_token=access_token
         )
 
     def request_profile(self, expected_code, url_suffix="", access_token=None):
         request, channel = self.make_request(
-            "GET",
-            self.profile_url + url_suffix,
-            access_token=access_token,
+            "GET", self.profile_url + url_suffix, access_token=access_token
         )
         self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
@@ -237,9 +224,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def ensure_requester_left_room(self):
         try:
             self.helper.leave(
-                room=self.room_id,
-                user=self.requester,
-                tok=self.requester_tok,
+                room=self.room_id, user=self.requester, tok=self.requester_tok
             )
         except AssertionError:
             # We don't care whether the leave request didn't return a 200 (e.g.

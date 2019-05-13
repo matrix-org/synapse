@@ -1,1 +1,0 @@
-Workaround bug in twisted where attempting too many concurrent DNS requests could cause it to hang due to running out of file descriptors.

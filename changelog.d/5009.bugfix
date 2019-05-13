@@ -1,1 +1,0 @@
-Clients timing out/disappearing while downloading from the media repository will now no longer log a spurious "Producer was not unregistered" message.

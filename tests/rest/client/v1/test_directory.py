@@ -34,7 +34,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
-        config.require_membership_for_aliases = True
+        config["require_membership_for_aliases"] = True
 
         self.hs = self.setup_test_homeserver(config=config)
 
@@ -45,7 +45,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.room_owner_tok = self.login("room_owner", "test")
 
         self.room_id = self.helper.create_room_as(
-            self.room_owner, tok=self.room_owner_tok,
+            self.room_owner, tok=self.room_owner_tok
         )
 
         self.user = self.register_user("user", "test")
@@ -80,12 +80,10 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
 
         # We use deliberately a localpart under the length threshold so
         # that we can make sure that the check is done on the whole alias.
-        data = {
-            "room_alias_name": random_string(256 - len(self.hs.hostname)),
-        }
+        data = {"room_alias_name": random_string(256 - len(self.hs.hostname))}
         request_data = json.dumps(data)
         request, channel = self.make_request(
-            "POST", url, request_data, access_token=self.user_tok,
+            "POST", url, request_data, access_token=self.user_tok
         )
         self.render(request)
         self.assertEqual(channel.code, 400, channel.result)
@@ -96,51 +94,42 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         # Check with an alias of allowed length. There should already be
         # a test that ensures it works in test_register.py, but let's be
         # as cautious as possible here.
-        data = {
-            "room_alias_name": random_string(5),
-        }
+        data = {"room_alias_name": random_string(5)}
         request_data = json.dumps(data)
         request, channel = self.make_request(
-            "POST", url, request_data, access_token=self.user_tok,
+            "POST", url, request_data, access_token=self.user_tok
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
 
     def set_alias_via_state_event(self, expected_code, alias_length=5):
-        url = ("/_matrix/client/r0/rooms/%s/state/m.room.aliases/%s"
-               % (self.room_id, self.hs.hostname))
+        url = "/_matrix/client/r0/rooms/%s/state/m.room.aliases/%s" % (
+            self.room_id,
+            self.hs.hostname,
+        )
 
-        data = {
-            "aliases": [
-                self.random_alias(alias_length),
-            ],
-        }
+        data = {"aliases": [self.random_alias(alias_length)]}
         request_data = json.dumps(data)
 
         request, channel = self.make_request(
-            "PUT", url, request_data, access_token=self.user_tok,
+            "PUT", url, request_data, access_token=self.user_tok
         )
         self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def set_alias_via_directory(self, expected_code, alias_length=5):
         url = "/_matrix/client/r0/directory/room/%s" % self.random_alias(alias_length)
-        data = {
-            "room_id": self.room_id,
-        }
+        data = {"room_id": self.room_id}
         request_data = json.dumps(data)
 
         request, channel = self.make_request(
-            "PUT", url, request_data, access_token=self.user_tok,
+            "PUT", url, request_data, access_token=self.user_tok
         )
         self.render(request)
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def random_alias(self, length):
-        return RoomAlias(
-            random_string(length),
-            self.hs.hostname,
-        ).to_string()
+        return RoomAlias(random_string(length), self.hs.hostname).to_string()
 
     def ensure_user_left_room(self):
         self.ensure_membership("leave")
@@ -151,17 +140,9 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
     def ensure_membership(self, membership):
         try:
             if membership == "leave":
-                self.helper.leave(
-                    room=self.room_id,
-                    user=self.user,
-                    tok=self.user_tok,
-                )
+                self.helper.leave(room=self.room_id, user=self.user, tok=self.user_tok)
             if membership == "join":
-                self.helper.join(
-                    room=self.room_id,
-                    user=self.user,
-                    tok=self.user_tok,
-                )
+                self.helper.join(room=self.room_id, user=self.user, tok=self.user_tok)
         except AssertionError:
             # We don't care whether the leave request didn't return a 200 (e.g.
             # if the user isn't already in the room), because we only want to

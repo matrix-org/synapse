@@ -17,6 +17,8 @@
 import logging
 import os.path
 
+from netaddr import IPSet
+
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
 
@@ -136,6 +138,24 @@ class ServerConfig(Config):
 
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
+
+        self.federation_ip_range_blacklist = config.get(
+            "federation_ip_range_blacklist", [],
+        )
+
+        # Attempt to create an IPSet from the given ranges
+        try:
+            self.federation_ip_range_blacklist = IPSet(
+                self.federation_ip_range_blacklist
+            )
+
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
+        except Exception as e:
+            raise ConfigError(
+                "Invalid range(s) provided in "
+                "federation_ip_range_blacklist: %s" % e
+            )
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -385,6 +405,24 @@ class ServerConfig(Config):
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com
+
+        # Prevent federation requests from being sent to the following
+        # blacklist IP address CIDR ranges. If this option is not specified, or
+        # specified with an empty list, no ip range blacklist will be enforced.
+        #
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
+        #
+        federation_ip_range_blacklist:
+          - '127.0.0.0/8'
+          - '10.0.0.0/8'
+          - '172.16.0.0/12'
+          - '192.168.0.0/16'
+          - '100.64.0.0/10'
+          - '169.254.0.0/16'
+          - '::1/128'
+          - 'fe80::/64'
+          - 'fc00::/7'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

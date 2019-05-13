@@ -52,22 +52,26 @@ class EmailPusherTests(HomeserverTestCase):
             return d
 
         config = self.default_config()
-        config.email_enable_notifs = True
-        config.start_pushers = True
-
-        config.email_template_dir = os.path.abspath(
-            pkg_resources.resource_filename('synapse', 'res/templates')
-        )
-        config.email_notif_template_html = "notif_mail.html"
-        config.email_notif_template_text = "notif_mail.txt"
-        config.email_smtp_host = "127.0.0.1"
-        config.email_smtp_port = 20
-        config.require_transport_security = False
-        config.email_smtp_user = None
-        config.email_smtp_pass = None
-        config.email_app_name = "Matrix"
-        config.email_notif_from = "test@example.com"
-        config.email_riot_base_url = None
+        config["email"] = {
+            "enable_notifs": True,
+            "template_dir": os.path.abspath(
+                pkg_resources.resource_filename('synapse', 'res/templates')
+            ),
+            "expiry_template_html": "notice_expiry.html",
+            "expiry_template_text": "notice_expiry.txt",
+            "notif_template_html": "notif_mail.html",
+            "notif_template_text": "notif_mail.txt",
+            "smtp_host": "127.0.0.1",
+            "smtp_port": 20,
+            "require_transport_security": False,
+            "smtp_user": None,
+            "smtp_pass": None,
+            "app_name": "Matrix",
+            "notif_from": "test@example.com",
+            "riot_base_url": None,
+        }
+        config["public_baseurl"] = "aaa"
+        config["start_pushers"] = True
 
         hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
 

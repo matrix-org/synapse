@@ -1,1 +1,0 @@
-start.sh: Fix the --no-rate-limit option for messages and make it bypass rate limit on registration and login too.
