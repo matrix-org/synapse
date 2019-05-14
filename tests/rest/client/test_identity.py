@@ -19,7 +19,8 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.rest.client.v1 import admin, login, room
+import synapse.rest.admin
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account
 
 from tests import unittest
@@ -30,7 +31,7 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         account.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -109,7 +110,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         account.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]
@@ -154,9 +155,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
             "address": "test@example.com",
         }
         request_data = json.dumps(params)
-        request_url = (
-            "/rooms/%s/invite" % (room_id)
-        ).encode('ascii')
+        request_url = ("/rooms/%s/invite" % (room_id)).encode('ascii')
         request, channel = self.make_request(
             b"POST", request_url, request_data, access_token=self.tok,
         )

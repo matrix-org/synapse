@@ -421,7 +421,7 @@ class RoomCreationHandler(BaseHandler):
                 yield directory_handler.create_association(
                     requester, RoomAlias.from_string(alias),
                     new_room_id, servers=(self.hs.hostname, ),
-                    send_event=False,
+                    send_event=False, check_membership=False,
                 )
                 logger.info("Moved alias %s to new room", alias)
             except SynapseError as e:
@@ -571,6 +571,7 @@ class RoomCreationHandler(BaseHandler):
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
                 send_event=False,
+                check_membership=False,
             )
 
         preset_config = config.get(

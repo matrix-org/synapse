@@ -102,8 +102,9 @@ when ``SYNAPSE_CONFIG_PATH`` is not set.
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the server public hostname.
 * ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
-* ``SYNAPSE_NO_TLS``, set this variable to disable TLS in Synapse (use this if
-  you run your own TLS-capable reverse proxy).
+* `SYNAPSE_NO_TLS`, (accepts `true`, `false`, `on`, `off`, `1`, `0`, `yes`, `no`]): disable
+  TLS in Synapse (use this if you run your own TLS-capable reverse proxy). Defaults
+  to `false` (ie, TLS is enabled by default).
 * ``SYNAPSE_ENABLE_REGISTRATION``, set this variable to enable registration on
   the Synapse instance.
 * ``SYNAPSE_ALLOW_GUEST``, set this variable to allow guest joining this server.

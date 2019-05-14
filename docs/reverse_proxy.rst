@@ -69,6 +69,7 @@ Let's assume that we expect clients to connect to our server at
           SSLEngine on
           ServerName matrix.example.com;
 
+          AllowEncodedSlashes NoDecode
           ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
           ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
       </VirtualHost>
@@ -77,6 +78,7 @@ Let's assume that we expect clients to connect to our server at
           SSLEngine on
           ServerName example.com;
           
+          AllowEncodedSlashes NoDecode
           ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
           ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
       </VirtualHost>

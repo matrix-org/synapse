@@ -16,8 +16,9 @@
 
 import json
 
+import synapse.rest.admin
 from synapse.config._base import ConfigError
-from synapse.rest.client.v1 import admin, login, room
+from synapse.rest.client.v1 import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
 from tests import unittest
@@ -155,7 +156,7 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
 
 class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
         login.register_servlets,
     ]

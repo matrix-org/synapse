@@ -301,6 +301,12 @@ class PublicRoomListRestServlet(ClientV1RestServlet):
         try:
             yield self.auth.get_user_by_req(request, allow_guest=True)
         except AuthError as e:
+            # Option to allow servers to require auth when accessing
+            # /publicRooms via CS API. This is especially helpful in private
+            # federations.
+            if self.hs.config.restrict_public_rooms_to_local_users:
+                raise
+
             # We allow people to not be authed if they're just looking at our
             # room list, but require auth when we proxy the request.
             # In both cases we call the auth function, as that has the side

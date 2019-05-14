@@ -31,7 +31,7 @@ from .base import ClientV1RestServlet, client_path_patterns
 
 
 class PushRuleRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/pushrules/.*$")
+    PATTERNS = client_path_patterns("/(?P<path>pushrules/.*)$")
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
 
@@ -39,10 +39,14 @@ class PushRuleRestServlet(ClientV1RestServlet):
         super(PushRuleRestServlet, self).__init__(hs)
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
+        self._is_worker = hs.config.worker_app is not None
 
     @defer.inlineCallbacks
-    def on_PUT(self, request):
-        spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
+    def on_PUT(self, request, path):
+        if self._is_worker:
+            raise Exception("Cannot handle PUT /push_rules on worker")
+
+        spec = _rule_spec_from_path([x for x in path.split("/")])
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
@@ -102,8 +106,11 @@ class PushRuleRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
     @defer.inlineCallbacks
-    def on_DELETE(self, request):
-        spec = _rule_spec_from_path([x.decode('utf8') for x in request.postpath])
+    def on_DELETE(self, request, path):
+        if self._is_worker:
+            raise Exception("Cannot handle DELETE /push_rules on worker")
+
+        spec = _rule_spec_from_path([x for x in path.split("/")])
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
@@ -123,7 +130,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
                 raise
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_GET(self, request, path):
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
@@ -134,7 +141,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
 
         rules = format_push_rules_for_user(requester.user, rules)
 
-        path = [x.decode('utf8') for x in request.postpath][1:]
+        path = [x for x in path.split("/")][1:]
 
         if path == []:
             # we're a reference impl: pedantry is our job.
@@ -150,7 +157,7 @@ class PushRuleRestServlet(ClientV1RestServlet):
         else:
             raise UnrecognizedRequestError()
 
-    def on_OPTIONS(self, _):
+    def on_OPTIONS(self, request, path):
         return 200, {}
 
     def notify_user(self, user_id):

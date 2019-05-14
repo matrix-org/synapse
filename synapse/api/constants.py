@@ -20,6 +20,9 @@
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2**63 - 1
 
+# the maximum length for a room alias is 255 characters
+MAX_ALIAS_LENGTH = 255
+
 
 class Membership(object):
 

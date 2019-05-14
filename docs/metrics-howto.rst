@@ -48,7 +48,10 @@ How to monitor Synapse metrics using Prometheus
     - job_name: "synapse"
       metrics_path: "/_synapse/metrics"
       static_configs:
-        - targets: ["my.server.here:9092"]
+        - targets: ["my.server.here:port"]
+
+   where ``my.server.here`` is the IP address of Synapse, and ``port`` is the listener port
+   configured with the ``metrics`` resource.
 
    If your prometheus is older than 1.5.2, you will need to replace
    ``static_configs`` in the above with ``target_groups``.

@@ -45,6 +45,7 @@ from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.client.v1.login import LoginRestServlet
+from synapse.rest.client.v1.push_rule import PushRuleRestServlet
 from synapse.rest.client.v1.room import (
     JoinedRoomMemberListRestServlet,
     PublicRoomListRestServlet,
@@ -52,9 +53,11 @@ from synapse.rest.client.v1.room import (
     RoomMemberListRestServlet,
     RoomStateRestServlet,
 )
+from synapse.rest.client.v1.voip import VoipRestServlet
 from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+from synapse.rest.client.versions import VersionsRestServlet
 from synapse.server import HomeServer
 from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
@@ -109,12 +112,12 @@ class ClientReaderServer(HomeServer):
                     ThreepidRestServlet(self).register(resource)
                     KeyQueryServlet(self).register(resource)
                     KeyChangesServlet(self).register(resource)
+                    VoipRestServlet(self).register(resource)
+                    PushRuleRestServlet(self).register(resource)
+                    VersionsRestServlet().register(resource)
 
                     resources.update({
-                        "/_matrix/client/r0": resource,
-                        "/_matrix/client/unstable": resource,
-                        "/_matrix/client/v2_alpha": resource,
-                        "/_matrix/client/api/v1": resource,
+                        "/_matrix/client": resource,
                     })
 
         root_resource = create_resource_tree(resources, NoResource())
