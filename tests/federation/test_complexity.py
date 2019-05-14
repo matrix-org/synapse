@@ -18,6 +18,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -40,7 +41,16 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
             def authenticate_request(self, request, content):
                 return defer.succeed("otherserver.nottld")
 
-        ratelimiter = FederationRateLimiter(clock, 1, 10000, 0, 10000, 10000)
+        ratelimiter = FederationRateLimiter(
+            clock,
+            FederationRateLimitConfig(
+                window_size=1,
+                sleep_limit=1,
+                sleep_msec=1,
+                reject_limit=1000,
+                concurrent_requests=1000,
+            ),
+        )
         server.register_servlets(
             homeserver, self.resource, Authenticator(), ratelimiter
         )
