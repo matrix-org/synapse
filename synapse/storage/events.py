@@ -1351,6 +1351,8 @@ class EventsStore(
                 # Insert into the event_search table.
                 self._store_guest_access_txn(txn, event)
 
+            self._handle_event_relations(txn, event)
+
         # Insert into the room_memberships table.
         self._store_room_members_txn(
             txn,
