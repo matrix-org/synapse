@@ -134,10 +134,6 @@ def default_config(name, parse=False):
         "email_enable_notifs": False,
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
-        "federation_rc_reject_limit": 10,
-        "federation_rc_sleep_limit": 10,
-        "federation_rc_sleep_delay": 100,
-        "federation_rc_concurrent": 10,
         "filter_timeline_limit": 5000,
         "user_directory_search_all_users": False,
         "user_consent_server_notice_content": None,
@@ -156,6 +152,12 @@ def default_config(name, parse=False):
         "mau_stats_only": False,
         "mau_limits_reserved_threepids": [],
         "admin_contact": None,
+        "rc_federation": {
+            "reject_limit": 10,
+            "sleep_limit": 10,
+            "sleep_delay": 10,
+            "concurrent": 10,
+        },
         "rc_message": {"per_second": 10000, "burst_count": 10000},
         "rc_registration": {"per_second": 10000, "burst_count": 10000},
         "rc_login": {
@@ -374,12 +376,7 @@ def register_federation_servlets(hs, resource):
         resource=resource,
         authenticator=federation_server.Authenticator(hs),
         ratelimiter=FederationRateLimiter(
-            hs.get_clock(),
-            window_size=hs.config.federation_rc_window_size,
-            sleep_limit=hs.config.federation_rc_sleep_limit,
-            sleep_msec=hs.config.federation_rc_sleep_delay,
-            reject_limit=hs.config.federation_rc_reject_limit,
-            concurrent_requests=hs.config.federation_rc_concurrent,
+            hs.get_clock(), config=hs.config.rc_federation
         ),
     )
 
