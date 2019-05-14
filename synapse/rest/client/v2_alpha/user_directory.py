@@ -15,6 +15,8 @@
 
 import logging
 
+from signedjson.sign import sign_json
+
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
@@ -37,6 +39,7 @@ class UserDirectorySearchRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.user_directory_handler = hs.get_user_directory_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -66,6 +69,14 @@ class UserDirectorySearchRestServlet(RestServlet):
             }))
 
         body = parse_json_object_from_request(request)
+
+        if self.hs.config.user_directory_defer_to_id_server:
+            signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
+            url = "%s/_matrix/identity/api/v1/user_directory/search" % (
+                self.hs.config.user_directory_defer_to_id_server,
+            )
+            resp = yield self.http_client.post_json_get_json(url, signed_body)
+            defer.returnValue((200, resp))
 
         limit = body.get("limit", 10)
         limit = min(limit, 50)

@@ -143,6 +143,7 @@ def default_config(name):
     config.federation_rc_concurrent = 10
     config.filter_timeline_limit = 5000
     config.user_directory_search_all_users = False
+    config.replicate_user_profiles_to = []
     config.user_consent_server_notice_content = None
     config.block_events_without_consent_error = None
     config.user_consent_at_registration = False
@@ -161,6 +162,8 @@ def default_config(name):
     config.admin_contact = None
     config.rc_messages_per_second = 10000
     config.rc_message_burst_count = 10000
+    config.register_mxid_from_3pid = None
+    config.shadow_server = None
     config.rc_registration.per_second = 10000
     config.rc_registration.burst_count = 10000
     config.rc_login_address.per_second = 10000

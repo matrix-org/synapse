@@ -568,6 +568,12 @@ class DeviceListEduUpdater(object):
                 stream_id = result["stream_id"]
                 devices = result["devices"]
 
+                for device in devices:
+                    logger.debug(
+                        "Handling resync update %r/%r, ID: %r",
+                        user_id, device["device_id"], stream_id,
+                    )
+
                 # If the remote server has more than ~1000 devices for this user
                 # we assume that something is going horribly wrong (e.g. a bot
                 # that logs in and creates a new device every time it tries to

@@ -16,11 +16,14 @@
 import logging
 import re
 
+from twisted.internet import defer
+
 logger = logging.getLogger(__name__)
 
 
+@defer.inlineCallbacks
 def check_3pid_allowed(hs, medium, address):
-    """Checks whether a given format of 3PID is allowed to be used on this HS
+    """Checks whether a given 3PID is allowed to be used on this HS
 
     Args:
         hs (synapse.server.HomeServer): server
@@ -28,8 +31,34 @@ def check_3pid_allowed(hs, medium, address):
         address (str): address within that medium (e.g. "wotan@matrix.org")
             msisdns need to first have been canonicalised
     Returns:
-        bool: whether the 3PID medium/address is allowed to be added to this HS
+        defered bool: whether the 3PID medium/address is allowed to be added to this HS
     """
+
+    if hs.config.check_is_for_allowed_local_3pids:
+        data = yield hs.get_simple_http_client().get_json(
+            "https://%s%s" % (
+                hs.config.check_is_for_allowed_local_3pids,
+                "/_matrix/identity/api/v1/internal-info"
+            ),
+            {'medium': medium, 'address': address}
+        )
+
+        # Check for invalid response
+        if 'hs' not in data and 'shadow_hs' not in data:
+            defer.returnValue(False)
+
+        # Check if this user is intended to register for this homeserver
+        if (
+            data.get('hs') != hs.config.server_name
+            and data.get('shadow_hs') != hs.config.server_name
+        ):
+            defer.returnValue(False)
+
+        if data.get('requires_invite', False) and not data.get('invited', False):
+            # Requires an invite but hasn't been invited
+            defer.returnValue(False)
+
+        defer.returnValue(True)
 
     if hs.config.allowed_local_3pids:
         for constraint in hs.config.allowed_local_3pids:
@@ -41,8 +70,8 @@ def check_3pid_allowed(hs, medium, address):
                 medium == constraint['medium'] and
                 re.match(constraint['pattern'], address)
             ):
-                return True
+                defer.returnValue(True)
     else:
-        return True
+        defer.returnValue(True)
 
-    return False
+    defer.returnValue(False)

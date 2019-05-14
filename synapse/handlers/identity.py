@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018, 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,13 +20,18 @@
 import logging
 
 from canonicaljson import json
+from signedjson.key import decode_verify_key_bytes
+from signedjson.sign import verify_signed_json
+from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
 from synapse.api.errors import (
+    AuthError,
     CodeMessageException,
     Codes,
     HttpResponseException,
+    ProxiedRequestError,
     SynapseError,
 )
 
@@ -47,6 +52,8 @@ class IdentityHandler(BaseHandler):
         self.trust_any_id_server_just_for_testing_do_not_use = (
             hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
         )
+        self.rewrite_identity_server_urls = hs.config.rewrite_identity_server_urls
+        self._enable_lookup = hs.config.enable_3pid_lookup
 
     def _should_trust_id_server(self, id_server):
         if id_server not in self.trusted_id_servers:
@@ -84,7 +91,10 @@ class IdentityHandler(BaseHandler):
                 'credentials', id_server
             )
             defer.returnValue(None)
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.get_json(
                 "https://%s%s" % (
@@ -119,7 +129,10 @@ class IdentityHandler(BaseHandler):
             client_secret = creds['clientSecret']
         else:
             raise SynapseError(400, "No client_secret in creds")
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.post_urlencoded_get_json(
                 "https://%s%s" % (
@@ -221,6 +234,16 @@ class IdentityHandler(BaseHandler):
             b"Authorization": auth_headers,
         }
 
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        #
+        # Note that destination_is has to be the real id_server, not
+        # the server we connect to.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
+
+        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
+
         try:
             yield self.http_client.post_json_get_json(
                 url,
@@ -260,7 +283,10 @@ class IdentityHandler(BaseHandler):
             'send_attempt': send_attempt,
         }
         params.update(kwargs)
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.post_json_get_json(
                 "https://%s%s" % (
@@ -292,7 +318,10 @@ class IdentityHandler(BaseHandler):
             'send_attempt': send_attempt,
         }
         params.update(kwargs)
-
+        # if we have a rewrite rule set for the identity server,
+        # apply it now.
+        if id_server in self.rewrite_identity_server_urls:
+            id_server = self.rewrite_identity_server_urls[id_server]
         try:
             data = yield self.http_client.post_json_get_json(
                 "https://%s%s" % (
@@ -305,3 +334,125 @@ class IdentityHandler(BaseHandler):
         except HttpResponseException as e:
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
+
+    @defer.inlineCallbacks
+    def lookup_3pid(self, id_server, medium, address):
+        """Looks up a 3pid in the passed identity server.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            medium (str): The type of the third party identifier (e.g. "email").
+            address (str): The third party identifier (e.g. "foo@example.com").
+
+        Returns:
+            Deferred[dict]: The result of the lookup. See
+            https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
+            for details
+        """
+        if not self._should_trust_id_server(id_server):
+            raise SynapseError(
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
+            )
+
+        if not self._enable_lookup:
+            raise AuthError(
+                403, "Looking up third-party identifiers is denied from this server",
+            )
+
+        target = self.rewrite_identity_server_urls.get(id_server, id_server)
+
+        try:
+            data = yield self.http_client.get_json(
+                "https://%s/_matrix/identity/api/v1/lookup" % (target,),
+                {
+                    "medium": medium,
+                    "address": address,
+                }
+            )
+
+            if "mxid" in data:
+                if "signatures" not in data:
+                    raise AuthError(401, "No signatures on 3pid binding")
+                yield self._verify_any_signature(data, id_server)
+
+        except HttpResponseException as e:
+            logger.info("Proxied lookup failed: %r", e)
+            raise e.to_synapse_error()
+        except IOError as e:
+            logger.info("Failed to contact %r: %s", id_server, e)
+            raise ProxiedRequestError(503, "Failed to contact identity server")
+
+        defer.returnValue(data)
+
+    @defer.inlineCallbacks
+    def bulk_lookup_3pid(self, id_server, threepids):
+        """Looks up given 3pids in the passed identity server.
+
+        Args:
+            id_server (str): The server name (including port, if required)
+                of the identity server to use.
+            threepids ([[str, str]]): The third party identifiers to lookup, as
+                a list of 2-string sized lists ([medium, address]).
+
+        Returns:
+            Deferred[dict]: The result of the lookup. See
+            https://matrix.org/docs/spec/identity_service/r0.1.0.html#association-lookup
+            for details
+        """
+        if not self._should_trust_id_server(id_server):
+            raise SynapseError(
+                400, "Untrusted ID server '%s'" % id_server,
+                Codes.SERVER_NOT_TRUSTED
+            )
+
+        if not self._enable_lookup:
+            raise AuthError(
+                403, "Looking up third-party identifiers is denied from this server",
+            )
+
+        target = self.rewrite_identity_server_urls.get(id_server, id_server)
+
+        try:
+            data = yield self.http_client.post_json_get_json(
+                "https://%s/_matrix/identity/api/v1/bulk_lookup" % (target,),
+                {
+                    "threepids": threepids,
+                }
+            )
+
+        except HttpResponseException as e:
+            logger.info("Proxied lookup failed: %r", e)
+            raise e.to_synapse_error()
+        except IOError as e:
+            logger.info("Failed to contact %r: %s", id_server, e)
+            raise ProxiedRequestError(503, "Failed to contact identity server")
+
+        defer.returnValue(data)
+
+    @defer.inlineCallbacks
+    def _verify_any_signature(self, data, server_hostname):
+        if server_hostname not in data["signatures"]:
+            raise AuthError(401, "No signature from server %s" % (server_hostname,))
+
+        for key_name, signature in data["signatures"][server_hostname].items():
+            target = self.rewrite_identity_server_urls.get(
+                server_hostname, server_hostname,
+            )
+
+            key_data = yield self.http_client.get_json(
+                "https://%s/_matrix/identity/api/v1/pubkey/%s" %
+                (target, key_name,),
+            )
+            if "public_key" not in key_data:
+                raise AuthError(401, "No public key named %s from %s" %
+                                (key_name, server_hostname,))
+            verify_signed_json(
+                data,
+                server_hostname,
+                decode_verify_key_bytes(key_name, decode_base64(key_data["public_key"]))
+            )
+            return
+
+        raise AuthError(401, "No signature from server %s" % (server_hostname,))

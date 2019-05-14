@@ -61,6 +61,7 @@ class RegistrationHandler(BaseHandler):
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self.captcha_client = CaptchaServerHttpClient(hs)
+        self.http_client = hs.get_simple_http_client()
         self.identity_handler = self.hs.get_handlers().identity_handler
         self.ratelimiter = hs.get_registration_ratelimiter()
 
@@ -225,6 +226,11 @@ class RegistrationHandler(BaseHandler):
                 address=address,
             )
 
+            if default_display_name:
+                yield self.profile_handler.set_displayname(
+                    user, None, default_display_name, by_admin=True,
+                )
+
             if self.hs.config.user_directory_search_all_users:
                 profile = yield self.store.get_profileinfo(localpart)
                 yield self.user_directory_handler.handle_local_profile_change(
@@ -254,6 +260,11 @@ class RegistrationHandler(BaseHandler):
                         create_profile_with_displayname=default_display_name,
                         address=address,
                     )
+
+                    yield self.profile_handler.set_displayname(
+                        user, None, default_display_name, by_admin=True,
+                    )
+
                 except SynapseError:
                     # if user id is taken, just generate another
                     user = None
@@ -347,7 +358,9 @@ class RegistrationHandler(BaseHandler):
         yield self._auto_join_rooms(user_id)
 
     @defer.inlineCallbacks
-    def appservice_register(self, user_localpart, as_token):
+    def appservice_register(self, user_localpart, as_token, password, display_name):
+        # FIXME: this should be factored out and merged with normal register()
+
         user = UserID(user_localpart, self.hs.hostname)
         user_id = user.to_string()
         service = self.store.get_app_service_by_token(as_token)
@@ -365,12 +378,29 @@ class RegistrationHandler(BaseHandler):
             user_id, allowed_appservice=service
         )
 
+        password_hash = ""
+        if password:
+            password_hash = yield self.auth_handler().hash(password)
+
+        display_name = display_name or user.localpart
+
         yield self.register_with_store(
             user_id=user_id,
-            password_hash="",
+            password_hash=password_hash,
             appservice_id=service_id,
-            create_profile_with_displayname=user.localpart,
+            create_profile_with_displayname=display_name,
         )
+
+        yield self.profile_handler.set_displayname(
+            user, None, display_name, by_admin=True,
+        )
+
+        if self.hs.config.user_directory_search_all_users:
+            profile = yield self.store.get_profileinfo(user_localpart)
+            yield self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
+
         defer.returnValue(user_id)
 
     @defer.inlineCallbacks
@@ -397,6 +427,39 @@ class RegistrationHandler(BaseHandler):
             logger.info("Valid captcha entered from %s", ip)
 
     @defer.inlineCallbacks
+    def register_saml2(self, localpart):
+        """
+        Registers email_id as SAML2 Based Auth.
+        """
+        if types.contains_invalid_mxid_characters(localpart):
+            raise SynapseError(
+                400,
+                "User ID can only contain characters a-z, 0-9, or '=_-./'",
+            )
+        yield self.auth.check_auth_blocking()
+        user = UserID(localpart, self.hs.hostname)
+        user_id = user.to_string()
+
+        yield self.check_user_id_not_appservice_exclusive(user_id)
+        token = self.macaroon_gen.generate_access_token(user_id)
+        try:
+            yield self.register_with_store(
+                user_id=user_id,
+                token=token,
+                password_hash=None,
+                create_profile_with_displayname=user.localpart,
+            )
+
+            yield self.profile_handler.set_displayname(
+                user, None, user.localpart, by_admin=True,
+            )
+        except Exception as e:
+            yield self.store.add_access_token_to_user(user_id, token)
+            # Ignore Registration errors
+            logger.exception(e)
+        defer.returnValue((user_id, token))
+
+    @defer.inlineCallbacks
     def register_email(self, threepidCreds):
         """
         Registers emails with an identity server.
@@ -418,7 +481,9 @@ class RegistrationHandler(BaseHandler):
             logger.info("got threepid with medium '%s' and address '%s'",
                         threepid['medium'], threepid['address'])
 
-            if not check_3pid_allowed(self.hs, threepid['medium'], threepid['address']):
+            if not (
+                yield check_3pid_allowed(self.hs, threepid['medium'], threepid['address'])
+            ):
                 raise RegistrationError(
                     403, "Third party identifier is not allowed"
                 )
@@ -458,6 +523,39 @@ class RegistrationHandler(BaseHandler):
                     400, "This user ID is reserved by an application service.",
                     errcode=Codes.EXCLUSIVE
                 )
+
+    @defer.inlineCallbacks
+    def shadow_register(self, localpart, display_name, auth_result, params):
+        """Invokes the current registration on another server, using
+        shared secret registration, passing in any auth_results from
+        other registration UI auth flows (e.g. validated 3pids)
+        Useful for setting up shadow/backup accounts on a parallel deployment.
+        """
+
+        # TODO: retries
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
+        as_token = self.hs.config.shadow_server.get("as_token")
+
+        yield self.http_client.post_json_get_json(
+            "%s/_matrix/client/r0/register?access_token=%s" % (
+                shadow_hs_url, as_token,
+            ),
+            {
+                # XXX: auth_result is an unspecified extension for shadow registration
+                'auth_result': auth_result,
+                # XXX: another unspecified extension for shadow registration to ensure
+                # that the displayname is correctly set by the masters erver
+                'display_name': display_name,
+                'username': localpart,
+                'password': params.get("password"),
+                'bind_email': params.get("bind_email"),
+                'bind_msisdn': params.get("bind_msisdn"),
+                'device_id': params.get("device_id"),
+                'initial_device_display_name': params.get("initial_device_display_name"),
+                'inhibit_login': False,
+                'access_token': as_token,
+            }
+        )
 
     @defer.inlineCallbacks
     def _generate_user_id(self, reseed=False):
@@ -545,17 +643,15 @@ class RegistrationHandler(BaseHandler):
                 user_id=user_id,
                 token=token,
                 password_hash=password_hash,
-                create_profile_with_displayname=user.localpart,
+                create_profile_with_displayname=displayname or user.localpart,
             )
+            if displayname is not None:
+                yield self.profile_handler.set_displayname(
+                    user, None, displayname or user.localpart, by_admin=True,
+                )
         else:
             yield self._auth_handler.delete_access_tokens_for_user(user_id)
             yield self.store.add_access_token_to_user(user_id=user_id, token=token)
-
-        if displayname is not None:
-            logger.info("setting user display name: %s -> %s", user_id, displayname)
-            yield self.profile_handler.set_displayname(
-                user, requester, displayname, by_admin=True,
-            )
 
         defer.returnValue((user_id, token))
 

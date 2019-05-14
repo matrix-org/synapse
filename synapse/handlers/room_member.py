@@ -19,16 +19,12 @@ import logging
 
 from six.moves import http_client
 
-from signedjson.key import decode_verify_key_bytes
-from signedjson.sign import verify_signed_json
-from unpaddedbase64 import decode_base64
-
 from twisted.internet import defer
 
 import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, ProxiedRequestError, SynapseError
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -64,13 +60,14 @@ class RoomMemberHandler(object):
         self.registration_handler = hs.get_registration_handler()
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.identity_handler = hs.get_handlers().identity_handler
 
         self.member_linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
-        self._enable_lookup = hs.config.enable_3pid_lookup
+        self.rewrite_identity_server_urls = self.config.rewrite_identity_server_urls
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -308,8 +305,31 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            new_room=False,
             require_consent=True,
     ):
+        """Update a users membership in a room
+
+        Args:
+            requester (Requester)
+            target (UserID)
+            room_id (str)
+            action (str): The "action" the requester is performing against the
+                target. One of join/leave/kick/ban/invite/unban.
+            txn_id (str|None): The transaction ID associated with the request,
+                or None not provided.
+            remote_room_hosts (list[str]|None): List of remote servers to try
+                and join via if server isn't already in the room.
+            third_party_signed (dict|None): The signed object for third party
+                invites.
+            ratelimit (bool): Whether to apply ratelimiting to this request.
+            content (dict|None): Fields to include in the new events content.
+            new_room (bool): Whether these membership changes are happening
+                as part of a room creation (e.g. initial joins and invites)
+
+        Returns:
+            Deferred[FrozenEvent]
+        """
         key = (room_id,)
 
         with (yield self.member_linearizer.queue(key)):
@@ -323,6 +343,7 @@ class RoomMemberHandler(object):
                 third_party_signed=third_party_signed,
                 ratelimit=ratelimit,
                 content=content,
+                new_room=new_room,
                 require_consent=require_consent,
             )
 
@@ -340,6 +361,7 @@ class RoomMemberHandler(object):
             third_party_signed=None,
             ratelimit=True,
             content=None,
+            new_room=False,
             require_consent=True,
     ):
         content_specified = bool(content)
@@ -400,8 +422,14 @@ class RoomMemberHandler(object):
                     )
                     block_invite = True
 
+                is_published = yield self.store.is_room_published(room_id)
+
                 if not self.spam_checker.user_may_invite(
-                    requester.user.to_string(), target.to_string(), room_id,
+                    requester.user.to_string(), target.to_string(),
+                    third_party_invite=None,
+                    room_id=room_id,
+                    new_room=new_room,
+                    published_room=is_published,
                 ):
                     logger.info("Blocking invite due to spam checker")
                     block_invite = True
@@ -480,8 +508,29 @@ class RoomMemberHandler(object):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
+            if (self._server_notices_mxid is not None and
+                    requester.user.to_string() == self._server_notices_mxid):
+                # allow the server notices mxid to join rooms
+                is_requester_admin = True
+
+            else:
+                is_requester_admin = yield self.auth.is_server_admin(
+                    requester.user,
+                )
+
+            inviter = yield self._get_inviter(target.to_string(), room_id)
+            if not is_requester_admin:
+                # We assume that if the spam checker allowed the user to create
+                # a room then they're allowed to join it.
+                if not new_room and not self.spam_checker.user_may_join_room(
+                    target.to_string(), room_id,
+                    is_invited=inviter is not None,
+                ):
+                    raise SynapseError(
+                        403, "Not allowed to join this room",
+                    )
+
             if not is_host_in_room:
-                inviter = yield self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
                     remote_room_hosts.append(inviter.domain)
 
@@ -691,7 +740,8 @@ class RoomMemberHandler(object):
             address,
             id_server,
             requester,
-            txn_id
+            txn_id,
+            new_room=False,
     ):
         if self.config.block_non_admin_invites:
             is_requester_admin = yield self.auth.is_server_admin(
@@ -706,6 +756,23 @@ class RoomMemberHandler(object):
         invitee = yield self._lookup_3pid(
             id_server, medium, address
         )
+
+        is_published = yield self.store.is_room_published(room_id)
+
+        if not self.spam_checker.user_may_invite(
+            requester.user.to_string(), invitee,
+            third_party_invite={
+                "medium": medium,
+                "address": address,
+            },
+            room_id=room_id,
+            new_room=new_room,
+            published_room=is_published,
+        ):
+            logger.info("Blocking invite due to spam checker")
+            raise SynapseError(
+                403, "Invites have been disabled on this server",
+            )
 
         if invitee:
             yield self.update_membership(
@@ -726,6 +793,20 @@ class RoomMemberHandler(object):
                 txn_id=txn_id
             )
 
+    def _get_id_server_target(self, id_server):
+        """Looks up an id_server's actual http endpoint
+
+        Args:
+            id_server (str): the server name to lookup.
+
+        Returns:
+            the http endpoint to connect to.
+        """
+        if id_server in self.rewrite_identity_server_urls:
+            return self.rewrite_identity_server_urls[id_server]
+
+        return id_server
+
     @defer.inlineCallbacks
     def _lookup_3pid(self, id_server, medium, address):
         """Looks up a 3pid in the passed identity server.
@@ -739,47 +820,12 @@ class RoomMemberHandler(object):
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
-        if not self._enable_lookup:
-            raise SynapseError(
-                403, "Looking up third-party identifiers is denied from this server",
-            )
         try:
-            data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),
-                {
-                    "medium": medium,
-                    "address": address,
-                }
-            )
-
-            if "mxid" in data:
-                if "signatures" not in data:
-                    raise AuthError(401, "No signatures on 3pid binding")
-                yield self._verify_any_signature(data, id_server)
-                defer.returnValue(data["mxid"])
-
-        except IOError as e:
+            data = yield self.identity_handler.lookup_3pid(id_server, medium, address)
+            defer.returnValue(data.get("mxid"))
+        except ProxiedRequestError as e:
             logger.warn("Error from identity server lookup: %s" % (e,))
             defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def _verify_any_signature(self, data, server_hostname):
-        if server_hostname not in data["signatures"]:
-            raise AuthError(401, "No signature from server %s" % (server_hostname,))
-        for key_name, signature in data["signatures"][server_hostname].items():
-            key_data = yield self.simple_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/pubkey/%s" %
-                (id_server_scheme, server_hostname, key_name,),
-            )
-            if "public_key" not in key_data:
-                raise AuthError(401, "No public key named %s from %s" %
-                                (key_name, server_hostname,))
-            verify_signed_json(
-                data,
-                server_hostname,
-                decode_verify_key_bytes(key_name, decode_base64(key_data["public_key"]))
-            )
-            return
 
     @defer.inlineCallbacks
     def _make_and_store_3pid_invite(
@@ -906,8 +952,9 @@ class RoomMemberHandler(object):
                     user.
         """
 
+        target = self._get_id_server_target(id_server)
         is_url = "%s%s/_matrix/identity/api/v1/store-invite" % (
-            id_server_scheme, id_server,
+            id_server_scheme, target,
         )
 
         invite_config = {
@@ -947,7 +994,7 @@ class RoomMemberHandler(object):
             fallback_public_key = {
                 "public_key": data["public_key"],
                 "key_validity_url": "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-                    id_server_scheme, id_server,
+                    id_server_scheme, target,
                 ),
             }
         else:

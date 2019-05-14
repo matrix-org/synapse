@@ -60,8 +60,19 @@ class RegistrationConfig(Config):
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
+        self.check_is_for_allowed_local_3pids = config.get(
+            "check_is_for_allowed_local_3pids", None
+        )
+        self.allow_invited_3pids = config.get("allow_invited_3pids", False)
+
+        self.disable_3pid_changes = config.get("disable_3pid_changes", False)
+
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
         self.registration_shared_secret = config.get("registration_shared_secret")
+        self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
+        self.register_just_use_email_for_display_name = config.get(
+            "register_just_use_email_for_display_name", False,
+        )
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config.get(
@@ -80,6 +91,16 @@ class RegistrationConfig(Config):
             if not RoomAlias.is_valid(room_alias):
                 raise ConfigError('Invalid auto_join_rooms entry %s' % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
+
+        self.disable_set_displayname = config.get("disable_set_displayname", False)
+        self.disable_set_avatar_url = config.get("disable_set_avatar_url", False)
+
+        self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
+        if not isinstance(self.replicate_user_profiles_to, list):
+            self.replicate_user_profiles_to = [self.replicate_user_profiles_to, ]
+
+        self.shadow_server = config.get("shadow_server", None)
+        self.rewrite_identity_server_urls = config.get("rewrite_identity_server_urls", {})
 
         self.disable_msisdn_registration = (
             config.get("disable_msisdn_registration", False)
@@ -140,8 +161,31 @@ class RegistrationConfig(Config):
         #
         #disable_msisdn_registration: true
 
+        # Derive the user's matrix ID from a type of 3PID used when registering.
+        # This overrides any matrix ID the user proposes when calling /register
+        # The 3PID type should be present in registrations_require_3pid to avoid
+        # users failing to register if they don't specify the right kind of 3pid.
+        #
+        #register_mxid_from_3pid: email
+
+        # Uncomment to set the display name of new users to their email address,
+        # rather than using the default heuristic.
+        #
+        #register_just_use_email_for_display_name: true
+
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
+        #
+        # Use an Identity Server to establish which 3PIDs are allowed to register?
+        # Overrides allowed_local_3pids below.
+        #
+        #check_is_for_allowed_local_3pids: matrix.org
+        #
+        # If you are using an IS you can also check whether that IS registers
+        # pending invites for the given 3PID (and then allow it to sign up on
+        # the platform):
+        #
+        #allow_invited_3pids: False
         #
         #allowed_local_3pids:
         #  - medium: email
@@ -150,6 +194,11 @@ class RegistrationConfig(Config):
         #    pattern: '.*@vector\\.im'
         #  - medium: msisdn
         #    pattern: '\\+44'
+
+        # If true, stop users from trying to change the 3PIDs associated with
+        # their accounts.
+        #
+        #disable_3pid_changes: False
 
         # Enable 3PIDs lookup requests to identity servers from this server.
         #
@@ -191,6 +240,30 @@ class RegistrationConfig(Config):
         #trusted_third_party_id_servers:
         #  - matrix.org
         #  - vector.im
+
+        # If enabled, user IDs, display names and avatar URLs will be replicated
+        # to this server whenever they change.
+        # This is an experimental API currently implemented by sydent to support
+        # cross-homeserver user directories.
+        #
+        #replicate_user_profiles_to: example.com
+
+        # If specified, attempt to replay registrations, profile changes & 3pid
+        # bindings on the given target homeserver via the AS API. The HS is authed
+        # via a given AS token.
+        #
+        #shadow_server:
+        #  hs_url: https://shadow.example.com
+        #  hs: shadow.example.com
+        #  as_token: 12u394refgbdhivsia
+
+        # If enabled, don't let users set their own display names/avatars
+        # other than for the very first time (unless they are a server admin).
+        # Useful when provisioning users based on the contents of a 3rd party
+        # directory and to avoid ambiguities.
+        #
+        #disable_set_displayname: False
+        #disable_set_avatar_url: False
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms

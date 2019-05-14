@@ -26,16 +26,6 @@ steps:
       - docker#v3.0.1:
           image: "python:3.6"
 
-  - command:
-      - "python -m pip install tox"
-      - "scripts-dev/check-newsfragment"
-    label: ":newspaper: Newsfile"
-    branches: "!master !develop !release-*"
-    plugins:
-      - docker#v3.0.1:
-          image: "python:3.6"
-          propagate-environment: true
-
   - wait
 
   - command:

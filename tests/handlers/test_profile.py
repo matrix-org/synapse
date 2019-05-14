@@ -67,13 +67,13 @@ class ProfileTestCase(unittest.TestCase):
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        yield self.store.create_profile(self.frank.localpart)
-
         self.handler = hs.get_profile_handler()
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        yield self.store.set_profile_displayname(
+            self.frank.localpart, "Frank", 1,
+        )
 
         displayname = yield self.handler.get_displayname(self.frank)
 
@@ -116,8 +116,7 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield self.store.create_profile("caroline")
-        yield self.store.set_profile_displayname("caroline", "Caroline")
+        yield self.store.set_profile_displayname("caroline", "Caroline", 1)
 
         response = yield self.query_handlers["profile"](
             {"user_id": "@caroline:test", "field": "displayname"}
@@ -128,7 +127,7 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
         yield self.store.set_profile_avatar_url(
-            self.frank.localpart, "http://my.server/me.png"
+            self.frank.localpart, "http://my.server/me.png", 1,
         )
 
         avatar_url = yield self.handler.get_avatar_url(self.frank)

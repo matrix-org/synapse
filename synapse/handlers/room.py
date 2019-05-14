@@ -49,12 +49,14 @@ class RoomCreationHandler(BaseHandler):
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": True,
+            "encryption_alg": "m.megolm.v1.aes-sha2",
         },
         RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "shared",
             "original_invitees_have_ops": True,
             "guest_can_join": True,
+            "encryption_alg": "m.megolm.v1.aes-sha2",
         },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
@@ -73,6 +75,8 @@ class RoomCreationHandler(BaseHandler):
 
         # linearizer to stop two upgrades happening at once
         self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
+
+        self._server_notices_mxid = hs.config.server_notices_mxid
 
     @defer.inlineCallbacks
     def upgrade_room(self, requester, old_room_id, new_version):
@@ -247,7 +251,22 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if not self.spam_checker.user_may_create_room(user_id):
+        if (self._server_notices_mxid is not None and
+                requester.user.to_string() == self._server_notices_mxid):
+            # allow the server notices mxid to create rooms
+            is_requester_admin = True
+
+        else:
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
+
+        if not is_requester_admin and not self.spam_checker.user_may_create_room(
+            user_id,
+            invite_list=[],
+            third_party_invite_list=[],
+            cloning=True,
+        ):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         creation_content = {
@@ -469,7 +488,24 @@ class RoomCreationHandler(BaseHandler):
 
         yield self.auth.check_auth_blocking(user_id)
 
-        if not self.spam_checker.user_may_create_room(user_id):
+        invite_list = config.get("invite", [])
+        invite_3pid_list = config.get("invite_3pid", [])
+
+        if (self._server_notices_mxid is not None and
+                requester.user.to_string() == self._server_notices_mxid):
+            # allow the server notices mxid to create rooms
+            is_requester_admin = True
+        else:
+            is_requester_admin = yield self.auth.is_server_admin(
+                requester.user,
+            )
+
+        if not is_requester_admin and not self.spam_checker.user_may_create_room(
+            user_id,
+            invite_list=invite_list,
+            third_party_invite_list=invite_3pid_list,
+            cloning=False,
+        ):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         if ratelimit:
@@ -512,7 +548,6 @@ class RoomCreationHandler(BaseHandler):
         else:
             room_alias = None
 
-        invite_list = config.get("invite", [])
         for i in invite_list:
             try:
                 UserID.from_string(i)
@@ -522,8 +557,6 @@ class RoomCreationHandler(BaseHandler):
         yield self.event_creation_handler.assert_accepted_privacy_policy(
             requester,
         )
-
-        invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
@@ -609,6 +642,7 @@ class RoomCreationHandler(BaseHandler):
                 "invite",
                 ratelimit=False,
                 content=content,
+                new_room=True,
             )
 
         for invite_3pid in invite_3pid_list:
@@ -623,6 +657,7 @@ class RoomCreationHandler(BaseHandler):
                 id_server,
                 requester,
                 txn_id=None,
+                new_room=True,
             )
 
         result = {"room_id": room_id}
@@ -693,6 +728,7 @@ class RoomCreationHandler(BaseHandler):
             "join",
             ratelimit=False,
             content=creator_join_profile,
+            new_room=True,
         )
 
         # We treat the power levels override specially as this needs to be one
@@ -766,6 +802,15 @@ class RoomCreationHandler(BaseHandler):
                 etype=etype,
                 state_key=state_key,
                 content=content,
+            )
+
+        if "encryption_alg" in config:
+            yield send(
+                etype=EventTypes.Encryption,
+                state_key="",
+                content={
+                    'algorithm': config["encryption_alg"],
+                }
             )
 
     @defer.inlineCallbacks

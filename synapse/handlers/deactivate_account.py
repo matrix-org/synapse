@@ -33,6 +33,7 @@ class DeactivateAccountHandler(BaseHandler):
         self._device_handler = hs.get_device_handler()
         self._room_member_handler = hs.get_room_member_handler()
         self._identity_handler = hs.get_handlers().identity_handler
+        self._profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
 
         # Flag that indicates whether the process to part users from rooms is running
@@ -97,6 +98,9 @@ class DeactivateAccountHandler(BaseHandler):
         yield self._auth_handler.delete_access_tokens_for_user(user_id)
 
         yield self.store.user_set_password_hash(user_id, None)
+
+        user = UserID.from_string(user_id)
+        yield self._profile_handler.set_active(user, False, False)
 
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)
