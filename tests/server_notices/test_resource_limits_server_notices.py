@@ -27,7 +27,6 @@ from tests import unittest
 
 
 class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
-
     def make_homeserver(self, reactor, clock):
         hs_config = self.default_config("test")
         hs_config.server_notices_mxid = "@server:test"

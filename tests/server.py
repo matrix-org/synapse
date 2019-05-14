@@ -182,7 +182,8 @@ def make_request(
 
     if federation_auth_origin is not None:
         req.requestHeaders.addRawHeader(
-            b"Authorization", b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,)
+            b"Authorization",
+            b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,),
         )
 
     if content:
@@ -233,7 +234,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         class FakeResolver(object):
             def getHostByName(self, name, timeout=None):
                 if name not in lookups:
-                    return fail(DNSLookupError("OH NO: unknown %s" % (name, )))
+                    return fail(DNSLookupError("OH NO: unknown %s" % (name,)))
                 return succeed(lookups[name])
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
@@ -454,6 +455,6 @@ class FakeTransport(object):
             logger.warning("Exception writing to protocol: %s", e)
             return
 
-        self.buffer = self.buffer[len(to_write):]
+        self.buffer = self.buffer[len(to_write) :]
         if self.buffer and self.autoflush:
             self._reactor.callLater(0.0, self.flush)

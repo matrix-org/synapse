@@ -88,21 +88,16 @@ class UsersRestServlet(RestServlet):
 
 
 class VersionServlet(RestServlet):
-    PATTERNS = historical_admin_path_patterns("/server_version")
+    PATTERNS = (re.compile("^/_synapse/admin/v1/server_version$"), )
 
     def __init__(self, hs):
-        self.auth = hs.get_auth()
-
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield assert_requester_is_admin(self.auth, request)
-
-        ret = {
+        self.res = {
             'server_version': get_version_string(synapse),
             'python_version': platform.python_version(),
         }
 
-        defer.returnValue((200, ret))
+    def on_GET(self, request):
+        return 200, self.res
 
 
 class UserRegisterServlet(RestServlet):
@@ -830,6 +825,7 @@ class AdminRestResource(JsonResource):
 
         register_servlets_for_client_rest_resource(hs, self)
         SendServerNoticeServlet(hs).register(self)
+        VersionServlet(hs).register(self)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):
@@ -847,7 +843,6 @@ def register_servlets_for_client_rest_resource(hs, http_server):
     QuarantineMediaInRoom(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
-    VersionServlet(hs).register(http_server)
     DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
     # don't add more things here: new servlets should only be exposed on

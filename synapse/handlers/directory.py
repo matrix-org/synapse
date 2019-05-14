@@ -19,7 +19,7 @@ import string
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 
 
 class DirectoryHandler(BaseHandler):
-    MAX_ALIAS_LENGTH = 255
 
     def __init__(self, hs):
         super(DirectoryHandler, self).__init__(hs)
@@ -105,10 +104,10 @@ class DirectoryHandler(BaseHandler):
 
         user_id = requester.user.to_string()
 
-        if len(room_alias.to_string()) > self.MAX_ALIAS_LENGTH:
+        if len(room_alias.to_string()) > MAX_ALIAS_LENGTH:
             raise SynapseError(
                 400,
-                "Can't create aliases longer than %s characters" % self.MAX_ALIAS_LENGTH,
+                "Can't create aliases longer than %s characters" % MAX_ALIAS_LENGTH,
                 Codes.INVALID_PARAM,
             )
 

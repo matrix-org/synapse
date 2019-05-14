@@ -228,6 +228,7 @@ class EventCreationHandler(object):
         self.ratelimiter = hs.get_ratelimiter()
         self.notifier = hs.get_notifier()
         self.config = hs.config
+        self.require_membership_for_aliases = hs.config.require_membership_for_aliases
 
         self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
 
@@ -335,6 +336,35 @@ class EventCreationHandler(object):
             requester=requester,
             prev_events_and_hashes=prev_events_and_hashes,
         )
+
+        # In an ideal world we wouldn't need the second part of this condition. However,
+        # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
+        # behaviour. Another reason is that this code is also evaluated each time a new
+        # m.room.aliases event is created, which includes hitting a /directory route.
+        # Therefore not including this condition here would render the similar one in
+        # synapse.handlers.directory pointless.
+        if builder.type == EventTypes.Aliases and self.require_membership_for_aliases:
+            # Ideally we'd do the membership check in event_auth.check(), which
+            # describes a spec'd algorithm for authenticating events received over
+            # federation as well as those created locally. As of room v3, aliases events
+            # can be created by users that are not in the room, therefore we have to
+            # tolerate them in event_auth.check().
+            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
+            prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+            if not prev_event or prev_event.membership != Membership.JOIN:
+                logger.warning(
+                    ("Attempt to send `m.room.aliases` in room %s by user %s but"
+                     " membership is %s"),
+                    event.room_id,
+                    event.sender,
+                    prev_event.membership if prev_event else None,
+                )
+
+                raise AuthError(
+                    403,
+                    "You must be in the room to create an alias for it",
+                )
 
         self.validator.validate_new(event)
 

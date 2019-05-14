@@ -10,8 +10,6 @@ The api is::
 
     GET /_synapse/admin/v1/server_version
 
-including an ``access_token`` of a server admin.
-
 It returns a JSON body like the following:
 
 .. code:: json

@@ -19,7 +19,6 @@ from tests import unittest
 
 
 class ServerConfigTestCase(unittest.TestCase):
-
     def test_is_threepid_reserved(self):
         user1 = {'medium': 'email', 'address': 'user1@example.com'}
         user2 = {'medium': 'email', 'address': 'user2@example.com'}

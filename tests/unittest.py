@@ -84,9 +84,8 @@ class TestCase(unittest.TestCase):
             # all future bets are off.
             if LoggingContext.current_context() is not LoggingContext.sentinel:
                 self.fail(
-                    "Test starting with non-sentinel logging context %s" % (
-                        LoggingContext.current_context(),
-                    )
+                    "Test starting with non-sentinel logging context %s"
+                    % (LoggingContext.current_context(),)
                 )
 
             old_level = logging.getLogger().level
@@ -181,10 +180,7 @@ class HomeserverTestCase(TestCase):
             raise Exception("A homeserver wasn't returned, but %r" % (self.hs,))
 
         # Register the resources
-        self.resource = JsonResource(self.hs)
-
-        for servlet in self.servlets:
-            servlet(self.hs, self.resource)
+        self.resource = self.create_test_json_resource()
 
         from tests.rest.client.v1.utils import RestHelper
 
@@ -229,6 +225,23 @@ class HomeserverTestCase(TestCase):
         """
         hs = self.setup_test_homeserver()
         return hs
+
+    def create_test_json_resource(self):
+        """
+        Create a test JsonResource, with the relevant servlets registerd to it
+
+        The default implementation calls each function in `servlets` to do the
+        registration.
+
+        Returns:
+            JsonResource:
+        """
+        resource = JsonResource(self.hs)
+
+        for servlet in self.servlets:
+            servlet(self.hs, resource)
+
+        return resource
 
     def default_config(self, name="test"):
         """
@@ -286,7 +299,13 @@ class HomeserverTestCase(TestCase):
             content = json.dumps(content).encode('utf8')
 
         return make_request(
-            self.reactor, method, path, content, access_token, request, shorthand,
+            self.reactor,
+            method,
+            path,
+            content,
+            access_token,
+            request,
+            shorthand,
             federation_auth_origin,
         )
 
