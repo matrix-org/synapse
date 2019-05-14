@@ -156,7 +156,8 @@ def default_config(name, parse=False):
         "mau_stats_only": False,
         "mau_limits_reserved_threepids": [],
         "admin_contact": None,
-        "rc_message": {"per_second": 10000, "burst_count": 10000},
+        "rc_messages_per_second": 10000,
+        "rc_message_burst_count": 10000,
         "rc_registration": {"per_second": 10000, "burst_count": 10000},
         "rc_login": {
             "address": {"per_second": 10000, "burst_count": 10000},
