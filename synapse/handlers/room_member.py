@@ -1017,9 +1017,9 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             room_id (str)
             remote_room_hosts (list[str])
 
-        Returns: bool of whether the complexity is too great, or None if unable to be fetched
+        Returns: bool of whether the complexity is too great, or None
+            if unable to be fetched
         """
-
         max_complexity = self.hs.config.limit_large_room_complexity
         complexity = yield self.federation_handler.get_room_complexity(
             remote_room_hosts, room_id
@@ -1049,7 +1049,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         return False
 
-
     @defer.inlineCallbacks
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
         """Implements RoomMemberHandler._remote_join
@@ -1066,7 +1065,9 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         if self.hs.config.limit_large_room_joins:
             # Fetch the room complexity
-            complexity = yield self._check_room_complexity_remote(room_id, remote_room_hosts)
+            complexity = yield self._check_room_complexity_remote(
+                room_id, remote_room_hosts
+            )
             if complexity is True:
                 msg = "Room too large (preflight)"
                 raise SynapseError(
