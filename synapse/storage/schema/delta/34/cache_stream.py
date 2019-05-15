@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.prepare_database import get_statements
-from synapse.storage.engines import PostgresEngine
-
 import logging
+
+from synapse.storage.engines import PostgresEngine
+from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)
 

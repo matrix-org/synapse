@@ -20,10 +20,8 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import SynapseError
-from synapse.http.server import (
-    respond_with_json,
-    wrap_json_request_handler,
-)
+from synapse.http.server import respond_with_json, wrap_json_request_handler
+from synapse.http.servlet import parse_string
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +55,7 @@ class UploadResource(Resource):
         requester = yield self.auth.get_user_by_req(request)
         # TODO: The checks here are a bit late. The content will have
         # already been uploaded to a tmp file at this point
-        content_length = request.getHeader("Content-Length")
+        content_length = request.getHeader(b"Content-Length").decode('ascii')
         if content_length is None:
             raise SynapseError(
                 msg="Request must specify a Content-Length", code=400
@@ -68,10 +66,10 @@ class UploadResource(Resource):
                 code=413,
             )
 
-        upload_name = request.args.get("filename", None)
+        upload_name = parse_string(request, b"filename", encoding=None)
         if upload_name:
             try:
-                upload_name = upload_name[0].decode('UTF-8')
+                upload_name = upload_name.decode('utf8')
             except UnicodeDecodeError:
                 raise SynapseError(
                     msg="Invalid UTF-8 filename parameter: %r" % (upload_name),
@@ -80,8 +78,8 @@ class UploadResource(Resource):
 
         headers = request.requestHeaders
 
-        if headers.hasHeader("Content-Type"):
-            media_type = headers.getRawHeaders(b"Content-Type")[0]
+        if headers.hasHeader(b"Content-Type"):
+            media_type = headers.getRawHeaders(b"Content-Type")[0].decode('ascii')
         else:
             raise SynapseError(
                 msg="Upload request missing 'Content-Type'",

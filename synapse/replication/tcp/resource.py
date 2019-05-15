@@ -15,19 +15,23 @@
 """The server side of the replication stream.
 """
 
+import logging
+import random
+
+from six import itervalues
+
+from prometheus_client import Counter
+
 from twisted.internet import defer
 from twisted.internet.protocol import Factory
 
-from .streams import STREAMS_MAP, FederationStream
-from .protocol import ServerReplicationStreamProtocol
-
-from synapse.util.metrics import Measure, measure_func
 from synapse.metrics import LaterGauge
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util.metrics import Measure, measure_func
 
-import logging
-
-from prometheus_client import Counter
-from six import itervalues
+from .protocol import ServerReplicationStreamProtocol
+from .streams import STREAMS_MAP
+from .streams.federation import FederationStream
 
 stream_updates_counter = Counter("synapse_replication_tcp_resource_stream_updates",
                                  "", ["stream_name"])
@@ -54,7 +58,6 @@ class ReplicationStreamProtocolFactory(Factory):
             self.server_name,
             self.clock,
             self.streamer,
-            addr
         )
 
 
@@ -71,6 +74,8 @@ class ReplicationStreamer(object):
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self._server_notices_sender = hs.get_server_notices_sender()
+
+        self._replication_torture_level = hs.config.replication_torture_level
 
         # Current connections.
         self.connections = []
@@ -116,7 +121,6 @@ class ReplicationStreamer(object):
         for conn in self.connections:
             conn.send_error("server shutting down")
 
-    @defer.inlineCallbacks
     def on_notifier_poke(self):
         """Checks if there is actually any new data and sends it to the
         connections if there are.
@@ -131,14 +135,16 @@ class ReplicationStreamer(object):
                 stream.discard_updates_and_advance()
             return
 
-        # If we're in the process of checking for new updates, mark that fact
-        # and return
+        self.pending_updates = True
+
         if self.is_looping:
-            logger.debug("Noitifier poke loop already running")
-            self.pending_updates = True
+            logger.debug("Notifier poke loop already running")
             return
 
-        self.pending_updates = True
+        run_as_background_process("replication_notifier", self._run_notifier_loop)
+
+    @defer.inlineCallbacks
+    def _run_notifier_loop(self):
         self.is_looping = True
 
         try:
@@ -154,9 +160,22 @@ class ReplicationStreamer(object):
                     for stream in self.streams:
                         stream.advance_current_token()
 
-                    for stream in self.streams:
+                    all_streams = self.streams
+
+                    if self._replication_torture_level is not None:
+                        # there is no guarantee about ordering between the streams,
+                        # so let's shuffle them around a bit when we are in torture mode.
+                        all_streams = list(all_streams)
+                        random.shuffle(all_streams)
+
+                    for stream in all_streams:
                         if stream.last_token == stream.upto_token:
                             continue
+
+                        if self._replication_torture_level:
+                            yield self.clock.sleep(
+                                self._replication_torture_level / 1000.0
+                            )
 
                         logger.debug(
                             "Getting stream: %s: %s -> %s",

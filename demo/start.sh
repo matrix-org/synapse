@@ -27,16 +27,26 @@ for port in 8080 8081 8082; do
         --config-path "$DIR/etc/$port.config" \
         --report-stats no
 
+    printf '\n\n# Customisation made by demo/start.sh\n' >> $DIR/etc/$port.config
+    echo 'enable_registration: true' >> $DIR/etc/$port.config
+
     # Check script parameters
     if [ $# -eq 1 ]; then
         if [ $1 = "--no-rate-limit" ]; then
-            # Set high limits in config file to disable rate limiting
-            perl -p -i -e 's/rc_messages_per_second.*/rc_messages_per_second: 1000/g' $DIR/etc/$port.config
-            perl -p -i -e 's/rc_message_burst_count.*/rc_message_burst_count: 1000/g' $DIR/etc/$port.config
+            # messages rate limit
+            echo 'rc_messages_per_second: 1000' >> $DIR/etc/$port.config
+            echo 'rc_message_burst_count: 1000' >> $DIR/etc/$port.config
+
+            # registration rate limit
+            printf 'rc_registration:\n  per_second: 1000\n  burst_count: 1000\n' >> $DIR/etc/$port.config
+
+            # login rate limit
+            echo 'rc_login:' >> $DIR/etc/$port.config
+            printf '  address:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
+            printf '  account:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
+            printf '  failed_attempts:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
         fi
     fi
-
-    perl -p -i -e 's/^enable_registration:.*/enable_registration: true/g' $DIR/etc/$port.config
 
     if ! grep -F "full_twisted_stacktraces" -q  $DIR/etc/$port.config; then
         echo "full_twisted_stacktraces: true" >> $DIR/etc/$port.config

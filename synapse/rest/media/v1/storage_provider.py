@@ -13,17 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, threads
-
-from .media_storage import FileResponder
-
-from synapse.config._base import Config
-from synapse.util.logcontext import run_in_background
-
 import logging
 import os
 import shutil
 
+from twisted.internet import defer
+
+from synapse.config._base import Config
+from synapse.util import logcontext
+from synapse.util.logcontext import run_in_background
+
+from .media_storage import FileResponder
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +108,7 @@ class FileStorageProviderBackend(StorageProvider):
     """
 
     def __init__(self, hs, config):
+        self.hs = hs
         self.cache_directory = hs.config.media_store_path
         self.base_directory = config
 
@@ -121,7 +122,8 @@ class FileStorageProviderBackend(StorageProvider):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        return threads.deferToThread(
+        return logcontext.defer_to_thread(
+            self.hs.get_reactor(),
             shutil.copyfile, primary_fname, backup_fname,
         )
 

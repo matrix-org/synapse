@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.push.rulekinds import PRIORITY_CLASS_MAP, PRIORITY_CLASS_INVERSE_MAP
 import copy
+
+from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
 
 
 def list_with_base_rules(rawrules):
@@ -253,6 +254,23 @@ BASE_APPEND_OVERRIDE_RULES = [
                 'key': 'room',
                 '_id': '_roomnotif_pl',
             },
+        ],
+        'actions': [
+            'notify', {
+                'set_tweak': 'highlight',
+                'value': True,
+            }
+        ]
+    },
+    {
+        'rule_id': 'global/override/.m.rule.tombstone',
+        'conditions': [
+            {
+                'kind': 'event_match',
+                'key': 'type',
+                'pattern': 'm.room.tombstone',
+                '_id': '_tombstone',
+            }
         ],
         'actions': [
             'notify', {

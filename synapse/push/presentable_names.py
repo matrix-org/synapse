@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-import re
 import logging
+import re
+
+from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 

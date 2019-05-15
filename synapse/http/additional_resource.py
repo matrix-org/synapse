@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import wrap_json_request_handler
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
+
+from synapse.http.server import wrap_json_request_handler
 
 
 class AdditionalResource(Resource):

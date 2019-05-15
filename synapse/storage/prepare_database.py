@@ -20,13 +20,12 @@ import logging
 import os
 import re
 
-
 logger = logging.getLogger(__name__)
 
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 50
+SCHEMA_VERSION = 54
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -144,10 +143,9 @@ def _setup_new_database(cur, database_engine):
 
     cur.execute(
         database_engine.convert_param_style(
-            "INSERT INTO schema_version (version, upgraded)"
-            " VALUES (?,?)"
+            "INSERT INTO schema_version (version, upgraded)" " VALUES (?,?)"
         ),
-        (max_current_ver, False,)
+        (max_current_ver, False),
     )
 
     _upgrade_existing_database(
@@ -161,8 +159,15 @@ def _setup_new_database(cur, database_engine):
     )
 
 
-def _upgrade_existing_database(cur, current_version, applied_delta_files,
-                               upgraded, database_engine, config, is_empty=False):
+def _upgrade_existing_database(
+    cur,
+    current_version,
+    applied_delta_files,
+    upgraded,
+    database_engine,
+    config,
+    is_empty=False,
+):
     """Upgrades an existing database.
 
     Delta files can either be SQL stored in *.sql files, or python modules
@@ -210,8 +215,8 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
 
     if current_version > SCHEMA_VERSION:
         raise ValueError(
-            "Cannot use this database as it is too " +
-            "new for the server to understand"
+            "Cannot use this database as it is too "
+            + "new for the server to understand"
         )
 
     start_ver = current_version
@@ -240,25 +245,19 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
             if relative_path in applied_delta_files:
                 continue
 
-            absolute_path = os.path.join(
-                dir_path, "schema", "delta", relative_path,
-            )
+            absolute_path = os.path.join(dir_path, "schema", "delta", relative_path)
             root_name, ext = os.path.splitext(file_name)
             if ext == ".py":
                 # This is a python upgrade module. We need to import into some
                 # package and then execute its `run_upgrade` function.
-                module_name = "synapse.storage.v%d_%s" % (
-                    v, root_name
-                )
+                module_name = "synapse.storage.v%d_%s" % (v, root_name)
                 with open(absolute_path) as python_file:
-                    module = imp.load_source(
-                        module_name, absolute_path, python_file
-                    )
+                    module = imp.load_source(module_name, absolute_path, python_file)
                 logger.info("Running script %s", relative_path)
                 module.run_create(cur, database_engine)
                 if not is_empty:
                     module.run_upgrade(cur, database_engine, config=config)
-            elif ext == ".pyc":
+            elif ext == ".pyc" or file_name == "__pycache__":
                 # Sometimes .pyc files turn up anyway even though we've
                 # disabled their generation; e.g. from distribution package
                 # installers. Silently skip it
@@ -270,8 +269,7 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
             else:
                 # Not a valid delta file.
                 logger.warn(
-                    "Found directory entry that did not end in .py or"
-                    " .sql: %s",
+                    "Found directory entry that did not end in .py or" " .sql: %s",
                     relative_path,
                 )
                 continue
@@ -279,19 +277,17 @@ def _upgrade_existing_database(cur, current_version, applied_delta_files,
             # Mark as done.
             cur.execute(
                 database_engine.convert_param_style(
-                    "INSERT INTO applied_schema_deltas (version, file)"
-                    " VALUES (?,?)",
+                    "INSERT INTO applied_schema_deltas (version, file)" " VALUES (?,?)"
                 ),
-                (v, relative_path)
+                (v, relative_path),
             )
 
             cur.execute("DELETE FROM schema_version")
             cur.execute(
                 database_engine.convert_param_style(
-                    "INSERT INTO schema_version (version, upgraded)"
-                    " VALUES (?,?)",
+                    "INSERT INTO schema_version (version, upgraded)" " VALUES (?,?)"
                 ),
-                (v, True)
+                (v, True),
             )
 
 
@@ -309,7 +305,7 @@ def _apply_module_schemas(txn, database_engine, config):
             continue
         modname = ".".join((mod.__module__, mod.__name__))
         _apply_module_schema_files(
-            txn, database_engine, modname, mod.get_db_schema_files(),
+            txn, database_engine, modname, mod.get_db_schema_files()
         )
 
 
@@ -327,7 +323,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
         database_engine.convert_param_style(
             "SELECT file FROM applied_module_schemas WHERE module_name = ?"
         ),
-        (modname,)
+        (modname,),
     )
     applied_deltas = set(d for d, in cur)
     for (name, stream) in names_and_streams:
@@ -337,7 +333,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
         root_name, ext = os.path.splitext(name)
         if ext != '.sql':
             raise PrepareDatabaseException(
-                "only .sql files are currently supported for module schemas",
+                "only .sql files are currently supported for module schemas"
             )
 
         logger.info("applying schema %s for %s", name, modname)
@@ -347,10 +343,9 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
         # Mark as done.
         cur.execute(
             database_engine.convert_param_style(
-                "INSERT INTO applied_module_schemas (module_name, file)"
-                " VALUES (?,?)",
+                "INSERT INTO applied_module_schemas (module_name, file)" " VALUES (?,?)"
             ),
-            (modname, name)
+            (modname, name),
         )
 
 
@@ -387,10 +382,7 @@ def get_statements(f):
         statements = line.split(";")
 
         # We must prepend statement_buffer to the first statement
-        first_statement = "%s %s" % (
-            statement_buffer.strip(),
-            statements[0].strip()
-        )
+        first_statement = "%s %s" % (statement_buffer.strip(), statements[0].strip())
         statements[0] = first_statement
 
         # Every entry, except the last, is a full statement
@@ -410,9 +402,7 @@ def executescript(txn, schema_path):
 
 def _get_or_create_schema_state(txn, database_engine):
     # Bluntly try creating the schema_version tables.
-    schema_path = os.path.join(
-        dir_path, "schema", "schema_version.sql",
-    )
+    schema_path = os.path.join(dir_path, "schema", "schema_version.sql")
     executescript(txn, schema_path)
 
     txn.execute("SELECT version, upgraded FROM schema_version")
@@ -425,7 +415,7 @@ def _get_or_create_schema_state(txn, database_engine):
             database_engine.convert_param_style(
                 "SELECT file FROM applied_schema_deltas WHERE version >= ?"
             ),
-            (current_version,)
+            (current_version,),
         )
         applied_deltas = [d for d, in txn]
         return current_version, applied_deltas, upgraded

@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from .httppusher import HttpPusher
 
-import logging
 logger = logging.getLogger(__name__)
 
 # We try importing this if we can (it will fail if we don't
@@ -43,7 +44,11 @@ class PusherFactory(object):
         if hs.config.email_enable_notifs:
             self.mailers = {}  # app_name -> Mailer
 
-            templates = load_jinja2_templates(hs.config)
+            templates = load_jinja2_templates(
+                config=hs.config,
+                template_html_name=hs.config.email_notif_template_html,
+                template_text_name=hs.config.email_notif_template_text,
+            )
             self.notif_template_html, self.notif_template_text = templates
 
             self.pusher_types["email"] = self._create_email_pusher
@@ -51,11 +56,12 @@ class PusherFactory(object):
             logger.info("defined email pusher type")
 
     def create_pusher(self, pusherdict):
-        logger.info("trying to create_pusher for %r", pusherdict)
-
-        if pusherdict['kind'] in self.pusher_types:
-            logger.info("found pusher")
-            return self.pusher_types[pusherdict['kind']](self.hs, pusherdict)
+        kind = pusherdict['kind']
+        f = self.pusher_types.get(kind, None)
+        if not f:
+            return None
+        logger.debug("creating %s pusher for %r", kind, pusherdict)
+        return f(self.hs, pusherdict)
 
     def _create_email_pusher(self, _hs, pusherdict):
         app_name = self._app_name_from_pusherdict(pusherdict)

@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import SQLBaseStore
-
 import logging
+
+from ._base import SQLBaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +36,7 @@ class RejectionsStore(SQLBaseStore):
         return self._simple_select_one_onecol(
             table="rejections",
             retcol="reason",
-            keyvalues={
-                "event_id": event_id,
-            },
+            keyvalues={"event_id": event_id},
             allow_none=True,
             desc="get_rejection_reason",
         )

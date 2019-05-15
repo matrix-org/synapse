@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import PIL.Image as Image
+import logging
 from io import BytesIO
 
-import logging
+import PIL.Image as Image
 
 logger = logging.getLogger(__name__)
 

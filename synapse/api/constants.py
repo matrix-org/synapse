@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +19,9 @@
 
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2**63 - 1
+
+# the maximum length for a room alias is 255 characters
+MAX_ALIAS_LENGTH = 255
 
 
 class Membership(object):
@@ -50,6 +54,7 @@ class LoginType(object):
     EMAIL_IDENTITY = u"m.login.email.identity"
     MSISDN = u"m.login.msisdn"
     RECAPTCHA = u"m.login.recaptcha"
+    TERMS = u"m.login.terms"
     DUMMY = u"m.login.dummy"
 
     # Only for C/S API v1
@@ -60,21 +65,28 @@ class LoginType(object):
 class EventTypes(object):
     Member = "m.room.member"
     Create = "m.room.create"
+    Tombstone = "m.room.tombstone"
     JoinRules = "m.room.join_rules"
     PowerLevels = "m.room.power_levels"
     Aliases = "m.room.aliases"
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
+    Encryption = "m.room.encryption"
+    RelatedGroups = "m.room.related_groups"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
     RoomAvatar = "m.room.avatar"
+    RoomEncryption = "m.room.encryption"
     GuestAccess = "m.room.guest_access"
 
     # These are used for validation
     Message = "m.room.message"
     Topic = "m.room.topic"
     Name = "m.room.name"
+
+    ServerACL = "m.room.server_acl"
+    Pinned = "m.room.pinned_events"
 
 
 class RejectedReason(object):
@@ -92,3 +104,15 @@ class RoomCreationPreset(object):
 class ThirdPartyEntityKind(object):
     USER = "user"
     LOCATION = "location"
+
+
+ServerNoticeMsgType = "m.server_notice"
+ServerNoticeLimitReached = "m.server_notice.usage_limit_reached"
+
+
+class UserTypes(object):
+    """Allows for user type specific behaviour. With the benefit of hindsight
+    'admin' and 'guest' users should also be UserTypes. Normal users are type None
+    """
+    SUPPORT = "support"
+    ALL_USER_TYPES = (SUPPORT,)

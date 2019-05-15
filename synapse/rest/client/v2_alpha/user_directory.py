@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,12 @@ class UserDirectorySearchRestServlet(RestServlet):
         """
         requester = yield self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
+
+        if not self.hs.config.user_directory_search_enabled:
+            defer.returnValue((200, {
+                "limited": False,
+                "results": [],
+            }))
 
         body = parse_json_object_from_request(request)
 

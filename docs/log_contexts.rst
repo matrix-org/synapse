@@ -163,7 +163,7 @@ the logcontext was set, this will make things work out ok: provided
 It's all too easy to forget to ``yield``: for instance if we forgot that
 ``do_some_stuff`` returned a deferred, we might plough on regardless. This
 leads to a mess; it will probably work itself out eventually, but not before
-a load of stuff has been logged against the wrong content. (Normally, other
+a load of stuff has been logged against the wrong context. (Normally, other
 things will break, more obviously, if you forget to ``yield``, so this tends
 not to be a major problem in practice.)
 
@@ -440,3 +440,59 @@ To conclude: I think this scheme would have worked equally well, with less
 danger of messing it up, and probably made some more esoteric code easier to
 write. But again — changing the conventions of the entire Synapse codebase is
 not a sensible option for the marginal improvement offered.
+
+
+A note on garbage-collection of Deferred chains
+-----------------------------------------------
+
+It turns out that our logcontext rules do not play nicely with Deferred
+chains which get orphaned and garbage-collected.
+
+Imagine we have some code that looks like this:
+
+.. code:: python
+
+    listener_queue = []
+
+    def on_something_interesting():
+        for d in listener_queue:
+            d.callback("foo")
+
+    @defer.inlineCallbacks
+    def await_something_interesting():
+        new_deferred = defer.Deferred()
+        listener_queue.append(new_deferred)
+
+        with PreserveLoggingContext():
+            yield new_deferred
+
+Obviously, the idea here is that we have a bunch of things which are waiting
+for an event. (It's just an example of the problem here, but a relatively
+common one.)
+
+Now let's imagine two further things happen. First of all, whatever was
+waiting for the interesting thing goes away. (Perhaps the request times out,
+or something *even more* interesting happens.)
+
+Secondly, let's suppose that we decide that the interesting thing is never
+going to happen, and we reset the listener queue:
+
+.. code:: python
+
+    def reset_listener_queue():
+        listener_queue.clear()
+
+So, both ends of the deferred chain have now dropped their references, and the
+deferred chain is now orphaned, and will be garbage-collected at some point.
+Note that ``await_something_interesting`` is a generator function, and when
+Python garbage-collects generator functions, it gives them a chance to clean
+up by making the ``yield`` raise a ``GeneratorExit`` exception. In our case,
+that means that the ``__exit__`` handler of ``PreserveLoggingContext`` will
+carefully restore the request context, but there is now nothing waiting for
+its return, so the request context is never cleared.
+
+To reiterate, this problem only arises when *both* ends of a deferred chain
+are dropped. Dropping the the reference to a deferred you're supposed to be
+calling is probably bad practice, so this doesn't actually happen too much.
+Unfortunately, when it does happen, it will lead to leaked logcontexts which
+are incredibly hard to track down.

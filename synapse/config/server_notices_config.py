@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from ._base import Config
 from synapse.types import UserID
+
+from ._base import Config
 
 DEFAULT_CONFIG = """\
 # Server Notices room configuration
@@ -29,11 +30,11 @@ DEFAULT_CONFIG = """\
 # It's also possible to override the room name, the display name of the
 # "notices" user, and the avatar for the user.
 #
-# server_notices:
-#   system_mxid_localpart: notices
-#   system_mxid_display_name: "Server Notices"
-#   system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
-#   room_name: "Server Notices"
+#server_notices:
+#  system_mxid_localpart: notices
+#  system_mxid_display_name: "Server Notices"
+#  system_mxid_avatar_url: "mxc://server.com/oumMVlgDnLYFaPVkExemNVVZ"
+#  room_name: "Server Notices"
 """
 
 

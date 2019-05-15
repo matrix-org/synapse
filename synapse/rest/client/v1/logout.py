@@ -13,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.api.auth import get_access_token_from_request
 from synapse.api.errors import AuthError
 
 from .base import ClientV1RestServlet, client_path_patterns
-
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +50,7 @@ class LogoutRestServlet(ClientV1RestServlet):
             if requester.device_id is None:
                 # the acccess token wasn't associated with a device.
                 # Just delete the access token
-                access_token = get_access_token_from_request(request)
+                access_token = self._auth.get_access_token_from_request(request)
                 yield self._auth_handler.delete_access_token(access_token)
             else:
                 yield self._device_handler.delete_device(

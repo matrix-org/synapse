@@ -15,8 +15,10 @@
 # limitations under the License.
 import re
 
+from twisted.internet import task
 from twisted.internet.defer import CancelledError
 from twisted.python import failure
+from twisted.web.client import FileBodyProducer
 
 from synapse.api.errors import SynapseError
 
@@ -38,12 +40,25 @@ def cancelled_to_request_timed_out_error(value, timeout):
     return value
 
 
-ACCESS_TOKEN_RE = re.compile(br'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
+ACCESS_TOKEN_RE = re.compile(r'(\?.*access(_|%5[Ff])token=)[^&]*(.*)$')
 
 
 def redact_uri(uri):
     """Strips access tokens from the uri replaces with <redacted>"""
     return ACCESS_TOKEN_RE.sub(
-        br'\1<redacted>\3',
+        r'\1<redacted>\3',
         uri
     )
+
+
+class QuieterFileBodyProducer(FileBodyProducer):
+    """Wrapper for FileBodyProducer that avoids CRITICAL errors when the connection drops.
+
+    Workaround for https://github.com/matrix-org/synapse/issues/4003 /
+    https://twistedmatrix.com/trac/ticket/6528
+    """
+    def stopProducing(self):
+        try:
+            FileBodyProducer.stopProducing(self)
+        except task.TaskStopped:
+            pass

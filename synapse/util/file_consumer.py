@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six.moves import queue
+
 from twisted.internet import threads
 
 from synapse.util.logcontext import make_deferred_yieldable, run_in_background
-
-from six.moves import queue
 
 
 class BackgroundFileConsumer(object):

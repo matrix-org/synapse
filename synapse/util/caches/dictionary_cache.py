@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.caches.lrucache import LruCache
-from collections import namedtuple
-from . import register_cache
-import threading
 import logging
+import threading
+from collections import namedtuple
 
+from synapse.util.caches.lrucache import LruCache
+
+from . import register_cache
 
 logger = logging.getLogger(__name__)
 

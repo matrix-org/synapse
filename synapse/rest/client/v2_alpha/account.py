@@ -17,17 +17,19 @@
 import logging
 
 from six.moves import http_client
+
 from twisted.internet import defer
 
-from synapse.api.auth import has_access_token
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
-    RestServlet, assert_params_in_request,
+    RestServlet,
+    assert_params_in_dict,
     parse_json_object_from_request,
 )
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import check_3pid_allowed
+
 from ._base import client_v2_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
@@ -45,13 +47,15 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret', 'email', 'send_attempt'
         ])
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Your email domain is not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.hs.get_datastore().get_user_id_by_threepid(
@@ -78,7 +82,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
-        assert_params_in_request(body, [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret',
             'country', 'phone_number', 'send_attempt',
         ])
@@ -87,7 +91,9 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Account phone numbers are not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
@@ -127,7 +133,7 @@ class PasswordRestServlet(RestServlet):
         #
         # In the second case, we require a password to confirm their identity.
 
-        if has_access_token(request):
+        if self.auth.has_access_token(request):
             requester = yield self.auth.get_user_by_req(request)
             params = yield self.auth_handler.validate_user_via_ui_auth(
                 requester, body, self.hs.get_ip_from_request(request),
@@ -157,11 +163,10 @@ class PasswordRestServlet(RestServlet):
                     raise SynapseError(404, "Email address not found", Codes.NOT_FOUND)
                 user_id = threepid_user_id
             else:
-                logger.error("Auth succeeded but no known type!", result.keys())
+                logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        if 'new_password' not in params:
-            raise SynapseError(400, "", Codes.MISSING_PARAM)
+        assert_params_in_dict(params, ["new_password"])
         new_password = params['new_password']
 
         yield self._set_password_handler.set_password(
@@ -208,10 +213,18 @@ class DeactivateAccountRestServlet(RestServlet):
         yield self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request),
         )
-        yield self._deactivate_account_handler.deactivate_account(
+        result = yield self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase,
+            id_server=body.get("id_server"),
         )
-        defer.returnValue((200, {}))
+        if result:
+            id_server_unbind_result = "success"
+        else:
+            id_server_unbind_result = "no-support"
+
+        defer.returnValue((200, {
+            "id_server_unbind_result": id_server_unbind_result,
+        }))
 
 
 class EmailThreepidRequestTokenRestServlet(RestServlet):
@@ -226,19 +239,16 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-
-        required = ['id_server', 'client_secret', 'email', 'send_attempt']
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if absent:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        assert_params_in_dict(
+            body,
+            ['id_server', 'client_secret', 'email', 'send_attempt'],
+        )
 
         if not check_3pid_allowed(self.hs, "email", body['email']):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Your email domain is not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
@@ -264,24 +274,18 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-
-        required = [
+        assert_params_in_dict(body, [
             'id_server', 'client_secret',
             'country', 'phone_number', 'send_attempt',
-        ]
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if absent:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        ])
 
         msisdn = phone_number_to_msisdn(body['country'], body['phone_number'])
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
-                403, "Third party identifier is not allowed", Codes.THREEPID_DENIED,
+                403,
+                "Account phone numbers are not authorized on this server",
+                Codes.THREEPID_DENIED,
             )
 
         existingUid = yield self.datastore.get_user_id_by_threepid(
@@ -360,7 +364,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidDeleteRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/delete$", releases=())
+    PATTERNS = client_v2_patterns("/account/3pid/delete$")
 
     def __init__(self, hs):
         super(ThreepidDeleteRestServlet, self).__init__()
@@ -370,22 +374,14 @@ class ThreepidDeleteRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         body = parse_json_object_from_request(request)
-
-        required = ['medium', 'address']
-        absent = []
-        for k in required:
-            if k not in body:
-                absent.append(k)
-
-        if absent:
-            raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
+        assert_params_in_dict(body, ['medium', 'address'])
 
         requester = yield self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         try:
-            yield self.auth_handler.delete_threepid(
-                user_id, body['medium'], body['address']
+            ret = yield self.auth_handler.delete_threepid(
+                user_id, body['medium'], body['address'], body.get("id_server"),
             )
         except Exception:
             # NB. This endpoint should succeed if there is nothing to
@@ -394,7 +390,14 @@ class ThreepidDeleteRestServlet(RestServlet):
             logger.exception("Failed to remove threepid")
             raise SynapseError(500, "Failed to remove threepid")
 
-        defer.returnValue((200, {}))
+        if ret:
+            id_server_unbind_result = "success"
+        else:
+            id_server_unbind_result = "no-support"
+
+        defer.returnValue((200, {
+            "id_server_unbind_result": id_server_unbind_result,
+        }))
 
 
 class WhoamiRestServlet(RestServlet):

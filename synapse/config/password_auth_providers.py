@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
-
 from synapse.util.module_loader import load_module
+
+from ._base import Config
 
 LDAP_PROVIDER = 'ldap_auth_provider.LdapAuthProvider'
 
@@ -52,18 +52,18 @@ class PasswordAuthProviderConfig(Config):
 
     def default_config(self, **kwargs):
         return """\
-        # password_providers:
-        #     - module: "ldap_auth_provider.LdapAuthProvider"
-        #       config:
-        #         enabled: true
-        #         uri: "ldap://ldap.example.com:389"
-        #         start_tls: true
-        #         base: "ou=users,dc=example,dc=com"
-        #         attributes:
-        #            uid: "cn"
-        #            mail: "email"
-        #            name: "givenName"
-        #         #bind_dn:
-        #         #bind_password:
-        #         #filter: "(objectClass=posixAccount)"
+        #password_providers:
+        #    - module: "ldap_auth_provider.LdapAuthProvider"
+        #      config:
+        #        enabled: true
+        #        uri: "ldap://ldap.example.com:389"
+        #        start_tls: true
+        #        base: "ou=users,dc=example,dc=com"
+        #        attributes:
+        #           uid: "cn"
+        #           mail: "email"
+        #           name: "givenName"
+        #        #bind_dn:
+        #        #bind_password:
+        #        #filter: "(objectClass=posixAccount)"
         """

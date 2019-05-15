@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.http.endpoint import parse_server_name
+from synapse.http.endpoint import parse_and_validate_server_name, parse_server_name
+
 from tests import unittest
 
 
@@ -30,17 +31,21 @@ class ServerNameTestCase(unittest.TestCase):
         for i, o in test_data.items():
             self.assertEqual(parse_server_name(i), o)
 
-    def test_parse_bad_server_names(self):
+    def test_validate_bad_server_names(self):
         test_data = [
             "",  # empty
             "localhost:http",  # non-numeric port
             "1234]",  # smells like ipv6 literal but isn't
+            "[1234",
+            "underscore_.com",
+            "percent%65.com",
+            "1234:5678:80",  # too many colons
         ]
         for i in test_data:
             try:
-                parse_server_name(i)
+                parse_and_validate_server_name(i)
                 self.fail(
-                    "Expected parse_server_name(\"%s\") to throw" % i,
+                    "Expected parse_and_validate_server_name('%s') to throw" % (i,)
                 )
             except ValueError:
                 pass

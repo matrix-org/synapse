@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
-
-from synapse.appservice import ApplicationService
-from synapse.types import UserID
-
-from netaddr import IPSet
-
-import yaml
 import logging
 
 from six import string_types
 from six.moves.urllib import parse as urlparse
+
+import yaml
+from netaddr import IPSet
+
+from synapse.appservice import ApplicationService
+from synapse.types import UserID
+
+from ._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +33,20 @@ class AppServiceConfig(Config):
     def read_config(self, config):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
+        self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
     def default_config(cls, **kwargs):
         return """\
-        # A list of application service config file to use
-        app_service_config_files: []
+        # A list of application service config files to use
+        #
+        #app_service_config_files:
+        #  - app_service_1.yaml
+        #  - app_service_2.yaml
+
+        # Uncomment to enable tracking of application service IP addresses. Implicitly
+        # enables MAU tracking for application service users.
+        #
+        #track_appservice_user_ips: True
         """
 
 
@@ -59,7 +68,7 @@ def load_appservices(hostname, config_files):
         try:
             with open(config_file, 'r') as f:
                 appservice = _load_appservice(
-                    hostname, yaml.load(f), config_file
+                    hostname, yaml.safe_load(f), config_file
                 )
                 if appservice.id in seen_ids:
                     raise ConfigError(

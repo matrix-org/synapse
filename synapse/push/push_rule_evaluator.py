@@ -17,11 +17,11 @@
 import logging
 import re
 
+from six import string_types
+
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
-
-from six import string_types
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ class PushRuleEvaluatorForEvent(object):
 
         # XXX: optimisation: cache our pattern regexps
         if condition['key'] == 'content.body':
-            body = self._event["content"].get("body", None)
+            body = self._event.content.get("body", None)
             if not body:
                 return False
 
@@ -140,7 +140,7 @@ class PushRuleEvaluatorForEvent(object):
         if not display_name:
             return False
 
-        body = self._event["content"].get("body", None)
+        body = self._event.content.get("body", None)
         if not body:
             return False
 

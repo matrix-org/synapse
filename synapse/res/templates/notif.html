@@ -1,0 +1,45 @@
+{% for message in notif.messages %}
+    <tr class="{{ "historical_message" if message.is_historical else "message" }}">
+        <td class="sender_avatar">
+            {% if loop.index0 == 0 or notif.messages[loop.index0 - 1].sender_name != notif.messages[loop.index0].sender_name %}
+                {% if message.sender_avatar_url %}
+                    <img alt="" class="sender_avatar" src="{{ message.sender_avatar_url|mxc_to_http(32,32) }}"  />
+                {% else %}
+                    {% if message.sender_hash % 3 == 0 %}
+                        <img class="sender_avatar" src="https://riot.im/img/external/avatar-1.png"  />
+                    {% elif message.sender_hash % 3 == 1 %}
+                        <img class="sender_avatar" src="https://riot.im/img/external/avatar-2.png"  />
+                    {% else %}
+                        <img class="sender_avatar" src="https://riot.im/img/external/avatar-3.png"  />
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        </td>
+        <td class="message_contents">
+            {% if loop.index0 == 0 or notif.messages[loop.index0 - 1].sender_name != notif.messages[loop.index0].sender_name %}
+                <div class="sender_name">{% if message.msgtype == "m.emote" %}*{% endif %} {{ message.sender_name }}</div>
+            {% endif %}
+            <div class="message_body">
+                {% if message.msgtype == "m.text" %}
+                    {{ message.body_text_html }}
+                {% elif message.msgtype == "m.emote" %}
+                    {{ message.body_text_html }}
+                {% elif message.msgtype == "m.notice" %}
+                    {{ message.body_text_html }}
+                {% elif message.msgtype == "m.image" %}
+                    <img src="{{ message.image_url|mxc_to_http(640, 480, scale) }}" />
+                {% elif message.msgtype == "m.file" %}
+                    <span class="filename">{{ message.body_text_plain }}</span>
+                {% endif %}
+            </div>
+        </td>
+        <td class="message_time">{{ message.ts|format_ts("%H:%M") }}</td>
+    </tr>
+{% endfor %}
+<tr class="notif_link">
+    <td></td>
+    <td>
+        <a href="{{ notif.link }}">View {{ room.title }}</a>
+    </td>
+    <td></td>
+</tr>

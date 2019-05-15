@@ -14,16 +14,15 @@
 # limitations under the License.
 
 
-from twisted.internet import defer
-
-from synapse.api.errors import AuthError, SynapseError, Codes
-from synapse.types import RoomAlias
-from synapse.http.servlet import parse_json_object_from_request
-
-from .base import ClientV1RestServlet, client_path_patterns
-
 import logging
 
+from twisted.internet import defer
+
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import RoomAlias
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +52,14 @@ class ClientDirectoryServer(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_PUT(self, request, room_alias):
+        room_alias = RoomAlias.from_string(room_alias)
+
         content = parse_json_object_from_request(request)
         if "room_id" not in content:
-            raise SynapseError(400, "Missing room_id key",
+            raise SynapseError(400, 'Missing params: ["room_id"]',
                                errcode=Codes.BAD_JSON)
 
         logger.debug("Got content: %s", content)
-
-        room_alias = RoomAlias.from_string(room_alias)
-
         logger.debug("Got room name: %s", room_alias.to_string())
 
         room_id = content["room_id"]
@@ -76,38 +74,11 @@ class ClientDirectoryServer(ClientV1RestServlet):
         if room is None:
             raise SynapseError(400, "Room does not exist")
 
-        dir_handler = self.handlers.directory_handler
+        requester = yield self.auth.get_user_by_req(request)
 
-        try:
-            # try to auth as a user
-            requester = yield self.auth.get_user_by_req(request)
-            try:
-                user_id = requester.user.to_string()
-                yield dir_handler.create_association(
-                    user_id, room_alias, room_id, servers
-                )
-                yield dir_handler.send_room_alias_update_event(
-                    requester,
-                    user_id,
-                    room_id
-                )
-            except SynapseError as e:
-                raise e
-            except Exception:
-                logger.exception("Failed to create association")
-                raise
-        except AuthError:
-            # try to auth as an application service
-            service = yield self.auth.get_appservice_by_req(request)
-            yield dir_handler.create_appservice_association(
-                service, room_alias, room_id, servers
-            )
-            logger.info(
-                "Application service at %s created alias %s pointing to %s",
-                service.url,
-                room_alias.to_string(),
-                room_id
-            )
+        yield self.handlers.directory_handler.create_association(
+            requester, room_alias, room_id, servers
+        )
 
         defer.returnValue((200, {}))
 
@@ -137,7 +108,7 @@ class ClientDirectoryServer(ClientV1RestServlet):
         room_alias = RoomAlias.from_string(room_alias)
 
         yield dir_handler.delete_association(
-            requester, user.to_string(), room_alias
+            requester, room_alias
         )
 
         logger.info(
@@ -161,7 +132,7 @@ class ClientDirectoryListServer(ClientV1RestServlet):
     def on_GET(self, request, room_id):
         room = yield self.store.get_room(room_id)
         if room is None:
-            raise SynapseError(400, "Unknown room")
+            raise NotFoundError("Unknown room")
 
         defer.returnValue((200, {
             "visibility": "public" if room["is_public"] else "private"

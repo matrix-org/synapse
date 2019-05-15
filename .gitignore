@@ -1,56 +1,40 @@
-*.pyc
-.*.swp
+# filename patterns
 *~
-
-.DS_Store
-_trial_temp/
-logs/
-dbs/
+.*.swp
+.#*
+*.deb
 *.egg
-dist/
-docs/build/
 *.egg-info
-
-cmdclient_config.json
-homeserver*.db
-homeserver*.log
-homeserver*.log.*
-homeserver*.pid
-homeserver*.yaml
-
-*.signing.key
-*.tls.crt
-*.tls.dh
-*.tls.key
-
-.coverage
-htmlcov
-
-demo/*/*.db
-demo/*/*.log
-demo/*/*.log.*
-demo/*/*.pid
-demo/media_store.*
-demo/etc
-
-uploads
-cache
-
-.idea/
-media_store/
-
+*.lock
+*.pyc
 *.tac
+_trial_temp/
+_trial_temp*/
 
-build/
-venv/
-venv*/
+# stuff that is likely to exist when you run a server locally
+/*.db
+/*.log
+/*.log.config
+/*.pid
+/*.signing.key
+/env/
+/homeserver*.yaml
+/media_store/
+/uploads
 
-localhost-800*/
-static/client/register/register_config.js
-.tox
+# IDEs
+/.idea/
+/.ropeproject/
+/.vscode/
 
-env/
-*.config
+# build products
+/.coverage*
+!/.coveragerc
+/.tox
+/build/
+/coverage.*
+/dist/
+/docs/build/
+/htmlcov
+/pip-wheel-metadata/
 
-.vscode/
-.ropeproject/

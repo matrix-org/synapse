@@ -14,9 +14,10 @@
 # limitations under the License.
 
 
-from six import StringIO
 import logging
 import traceback
+
+from six import StringIO
 
 
 class LogFormatter(logging.Formatter):

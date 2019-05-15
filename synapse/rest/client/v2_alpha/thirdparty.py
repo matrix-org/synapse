@@ -20,6 +20,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import ThirdPartyEntityKind
 from synapse.http.servlet import RestServlet
+
 from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class ThirdPartyUserServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
         fields = request.args
-        fields.pop("access_token", None)
+        fields.pop(b"access_token", None)
 
         results = yield self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.USER, protocol, fields
@@ -101,7 +102,7 @@ class ThirdPartyLocationServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
         fields = request.args
-        fields.pop("access_token", None)
+        fields.pop(b"access_token", None)
 
         results = yield self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.LOCATION, protocol, fields

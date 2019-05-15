@@ -16,9 +16,10 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_patterns
-from synapse.types import UserID
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.types import UserID
+
+from .base import ClientV1RestServlet, client_path_patterns
 
 
 class ProfileDisplaynameRestServlet(ClientV1RestServlet):
@@ -30,11 +31,17 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester_user = None
+
+        if self.hs.config.require_auth_for_profile_requests:
+            requester = yield self.auth.get_user_by_req(request)
+            requester_user = requester.user
+
         user = UserID.from_string(user_id)
 
-        displayname = yield self.profile_handler.get_displayname(
-            user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        displayname = yield self.profile_handler.get_displayname(user)
 
         ret = {}
         if displayname is not None:
@@ -73,11 +80,17 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester_user = None
+
+        if self.hs.config.require_auth_for_profile_requests:
+            requester = yield self.auth.get_user_by_req(request)
+            requester_user = requester.user
+
         user = UserID.from_string(user_id)
 
-        avatar_url = yield self.profile_handler.get_avatar_url(
-            user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        avatar_url = yield self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if avatar_url is not None:
@@ -115,14 +128,18 @@ class ProfileRestServlet(ClientV1RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
+        requester_user = None
+
+        if self.hs.config.require_auth_for_profile_requests:
+            requester = yield self.auth.get_user_by_req(request)
+            requester_user = requester.user
+
         user = UserID.from_string(user_id)
 
-        displayname = yield self.profile_handler.get_displayname(
-            user,
-        )
-        avatar_url = yield self.profile_handler.get_avatar_url(
-            user,
-        )
+        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+
+        displayname = yield self.profile_handler.get_displayname(user)
+        avatar_url = yield self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if displayname is not None:

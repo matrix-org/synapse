@@ -14,15 +14,15 @@
 # limitations under the License.
 
 
-from ._base import client_v2_patterns
-
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.api.errors import AuthError
-from synapse.util.stringutils import random_string
+import logging
 
 from twisted.internet import defer
 
-import logging
+from synapse.api.errors import AuthError
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.util.stringutils import random_string
+
+from ._base import client_v2_patterns
 
 logger = logging.getLogger(__name__)
 

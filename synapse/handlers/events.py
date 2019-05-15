@@ -13,19 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from synapse.util.logutils import log_function
-from synapse.types import UserID
-from synapse.events.utils import serialize_event
-from synapse.api.constants import Membership, EventTypes
-from synapse.events import EventBase
-
-from ._base import BaseHandler
-
 import logging
 import random
 
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import AuthError, SynapseError
+from synapse.events import EventBase
+from synapse.types import UserID
+from synapse.util.logutils import log_function
+from synapse.visibility import filter_events_for_client
+
+from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ class EventStreamHandler(BaseHandler):
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
         self._server_notices_sender = hs.get_server_notices_sender()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     @log_function
@@ -59,6 +60,11 @@ class EventStreamHandler(BaseHandler):
 
         If `only_keys` is not None, events from keys will be sent down.
         """
+
+        if room_id:
+            blocked = yield self.store.is_room_blocked(room_id)
+            if blocked:
+                raise SynapseError(403, "This room has been blocked on this server")
 
         # send any outstanding server notices to the user.
         yield self._server_notices_sender.on_user_syncing(auth_user_id)
@@ -96,7 +102,7 @@ class EventStreamHandler(BaseHandler):
                     # Send down presence.
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
-                        users = yield self.state.get_current_user_in_room(event.room_id)
+                        users = yield self.state.get_current_users_in_room(event.room_id)
                         states = yield presence_handler.get_states(
                             users,
                             as_event=True,
@@ -114,9 +120,9 @@ class EventStreamHandler(BaseHandler):
 
             time_now = self.clock.time_msec()
 
-            chunks = [
-                serialize_event(e, time_now, as_client_event) for e in events
-            ]
+            chunks = yield self._event_serializer.serialize_events(
+                events, time_now, as_client_event=as_client_event,
+            )
 
             chunk = {
                 "chunk": chunks,
@@ -130,11 +136,13 @@ class EventStreamHandler(BaseHandler):
 class EventHandler(BaseHandler):
 
     @defer.inlineCallbacks
-    def get_event(self, user, event_id):
+    def get_event(self, user, room_id, event_id):
         """Retrieve a single specified event.
 
         Args:
             user (synapse.types.UserID): The user requesting the event
+            room_id (str|None): The expected room id. We'll return None if the
+                event's room does not match.
             event_id (str): The event ID to obtain.
         Returns:
             dict: An event, or None if there is no event matching this ID.
@@ -143,13 +151,26 @@ class EventHandler(BaseHandler):
             AuthError if the user does not have the rights to inspect this
             event.
         """
-        event = yield self.store.get_event(event_id)
+        event = yield self.store.get_event(event_id, check_room_id=room_id)
 
         if not event:
             defer.returnValue(None)
             return
 
-        if hasattr(event, "room_id"):
-            yield self.auth.check_joined_room(event.room_id, user.to_string())
+        users = yield self.store.get_users_in_room(event.room_id)
+        is_peeking = user.to_string() not in users
+
+        filtered = yield filter_events_for_client(
+            self.store,
+            user.to_string(),
+            [event],
+            is_peeking=is_peeking
+        )
+
+        if not filtered:
+            raise AuthError(
+                403,
+                "You don't have permission to access that event."
+            )
 
         defer.returnValue(event)

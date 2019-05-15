@@ -14,41 +14,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer, threads
-import twisted.internet.error
-import twisted.web.http
-from twisted.web.resource import Resource
-
-from ._base import respond_404, FileInfo, respond_with_responder
-from .upload_resource import UploadResource
-from .download_resource import DownloadResource
-from .thumbnail_resource import ThumbnailResource
-from .identicon_resource import IdenticonResource
-from .preview_url_resource import PreviewUrlResource
-from .filepath import MediaFilePaths
-from .thumbnailer import Thumbnailer
-from .storage_provider import StorageProviderWrapper
-from .media_storage import MediaStorage
-
-from synapse.http.matrixfederationclient import MatrixFederationHttpClient
-from synapse.util.stringutils import random_string
-from synapse.api.errors import (
-    SynapseError, HttpResponseException, NotFoundError, FederationDeniedError,
-)
-
-from synapse.util.async import Linearizer
-from synapse.util.stringutils import is_ascii
-from synapse.util.logcontext import make_deferred_yieldable
-from synapse.util.retryutils import NotRetryingDestination
-
-import os
 import errno
+import logging
+import os
 import shutil
 
-import cgi
-import logging
-from six.moves.urllib import parse as urlparse
 from six import iteritems
+
+import twisted.internet.error
+import twisted.web.http
+from twisted.internet import defer
+from twisted.web.resource import Resource
+
+from synapse.api.errors import (
+    FederationDeniedError,
+    HttpResponseException,
+    NotFoundError,
+    RequestSendFailed,
+    SynapseError,
+)
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util import logcontext
+from synapse.util.async_helpers import Linearizer
+from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.stringutils import random_string
+
+from ._base import (
+    FileInfo,
+    get_filename_from_headers,
+    respond_404,
+    respond_with_responder,
+)
+from .config_resource import MediaConfigResource
+from .download_resource import DownloadResource
+from .filepath import MediaFilePaths
+from .media_storage import MediaStorage
+from .preview_url_resource import PreviewUrlResource
+from .storage_provider import StorageProviderWrapper
+from .thumbnail_resource import ThumbnailResource
+from .thumbnailer import Thumbnailer
+from .upload_resource import UploadResource
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +65,7 @@ class MediaRepository(object):
     def __init__(self, hs):
         self.hs = hs
         self.auth = hs.get_auth()
-        self.client = MatrixFederationHttpClient(hs)
+        self.client = hs.get_http_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
@@ -99,8 +104,13 @@ class MediaRepository(object):
         )
 
         self.clock.looping_call(
-            self._update_recently_accessed,
+            self._start_update_recently_accessed,
             UPDATE_RECENTLY_ACCESSED_TS,
+        )
+
+    def _start_update_recently_accessed(self):
+        return run_as_background_process(
+            "update_recently_accessed_media", self._update_recently_accessed,
         )
 
     @defer.inlineCallbacks
@@ -363,16 +373,16 @@ class MediaRepository(object):
                         "allow_remote": "false",
                     }
                 )
-            except twisted.internet.error.DNSLookupError as e:
-                logger.warn("HTTP error fetching remote media %s/%s: %r",
+            except RequestSendFailed as e:
+                logger.warn("Request failed fetching remote media %s/%s: %r",
                             server_name, media_id, e)
-                raise NotFoundError()
+                raise SynapseError(502, "Failed to fetch remote media")
 
             except HttpResponseException as e:
                 logger.warn("HTTP error fetching remote media %s/%s: %s",
                             server_name, media_id, e.response)
                 if e.code == twisted.web.http.NOT_FOUND:
-                    raise SynapseError.from_http_response_exception(e)
+                    raise e.to_synapse_error()
                 raise SynapseError(502, "Failed to fetch remote media")
 
             except SynapseError:
@@ -389,35 +399,9 @@ class MediaRepository(object):
 
             yield finish()
 
-        media_type = headers["Content-Type"][0]
-
+        media_type = headers[b"Content-Type"][0].decode('ascii')
+        upload_name = get_filename_from_headers(headers)
         time_now_ms = self.clock.time_msec()
-
-        content_disposition = headers.get("Content-Disposition", None)
-        if content_disposition:
-            _, params = cgi.parse_header(content_disposition[0],)
-            upload_name = None
-
-            # First check if there is a valid UTF-8 filename
-            upload_name_utf8 = params.get("filename*", None)
-            if upload_name_utf8:
-                if upload_name_utf8.lower().startswith("utf-8''"):
-                    upload_name = upload_name_utf8[7:]
-
-            # If there isn't check for an ascii name.
-            if not upload_name:
-                upload_name_ascii = params.get("filename", None)
-                if upload_name_ascii and is_ascii(upload_name_ascii):
-                    upload_name = upload_name_ascii
-
-            if upload_name:
-                upload_name = urlparse.unquote(upload_name)
-                try:
-                    upload_name = upload_name.decode("utf-8")
-                except UnicodeDecodeError:
-                    upload_name = None
-        else:
-            upload_name = None
 
         logger.info("Stored remote media in file %r", fname)
 
@@ -480,10 +464,11 @@ class MediaRepository(object):
         ))
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+        t_byte_source = yield logcontext.defer_to_thread(
+            self.hs.get_reactor(),
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
-        ))
+        )
 
         if t_byte_source:
             try:
@@ -522,10 +507,11 @@ class MediaRepository(object):
         ))
 
         thumbnailer = Thumbnailer(input_path)
-        t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+        t_byte_source = yield logcontext.defer_to_thread(
+            self.hs.get_reactor(),
             self._generate_thumbnail,
             thumbnailer, t_width, t_height, t_method, t_type
-        ))
+        )
 
         if t_byte_source:
             try:
@@ -608,15 +594,17 @@ class MediaRepository(object):
         for (t_width, t_height, t_type), t_method in iteritems(thumbnails):
             # Generate the thumbnail
             if t_method == "crop":
-                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                t_byte_source = yield logcontext.defer_to_thread(
+                    self.hs.get_reactor(),
                     thumbnailer.crop,
                     t_width, t_height, t_type,
-                ))
+                )
             elif t_method == "scale":
-                t_byte_source = yield make_deferred_yieldable(threads.deferToThread(
+                t_byte_source = yield logcontext.defer_to_thread(
+                    self.hs.get_reactor(),
                     thumbnailer.scale,
                     t_width, t_height, t_type,
-                ))
+                )
             else:
                 logger.error("Unrecognized method: %r", t_method)
                 continue
@@ -748,13 +736,13 @@ class MediaRepositoryResource(Resource):
 
         media_repo = hs.get_media_repository()
 
-        self.putChild("upload", UploadResource(hs, media_repo))
-        self.putChild("download", DownloadResource(hs, media_repo))
-        self.putChild("thumbnail", ThumbnailResource(
+        self.putChild(b"upload", UploadResource(hs, media_repo))
+        self.putChild(b"download", DownloadResource(hs, media_repo))
+        self.putChild(b"thumbnail", ThumbnailResource(
             hs, media_repo, media_repo.media_storage,
         ))
-        self.putChild("identicon", IdenticonResource())
         if hs.config.url_preview_enabled:
-            self.putChild("preview_url", PreviewUrlResource(
+            self.putChild(b"preview_url", PreviewUrlResource(
                 hs, media_repo, media_repo.media_storage,
             ))
+        self.putChild(b"config", MediaConfigResource(hs))

@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
-from ._slaved_id_tracker import SlavedIdTracker
-
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.storage import DataStore
 from synapse.storage.presence import PresenceStore
+from synapse.util.caches.stream_change_cache import StreamChangeCache
+
+from ._base import BaseSlavedStore, __func__
+from ._slaved_id_tracker import SlavedIdTracker
 
 
 class SlavedPresenceStore(BaseSlavedStore):
@@ -34,28 +34,21 @@ class SlavedPresenceStore(BaseSlavedStore):
             "PresenceStreamChangeCache", self._presence_id_gen.get_current_token()
         )
 
-    _get_active_presence = DataStore._get_active_presence.__func__
-    take_presence_startup_info = DataStore.take_presence_startup_info.__func__
+    _get_active_presence = __func__(DataStore._get_active_presence)
+    take_presence_startup_info = __func__(DataStore.take_presence_startup_info)
     _get_presence_for_user = PresenceStore.__dict__["_get_presence_for_user"]
     get_presence_for_users = PresenceStore.__dict__["get_presence_for_users"]
-
-    # XXX: This is a bit broken because we don't persist the accepted list in a
-    # way that can be replicated. This means that we don't have a way to
-    # invalidate the cache correctly.
-    get_presence_list_accepted = PresenceStore.__dict__[
-        "get_presence_list_accepted"
-    ]
-    get_presence_list_observers_accepted = PresenceStore.__dict__[
-        "get_presence_list_observers_accepted"
-    ]
 
     def get_current_presence_token(self):
         return self._presence_id_gen.get_current_token()
 
     def stream_positions(self):
         result = super(SlavedPresenceStore, self).stream_positions()
-        position = self._presence_id_gen.get_current_token()
-        result["presence"] = position
+
+        if self.hs.config.use_presence:
+            position = self._presence_id_gen.get_current_token()
+            result["presence"] = position
+
         return result
 
     def process_replication_rows(self, stream_name, token, rows):

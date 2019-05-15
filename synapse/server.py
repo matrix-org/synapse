@@ -19,9 +19,11 @@
 # partial one for unit test mocking.
 
 # Imports required for the default HomeServer() implementation
+import abc
 import logging
 
 from twisted.enterprise import adbapi
+from twisted.mail.smtp import sendmail
 from twisted.web.client import BrowserLikePolicyForHTTPS
 
 from synapse.api.auth import Auth
@@ -29,41 +31,51 @@ from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
+from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
+from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
-from synapse.federation.federation_server import FederationServer
+from synapse.federation.federation_server import (
+    FederationHandlerRegistry,
+    FederationServer,
+    ReplicationFederationHandlerRegistry,
+)
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.federation_server import FederationHandlerRegistry
+from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
-from synapse.federation.transaction_queue import TransactionQueue
+from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
+from synapse.groups.groups_server import GroupsServerHandler
 from synapse.handlers import Handlers
+from synapse.handlers.account_validity import AccountValidityHandler
+from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
+from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
-from synapse.handlers.device import DeviceHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
+from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
+from synapse.handlers.events import EventHandler, EventStreamHandler
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.initial_sync import InitialSyncHandler
+from synapse.handlers.message import EventCreationHandler, MessageHandler
+from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.presence import PresenceHandler
-from synapse.handlers.room import RoomCreationHandler
+from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
+from synapse.handlers.read_marker import ReadMarkerHandler
+from synapse.handlers.receipts import ReceiptsHandler
+from synapse.handlers.register import RegistrationHandler
+from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.sync import SyncHandler
 from synapse.handlers.typing import TypingHandler
-from synapse.handlers.events import EventHandler, EventStreamHandler
-from synapse.handlers.initial_sync import InitialSyncHandler
-from synapse.handlers.receipts import ReceiptsHandler
-from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
-from synapse.handlers.groups_local import GroupsLocalHandler
-from synapse.handlers.profile import ProfileHandler
-from synapse.handlers.message import EventCreationHandler
-from synapse.groups.groups_server import GroupsServerHandler
-from synapse.groups.attestations import GroupAttestionRenewer, GroupAttestationSigning
-from synapse.http.client import SimpleHttpClient, InsecureInterceptableContextFactory
+from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
@@ -72,13 +84,11 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
+from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
-from synapse.server_notices.worker_server_notices_sender import (
-    WorkerServerNoticesSender,
-)
+from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStore
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -106,7 +116,11 @@ class HomeServer(object):
 
     Attributes:
         config (synapse.config.homeserver.HomeserverConfig):
+        _listening_services (list[twisted.internet.tcp.Port]): TCP ports that
+            we are listening on to provide HTTP services.
     """
+
+    __metaclass__ = abc.ABCMeta
 
     DEPENDENCIES = [
         'http_client',
@@ -122,9 +136,11 @@ class HomeServer(object):
         'sync_handler',
         'typing_handler',
         'room_list_handler',
+        'acme_handler',
         'auth_handler',
         'device_handler',
         'e2e_keys_handler',
+        'e2e_room_keys_handler',
         'event_handler',
         'event_stream_handler',
         'initial_sync_handler',
@@ -158,12 +174,29 @@ class HomeServer(object):
         'groups_server_handler',
         'groups_attestation_signing',
         'groups_attestation_renewer',
+        'secrets',
         'spam_checker',
         'room_member_handler',
         'federation_registry',
         'server_notices_manager',
         'server_notices_sender',
+        'message_handler',
+        'pagination_handler',
+        'room_context_handler',
+        'sendmail',
+        'registration_handler',
+        'account_validity_handler',
+        'event_client_serializer',
     ]
+
+    REQUIRED_ON_MASTER_STARTUP = [
+        "user_directory_handler",
+    ]
+
+    # This is overridden in derived application classes
+    # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
+    # instantiated during setup() for future return by get_datastore()
+    DATASTORE_CLASS = abc.abstractproperty()
 
     def __init__(self, hostname, reactor=None, **kwargs):
         """
@@ -176,10 +209,14 @@ class HomeServer(object):
         self._reactor = reactor
         self.hostname = hostname
         self._building = {}
+        self._listening_services = []
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
+        self.registration_ratelimiter = Ratelimiter()
+
+        self.datastore = None
 
         # Other kwargs are explicit dependencies
         for depname in kwargs:
@@ -187,8 +224,19 @@ class HomeServer(object):
 
     def setup(self):
         logger.info("Setting up.")
-        self.datastore = DataStore(self.get_db_conn(), self)
+        with self.get_db_conn() as conn:
+            self.datastore = self.DATASTORE_CLASS(conn, self)
+            conn.commit()
         logger.info("Finished setting up.")
+
+    def setup_master(self):
+        """
+        Some handlers have side effects on instantiation (like registering
+        background updates). This function causes them to be fetched, and
+        therefore instantiated, to run those side effects.
+        """
+        for i in self.REQUIRED_ON_MASTER_STARTUP:
+            getattr(self, "get_" + i)()
 
     def get_reactor(self):
         """
@@ -221,6 +269,9 @@ class HomeServer(object):
     def get_ratelimiter(self):
         return self.ratelimiter
 
+    def get_registration_ratelimiter(self):
+        return self.registration_ratelimiter
+
     def build_federation_client(self):
         return FederationClient(self)
 
@@ -249,6 +300,9 @@ class HomeServer(object):
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
 
+    def build_sendmail(self):
+        return sendmail
+
     def build_state_handler(self):
         return StateHandler(self)
 
@@ -274,13 +328,22 @@ class HomeServer(object):
         return MacaroonGenerator(self)
 
     def build_device_handler(self):
-        return DeviceHandler(self)
+        if self.config.worker_app:
+            return DeviceWorkerHandler(self)
+        else:
+            return DeviceHandler(self)
 
     def build_device_message_handler(self):
         return DeviceMessageHandler(self)
 
     def build_e2e_keys_handler(self):
         return E2eKeysHandler(self)
+
+    def build_e2e_room_keys_handler(self):
+        return E2eRoomKeysHandler(self)
+
+    def build_acme_handler(self):
+        return AcmeHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)
@@ -301,7 +364,10 @@ class HomeServer(object):
         return InitialSyncHandler(self)
 
     def build_profile_handler(self):
-        return ProfileHandler(self)
+        if self.config.worker_app:
+            return BaseProfileHandler(self)
+        else:
+            return MasterProfileHandler(self)
 
     def build_event_creation_handler(self):
         return EventCreationHandler(self)
@@ -319,10 +385,7 @@ class HomeServer(object):
         return Keyring(self)
 
     def build_event_builder_factory(self):
-        return EventBuilderFactory(
-            clock=self.get_clock(),
-            hostname=self.hostname,
-        )
+        return EventBuilderFactory(self)
 
     def build_filtering(self):
         return Filtering(self)
@@ -331,7 +394,10 @@ class HomeServer(object):
         return PusherPool(self)
 
     def build_http_client(self):
-        return MatrixFederationHttpClient(self)
+        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+            self.config
+        )
+        return MatrixFederationHttpClient(self, tls_client_options_factory)
 
     def build_db_pool(self):
         name = self.db_config["name"]
@@ -372,7 +438,7 @@ class HomeServer(object):
 
     def build_federation_sender(self):
         if self.should_send_federation():
-            return TransactionQueue(self)
+            return FederationSender(self)
         elif not self.config.worker_app:
             return FederationRemoteSendQueue(self)
         else:
@@ -405,6 +471,9 @@ class HomeServer(object):
     def build_groups_attestation_renewer(self):
         return GroupAttestionRenewer(self)
 
+    def build_secrets(self):
+        return Secrets()
+
     def build_spam_checker(self):
         return SpamChecker(self)
 
@@ -414,7 +483,10 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        return FederationHandlerRegistry()
+        if self.config.worker_app:
+            return ReplicationFederationHandlerRegistry(self)
+        else:
+            return FederationHandlerRegistry()
 
     def build_server_notices_manager(self):
         if self.config.worker_app:
@@ -425,6 +497,24 @@ class HomeServer(object):
         if self.config.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
+
+    def build_message_handler(self):
+        return MessageHandler(self)
+
+    def build_pagination_handler(self):
+        return PaginationHandler(self)
+
+    def build_room_context_handler(self):
+        return RoomContextHandler(self)
+
+    def build_registration_handler(self):
+        return RegistrationHandler(self)
+
+    def build_account_validity_handler(self):
+        return AccountValidityHandler(self)
+
+    def build_event_client_serializer(self):
+        return EventClientSerializer(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

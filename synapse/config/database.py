@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 from ._base import Config
 
@@ -45,10 +46,11 @@ class DatabaseConfig(Config):
 
         self.set_databasepath(config.get("database_path"))
 
-    def default_config(self, **kwargs):
-        database_path = self.abspath("homeserver.db")
+    def default_config(self, data_dir_path, **kwargs):
+        database_path = os.path.join(data_dir_path, "homeserver.db")
         return """\
-        # Database configuration
+        ## Database ##
+
         database:
           # The database engine name
           name: "sqlite3"
@@ -58,7 +60,8 @@ class DatabaseConfig(Config):
             database: "%(database_path)s"
 
         # Number of events to cache in memory.
-        event_cache_size: "10K"
+        #
+        #event_cache_size: 10K
         """ % locals()
 
     def read_arguments(self, args):

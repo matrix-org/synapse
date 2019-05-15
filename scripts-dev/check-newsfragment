@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# A script which checks that an appropriate news file has been added on this
+# branch.
+
+set -e
+
+# make sure that origin/develop is up to date
+git remote set-branches --add origin develop
+git fetch origin develop
+
+# if there are changes in the debian directory, check that the debian changelog
+# has been updated
+if ! git diff --quiet FETCH_HEAD... -- debian; then
+    if git diff --quiet FETCH_HEAD... -- debian/changelog; then
+        echo "Updates to debian directory, but no update to the changelog." >&2
+        exit 1
+    fi
+fi
+
+# if there are changes *outside* the debian directory, check that the
+# newsfragments have been updated.
+if git diff --name-only FETCH_HEAD... | grep -qv '^debian/'; then
+    tox -e check-newsfragment
+fi
+
+echo
+echo "--------------------------"
+echo
+
+# check that any new newsfiles on this branch end with a full stop.
+for f in `git diff --name-only FETCH_HEAD... -- changelog.d`; do
+    lastchar=`tr -d '\n' < $f | tail -c 1`
+    if [ $lastchar != '.' -a $lastchar != '!' ]; then
+        echo -e "\e[31mERROR: newsfragment $f does not end with a '.' or '!'\e[39m" >&2
+        exit 1
+    fi
+done
+

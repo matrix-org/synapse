@@ -29,24 +29,24 @@ dead worker doesn't cause the queues to grow limitlessly.
 Events are replicated via a separate events stream.
 """
 
-from .units import Edu
-
-from synapse.storage.presence import UserPresenceState
-from synapse.util.metrics import Measure
-from synapse.metrics import LaterGauge
-
-from sortedcontainers import SortedDict
+import logging
 from collections import namedtuple
 
-import logging
+from six import iteritems
 
-from six import itervalues, iteritems
+from sortedcontainers import SortedDict
+
+from synapse.metrics import LaterGauge
+from synapse.storage.presence import UserPresenceState
+from synapse.util.metrics import Measure
+
+from .units import Edu
 
 logger = logging.getLogger(__name__)
 
 
 class FederationRemoteSendQueue(object):
-    """A drop in replacement for TransactionQueue"""
+    """A drop in replacement for FederationSender"""
 
     def __init__(self, hs):
         self.server_name = hs.hostname
@@ -55,14 +55,17 @@ class FederationRemoteSendQueue(object):
         self.is_mine_id = hs.is_mine_id
 
         self.presence_map = {}  # Pending presence map user_id -> UserPresenceState
-        self.presence_changed = SortedDict()  # Stream position -> user_id
+        self.presence_changed = SortedDict()  # Stream position -> list[user_id]
+
+        # Stores the destinations we need to explicitly send presence to about a
+        # given user.
+        # Stream position -> (user_id, destinations)
+        self.presence_destinations = SortedDict()
 
         self.keyed_edu = {}  # (destination, key) -> EDU
         self.keyed_edu_changed = SortedDict()  # stream position -> (destination, key)
 
         self.edus = SortedDict()  # stream position -> Edu
-
-        self.failures = SortedDict()  # stream position -> (destination, Failure)
 
         self.device_messages = SortedDict()  # stream position -> destination
 
@@ -79,7 +82,7 @@ class FederationRemoteSendQueue(object):
 
         for queue_name in [
             "presence_map", "presence_changed", "keyed_edu", "keyed_edu_changed",
-            "edus", "failures", "device_messages", "pos_time",
+            "edus", "device_messages", "pos_time", "presence_destinations",
         ]:
             register(queue_name, getattr(self, queue_name))
 
@@ -119,8 +122,17 @@ class FederationRemoteSendQueue(object):
 
             user_ids = set(
                 user_id
-                for uids in itervalues(self.presence_changed)
+                for uids in self.presence_changed.values()
                 for user_id in uids
+            )
+
+            keys = self.presence_destinations.keys()
+            i = self.presence_destinations.bisect_left(position_to_delete)
+            for key in keys[:i]:
+                del self.presence_destinations[key]
+
+            user_ids.update(
+                user_id for user_id, _ in self.presence_destinations.values()
             )
 
             to_del = [
@@ -149,12 +161,6 @@ class FederationRemoteSendQueue(object):
             for key in keys[:i]:
                 del self.edus[key]
 
-            # Delete things out of failure map
-            keys = self.failures.keys()
-            i = self.failures.bisect_left(position_to_delete)
-            for key in keys[:i]:
-                del self.failures[key]
-
             # Delete things out of device map
             keys = self.device_messages.keys()
             i = self.device_messages.bisect_left(position_to_delete)
@@ -162,13 +168,17 @@ class FederationRemoteSendQueue(object):
                 del self.device_messages[key]
 
     def notify_new_events(self, current_id):
-        """As per TransactionQueue"""
+        """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.
         pass
 
-    def send_edu(self, destination, edu_type, content, key=None):
-        """As per TransactionQueue"""
+    def build_and_send_edu(self, destination, edu_type, content, key=None):
+        """As per FederationSender"""
+        if destination == self.server_name:
+            logger.info("Not sending EDU to ourselves")
+            return
+
         pos = self._next_pos()
 
         edu = Edu(
@@ -187,8 +197,17 @@ class FederationRemoteSendQueue(object):
 
         self.notifier.on_new_replication_data()
 
+    def send_read_receipt(self, receipt):
+        """As per FederationSender
+
+        Args:
+            receipt (synapse.types.ReadReceipt):
+        """
+        # nothing to do here: the replication listener will handle it.
+        pass
+
     def send_presence(self, states):
-        """As per TransactionQueue
+        """As per FederationSender
 
         Args:
             states (list(UserPresenceState))
@@ -204,15 +223,22 @@ class FederationRemoteSendQueue(object):
 
         self.notifier.on_new_replication_data()
 
-    def send_failure(self, failure, destination):
-        """As per TransactionQueue"""
-        pos = self._next_pos()
+    def send_presence_to_destinations(self, states, destinations):
+        """As per FederationSender
 
-        self.failures[pos] = (destination, str(failure))
+        Args:
+            states (list[UserPresenceState])
+            destinations (list[str])
+        """
+        for state in states:
+            pos = self._next_pos()
+            self.presence_map.update({state.user_id: state for state in states})
+            self.presence_destinations[pos] = (state.user_id, destinations)
+
         self.notifier.on_new_replication_data()
 
     def send_device_messages(self, destination):
-        """As per TransactionQueue"""
+        """As per FederationSender"""
         pos = self._next_pos()
         self.device_messages[pos] = destination
         self.notifier.on_new_replication_data()
@@ -263,6 +289,16 @@ class FederationRemoteSendQueue(object):
                 state=self.presence_map[user_id],
             )))
 
+        # Fetch presence to send to destinations
+        i = self.presence_destinations.bisect_right(from_token)
+        j = self.presence_destinations.bisect_right(to_token) + 1
+
+        for pos, (user_id, dests) in self.presence_destinations.items()[i:j]:
+            rows.append((pos, PresenceDestinationsRow(
+                state=self.presence_map[user_id],
+                destinations=list(dests),
+            )))
+
         # Fetch changes keyed edus
         i = self.keyed_edu_changed.bisect_right(from_token)
         j = self.keyed_edu_changed.bisect_right(to_token) + 1
@@ -284,17 +320,6 @@ class FederationRemoteSendQueue(object):
 
         for (pos, edu) in edus:
             rows.append((pos, EduRow(edu)))
-
-        # Fetch changed failures
-        i = self.failures.bisect_right(from_token)
-        j = self.failures.bisect_right(to_token) + 1
-        failures = self.failures.items()[i:j]
-
-        for (pos, (destination, failure)) in failures:
-            rows.append((pos, FailureRow(
-                destination=destination,
-                failure=failure,
-            )))
 
         # Fetch changed device messages
         i = self.device_messages.bisect_right(from_token)
@@ -370,6 +395,29 @@ class PresenceRow(BaseFederationRow, namedtuple("PresenceRow", (
         buff.presence.append(self.state)
 
 
+class PresenceDestinationsRow(BaseFederationRow, namedtuple("PresenceDestinationsRow", (
+    "state",  # UserPresenceState
+    "destinations",  # list[str]
+))):
+    TypeId = "pd"
+
+    @staticmethod
+    def from_data(data):
+        return PresenceDestinationsRow(
+            state=UserPresenceState.from_dict(data["state"]),
+            destinations=data["dests"],
+        )
+
+    def to_data(self):
+        return {
+            "state": self.state.as_dict(),
+            "dests": self.destinations,
+        }
+
+    def add_to_buffer(self, buff):
+        buff.presence_destinations.append((self.state, self.destinations))
+
+
 class KeyedEduRow(BaseFederationRow, namedtuple("KeyedEduRow", (
     "key",  # tuple(str) - the edu key passed to send_edu
     "edu",  # Edu
@@ -417,34 +465,6 @@ class EduRow(BaseFederationRow, namedtuple("EduRow", (
         buff.edus.setdefault(self.edu.destination, []).append(self.edu)
 
 
-class FailureRow(BaseFederationRow, namedtuple("FailureRow", (
-    "destination",  # str
-    "failure",
-))):
-    """Streams failures to a remote server. Failures are issued when there was
-    something wrong with a transaction the remote sent us, e.g. it included
-    an event that was invalid.
-    """
-
-    TypeId = "f"
-
-    @staticmethod
-    def from_data(data):
-        return FailureRow(
-            destination=data["destination"],
-            failure=data["failure"],
-        )
-
-    def to_data(self):
-        return {
-            "destination": self.destination,
-            "failure": self.failure,
-        }
-
-    def add_to_buffer(self, buff):
-        buff.failures.setdefault(self.destination, []).append(self.failure)
-
-
 class DeviceRow(BaseFederationRow, namedtuple("DeviceRow", (
     "destination",  # str
 ))):
@@ -469,9 +489,9 @@ TypeToRow = {
     Row.TypeId: Row
     for Row in (
         PresenceRow,
+        PresenceDestinationsRow,
         KeyedEduRow,
         EduRow,
-        FailureRow,
         DeviceRow,
     )
 }
@@ -479,9 +499,9 @@ TypeToRow = {
 
 ParsedFederationStreamData = namedtuple("ParsedFederationStreamData", (
     "presence",  # list(UserPresenceState)
+    "presence_destinations",  # list of tuples of UserPresenceState and destinations
     "keyed_edus",  # dict of destination -> { key -> Edu }
     "edus",  # dict of destination -> [Edu]
-    "failures",  # dict of destination -> [failures]
     "device_destinations",  # set of destinations
 ))
 
@@ -491,7 +511,7 @@ def process_rows_for_federation(transaction_queue, rows):
     transaction queue ready for sending to the relevant homeservers.
 
     Args:
-        transaction_queue (TransactionQueue)
+        transaction_queue (FederationSender)
         rows (list(synapse.replication.tcp.streams.FederationStreamRow))
     """
 
@@ -501,9 +521,9 @@ def process_rows_for_federation(transaction_queue, rows):
 
     buff = ParsedFederationStreamData(
         presence=[],
+        presence_destinations=[],
         keyed_edus={},
         edus={},
-        failures={},
         device_destinations=set(),
     )
 
@@ -520,21 +540,18 @@ def process_rows_for_federation(transaction_queue, rows):
     if buff.presence:
         transaction_queue.send_presence(buff.presence)
 
+    for state, destinations in buff.presence_destinations:
+        transaction_queue.send_presence_to_destinations(
+            states=[state], destinations=destinations,
+        )
+
     for destination, edu_map in iteritems(buff.keyed_edus):
         for key, edu in edu_map.items():
-            transaction_queue.send_edu(
-                edu.destination, edu.edu_type, edu.content, key=key,
-            )
+            transaction_queue.send_edu(edu, key)
 
     for destination, edu_list in iteritems(buff.edus):
         for edu in edu_list:
-            transaction_queue.send_edu(
-                edu.destination, edu.edu_type, edu.content, key=None,
-            )
-
-    for destination, failure_list in iteritems(buff.failures):
-        for failure in failure_list:
-            transaction_queue.send_failure(destination, failure)
+            transaction_queue.send_edu(edu, None)
 
     for destination in buff.device_destinations:
         transaction_queue.send_device_messages(destination)

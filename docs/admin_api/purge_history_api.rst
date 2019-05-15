@@ -10,7 +10,7 @@ paginate further back in the room from the point being purged from.
 
 The API is:
 
-``POST /_matrix/client/r0/admin/purge_history/<room_id>[/<event_id>]``
+``POST /_synapse/admin/v1/purge_history/<room_id>[/<event_id>]``
 
 including an ``access_token`` of a server admin.
 
@@ -49,7 +49,7 @@ Purge status query
 
 It is possible to poll for updates on recent purges with a second API;
 
-``GET /_matrix/client/r0/admin/purge_history_status/<purge_id>``
+``GET /_synapse/admin/v1/purge_history_status/<purge_id>``
 
 (again, with a suitable ``access_token``). This API returns a JSON body like
 the following:
@@ -61,3 +61,11 @@ the following:
     }
 
 The status will be one of ``active``, ``complete``, or ``failed``.
+
+Reclaim disk space (Postgres)
+-----------------------------
+
+To reclaim the disk space and return it to the operating system, you need to run
+`VACUUM FULL;` on the database.
+
+https://www.postgresql.org/docs/current/sql-vacuum.html

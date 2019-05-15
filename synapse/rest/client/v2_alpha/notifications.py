@@ -13,18 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
-from synapse.http.servlet import (
-    RestServlet, parse_string, parse_integer
-)
-from synapse.events.utils import (
-    serialize_event, format_event_for_client_v2_without_room_id,
-)
+from synapse.events.utils import format_event_for_client_v2_without_room_id
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
 
 from ._base import client_v2_patterns
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +33,7 @@ class NotificationsServlet(RestServlet):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -70,11 +67,11 @@ class NotificationsServlet(RestServlet):
                 "profile_tag": pa["profile_tag"],
                 "actions": pa["actions"],
                 "ts": pa["received_ts"],
-                "event": serialize_event(
+                "event": (yield self._event_serializer.serialize_event(
                     notif_events[pa["event_id"]],
                     self.clock.time_msec(),
                     event_format=format_event_for_client_v2_without_room_id,
-                ),
+                )),
             }
 
             if pa["room_id"] not in receipts_by_room:

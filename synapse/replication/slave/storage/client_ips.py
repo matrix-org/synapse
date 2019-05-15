@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import BaseSlavedStore
 from synapse.storage.client_ips import LAST_SEEN_GRANULARITY
 from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.descriptors import Cache
+
+from ._base import BaseSlavedStore
 
 
 class SlavedClientIpStore(BaseSlavedStore):
@@ -41,6 +42,8 @@ class SlavedClientIpStore(BaseSlavedStore):
         # Rate-limited inserts
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
+
+        self.client_ip_last_seen.prefill(key, now)
 
         self.hs.get_tcp_replication().send_user_ip(
             user_id, access_token, ip, user_agent, device_id, now

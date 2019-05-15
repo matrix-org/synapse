@@ -12,14 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import synapse.util.logcontext
-from twisted.internet import defer
-
-from synapse.api.errors import CodeMessageException
-
 import logging
 import random
 
+from twisted.internet import defer
+
+import synapse.util.logcontext
+from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +188,7 @@ class RetryDestinationLimiter(object):
             else:
                 self.retry_interval = self.min_retry_interval
 
-            logger.debug(
+            logger.info(
                 "Connection to %s was unsuccessful (%s(%s)); backoff now %i",
                 self.destination, exc_type, exc_val, self.retry_interval
             )

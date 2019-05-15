@@ -19,6 +19,7 @@ handlers:
   # example output to console
   console:
     class: logging.StreamHandler
+    formatter: fmt
     filters: [context]
 
   # example output to file - to enable, edit 'root' config below.
@@ -29,7 +30,7 @@ handlers:
     maxBytes: 100000000
     backupCount: 3
     filters: [context]
-
+    encoding: utf8
 
 root:
     level: INFO
