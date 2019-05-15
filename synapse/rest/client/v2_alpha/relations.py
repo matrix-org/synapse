@@ -31,6 +31,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.rest.client.transactions import HttpTransactionCache
 
 from ._base import client_v2_patterns
 
@@ -59,6 +60,7 @@ class RelationSendServlet(RestServlet):
         super(RelationSendServlet, self).__init__()
         self.auth = hs.get_auth()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.txns = HttpTransactionCache(hs)
 
     def register(self, http_server):
         http_server.register_paths(
@@ -69,7 +71,12 @@ class RelationSendServlet(RestServlet):
         http_server.register_paths(
             "PUT",
             client_v2_patterns(self.PATTERN + "/(?P<txn_id>[^/]*)$", releases=()),
-            self.on_PUT_or_POST,
+            self.on_PUT,
+        )
+
+    def on_PUT(self, request, *args, **kwargs):
+        return self.txns.fetch_or_execute_request(
+            request, self.on_PUT_or_POST, request, *args, **kwargs
         )
 
     @defer.inlineCallbacks
