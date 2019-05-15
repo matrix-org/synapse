@@ -460,7 +460,7 @@ class SearchStore(BackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        events = yield self._get_events([r["event_id"] for r in results])
+        events = yield self.get_events_as_list([r["event_id"] for r in results])
 
         event_map = {ev.event_id: ev for ev in events}
 
@@ -605,7 +605,7 @@ class SearchStore(BackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        events = yield self._get_events([r["event_id"] for r in results])
+        events = yield self.get_events_as_list([r["event_id"] for r in results])
 
         event_map = {ev.event_id: ev for ev in events}
 
