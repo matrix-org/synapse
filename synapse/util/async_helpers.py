@@ -166,7 +166,7 @@ def yieldable_gather_results(func, iter, *args, **kwargs):
         *args: Arguments to be passed to each call to func
 
     Returns
-        Deferred: Resolved when all functions have been invoked, or errors if
+        Deferred[list]: Resolved when all functions have been invoked, or errors if
         one of the function calls fails.
     """
     return logcontext.make_deferred_yieldable(defer.gatherResults([
