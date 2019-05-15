@@ -65,11 +65,11 @@ class RelationsStore(SQLBaseStore):
         where_clause = ["relates_to_id = ?"]
         where_args = [event_id]
 
-        if relation_type:
+        if relation_type is not None:
             where_clause.append("relation_type = ?")
             where_args.append(relation_type)
 
-        if event_type:
+        if event_type is not None:
             where_clause.append("type = ?")
             where_args.append(event_type)
 
