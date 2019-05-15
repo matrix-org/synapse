@@ -36,6 +36,12 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
+    def default_config(self, name='test'):
+        config = super().default_config(name=name)
+        config["limit_large_remote_room_joins"] = True
+        config["limit_large_remote_room_complexity"] = 0.05
+        return config
+
     def prepare(self, reactor, clock, homeserver):
         class Authenticator(object):
             def authenticate_request(self, request, content):
@@ -74,28 +80,19 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         complexity = channel.json_body["v1"]
         self.assertTrue(complexity > 0, complexity)
 
-        # Make more events -- over the threshold
-        for i in range(500):
-            self.helper.send_state(
-                room_1,
-                event_type="m.room.topic",
-                body={"topic": "foo%s" % (i,)},
-                tok=u1_token,
-            )
+        # Artificially raise the complexity
+        self.hs.get_datastore().get_state_event_counts = lambda x: defer.succeed(500 * 1.23)
 
-        # Get the room complexity again -- make sure it's above 1
+        # Get the room complexity again -- make sure it's our artificial value
         request, channel = self.make_request(
             "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
         self.render(request)
         self.assertEquals(200, channel.code)
         complexity = channel.json_body["v1"]
-        self.assertTrue(complexity > 1, complexity)
+        self.assertEqual(complexity, 1.23)
 
     def test_join_too_large(self):
-
-        self.hs.config.limit_large_room_joins = True
-        self.hs.config.limit_large_room_joins_complexity = 1
 
         u1 = self.register_user("u1", "pass")
 
@@ -110,7 +107,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
             None,
             ["otherserver.example"],
             "roomid",
-            UserID(u1, domain=self.hs.hostname),
+            UserID.from_string(u1),
             {"membership": "join"},
         )
 
@@ -119,13 +116,10 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         # The request failed with a SynapseError saying the resource limit was
         # exceeded.
         f = self.get_failure(d, SynapseError)
-        self.assertEqual(f.value.code, 400)
+        self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def test_join_too_large_once_joined(self):
-
-        self.hs.config.limit_large_room_joins = True
-        self.hs.config.limit_large_room_joins_complexity = 0.05
 
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -138,21 +132,15 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         # scenario.
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
-        # Make more events -- over the threshold
-        for i in range(50):
-            self.helper.send_state(
-                room_1,
-                event_type="m.room.topic",
-                body={"topic": "foo%s" % (i,)},
-                tok=u1_token,
-            )
-
         handler = self.hs.get_room_member_handler()
         fed_transport = self.hs.get_federation_transport_client()
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=defer.succeed(None))
         handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
+
+        # Artificially raise the complexity
+        self.hs.get_datastore().get_state_event_counts = lambda x: defer.succeed(600)
 
         d = handler._remote_join(
             None,

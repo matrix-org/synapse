@@ -598,7 +598,7 @@ class EventsWorkerStore(SQLBaseStore):
         """
         See get_state_event_counts.
         """
-        sql = "SELECT COUNT(*) FROM state_events WHERE room_id=?"
+        sql = "SELECT COUNT(*) FROM current_state_events WHERE room_id=?"
         txn.execute(sql, (room_id,))
         row = txn.fetchone()
         return row[0] if row else 0
