@@ -171,7 +171,7 @@ class EventsWorkerStore(SQLBaseStore):
             allow_rejected (bool): If True return rejected events.
 
         Returns:
-            Deferred[list]: List of events fetched from the database. The
+            Deferred[list[EventBase]]: List of events fetched from the database. The
             events are in the same order as `event_ids` arg.
 
             Note that the returned list may be smaller than the list of event
