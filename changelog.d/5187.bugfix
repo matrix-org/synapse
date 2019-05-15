@@ -1,1 +1,1 @@
-Fix register endpoint returning a previously registered account.
+Fix a bug where the register endpoint would fail with M_THREEPID_IN_USE instead of returning an account previously registered in the same session.
