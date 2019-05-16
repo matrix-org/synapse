@@ -31,6 +31,7 @@ EXIF_TRANSPOSE_MAPPINGS = {
     8: Image.ROTATE_90
 }
 
+
 class Thumbnailer(object):
 
     FORMATS = {
@@ -56,7 +57,7 @@ class Thumbnailer(object):
         """Transpose the image using its EXIF Orientation tag
 
         Returns:
-            Tuple[int, int]: A 2-Tuple containing the new image size (width, height) in pixels.
+            Tuple[int, int]: (width, height) containing the new image size in pixels.
         """
         if self.transpose_method is not None:
             self.image = self.image.transpose(self.transpose_method)
