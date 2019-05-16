@@ -109,7 +109,7 @@ class AggregationPaginationToken(object):
         return "%d-%d" % (self.count, self.stream)
 
 
-class RelationsStore(SQLBaseStore):
+class RelationsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     def get_relations_for_event(
         self,
@@ -318,6 +318,8 @@ class RelationsStore(SQLBaseStore):
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
         )
 
+
+class RelationsStore(RelationsWorkerStore):
     def _handle_event_relations(self, txn, event):
         """Handles inserting relation data during peristence of events
 
