@@ -1012,10 +1012,13 @@ class FederationClient(FederationBase):
                 room_id=room_id
             )
             defer.returnValue(complexity)
-        except CodeMessageException:
+        except CodeMessageException as e:
             # We didn't manage to get it -- probably a 404. We are okay if other
             # servers don't give it to us.
-            pass
+            logger.debug(
+                "Failed to fetch room complexity via %s for %s, got a %d",
+                destination, room_id, e.code
+            )
         except Exception as e:
             logger.exception(
                 "Failed to fetch room complexity via %s for %s: %s",
