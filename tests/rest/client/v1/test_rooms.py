@@ -1004,4 +1004,3 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
 
         res_displayname = channel.json_body["content"]["displayname"]
         self.assertEqual(res_displayname, self.displayname, channel.result)
-
