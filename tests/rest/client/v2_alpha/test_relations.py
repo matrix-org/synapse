@@ -296,7 +296,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/aggregations/m.replaces/%s?limit=1"
+            "/_matrix/client/unstable/rooms/%s/aggregations/%s/m.replace?limit=1"
             % (self.room, self.parent_id),
         )
         self.render(request)

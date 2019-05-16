@@ -131,6 +131,7 @@ class RelationPaginationServlet(RestServlet):
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
+        self.event_handler = hs.get_event_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, parent_id, relation_type=None, event_type=None):
@@ -139,6 +140,10 @@ class RelationPaginationServlet(RestServlet):
         yield self.auth.check_in_room_or_world_readable(
             room_id, requester.user.to_string()
         )
+
+        # This checks that a) the event exists and b) the user is allowed to
+        # view it.
+        yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         limit = parse_integer(request, "limit", default=5)
         from_token = parse_string(request, "from")
@@ -195,6 +200,7 @@ class RelationAggregationPaginationServlet(RestServlet):
         super(RelationAggregationPaginationServlet, self).__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.event_handler = hs.get_event_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, parent_id, relation_type=None, event_type=None):
@@ -203,6 +209,10 @@ class RelationAggregationPaginationServlet(RestServlet):
         yield self.auth.check_in_room_or_world_readable(
             room_id, requester.user.to_string()
         )
+
+        # This checks that a) the event exists and b) the user is allowed to
+        # view it.
+        yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         if relation_type not in (RelationTypes.ANNOTATION, None):
             raise SynapseError(400, "Relation type must be 'annotation'")
@@ -258,6 +268,7 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
+        self.event_handler = hs.get_event_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, parent_id, relation_type, event_type, key):
@@ -266,6 +277,10 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         yield self.auth.check_in_room_or_world_readable(
             room_id, requester.user.to_string()
         )
+
+        # This checks that a) the event exists and b) the user is allowed to
+        # view it.
+        yield self.event_handler.get_event(requester.user, room_id, parent_id)
 
         if relation_type != RelationTypes.ANNOTATION:
             raise SynapseError(400, "Relation type must be 'annotation'")
@@ -293,8 +308,6 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
 
         return_value = result.to_dict()
         return_value["chunk"] = events
-
-        defer.returnValue((200, return_value))
 
         defer.returnValue((200, return_value))
 
