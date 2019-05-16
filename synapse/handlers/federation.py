@@ -1321,7 +1321,6 @@ class FederationHandler(BaseHandler):
                 sender, target, event.room_id,
             )
 
-        FrozenEvent.from_event(event)
         event.unsigned.pop("invite_room_state", None)
         defer.returnValue(event)
 
