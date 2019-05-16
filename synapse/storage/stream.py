@@ -77,6 +77,15 @@ def generate_pagination_where_clause(
 
     would be generated for dir=b, from_token=(6, 7) and to_token=(5, 3).
 
+    Note that tokens are considered to be after the row they are in, e.g. if
+    a row A has a token T, then we consider A to be before T. This covention
+    is important when figuring out inequalities for the generated SQL, and
+    produces the following result:
+        - If paginatiting forwards then we exclude any rows matching the from
+          token, but include those that match the to token.
+        - If paginatiting backwards then we include any rows matching the from
+          token, but include those that match the to token.
+
     Args:
         direction (str): Whether we're paginating backwards("b") or
             forwards ("f").
@@ -131,7 +140,9 @@ def _make_generic_sql_bound(bound, column_names, values, engine):
         names (tuple[str, str]): The column names. Must *not* be user defined
             as these get inserted directly into the SQL statement without
             escapes.
-        values (tuple[int, int]): The values to bound the columns by.
+        values (tuple[int|None, int]): The values to bound the columns by. If
+            the first value is None then only creates a bound on the second
+            column.
         engine: The database engine to generate the SQL for
 
     Returns:
