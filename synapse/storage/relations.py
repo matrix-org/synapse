@@ -21,6 +21,7 @@ from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.stream import generate_pagination_where_clause
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ class AggregationPaginationToken(object):
 
 
 class RelationsStore(SQLBaseStore):
+    @cached(tree=True)
     def get_relations_for_event(
         self,
         event_id,
@@ -216,6 +218,7 @@ class RelationsStore(SQLBaseStore):
             "get_recent_references_for_event", _get_recent_references_for_event_txn
         )
 
+    @cached(tree=True)
     def get_aggregation_groups_for_event(
         self,
         event_id,
@@ -352,4 +355,9 @@ class RelationsStore(SQLBaseStore):
                 "relation_type": rel_type,
                 "aggregation_key": aggregation_key,
             },
+        )
+
+        txn.call_after(self.get_relations_for_event.invalidate_many, (parent_id,))
+        txn.call_after(
+            self.get_aggregation_groups_for_event.invalidate_many, (parent_id,)
         )
