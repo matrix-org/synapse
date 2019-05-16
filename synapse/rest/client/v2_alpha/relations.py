@@ -32,6 +32,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.client.transactions import HttpTransactionCache
+from synapse.storage.relations import AggregationPaginationToken, RelationPaginationToken
 
 from ._base import client_v2_patterns
 
@@ -149,6 +150,12 @@ class RelationPaginationServlet(RestServlet):
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
+        if from_token:
+            from_token = RelationPaginationToken.from_string(from_token)
+
+        if to_token:
+            to_token = RelationPaginationToken.from_string(to_token)
+
         result = yield self.store.get_relations_for_event(
             event_id=parent_id,
             relation_type=relation_type,
@@ -221,6 +228,12 @@ class RelationAggregationPaginationServlet(RestServlet):
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
 
+        if from_token:
+            from_token = AggregationPaginationToken.from_string(from_token)
+
+        if to_token:
+            to_token = AggregationPaginationToken.from_string(to_token)
+
         res = yield self.store.get_aggregation_groups_for_event(
             event_id=parent_id,
             event_type=event_type,
@@ -288,6 +301,12 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         limit = parse_integer(request, "limit", default=5)
         from_token = parse_string(request, "from")
         to_token = parse_string(request, "to")
+
+        if from_token:
+            from_token = RelationPaginationToken.from_string(from_token)
+
+        if to_token:
+            to_token = RelationPaginationToken.from_string(to_token)
 
         result = yield self.store.get_relations_for_event(
             event_id=parent_id,

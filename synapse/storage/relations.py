@@ -54,7 +54,7 @@ class PaginationChunk(object):
         return d
 
 
-@attr.s
+@attr.s(frozen=True, slots=True)
 class RelationPaginationToken(object):
     """Pagination token for relation pagination API.
 
@@ -85,7 +85,7 @@ class RelationPaginationToken(object):
         return attr.astuple(self)
 
 
-@attr.s
+@attr.s(frozen=True, slots=True)
 class AggregationPaginationToken(object):
     """Pagination token for relation aggregation pagination API.
 
@@ -150,12 +150,6 @@ class RelationsWorkerStore(SQLBaseStore):
             Deferred[PaginationChunk]: List of event IDs that match relations
             requested. The rows are of the form `{"event_id": "..."}`.
         """
-
-        if from_token:
-            from_token = RelationPaginationToken.from_string(from_token)
-
-        if to_token:
-            to_token = RelationPaginationToken.from_string(to_token)
 
         where_clause = ["relates_to_id = ?"]
         where_args = [event_id]
@@ -257,12 +251,6 @@ class RelationsWorkerStore(SQLBaseStore):
             Deferred[PaginationChunk]: List of groups of annotations that
             match. Each row is a dict with `type`, `key` and `count` fields.
         """
-
-        if from_token:
-            from_token = AggregationPaginationToken.from_string(from_token)
-
-        if to_token:
-            to_token = AggregationPaginationToken.from_string(to_token)
 
         where_clause = ["relates_to_id = ?", "relation_type = ?"]
         where_args = [event_id, RelationTypes.ANNOTATION]
