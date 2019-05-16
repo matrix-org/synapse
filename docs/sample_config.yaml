@@ -276,6 +276,12 @@ listeners:
 #
 #require_membership_for_aliases: false
 
+# Whether to allow per-room membership profiles through the send of membership
+# events with profile information that differ from the target's global profile.
+# Defaults to 'true'.
+#
+#allow_per_room_profiles: false
+
 
 ## TLS ##
 
