@@ -19,7 +19,6 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.events.utils import serialize_event
 from synapse.streams.config import PaginationConfig
 
 from .base import ClientV1RestServlet, client_path_patterns
@@ -84,6 +83,7 @@ class EventRestServlet(ClientV1RestServlet):
         super(EventRestServlet, self).__init__(hs)
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request, event_id):
@@ -92,7 +92,8 @@ class EventRestServlet(ClientV1RestServlet):
 
         time_now = self.clock.time_msec()
         if event:
-            defer.returnValue((200, serialize_event(event, time_now)))
+            event = yield self._event_serializer.serialize_event(event, time_now)
+            defer.returnValue((200, event))
         else:
             defer.returnValue((404, "Event not found."))
 

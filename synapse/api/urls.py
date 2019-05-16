@@ -22,8 +22,7 @@ from six.moves.urllib.parse import urlencode
 
 from synapse.config import ConfigError
 
-CLIENT_PREFIX = "/_matrix/client/api/v1"
-CLIENT_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha"
+CLIENT_API_PREFIX = "/_matrix/client"
 FEDERATION_PREFIX = "/_matrix/federation"
 FEDERATION_V1_PREFIX = FEDERATION_PREFIX + "/v1"
 FEDERATION_V2_PREFIX = FEDERATION_PREFIX + "/v2"
