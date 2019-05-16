@@ -69,12 +69,22 @@ REQUIREMENTS = [
     "attrs>=17.4.0",
 
     "netaddr>=0.7.18",
+
+    # requests is a transitive dep of treq, and urlib3 is a transitive dep
+    # of requests, as well as of sentry-sdk.
+    #
+    # As of requests 2.21, requests does not yet support urllib3 1.25.
+    # (If we do not pin it here, pip will give us the latest urllib3
+    # due to the dep via sentry-sdk.)
+    "urllib3<1.25",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
     "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
-    "postgres": ["psycopg2>=2.6"],
+
+    # we use execute_batch, which arrived in psycopg 2.7.
+    "postgres": ["psycopg2>=2.7"],
 
     # ConsentResource uses select_autoescape, which arrived in jinja 2.9
     "resources.consent": ["Jinja2>=2.9"],
@@ -84,18 +94,22 @@ CONDITIONAL_REQUIREMENTS = {
     "acme": ["txacme>=0.9.2"],
 
     "saml2": ["pysaml2>=4.5.0"],
+    "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0", "parameterized"],
     "sentry": ["sentry-sdk>=0.7.2"],
 }
 
+ALL_OPTIONAL_REQUIREMENTS = set()
+
+for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
+    # Exclude systemd as it's a system-based requirement.
+    if name not in ["systemd"]:
+        ALL_OPTIONAL_REQUIREMENTS = set(optional_deps) | ALL_OPTIONAL_REQUIREMENTS
+
 
 def list_requirements():
-    deps = set(REQUIREMENTS)
-    for opt in CONDITIONAL_REQUIREMENTS.values():
-        deps = set(opt) | deps
-
-    return list(deps)
+    return list(set(REQUIREMENTS) | ALL_OPTIONAL_REQUIREMENTS)
 
 
 class DependencyException(Exception):

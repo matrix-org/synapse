@@ -18,7 +18,8 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership, RoomVersions
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomID, UserID
 
 from tests import unittest
@@ -49,7 +50,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def inject_room_member(self, room, user, membership, replaces_state=None):
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": EventTypes.Member,
@@ -57,7 +58,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
                 "state_key": user.to_string(),
                 "room_id": room.to_string(),
                 "content": {"membership": membership},
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(

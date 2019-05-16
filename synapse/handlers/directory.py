@@ -19,7 +19,7 @@ import string
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -43,8 +43,10 @@ class DirectoryHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.store = hs.get_datastore()
         self.config = hs.config
         self.enable_room_list_search = hs.config.enable_room_list_search
+        self.require_membership = hs.config.require_membership_for_aliases
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -68,7 +70,7 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            users = yield self.state.get_current_user_in_room(room_id)
+            users = yield self.state.get_current_users_in_room(room_id)
             servers = set(get_domain_from_id(u) for u in users)
 
         if not servers:
@@ -83,7 +85,7 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_association(self, requester, room_alias, room_id, servers=None,
-                           send_event=True):
+                           send_event=True, check_membership=True):
         """Attempt to create a new alias
 
         Args:
@@ -93,12 +95,21 @@ class DirectoryHandler(BaseHandler):
             servers (list[str]|None): List of servers that others servers
                 should try and join via
             send_event (bool): Whether to send an updated m.room.aliases event
+            check_membership (bool): Whether to check if the user is in the room
+                before the alias can be set (if the server's config requires it).
 
         Returns:
             Deferred
         """
 
         user_id = requester.user.to_string()
+
+        if len(room_alias.to_string()) > MAX_ALIAS_LENGTH:
+            raise SynapseError(
+                400,
+                "Can't create aliases longer than %s characters" % MAX_ALIAS_LENGTH,
+                Codes.INVALID_PARAM,
+            )
 
         service = requester.app_service
         if service:
@@ -108,6 +119,14 @@ class DirectoryHandler(BaseHandler):
                     " this kind of alias.", errcode=Codes.EXCLUSIVE
                 )
         else:
+            if self.require_membership and check_membership:
+                rooms_for_user = yield self.store.get_rooms_for_user(user_id)
+                if room_id not in rooms_for_user:
+                    raise AuthError(
+                        403,
+                        "You must be in the room to create an alias for it",
+                    )
+
             if not self.spam_checker.user_may_create_room_alias(user_id, room_alias):
                 raise AuthError(
                     403, "This user is not permitted to create this alias",
@@ -268,7 +287,7 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND
             )
 
-        users = yield self.state.get_current_user_in_room(room_id)
+        users = yield self.state.get_current_users_in_room(room_id)
         extra_servers = set(get_domain_from_id(u) for u in users)
         servers = set(extra_servers) | set(servers)
 

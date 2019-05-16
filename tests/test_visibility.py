@@ -17,7 +17,7 @@ import logging
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import RoomVersions
+from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.visibility import filter_events_for_server
 
@@ -124,7 +124,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def inject_visibility(self, user_id, visibility):
         content = {"history_visibility": visibility}
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": "m.room.history_visibility",
@@ -132,7 +132,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
                 "state_key": "",
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -145,7 +145,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     def inject_room_member(self, user_id, membership="join", extra_content={}):
         content = {"membership": membership}
         content.update(extra_content)
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": "m.room.member",
@@ -153,7 +153,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
                 "state_key": user_id,
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -167,14 +167,14 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     def inject_message(self, user_id, content=None):
         if content is None:
             content = {"body": "testytest", "msgtype": "m.text"}
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": "m.room.message",
                 "sender": user_id,
                 "room_id": TEST_ROOM_ID,
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(

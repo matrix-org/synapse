@@ -33,6 +33,8 @@ from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
+from ._base import BaseHandler
+
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
@@ -70,6 +72,12 @@ class RoomMemberHandler(object):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
+        self._enable_lookup = hs.config.enable_3pid_lookup
+
+        # This is only used to get at ratelimit function, and
+        # maybe_kick_guest_users. It's fine there are multiple of these as
+        # it doesn't store state.
+        self.base_handler = BaseHandler(hs)
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -421,6 +429,9 @@ class RoomMemberHandler(object):
             room_id, latest_event_ids=latest_event_ids,
         )
 
+        # TODO: Refactor into dictionary of explicitly allowed transitions
+        # between old and new state, with specific error messages for some
+        # transitions and generic otherwise
         old_state_id = current_state_ids.get((EventTypes.Member, target.to_string()))
         if old_state_id:
             old_state = yield self.store.get_event(old_state_id, allow_none=True)
@@ -446,6 +457,9 @@ class RoomMemberHandler(object):
                 if same_sender and same_membership and same_content:
                     defer.returnValue(old_state)
 
+            if old_membership in ["ban", "leave"] and action == "kick":
+                raise AuthError(403, "The target user is not in the room")
+
             # we don't allow people to reject invites to the server notice
             # room, but they can leave it once they are joined.
             if (
@@ -459,6 +473,9 @@ class RoomMemberHandler(object):
                         "You cannot reject this invite",
                         errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
                     )
+        else:
+            if action == "kick":
+                raise AuthError(403, "The target user is not in the room")
 
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
 
@@ -693,6 +710,10 @@ class RoomMemberHandler(object):
                     Codes.FORBIDDEN,
                 )
 
+        # We need to rate limit *before* we send out any 3PID invites, so we
+        # can't just rely on the standard ratelimiting of events.
+        yield self.base_handler.ratelimit(requester)
+
         invitee = yield self._lookup_3pid(
             id_server, medium, address
         )
@@ -729,6 +750,10 @@ class RoomMemberHandler(object):
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
+        if not self._enable_lookup:
+            raise SynapseError(
+                403, "Looking up third-party identifiers is denied from this server",
+            )
         try:
             data = yield self.simple_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server,),

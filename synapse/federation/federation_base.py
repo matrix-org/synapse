@@ -20,8 +20,9 @@ import six
 from twisted.internet import defer
 from twisted.internet.defer import DeferredList
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership, RoomVersions
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import event_type_from_format_version
 from synapse.events.utils import prune_event
@@ -268,15 +269,29 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
         for p in pdus_to_check_sender
     ])
 
+    def sender_err(e, pdu_to_check):
+        errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
+            pdu_to_check.pdu.event_id,
+            pdu_to_check.sender_domain,
+            e.getErrorMessage(),
+        )
+        # XX not really sure if these are the right codes, but they are what
+        # we've done for ages
+        raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+
     for p, d in zip(pdus_to_check_sender, more_deferreds):
+        d.addErrback(sender_err, p)
         p.deferreds.append(d)
 
     # now let's look for events where the sender's domain is different to the
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
-    if room_version in (
-        RoomVersions.V1, RoomVersions.V2, RoomVersions.STATE_V2_TEST,
-    ):
+    # (ie, the room version uses old-style non-hash event IDs).
+    v = KNOWN_ROOM_VERSIONS.get(room_version)
+    if not v:
+        raise RuntimeError("Unrecognized room version %s" % (room_version,))
+
+    if v.event_format == EventFormatVersions.V1:
         pdus_to_check_event_id = [
             p for p in pdus_to_check
             if p.sender_domain != get_domain_from_id(p.pdu.event_id)
@@ -287,12 +302,19 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
             for p in pdus_to_check_event_id
         ])
 
+        def event_err(e, pdu_to_check):
+            errmsg = (
+                "event id %s: unable to verify signature for event id domain: %s" % (
+                    pdu_to_check.pdu.event_id,
+                    e.getErrorMessage(),
+                )
+            )
+            # XX as above: not really sure if these are the right codes
+            raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+
         for p, d in zip(pdus_to_check_event_id, more_deferreds):
+            d.addErrback(event_err, p)
             p.deferreds.append(d)
-    elif room_version in (RoomVersions.V3,):
-        pass  # No further checks needed, as event IDs are hashes here
-    else:
-        raise RuntimeError("Unrecognized room version %s" % (room_version,))
 
     # replace lists of deferreds with single Deferreds
     return [_flatten_deferred_list(p.deferreds) for p in pdus_to_check]

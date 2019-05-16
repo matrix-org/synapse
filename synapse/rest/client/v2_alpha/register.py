@@ -31,6 +31,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import (
     RestServlet,
@@ -153,16 +154,18 @@ class UsernameAvailabilityRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
-            # Time window of 2s
-            window_size=2000,
-            # Artificially delay requests if rate > sleep_limit/window_size
-            sleep_limit=1,
-            # Amount of artificial delay to apply
-            sleep_msec=1000,
-            # Error with 429 if more than reject_limit requests are queued
-            reject_limit=1,
-            # Allow 1 request at a time
-            concurrent_requests=1,
+            FederationRateLimitConfig(
+                # Time window of 2s
+                window_size=2000,
+                # Artificially delay requests if rate > sleep_limit/window_size
+                sleep_limit=1,
+                # Amount of artificial delay to apply
+                sleep_msec=1000,
+                # Error with 429 if more than reject_limit requests are queued
+                reject_limit=1,
+                # Allow 1 request at a time
+                concurrent_requests=1,
+            )
         )
 
     @defer.inlineCallbacks
@@ -391,6 +394,13 @@ class RegisterRestServlet(RestServlet):
         # the user-facing checks will probably already have happened in
         # /register/email/requestToken when we requested a 3pid, but that's not
         # guaranteed.
+        #
+        # Also check that we're not trying to register a 3pid that's already
+        # been registered.
+        #
+        # This has probably happened in /register/email/requestToken as well,
+        # but if a user hits this endpoint twice then clicks on each link from
+        # the two activation emails, they would register the same 3pid twice.
 
         if auth_result:
             for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
@@ -404,6 +414,17 @@ class RegisterRestServlet(RestServlet):
                             "Third party identifiers (email/phone numbers)" +
                             " are not authorized on this server",
                             Codes.THREEPID_DENIED,
+                        )
+
+                    existingUid = yield self.store.get_user_id_by_threepid(
+                        medium, address,
+                    )
+
+                    if existingUid is not None:
+                        raise SynapseError(
+                            400,
+                            "%s is already in use" % medium,
+                            Codes.THREEPID_IN_USE,
                         )
 
         if registered_user_id is not None:

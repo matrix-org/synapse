@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2019 New Vector Ltd.
+# Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -190,6 +190,10 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         # away. Unfortunately, Twisted simply throws a generic exception at us
         # in that case.
         logger.warning("Failed to write to consumer: %s %s", type(e), e)
+
+        # Unregister the producer, if it has one, so Twisted doesn't complain
+        if request.producer:
+            request.unregisterProducer()
 
     finish_request(request)
 

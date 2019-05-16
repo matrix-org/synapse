@@ -153,6 +153,7 @@ class RegistrationHandler(BaseHandler):
         user_type=None,
         default_display_name=None,
         address=None,
+        bind_emails=[],
     ):
         """Registers a new client on the server.
 
@@ -171,7 +172,8 @@ class RegistrationHandler(BaseHandler):
               api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
               will be set to this. Defaults to 'localpart'.
-            address (str|None): the IP address used to perform the regitration.
+            address (str|None): the IP address used to perform the registration.
+            bind_emails (List[str]): list of emails to bind to this account.
         Returns:
             A tuple of (user_id, access_token).
         Raises:
@@ -260,6 +262,21 @@ class RegistrationHandler(BaseHandler):
                     attempts += 1
         if not self.hs.config.user_consent_at_registration:
             yield self._auto_join_rooms(user_id)
+
+        # Bind any specified emails to this account
+        current_time = self.hs.get_clock().time_msec()
+        for email in bind_emails:
+            # generate threepid dict
+            threepid_dict = {
+                "medium": "email",
+                "address": email,
+                "validated_at": current_time,
+            }
+
+            # Bind email to new account
+            yield self._register_email_threepid(
+                user_id, threepid_dict, None, False,
+            )
 
         defer.returnValue((user_id, token))
 
@@ -623,7 +640,7 @@ class RegistrationHandler(BaseHandler):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
-            address (str|None): the IP address used to perform the regitration.
+            address (str|None): the IP address used to perform the registration.
 
         Returns:
             Deferred
@@ -721,9 +738,9 @@ class RegistrationHandler(BaseHandler):
             access_token (str|None): The access token of the newly logged in
                 device, or None if `inhibit_login` enabled.
             bind_email (bool): Whether to bind the email with the identity
-                server
+                server.
             bind_msisdn (bool): Whether to bind the msisdn with the identity
-                server
+                server.
         """
         if self.hs.config.worker_app:
             yield self._post_registration_client(
@@ -765,7 +782,7 @@ class RegistrationHandler(BaseHandler):
         """A user consented to the terms on registration
 
         Args:
-            user_id (str): The user ID that consented
+            user_id (str): The user ID that consented.
             consent_version (str): version of the policy the user has
                 consented to.
         """

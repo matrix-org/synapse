@@ -135,7 +135,12 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
 
     @defer.inlineCallbacks
     def _populate_user_directory_process_rooms(self, progress, batch_size):
-
+        """
+        Args:
+            progress (dict)
+            batch_size (int): Maximum number of state events to process
+                per cycle.
+        """
         state = self.hs.get_state_handler()
 
         # If we don't have progress filed, delete everything.
@@ -143,21 +148,20 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             yield self.delete_all_from_user_dir()
 
         def _get_next_batch(txn):
+            # Only fetch 250 rooms, so we don't fetch too many at once, even
+            # if those 250 rooms have less than batch_size state events.
             sql = """
-                SELECT room_id FROM %s
+                SELECT room_id, events FROM %s
                 ORDER BY events DESC
-                LIMIT %s
+                LIMIT 250
             """ % (
                 TEMP_TABLE + "_rooms",
-                str(batch_size),
             )
             txn.execute(sql)
             rooms_to_work_on = txn.fetchall()
 
             if not rooms_to_work_on:
                 return None
-
-            rooms_to_work_on = [x[0] for x in rooms_to_work_on]
 
             # Get how many are left to process, so we can give status on how
             # far we are in processing
@@ -180,7 +184,9 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
             % (len(rooms_to_work_on), progress["remaining"])
         )
 
-        for room_id in rooms_to_work_on:
+        processed_event_count = 0
+
+        for room_id, event_count in rooms_to_work_on:
             is_in_room = yield self.is_host_joined(room_id, self.server_name)
 
             if is_in_room:
@@ -188,7 +194,7 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                     room_id
                 )
 
-                users_with_profile = yield state.get_current_user_in_room(room_id)
+                users_with_profile = yield state.get_current_users_in_room(room_id)
                 user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.
@@ -247,7 +253,13 @@ class UserDirectoryStore(StateDeltasStore, BackgroundUpdateStore):
                 progress,
             )
 
-        defer.returnValue(len(rooms_to_work_on))
+            processed_event_count += event_count
+
+            if processed_event_count > batch_size:
+                # Don't process any more rooms, we've hit our batch size.
+                defer.returnValue(processed_event_count)
+
+        defer.returnValue(processed_event_count)
 
     @defer.inlineCallbacks
     def _populate_user_directory_process_users(self, progress, batch_size):

@@ -9,9 +9,7 @@ from tests.utils import setup_test_homeserver
 class BackgroundUpdateTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        hs = yield setup_test_homeserver(
-            self.addCleanup
-        )
+        hs = yield setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
 

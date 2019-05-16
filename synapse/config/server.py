@@ -17,6 +17,8 @@
 import logging
 import os.path
 
+from netaddr import IPSet
+
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
 
@@ -37,6 +39,7 @@ class ServerConfig(Config):
 
     def read_config(self, config):
         self.server_name = config["server_name"]
+        self.server_context = config.get("server_context", None)
 
         try:
             parse_and_validate_server_name(self.server_name)
@@ -70,6 +73,19 @@ class ServerConfig(Config):
         # doing so ensures that we will not run cache cleanup jobs on the
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
+
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API.
+        self.require_auth_for_profile_requests = config.get(
+            "require_auth_for_profile_requests", False,
+        )
+
+        # If set to 'True', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation.
+        self.restrict_public_rooms_to_local_users = config.get(
+            "restrict_public_rooms_to_local_users", False,
+        )
 
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
@@ -113,13 +129,33 @@ class ServerConfig(Config):
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None
         federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", None
+            "federation_domain_whitelist", None,
         )
-        # turn the whitelist into a hash for speed of lookup
+
         if federation_domain_whitelist is not None:
+            # turn the whitelist into a hash for speed of lookup
             self.federation_domain_whitelist = {}
+
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
+
+        self.federation_ip_range_blacklist = config.get(
+            "federation_ip_range_blacklist", [],
+        )
+
+        # Attempt to create an IPSet from the given ranges
+        try:
+            self.federation_ip_range_blacklist = IPSet(
+                self.federation_ip_range_blacklist
+            )
+
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
+        except Exception as e:
+            raise ConfigError(
+                "Invalid range(s) provided in "
+                "federation_ip_range_blacklist: %s" % e
+            )
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
@@ -130,6 +166,12 @@ class ServerConfig(Config):
         # for testing. The value defines the number of milliseconds to pause before
         # sending out any replication updates.
         self.replication_torture_level = config.get("replication_torture_level")
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to True.
+        self.require_membership_for_aliases = config.get(
+            "require_membership_for_aliases", True,
+        )
 
         self.listeners = []
         for listener in config.get("listeners", []):
@@ -318,6 +360,20 @@ class ServerConfig(Config):
         #
         #use_presence: false
 
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API. Defaults to
+        # 'false'. Note that profile data is also available via the federation
+        # API, so this setting is of limited value if federation is enabled on
+        # the server.
+        #
+        #require_auth_for_profile_requests: true
+
+        # If set to 'true', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation. Defaults to 'false'.
+        #
+        #restrict_public_rooms_to_local_users: true
+
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
         #gc_thresholds: [700, 10, 10]
@@ -349,6 +405,24 @@ class ServerConfig(Config):
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com
+
+        # Prevent federation requests from being sent to the following
+        # blacklist IP address CIDR ranges. If this option is not specified, or
+        # specified with an empty list, no ip range blacklist will be enforced.
+        #
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
+        #
+        federation_ip_range_blacklist:
+          - '127.0.0.0/8'
+          - '10.0.0.0/8'
+          - '172.16.0.0/12'
+          - '192.168.0.0/16'
+          - '100.64.0.0/10'
+          - '169.254.0.0/16'
+          - '::1/128'
+          - 'fe80::/64'
+          - 'fc00::/7'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
@@ -385,8 +459,8 @@ class ServerConfig(Config):
         #
         # Valid resource names are:
         #
-        #   client: the client-server API (/_matrix/client). Also implies 'media' and
-        #       'static'.
+        #   client: the client-server API (/_matrix/client), and the synapse admin
+        #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
         #   consent: user consent forms (/_matrix/consent). See
         #       docs/consent_tracking.md.
@@ -484,6 +558,14 @@ class ServerConfig(Config):
         #mau_limit_reserved_threepids:
         #  - medium: 'email'
         #    address: 'reserved_user@example.com'
+
+        # Used by phonehome stats to group together related servers.
+        #server_context: context
+
+        # Whether to require a user to be in the room to add an alias to it.
+        # Defaults to 'true'.
+        #
+        #require_membership_for_aliases: false
         """ % locals()
 
     def read_arguments(self, args):

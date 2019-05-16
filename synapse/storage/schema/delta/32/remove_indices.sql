@@ -24,13 +24,9 @@ DROP INDEX IF EXISTS state_groups_id; -- Duplicate of PRIMARY KEY
 DROP INDEX IF EXISTS event_to_state_groups_id; -- Duplicate of PRIMARY KEY
 DROP INDEX IF EXISTS event_push_actions_room_id_event_id_user_id_profile_tag; -- Duplicate of UNIQUE CONSTRAINT
 
-DROP INDEX IF EXISTS event_destinations_id; -- Prefix of UNIQUE CONSTRAINT
 DROP INDEX IF EXISTS st_extrem_id; -- Prefix of UNIQUE CONSTRAINT
-DROP INDEX IF EXISTS event_content_hashes_id; -- Prefix of UNIQUE CONSTRAINT
 DROP INDEX IF EXISTS event_signatures_id; -- Prefix of UNIQUE CONSTRAINT
-DROP INDEX IF EXISTS event_edge_hashes_id; -- Prefix of UNIQUE CONSTRAINT
 DROP INDEX IF EXISTS redactions_event_id; -- Duplicate of UNIQUE CONSTRAINT
-DROP INDEX IF EXISTS room_hosts_room_id; -- Prefix of UNIQUE CONSTRAINT
 
 -- The following indices were unused
 DROP INDEX IF EXISTS remote_media_cache_thumbnails_media_id;

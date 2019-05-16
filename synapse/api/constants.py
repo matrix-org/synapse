@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
-# Copyright 2018 New Vector Ltd.
+# Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@
 
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2**63 - 1
+
+# the maximum length for a room alias is 255 characters
+MAX_ALIAS_LENGTH = 255
 
 
 class Membership(object):
@@ -69,6 +72,7 @@ class EventTypes(object):
     Redaction = "m.room.redaction"
     ThirdPartyInvite = "m.room.third_party_invite"
     Encryption = "m.room.encryption"
+    RelatedGroups = "m.room.related_groups"
 
     RoomHistoryVisibility = "m.room.history_visibility"
     CanonicalAlias = "m.room.canonical_alias"
@@ -100,46 +104,6 @@ class RoomCreationPreset(object):
 class ThirdPartyEntityKind(object):
     USER = "user"
     LOCATION = "location"
-
-
-class RoomVersions(object):
-    V1 = "1"
-    V2 = "2"
-    V3 = "3"
-    STATE_V2_TEST = "state-v2-test"
-
-
-class RoomDisposition(object):
-    STABLE = "stable"
-    UNSTABLE = "unstable"
-
-
-# the version we will give rooms which are created on this server
-DEFAULT_ROOM_VERSION = RoomVersions.V1
-
-# vdh-test-version is a placeholder to get room versioning support working and tested
-# until we have a working v2.
-KNOWN_ROOM_VERSIONS = {
-    RoomVersions.V1,
-    RoomVersions.V2,
-    RoomVersions.V3,
-    RoomVersions.STATE_V2_TEST,
-    RoomVersions.V3,
-}
-
-
-class EventFormatVersions(object):
-    """This is an internal enum for tracking the version of the event format,
-    independently from the room version.
-    """
-    V1 = 1
-    V2 = 2
-
-
-KNOWN_EVENT_FORMAT_VERSIONS = {
-    EventFormatVersions.V1,
-    EventFormatVersions.V2,
-}
 
 
 ServerNoticeMsgType = "m.server_notice"

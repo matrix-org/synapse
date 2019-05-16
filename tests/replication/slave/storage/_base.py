@@ -56,7 +56,9 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         client = client_factory.buildProtocol(None)
 
         client.makeConnection(FakeTransport(server, reactor))
-        server.makeConnection(FakeTransport(client, reactor))
+
+        self.server_to_client_transport = FakeTransport(client, reactor)
+        server.makeConnection(self.server_to_client_transport)
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then
@@ -69,6 +71,21 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         master_result = self.get_success(getattr(self.master_store, method)(*args))
         slaved_result = self.get_success(getattr(self.slaved_store, method)(*args))
         if expected_result is not None:
-            self.assertEqual(master_result, expected_result)
-            self.assertEqual(slaved_result, expected_result)
-        self.assertEqual(master_result, slaved_result)
+            self.assertEqual(
+                master_result,
+                expected_result,
+                "Expected master result to be %r but was %r"
+                % (expected_result, master_result),
+            )
+            self.assertEqual(
+                slaved_result,
+                expected_result,
+                "Expected slave result to be %r but was %r"
+                % (expected_result, slaved_result),
+            )
+        self.assertEqual(
+            master_result,
+            slaved_result,
+            "Slave result %r does not match master result %r"
+            % (slaved_result, master_result),
+        )

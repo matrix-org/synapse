@@ -18,7 +18,6 @@ import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
 
-
 class HomeServer(object):
     @property
     def config(self) -> synapse.config.homeserver.HomeServerConfig:

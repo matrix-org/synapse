@@ -18,7 +18,8 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership, RoomVersions
+from synapse.api.constants import EventTypes, Membership
+from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomID, UserID
 
 from tests import unittest
@@ -51,7 +52,7 @@ class RedactionTestCase(unittest.TestCase):
     ):
         content = {"membership": membership}
         content.update(extra_content)
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": EventTypes.Member,
@@ -59,7 +60,7 @@ class RedactionTestCase(unittest.TestCase):
                 "state_key": user.to_string(),
                 "room_id": room.to_string(),
                 "content": content,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -74,7 +75,7 @@ class RedactionTestCase(unittest.TestCase):
     def inject_message(self, room, user, body):
         self.depth += 1
 
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": EventTypes.Message,
@@ -82,7 +83,7 @@ class RedactionTestCase(unittest.TestCase):
                 "state_key": user.to_string(),
                 "room_id": room.to_string(),
                 "content": {"body": body, "msgtype": u"message"},
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(
@@ -95,7 +96,7 @@ class RedactionTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def inject_redaction(self, room, event_id, user, reason):
-        builder = self.event_builder_factory.new(
+        builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
                 "type": EventTypes.Redaction,
@@ -104,7 +105,7 @@ class RedactionTestCase(unittest.TestCase):
                 "room_id": room.to_string(),
                 "content": {"reason": reason},
                 "redacts": event_id,
-            }
+            },
         )
 
         event, context = yield self.event_creation_handler.create_new_client_event(

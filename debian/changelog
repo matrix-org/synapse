@@ -1,8 +1,34 @@
-matrix-synapse-py3 (0.99.3) UNRELEASED; urgency=medium
+matrix-synapse-py3 (0.99.4) stable; urgency=medium
 
+  [ Christoph Müller ]
+  * Configure the systemd units to have a log identifier of `matrix-synapse`
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.4.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 15 May 2019 13:58:08 +0100
+
+matrix-synapse-py3 (0.99.3.2) stable; urgency=medium
+
+  * New synapse release 0.99.3.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 18:56:20 +0100
+
+matrix-synapse-py3 (0.99.3.1) stable; urgency=medium
+
+  * New synapse release 0.99.3.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 May 2019 16:02:43 +0100
+
+matrix-synapse-py3 (0.99.3) stable; urgency=medium
+
+  [ Richard van der Hoff ]
   * Fix warning during preconfiguration. (Fixes: #4819)
 
- -- Richard van der Hoff <richard@matrix.org>  Thu, 07 Mar 2019 07:17:00 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 01 Apr 2019 12:48:21 +0000
 
 matrix-synapse-py3 (0.99.2) stable; urgency=medium
 

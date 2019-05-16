@@ -38,16 +38,12 @@ logger = logging.getLogger(__name__)
 
 
 _TransactionRow = namedtuple(
-    "_TransactionRow", (
-        "id", "transaction_id", "destination", "ts", "response_code",
-        "response_json",
-    )
+    "_TransactionRow",
+    ("id", "transaction_id", "destination", "ts", "response_code", "response_json"),
 )
 
 _UpdateTransactionRow = namedtuple(
-    "_TransactionRow", (
-        "response_code", "response_json",
-    )
+    "_TransactionRow", ("response_code", "response_json")
 )
 
 SENTINEL = object()
@@ -84,19 +80,22 @@ class TransactionStore(SQLBaseStore):
 
         return self.runInteraction(
             "get_received_txn_response",
-            self._get_received_txn_response, transaction_id, origin
+            self._get_received_txn_response,
+            transaction_id,
+            origin,
         )
 
     def _get_received_txn_response(self, txn, transaction_id, origin):
         result = self._simple_select_one_txn(
             txn,
             table="received_transactions",
-            keyvalues={
-                "transaction_id": transaction_id,
-                "origin": origin,
-            },
+            keyvalues={"transaction_id": transaction_id, "origin": origin},
             retcols=(
-                "transaction_id", "origin", "ts", "response_code", "response_json",
+                "transaction_id",
+                "origin",
+                "ts",
+                "response_code",
+                "response_json",
                 "has_been_referenced",
             ),
             allow_none=True,
@@ -108,8 +107,7 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_received_txn_response(self, transaction_id, origin, code,
-                                  response_dict):
+    def set_received_txn_response(self, transaction_id, origin, code, response_dict):
         """Persist the response we returened for an incoming transaction, and
         should return for subsequent transactions with the same transaction_id
         and origin.
@@ -135,8 +133,7 @@ class TransactionStore(SQLBaseStore):
             desc="set_received_txn_response",
         )
 
-    def prep_send_transaction(self, transaction_id, destination,
-                              origin_server_ts):
+    def prep_send_transaction(self, transaction_id, destination, origin_server_ts):
         """Persists an outgoing transaction and calculates the values for the
         previous transaction id list.
 
@@ -182,7 +179,9 @@ class TransactionStore(SQLBaseStore):
 
         result = yield self.runInteraction(
             "get_destination_retry_timings",
-            self._get_destination_retry_timings, destination)
+            self._get_destination_retry_timings,
+            destination,
+        )
 
         # We don't hugely care about race conditions between getting and
         # invalidating the cache, since we time out fairly quickly anyway.
@@ -193,9 +192,7 @@ class TransactionStore(SQLBaseStore):
         result = self._simple_select_one_txn(
             txn,
             table="destinations",
-            keyvalues={
-                "destination": destination,
-            },
+            keyvalues={"destination": destination},
             retcols=("destination", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
@@ -205,8 +202,7 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_destination_retry_timings(self, destination,
-                                      retry_last_ts, retry_interval):
+    def set_destination_retry_timings(self, destination, retry_last_ts, retry_interval):
         """Sets the current retry timings for a given destination.
         Both timings should be zero if retrying is no longer occuring.
 
@@ -225,8 +221,9 @@ class TransactionStore(SQLBaseStore):
             retry_interval,
         )
 
-    def _set_destination_retry_timings(self, txn, destination,
-                                       retry_last_ts, retry_interval):
+    def _set_destination_retry_timings(
+        self, txn, destination, retry_last_ts, retry_interval
+    ):
         self.database_engine.lock_table(txn, "destinations")
 
         # We need to be careful here as the data may have changed from under us
@@ -235,9 +232,7 @@ class TransactionStore(SQLBaseStore):
         prev_row = self._simple_select_one_txn(
             txn,
             table="destinations",
-            keyvalues={
-                "destination": destination,
-            },
+            keyvalues={"destination": destination},
             retcols=("retry_last_ts", "retry_interval"),
             allow_none=True,
         )
@@ -250,15 +245,13 @@ class TransactionStore(SQLBaseStore):
                     "destination": destination,
                     "retry_last_ts": retry_last_ts,
                     "retry_interval": retry_interval,
-                }
+                },
             )
         elif retry_interval == 0 or prev_row["retry_interval"] < retry_interval:
             self._simple_update_one_txn(
                 txn,
                 "destinations",
-                keyvalues={
-                    "destination": destination,
-                },
+                keyvalues={"destination": destination},
                 updatevalues={
                     "retry_last_ts": retry_last_ts,
                     "retry_interval": retry_interval,
@@ -273,8 +266,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         return self.runInteraction(
-            "get_destinations_needing_retry",
-            self._get_destinations_needing_retry
+            "get_destinations_needing_retry", self._get_destinations_needing_retry
         )
 
     def _get_destinations_needing_retry(self, txn):
@@ -288,7 +280,7 @@ class TransactionStore(SQLBaseStore):
 
     def _start_cleanup_transactions(self):
         return run_as_background_process(
-            "cleanup_transactions", self._cleanup_transactions,
+            "cleanup_transactions", self._cleanup_transactions
         )
 
     def _cleanup_transactions(self):

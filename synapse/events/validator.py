@@ -15,8 +15,9 @@
 
 from six import string_types
 
-from synapse.api.constants import EventFormatVersions, EventTypes, Membership
-from synapse.api.errors import SynapseError
+from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
+from synapse.api.errors import Codes, SynapseError
+from synapse.api.room_versions import EventFormatVersions
 from synapse.types import EventID, RoomID, UserID
 
 
@@ -54,6 +55,17 @@ class EventValidator(object):
         for s in event_strings:
             if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "'%s' not a string type" % (s,))
+
+        if event.type == EventTypes.Aliases:
+            if "aliases" in event.content:
+                for alias in event.content["aliases"]:
+                    if len(alias) > MAX_ALIAS_LENGTH:
+                        raise SynapseError(
+                            400,
+                            ("Can't create aliases longer than"
+                             " %d characters" % (MAX_ALIAS_LENGTH,)),
+                            Codes.INVALID_PARAM,
+                        )
 
     def validate_builder(self, event):
         """Validates that the builder/event has roughly the right format. Only

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class DevicesRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/devices$", v2_alpha=False)
+    PATTERNS = client_v2_patterns("/devices$")
 
     def __init__(self, hs):
         """
@@ -56,7 +56,7 @@ class DeleteDevicesRestServlet(RestServlet):
     API for bulk deletion of devices. Accepts a JSON object with a devices
     key which lists the device_ids to delete. Requires user interactive auth.
     """
-    PATTERNS = client_v2_patterns("/delete_devices", v2_alpha=False)
+    PATTERNS = client_v2_patterns("/delete_devices")
 
     def __init__(self, hs):
         super(DeleteDevicesRestServlet, self).__init__()
@@ -95,7 +95,7 @@ class DeleteDevicesRestServlet(RestServlet):
 
 
 class DeviceRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$", v2_alpha=False)
+    PATTERNS = client_v2_patterns("/devices/(?P<device_id>[^/]*)$")
 
     def __init__(self, hs):
         """

@@ -90,8 +90,8 @@ class BaseHandler(object):
             messages_per_second = override.messages_per_second
             burst_count = override.burst_count
         else:
-            messages_per_second = self.hs.config.rc_messages_per_second
-            burst_count = self.hs.config.rc_message_burst_count
+            messages_per_second = self.hs.config.rc_message.per_second
+            burst_count = self.hs.config.rc_message.burst_count
 
         allowed, time_allowed = self.ratelimiter.can_do_action(
             user_id, time_now,

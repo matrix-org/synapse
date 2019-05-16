@@ -1,1 +1,0 @@
-'event_id' is now a required parameter in federated state requests, as per the matrix spec.

@@ -21,8 +21,8 @@ import re
 from twisted.internet import defer
 
 import synapse
-from synapse.api.constants import RoomVersions
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
+from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_V1_PREFIX, FEDERATION_V2_PREFIX
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
@@ -63,11 +63,7 @@ class TransportLayerServer(JsonResource):
         self.authenticator = Authenticator(hs)
         self.ratelimiter = FederationRateLimiter(
             self.clock,
-            window_size=hs.config.federation_rc_window_size,
-            sleep_limit=hs.config.federation_rc_sleep_limit,
-            sleep_msec=hs.config.federation_rc_sleep_delay,
-            reject_limit=hs.config.federation_rc_reject_limit,
-            concurrent_requests=hs.config.federation_rc_concurrent,
+            config=hs.config.rc_federation,
         )
 
         self.register_servlets()
@@ -312,7 +308,7 @@ class BaseFederationServlet(object):
 
 
 class FederationSendServlet(BaseFederationServlet):
-    PATH = "/send/(?P<transaction_id>[^/]*)/"
+    PATH = "/send/(?P<transaction_id>[^/]*)/?"
 
     def __init__(self, handler, server_name, **kwargs):
         super(FederationSendServlet, self).__init__(
@@ -378,7 +374,7 @@ class FederationSendServlet(BaseFederationServlet):
 
 
 class FederationEventServlet(BaseFederationServlet):
-    PATH = "/event/(?P<event_id>[^/]*)/"
+    PATH = "/event/(?P<event_id>[^/]*)/?"
 
     # This is when someone asks for a data item for a given server data_id pair.
     def on_GET(self, origin, content, query, event_id):
@@ -386,7 +382,7 @@ class FederationEventServlet(BaseFederationServlet):
 
 
 class FederationStateServlet(BaseFederationServlet):
-    PATH = "/state/(?P<context>[^/]*)/"
+    PATH = "/state/(?P<context>[^/]*)/?"
 
     # This is when someone asks for all data for a given context.
     def on_GET(self, origin, content, query, context):
@@ -398,7 +394,7 @@ class FederationStateServlet(BaseFederationServlet):
 
 
 class FederationStateIdsServlet(BaseFederationServlet):
-    PATH = "/state_ids/(?P<room_id>[^/]*)/"
+    PATH = "/state_ids/(?P<room_id>[^/]*)/?"
 
     def on_GET(self, origin, content, query, room_id):
         return self.handler.on_state_ids_request(
@@ -409,7 +405,7 @@ class FederationStateIdsServlet(BaseFederationServlet):
 
 
 class FederationBackfillServlet(BaseFederationServlet):
-    PATH = "/backfill/(?P<context>[^/]*)/"
+    PATH = "/backfill/(?P<context>[^/]*)/?"
 
     def on_GET(self, origin, content, query, context):
         versions = [x.decode('ascii') for x in query[b"v"]]
@@ -513,7 +509,7 @@ class FederationV1InviteServlet(BaseFederationServlet):
         # state resolution algorithm, and we don't use that for processing
         # invites
         content = yield self.handler.on_invite_request(
-            origin, content, room_version=RoomVersions.V1,
+            origin, content, room_version=RoomVersions.V1.identifier,
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
@@ -716,8 +712,17 @@ class PublicRoomList(BaseFederationServlet):
 
     PATH = "/publicRooms"
 
+    def __init__(self, handler, authenticator, ratelimiter, server_name, deny_access):
+        super(PublicRoomList, self).__init__(
+            handler, authenticator, ratelimiter, server_name,
+        )
+        self.deny_access = deny_access
+
     @defer.inlineCallbacks
     def on_GET(self, origin, content, query):
+        if self.deny_access:
+            raise FederationDeniedError(origin)
+
         limit = parse_integer_from_args(query, "limit", 0)
         since_token = parse_string_from_args(query, "since", None)
         include_all_networks = parse_boolean_from_args(
@@ -1080,7 +1085,7 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
     """Get all categories for a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/categories/"
+        "/groups/(?P<group_id>[^/]*)/categories/?"
     )
 
     @defer.inlineCallbacks
@@ -1150,7 +1155,7 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
     """Get roles in a group
     """
     PATH = (
-        "/groups/(?P<group_id>[^/]*)/roles/"
+        "/groups/(?P<group_id>[^/]*)/roles/?"
     )
 
     @defer.inlineCallbacks
@@ -1417,6 +1422,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
+                deny_access=hs.config.restrict_public_rooms_to_local_users,
             ).register(resource)
 
     if "group_server" in servlet_groups:

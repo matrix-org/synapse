@@ -12,9 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from synapse.api.constants import DEFAULT_ROOM_VERSION, KNOWN_ROOM_VERSIONS
-from synapse.rest.client.v1 import admin, login
+import synapse.rest.admin
+from synapse.api.room_versions import DEFAULT_ROOM_VERSION, KNOWN_ROOM_VERSIONS
+from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import capabilities
 
 from tests import unittest
@@ -23,7 +23,7 @@ from tests import unittest
 class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         capabilities.register_servlets,
         login.register_servlets,
     ]
@@ -52,7 +52,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         for room_version in capabilities['m.room_versions']['available'].keys():
             self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
         self.assertEqual(
-            DEFAULT_ROOM_VERSION, capabilities['m.room_versions']['default']
+            DEFAULT_ROOM_VERSION.identifier, capabilities['m.room_versions']['default']
         )
 
     def test_get_change_password_capabilities(self):

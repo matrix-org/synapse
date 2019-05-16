@@ -16,8 +16,8 @@
 
 from twisted.internet.defer import succeed
 
+import synapse.rest.admin
 from synapse.api.constants import LoginType
-from synapse.rest.client.v1 import admin
 from synapse.rest.client.v2_alpha import auth, register
 
 from tests import unittest
@@ -27,7 +27,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
     servlets = [
         auth.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         register.register_servlets,
     ]
     hijack_auth = False
@@ -36,9 +36,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
         config = self.default_config()
 
-        config.enable_registration_captcha = True
-        config.recaptcha_public_key = "brokencake"
-        config.registrations_require_3pid = []
+        config["enable_registration_captcha"] = True
+        config["recaptcha_public_key"] = "brokencake"
+        config["registrations_require_3pid"] = []
 
         hs = self.setup_test_homeserver(config=config)
         return hs

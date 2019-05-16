@@ -42,8 +42,8 @@ indicate which side is sending, these are *not* included on the wire::
     > POSITION backfill 1
     > POSITION caches 1
     > RDATA caches 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
-    > RDATA events 14 ["$149019767112vOHxz:localhost:8823",
-        "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]
+    > RDATA events 14 ["ev", ["$149019767112vOHxz:localhost:8823",
+        "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]]
     < PING 1490197675618
     > ERROR server stopping
     * connection closed by server *
@@ -375,8 +375,11 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             self.transport.unregisterProducer()
 
     def __str__(self):
+        addr = None
+        if self.transport:
+            addr = str(self.transport.getPeer())
         return "ReplicationConnection<name=%s,conn_id=%s,addr=%s>" % (
-            self.name, self.conn_id, self.addr,
+            self.name, self.conn_id, addr,
         )
 
     def id(self):
@@ -392,12 +395,11 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     VALID_INBOUND_COMMANDS = VALID_CLIENT_COMMANDS
     VALID_OUTBOUND_COMMANDS = VALID_SERVER_COMMANDS
 
-    def __init__(self, server_name, clock, streamer, addr):
+    def __init__(self, server_name, clock, streamer):
         BaseReplicationStreamProtocol.__init__(self, clock)  # Old style class
 
         self.server_name = server_name
         self.streamer = streamer
-        self.addr = addr
 
         # The streams the client has subscribed to and is up to date with
         self.replication_streams = set()
@@ -603,7 +605,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         inbound_rdata_count.labels(stream_name).inc()
 
         try:
-            row = STREAMS_MAP[stream_name].ROW_TYPE(*cmd.row)
+            row = STREAMS_MAP[stream_name].parse_row(cmd.row)
         except Exception:
             logger.exception(
                 "[%s] Failed to parse RDATA: %r %r",

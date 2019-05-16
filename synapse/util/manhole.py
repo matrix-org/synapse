@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,10 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
+import traceback
 
 from twisted.conch import manhole_ssh
 from twisted.conch.insults import insults
-from twisted.conch.manhole import ColoredManhole
+from twisted.conch.manhole import ColoredManhole, ManholeInterpreter
 from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
 
@@ -79,7 +82,7 @@ def manhole(username, password, globals):
 
     rlm = manhole_ssh.TerminalRealm()
     rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(
-        ColoredManhole,
+        SynapseManhole,
         dict(globals, __name__="__console__")
     )
 
@@ -88,3 +91,55 @@ def manhole(username, password, globals):
     factory.privateKeys[b'ssh-rsa'] = Key.fromString(PRIVATE_KEY)
 
     return factory
+
+
+class SynapseManhole(ColoredManhole):
+    """Overrides connectionMade to create our own ManholeInterpreter"""
+    def connectionMade(self):
+        super(SynapseManhole, self).connectionMade()
+
+        # replace the manhole interpreter with our own impl
+        self.interpreter = SynapseManholeInterpreter(self, self.namespace)
+
+        # this would also be a good place to add more keyHandlers.
+
+
+class SynapseManholeInterpreter(ManholeInterpreter):
+    def showsyntaxerror(self, filename=None):
+        """Display the syntax error that just occurred.
+
+        Overrides the base implementation, ignoring sys.excepthook. We always want
+        any syntax errors to be sent to the terminal, rather than sentry.
+        """
+        type, value, tb = sys.exc_info()
+        sys.last_type = type
+        sys.last_value = value
+        sys.last_traceback = tb
+        if filename and type is SyntaxError:
+            # Work hard to stuff the correct filename in the exception
+            try:
+                msg, (dummy_filename, lineno, offset, line) = value.args
+            except ValueError:
+                # Not the format we expect; leave it alone
+                pass
+            else:
+                # Stuff in the right filename
+                value = SyntaxError(msg, (filename, lineno, offset, line))
+                sys.last_value = value
+        lines = traceback.format_exception_only(type, value)
+        self.write(''.join(lines))
+
+    def showtraceback(self):
+        """Display the exception that just occurred.
+
+        Overrides the base implementation, ignoring sys.excepthook. We always want
+        any syntax errors to be sent to the terminal, rather than sentry.
+        """
+        sys.last_type, sys.last_value, last_tb = ei = sys.exc_info()
+        sys.last_traceback = last_tb
+        try:
+            # We remove the first stack item because it is our own code.
+            lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
+            self.write(''.join(lines))
+        finally:
+            last_tb = ei = None

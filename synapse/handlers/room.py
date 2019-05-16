@@ -25,14 +25,9 @@ from six import iteritems, string_types
 
 from twisted.internet import defer
 
-from synapse.api.constants import (
-    DEFAULT_ROOM_VERSION,
-    KNOWN_ROOM_VERSIONS,
-    EventTypes,
-    JoinRules,
-    RoomCreationPreset,
-)
+from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.room_versions import DEFAULT_ROOM_VERSION, KNOWN_ROOM_VERSIONS
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
@@ -285,6 +280,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.RoomAvatar, ""),
             (EventTypes.Encryption, ""),
             (EventTypes.ServerACL, ""),
+            (EventTypes.RelatedGroups, ""),
         )
 
         old_room_state_ids = yield self.store.get_filtered_current_state_ids(
@@ -406,7 +402,7 @@ class RoomCreationHandler(BaseHandler):
                 yield directory_handler.create_association(
                     requester, RoomAlias.from_string(alias),
                     new_room_id, servers=(self.hs.hostname, ),
-                    send_event=False,
+                    send_event=False, check_membership=False,
                 )
                 logger.info("Moved alias %s to new room", alias)
             except SynapseError as e:
@@ -479,7 +475,7 @@ class RoomCreationHandler(BaseHandler):
         if ratelimit:
             yield self.ratelimit(requester)
 
-        room_version = config.get("room_version", DEFAULT_ROOM_VERSION)
+        room_version = config.get("room_version", DEFAULT_ROOM_VERSION.identifier)
         if not isinstance(room_version, string_types):
             raise SynapseError(
                 400,
@@ -542,6 +538,7 @@ class RoomCreationHandler(BaseHandler):
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
                 send_event=False,
+                check_membership=False,
             )
 
         preset_config = config.get(

@@ -35,6 +35,7 @@ from synapse.crypto import context_factory
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
+from synapse.events.utils import EventClientSerializer
 from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
@@ -47,6 +48,7 @@ from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler
 from synapse.handlers import Handlers
+from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
@@ -183,6 +185,8 @@ class HomeServer(object):
         'room_context_handler',
         'sendmail',
         'registration_handler',
+        'account_validity_handler',
+        'event_client_serializer',
     ]
 
     REQUIRED_ON_MASTER_STARTUP = [
@@ -505,6 +509,12 @@ class HomeServer(object):
 
     def build_registration_handler(self):
         return RegistrationHandler(self)
+
+    def build_account_validity_handler(self):
+        return AccountValidityHandler(self)
+
+    def build_event_client_serializer(self):
+        return EventClientSerializer(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

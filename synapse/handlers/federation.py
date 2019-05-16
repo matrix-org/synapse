@@ -29,13 +29,7 @@ from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
-from synapse.api.constants import (
-    KNOWN_ROOM_VERSIONS,
-    EventTypes,
-    Membership,
-    RejectedReason,
-    RoomVersions,
-)
+from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -44,6 +38,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
 from synapse.events.validator import EventValidator
@@ -1733,7 +1728,9 @@ class FederationHandler(BaseHandler):
             # invalid, and it would fail auth checks anyway.
             raise SynapseError(400, "No create event in state")
 
-        room_version = create_event.content.get("room_version", RoomVersions.V1)
+        room_version = create_event.content.get(
+            "room_version", RoomVersions.V1.identifier,
+        )
 
         missing_auth_events = set()
         for e in itertools.chain(auth_events, state, [event]):

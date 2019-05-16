@@ -21,10 +21,29 @@ logger = logging.getLogger(__name__)
 
 
 class StateDeltasStore(SQLBaseStore):
-
     def get_current_state_deltas(self, prev_stream_id):
+        """Fetch a list of room state changes since the given stream id
+
+        Each entry in the result contains the following fields:
+            - stream_id (int)
+            - room_id (str)
+            - type (str): event type
+            - state_key (str):
+            - event_id (str|None): new event_id for this state key. None if the
+                state has been deleted.
+            - prev_event_id (str|None): previous event_id for this state key. None
+                if it's new state.
+
+        Args:
+            prev_stream_id (int): point to get changes since (exclusive)
+
+        Returns:
+            Deferred[list[dict]]: results
+        """
         prev_stream_id = int(prev_stream_id)
-        if not self._curr_state_delta_stream_cache.has_any_entity_changed(prev_stream_id):
+        if not self._curr_state_delta_stream_cache.has_any_entity_changed(
+            prev_stream_id
+        ):
             return []
 
         def get_current_state_deltas_txn(txn):
@@ -58,7 +77,7 @@ class StateDeltasStore(SQLBaseStore):
                 WHERE ? < stream_id AND stream_id <= ?
                 ORDER BY stream_id ASC
             """
-            txn.execute(sql, (prev_stream_id, max_stream_id,))
+            txn.execute(sql, (prev_stream_id, max_stream_id))
             return self.cursor_to_dict(txn)
 
         return self.runInteraction(

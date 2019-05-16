@@ -17,8 +17,8 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import KNOWN_ROOM_VERSIONS
 from synapse.api.errors import Codes, SynapseError
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -50,7 +50,6 @@ class RoomUpgradeRestServlet(RestServlet):
     PATTERNS = client_v2_patterns(
         # /rooms/$roomid/upgrade
         "/rooms/(?P<room_id>[^/]*)/upgrade$",
-        v2_alpha=False,
     )
 
     def __init__(self, hs):

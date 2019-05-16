@@ -21,7 +21,6 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
-from synapse.events.utils import serialize_event
 from synapse.types import UserID
 from synapse.util.logutils import log_function
 from synapse.visibility import filter_events_for_client
@@ -50,6 +49,7 @@ class EventStreamHandler(BaseHandler):
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
         self._server_notices_sender = hs.get_server_notices_sender()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     @log_function
@@ -102,7 +102,7 @@ class EventStreamHandler(BaseHandler):
                     # Send down presence.
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
-                        users = yield self.state.get_current_user_in_room(event.room_id)
+                        users = yield self.state.get_current_users_in_room(event.room_id)
                         states = yield presence_handler.get_states(
                             users,
                             as_event=True,
@@ -120,9 +120,9 @@ class EventStreamHandler(BaseHandler):
 
             time_now = self.clock.time_msec()
 
-            chunks = [
-                serialize_event(e, time_now, as_client_event) for e in events
-            ]
+            chunks = yield self._event_serializer.serialize_events(
+                events, time_now, as_client_event=as_client_event,
+            )
 
             chunk = {
                 "chunk": chunks,

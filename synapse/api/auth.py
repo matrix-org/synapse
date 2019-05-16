@@ -64,6 +64,8 @@ class Auth(object):
         self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
         register_cache("cache", "token_cache", self.token_cache)
 
+        self._account_validity = hs.config.account_validity
+
     @defer.inlineCallbacks
     def check_from_context(self, room_version, event, context, do_sig_check=True):
         prev_state_ids = yield context.get_prev_state_ids(self.store)
@@ -225,6 +227,17 @@ class Auth(object):
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
+
+            # Deny the request if the user account has expired.
+            if self._account_validity.enabled:
+                user_id = user.to_string()
+                expiration_ts = yield self.store.get_expiration_ts_for_user(user_id)
+                if expiration_ts is not None and self.clock.time_msec() >= expiration_ts:
+                    raise AuthError(
+                        403,
+                        "User account has expired",
+                        errcode=Codes.EXPIRED_ACCOUNT,
+                    )
 
             # device_id may not be present if get_user_by_access_token has been
             # stubbed out.
@@ -543,7 +556,7 @@ class Auth(object):
         """ Check if the given user is a local server admin.
 
         Args:
-            user (str): mxid of user to check
+            user (UserID): user to check
 
         Returns:
             bool: True if the user is an admin
@@ -621,13 +634,13 @@ class Auth(object):
 
         Returns:
             True if the the sender is allowed to redact the target event if the
-            target event was created by them.
+                target event was created by them.
             False if the sender is allowed to redact the target event with no
-            further checks.
+                further checks.
 
         Raises:
             AuthError if the event sender is definitely not allowed to redact
-            the target event.
+                the target event.
         """
         return event_auth.check_redaction(room_version, event, auth_events)
 
@@ -743,9 +756,9 @@ class Auth(object):
 
         Returns:
             Deferred[tuple[str, str|None]]: Resolves to the current membership of
-            the user in the room and the membership event ID of the user. If
-            the user is not in the room and never has been, then
-            `(Membership.JOIN, None)` is returned.
+                the user in the room and the membership event ID of the user. If
+                the user is not in the room and never has been, then
+                `(Membership.JOIN, None)` is returned.
         """
 
         try:
@@ -777,13 +790,13 @@ class Auth(object):
 
         Args:
             user_id(str|None): If present, checks for presence against existing
-            MAU cohort
+                MAU cohort
 
             threepid(dict|None): If present, checks for presence against configured
-            reserved threepid. Used in cases where the user is trying register
-            with a MAU blocked server, normally they would be rejected but their
-            threepid is on the reserved list. user_id and
-            threepid should never be set at the same time.
+                reserved threepid. Used in cases where the user is trying register
+                with a MAU blocked server, normally they would be rejected but their
+                threepid is on the reserved list. user_id and
+                threepid should never be set at the same time.
         """
 
         # Never fail an auth check for the server notices users or support user
