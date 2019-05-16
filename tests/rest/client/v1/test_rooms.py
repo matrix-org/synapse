@@ -984,7 +984,9 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
         request_data = json.dumps(data)
         request, channel = self.make_request(
             "PUT",
-            "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (self.room_id, self.user_id),
+            "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (
+                self.room_id, self.user_id,
+            ),
             request_data,
             access_token=self.tok,
         )
