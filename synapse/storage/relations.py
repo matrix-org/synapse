@@ -81,6 +81,9 @@ class RelationPaginationToken(object):
     def to_string(self):
         return "%d-%d" % (self.topological, self.stream)
 
+    def as_tuple(self):
+        return attr.astuple(self)
+
 
 @attr.s
 class AggregationPaginationToken(object):
@@ -107,6 +110,9 @@ class AggregationPaginationToken(object):
 
     def to_string(self):
         return "%d-%d" % (self.count, self.stream)
+
+    def as_tuple(self):
+        return attr.astuple(self)
 
 
 class RelationsWorkerStore(SQLBaseStore):
