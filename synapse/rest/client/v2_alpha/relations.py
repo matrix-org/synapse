@@ -23,7 +23,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -32,6 +32,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.client.transactions import HttpTransactionCache
+from synapse.storage.relations import AggregationPaginationToken, RelationPaginationToken
 
 from ._base import client_v2_patterns
 
@@ -131,6 +132,7 @@ class RelationPaginationServlet(RestServlet):
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
+        self.event_handler = hs.get_event_handler()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, parent_id, relation_type=None, event_type=None):
@@ -140,13 +142,180 @@ class RelationPaginationServlet(RestServlet):
             room_id, requester.user.to_string()
         )
 
+        # This checks that a) the event exists and b) the user is allowed to
+        # view it.
+        yield self.event_handler.get_event(requester.user, room_id, parent_id)
+
         limit = parse_integer(request, "limit", default=5)
+        from_token = parse_string(request, "from")
+        to_token = parse_string(request, "to")
+
+        if from_token:
+            from_token = RelationPaginationToken.from_string(from_token)
+
+        if to_token:
+            to_token = RelationPaginationToken.from_string(to_token)
 
         result = yield self.store.get_relations_for_event(
             event_id=parent_id,
             relation_type=relation_type,
             event_type=event_type,
             limit=limit,
+            from_token=from_token,
+            to_token=to_token,
+        )
+
+        events = yield self.store.get_events_as_list(
+            [c["event_id"] for c in result.chunk]
+        )
+
+        now = self.clock.time_msec()
+        events = yield self._event_serializer.serialize_events(events, now)
+
+        return_value = result.to_dict()
+        return_value["chunk"] = events
+
+        defer.returnValue((200, return_value))
+
+
+class RelationAggregationPaginationServlet(RestServlet):
+    """API to paginate aggregation groups of relations, e.g. paginate the
+    types and counts of the reactions on the events.
+
+    Example request and response:
+
+        GET /rooms/{room_id}/aggregations/{parent_id}
+
+        {
+            chunk: [
+                {
+                    "type": "m.reaction",
+                    "key": "👍",
+                    "count": 3
+                }
+            ]
+        }
+    """
+
+    PATTERNS = client_v2_patterns(
+        "/rooms/(?P<room_id>[^/]*)/aggregations/(?P<parent_id>[^/]*)"
+        "(/(?P<relation_type>[^/]*)(/(?P<event_type>[^/]*))?)?$",
+        releases=(),
+    )
+
+    def __init__(self, hs):
+        super(RelationAggregationPaginationServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.event_handler = hs.get_event_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id, parent_id, relation_type=None, event_type=None):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        yield self.auth.check_in_room_or_world_readable(
+            room_id, requester.user.to_string()
+        )
+
+        # This checks that a) the event exists and b) the user is allowed to
+        # view it.
+        yield self.event_handler.get_event(requester.user, room_id, parent_id)
+
+        if relation_type not in (RelationTypes.ANNOTATION, None):
+            raise SynapseError(400, "Relation type must be 'annotation'")
+
+        limit = parse_integer(request, "limit", default=5)
+        from_token = parse_string(request, "from")
+        to_token = parse_string(request, "to")
+
+        if from_token:
+            from_token = AggregationPaginationToken.from_string(from_token)
+
+        if to_token:
+            to_token = AggregationPaginationToken.from_string(to_token)
+
+        res = yield self.store.get_aggregation_groups_for_event(
+            event_id=parent_id,
+            event_type=event_type,
+            limit=limit,
+            from_token=from_token,
+            to_token=to_token,
+        )
+
+        defer.returnValue((200, res.to_dict()))
+
+
+class RelationAggregationGroupPaginationServlet(RestServlet):
+    """API to paginate within an aggregation group of relations, e.g. paginate
+    all the 👍 reactions on an event.
+
+    Example request and response:
+
+        GET /rooms/{room_id}/aggregations/{parent_id}/m.annotation/m.reaction/👍
+
+        {
+            chunk: [
+                {
+                    "type": "m.reaction",
+                    "content": {
+                        "m.relates_to": {
+                            "rel_type": "m.annotation",
+                            "key": "👍"
+                        }
+                    }
+                },
+                ...
+            ]
+        }
+    """
+
+    PATTERNS = client_v2_patterns(
+        "/rooms/(?P<room_id>[^/]*)/aggregations/(?P<parent_id>[^/]*)"
+        "/(?P<relation_type>[^/]*)/(?P<event_type>[^/]*)/(?P<key>[^/]*)$",
+        releases=(),
+    )
+
+    def __init__(self, hs):
+        super(RelationAggregationGroupPaginationServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
+        self._event_serializer = hs.get_event_client_serializer()
+        self.event_handler = hs.get_event_handler()
+
+    @defer.inlineCallbacks
+    def on_GET(self, request, room_id, parent_id, relation_type, event_type, key):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+
+        yield self.auth.check_in_room_or_world_readable(
+            room_id, requester.user.to_string()
+        )
+
+        # This checks that a) the event exists and b) the user is allowed to
+        # view it.
+        yield self.event_handler.get_event(requester.user, room_id, parent_id)
+
+        if relation_type != RelationTypes.ANNOTATION:
+            raise SynapseError(400, "Relation type must be 'annotation'")
+
+        limit = parse_integer(request, "limit", default=5)
+        from_token = parse_string(request, "from")
+        to_token = parse_string(request, "to")
+
+        if from_token:
+            from_token = RelationPaginationToken.from_string(from_token)
+
+        if to_token:
+            to_token = RelationPaginationToken.from_string(to_token)
+
+        result = yield self.store.get_relations_for_event(
+            event_id=parent_id,
+            relation_type=relation_type,
+            event_type=event_type,
+            aggregation_key=key,
+            limit=limit,
+            from_token=from_token,
+            to_token=to_token,
         )
 
         events = yield self.store.get_events_as_list(
@@ -165,3 +334,5 @@ class RelationPaginationServlet(RestServlet):
 def register_servlets(hs, http_server):
     RelationSendServlet(hs).register(http_server)
     RelationPaginationServlet(hs).register(http_server)
+    RelationAggregationPaginationServlet(hs).register(http_server)
+    RelationAggregationGroupPaginationServlet(hs).register(http_server)
