@@ -32,7 +32,6 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import ConsentURIBuilder
-from synapse.events.utils import serialize_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.state import StateFilter
@@ -57,6 +56,7 @@ class MessageHandler(object):
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def get_room_data(self, user_id=None, room_id=None,
@@ -164,9 +164,10 @@ class MessageHandler(object):
                 room_state = room_state[membership_event_id]
 
         now = self.clock.time_msec()
-        defer.returnValue(
-            [serialize_event(c, now) for c in room_state.values()]
+        events = yield self._event_serializer.serialize_events(
+            room_state.values(), now,
         )
+        defer.returnValue(events)
 
     @defer.inlineCallbacks
     def get_joined_members(self, requester, room_id):
