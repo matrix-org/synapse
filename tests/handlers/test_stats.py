@@ -79,8 +79,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 0)
 
         # Disable stats
-        self.hs.config.stats_enable = False
-        self.handler.stats_enable = False
+        self.hs.config.stats_enabled = False
+        self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -95,8 +95,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.assertEqual(len(r), 0)
 
         # Enable stats
-        self.hs.config.stats_enable = True
-        self.handler.stats_enable = True
+        self.hs.config.stats_enabled = True
+        self.handler.stats_enabled = True
 
         # Do the initial population of the user directory via the background update
         self._add_background_updates()
@@ -116,8 +116,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         """
         self.reactor.advance(86401)
 
-        self.hs.config.stats_enable = False
-        self.handler.stats_enable = False
+        self.hs.config.stats_enabled = False
+        self.handler.stats_enabled = False
 
         u1 = self.register_user("u1", "pass")
         u1_token = self.login("u1", "pass")
@@ -135,8 +135,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # Begin the ingestion by creating the temp tables. This will also store
         # the position that the deltas should begin at, once they take over.
-        self.hs.config.stats_enable = True
-        self.handler.stats_enable = True
+        self.hs.config.stats_enabled = True
+        self.handler.stats_enabled = True
         self.store._all_done = False
         self.get_success(self.store.update_stats_stream_pos(None))
 

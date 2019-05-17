@@ -24,12 +24,12 @@ class StatsConfig(Config):
     """
 
     def read_config(self, config):
-        self.stats_enable = True
+        self.stats_enabled = True
         self.stats_bucket_size = 86400
         self.stats_retention = sys.maxsize
         stats_config = config.get("stats", None)
         if stats_config:
-            self.stats_enable = stats_config.get("enable", self.stats_enable)
+            self.stats_enabled = stats_config.get("enabled", self.stats_enabled)
             self.stats_bucket_size = stats_config.get(
                 "bucket_size", self.stats_bucket_size
             )
@@ -46,7 +46,7 @@ class StatsConfig(Config):
         # in seconds.
         #
         # stats:
-        #    enable: true
+        #    enabled: true
         #    bucket_size: 86400 # 1 day
         #    retention: 31536000 # 1 year
         """

@@ -1149,7 +1149,7 @@ password_config:
 # in seconds.
 #
 # stats:
-#    enable: true
+#    enabled: true
 #    bucket_size: 86400 # 1 day
 #    retention: 31536000 # 1 year
 

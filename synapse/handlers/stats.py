@@ -52,7 +52,7 @@ class StatsHandler(StateDeltasHandler):
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if hs.config.stats_enable:
+        if hs.config.stats_enabled:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before
@@ -62,7 +62,7 @@ class StatsHandler(StateDeltasHandler):
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
-        if not self.hs.config.stats_enable:
+        if not self.hs.config.stats_enabled:
             return
 
         if self._is_processing:

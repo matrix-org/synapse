@@ -58,7 +58,7 @@ class StatsStore(StateDeltasStore):
 
         self.server_name = hs.hostname
         self.clock = self.hs.get_clock()
-        self.stats_enable = hs.config.stats_enable
+        self.stats_enabled = hs.config.stats_enabled
         self.stats_bucket_size = hs.config.stats_bucket_size
 
         self.register_background_update_handler(
@@ -74,7 +74,7 @@ class StatsStore(StateDeltasStore):
     @defer.inlineCallbacks
     def _populate_stats_createtables(self, progress, batch_size):
 
-        if not self.stats_enable:
+        if not self.stats_enabled:
             yield self._end_background_update("populate_stats_createtables")
             defer.returnValue(1)
 
@@ -117,7 +117,7 @@ class StatsStore(StateDeltasStore):
         """
         Update the user directory stream position, then clean up the old tables.
         """
-        if not self.stats_enable:
+        if not self.stats_enabled:
             yield self._end_background_update("populate_stats_cleanup")
             defer.returnValue(1)
 
@@ -138,7 +138,7 @@ class StatsStore(StateDeltasStore):
     @defer.inlineCallbacks
     def _populate_stats_process_rooms(self, progress, batch_size):
 
-        if not self.stats_enable:
+        if not self.stats_enabled:
             yield self._end_background_update("populate_stats_process_rooms")
             defer.returnValue(1)
 
