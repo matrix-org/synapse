@@ -632,5 +632,6 @@ class EventsWorkerStore(SQLBaseStore):
             Deferred[int]
         """
         return self.runInteraction(
-            "get_total_state_event_counts", self._get_total_state_event_counts_txn, room_id
+            "get_total_state_event_counts",
+            self._get_total_state_event_counts_txn, room_id
         )
