@@ -78,12 +78,12 @@ def generate_pagination_where_clause(
     would be generated for dir=b, from_token=(6, 7) and to_token=(5, 3).
 
     Note that tokens are considered to be after the row they are in, e.g. if
-    a row A has a token T, then we consider A to be before T. This covention
+    a row A has a token T, then we consider A to be before T. This convention
     is important when figuring out inequalities for the generated SQL, and
     produces the following result:
-        - If paginatiting forwards then we exclude any rows matching the from
+        - If paginating forwards then we exclude any rows matching the from
           token, but include those that match the to token.
-        - If paginatiting backwards then we include any rows matching the from
+        - If paginating backwards then we include any rows matching the from
           token, but include those that match the to token.
 
     Args:
@@ -92,8 +92,12 @@ def generate_pagination_where_clause(
         column_names (tuple[str, str]): The column names to bound. Must *not*
             be user defined as these get inserted directly into the SQL
             statement without escapes.
-        from_token (tuple[int, int]|None)
-        to_token (tuple[int, int]|None)
+        from_token (tuple[int, int]|None): The start point for the pagination.
+            This is an exclusive minimum bound if direction is "f", and an
+            inclusive maximum bound if direction is "b".
+        to_token (tuple[int, int]|None): The endpoint point for the pagination.
+            This is an inclusive maximum bound if direction is "f", and an
+            exclusive minimum bound if direction is "b".
         engine: The database engine to generate the clauses for
 
     Returns:
