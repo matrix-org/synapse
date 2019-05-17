@@ -23,9 +23,6 @@ from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
-# these fields track relative numbers (e.g. number of events sent in this timeslice)
-RELATIVE_STATS_FIELDS = {"room": ("sent_events",), "user": ("sent_events",)}
-
 # these fields track absolutes (e.g. total number of rooms on the server)
 ABSOLUTE_STATS_FIELDS = {
     "room": (
@@ -257,9 +254,6 @@ class StatsStore(StateDeltasStore):
                     txn, room_id, Membership.BAN
                 )
                 state_events = self._get_state_event_counts_txn(txn, room_id)
-                (local_events, remote_events) = self._get_event_counts_txn(
-                    txn, room_id, self.server_name
-                )
 
                 self._update_stats_txn(
                     txn,
@@ -274,9 +268,6 @@ class StatsStore(StateDeltasStore):
                         "left_members": left_members,
                         "banned_members": banned_members,
                         "state_events": state_events,
-                        "local_events": local_events,
-                        "remote_events": remote_events,
-                        "sent_events": local_events + remote_events,
                     },
                 )
                 self._simple_insert_txn(
@@ -359,8 +350,7 @@ class StatsStore(StateDeltasStore):
 
         Returns:
             Deferred[list[dict]], where the dict has the keys of
-            ABSOLUTE_STATS_FIELDS["room"], RELATIVE_STATS_FIELDS["room"],
-            and "ts".
+            ABSOLUTE_STATS_FIELDS["room"] and "ts".
         """
         return self._simple_select_list_paginate(
             "room_stats",
@@ -370,7 +360,6 @@ class StatsStore(StateDeltasStore):
             size,
             retcols=(
                 list(ABSOLUTE_STATS_FIELDS["room"])
-                + list(RELATIVE_STATS_FIELDS["room"])
                 + ["ts"]
             ),
             order_direction="DESC",
@@ -447,10 +436,6 @@ class StatsStore(StateDeltasStore):
                 values[id_col] = stats_id
                 values["ts"] = ts
                 values["bucket_size"] = self.stats_bucket_size
-
-                # Set the relative fields to 0.
-                for val in RELATIVE_STATS_FIELDS[stats_type]:
-                    values[val] = 0
 
                 self._simple_insert_txn(txn, table=table, values=values)
 

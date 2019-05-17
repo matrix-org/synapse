@@ -238,15 +238,15 @@ class StatsHandler(StateDeltasHandler):
                 )
 
             elif typ == EventTypes.JoinRules:
-                self.store.update_room_state(
+                yield self.store.update_room_state(
                     room_id, {"join_rules": event_content.get("join_rule")}
                 )
 
-                is_public = self._get_key_change(
+                is_public = yield self._get_key_change(
                     prev_event_id, event_id, "join_rule", JoinRules.PUBLIC
                 )
                 if is_public is not None:
-                    self.update_public_room_stats(now, room_id, is_public)
+                    yield self.update_public_room_stats(now, room_id, is_public)
 
             elif typ == EventTypes.RoomHistoryVisibility:
                 yield self.store.update_room_state(
@@ -254,30 +254,30 @@ class StatsHandler(StateDeltasHandler):
                     {"history_visibility": event_content.get("history_visibility")},
                 )
 
-                is_public = self._get_key_change(
+                is_public = yield self._get_key_change(
                     prev_event_id, event_id, "history_visibility", "world_readable"
                 )
                 if is_public is not None:
                     yield self.update_public_room_stats(now, room_id, is_public)
 
             elif typ == EventTypes.Encryption:
-                self.store.update_room_state(
+                yield self.store.update_room_state(
                     room_id, {"encryption": event_content.get("algorithm")}
                 )
             elif typ == EventTypes.Name:
-                self.store.update_room_state(
+                yield self.store.update_room_state(
                     room_id, {"name": event_content.get("name")}
                 )
             elif typ == EventTypes.Topic:
-                self.store.update_room_state(
+                yield self.store.update_room_state(
                     room_id, {"topic": event_content.get("topic")}
                 )
             elif typ == EventTypes.RoomAvatar:
-                self.store.update_room_state(
+                yield self.store.update_room_state(
                     room_id, {"avatar": event_content.get("url")}
                 )
             elif typ == EventTypes.CanonicalAlias:
-                self.store.update_room_state(
+                yield self.store.update_room_state(
                     room_id, {"canonical_alias": event_content.get("alias")}
                 )
 

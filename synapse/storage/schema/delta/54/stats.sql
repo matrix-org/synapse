@@ -25,12 +25,8 @@ CREATE TABLE user_stats (
     user_id TEXT NOT NULL,
     ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
-    sent_events INT NOT NULL,
-    local_events INT NOT NULL,
     public_rooms INT NOT NULL,
     private_rooms INT NOT NULL,
-    sent_file_count INT NOT NULL,
-    sent_file_size INT NOT NULL
 );
 
 CREATE UNIQUE INDEX user_stats_user_ts ON user_stats(user_id, ts);
@@ -45,9 +41,6 @@ CREATE TABLE room_stats (
     left_members INT NOT NULL,
     banned_members INT NOT NULL,
     state_events INT NOT NULL,
-    local_events INT NOT NULL,
-    remote_events INT NOT NULL,
-    sent_events INT NOT NULL -- number sent per timeslice
 );
 
 CREATE UNIQUE INDEX room_stats_room_ts ON room_stats(room_id, ts);
@@ -66,17 +59,6 @@ CREATE TABLE room_state (
 );
 
 CREATE UNIQUE INDEX room_state_room ON room_state(room_id);
-
-CREATE TABLE media_stats (
-    ts BIGINT NOT NULL,
-    bucket_size INT NOT NULL,
-    local_media_count INT NOT NULL,
-    local_media_size INT NOT NULL,
-    remote_media_count INT NOT NULL,
-    remote_media_size INT NOT NULL
-);
-
-CREATE UNIQUE INDEX media_stats_ts ON media_stats(ts);
 
 CREATE TABLE room_stats_earliest_token (
     room_id TEXT NOT NULL,
