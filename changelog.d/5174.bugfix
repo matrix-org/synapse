@@ -1,0 +1,1 @@
+Re-order stages in registration flows such that msisdn and email verification are done last.

@@ -41,10 +41,10 @@ class VersionTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request("GET", self.url, shorthand=False)
         self.render(request)
 
-        self.assertEqual(200, int(channel.result["code"]),
-                         msg=channel.result["body"])
-        self.assertEqual({'server_version', 'python_version'},
-                         set(channel.json_body.keys()))
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            {'server_version', 'python_version'}, set(channel.json_body.keys())
+        )
 
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
@@ -200,9 +200,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(
-            nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin"
-        )
+        want_mac.update(nonce.encode('ascii') + b"\x00bob\x00abc123\x00admin")
         want_mac = want_mac.hexdigest()
 
         body = json.dumps(
@@ -330,11 +328,13 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         #
 
         # Invalid user_type
-        body = json.dumps({
-            "nonce": nonce(),
-            "username": "a",
-            "password": "1234",
-            "user_type": "invalid"}
+        body = json.dumps(
+            {
+                "nonce": nonce(),
+                "username": "a",
+                "password": "1234",
+                "user_type": "invalid",
+            }
         )
         request, channel = self.make_request("POST", self.url, body.encode('utf8'))
         self.render(request)
@@ -357,9 +357,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         hs.config.user_consent_version = "1"
 
         consent_uri_builder = Mock()
-        consent_uri_builder.build_user_consent_uri.return_value = (
-            "http://example.com"
-        )
+        consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creation_handler._consent_uri_builder = consent_uri_builder
 
         self.store = hs.get_datastore()
@@ -371,9 +369,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         self.other_user_token = self.login("user", "pass")
 
         # Mark the admin user as having consented
-        self.get_success(
-            self.store.user_set_consent_version(self.admin_user, "1"),
-        )
+        self.get_success(self.store.user_set_consent_version(self.admin_user, "1"))
 
     def test_shutdown_room_consent(self):
         """Test that we can shutdown rooms with local users who have not
@@ -385,9 +381,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
 
         # Assert one user in room
-        users_in_room = self.get_success(
-            self.store.get_users_in_room(room_id),
-        )
+        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
         self.assertEqual([self.other_user], users_in_room)
 
         # Enable require consent to send events
@@ -395,8 +389,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         # Assert that the user is getting consent error
         self.helper.send(
-            room_id,
-            body="foo", tok=self.other_user_token, expect_code=403,
+            room_id, body="foo", tok=self.other_user_token, expect_code=403
         )
 
         # Test that the admin can still send shutdown
@@ -412,9 +405,7 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Assert there is now no longer anyone in the room
-        users_in_room = self.get_success(
-            self.store.get_users_in_room(room_id),
-        )
+        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
         self.assertEqual([], users_in_room)
 
     @unittest.DEBUG
@@ -459,24 +450,20 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
 
         url = "rooms/%s/initialSync" % (room_id,)
         request, channel = self.make_request(
-            "GET",
-            url.encode('ascii'),
-            access_token=self.admin_user_tok,
+            "GET", url.encode('ascii'), access_token=self.admin_user_tok
         )
         self.render(request)
         self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"],
+            expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
 
         url = "events?timeout=0&room_id=" + room_id
         request, channel = self.make_request(
-            "GET",
-            url.encode('ascii'),
-            access_token=self.admin_user_tok,
+            "GET", url.encode('ascii'), access_token=self.admin_user_tok
         )
         self.render(request)
         self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"],
+            expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
 
 
@@ -502,15 +489,11 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             "POST",
             "/create_group".encode('ascii'),
             access_token=self.admin_user_tok,
-            content={
-                "localpart": "test",
-            }
+            content={"localpart": "test"},
         )
 
         self.render(request)
-        self.assertEqual(
-            200, int(channel.result["code"]), msg=channel.result["body"],
-        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         group_id = channel.json_body["group_id"]
 
@@ -520,27 +503,17 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
         url = "/groups/%s/admin/users/invite/%s" % (group_id, self.other_user)
         request, channel = self.make_request(
-            "PUT",
-            url.encode('ascii'),
-            access_token=self.admin_user_tok,
-            content={}
+            "PUT", url.encode('ascii'), access_token=self.admin_user_tok, content={}
         )
         self.render(request)
-        self.assertEqual(
-            200, int(channel.result["code"]), msg=channel.result["body"],
-        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         url = "/groups/%s/self/accept_invite" % (group_id,)
         request, channel = self.make_request(
-            "PUT",
-            url.encode('ascii'),
-            access_token=self.other_user_token,
-            content={}
+            "PUT", url.encode('ascii'), access_token=self.other_user_token, content={}
         )
         self.render(request)
-        self.assertEqual(
-            200, int(channel.result["code"]), msg=channel.result["body"],
-        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Check other user knows they're in the group
         self.assertIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
@@ -552,15 +525,11 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
             "POST",
             url.encode('ascii'),
             access_token=self.admin_user_tok,
-            content={
-                "localpart": "test",
-            }
+            content={"localpart": "test"},
         )
 
         self.render(request)
-        self.assertEqual(
-            200, int(channel.result["code"]), msg=channel.result["body"],
-        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Check group returns 404
         self._check_group(group_id, expect_code=404)
@@ -576,28 +545,22 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
         url = "/groups/%s/profile" % (group_id,)
         request, channel = self.make_request(
-            "GET",
-            url.encode('ascii'),
-            access_token=self.admin_user_tok,
+            "GET", url.encode('ascii'), access_token=self.admin_user_tok
         )
 
         self.render(request)
         self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"],
+            expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
 
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)
         """
         request, channel = self.make_request(
-            "GET",
-            "/joined_groups".encode('ascii'),
-            access_token=access_token,
+            "GET", "/joined_groups".encode('ascii'), access_token=access_token
         )
 
         self.render(request)
-        self.assertEqual(
-            200, int(channel.result["code"]), msg=channel.result["body"],
-        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         return channel.json_body["groups"]

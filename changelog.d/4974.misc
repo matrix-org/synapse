@@ -1,1 +1,0 @@
-Add `config.signing_key_path` that can be read by `synapse.config` utility.

@@ -20,7 +20,6 @@ from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
-from synapse.events.utils import serialize_event
 from synapse.storage.state import StateFilter
 from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import ReadWriteLock
@@ -78,6 +77,7 @@ class PaginationHandler(object):
         self._purges_in_progress_by_room = set()
         # map from purge id to PurgeStatus
         self._purges_by_id = {}
+        self._event_serializer = hs.get_event_client_serializer()
 
     def start_purge_history(self, room_id, token,
                             delete_local_events=False):
@@ -278,18 +278,22 @@ class PaginationHandler(object):
         time_now = self.clock.time_msec()
 
         chunk = {
-            "chunk": [
-                serialize_event(e, time_now, as_client_event)
-                for e in events
-            ],
+            "chunk": (
+                yield self._event_serializer.serialize_events(
+                    events, time_now,
+                    as_client_event=as_client_event,
+                )
+            ),
             "start": pagin_config.from_token.to_string(),
             "end": next_token.to_string(),
         }
 
         if state:
-            chunk["state"] = [
-                serialize_event(e, time_now, as_client_event)
-                for e in state
-            ]
+            chunk["state"] = (
+                yield self._event_serializer.serialize_events(
+                    state, time_now,
+                    as_client_event=as_client_event,
+                )
+            )
 
         defer.returnValue(chunk)

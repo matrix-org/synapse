@@ -37,7 +37,9 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send state
         event_auth.check(
-            RoomVersions.V1.identifier, _random_state_event(creator), auth_events,
+            RoomVersions.V1.identifier,
+            _random_state_event(creator),
+            auth_events,
             do_sig_check=False,
         )
 
@@ -82,7 +84,9 @@ class EventAuthTestCase(unittest.TestCase):
 
         # king should be able to send state
         event_auth.check(
-            RoomVersions.V1.identifier, _random_state_event(king), auth_events,
+            RoomVersions.V1.identifier,
+            _random_state_event(king),
+            auth_events,
             do_sig_check=False,
         )
 

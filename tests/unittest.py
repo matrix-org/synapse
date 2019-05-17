@@ -27,6 +27,7 @@ import twisted.logger
 from twisted.internet.defer import Deferred
 from twisted.trial import unittest
 
+from synapse.config.homeserver import HomeServerConfig
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
 from synapse.server import HomeServer
@@ -84,9 +85,8 @@ class TestCase(unittest.TestCase):
             # all future bets are off.
             if LoggingContext.current_context() is not LoggingContext.sentinel:
                 self.fail(
-                    "Test starting with non-sentinel logging context %s" % (
-                        LoggingContext.current_context(),
-                    )
+                    "Test starting with non-sentinel logging context %s"
+                    % (LoggingContext.current_context(),)
                 )
 
             old_level = logging.getLogger().level
@@ -246,7 +246,7 @@ class HomeserverTestCase(TestCase):
 
     def default_config(self, name="test"):
         """
-        Get a default HomeServer config object.
+        Get a default HomeServer config dict.
 
         Args:
             name (str): The homeserver name/domain.
@@ -300,7 +300,13 @@ class HomeserverTestCase(TestCase):
             content = json.dumps(content).encode('utf8')
 
         return make_request(
-            self.reactor, method, path, content, access_token, request, shorthand,
+            self.reactor,
+            method,
+            path,
+            content,
+            access_token,
+            request,
+            shorthand,
             federation_auth_origin,
         )
 
@@ -330,7 +336,14 @@ class HomeserverTestCase(TestCase):
         kwargs.update(self._hs_args)
         if "config" not in kwargs:
             config = self.default_config()
-            kwargs["config"] = config
+        else:
+            config = kwargs["config"]
+
+        # Parse the config from a config dict into a HomeServerConfig
+        config_obj = HomeServerConfig()
+        config_obj.parse_config_dict(config)
+        kwargs["config"] = config_obj
+
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
 

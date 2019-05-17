@@ -1,3 +1,13 @@
+matrix-synapse-py3 (0.99.4) stable; urgency=medium
+
+  [ Christoph Müller ]
+  * Configure the systemd units to have a log identifier of `matrix-synapse`
+
+  [ Synapse Packaging team ]
+  * New synapse release 0.99.4.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 15 May 2019 13:58:08 +0100
+
 matrix-synapse-py3 (0.99.3.2) stable; urgency=medium
 
   * New synapse release 0.99.3.2.

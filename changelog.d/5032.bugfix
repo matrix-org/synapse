@@ -1,1 +1,0 @@
-Fix "cannot import name execute_batch" error with postgres.
