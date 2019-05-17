@@ -32,16 +32,8 @@ ABSOLUTE_STATS_FIELDS = {
         "left_members",
         "banned_members",
         "state_events",
-        "local_events",
-        "remote_events",
     ),
-    "user": (
-        "local_events",
-        "public_rooms",
-        "private_rooms",
-        "sent_file_count",
-        "sent_file_size",
-    ),
+    "user": ("public_rooms", "private_rooms"),
 }
 
 TYPE_TO_ROOM = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
@@ -253,7 +245,9 @@ class StatsStore(StateDeltasStore):
                 banned_members = self._get_user_count_in_room_txn(
                     txn, room_id, Membership.BAN
                 )
-                state_events = self._get_state_event_counts_txn(txn, room_id)
+                total_state_events = self._get_total_state_event_counts_txn(
+                    txn, room_id
+                )
 
                 self._update_stats_txn(
                     txn,
@@ -267,7 +261,7 @@ class StatsStore(StateDeltasStore):
                         "invited_members": invited_members,
                         "left_members": left_members,
                         "banned_members": banned_members,
-                        "state_events": state_events,
+                        "state_events": total_state_events,
                     },
                 )
                 self._simple_insert_txn(
@@ -358,10 +352,7 @@ class StatsStore(StateDeltasStore):
             "ts",
             start,
             size,
-            retcols=(
-                list(ABSOLUTE_STATS_FIELDS["room"])
-                + ["ts"]
-            ),
+            retcols=(list(ABSOLUTE_STATS_FIELDS["room"]) + ["ts"]),
             order_direction="DESC",
         )
 

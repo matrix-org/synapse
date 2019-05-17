@@ -26,7 +26,7 @@ CREATE TABLE user_stats (
     ts BIGINT NOT NULL,
     bucket_size INT NOT NULL,
     public_rooms INT NOT NULL,
-    private_rooms INT NOT NULL,
+    private_rooms INT NOT NULL
 );
 
 CREATE UNIQUE INDEX user_stats_user_ts ON user_stats(user_id, ts);
@@ -40,7 +40,7 @@ CREATE TABLE room_stats (
     invited_members INT NOT NULL,
     left_members INT NOT NULL,
     banned_members INT NOT NULL,
-    state_events INT NOT NULL,
+    state_events INT NOT NULL
 );
 
 CREATE UNIQUE INDEX room_stats_room_ts ON room_stats(room_id, ts);
