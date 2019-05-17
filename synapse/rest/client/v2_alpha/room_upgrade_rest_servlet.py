@@ -50,7 +50,6 @@ class RoomUpgradeRestServlet(RestServlet):
     PATTERNS = client_v2_patterns(
         # /rooms/$roomid/upgrade
         "/rooms/(?P<room_id>[^/]*)/upgrade$",
-        v2_alpha=False,
     )
 
     def __init__(self, hs):

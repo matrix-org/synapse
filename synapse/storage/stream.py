@@ -319,7 +319,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         rows = yield self.runInteraction("get_room_events_stream_for_room", f)
 
-        ret = yield self._get_events([r.event_id for r in rows], get_prev_content=True)
+        ret = yield self.get_events_as_list([
+            r.event_id for r in rows], get_prev_content=True,
+        )
 
         self._set_before_and_after(ret, rows, topo_order=from_id is None)
 
@@ -367,7 +369,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         rows = yield self.runInteraction("get_membership_changes_for_user", f)
 
-        ret = yield self._get_events([r.event_id for r in rows], get_prev_content=True)
+        ret = yield self.get_events_as_list(
+            [r.event_id for r in rows], get_prev_content=True,
+        )
 
         self._set_before_and_after(ret, rows, topo_order=False)
 
@@ -394,7 +398,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         logger.debug("stream before")
-        events = yield self._get_events(
+        events = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
         logger.debug("stream after")
@@ -580,11 +584,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             event_filter,
         )
 
-        events_before = yield self._get_events(
+        events_before = yield self.get_events_as_list(
             [e for e in results["before"]["event_ids"]], get_prev_content=True
         )
 
-        events_after = yield self._get_events(
+        events_after = yield self.get_events_as_list(
             [e for e in results["after"]["event_ids"]], get_prev_content=True
         )
 
@@ -697,7 +701,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_all_new_events_stream", get_all_new_events_stream_txn
         )
 
-        events = yield self._get_events(event_ids)
+        events = yield self.get_events_as_list(event_ids)
 
         defer.returnValue((upper_bound, events))
 
@@ -849,7 +853,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             event_filter,
         )
 
-        events = yield self._get_events(
+        events = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
 
