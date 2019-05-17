@@ -103,7 +103,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             Deferred : A FrozenEvent.
         """
-        events = yield self._get_events(
+        events = yield self.get_events_as_list(
             [event_id],
             check_redacted=check_redacted,
             get_prev_content=get_prev_content,
@@ -142,7 +142,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             Deferred : Dict from event_id to event.
         """
-        events = yield self._get_events(
+        events = yield self.get_events_as_list(
             event_ids,
             check_redacted=check_redacted,
             get_prev_content=get_prev_content,
@@ -152,13 +152,32 @@ class EventsWorkerStore(SQLBaseStore):
         defer.returnValue({e.event_id: e for e in events})
 
     @defer.inlineCallbacks
-    def _get_events(
+    def get_events_as_list(
         self,
         event_ids,
         check_redacted=True,
         get_prev_content=False,
         allow_rejected=False,
     ):
+        """Get events from the database and return in a list in the same order
+        as given by `event_ids` arg.
+
+        Args:
+            event_ids (list): The event_ids of the events to fetch
+            check_redacted (bool): If True, check if event has been redacted
+                and redact it.
+            get_prev_content (bool): If True and event is a state event,
+                include the previous states content in the unsigned field.
+            allow_rejected (bool): If True return rejected events.
+
+        Returns:
+            Deferred[list[EventBase]]: List of events fetched from the database. The
+            events are in the same order as `event_ids` arg.
+
+            Note that the returned list may be smaller than the list of event
+            IDs if not all events could be fetched.
+        """
+
         if not event_ids:
             defer.returnValue([])
 
@@ -202,21 +221,22 @@ class EventsWorkerStore(SQLBaseStore):
                     #
                     # The problem is that we end up at this point when an event
                     # which has been redacted is pulled out of the database by
-                    # _enqueue_events, because _enqueue_events needs to check the
-                    # redaction before it can cache the redacted event. So obviously,
-                    # calling get_event to get the redacted event out of the database
-                    # gives us an infinite loop.
+                    # _enqueue_events, because _enqueue_events needs to check
+                    # the redaction before it can cache the redacted event. So
+                    # obviously, calling get_event to get the redacted event out
+                    # of the database gives us an infinite loop.
                     #
-                    # For now (quick hack to fix during 0.99 release cycle), we just
-                    # go and fetch the relevant row from the db, but it would be nice
-                    # to think about how we can cache this rather than hit the db
-                    # every time we access a redaction event.
+                    # For now (quick hack to fix during 0.99 release cycle), we
+                    # just go and fetch the relevant row from the db, but it
+                    # would be nice to think about how we can cache this rather
+                    # than hit the db every time we access a redaction event.
                     #
                     # One thought on how to do this:
-                    #  1. split _get_events up so that it is divided into (a) get the
-                    #     rawish event from the db/cache, (b) do the redaction/rejection
-                    #     filtering
-                    #  2. have _get_event_from_row just call the first half of that
+                    #  1. split get_events_as_list up so that it is divided into
+                    #     (a) get the rawish event from the db/cache, (b) do the
+                    #     redaction/rejection filtering
+                    #  2. have _get_event_from_row just call the first half of
+                    #     that
 
                     orig_sender = yield self._simple_select_one_onecol(
                         table="events",

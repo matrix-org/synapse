@@ -15,6 +15,8 @@
 
 from mock import Mock
 
+from netaddr import IPSet
+
 from twisted.internet import defer
 from twisted.internet.defer import TimeoutError
 from twisted.internet.error import ConnectingCancelledError, DNSLookupError
@@ -208,6 +210,75 @@ class FederationClientTests(HomeserverTestCase):
 
         self.assertIsInstance(f.value, RequestSendFailed)
         self.assertIsInstance(f.value.inner_exception, ResponseNeverReceived)
+
+    def test_client_ip_range_blacklist(self):
+        """Ensure that Synapse does not try to connect to blacklisted IPs"""
+
+        # Set up the ip_range blacklist
+        self.hs.config.federation_ip_range_blacklist = IPSet([
+            "127.0.0.0/8",
+            "fe80::/64",
+        ])
+        self.reactor.lookups["internal"] = "127.0.0.1"
+        self.reactor.lookups["internalv6"] = "fe80:0:0:0:0:8a2e:370:7337"
+        self.reactor.lookups["fine"] = "10.20.30.40"
+        cl = MatrixFederationHttpClient(self.hs, None)
+
+        # Try making a GET request to a blacklisted IPv4 address
+        # ------------------------------------------------------
+        # Make the request
+        d = cl.get_json("internal:8008", "foo/bar", timeout=10000)
+
+        # Nothing happened yet
+        self.assertNoResult(d)
+
+        self.pump(1)
+
+        # Check that it was unable to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 0)
+
+        f = self.failureResultOf(d)
+        self.assertIsInstance(f.value, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
+
+        # Try making a POST request to a blacklisted IPv6 address
+        # -------------------------------------------------------
+        # Make the request
+        d = cl.post_json("internalv6:8008", "foo/bar", timeout=10000)
+
+        # Nothing has happened yet
+        self.assertNoResult(d)
+
+        # Move the reactor forwards
+        self.pump(1)
+
+        # Check that it was unable to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 0)
+
+        # Check that it was due to a blacklisted DNS lookup
+        f = self.failureResultOf(d, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, DNSLookupError)
+
+        # Try making a GET request to a non-blacklisted IPv4 address
+        # ----------------------------------------------------------
+        # Make the request
+        d = cl.post_json("fine:8008", "foo/bar", timeout=10000)
+
+        # Nothing has happened yet
+        self.assertNoResult(d)
+
+        # Move the reactor forwards
+        self.pump(1)
+
+        # Check that it was able to resolve the address
+        clients = self.reactor.tcpClients
+        self.assertNotEqual(len(clients), 0)
+
+        # Connection will still fail as this IP address does not resolve to anything
+        f = self.failureResultOf(d, RequestSendFailed)
+        self.assertIsInstance(f.value.inner_exception, ConnectingCancelledError)
 
     def test_client_gets_headers(self):
         """

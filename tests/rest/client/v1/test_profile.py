@@ -171,7 +171,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.require_auth_for_profile_requests = True
+        config["require_auth_for_profile_requests"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs

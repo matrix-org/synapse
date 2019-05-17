@@ -39,11 +39,10 @@ class IdentityDisabledTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.enable_3pid_lookup = False
-        config.trusted_third_party_id_servers = [
+        config["trusted_third_party_id_servers"] = [
             "testis",
         ]
-
+        config["enable_3pid_lookup"] = False
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -118,8 +117,8 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.enable_3pid_lookup = True
-        config.trusted_third_party_id_servers = [
+        config["enable_3pid_lookup"] = True
+        config["trusted_third_party_id_servers"] = [
             "testis",
         ]
 

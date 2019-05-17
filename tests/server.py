@@ -227,6 +227,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
     """
 
     def __init__(self):
+        self.threadpool = ThreadPool(self)
+
         self._udp = []
         lookups = self.lookups = {}
 
@@ -253,6 +255,37 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         d = Deferred()
         d.addCallback(lambda x: callback(*args, **kwargs))
         self.callLater(0, d.callback, True)
+        return d
+
+    def getThreadPool(self):
+        return self.threadpool
+
+
+class ThreadPool:
+    """
+    Threadless thread pool.
+    """
+
+    def __init__(self, reactor):
+        self._reactor = reactor
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def callInThreadWithCallback(self, onResult, function, *args, **kwargs):
+        def _(res):
+            if isinstance(res, Failure):
+                onResult(False, res)
+            else:
+                onResult(True, res)
+
+        d = Deferred()
+        d.addCallback(lambda x: function(*args, **kwargs))
+        d.addBoth(_)
+        self._reactor.callLater(0, d.callback, True)
         return d
 
 
@@ -290,36 +323,10 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
             **kwargs
         )
 
-    class ThreadPool:
-        """
-        Threadless thread pool.
-        """
-
-        def start(self):
-            pass
-
-        def stop(self):
-            pass
-
-        def callInThreadWithCallback(self, onResult, function, *args, **kwargs):
-            def _(res):
-                if isinstance(res, Failure):
-                    onResult(False, res)
-                else:
-                    onResult(True, res)
-
-            d = Deferred()
-            d.addCallback(lambda x: function(*args, **kwargs))
-            d.addBoth(_)
-            clock._reactor.callLater(0, d.callback, True)
-            return d
-
-    clock.threadpool = ThreadPool()
-
     if pool:
         pool.runWithConnection = runWithConnection
         pool.runInteraction = runInteraction
-        pool.threadpool = ThreadPool()
+        pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
     return d
 

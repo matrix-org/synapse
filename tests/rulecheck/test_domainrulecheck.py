@@ -165,13 +165,13 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
-        config.trusted_third_party_id_servers = [
+        config["trusted_third_party_id_servers"] = [
             "localhost",
         ]
 
-        config.spam_checker = (
-            DomainRuleChecker,
-            {
+        config["spam_checker"] = {
+            "module": "synapse.rulecheck.domain_rule_checker.DomainRuleChecker",
+            "config": {
                 "default": True,
                 "domain_mapping": {},
                 "can_only_join_rooms_with_invite": True,
@@ -179,7 +179,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
                 "can_only_invite_during_room_creation": True,
                 "can_invite_by_third_party_id": False,
             },
-        )
+        }
 
         hs = self.setup_test_homeserver(config=config)
         return hs

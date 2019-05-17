@@ -168,7 +168,7 @@ class StateTestCase(unittest.TestCase):
                 "get_state_resolution_handler",
             ]
         )
-        hs.config = default_config("tesths")
+        hs.config = default_config("tesths", True)
         hs.get_datastore.return_value = self.store
         hs.get_state_handler.return_value = None
         hs.get_clock.return_value = MockClock()
