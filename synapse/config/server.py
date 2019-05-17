@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -172,6 +173,10 @@ class ServerConfig(Config):
         self.require_membership_for_aliases = config.get(
             "require_membership_for_aliases", True,
         )
+
+        # Whether to allow per-room membership profiles through the send of membership
+        # events with profile information that differ from the target's global profile.
+        self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
         self.listeners = []
         for listener in config.get("listeners", []):
@@ -566,6 +571,12 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #require_membership_for_aliases: false
+
+        # Whether to allow per-room membership profiles through the send of membership
+        # events with profile information that differ from the target's global profile.
+        # Defaults to 'true'.
+        #
+        #allow_per_room_profiles: false
         """ % locals()
 
     def read_arguments(self, args):
