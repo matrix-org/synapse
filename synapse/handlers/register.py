@@ -126,11 +126,11 @@ class RegistrationHandler(BaseHandler):
 
         self.check_user_id_not_appservice_exclusive(user_id)
 
-        if len(user_id) > MAX_ALIAS_LENGTH:
+        if len(user_id) > MAX_USERID_LENGTH:
             raise SynapseError(
                 400,
                 "User ID may not be longer than %s characters" % (
-                    MAX_ALIAS_LENGTH,
+                    MAX_USERID_LENGTH,
                 ),
                 Codes.INVALID_USERNAME
             )
