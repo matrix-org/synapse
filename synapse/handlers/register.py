@@ -123,6 +123,12 @@ class RegistrationHandler(BaseHandler):
 
         self.check_user_id_not_appservice_exclusive(user_id)
 
+        if len(user_id) > 256:
+            raise SynapseError(
+                400,
+                "User ID may not be longer than 256 characters"
+            )
+
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
         if users:
             if not guest_access_token:
