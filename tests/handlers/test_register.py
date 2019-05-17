@@ -232,5 +232,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_invalid_user_id_length(self):
         invalid_user_id = "x"*257
         res = self.get_failure(
-            self.handler.register(localpart=invalid_user_id)
+            self.handler.register(localpart=invalid_user_id),
+            SynapseError
         )

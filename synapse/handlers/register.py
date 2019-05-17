@@ -126,7 +126,8 @@ class RegistrationHandler(BaseHandler):
         if len(user_id) > 256:
             raise SynapseError(
                 400,
-                "User ID may not be longer than 256 characters"
+                "User ID may not be longer than 256 characters",
+                Codes.INVALID_USERNAME
             )
 
         users = yield self.store.get_users_by_id_case_insensitive(user_id)
