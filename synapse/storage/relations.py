@@ -280,7 +280,7 @@ class RelationsWorkerStore(SQLBaseStore):
             having_clause = ""
 
         sql = """
-            SELECT type, aggregation_key, COUNT(*), MAX(stream_ordering)
+            SELECT type, aggregation_key, COUNT(DISTINCT sender), MAX(stream_ordering)
             FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE {where_clause}
