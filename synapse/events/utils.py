@@ -368,9 +368,7 @@ class EventClientSerializer(object):
 
             edit = None
             if event.type == EventTypes.Message:
-                edit = yield self.store.get_applicable_edit(
-                    event.event_id, event.type, event.sender,
-                )
+                edit = yield self.store.get_applicable_edit(event_id)
 
             if edit:
                 # If there is an edit replace the content, preserving existing
