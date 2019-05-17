@@ -19,7 +19,10 @@ import logging
 from twisted.internet import defer
 
 from synapse import types
-from synapse.api.constants import LoginType
+from synapse.api.constants import (
+    LoginType,
+    MAX_USERID_LENGTH
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -123,10 +126,12 @@ class RegistrationHandler(BaseHandler):
 
         self.check_user_id_not_appservice_exclusive(user_id)
 
-        if len(user_id) > 256:
+        if len(user_id) > MAX_ALIAS_LENGTH:
             raise SynapseError(
                 400,
-                "User ID may not be longer than 256 characters",
+                "User ID may not be longer than %s characters" % (
+                    MAX_ALIAS_LENGTH,
+                ),
                 Codes.INVALID_USERNAME
             )
 
