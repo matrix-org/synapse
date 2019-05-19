@@ -32,7 +32,7 @@ listeners:
     bind_addresses: ['::']
     type: http
     tls: true
-    x_forwarded: false
+    x_forwarded: {{ "True" if SYNAPSE_REVERSE_PROXY else "False" }}
     resources:
       - names: [client]
         compress: true
@@ -44,7 +44,7 @@ listeners:
     tls: false
     bind_addresses: ['::']
     type: http
-    x_forwarded: false
+    x_forwarded: {{ "True" if SYNAPSE_REVERSE_PROXY else "False" }}
 
     resources:
       - names: [client]

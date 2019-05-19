@@ -28,6 +28,20 @@ def generate_secrets(environ, secrets):
                 with open(filename, "w") as handle: handle.write(value)
             environ[secret] = value
 
+def environ_to_bool(environ, key):
+    # Convert an environment variable to boolean if exists
+    if key not in environ:
+        return
+
+    tlsanswerstring = str.lower(environ[key])
+    if tlsanswerstring in ("true", "on", "1", "yes"):
+        environ[key] = True
+    else if tlsanswerstring in ("false", "off", "0", "no"):
+        environ[key] = False
+    else:
+        print("Environment variable \"" + key + "\" found but value \"" + tlsanswerstring + "\" unrecognized; exiting.")
+        sys.exit(2)
+
 # Prepare the configuration
 mode = sys.argv[1] if len(sys.argv) > 1 else None
 environ = os.environ.copy()
@@ -60,17 +74,8 @@ else:
 
         config_path = "/compiled/homeserver.yaml"
         
-        # Convert SYNAPSE_NO_TLS to boolean if exists
-        if "SYNAPSE_NO_TLS" in environ:
-            tlsanswerstring = str.lower(environ["SYNAPSE_NO_TLS"])
-            if tlsanswerstring in ("true", "on", "1", "yes"):
-                environ["SYNAPSE_NO_TLS"] = True
-            else:
-                if tlsanswerstring in ("false", "off", "0", "no"):
-                    environ["SYNAPSE_NO_TLS"] = False
-                else:
-                    print("Environment variable \"SYNAPSE_NO_TLS\" found but value \"" + tlsanswerstring + "\" unrecognized; exiting.")
-                    sys.exit(2)
+        environ_to_bool(environ, "SYNAPSE_NO_TLS")
+        environ_to_bool(environ, "SYNAPSE_REVERSE_PROXY")
 
         convert("/conf/homeserver.yaml", config_path, environ)
         convert("/conf/log.config", "/compiled/log.config", environ)

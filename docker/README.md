@@ -65,7 +65,7 @@ Synapse requires a valid TLS certificate. You can do one of the following:
 
  * Use a reverse proxy to terminate incoming TLS, and forward the plain http
    traffic to port 8008 in the container. In this case you should set `-e
-   SYNAPSE_NO_TLS=1`.
+   SYNAPSE_NO_TLS=1` and `-e SYNAPSE_REVERSE_PROXY=1`.
 
  * Use the ACME (Let's Encrypt) support built into Synapse. This requires
    `${SYNAPSE_SERVER_NAME}` port 80 to be forwarded to port 8009 in the
@@ -102,9 +102,12 @@ when ``SYNAPSE_CONFIG_PATH`` is not set.
 * ``SYNAPSE_SERVER_NAME`` (mandatory), the server public hostname.
 * ``SYNAPSE_REPORT_STATS``, (mandatory, ``yes`` or ``no``), enable anonymous
   statistics reporting back to the Matrix project which helps us to get funding.
-* `SYNAPSE_NO_TLS`, (accepts `true`, `false`, `on`, `off`, `1`, `0`, `yes`, `no`]): disable
+* `SYNAPSE_NO_TLS`, (accepts `true`, `false`, `on`, `off`, `1`, `0`, `yes`, `no`): disable
   TLS in Synapse (use this if you run your own TLS-capable reverse proxy). Defaults
   to `false` (ie, TLS is enabled by default).
+* `SYNAPSE_REVERSE_PROXY`, (accepts `true`, `false`, `on`, `off`, `1`, `0`, `yes`, `no`): enable
+  reverse proxy support in Synapse (use this to accept `X-Forwarded-*` headers). Defaults
+  to `false` (ie, reverse proxy support is disabled by default).
 * ``SYNAPSE_ENABLE_REGISTRATION``, set this variable to enable registration on
   the Synapse instance.
 * ``SYNAPSE_ALLOW_GUEST``, set this variable to allow guest joining this server.
