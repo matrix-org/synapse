@@ -1019,7 +1019,7 @@ class FederationClient(FederationBase):
                 "Failed to fetch room complexity via %s for %s, got a %d",
                 destination, room_id, e.code
             )
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Failed to fetch room complexity via %s for %s",
                 destination, room_id
