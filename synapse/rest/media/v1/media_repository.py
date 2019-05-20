@@ -444,6 +444,9 @@ class MediaRepository(object):
             )
             return
 
+        if thumbnailer.transpose_method is not None:
+            m_width, m_height = thumbnailer.transpose()
+
         if t_method == "crop":
             t_byte_source = thumbnailer.crop(t_width, t_height, t_type)
         elif t_method == "scale":
@@ -577,6 +580,12 @@ class MediaRepository(object):
                 m_width, m_height, self.max_image_pixels
             )
             return
+
+        if thumbnailer.transpose_method is not None:
+            m_width, m_height = yield logcontext.defer_to_thread(
+                self.hs.get_reactor(),
+                thumbnailer.transpose
+            )
 
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
         # they have the same dimensions of a scaled one.

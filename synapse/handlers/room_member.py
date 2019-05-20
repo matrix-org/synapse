@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,6 +74,7 @@ class RoomMemberHandler(object):
         self.spam_checker = hs.get_spam_checker()
         self._server_notices_mxid = self.config.server_notices_mxid
         self._enable_lookup = hs.config.enable_3pid_lookup
+        self.allow_per_room_profiles = self.config.allow_per_room_profiles
 
         # This is only used to get at ratelimit function, and
         # maybe_kick_guest_users. It's fine there are multiple of these as
@@ -356,6 +358,13 @@ class RoomMemberHandler(object):
             # We do a copy here as we potentially change some keys
             # later on.
             content = dict(content)
+
+        if not self.allow_per_room_profiles:
+            # Strip profile data, knowing that new profile data will be added to the
+            # event's content in event_creation_handler.create_event() using the target's
+            # global profile.
+            content.pop("displayname", None)
+            content.pop("avatar_url", None)
 
         effective_membership_state = action
         if action in ["kick", "unban"]:
@@ -935,7 +944,7 @@ class RoomMemberHandler(object):
         }
 
         if self.config.invite_3pid_guest:
-            guest_access_token, guest_user_id = yield self.get_or_register_3pid_guest(
+            guest_user_id, guest_access_token = yield self.get_or_register_3pid_guest(
                 requester=requester,
                 medium=medium,
                 address=address,
