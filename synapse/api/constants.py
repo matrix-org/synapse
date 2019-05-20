@@ -125,5 +125,5 @@ class RelationTypes(object):
     """The types of relations known to this server.
     """
     ANNOTATION = "m.annotation"
-    REPLACES = "m.replaces"
-    REFERENCES = "m.references"
+    REPLACE = "m.replace"
+    REFERENCE = "m.reference"

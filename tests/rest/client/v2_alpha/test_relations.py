@@ -363,8 +363,8 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/rooms/%s/aggregations/%s/m.replace?limit=1"
-            % (self.room, self.parent_id),
+            "/_matrix/client/unstable/rooms/%s/aggregations/%s/%s?limit=1"
+            % (self.room, self.parent_id, RelationTypes.REPLACE),
             access_token=self.user_token,
         )
         self.render(request)
@@ -386,11 +386,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
         self.assertEquals(200, channel.code, channel.json_body)
 
-        channel = self._send_relation(RelationTypes.REFERENCES, "m.room.test")
+        channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
         self.assertEquals(200, channel.code, channel.json_body)
         reply_1 = channel.json_body["event_id"]
 
-        channel = self._send_relation(RelationTypes.REFERENCES, "m.room.test")
+        channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
         self.assertEquals(200, channel.code, channel.json_body)
         reply_2 = channel.json_body["event_id"]
 
@@ -411,7 +411,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                         {"type": "m.reaction", "key": "b", "count": 1},
                     ]
                 },
-                RelationTypes.REFERENCES: {
+                RelationTypes.REFERENCE: {
                     "chunk": [{"event_id": reply_1}, {"event_id": reply_2}]
                 },
             },
@@ -423,7 +423,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
         channel = self._send_relation(
-            RelationTypes.REPLACES,
+            RelationTypes.REPLACE,
             "m.room.message",
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
         )
@@ -443,7 +443,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(
             channel.json_body["unsigned"].get("m.relations"),
-            {RelationTypes.REPLACES: {"event_id": edit_event_id}},
+            {RelationTypes.REPLACE: {"event_id": edit_event_id}},
         )
 
     def test_multi_edit(self):
@@ -452,7 +452,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         """
 
         channel = self._send_relation(
-            RelationTypes.REPLACES,
+            RelationTypes.REPLACE,
             "m.room.message",
             content={
                 "msgtype": "m.text",
@@ -464,7 +464,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
         channel = self._send_relation(
-            RelationTypes.REPLACES,
+            RelationTypes.REPLACE,
             "m.room.message",
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
         )
@@ -473,7 +473,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         edit_event_id = channel.json_body["event_id"]
 
         channel = self._send_relation(
-            RelationTypes.REPLACES,
+            RelationTypes.REPLACE,
             "m.room.message.WRONG_TYPE",
             content={
                 "msgtype": "m.text",
@@ -495,7 +495,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(
             channel.json_body["unsigned"].get("m.relations"),
-            {RelationTypes.REPLACES: {"event_id": edit_event_id}},
+            {RelationTypes.REPLACE: {"event_id": edit_event_id}},
         )
 
     def _send_relation(
