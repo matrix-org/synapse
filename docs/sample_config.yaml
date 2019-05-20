@@ -996,6 +996,16 @@ password_config:
    #
    #pepper: "EVEN_MORE_SECRET"
 
+   # Password policy.
+   #
+   #policy:
+   #  enabled: true
+   #  minimum_length: 15
+   #  require_digit: true
+   #  require_symbol: true
+   #  require_lowercase: true
+   #  require_uppercase: true
+
 
 
 # Enable sending emails for notification events or expiry notices
