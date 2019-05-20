@@ -355,7 +355,7 @@ class EventClientSerializer(object):
                 event_id,
             )
             references = yield self.store.get_relations_for_event(
-                event_id, RelationTypes.REFERENCES, direction="f",
+                event_id, RelationTypes.REFERENCE, direction="f",
             )
 
             if annotations.chunk:
@@ -364,7 +364,7 @@ class EventClientSerializer(object):
 
             if references.chunk:
                 r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.REFERENCES] = references.to_dict()
+                r[RelationTypes.REFERENCE] = references.to_dict()
 
             edit = None
             if event.type == EventTypes.Message:
@@ -382,7 +382,7 @@ class EventClientSerializer(object):
                     serialized_event["content"].pop("m.relates_to", None)
 
                 r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.REPLACES] = {
+                r[RelationTypes.REPLACE] = {
                     "event_id": edit.event_id,
                 }
 

@@ -351,7 +351,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_applicable_edit_txn(txn):
             txn.execute(
-                sql, (event_id, RelationTypes.REPLACES,)
+                sql, (event_id, RelationTypes.REPLACE,)
             )
             row = txn.fetchone()
             if row:
@@ -384,8 +384,8 @@ class RelationsStore(RelationsWorkerStore):
         rel_type = relation.get("rel_type")
         if rel_type not in (
             RelationTypes.ANNOTATION,
-            RelationTypes.REFERENCES,
-            RelationTypes.REPLACES,
+            RelationTypes.REFERENCE,
+            RelationTypes.REPLACE,
         ):
             # Unknown relation type
             return
@@ -413,7 +413,7 @@ class RelationsStore(RelationsWorkerStore):
             self.get_aggregation_groups_for_event.invalidate_many, (parent_id,)
         )
 
-        if rel_type == RelationTypes.REPLACES:
+        if rel_type == RelationTypes.REPLACE:
             txn.call_after(self.get_applicable_edit.invalidate, (parent_id,))
 
     def _handle_redaction(self, txn, redacted_event_id):
