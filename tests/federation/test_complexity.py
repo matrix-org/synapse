@@ -13,16 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
 from twisted.internet import defer
 
-from synapse.api.errors import Codes, SynapseError
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-from synapse.types import UserID
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
