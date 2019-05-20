@@ -321,7 +321,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_aggregation_redactions(self):
-        """Test that annotations get correctly aggregated after a redactions.
+        """Test that annotations get correctly aggregated after a redaction.
         """
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
@@ -333,7 +333,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.json_body)
 
-        # Now lets redact the 'a' reaction
+        # Now lets redact one of the 'a' reactions
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/%s/redact/%s" % (self.room, to_redact_event_id),
