@@ -822,10 +822,16 @@ class AdminRestResource(JsonResource):
 
     def __init__(self, hs):
         JsonResource.__init__(self, hs, canonical_json=False)
+        register_servlets(hs, self)
 
-        register_servlets_for_client_rest_resource(hs, self)
-        SendServerNoticeServlet(hs).register(self)
-        VersionServlet(hs).register(self)
+
+def register_servlets(hs, http_server):
+    """
+    Register all the admin servlets.
+    """
+    register_servlets_for_client_rest_resource(hs, http_server)
+    SendServerNoticeServlet(hs).register(http_server)
+    VersionServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):
