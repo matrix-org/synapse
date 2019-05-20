@@ -230,8 +230,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.assertFalse(self.store.is_support_user(res[0]))
 
     def test_invalid_user_id_length(self):
-        invalid_user_id = "x"*257
-        res = self.get_failure(
+        invalid_user_id = "x" * 256
+        self.get_failure(
             self.handler.register(localpart=invalid_user_id),
             SynapseError
         )
