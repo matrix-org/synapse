@@ -320,6 +320,43 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             },
         )
 
+    def test_aggregation_redactions(self):
+        """Test that annotations get correctly aggregated after a redactions.
+        """
+
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self.assertEquals(200, channel.code, channel.json_body)
+        to_redact_event_id = channel.json_body["event_id"]
+
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # Now lets redact the 'a' reaction
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/%s/redact/%s" % (self.room, to_redact_event_id),
+            access_token=self.user_token,
+            content={},
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/rooms/%s/aggregations/%s"
+            % (self.room, self.parent_id),
+            access_token=self.user_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        self.assertEquals(
+            channel.json_body,
+            {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
+        )
+
     def test_aggregation_must_be_annotation(self):
         """Test that aggregations must be annotations.
         """
