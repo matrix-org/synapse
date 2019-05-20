@@ -33,7 +33,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
     ]
 
     def default_config(self, name='test'):
-        config = super().default_config(name=name)
+        config = super(RoomComplexityTests, self).default_config(name=name)
         config["limit_large_remote_room_joins"] = True
         config["limit_large_remote_room_complexity"] = 0.05
         return config
