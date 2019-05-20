@@ -19,7 +19,7 @@ import logging
 from twisted.internet import defer
 
 from synapse import types
-from synapse.api.constants import MAX_USER_ID_LENGTH, LoginType
+from synapse.api.constants import MAX_USERID_LENGTH, LoginType
 from synapse.api.errors import (
     AuthError,
     Codes,
