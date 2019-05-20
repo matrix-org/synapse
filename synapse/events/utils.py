@@ -346,7 +346,7 @@ class EventClientSerializer(object):
             defer.returnValue(event)
 
         event_id = event.event_id
-        event = serialize_event(event, time_now, **kwargs)
+        serialized_event = serialize_event(event, time_now, **kwargs)
 
         # If MSC1849 is enabled then we need to look if thre are any relations
         # we need to bundle in with the event
@@ -359,14 +359,34 @@ class EventClientSerializer(object):
             )
 
             if annotations.chunk:
-                r = event["unsigned"].setdefault("m.relations", {})
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
                 r[RelationTypes.ANNOTATION] = annotations.to_dict()
 
             if references.chunk:
-                r = event["unsigned"].setdefault("m.relations", {})
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
                 r[RelationTypes.REFERENCES] = references.to_dict()
 
-        defer.returnValue(event)
+            edit = None
+            if event.type == EventTypes.Message:
+                edit = yield self.store.get_applicable_edit(event_id)
+
+            if edit:
+                # If there is an edit replace the content, preserving existing
+                # relations.
+
+                relations = event.content.get("m.relates_to")
+                serialized_event["content"] = edit.content.get("m.new_content", {})
+                if relations:
+                    serialized_event["content"]["m.relates_to"] = relations
+                else:
+                    serialized_event["content"].pop("m.relates_to", None)
+
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.REPLACES] = {
+                    "event_id": edit.event_id,
+                }
+
+        defer.returnValue(serialized_event)
 
     def serialize_events(self, events, time_now, **kwargs):
         """Serializes multiple events.

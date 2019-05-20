@@ -143,3 +143,4 @@ class SlavedEventStore(EventFederationWorkerStore,
         if relates_to:
             self.get_relations_for_event.invalidate_many((relates_to,))
             self.get_aggregation_groups_for_event.invalidate_many((relates_to,))
+            self.get_applicable_edit.invalidate((relates_to,))
