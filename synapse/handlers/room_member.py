@@ -518,7 +518,6 @@ class RoomMemberHandler(object):
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
                 # perhaps we've been invited
-                print(target.to_string(), room_id)
                 inviter = yield self._get_inviter(target.to_string(), room_id)
                 if not inviter:
                     raise SynapseError(404, "Not a known room")
@@ -1018,7 +1017,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         self.distributor.declare("user_left_room")
 
     @defer.inlineCallbacks
-    def _check_room_complexity_remote(self, room_id, remote_room_hosts):
+    def _is_remote_room_too_complex(self, room_id, remote_room_hosts):
         """
         Check if complexity of a remote room is too great.
 
@@ -1041,7 +1040,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         return None
 
     @defer.inlineCallbacks
-    def _check_room_complexity_local(self, room_id):
+    def _is_local_room_too_complex(self, room_id):
         """
         Check if the complexity of a local room is too great.
 
@@ -1074,10 +1073,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         if self.hs.config.limit_large_room_joins:
             # Fetch the room complexity
-            complexity = yield self._check_room_complexity_remote(
+            too_complex = yield self._is_remote_room_too_complex(
                 room_id, remote_room_hosts
             )
-            if complexity is True:
+            if too_complex is True:
                 msg = "Room too large (preflight)"
                 raise SynapseError(
                     code=400, msg=msg,
@@ -1099,17 +1098,18 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         # Check the room we just joined wasn't too large, if we didn't fetch the
         # complexity of it before.
         if self.hs.config.limit_large_room_joins:
-            if complexity is False:
+            if too_complex is False:
                 # We checked, and we're under the limit.
                 return
 
             # Check again, but with the local state events
-            complexity = yield self._check_room_complexity_local(room_id)
+            too_complex = yield self._is_local_room_too_complex(room_id)
 
-            if complexity is False:
+            if too_complex is False:
                 # We're under the limit.
                 return
 
+            # The room is too large. Leave.
             requester = types.create_requester(
                 user, None, False, None
             )

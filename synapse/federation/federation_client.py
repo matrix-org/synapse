@@ -1021,8 +1021,8 @@ class FederationClient(FederationBase):
             )
         except Exception as e:
             logger.exception(
-                "Failed to fetch room complexity via %s for %s: %s",
-                destination, room_id, str(e)
+                "Failed to fetch room complexity via %s for %s",
+                destination, room_id
             )
 
         # If we don't manage to find it, return None. It's not an error if a
