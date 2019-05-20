@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2015-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +30,10 @@ class PasswordConfig(Config):
         self.password_enabled = password_config.get("enabled", True)
         self.password_pepper = password_config.get("pepper", "")
 
+        # Password policy
+        self.password_policy = password_config.get("policy", {})
+        self.password_policy_enabled = self.password_policy.pop("enabled", False)
+
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """\
         password_config:
@@ -39,4 +45,14 @@ class PasswordConfig(Config):
            # DO NOT CHANGE THIS AFTER INITIAL SETUP!
            #
            #pepper: "EVEN_MORE_SECRET"
+
+           # Password policy.
+           #
+           #policy:
+           #  enabled: true
+           #  minimum_length: 15
+           #  require_digit: true
+           #  require_symbol: true
+           #  require_lowercase: true
+           #  require_uppercase: true
         """

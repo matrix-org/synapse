@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,6 +64,7 @@ from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
+from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
@@ -187,6 +190,7 @@ class HomeServer(object):
         'registration_handler',
         'account_validity_handler',
         'event_client_serializer',
+        'password_policy_handler',
     ]
 
     REQUIRED_ON_MASTER_STARTUP = [
@@ -515,6 +519,9 @@ class HomeServer(object):
 
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
+
+    def build_password_policy_handler(self):
+        return PasswordPolicyHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

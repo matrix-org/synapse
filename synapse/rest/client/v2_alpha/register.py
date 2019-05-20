@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 - 2016 OpenMarket Ltd
-# Copyright 2017 Vector Creations Ltd
+# Copyright 2015-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -200,6 +201,7 @@ class RegisterRestServlet(RestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()
+        self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
 
     @interactive_auth_handler
@@ -243,6 +245,7 @@ class RegisterRestServlet(RestServlet):
             if (not isinstance(body['password'], string_types) or
                     len(body['password']) > 512):
                 raise SynapseError(400, "Invalid password")
+            self.password_policy_handler.validate_password(body['password'])
             desired_password = body["password"]
 
         desired_username = None
