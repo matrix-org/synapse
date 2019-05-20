@@ -22,7 +22,7 @@ from canonicaljson import encode_canonical_json, json
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RelationTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -600,6 +600,20 @@ class EventCreationHandler(object):
             context.app_service = requester.app_service
 
         self.validator.validate_new(event)
+
+        # We now check that if this event is an annotation that the can't
+        # annotate the same way twice (e.g. stops users from liking an event
+        # multiple times).
+        relation = event.content.get("m.relates_to", {})
+        if relation.get("rel_type") == RelationTypes.ANNOTATION:
+            relates_to = relation["event_id"]
+            aggregation_key = relation["key"]
+
+            already_exists = yield self.store.has_user_annotated_event(
+                relates_to, event.type, aggregation_key, event.sender,
+            )
+            if already_exists:
+                raise SynapseError(400, "Can't send same reaction twice")
 
         logger.debug(
             "Created event %s",

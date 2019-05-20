@@ -350,9 +350,7 @@ class RelationsWorkerStore(SQLBaseStore):
         """
 
         def _get_applicable_edit_txn(txn):
-            txn.execute(
-                sql, (event_id, RelationTypes.REPLACE,)
-            )
+            txn.execute(sql, (event_id, RelationTypes.REPLACE))
             row = txn.fetchone()
             if row:
                 return row[0]
@@ -366,6 +364,50 @@ class RelationsWorkerStore(SQLBaseStore):
 
         edit_event = yield self.get_event(edit_id, allow_none=True)
         defer.returnValue(edit_event)
+
+    def has_user_annotated_event(self, parent_id, event_type, aggregation_key, sender):
+        """Check if a user has already annotated an event with the same key
+        (e.g. already liked an event).
+
+        Args:
+            parent_id (str): The event being annotated
+            event_type (str): The event type of the annotation
+            aggregation_key (str): The aggregation key of the annotation
+            sender (str): The sender of the annotation
+
+        Returns:
+            Deferred[bool]
+        """
+
+        sql = """
+            SELECT 1 FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE
+                relates_to_id = ?
+                AND relation_type = ?
+                AND type = ?
+                AND sender = ?
+                AND aggregation_key = ?
+            LIMIT 1;
+        """
+
+        def _get_if_user_has_annotated_event(txn):
+            txn.execute(
+                sql,
+                (
+                    parent_id,
+                    RelationTypes.ANNOTATION,
+                    event_type,
+                    sender,
+                    aggregation_key,
+                ),
+            )
+
+            return bool(txn.fetchone())
+
+        return self.runInteraction(
+            "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
+        )
 
 
 class RelationsStore(RelationsWorkerStore):
