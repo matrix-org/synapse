@@ -26,7 +26,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.filtering import Filter
-from synapse.events.utils import format_event_for_client_v2, serialize_event
+from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     assert_params_in_dict,
     parse_integer,
@@ -537,6 +537,7 @@ class RoomEventServlet(ClientV1RestServlet):
         super(RoomEventServlet, self).__init__(hs)
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
@@ -545,7 +546,8 @@ class RoomEventServlet(ClientV1RestServlet):
 
         time_now = self.clock.time_msec()
         if event:
-            defer.returnValue((200, serialize_event(event, time_now)))
+            event = yield self._event_serializer.serialize_event(event, time_now)
+            defer.returnValue((200, event))
         else:
             defer.returnValue((404, "Event not found."))
 
@@ -559,6 +561,7 @@ class RoomEventContextServlet(ClientV1RestServlet):
         super(RoomEventContextServlet, self).__init__(hs)
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
@@ -588,16 +591,18 @@ class RoomEventContextServlet(ClientV1RestServlet):
             )
 
         time_now = self.clock.time_msec()
-        results["events_before"] = [
-            serialize_event(event, time_now) for event in results["events_before"]
-        ]
-        results["event"] = serialize_event(results["event"], time_now)
-        results["events_after"] = [
-            serialize_event(event, time_now) for event in results["events_after"]
-        ]
-        results["state"] = [
-            serialize_event(event, time_now) for event in results["state"]
-        ]
+        results["events_before"] = yield self._event_serializer.serialize_events(
+            results["events_before"], time_now,
+        )
+        results["event"] = yield self._event_serializer.serialize_event(
+            results["event"], time_now,
+        )
+        results["events_after"] = yield self._event_serializer.serialize_events(
+            results["events_after"], time_now,
+        )
+        results["state"] = yield self._event_serializer.serialize_events(
+            results["state"], time_now,
+        )
 
         defer.returnValue((200, results))
 

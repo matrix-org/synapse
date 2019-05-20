@@ -27,6 +27,7 @@ import twisted.logger
 from twisted.internet.defer import Deferred
 from twisted.trial import unittest
 
+from synapse.config.homeserver import HomeServerConfig
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest
 from synapse.server import HomeServer
@@ -245,7 +246,7 @@ class HomeserverTestCase(TestCase):
 
     def default_config(self, name="test"):
         """
-        Get a default HomeServer config object.
+        Get a default HomeServer config dict.
 
         Args:
             name (str): The homeserver name/domain.
@@ -335,7 +336,14 @@ class HomeserverTestCase(TestCase):
         kwargs.update(self._hs_args)
         if "config" not in kwargs:
             config = self.default_config()
-            kwargs["config"] = config
+        else:
+            config = kwargs["config"]
+
+        # Parse the config from a config dict into a HomeServerConfig
+        config_obj = HomeServerConfig()
+        config_obj.parse_config_dict(config)
+        kwargs["config"] = config_obj
+
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
 

@@ -29,7 +29,12 @@ from tests import unittest
 class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs_config = self.default_config("test")
-        hs_config.server_notices_mxid = "@server:test"
+        hs_config["server_notices"] = {
+            "system_mxid_localpart": "server",
+            "system_mxid_display_name": "test display name",
+            "system_mxid_avatar_url": None,
+            "room_name": "Server Notices",
+        }
 
         hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
         return hs
@@ -79,7 +84,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._send_notice.assert_not_called()
         # Test when mau limiting disabled
         self.hs.config.hs_disabled = False
-        self.hs.limit_usage_by_mau = False
+        self.hs.config.limit_usage_by_mau = False
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
         self._send_notice.assert_not_called()

@@ -63,11 +63,7 @@ class TransportLayerServer(JsonResource):
         self.authenticator = Authenticator(hs)
         self.ratelimiter = FederationRateLimiter(
             self.clock,
-            window_size=hs.config.federation_rc_window_size,
-            sleep_limit=hs.config.federation_rc_sleep_limit,
-            sleep_msec=hs.config.federation_rc_sleep_delay,
-            reject_limit=hs.config.federation_rc_reject_limit,
-            concurrent_requests=hs.config.federation_rc_concurrent,
+            config=hs.config.rc_federation,
         )
 
         self.register_servlets()
