@@ -1325,6 +1325,9 @@ class EventsStore(
                     txn, event.room_id, event.redacts
                 )
 
+                # Remove from relations table.
+                self._handle_redaction(txn, event.redacts)
+
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
         self._handle_mult_prev_events(
