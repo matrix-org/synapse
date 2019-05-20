@@ -35,7 +35,7 @@ virtualenv -p python3 ~/synapse/env
 source ~/synapse/env/bin/activate
 pip install --upgrade pip
 pip install --upgrade setuptools
-pip install matrix-synapse[all]
+pip install matrix-synapse
 ```
 
 This will download Synapse from [PyPI](https://pypi.org/project/matrix-synapse)
@@ -48,7 +48,7 @@ update flag:
 
 ```
 source ~/synapse/env/bin/activate
-pip install -U matrix-synapse[all]
+pip install -U matrix-synapse
 ```
 
 Before you can start Synapse, you will need to generate a configuration

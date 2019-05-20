@@ -23,6 +23,9 @@ MAX_DEPTH = 2**63 - 1
 # the maximum length for a room alias is 255 characters
 MAX_ALIAS_LENGTH = 255
 
+# the maximum length for a user id is 255 characters
+MAX_USERID_LENGTH = 255
+
 
 class Membership(object):
 
@@ -116,3 +119,11 @@ class UserTypes(object):
     """
     SUPPORT = "support"
     ALL_USER_TYPES = (SUPPORT,)
+
+
+class RelationTypes(object):
+    """The types of relations known to this server.
+    """
+    ANNOTATION = "m.annotation"
+    REPLACE = "m.replace"
+    REFERENCE = "m.reference"
