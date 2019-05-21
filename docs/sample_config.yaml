@@ -83,6 +83,15 @@ pid_file: DATADIR/homeserver.pid
 #
 #restrict_public_rooms_to_local_users: true
 
+# The default room version for newly created rooms.
+#
+# Known room versions are listed here:
+# https://matrix.org/docs/spec/#complete-list-of-room-versions
+#
+# For example, for room version 1, default_room_version should be set
+# to "1".
+default_room_version: "1"
+
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
 #gc_thresholds: [700, 10, 10]
