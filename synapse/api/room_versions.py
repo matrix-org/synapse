@@ -77,9 +77,9 @@ class RoomVersions(object):
         EventFormatVersions.V2,
         StateResolutionVersions.V2,
     )
-    EVENTID_NOSLASH_TEST = RoomVersion(
-        "eventid-noslash-test",
-        RoomDisposition.UNSTABLE,
+    V4 = RoomVersion(
+        "4",
+        RoomDisposition.STABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
     )
@@ -95,6 +95,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V2,
         RoomVersions.V3,
         RoomVersions.STATE_V2_TEST,
-        RoomVersions.EVENTID_NOSLASH_TEST,
+        RoomVersions.V4,
     )
 }   # type: dict[str, RoomVersion]
