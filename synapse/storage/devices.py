@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 
-from six import iteritems, itervalues
+from six import iteritems
 
 from canonicaljson import json
 
@@ -79,11 +79,9 @@ class DeviceWorkerStore(SQLBaseStore):
         Returns:
             (int, list[dict]): current stream id and list of updates
         """
-        if limit < 1:
-            raise RuntimeError("Device limit must be at least 1")
-
         now_stream_id = self._device_list_id_gen.get_current_token()
 
+        # Why is this False in the test?
         has_changed = self._device_list_federation_stream_cache.has_entity_changed(
             destination, int(from_stream_id)
         )
@@ -115,9 +113,11 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # Check if the last and second-to-last row's stream_id's are the same
         if (
+            len(updates) > 1 and
             len(updates) > limit and
             updates[-1][2] == updates[-2][2]
         ):
+            # If so, cap our maximum stream_id at that final stream_id
             now_stream_id = updates[-1][2]
 
         # Perform the equivalent of a GROUP BY
@@ -138,19 +138,18 @@ class DeviceWorkerStore(SQLBaseStore):
             query_map[key] = max(query_map.get(key, 0), update[2])
 
         # If we ended up not being left over with any device updates to send
-        # out, then skip this stream_id.
+        # out (because there was more device updates with the same stream_id
+        # that our defined limit allows), then just skip this stream_id.
         #
         # The list of updates associated with this stream_id is too large and
         # thus we're just going to assume it was a client-side error and not
         # send them. We return an empty list of updates instead.
         if not query_map:
             defer.returnValue((now_stream_id + 1, []))
-        elif len(query_map) >= limit:
-            now_stream_id = max(stream_id for stream_id in itervalues(query_map))
 
         results = yield self.runInteraction(
-            "_get_devices_txn",
-            self._get_devices_txn,
+            "_get_device_update_edus_by_remote_txn",
+            self._get_device_update_edus_by_remote_txn,
             destination,
             from_stream_id,
             now_stream_id,

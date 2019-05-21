@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from twisted.internet import defer
 
 import synapse.api.errors
 
 import tests.unittest
 import tests.utils
+
+logger = logging.getLogger(__name__)
 
 
 class DeviceStoreTestCase(tests.unittest.TestCase):
@@ -73,7 +77,29 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_devices_by_remote(self):
-        self.store.store_device()
+        device_ids = ["device_id1", "device_id2"]
+
+        # Add a device update to the stream
+        stream_id = yield self.store.add_device_change_to_streams(
+            "user_id", device_ids, ["somehost"],
+        )
+
+        res = yield self.store.get_devices_by_remote("somehost", 0, limit=100)
+
+        logger.info("Res: %s", res)
+        self.assertEqual(1, 2)
+
+        device_updates = res[1]
+
+        for update in device_updates:
+            d_id = update["device_id"]
+            if d_id in device_ids:
+                del device_ids[d_id]
+
+        logger.info("stream_id: %s, updates: %s", stream_id, res)
+
+        # All device_ids should've been accounted for
+        self.assertEqual(len(device_ids), 0)
 
     @defer.inlineCallbacks
     def test_update_device(self):
