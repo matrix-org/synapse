@@ -187,7 +187,9 @@ class EventContext(object):
 
         Returns:
             Deferred[dict[(str, str), str]|None]: Returns None if state_group
-            is None, which happens when the associated event is an outlier.
+                is None, which happens when the associated event is an outlier.
+                Maps a (type, state_key) to the event ID of the state event matching
+                this tuple.
         """
 
         if not self._fetching_state_deferred:
@@ -205,7 +207,9 @@ class EventContext(object):
 
         Returns:
             Deferred[dict[(str, str), str]|None]: Returns None if state_group
-            is None, which happens when the associated event is an outlier.
+                is None, which happens when the associated event is an outlier.
+                Maps a (type, state_key) to the event ID of the state event matching
+                this tuple.
         """
 
         if not self._fetching_state_deferred:

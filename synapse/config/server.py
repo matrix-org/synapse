@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
 
 import logging
 import os.path
+
+from netaddr import IPSet
 
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
@@ -72,6 +75,19 @@ class ServerConfig(Config):
         # master, potentially causing inconsistency.
         self.enable_media_repo = config.get("enable_media_repo", True)
 
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API.
+        self.require_auth_for_profile_requests = config.get(
+            "require_auth_for_profile_requests", False,
+        )
+
+        # If set to 'True', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation.
+        self.restrict_public_rooms_to_local_users = config.get(
+            "restrict_public_rooms_to_local_users", False,
+        )
+
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
         # errors when attempting to search for messages.
@@ -83,6 +99,11 @@ class ServerConfig(Config):
         # (other than those sent by local server admins)
         self.block_non_admin_invites = config.get(
             "block_non_admin_invites", False,
+        )
+
+        # Whether to enable experimental MSC1849 (aka relations) support
+        self.experimental_msc1849_support_enabled = config.get(
+            "experimental_msc1849_support_enabled", False,
         )
 
         # Options to control access by tracking MAU
@@ -124,6 +145,24 @@ class ServerConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
+        self.federation_ip_range_blacklist = config.get(
+            "federation_ip_range_blacklist", [],
+        )
+
+        # Attempt to create an IPSet from the given ranges
+        try:
+            self.federation_ip_range_blacklist = IPSet(
+                self.federation_ip_range_blacklist
+            )
+
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
+        except Exception as e:
+            raise ConfigError(
+                "Invalid range(s) provided in "
+                "federation_ip_range_blacklist: %s" % e
+            )
+
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != '/':
                 self.public_baseurl += '/'
@@ -139,6 +178,10 @@ class ServerConfig(Config):
         self.require_membership_for_aliases = config.get(
             "require_membership_for_aliases", True,
         )
+
+        # Whether to allow per-room membership profiles through the send of membership
+        # events with profile information that differ from the target's global profile.
+        self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
         self.listeners = []
         for listener in config.get("listeners", []):
@@ -327,6 +370,20 @@ class ServerConfig(Config):
         #
         #use_presence: false
 
+        # Whether to require authentication to retrieve profile data (avatars,
+        # display names) of other users through the client API. Defaults to
+        # 'false'. Note that profile data is also available via the federation
+        # API, so this setting is of limited value if federation is enabled on
+        # the server.
+        #
+        #require_auth_for_profile_requests: true
+
+        # If set to 'true', requires authentication to access the server's
+        # public rooms directory through the client API, and forbids any other
+        # homeserver to fetch it via federation. Defaults to 'false'.
+        #
+        #restrict_public_rooms_to_local_users: true
+
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
         #gc_thresholds: [700, 10, 10]
@@ -358,6 +415,24 @@ class ServerConfig(Config):
         #  - lon.example.com
         #  - nyc.example.com
         #  - syd.example.com
+
+        # Prevent federation requests from being sent to the following
+        # blacklist IP address CIDR ranges. If this option is not specified, or
+        # specified with an empty list, no ip range blacklist will be enforced.
+        #
+        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+        # listed here, since they correspond to unroutable addresses.)
+        #
+        federation_ip_range_blacklist:
+          - '127.0.0.0/8'
+          - '10.0.0.0/8'
+          - '172.16.0.0/12'
+          - '192.168.0.0/16'
+          - '100.64.0.0/10'
+          - '169.254.0.0/16'
+          - '::1/128'
+          - 'fe80::/64'
+          - 'fc00::/7'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
@@ -501,6 +576,12 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #require_membership_for_aliases: false
+
+        # Whether to allow per-room membership profiles through the send of membership
+        # events with profile information that differ from the target's global profile.
+        # Defaults to 'true'.
+        #
+        #allow_per_room_profiles: false
         """ % locals()
 
     def read_arguments(self, args):

@@ -1330,6 +1330,9 @@ class EventsStore(
                     txn, event.room_id, event.redacts
                 )
 
+                # Remove from relations table.
+                self._handle_redaction(txn, event.redacts)
+
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
         self._handle_mult_prev_events(
@@ -1355,6 +1358,8 @@ class EventsStore(
             elif event.type == EventTypes.GuestAccess:
                 # Insert into the event_search table.
                 self._store_guest_access_txn(txn, event)
+
+            self._handle_event_relations(txn, event)
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -1660,10 +1665,11 @@ class EventsStore(
         def get_all_new_forward_event_rows(txn):
             sql = (
                 "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? < stream_ordering AND stream_ordering <= ?"
                 " ORDER BY stream_ordering ASC"
                 " LIMIT ?"
@@ -1678,11 +1684,12 @@ class EventsStore(
 
             sql = (
                 "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " INNER JOIN ex_outlier_stream USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? < event_stream_ordering"
                 " AND event_stream_ordering <= ?"
                 " ORDER BY event_stream_ordering DESC"
@@ -1703,10 +1710,11 @@ class EventsStore(
         def get_all_new_backfill_event_rows(txn):
             sql = (
                 "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? > stream_ordering AND stream_ordering >= ?"
                 " ORDER BY stream_ordering ASC"
                 " LIMIT ?"
@@ -1721,11 +1729,12 @@ class EventsStore(
 
             sql = (
                 "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " state_key, redacts"
+                " state_key, redacts, relates_to_id"
                 " FROM events AS e"
                 " INNER JOIN ex_outlier_stream USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
                 " WHERE ? > event_stream_ordering"
                 " AND event_stream_ordering >= ?"
                 " ORDER BY event_stream_ordering DESC"

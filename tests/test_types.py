@@ -94,8 +94,7 @@ class MapUsernameTestCase(unittest.TestCase):
 
     def testSymbols(self):
         self.assertEqual(
-            map_username_to_mxid_localpart("test=$?_1234"),
-            "test=3d=24=3f_1234",
+            map_username_to_mxid_localpart("test=$?_1234"), "test=3d=24=3f_1234"
         )
 
     def testLeadingUnderscore(self):
@@ -105,6 +104,5 @@ class MapUsernameTestCase(unittest.TestCase):
         # this should work with either a unicode or a bytes
         self.assertEqual(map_username_to_mxid_localpart(u'têst'), "t=c3=aast")
         self.assertEqual(
-            map_username_to_mxid_localpart(u'têst'.encode('utf-8')),
-            "t=c3=aast",
+            map_username_to_mxid_localpart(u'têst'.encode('utf-8')), "t=c3=aast"
         )

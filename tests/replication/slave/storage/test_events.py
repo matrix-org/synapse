@@ -234,10 +234,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.member", sender=USER_ID_2, key=USER_ID_2, membership="join"
         )
         msg, msgctx = self.build_event()
-        self.get_success(self.master_store.persist_events([
-            (j2, j2ctx),
-            (msg, msgctx),
-        ]))
+        self.get_success(self.master_store.persist_events([(j2, j2ctx), (msg, msgctx)]))
         self.replicate()
 
         event_source = RoomEventSource(self.hs)
@@ -257,15 +254,13 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             #
             # First, we get a list of the rooms we are joined to
             joined_rooms = self.get_success(
-                self.slaved_store.get_rooms_for_user_with_stream_ordering(
-                    USER_ID_2,
-                ),
+                self.slaved_store.get_rooms_for_user_with_stream_ordering(USER_ID_2)
             )
 
             # Then, we get a list of the events since the last sync
             membership_changes = self.get_success(
                 self.slaved_store.get_membership_changes_for_user(
-                    USER_ID_2, prev_token, current_token,
+                    USER_ID_2, prev_token, current_token
                 )
             )
 
@@ -298,9 +293,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                 self.master_store.persist_events([(event, context)], backfilled=True)
             )
         else:
-            self.get_success(
-                self.master_store.persist_event(event, context)
-            )
+            self.get_success(self.master_store.persist_event(event, context))
 
         return event
 
@@ -359,9 +352,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             )
         else:
             state_handler = self.hs.get_state_handler()
-            context = self.get_success(state_handler.compute_event_context(
-                event
-            ))
+            context = self.get_success(state_handler.compute_event_context(event))
 
         self.master_store.add_push_actions_to_staging(
             event.event_id, {user_id: actions for user_id, actions in push_actions}

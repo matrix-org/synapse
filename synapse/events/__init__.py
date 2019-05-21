@@ -335,11 +335,30 @@ class FrozenEventV2(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<FrozenEventV2 event_id='%s', type='%s', state_key='%s'>" % (
+        return "<%s event_id='%s', type='%s', state_key='%s'>" % (
+            self.__class__.__name__,
             self.event_id,
             self.get("type", None),
             self.get("state_key", None),
         )
+
+
+class FrozenEventV3(FrozenEventV2):
+    """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
+    format_version = EventFormatVersions.V3  # All events of this type are V3
+
+    @property
+    def event_id(self):
+        # We have to import this here as otherwise we get an import loop which
+        # is hard to break.
+        from synapse.crypto.event_signing import compute_event_reference_hash
+
+        if self._event_id:
+            return self._event_id
+        self._event_id = "$" + encode_base64(
+            compute_event_reference_hash(self)[1], urlsafe=True
+        )
+        return self._event_id
 
 
 def room_version_to_event_format(room_version):
@@ -376,6 +395,8 @@ def event_type_from_format_version(format_version):
         return FrozenEvent
     elif format_version == EventFormatVersions.V2:
         return FrozenEventV2
+    elif format_version == EventFormatVersions.V3:
+        return FrozenEventV3
     else:
         raise Exception(
             "No event format %r" % (format_version,)

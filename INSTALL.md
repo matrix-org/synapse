@@ -35,7 +35,7 @@ virtualenv -p python3 ~/synapse/env
 source ~/synapse/env/bin/activate
 pip install --upgrade pip
 pip install --upgrade setuptools
-pip install matrix-synapse[all]
+pip install matrix-synapse
 ```
 
 This will download Synapse from [PyPI](https://pypi.org/project/matrix-synapse)
@@ -48,7 +48,7 @@ update flag:
 
 ```
 source ~/synapse/env/bin/activate
-pip install -U matrix-synapse[all]
+pip install -U matrix-synapse
 ```
 
 Before you can start Synapse, you will need to generate a configuration
@@ -257,9 +257,8 @@ https://github.com/spantaleev/matrix-docker-ansible-deploy
 #### Matrix.org packages
 
 Matrix.org provides Debian/Ubuntu packages of the latest stable version of
-Synapse via https://packages.matrix.org/debian/. To use them:
-
-For Debian 9 (Stretch), Ubuntu 16.04 (Xenial), and later:
+Synapse via https://packages.matrix.org/debian/. They are available for Debian
+9 (Stretch), Ubuntu 16.04 (Xenial), and later. To use them:
 
 ```
 sudo apt install -y lsb-release wget apt-transport-https
@@ -270,19 +269,6 @@ sudo apt update
 sudo apt install matrix-synapse-py3
 ```
 
-For Debian 8 (Jessie):
-
-```
-sudo apt install -y lsb-release wget apt-transport-https
-sudo wget -O /etc/apt/trusted.gpg.d/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
-echo "deb [signed-by=5586CCC0CBBBEFC7A25811ADF473DD4473365DE1] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
-    sudo tee /etc/apt/sources.list.d/matrix-org.list
-sudo apt update
-sudo apt install matrix-synapse-py3
-```
-
-The fingerprint of the repository signing key is AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058.
-
 **Note**: if you followed a previous version of these instructions which
 recommended using `apt-key add` to add an old key from
 `https://matrix.org/packages/debian/`, you should note that this key has been
@@ -290,6 +276,9 @@ revoked. You should remove the old key with `sudo apt-key remove
 C35EB17E1EAE708E6603A9B3AD0592FE47F0DF61`, and follow the above instructions to
 update your configuration.
 
+The fingerprint of the repository signing key (as shown by `gpg
+/usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
+`AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
 #### Downstream Debian/Ubuntu packages
 
