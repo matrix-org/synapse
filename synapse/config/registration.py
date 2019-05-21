@@ -123,6 +123,14 @@ class RegistrationConfig(Config):
         # link. ``%%(app)s`` can be used as a placeholder for the ``app_name`` parameter
         # from the ``email`` section.
         #
+        # Once this feature is enabled, Synapse will look for registered users without an
+        # expiration date at startup and will add one to every account it found using the
+        # current settings at that time.
+        # This means that, if a validity period is set, and Synapse is restarted (it will
+        # then derive an expiration date from the current validity period), and some time
+        # after that the validity period changes and Synapse is restarted, the users'
+        # expiration dates won't be updated unless their account is manually renewed.
+        #
         #account_validity:
         #  enabled: True
         #  period: 6w
