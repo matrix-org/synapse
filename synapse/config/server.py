@@ -36,6 +36,8 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
 
+DEFAULT_ROOM_VERSION = "1"
+
 
 class ServerConfig(Config):
 
@@ -90,7 +92,7 @@ class ServerConfig(Config):
         )
 
         self.default_room_version = config.get(
-            "default_room_version", "1",
+            "default_room_version", DEFAULT_ROOM_VERSION,
         )
 
         if self.default_room_version not in KNOWN_ROOM_VERSIONS:
@@ -405,7 +407,7 @@ class ServerConfig(Config):
         #
         # For example, for room version 1, default_room_version should be set
         # to "1".
-        default_room_version: "1"
+        default_room_version: %(DEFAULT_ROOM_VERSION)s
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
