@@ -601,9 +601,9 @@ class EventCreationHandler(object):
 
         self.validator.validate_new(event)
 
-        # We now check that if this event is an annotation that the can't
-        # annotate the same way twice (e.g. stops users from liking an event
-        # multiple times).
+        # If this event is an annotation then we check that that the sender
+        # can't annotate the same way twice (e.g. stops users from liking an
+        # event multiple times).
         relation = event.content.get("m.relates_to", {})
         if relation.get("rel_type") == RelationTypes.ANNOTATION:
             relates_to = relation["event_id"]
