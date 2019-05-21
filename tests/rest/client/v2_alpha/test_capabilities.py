@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import synapse.rest.admin
-from synapse.api.room_versions import get_default_room_version, KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, get_default_room_version
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import capabilities
 
