@@ -21,6 +21,7 @@ import six
 
 from unpaddedbase64 import encode_base64
 
+from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
@@ -369,12 +370,15 @@ def room_version_to_event_format(room_version):
 
     Returns:
         int
+
+    Raises:
+        UnsupportedRoomVersionError if the room version is unknown
     """
     v = KNOWN_ROOM_VERSIONS.get(room_version)
 
     if not v:
-        # We should have already checked version, so this should not happen
-        raise RuntimeError("Unrecognized room version %s" % (room_version,))
+        # this can happen if support is withdrawn for a room version
+        raise UnsupportedRoomVersionError()
 
     return v.event_format
 

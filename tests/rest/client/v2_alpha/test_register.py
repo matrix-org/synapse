@@ -1,3 +1,20 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import datetime
 import json
 import os
@@ -409,3 +426,41 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.assertEqual(len(self.email_attempts), 1)
+
+
+class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        self.validity_period = 10
+
+        config = self.default_config()
+
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": False,
+        }
+
+        self.hs = self.setup_test_homeserver(config=config)
+        self.hs.config.account_validity.period = self.validity_period
+
+        self.store = self.hs.get_datastore()
+
+        return self.hs
+
+    def test_background_job(self):
+        """
+        Tests whether the account validity startup background job does the right thing,
+        which is sticking an expiration date to every account that doesn't already have
+        one.
+        """
+        user_id = self.register_user("kermit", "user")
+
+        now_ms = self.hs.clock.time_msec()
+        self.get_success(self.store._set_expiration_date_when_missing())
+
+        res = self.get_success(self.store.get_expiration_ts_for_user(user_id))
+        self.assertEqual(res, now_ms + self.validity_period)

@@ -82,7 +82,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         # Artificially raise the complexity
         store = self.hs.get_datastore()
-        store.get_state_event_counts = lambda x: defer.succeed(500 * 1.23)
+        store.get_current_state_event_counts = lambda x: defer.succeed(500 * 1.23)
 
         # Get the room complexity again -- make sure it's our artificial value
         request, channel = self.make_request(
@@ -141,7 +141,9 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
 
         # Artificially raise the complexity
-        self.hs.get_datastore().get_state_event_counts = lambda x: defer.succeed(600)
+        self.hs.get_datastore().get_current_state_event_counts = lambda x: defer.succeed(
+            600
+        )
 
         d = handler._remote_join(
             None,

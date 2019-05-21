@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -725,17 +727,7 @@ class RegistrationStore(
             raise StoreError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
 
         if self._account_validity.enabled:
-            now_ms = self.clock.time_msec()
-            expiration_ts = now_ms + self._account_validity.period
-            self._simple_insert_txn(
-                txn,
-                "account_validity",
-                values={
-                    "user_id": user_id,
-                    "expiration_ts_ms": expiration_ts,
-                    "email_sent": False,
-                }
-            )
+            self.set_expiration_date_for_user_txn(txn, user_id)
 
         if token:
             # it's possible for this to get a conflict, but only for a single user

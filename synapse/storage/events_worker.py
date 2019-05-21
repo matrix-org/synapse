@@ -614,18 +614,27 @@ class EventsWorkerStore(SQLBaseStore):
 
         return self.runInteraction("get_rejection_reasons", f)
 
-    def _get_state_event_counts_txn(self, txn, room_id):
+    def _get_current_state_event_counts_txn(self, txn, room_id):
         """
-        See get_state_event_counts.
+        See get_current_state_event_counts.
         """
         sql = "SELECT COUNT(*) FROM current_state_events WHERE room_id=?"
         txn.execute(sql, (room_id,))
         row = txn.fetchone()
         return row[0] if row else 0
 
-    def get_state_event_counts(self, room_id):
+    def _get_total_state_event_counts_txn(self, txn, room_id):
         """
-        Gets the total number of state events in a room.
+        See get_total_state_event_counts.
+        """
+        sql = "SELECT COUNT(*) FROM state_events WHERE room_id=?"
+        txn.execute(sql, (room_id,))
+        row = txn.fetchone()
+        return row[0] if row else 0
+
+    def get_current_state_event_counts(self, room_id):
+        """
+        Gets the current number of state events in a room.
 
         Args:
             room_id (str)
@@ -634,7 +643,7 @@ class EventsWorkerStore(SQLBaseStore):
             Deferred[int]
         """
         return self.runInteraction(
-            "get_state_event_counts", self._get_state_event_counts_txn, room_id
+            "get_current_state_event_counts", self._get_current_state_event_counts_txn, room_id
         )
 
     @defer.inlineCallbacks
@@ -648,7 +657,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             Deferred[dict[str:int]] of complexity version to complexity.
         """
-        state_events = yield self.get_state_event_counts(room_id)
+        state_events = yield self.get_current_state_event_counts(room_id)
 
         # Call this one "v1", so we can introduce new ones as we want to develop
         # it.

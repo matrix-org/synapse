@@ -1916,6 +1916,11 @@ class FederationHandler(BaseHandler):
                     event.room_id, latest_event_ids=extrem_ids,
                 )
 
+            logger.debug(
+                "Doing soft-fail check for %s: state %s",
+                event.event_id, current_state_ids,
+            )
+
             # Now check if event pass auth against said current state
             auth_types = auth_types_for_event(event)
             current_state_ids = [
@@ -1932,7 +1937,7 @@ class FederationHandler(BaseHandler):
                 self.auth.check(room_version, event, auth_events=current_auth_events)
             except AuthError as e:
                 logger.warn(
-                    "Failed current state auth resolution for %r because %s",
+                    "Soft-failing %r because %s",
                     event, e,
                 )
                 event.internal_metadata.soft_failed = True
