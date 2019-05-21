@@ -15,9 +15,11 @@
 
 import json
 
+from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
+from synapse.rest import admin
 from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import password_policy, register
+from synapse.rest.client.v2_alpha import account, password_policy, register
 
 from tests import unittest
 
@@ -39,9 +41,11 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     """
 
     servlets = [
+        admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         register.register_servlets,
         password_policy.register_servlets,
+        account.register_servlets,
     ]
 
     def make_homeserver(self, reactor, clock):
@@ -144,3 +148,32 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
         # Getting a 401 here means the password has passed validation and the server has
         # responded with a list of registration flows.
         self.assertEqual(channel.code, 401, channel.result)
+
+    def test_password_change(self):
+        """This doesn't test every possible use case, only that hitting /account/password
+        triggers the password validation code.
+        """
+        compliant_password = "C0mpl!antpassword"
+        not_compliant_password = "notcompliantpassword"
+
+        user_id = self.register_user("kermit", compliant_password)
+        tok = self.login("kermit", compliant_password)
+
+        request_data = json.dumps({
+            "new_password": not_compliant_password,
+            "auth": {
+                "password": compliant_password,
+                "type": LoginType.PASSWORD,
+                "user": user_id,
+            }
+        })
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/account/password",
+            request_data,
+            access_token=tok,
+        )
+        self.render(request)
+
+        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.json_body["errcode"], Codes.PASSWORD_NO_DIGIT)
