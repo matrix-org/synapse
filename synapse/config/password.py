@@ -46,13 +46,33 @@ class PasswordConfig(Config):
            #
            #pepper: "EVEN_MORE_SECRET"
 
-           # Password policy.
+           # Define and enforce a password policy. Each parameter is optional, boolean
+           # parameters default to 'false' and integer parameters default to 0.
+           # This is an early implementation of MSC2000.
            #
            #policy:
-           #  enabled: true
-           #  minimum_length: 15
-           #  require_digit: true
-           #  require_symbol: true
-           #  require_lowercase: true
-           #  require_uppercase: true
+              # Whether to enforce the password policy.
+              #
+              #enabled: true
+
+              # Minimum accepted length for a password.
+              #
+              #minimum_length: 15
+
+              # Whether a password must contain at least one digit.
+              #
+              #require_digit: true
+
+              # Whether a password must contain at least one symbol.
+              # A symbol is any character that's not a number or a letter.
+              #
+              #require_symbol: true
+
+              # Whether a password must contain at least one lowercase letter.
+              #
+              #require_lowercase: true
+
+              # Whether a password must contain at least one lowercase letter.
+              #
+              #require_uppercase: true
         """
