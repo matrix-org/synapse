@@ -361,10 +361,14 @@ class PasswordRefusedError(SynapseError):
     """A password has been refused, either during password reset/change or registration.
     """
 
-    def __init__(self, errcode=Codes.WEAK_PASSWORD):
+    def __init__(
+        self,
+        msg="This password doesn't comply with the server's policy",
+        errcode=Codes.WEAK_PASSWORD,
+    ):
         super(PasswordRefusedError, self).__init__(
             code=400,
-            msg="This password doesn't comply with the server's policy",
+            msg=msg,
             errcode=errcode,
         )
 

@@ -46,29 +46,48 @@ class PasswordPolicyHandler(object):
         if not self.enabled:
             return
 
-        if len(password) < self.policy.get("minimum_length", 0):
-            raise PasswordRefusedError(Codes.PASSWORD_TOO_SHORT)
+        minimum_accepted_length = self.policy.get("minimum_length", 0)
+        if len(password) < minimum_accepted_length:
+            raise PasswordRefusedError(
+                msg=(
+                    "The password must be at least %d characters long"
+                    % minimum_accepted_length
+                ),
+                errcode=Codes.PASSWORD_TOO_SHORT,
+            )
 
         if (
             self.policy.get("require_digit", False) and
             self.regexp_digit.search(password) is None
         ):
-            raise PasswordRefusedError(Codes.PASSWORD_NO_DIGIT)
+            raise PasswordRefusedError(
+                msg="The password must include at least one digit",
+                errcode=Codes.PASSWORD_NO_DIGIT,
+            )
 
         if (
             self.policy.get("require_symbol", False) and
             self.regexp_symbol.search(password) is None
         ):
-            raise PasswordRefusedError(Codes.PASSWORD_NO_SYMBOL)
+            raise PasswordRefusedError(
+                msg="The password must include at least one symbol",
+                errcode=Codes.PASSWORD_NO_SYMBOL,
+            )
 
         if (
             self.policy.get("require_uppercase", False) and
             self.regexp_uppercase.search(password) is None
         ):
-            raise PasswordRefusedError(Codes.PASSWORD_NO_UPPERCASE)
+            raise PasswordRefusedError(
+                msg="The password must include at least one uppercase letter",
+                errcode=Codes.PASSWORD_NO_UPPERCASE,
+            )
 
         if (
             self.policy.get("require_lowercase", False) and
             self.regexp_lowercase.search(password) is None
         ):
-            raise PasswordRefusedError(Codes.PASSWORD_NO_LOWERCASE)
+            raise PasswordRefusedError(
+                msg="The password must include at least one lowercase letter",
+                errcode=Codes.PASSWORD_NO_LOWERCASE,
+            )
