@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ConfigError
-
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+
+from ._base import Config, ConfigError
 
 
 class RoomConfig(Config):
