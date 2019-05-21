@@ -32,7 +32,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.url = b"/_matrix/client/r0/capabilities"
         hs = self.setup_test_homeserver()
         self.store = hs.get_datastore()
-        self.config = hs.config()
+        self.config = hs.config
         return hs
 
     def test_check_auth_required(self):
