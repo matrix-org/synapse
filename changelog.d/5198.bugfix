@@ -1,0 +1,1 @@
+Prevent registration for user ids that are to long to fit into a state key. Contributed by Reid Anderson.

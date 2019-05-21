@@ -49,6 +49,7 @@ from .pusher import PusherStore
 from .receipts import ReceiptsStore
 from .registration import RegistrationStore
 from .rejections import RejectionsStore
+from .relations import RelationsStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
@@ -101,6 +102,7 @@ class DataStore(
     UserErasureStore,
     MonthlyActiveUsersStore,
     StatsStore,
+    RelationsStore,
 ):
     def __init__(self, db_conn, hs):
         self.hs = hs
