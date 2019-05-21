@@ -88,6 +88,16 @@ class ServerConfig(Config):
             "restrict_public_rooms_to_local_users", False,
         )
 
+        self.default_room_version = config.get(
+            "default_room_version", "1",
+        )
+
+        if self.default_room_version not in KNOWN_ROOM_VERSIONS:
+            raise ConfigError(
+                "Unknown default_room_version: %s, known room versions: %s" %
+                (self.default_room_version, KNOWN_ROOM_VERSIONS.keys)
+            )
+
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
         # errors when attempting to search for messages.
@@ -383,6 +393,15 @@ class ServerConfig(Config):
         # homeserver to fetch it via federation. Defaults to 'false'.
         #
         #restrict_public_rooms_to_local_users: true
+
+        # The default room version for newly created rooms.
+        #
+        # Known room versions are listed here:
+        # https://matrix.org/docs/spec/#complete-list-of-room-versions
+        #
+        # For example, for room version 1, default_room_version should be set
+        # to "1".
+        default_room_version: "1"
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #

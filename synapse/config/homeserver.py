@@ -31,7 +31,6 @@ from .push import PushConfig
 from .ratelimiting import RatelimitConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
-from .room import RoomConfig
 from .room_directory import RoomDirectoryConfig
 from .saml2_config import SAML2Config
 from .server import ServerConfig
@@ -51,6 +50,6 @@ class HomeServerConfig(ServerConfig, TlsConfig, DatabaseConfig, LoggingConfig,
                        WorkerConfig, PasswordAuthProviderConfig, PushConfig,
                        SpamCheckerConfig, GroupsConfig, UserDirectoryConfig,
                        ConsentConfig,
-                       ServerNoticesConfig, RoomDirectoryConfig, RoomConfig,
+                       ServerNoticesConfig, RoomDirectoryConfig,
                        ):
     pass
