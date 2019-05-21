@@ -80,7 +80,7 @@ class DeviceWorkerStore(SQLBaseStore):
             (int, list[dict]): current stream id and list of updates
         """
         if limit < 1:
-            raise StoreError("Device limit must be at least 1")
+            raise RuntimeError("Device limit must be at least 1")
 
         now_stream_id = self._device_list_id_gen.get_current_token()
 
@@ -90,28 +90,38 @@ class DeviceWorkerStore(SQLBaseStore):
         if not has_changed:
             defer.returnValue((now_stream_id, []))
 
+        # We retrieve n+1 devices from the list of outbound pokes where n is
+        # our outbound device update limit. We then check if the very last
+        # device has the same stream_id as the second-to-last device. If so,
+        # then we ignore all devices with that stream_id and only send the
+        # devices with a lower stream_id.
+        #
+        # If when culling the list we end up with no devices afterwards, we
+        # consider the device update to be too large, and simply skip the
+        # stream_id; the rationale being that such a large device list update
+        # is likely an error.
         updates = yield self.runInteraction(
             "get_devices_by_remote",
             self._get_devices_by_remote_txn,
             destination,
             from_stream_id,
             now_stream_id,
-            limit,
+            limit + 1,
         )
 
-        # Return if there are no updates
-        if len(updates) == 0:
+        # Return an empty list if there are no updates
+        if not updates:
             defer.returnValue((now_stream_id, []))
 
         # Check if the last and second-to-last row's stream_id's are the same
-        offending_stream_id = None
         if (
             len(updates) > limit and
             updates[-1][2] == updates[-2][2]
         ):
-            offending_stream_id = updates[-1][2]
+            now_stream_id = updates[-1][2]
 
         # Perform the equivalent of a GROUP BY
+        #
         # Iterate through the updates list and copy non-duplicate
         # (user_id, device_id) entries into a map, with the value being
         # the max stream_id across each set of duplicate entries
@@ -120,26 +130,27 @@ class DeviceWorkerStore(SQLBaseStore):
         # as long as their stream_id does not match that of the last row
         query_map = {}
         for update in updates:
-            if update[2] == offending_stream_id:
-                continue
+            if update[2] == now_stream_id:
+                # Stop processing updates
+                break
 
             key = (update[0], update[1])
-            if key in query_map and query_map[key] >= update[2]:
-                # Preserve larger stream_id
-                continue
-
-            query_map[key] = update[2]
+            query_map[key] = max(query_map.get(key, 0), update[2])
 
         # If we ended up not being left over with any device updates to send
-        # out, then skip this stream_id
-        if len(query_map) == 0:
+        # out, then skip this stream_id.
+        #
+        # The list of updates associated with this stream_id is too large and
+        # thus we're just going to assume it was a client-side error and not
+        # send them. We return an empty list of updates instead.
+        if not query_map:
             defer.returnValue((now_stream_id + 1, []))
         elif len(query_map) >= limit:
             now_stream_id = max(stream_id for stream_id in itervalues(query_map))
 
-        max_stream_id_and_results = yield self.runInteraction(
-            "_get_max_stream_id_for_devices_txn",
-            self._get_max_stream_id_for_devices_txn,
+        results = yield self.runInteraction(
+            "_get_devices_txn",
+            self._get_devices_txn,
             destination,
             from_stream_id,
             now_stream_id,
@@ -147,34 +158,26 @@ class DeviceWorkerStore(SQLBaseStore):
             limit,
         )
 
-        defer.returnValue(max_stream_id_and_results)
+        defer.returnValue((now_stream_id, results))
 
     def _get_devices_by_remote_txn(
         self, txn, destination, from_stream_id, now_stream_id, limit
     ):
-        # We retrieve n+1 devices from the list of outbound pokes were n is our
-        # maximum. In our parent function, we then check if the very last
-        # device has the same stream_id as the second-to-last device. If so,
-        # then we ignore all devices with that stream_id and only send the
-        # devices with a lower stream_id.
-        #
-        # If when culling the list we end up with no devices afterwards, we
-        # consider the device update to be too large, and simply skip the
-        # stream_id - the rationale being that such a large device list update
-        # is likely an error.
+        """Return device update information for a given remote destination"""
         sql = """
             SELECT user_id, device_id, stream_id FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
             ORDER BY stream_id
             LIMIT ?
         """
-        txn.execute(sql, (destination, from_stream_id, now_stream_id, False, limit + 1))
+        txn.execute(sql, (destination, from_stream_id, now_stream_id, False, limit))
 
         return list(txn)
 
-    def _get_max_stream_id_for_devices_txn(
+    def _get_device_update_edus_by_remote_txn(
         self, txn, destination, from_stream_id, now_stream_id, query_map, limit
     ):
+        """Returns a list of device update EDUs as well as E2EE keys"""
         devices = self._get_e2e_device_keys_txn(
             txn,
             query_map.keys(),
@@ -218,7 +221,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
                 results.append(result)
 
-        return (now_stream_id, results)
+        return results
 
     def mark_as_sent_devices_by_remote(self, destination, stream_id):
         """Mark that updates have successfully been sent to the destination.

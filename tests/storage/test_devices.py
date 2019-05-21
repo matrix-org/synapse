@@ -72,6 +72,10 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_get_devices_by_remote(self):
+        self.store.store_device()
+
+    @defer.inlineCallbacks
     def test_update_device(self):
         yield self.store.store_device("user_id", "device_id", "display_name 1")
 
