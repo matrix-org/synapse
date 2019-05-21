@@ -85,10 +85,6 @@ class RoomVersions(object):
     )
 
 
-# the version we will give rooms which are created on this server
-DEFAULT_ROOM_VERSION = RoomVersions.V1
-
-
 KNOWN_ROOM_VERSIONS = {
     v.identifier: v for v in (
         RoomVersions.V1,
@@ -98,3 +94,7 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.EVENTID_NOSLASH_TEST,
     )
 }   # type: dict[str, RoomVersion]
+
+# the version we will give rooms which are created on this server
+def get_default_room_version(config):
+    return KNOWN_ROOM_VERSIONS[config.default_room_version]
