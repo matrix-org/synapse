@@ -91,7 +91,13 @@ CONDITIONAL_REQUIREMENTS = {
 
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
-    "acme": ["txacme>=0.9.2"],
+    "acme": [
+        "txacme>=0.9.2",
+
+        # txacme depends on eliot. Eliot 1.8.0 is incompatible with
+        # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
+        'eliot<1.8.0;python_version<"3.5.3"',
+    ],
 
     "saml2": ["pysaml2>=4.5.0"],
     "systemd": ["systemd-python>=231"],
@@ -125,7 +131,7 @@ class DependencyException(Exception):
     @property
     def dependencies(self):
         for i in self.args[0]:
-            yield '"' + i + '"'
+            yield "'" + i + "'"
 
 
 def check_requirements(for_feature=None, _get_distribution=get_distribution):
