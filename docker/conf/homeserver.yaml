@@ -161,6 +161,9 @@ enable_group_creation: true
 trusted_third_party_id_servers:
     - matrix.org
     - vector.im
+{% if SYNAPSE_TURN_URIS %}
+    - SYNAPSE_ADDITIONAL_ID_SERVER
+{% endif %}
 
 ## Metrics ###
 
