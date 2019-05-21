@@ -33,7 +33,7 @@ from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
 from synapse.util.msisdn import phone_number_to_msisdn
 
-from .base import ClientV1RestServlet, client_path_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +81,8 @@ def login_id_thirdparty_from_phone(identifier):
     }
 
 
-class LoginRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login$")
+class LoginRestServlet(RestServlet):
+    PATTERNS = client_patterns("/login$")
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
@@ -371,7 +371,7 @@ class LoginRestServlet(ClientV1RestServlet):
 
 
 class CasRedirectServlet(RestServlet):
-    PATTERNS = client_path_patterns("/login/(cas|sso)/redirect")
+    PATTERNS = client_patterns("/login/(cas|sso)/redirect")
 
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
@@ -394,8 +394,8 @@ class CasRedirectServlet(RestServlet):
         finish_request(request)
 
 
-class CasTicketServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/cas/ticket", releases=())
+class CasTicketServlet(RestServlet):
+    PATTERNS = client_patterns("/login/cas/ticket", releases=())
 
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__(hs)

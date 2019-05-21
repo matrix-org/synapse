@@ -18,14 +18,15 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError
+from synapse.http.servlet import RestServlet
 
-from .base import ClientV1RestServlet, client_path_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class LogoutRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/logout$")
+class LogoutRestServlet(RestServlet):
+    PATTERNS = client_patterns("/logout$")
 
     def __init__(self, hs):
         super(LogoutRestServlet, self).__init__(hs)
@@ -59,8 +60,8 @@ class LogoutRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class LogoutAllRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/logout/all$")
+class LogoutAllRestServlet(RestServlet):
+    PATTERNS = client_patterns("/logout/all$")
 
     def __init__(self, hs):
         super(LogoutAllRestServlet, self).__init__(hs)

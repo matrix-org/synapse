@@ -22,7 +22,7 @@ from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.types import RoomAlias
 
-from .base import ClientV1RestServlet, client_path_patterns
+from .base import RestServlet, client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ def register_servlets(hs, http_server):
     ClientAppserviceDirectoryListServer(hs).register(http_server)
 
 
-class ClientDirectoryServer(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/directory/room/(?P<room_alias>[^/]*)$")
+class ClientDirectoryServer(RestServlet):
+    PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$")
 
     def __init__(self, hs):
         super(ClientDirectoryServer, self).__init__(hs)
@@ -120,8 +120,8 @@ class ClientDirectoryServer(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class ClientDirectoryListServer(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/directory/list/room/(?P<room_id>[^/]*)$")
+class ClientDirectoryListServer(RestServlet):
+    PATTERNS = client_patterns("/directory/list/room/(?P<room_id>[^/]*)$")
 
     def __init__(self, hs):
         super(ClientDirectoryListServer, self).__init__(hs)
@@ -162,8 +162,8 @@ class ClientDirectoryListServer(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class ClientAppserviceDirectoryListServer(ClientV1RestServlet):
-    PATTERNS = client_path_patterns(
+class ClientAppserviceDirectoryListServer(RestServlet):
+    PATTERNS = client_patterns(
         "/directory/list/appservice/(?P<network_id>[^/]*)/(?P<room_id>[^/]*)$"
     )
 

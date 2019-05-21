@@ -15,15 +15,15 @@
 
 from twisted.internet import defer
 
-from synapse.http.servlet import parse_boolean
+from synapse.http.servlet import RestServlet, parse_boolean
 from synapse.streams.config import PaginationConfig
 
-from .base import ClientV1RestServlet, client_path_patterns
+from ._base import client_patterns
 
 
 # TODO: Needs unit testing
-class InitialSyncRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/initialSync$")
+class InitialSyncRestServlet(RestServlet):
+    PATTERNS = client_patterns("/initialSync$")
 
     def __init__(self, hs):
         super(InitialSyncRestServlet, self).__init__(hs)

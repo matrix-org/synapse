@@ -21,17 +21,17 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
-from synapse.http.servlet import parse_json_value_from_request, parse_string
+from synapse.http.servlet import RestServlet, parse_json_value_from_request, parse_string
 from synapse.push.baserules import BASE_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 
-from .base import ClientV1RestServlet, client_path_patterns
+from ._base import client_patterns
 
 
-class PushRuleRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/(?P<path>pushrules/.*)$")
+class PushRuleRestServlet(RestServlet):
+    PATTERNS = client_patterns("/(?P<path>pushrules/.*)$")
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
 

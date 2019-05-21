@@ -16,14 +16,14 @@
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 from twisted.internet import defer
 
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
-from .base import ClientV1RestServlet, client_path_patterns
+from ._base import client_patterns
 
 
-class ProfileDisplaynameRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/displayname")
+class ProfileDisplaynameRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname")
 
     def __init__(self, hs):
         super(ProfileDisplaynameRestServlet, self).__init__(hs)
@@ -71,8 +71,8 @@ class ProfileDisplaynameRestServlet(ClientV1RestServlet):
         return (200, {})
 
 
-class ProfileAvatarURLRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
+class ProfileAvatarURLRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
 
     def __init__(self, hs):
         super(ProfileAvatarURLRestServlet, self).__init__(hs)
@@ -119,8 +119,8 @@ class ProfileAvatarURLRestServlet(ClientV1RestServlet):
         return (200, {})
 
 
-class ProfileRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/profile/(?P<user_id>[^/]*)")
+class ProfileRestServlet(RestServlet):
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
         super(ProfileRestServlet, self).__init__(hs)

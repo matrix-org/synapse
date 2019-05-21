@@ -26,8 +26,7 @@ from synapse.api.urls import CLIENT_API_PREFIX
 logger = logging.getLogger(__name__)
 
 
-def client_v2_patterns(path_regex, releases=(0,),
-                       unstable=True):
+def client_patterns(path_regex, releases=(0,), unstable=True):
     """Creates a regex compiled client path with the correct client path
     prefix.
 
