@@ -82,9 +82,9 @@ class ClientReaderSlavedStore(
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedTransactionStore,
+    SlavedProfileStore,
     SlavedClientIpStore,
     BaseSlavedStore,
-    SlavedProfileStore,
 ):
     pass
 
