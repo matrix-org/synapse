@@ -119,6 +119,7 @@ when ``SYNAPSE_CONFIG_PATH`` is not set.
 * ``SYNAPSE_MAX_UPLOAD_SIZE``, set this variable to change the max upload size
   [default `10M`].
 * ``SYNAPSE_ACME``: set this to enable the ACME certificate renewal support.
+* ``SYNAPSE_ADDITIONAL_ID_SERVER``: add own id server to the list of allowed servers (trusted_third_party_id_servers)
 
 Shared secrets, that will be initialized to random values if not set:
 
