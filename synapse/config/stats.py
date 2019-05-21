@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import division
+
 import sys
 
 from ._base import Config
@@ -25,28 +27,35 @@ class StatsConfig(Config):
 
     def read_config(self, config):
         self.stats_enabled = True
-        self.stats_bucket_size = 86400
-        self.stats_retention = sys.maxsize
+        self.stats_bucket_size = "1d"
+        self.stats_retention = "%ds" % (sys.maxsize,)
         stats_config = config.get("stats", None)
         if stats_config:
             self.stats_enabled = stats_config.get("enabled", self.stats_enabled)
-            self.stats_bucket_size = stats_config.get(
-                "bucket_size", self.stats_bucket_size
+            self.stats_bucket_size = (
+                self.parse_duration(
+                    stats_config.get("bucket_size", self.stats_bucket_size)
+                )
+                / 1000
             )
-            self.stats_retention = stats_config.get("retention", self.stats_retention)
+            self.stats_retention = (
+                self.parse_duration(stats_config.get("retention", self.stats_retention))
+                / 1000
+            )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Local statistics collection. Used in populating the room directory.
         #
-        # 'bucket_size' controls how large each statistics timeslice is, in
-        # seconds. For example, 86400 will set it to one day collection buckets.
+        # 'bucket_size' controls how large each statistics timeslice is. It can
+        # be defined in a human readable short form -- e.g. "1d", "1y".
         #
-        # 'retention' controls how long historical statistics will be kept for,
-        # in seconds.
+        # 'retention' controls how long historical statistics will be kept for.
+        # It can be defined in a human readable short form -- e.g. "1d", "1y".
         #
-        # stats:
-        #    enabled: true
-        #    bucket_size: 86400 # 1 day
-        #    retention: 31536000 # 1 year
+        #
+        #stats:
+        #   enabled: true
+        #   bucket_size: 1d
+        #   retention: 1y
         """

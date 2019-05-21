@@ -1148,16 +1148,17 @@ password_config:
 
 # Local statistics collection. Used in populating the room directory.
 #
-# 'bucket_size' controls how large each statistics timeslice is, in
-# seconds. For example, 86400 will set it to one day collection buckets.
+# 'bucket_size' controls how large each statistics timeslice is. It can
+# be defined in a human readable short form -- e.g. "1d", "1y".
 #
-# 'retention' controls how long historical statistics will be kept for,
-# in seconds.
+# 'retention' controls how long historical statistics will be kept for.
+# It can be defined in a human readable short form -- e.g. "1d", "1y".
 #
-# stats:
-#    enabled: true
-#    bucket_size: 86400 # 1 day
-#    retention: 31536000 # 1 year
+#
+#stats:
+#   enabled: true
+#   bucket_size: 1d
+#   retention: 1y
 
 
 # Server Notices room configuration

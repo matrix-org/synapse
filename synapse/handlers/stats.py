@@ -24,6 +24,8 @@ from synapse.types import UserID
 from synapse.util import logcontext
 from synapse.util.metrics import Measure
 
+from synapse.metrics import event_processing_positions
+
 logger = logging.getLogger(__name__)
 
 
@@ -91,16 +93,18 @@ class StatsHandler(StateDeltasHandler):
         # Loop round handling deltas until we're up to date
         while True:
             with Measure(self.clock, "stats_delta"):
-                with logcontext.PreserveLoggingContext():
-                    deltas = yield self.store.get_current_state_deltas(self.pos)
-                    if not deltas:
-                        return
+                deltas = yield self.store.get_current_state_deltas(self.pos)
+                if not deltas:
+                    return
 
-                    logger.info("Handling %d state deltas", len(deltas))
-                    yield self._handle_deltas(deltas)
+                logger.info("Handling %d state deltas", len(deltas))
+                yield self._handle_deltas(deltas)
 
-                    self.pos = deltas[-1]["stream_id"]
-                    yield self.store.update_stats_stream_pos(self.pos)
+                self.pos = deltas[-1]["stream_id"]
+                yield self.store.update_stats_stream_pos(self.pos)
+
+                event_processing_positions.labels("stats").set(self.pos)
+
 
     @defer.inlineCallbacks
     def _handle_deltas(self, deltas):
