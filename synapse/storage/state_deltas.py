@@ -84,10 +84,16 @@ class StateDeltasStore(SQLBaseStore):
             "get_current_state_deltas", get_current_state_deltas_txn
         )
 
-    def get_max_stream_id_in_current_state_deltas(self):
-        return self._simple_select_one_onecol(
+    def _get_max_stream_id_in_current_state_deltas_txn(self, txn):
+        return self._simple_select_one_onecol_txn(
+            txn,
             table="current_state_delta_stream",
             keyvalues={},
             retcol="COALESCE(MAX(stream_id), -1)",
-            desc="get_max_stream_id_in_current_state_deltas",
+        )
+
+    def get_max_stream_id_in_current_state_deltas(self):
+        return self.runInteraction(
+            "get_max_stream_id_in_current_state_deltas",
+            self._get_max_stream_id_in_current_state_deltas_txn,
         )
