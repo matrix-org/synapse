@@ -95,11 +95,8 @@ KNOWN_ROOM_VERSIONS = {
     )
 }   # type: dict[str, RoomVersion]
 
+
 # the version we will give rooms which are created on this server
 # can be overridden by the config
-_default_room_version = None
 def get_default_room_version(config):
-    if _default_room_version:
-        _default_room_version = KNOWN_ROOM_VERSIONS[config.default_room_version]
-
-    return _default_room_version
+    return config.default_room_version

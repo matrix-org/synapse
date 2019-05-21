@@ -20,6 +20,7 @@ import os.path
 
 from netaddr import IPSet
 
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
 
@@ -97,6 +98,9 @@ class ServerConfig(Config):
                 "Unknown default_room_version: %s, known room versions: %s" %
                 (self.default_room_version, KNOWN_ROOM_VERSIONS.keys)
             )
+
+        # Get the actual room version object rather than just the identifier
+        self.default_room_version = KNOWN_ROOM_VERSIONS[self.default_room_version]
 
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
