@@ -27,19 +27,18 @@ class StatsConfig(Config):
 
     def read_config(self, config):
         self.stats_enabled = True
-        self.stats_bucket_size = "1d"
-        self.stats_retention = "%ds" % (sys.maxsize,)
+        self.stats_bucket_size = 86400
+        self.stats_retention = sys.maxsize
         stats_config = config.get("stats", None)
         if stats_config:
             self.stats_enabled = stats_config.get("enabled", self.stats_enabled)
             self.stats_bucket_size = (
-                self.parse_duration(
-                    stats_config.get("bucket_size", self.stats_bucket_size)
-                )
-                / 1000
+                self.parse_duration(stats_config.get("bucket_size", "1d")) / 1000
             )
             self.stats_retention = (
-                self.parse_duration(stats_config.get("retention", self.stats_retention))
+                self.parse_duration(
+                    stats_config.get("retention", "%ds" % (sys.maxsize,))
+                )
                 / 1000
             )
 
