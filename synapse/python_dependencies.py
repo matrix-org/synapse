@@ -16,7 +16,12 @@
 
 import logging
 
-from pkg_resources import DistributionNotFound, VersionConflict, get_distribution
+from pkg_resources import (
+    DistributionNotFound,
+    Requirement,
+    VersionConflict,
+    get_provider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +139,7 @@ class DependencyException(Exception):
             yield "'" + i + "'"
 
 
-def check_requirements(for_feature=None, _get_distribution=get_distribution):
+def check_requirements(for_feature=None):
     deps_needed = []
     errors = []
 
@@ -145,7 +150,7 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
 
     for dependency in reqs:
         try:
-            _get_distribution(dependency)
+            _check_requirement(dependency)
         except VersionConflict as e:
             deps_needed.append(dependency)
             errors.append(
@@ -163,7 +168,7 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
 
         for dependency in OPTS:
             try:
-                _get_distribution(dependency)
+                _check_requirement(dependency)
             except VersionConflict as e:
                 deps_needed.append(dependency)
                 errors.append(
@@ -179,6 +184,23 @@ def check_requirements(for_feature=None, _get_distribution=get_distribution):
             logging.error(e)
 
         raise DependencyException(deps_needed)
+
+
+def _check_requirement(dependency_string):
+    """Parses a dependency string, and checks if the specified requirement is installed
+
+    Raises:
+        VersionConflict if the requirement is installed, but with the the wrong version
+        DistributionNotFound if nothing is found to provide the requirement
+    """
+    req = Requirement.parse(dependency_string)
+
+    # first check if the markers specify that this requirement needs installing
+    if req.marker is not None and not req.marker.evaluate():
+        # not required for this environment
+        return
+
+    get_provider(req)
 
 
 if __name__ == "__main__":
