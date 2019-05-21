@@ -304,20 +304,16 @@ class SQLBaseStore(object):
                 " WHERE account_validity.user_id is NULL;"
             )
             txn.execute(sql, [])
-            return self.cursor_to_dict(txn)
 
-        res = yield self.runInteraction(
+            res = self.cursor_to_dict(txn)
+            if res:
+                for user in res:
+                    self.set_expiration_date_for_user_txn(txn, user["name"])
+
+        yield self.runInteraction(
             "get_users_with_no_expiration_date",
             select_users_with_no_expiration_date_txn,
         )
-
-        if res:
-            for user in res:
-                self.runInteraction(
-                    "set_expiration_date_for_user_background",
-                    self.set_expiration_date_for_user_txn,
-                    user["name"],
-                )
 
     def set_expiration_date_for_user_txn(self, txn, user_id):
         """Sets an expiration date to the account with the given user ID.
