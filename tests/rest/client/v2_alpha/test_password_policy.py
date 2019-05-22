@@ -74,11 +74,13 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(channel.code, 200, channel.result)
-        self.assertEqual(channel.json_body["m.minimum_length"], 10, channel.result)
-        self.assertEqual(channel.json_body["m.require_digit"], True, channel.result)
-        self.assertEqual(channel.json_body["m.require_symbol"], True, channel.result)
-        self.assertEqual(channel.json_body["m.require_lowercase"], True, channel.result)
-        self.assertEqual(channel.json_body["m.require_uppercase"], True, channel.result)
+        self.assertEqual(channel.json_body, {
+            "m.minimum_length": 10,
+            "m.require_digit": True,
+            "m.require_symbol": True,
+            "m.require_lowercase": True,
+            "m.require_uppercase": True,
+        }, channel.result)
 
     def test_password_too_short(self):
         request_data = json.dumps({"username": "kermit", "password": "shorty"})
