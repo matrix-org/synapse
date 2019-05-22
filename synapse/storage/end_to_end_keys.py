@@ -59,6 +59,12 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         for user_id, device_keys in iteritems(results):
             for device_id, device_info in iteritems(device_keys):
                 device_info["keys"] = db_to_json(device_info.pop("key_json"))
+                # add cross-signing signatures to the keys
+                if "signatures" in device_info:
+                    for sig_user_id, sigs in device_info["signatures"].items():
+                        device_info["keys"].setdefault("signatures", {}) \
+                                           .setdefault(sig_user_id, {}) \
+                                           .update(sigs)
 
         return results
 
@@ -71,6 +77,8 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         query_clauses = []
         query_params = []
+        signature_query_clauses = []
+        signature_query_params = []
 
         if include_all_devices is False:
             include_deleted_devices = False
@@ -81,12 +89,20 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         for (user_id, device_id) in query_list:
             query_clause = "user_id = ?"
             query_params.append(user_id)
+            signature_query_clause = "target_user_id = ?"
+            signature_query_params.append(user_id)
 
             if device_id is not None:
                 query_clause += " AND device_id = ?"
                 query_params.append(device_id)
+                signature_query_clause += " AND target_device_id = ?"
+                signature_query_params.append(device_id)
+
+            signature_query_clause += " AND user_id = ?"
+            signature_query_params.append(user_id)
 
             query_clauses.append(query_clause)
+            signature_query_clauses.append(signature_query_clause)
 
         sql = (
             "SELECT user_id, device_id, "
@@ -112,6 +128,28 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         if include_deleted_devices:
             for user_id, device_id in deleted_devices:
                 result.setdefault(user_id, {})[device_id] = None
+
+        # get signatures on the device
+        signature_sql = (
+            "SELECT * "
+            "  FROM e2e_device_signatures "
+            " WHERE %s"
+        ) % (
+            " OR ".join("(" + q + ")" for q in signature_query_clauses)
+        )
+
+        txn.execute(signature_sql, signature_query_params)
+        rows = self.cursor_to_dict(txn)
+
+        for row in rows:
+            target_user_id = row["target_user_id"]
+            target_device_id = row["target_device_id"]
+            if target_user_id in result \
+               and target_device_id in result[target_user_id]:
+                result[target_user_id][target_device_id] \
+                    .setdefault("signatures", {}) \
+                    .setdefault(row["user_id"], {})[row["key_id"]] \
+                    = row["signature"]
 
         log_kv(result)
         return result

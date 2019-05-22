@@ -277,9 +277,59 @@ class SigningKeyUploadServlet(RestServlet):
         return (200, result)
 
 
+class SignaturesUploadServlet(RestServlet):
+    """
+    POST /keys/signatures/upload HTTP/1.1
+    Content-Type: application/json
+
+    {
+      "@alice:example.com": {
+        "<device_id>": {
+          "user_id": "<user_id>",
+          "device_id": "<device_id>",
+          "algorithms": [
+            "m.olm.curve25519-aes-sha256",
+            "m.megolm.v1.aes-sha"
+          ],
+          "keys": {
+            "<algorithm>:<device_id>": "<key_base64>",
+          },
+          "signatures": {
+            "<signing_user_id>": {
+              "<algorithm>:<signing_key_base64>": "<signature_base64>>"
+            }
+          }
+        }
+      }
+    }
+    """
+    PATTERNS = client_v2_patterns("/keys/signatures/upload$")
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(SignaturesUploadServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.e2e_keys_handler = hs.get_e2e_keys_handler()
+
+    @defer.inlineCallbacks
+    def on_POST(self, request):
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        user_id = requester.user.to_string()
+        body = parse_json_object_from_request(request)
+
+        result = yield self.e2e_keys_handler.upload_signatures_for_device_keys(
+            user_id, body
+        )
+        defer.returnValue((200, result))
+
+
 def register_servlets(hs, http_server):
     KeyUploadServlet(hs).register(http_server)
     KeyQueryServlet(hs).register(http_server)
     KeyChangesServlet(hs).register(http_server)
     OneTimeKeyServlet(hs).register(http_server)
     SigningKeyUploadServlet(hs).register(http_server)
+    SignaturesUploadServlet(hs).register(http_server)
