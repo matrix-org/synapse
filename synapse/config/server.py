@@ -92,18 +92,21 @@ class ServerConfig(Config):
             "restrict_public_rooms_to_local_users", False,
         )
 
-        self.default_room_version = config.get(
+        default_room_version = config.get(
             "default_room_version", DEFAULT_ROOM_VERSION,
         )
 
-        if self.default_room_version not in KNOWN_ROOM_VERSIONS:
+        # Ensure room version is a str
+        default_room_version = str(default_room_version)
+
+        if default_room_version not in KNOWN_ROOM_VERSIONS:
             raise ConfigError(
                 "Unknown default_room_version: %s, known room versions: %s" %
-                (self.default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
+                (default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
             )
 
         # Get the actual room version object rather than just the identifier
-        self.default_room_version = KNOWN_ROOM_VERSIONS[self.default_room_version]
+        self.default_room_version = KNOWN_ROOM_VERSIONS[default_room_version]
 
         # whether to enable search. If disabled, new entries will not be inserted
         # into the search tables and they will not be indexed. Users will receive
@@ -407,8 +410,8 @@ class ServerConfig(Config):
         # https://matrix.org/docs/spec/#complete-list-of-room-versions
         #
         # For example, for room version 1, default_room_version should be set
-        # to "1". Make sure the value is wrapped in quotes.
-        default_room_version: "%(DEFAULT_ROOM_VERSION)s"
+        # to "1".
+        #default_room_version: "%(DEFAULT_ROOM_VERSION)s"
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #

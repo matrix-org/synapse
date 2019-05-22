@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import synapse.rest.admin
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, get_default_room_version
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import capabilities
 
@@ -53,9 +53,9 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         for room_version in capabilities['m.room_versions']['available'].keys():
             self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
 
-        default_room_version = get_default_room_version(self.config)
         self.assertEqual(
-            default_room_version.identifier, capabilities['m.room_versions']['default']
+            self.config.default_room_version.identifier,
+            capabilities['m.room_versions']['default'],
         )
 
     def test_get_change_password_capabilities(self):

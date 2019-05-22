@@ -16,7 +16,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, get_default_room_version
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import RestServlet
 
 from ._base import client_v2_patterns
@@ -49,7 +49,7 @@ class CapabilitiesRestServlet(RestServlet):
         response = {
             "capabilities": {
                 "m.room_versions": {
-                    "default": get_default_room_version(self.config).identifier,
+                    "default": self.config.default_room_version.identifier,
                     "available": {
                         v.identifier: v.disposition
                         for v in KNOWN_ROOM_VERSIONS.values()
