@@ -399,7 +399,7 @@ class CasTicketServlet(RestServlet):
     PATTERNS = client_patterns("/login/cas/ticket", releases=())
 
     def __init__(self, hs):
-        super(CasTicketServlet, self).__init__(hs)
+        super(CasTicketServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url
         self.cas_service_url = hs.config.cas_service_url
         self.cas_required_attributes = hs.config.cas_required_attributes

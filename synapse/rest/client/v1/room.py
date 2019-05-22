@@ -16,7 +16,7 @@
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
-from synapse.rest.client.transactions import HttpTransactionCache
+
 from six.moves.urllib import parse as urlparse
 
 from canonicaljson import json
@@ -34,6 +34,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
@@ -45,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 class TransactionRestServlet(RestServlet):
     def __init__(self, hs):
-        super(TransactionRestServlet).__init__()
+        super(TransactionRestServlet, self).__init__()
         self.txns = HttpTransactionCache(hs)
 
 
