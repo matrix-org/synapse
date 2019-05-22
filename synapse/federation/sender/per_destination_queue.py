@@ -366,10 +366,10 @@ class PerDestinationQueue(object):
             Edu(
                 origin=self._server_name,
                 destination=self._destination,
-                edu_type="m.device_list_update",
+                edu_type=edu_type,
                 content=content,
             )
-            for content in results
+            for (edu_type, content) in results
         ]
 
         assert len(edus) <= limit, "get_devices_by_remote returned too many EDUs"

@@ -94,9 +94,10 @@ class DeviceWorkerStore(SQLBaseStore):
         """Get stream of updates to send to remote servers
 
         Returns:
-            Deferred[tuple[int, list[dict]]]:
+            Deferred[tuple[int, list[tuple[string,dict]]]]:
                 current stream id (ie, the stream id of the last update included in the
-                response), and the list of updates
+                response), and the list of updates, where each update is a pair of EDU
+                type and EDU contents
         """
         now_stream_id = self._device_list_id_gen.get_current_token()
 
@@ -129,6 +130,25 @@ class DeviceWorkerStore(SQLBaseStore):
         if not updates:
             return now_stream_id, []
 
+        # get the cross-signing keys of the users the list
+        users = set(r[0] for r in updates)
+        master_key_by_user = {}
+        self_signing_key_by_user = {}
+        for user in users:
+            cross_signing_key = yield self.get_e2e_cross_signing_key(user, "master")
+            key_id, verify_key = get_verify_key_from_cross_signing_key(cross_signing_key)
+            master_key_by_user[user] = {
+                "key_info": cross_signing_key,
+                "pubkey": verify_key.version
+            }
+
+            cross_signing_key = yield self.get_e2e_cross_signing_key(user, "self_signing")
+            key_id, verify_key = get_verify_key_from_cross_signing_key(cross_signing_key)
+            self_signing_key_by_user[user] = {
+                "key_info": cross_signing_key,
+                "pubkey": verify_key.version
+            }
+
         # if we have exceeded the limit, we need to exclude any results with the
         # same stream_id as the last row.
         if len(updates) > limit:
@@ -158,6 +178,10 @@ class DeviceWorkerStore(SQLBaseStore):
                 # Stop processing updates
                 break
 
+            if update[1] == master_key_by_user[update[0]]["pubkey"] or \
+                    update[1] == self_signing_key_by_user[update[0]]["pubkey"]:
+                continue
+
             key = (update[0], update[1])
 
             update_context = update[3]
@@ -172,16 +196,37 @@ class DeviceWorkerStore(SQLBaseStore):
         # means that there are more than limit updates all of which have the same
         # steam_id.
 
+        # figure out which cross-signing keys were changed by intersecting the
+        # update list with the master/self-signing key by user maps
+        cross_signing_keys_by_user = {}
+        for user_id, device_id, stream in updates:
+            if device_id == master_key_by_user[user_id]["pubkey"]:
+                result = cross_signing_keys_by_user.setdefault(user_id, {})
+                result["master_key"] = \
+                    master_key_by_user[user_id]["key_info"]
+            elif device_id == self_signing_key_by_user[user_id]["pubkey"]:
+                result = cross_signing_keys_by_user.setdefault(user_id, {})
+                result["self_signing_key"] = \
+                    self_signing_key_by_user[user_id]["key_info"]
+
+        cross_signing_results = []
+
+        # add the updated cross-signing keys to the results list
+        for user_id, result in iteritems(cross_signing_keys_by_user):
+            result["user_id"] = user_id
+            cross_signing_results.append(("m.signing_key_update", result))
+
         # That should only happen if a client is spamming the server with new
         # devices, in which case E2E isn't going to work well anyway. We'll just
         # skip that stream_id and return an empty list, and continue with the next
         # stream_id next time.
-        if not query_map:
+        if not query_map and not cross_signing_results:
             return stream_id_cutoff, []
 
         results = yield self._get_device_update_edus_by_remote(
             destination, from_stream_id, query_map
         )
+        results.extend(cross_signing_results)
 
         return now_stream_id, results
 
@@ -200,6 +245,7 @@ class DeviceWorkerStore(SQLBaseStore):
         Returns:
             List: List of device updates
         """
+        # get the list of device updates that need to be sent
         sql = """
             SELECT user_id, device_id, stream_id, opentracing_context FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
@@ -231,7 +277,7 @@ class DeviceWorkerStore(SQLBaseStore):
             query_map.keys(),
             include_all_devices=True,
             include_deleted_devices=True,
-        )
+        ) if query_map else {}
 
         results = []
         for user_id, user_devices in iteritems(devices):
@@ -262,7 +308,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 else:
                     result["deleted"] = True
 
-                results.append(result)
+                results.append(("m.device_list_update", result))
 
         return results
 
