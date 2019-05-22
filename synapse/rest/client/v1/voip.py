@@ -27,6 +27,10 @@ from ._base import client_patterns
 class VoipRestServlet(RestServlet):
     PATTERNS = client_patterns("/voip/turnServer$")
 
+    def __init__(self, hs):
+        super(VoipRestServlet, self).__init__()
+        self.hs = hs
+
     @defer.inlineCallbacks
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(
