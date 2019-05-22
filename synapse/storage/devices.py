@@ -81,7 +81,6 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         now_stream_id = self._device_list_id_gen.get_current_token()
 
-        # Why is this False in the test?
         has_changed = self._device_list_federation_stream_cache.has_entity_changed(
             destination, int(from_stream_id)
         )
@@ -111,6 +110,8 @@ class DeviceWorkerStore(SQLBaseStore):
         if not updates:
             defer.returnValue((now_stream_id, []))
 
+        stream_id_cutoff = now_stream_id + 1
+
         # Check if the last and second-to-last row's stream_id's are the same
         if (
             len(updates) > 1 and
@@ -118,7 +119,7 @@ class DeviceWorkerStore(SQLBaseStore):
             updates[-1][2] == updates[-2][2]
         ):
             # If so, cap our maximum stream_id at that final stream_id
-            now_stream_id = updates[-1][2]
+            stream_id_cutoff = updates[-1][2]
 
         # Perform the equivalent of a GROUP BY
         #
@@ -130,7 +131,7 @@ class DeviceWorkerStore(SQLBaseStore):
         # as long as their stream_id does not match that of the last row
         query_map = {}
         for update in updates:
-            if update[2] == now_stream_id:
+            if update[2] >= stream_id_cutoff:
                 # Stop processing updates
                 break
 

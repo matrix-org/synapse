@@ -84,19 +84,14 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
             "user_id", device_ids, ["somehost"],
         )
 
-        res = yield self.store.get_devices_by_remote("somehost", 0, limit=100)
-
-        logger.info("Res: %s", res)
-        self.assertEqual(1, 2)
+        res = yield self.store.get_devices_by_remote("somehost", -1, limit=100)
 
         device_updates = res[1]
 
         for update in device_updates:
             d_id = update["device_id"]
             if d_id in device_ids:
-                del device_ids[d_id]
-
-        logger.info("stream_id: %s, updates: %s", stream_id, res)
+                device_ids.remove(d_id)
 
         # All device_ids should've been accounted for
         self.assertEqual(len(device_ids), 0)
