@@ -408,7 +408,7 @@ class ServerConfig(Config):
         #
         # For example, for room version 1, default_room_version should be set
         # to "1". Make sure the value is wrapped in quotes.
-        default_room_version: '%(DEFAULT_ROOM_VERSION)s'
+        default_room_version: "%(DEFAULT_ROOM_VERSION)s"
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
@@ -694,6 +694,7 @@ KNOWN_RESOURCES = (
     'static',
     'webclient',
 )
+
 
 def _check_resource_config(listeners):
     resource_names = set(
