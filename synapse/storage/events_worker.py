@@ -610,7 +610,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             return res
 
-        return self.runInteraction("get_rejection_reasons", f)
+        return self.runInteraction("get_seen_events_with_rejections", f)
 
     def _get_total_state_event_counts_txn(self, txn, room_id):
         """
