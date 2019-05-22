@@ -128,6 +128,7 @@ class ClientDirectoryListServer(RestServlet):
         super(ClientDirectoryListServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -172,6 +173,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
         super(ClientAppserviceDirectoryListServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
+        self.auth = hs.get_auth()
 
     def on_PUT(self, request, network_id, room_id):
         content = parse_json_object_from_request(request)

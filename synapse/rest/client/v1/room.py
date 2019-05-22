@@ -244,6 +244,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
     def __init__(self, hs):
         super(JoinRoomAliasServlet, self).__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
+        self.auth = hs.get_auth()
 
     def register(self, http_server):
         # /join/$room_identifier[/$txn_id]
@@ -513,6 +514,7 @@ class RoomStateRestServlet(RestServlet):
     def __init__(self, hs):
         super(RoomStateRestServlet, self).__init__()
         self.message_handler = hs.get_message_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):

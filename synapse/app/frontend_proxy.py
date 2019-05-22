@@ -52,7 +52,7 @@ class PresenceStatusStubServlet(RestServlet):
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     def __init__(self, hs):
-        super(PresenceStatusStubServlet, self).__init__(hs)
+        super(PresenceStatusStubServlet, self).__init__()
         self.http_client = hs.get_simple_http_client()
         self.auth = hs.get_auth()
         self.main_uri = hs.config.worker_main_http_uri
