@@ -23,6 +23,7 @@ from netaddr import IPSet
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.util.dictutils import merge_dicts
 
 from ._base import Config, ConfigError
 
@@ -98,7 +99,7 @@ class ServerConfig(Config):
         if self.default_room_version not in KNOWN_ROOM_VERSIONS:
             raise ConfigError(
                 "Unknown default_room_version: %s, known room versions: %s" %
-                (self.default_room_version, KNOWN_ROOM_VERSIONS.keys)
+                (self.default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
             )
 
         # Get the actual room version object rather than just the identifier
@@ -406,8 +407,8 @@ class ServerConfig(Config):
         # https://matrix.org/docs/spec/#complete-list-of-room-versions
         #
         # For example, for room version 1, default_room_version should be set
-        # to "1".
-        default_room_version: %(DEFAULT_ROOM_VERSION)s
+        # to "1". Make sure the value is wrapped in quotes.
+        default_room_version: '%(DEFAULT_ROOM_VERSION)s'
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
@@ -607,7 +608,7 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
-        """ % locals()
+        """ % merge_dicts(locals(), globals())
 
     def read_arguments(self, args):
         if args.manhole is not None:
@@ -693,7 +694,6 @@ KNOWN_RESOURCES = (
     'static',
     'webclient',
 )
-
 
 def _check_resource_config(listeners):
     resource_names = set(
