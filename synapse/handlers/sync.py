@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018, 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1060,6 +1060,11 @@ class SyncHandler(object):
             # TODO: Check that these users are actually new, i.e. either they
             # weren't in the previous sync *or* they left and rejoined.
             changed.update(newly_joined_or_invited_users)
+
+            user_signatures_changed = yield self.store.get_users_whose_signatures_changed(
+                user_id, since_token.device_list_key
+            )
+            changed.update(user_signatures_changed)
 
             if not changed and not newly_left_users:
                 defer.returnValue(DeviceLists(
