@@ -84,9 +84,9 @@ class BaseProfileHandler(BaseHandler):
                     ignore_backoff=True,
                 )
                 if len(result.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
-                    raise SynapseError(404, "Displayname is too long", Codes.UNKNONW)
+                    raise SynapseError(400, "Displayname is too long", Codes.UNKNONW)
                 if len(result.get("avatar_url", "")) > MAX_AVATARURL_LEN:
-                    raise SynapseError(404, "Avatar_url is too long", Codes.UNKNONW)
+                    raise SynapseError(400, "Avatar_url is too long", Codes.UNKNONW)
                 defer.returnValue(result)
             except CodeMessageException as e:
                 if e.code != 404:
@@ -151,7 +151,7 @@ class BaseProfileHandler(BaseHandler):
                 raise
             
             if len(result.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
-                raise SynapseError(404, "Displayname is too long", Codes.UNKNONW)
+                raise SynapseError(400, "Displayname is too long", Codes.UNKNONW)
 
             defer.returnValue(result["displayname"])
 
@@ -166,7 +166,7 @@ class BaseProfileHandler(BaseHandler):
             by_admin (bool): Whether this change was made by an administrator.
         """
         if not self.hs.is_mine(target_user):
-            raise SynapseError(403, "User is not hosted on this Home Server")
+            raise SynapseError(404, "User is not hosted on this Home Server")
 
         if not by_admin and target_user != requester.user:
             raise AuthError(403, "Cannot set another user's displayname")
@@ -198,7 +198,7 @@ class BaseProfileHandler(BaseHandler):
                 )
             except StoreError as e:
                 if e.code == 404:
-                    raise SynapseError(400, "Profile was not found", Codes.NOT_FOUND)
+                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
             defer.returnValue(avatar_url)
         else:
@@ -227,10 +227,10 @@ class BaseProfileHandler(BaseHandler):
         """target_user is the user whose avatar_url is to be changed;
         auth_user is the user attempting to make this change."""
         if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "User is not hosted on this Home Server")
+            raise SynapseError(404, "User is not hosted on this Home Server")
 
         if not by_admin and target_user != requester.user:
-            raise AuthError(400, "Cannot set another user's avatar_url")
+            raise AuthError(403, "Cannot set another user's avatar_url")
 
             
         if len(new_avatar_url) > MAX_AVATARURL_LEN:
@@ -252,7 +252,7 @@ class BaseProfileHandler(BaseHandler):
     def on_profile_query(self, args):
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
-            raise SynapseError(400, "User is not hosted on this Home Server")
+            raise SynapseError(404, "User is not hosted on this Home Server")
 
         just_field = args.get("field", None)
 
