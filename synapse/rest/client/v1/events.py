@@ -33,8 +33,9 @@ class EventStreamRestServlet(RestServlet):
     DEFAULT_LONGPOLL_TIME_MS = 30000
 
     def __init__(self, hs):
-        super(EventStreamRestServlet, self).__init__(hs)
+        super(EventStreamRestServlet, self).__init__()
         self.event_stream_handler = hs.get_event_stream_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -81,7 +82,7 @@ class EventRestServlet(RestServlet):
     PATTERNS = client_patterns("/events/(?P<event_id>[^/]*)$")
 
     def __init__(self, hs):
-        super(EventRestServlet, self).__init__(hs)
+        super(EventRestServlet, self).__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()

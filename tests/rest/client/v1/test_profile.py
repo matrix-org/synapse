@@ -28,7 +28,7 @@ from tests import unittest
 from ....utils import MockHttpResource, setup_test_homeserver
 
 myid = "@1234ABCD:test"
-PATH_PREFIX = "/_matrix/client/api/v1"
+PATH_PREFIX = "/_matrix/client/r0"
 
 
 class ProfileTestCase(unittest.TestCase):

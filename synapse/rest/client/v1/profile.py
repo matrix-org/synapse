@@ -26,8 +26,10 @@ class ProfileDisplaynameRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname")
 
     def __init__(self, hs):
-        super(ProfileDisplaynameRestServlet, self).__init__(hs)
+        super(ProfileDisplaynameRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -75,8 +77,10 @@ class ProfileAvatarURLRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
 
     def __init__(self, hs):
-        super(ProfileAvatarURLRestServlet, self).__init__(hs)
+        super(ProfileAvatarURLRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -123,8 +127,10 @@ class ProfileRestServlet(RestServlet):
     PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)")
 
     def __init__(self, hs):
-        super(ProfileRestServlet, self).__init__(hs)
+        super(ProfileRestServlet, self).__init__()
+        self.hs = hs
         self.profile_handler = hs.get_profile_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):

@@ -89,7 +89,8 @@ class LoginRestServlet(RestServlet):
     JWT_TYPE = "m.login.jwt"
 
     def __init__(self, hs):
-        super(LoginRestServlet, self).__init__(hs)
+        super(LoginRestServlet, self).__init__()
+        self.hs = hs
         self.jwt_enabled = hs.config.jwt_enabled
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm

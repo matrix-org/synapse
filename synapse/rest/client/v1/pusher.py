@@ -36,7 +36,7 @@ class PushersRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers$")
 
     def __init__(self, hs):
-        super(PushersRestServlet, self).__init__(hs)
+        super(PushersRestServlet, self).__init__()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -73,7 +73,7 @@ class PushersSetRestServlet(RestServlet):
     PATTERNS = client_patterns("/pushers/set$")
 
     def __init__(self, hs):
-        super(PushersSetRestServlet, self).__init__(hs)
+        super(PushersSetRestServlet, self).__init__()
         self.notifier = hs.get_notifier()
         self.pusher_pool = self.hs.get_pusherpool()
 

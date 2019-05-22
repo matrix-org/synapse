@@ -36,7 +36,7 @@ class PushRuleRestServlet(RestServlet):
         "Unrecognised request: You probably wanted a trailing slash")
 
     def __init__(self, hs):
-        super(PushRuleRestServlet, self).__init__(hs)
+        super(PushRuleRestServlet, self).__init__()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None

@@ -37,9 +37,10 @@ class ClientDirectoryServer(RestServlet):
     PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$")
 
     def __init__(self, hs):
-        super(ClientDirectoryServer, self).__init__(hs)
+        super(ClientDirectoryServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_alias):
@@ -124,7 +125,7 @@ class ClientDirectoryListServer(RestServlet):
     PATTERNS = client_patterns("/directory/list/room/(?P<room_id>[^/]*)$")
 
     def __init__(self, hs):
-        super(ClientDirectoryListServer, self).__init__(hs)
+        super(ClientDirectoryListServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
 
@@ -168,7 +169,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     )
 
     def __init__(self, hs):
-        super(ClientAppserviceDirectoryListServer, self).__init__(hs)
+        super(ClientAppserviceDirectoryListServer, self).__init__()
         self.store = hs.get_datastore()
         self.handlers = hs.get_handlers()
 

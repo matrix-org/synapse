@@ -26,7 +26,7 @@ class InitialSyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/initialSync$")
 
     def __init__(self, hs):
-        super(InitialSyncRestServlet, self).__init__(hs)
+        super(InitialSyncRestServlet, self).__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
 
     @defer.inlineCallbacks
