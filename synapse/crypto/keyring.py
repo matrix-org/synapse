@@ -489,7 +489,7 @@ class Keyring(object):
                 )
 
             processed_response = yield self.process_v2_response(
-                perspective_name, response
+                perspective_name, response, time_added_ms=time_now_ms
             )
             server_name = response["server_name"]
 
@@ -541,6 +541,7 @@ class Keyring(object):
                 from_server=server_name,
                 requested_ids=[requested_key_id],
                 response_json=response,
+                time_added_ms=time_now_ms,
             )
             yield self.store.store_server_verify_keys(
                 server_name,
@@ -552,7 +553,9 @@ class Keyring(object):
         defer.returnValue({server_name: keys})
 
     @defer.inlineCallbacks
-    def process_v2_response(self, from_server, response_json, requested_ids=[]):
+    def process_v2_response(
+        self, from_server, response_json, time_added_ms, requested_ids=[]
+    ):
         """Parse a 'Server Keys' structure from the result of a /key request
 
         This is used to parse either the entirety of the response from
@@ -573,6 +576,8 @@ class Keyring(object):
 
             response_json (dict): the json-decoded Server Keys response object
 
+            time_added_ms (int): the timestamp to record in server_keys_json
+
             requested_ids (iterable[str]): a list of the key IDs that were requested.
                 We will store the json for these key ids as well as any that are
                 actually in the response
@@ -581,7 +586,6 @@ class Keyring(object):
             Deferred[dict[str, nacl.signing.VerifyKey]]:
                 map from key_id to key object
         """
-        time_now_ms = self.clock.time_msec()
         response_keys = {}
         verify_keys = {}
         for key_id, key_data in response_json["verify_keys"].items():
@@ -630,7 +634,7 @@ class Keyring(object):
                         server_name=server_name,
                         key_id=key_id,
                         from_server=from_server,
-                        ts_now_ms=time_now_ms,
+                        ts_now_ms=time_added_ms,
                         ts_expires_ms=ts_valid_until_ms,
                         key_json_bytes=signed_key_json_bytes,
                     )
