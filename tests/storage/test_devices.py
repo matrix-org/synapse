@@ -80,10 +80,11 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         device_ids = ["device_id1", "device_id2"]
 
         # Add a device update to the stream
-        stream_id = yield self.store.add_device_change_to_streams(
+        yield self.store.add_device_change_to_streams(
             "user_id", device_ids, ["somehost"],
         )
 
+        # Get all device updates ever meant for this remote
         res = yield self.store.get_devices_by_remote("somehost", -1, limit=100)
 
         device_updates = res[1]
