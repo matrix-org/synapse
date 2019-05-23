@@ -201,6 +201,11 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
 
+        # Pull out the relationship early if the client sent us something
+        # which cannot possibly be processed by us.
+        if content.get("m.relates_to", "not None") is None:
+            del content["m.relates_to"]
+
         event_dict = {
             "type": event_type,
             "content": content,
