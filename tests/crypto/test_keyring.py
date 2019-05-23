@@ -25,6 +25,7 @@ from twisted.internet import defer
 from synapse.api.errors import SynapseError
 from synapse.crypto import keyring
 from synapse.crypto.keyring import KeyLookupError
+from synapse.storage.keys import FetchKeyResult
 from synapse.util import logcontext
 from synapse.util.logcontext import LoggingContext
 
@@ -192,8 +193,18 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         kr = keyring.Keyring(self.hs)
 
         key1 = signedjson.key.generate_signing_key(1)
-        r = self.hs.datastore.store_server_verify_key(
-            "server9", "", time.time() * 1000, signedjson.key.get_verify_key(key1)
+        key1_id = "%s:%s" % (key1.alg, key1.version)
+
+        r = self.hs.datastore.store_server_verify_keys(
+            "server9",
+            time.time() * 1000,
+            [
+                (
+                    "server9",
+                    key1_id,
+                    FetchKeyResult(signedjson.key.get_verify_key(key1), 1000),
+                ),
+            ],
         )
         self.get_success(r)
         json1 = {}
@@ -241,9 +252,10 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         server_name_and_key_ids = [(SERVER_NAME, ("key1",))]
         keys = self.get_success(kr.get_keys_from_server(server_name_and_key_ids))
         k = keys[SERVER_NAME][testverifykey_id]
-        self.assertEqual(k, testverifykey)
-        self.assertEqual(k.alg, "ed25519")
-        self.assertEqual(k.version, "ver1")
+        self.assertEqual(k.valid_until_ts, VALID_UNTIL_TS)
+        self.assertEqual(k.verify_key, testverifykey)
+        self.assertEqual(k.verify_key.alg, "ed25519")
+        self.assertEqual(k.verify_key.version, "ver1")
 
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
@@ -311,9 +323,10 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         keys = self.get_success(kr.get_keys_from_perspectives(server_name_and_key_ids))
         self.assertIn(SERVER_NAME, keys)
         k = keys[SERVER_NAME][testverifykey_id]
-        self.assertEqual(k, testverifykey)
-        self.assertEqual(k.alg, "ed25519")
-        self.assertEqual(k.version, "ver1")
+        self.assertEqual(k.valid_until_ts, VALID_UNTIL_TS)
+        self.assertEqual(k.verify_key, testverifykey)
+        self.assertEqual(k.verify_key.alg, "ed25519")
+        self.assertEqual(k.verify_key.version, "ver1")
 
         # check that the perspectives store is correctly updated
         lookup_triplet = (SERVER_NAME, testverifykey_id, None)
@@ -336,7 +349,10 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
 @defer.inlineCallbacks
 def run_in_context(f, *args, **kwargs):
-    with LoggingContext("testctx"):
+    with LoggingContext("testctx") as ctx:
+        # we set the "request" prop to make it easier to follow what's going on in the
+        # logs.
+        ctx.request = "testctx"
         rv = yield f(*args, **kwargs)
     defer.returnValue(rv)
 

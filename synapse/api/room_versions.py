@@ -85,10 +85,6 @@ class RoomVersions(object):
     )
 
 
-# the version we will give rooms which are created on this server
-DEFAULT_ROOM_VERSION = RoomVersions.V1
-
-
 KNOWN_ROOM_VERSIONS = {
     v.identifier: v for v in (
         RoomVersions.V1,

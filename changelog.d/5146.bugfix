@@ -1,1 +1,0 @@
-Exclude soft-failed events from forward-extremity candidates: fixes "No forward extremities left!" error.

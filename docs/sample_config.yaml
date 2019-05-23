@@ -83,6 +83,15 @@ pid_file: DATADIR/homeserver.pid
 #
 #restrict_public_rooms_to_local_users: true
 
+# The default room version for newly created rooms.
+#
+# Known room versions are listed here:
+# https://matrix.org/docs/spec/#complete-list-of-room-versions
+#
+# For example, for room version 1, default_room_version should be set
+# to "1".
+#default_room_version: "1"
+
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
 #gc_thresholds: [700, 10, 10]
@@ -1151,6 +1160,22 @@ password_config:
 #  require_at_registration: False
 #  policy_name: Privacy Policy
 #
+
+
+
+# Local statistics collection. Used in populating the room directory.
+#
+# 'bucket_size' controls how large each statistics timeslice is. It can
+# be defined in a human readable short form -- e.g. "1d", "1y".
+#
+# 'retention' controls how long historical statistics will be kept for.
+# It can be defined in a human readable short form -- e.g. "1d", "1y".
+#
+#
+#stats:
+#   enabled: true
+#   bucket_size: 1d
+#   retention: 1y
 
 
 # Server Notices room configuration
