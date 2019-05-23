@@ -1,0 +1,1 @@
+Fix 500 Internal Server Error when sending an event with `m.relates_to: null`.
