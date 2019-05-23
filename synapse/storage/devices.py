@@ -136,18 +136,24 @@ class DeviceWorkerStore(SQLBaseStore):
         self_signing_key_by_user = {}
         for user in users:
             cross_signing_key = yield self.get_e2e_cross_signing_key(user, "master")
-            key_id, verify_key = get_verify_key_from_cross_signing_key(cross_signing_key)
-            master_key_by_user[user] = {
-                "key_info": cross_signing_key,
-                "pubkey": verify_key.version
-            }
+            if cross_signing_key:
+                key_id, verify_key = get_verify_key_from_cross_signing_key(
+                    cross_signing_key
+                )
+                master_key_by_user[user] = {
+                    "key_info": cross_signing_key,
+                    "pubkey": verify_key.version
+                }
 
             cross_signing_key = yield self.get_e2e_cross_signing_key(user, "self_signing")
-            key_id, verify_key = get_verify_key_from_cross_signing_key(cross_signing_key)
-            self_signing_key_by_user[user] = {
-                "key_info": cross_signing_key,
-                "pubkey": verify_key.version
-            }
+            if cross_signing_key:
+                key_id, verify_key = get_verify_key_from_cross_signing_key(
+                    cross_signing_key
+                )
+                self_signing_key_by_user[user] = {
+                    "key_info": cross_signing_key,
+                    "pubkey": verify_key.version
+                }
 
         # if we have exceeded the limit, we need to exclude any results with the
         # same stream_id as the last row.
@@ -178,8 +184,11 @@ class DeviceWorkerStore(SQLBaseStore):
                 # Stop processing updates
                 break
 
-            if update[1] == master_key_by_user[update[0]]["pubkey"] or \
-                    update[1] == self_signing_key_by_user[update[0]]["pubkey"]:
+            # skip over cross-signing keys
+            if (update[0] in master_key_by_user
+                    and update[1] == master_key_by_user[update[0]]["pubkey"]) \
+                or (update[0] in master_key_by_user
+                    and update[1] == self_signing_key_by_user[update[0]]["pubkey"]):
                 continue
 
             key = (update[0], update[1])
@@ -200,11 +209,13 @@ class DeviceWorkerStore(SQLBaseStore):
         # update list with the master/self-signing key by user maps
         cross_signing_keys_by_user = {}
         for user_id, device_id, stream in updates:
-            if device_id == master_key_by_user[user_id]["pubkey"]:
+            if device_id == master_key_by_user.get(user_id, {}) \
+                                              .get("pubkey", None):
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
                 result["master_key"] = \
                     master_key_by_user[user_id]["key_info"]
-            elif device_id == self_signing_key_by_user[user_id]["pubkey"]:
+            elif device_id == self_signing_key_by_user.get(user_id, {}) \
+                                                      .get("pubkey", None):
                 result = cross_signing_keys_by_user.setdefault(user_id, {})
                 result["self_signing_key"] = \
                     self_signing_key_by_user[user_id]["key_info"]
