@@ -589,7 +589,6 @@ class Keyring(object):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
                 verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_key.time_added = time_now_ms
                 verify_keys[key_id] = verify_key
 
         old_verify_keys = {}
@@ -598,8 +597,6 @@ class Keyring(object):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
                 verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_key.expired = key_data["expired_ts"]
-                verify_key.time_added = time_now_ms
                 old_verify_keys[key_id] = verify_key
 
         server_name = response_json["server_name"]
