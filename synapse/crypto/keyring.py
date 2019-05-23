@@ -453,10 +453,11 @@ class Keyring(object):
             raise_from(KeyLookupError("Remote server returned an error"), e)
 
         keys = {}
+        added_keys = []
 
-        responses = query_response["server_keys"]
+        time_now_ms = self.clock.time_msec()
 
-        for response in responses:
+        for response in query_response["server_keys"]:
             if (
                 u"signatures" not in response
                 or perspective_name not in response[u"signatures"]
@@ -492,21 +493,13 @@ class Keyring(object):
             )
             server_name = response["server_name"]
 
+            added_keys.extend(
+                (server_name, key_id, key) for key_id, key in processed_response.items()
+            )
             keys.setdefault(server_name, {}).update(processed_response)
 
-        yield logcontext.make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store_keys,
-                        server_name=server_name,
-                        from_server=perspective_name,
-                        verify_keys=response_keys,
-                    )
-                    for server_name, response_keys in keys.items()
-                ],
-                consumeErrors=True,
-            ).addErrback(unwrapFirstError)
+        yield self.store.store_server_verify_keys(
+            perspective_name, time_now_ms, added_keys
         )
 
         defer.returnValue(keys)
@@ -519,6 +512,7 @@ class Keyring(object):
             if requested_key_id in keys:
                 continue
 
+            time_now_ms = self.clock.time_msec()
             try:
                 response = yield self.client.get_json(
                     destination=server_name,
@@ -548,12 +542,13 @@ class Keyring(object):
                 requested_ids=[requested_key_id],
                 response_json=response,
             )
-
+            yield self.store.store_server_verify_keys(
+                server_name,
+                time_now_ms,
+                ((server_name, key_id, key) for key_id, key in response_keys.items()),
+            )
             keys.update(response_keys)
 
-        yield self.store_keys(
-            server_name=server_name, from_server=server_name, verify_keys=keys
-        )
         defer.returnValue({server_name: keys})
 
     @defer.inlineCallbacks
@@ -649,32 +644,6 @@ class Keyring(object):
         )
 
         defer.returnValue(response_keys)
-
-    def store_keys(self, server_name, from_server, verify_keys):
-        """Store a collection of verify keys for a given server
-        Args:
-            server_name(str): The name of the server the keys are for.
-            from_server(str): The server the keys were downloaded from.
-            verify_keys(dict): A mapping of key_id to VerifyKey.
-        Returns:
-            A deferred that completes when the keys are stored.
-        """
-        # TODO(markjh): Store whether the keys have expired.
-        return logcontext.make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store.store_server_verify_key,
-                        server_name,
-                        server_name,
-                        key.time_added,
-                        key,
-                    )
-                    for key_id, key in verify_keys.items()
-                ],
-                consumeErrors=True,
-            ).addErrback(unwrapFirstError)
-        )
 
 
 @defer.inlineCallbacks

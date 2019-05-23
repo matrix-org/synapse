@@ -192,8 +192,18 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         kr = keyring.Keyring(self.hs)
 
         key1 = signedjson.key.generate_signing_key(1)
-        r = self.hs.datastore.store_server_verify_key(
-            "server9", "", time.time() * 1000, signedjson.key.get_verify_key(key1)
+        key1_id = "%s:%s" % (key1.alg, key1.version)
+
+        r = self.hs.datastore.store_server_verify_keys(
+            "server9",
+            time.time() * 1000,
+            [
+                (
+                    "server9",
+                    key1_id,
+                    signedjson.key.get_verify_key(key1),
+                ),
+            ],
         )
         self.get_success(r)
         json1 = {}

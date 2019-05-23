@@ -84,38 +84,51 @@ class KeyStore(SQLBaseStore):
 
         return self.runInteraction("get_server_verify_keys", _txn)
 
-    def store_server_verify_key(
-        self, server_name, from_server, time_now_ms, verify_key
-    ):
-        """Stores a NACL verification key for the given server.
+    def store_server_verify_keys(self, from_server, ts_added_ms, verify_keys):
+        """Stores NACL verification keys for remote servers.
         Args:
-            server_name (str): The name of the server.
-            from_server (str): Where the verification key was looked up
-            time_now_ms (int): The time now in milliseconds
-            verify_key (nacl.signing.VerifyKey): The NACL verify key.
+            from_server (str): Where the verification keys were looked up
+            ts_added_ms (int): The time to record that the key was added
+            verify_keys (iterable[tuple[str, str, nacl.signing.VerifyKey]]):
+                keys to be stored. Each entry is a triplet of
+                (server_name, key_id, key).
         """
-        key_id = "%s:%s" % (verify_key.alg, verify_key.version)
-
-        # XXX fix this to not need a lock (#3819)
-        def _txn(txn):
-            self._simple_upsert_txn(
-                txn,
-                table="server_signature_keys",
-                keyvalues={"server_name": server_name, "key_id": key_id},
-                values={
-                    "from_server": from_server,
-                    "ts_added_ms": time_now_ms,
-                    "verify_key": db_binary_type(verify_key.encode()),
-                },
+        key_values = []
+        value_values = []
+        invalidations = []
+        for server_name, key_id, verify_key in verify_keys:
+            key_values.append((server_name, key_id))
+            value_values.append(
+                (
+                    from_server,
+                    ts_added_ms,
+                    db_binary_type(verify_key.encode()),
+                )
             )
             # invalidate takes a tuple corresponding to the params of
             # _get_server_verify_key. _get_server_verify_key only takes one
             # param, which is itself the 2-tuple (server_name, key_id).
-            txn.call_after(
-                self._get_server_verify_key.invalidate, ((server_name, key_id),)
-            )
+            invalidations.append((server_name, key_id))
 
-        return self.runInteraction("store_server_verify_key", _txn)
+        def _invalidate(res):
+            f = self._get_server_verify_key.invalidate
+            for i in invalidations:
+                f((i, ))
+            return res
+
+        return self.runInteraction(
+            "store_server_verify_keys",
+            self._simple_upsert_many_txn,
+            table="server_signature_keys",
+            key_names=("server_name", "key_id"),
+            key_values=key_values,
+            value_names=(
+                "from_server",
+                "ts_added_ms",
+                "verify_key",
+            ),
+            value_values=value_values,
+        ).addCallback(_invalidate)
 
     def store_server_keys_json(
         self, server_name, key_id, from_server, ts_now_ms, ts_expires_ms, key_json_bytes
