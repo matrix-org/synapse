@@ -2013,15 +2013,44 @@ class FederationHandler(BaseHandler):
 
         Args:
             origin (str):
-            event (synapse.events.FrozenEvent):
+            event (synapse.events.EventBase):
             context (synapse.events.snapshot.EventContext):
-            auth_events (dict[(str, str)->str]):
+            auth_events (dict[(str, str)->synapse.events.EventBase]):
+                Map from (event_type, state_key) to event
+
+                What we expect the event's auth_events to be, based on the event's
+                position in the dag. I think? maybe??
+
+                Also NB that this function adds entries to it.
+        Returns:
+            defer.Deferred[None]
+        """
+        room_version = yield self.store.get_room_version(event.room_id)
+
+        yield self._update_auth_events_and_context_for_auth(
+            origin, event, context, auth_events
+        )
+        try:
+            self.auth.check(room_version, event, auth_events=auth_events)
+        except AuthError as e:
+            logger.warn("Failed auth resolution for %r because %s", event, e)
+            raise e
+
+    @defer.inlineCallbacks
+    def _update_auth_events_and_context_for_auth(
+        self, origin, event, context, auth_events
+    ):
+        """Helper for do_auth. See there for docs.
+
+        Args:
+            origin (str):
+            event (synapse.events.EventBase):
+            context (synapse.events.snapshot.EventContext):
+            auth_events (dict[(str, str)->synapse.events.EventBase]):
 
         Returns:
             defer.Deferred[None]
         """
-        # Check if we have all the auth events.
-        current_state = set(e.event_id for e in auth_events.values())
         event_auth_events = set(event.auth_event_ids())
 
         if event.is_state():
@@ -2029,11 +2058,21 @@ class FederationHandler(BaseHandler):
         else:
             event_key = None
 
-        if event_auth_events - current_state:
+        # if the event's auth_events refers to events which are not in our
+        # calculated auth_events, we need to fetch those events from somewhere.
+        #
+        # we start by fetching them from the store, and then try calling /event_auth/.
+        missing_auth = event_auth_events.difference(
+            e.event_id for e in auth_events.values()
+        )
+
+        if missing_auth:
             # TODO: can we use store.have_seen_events here instead?
             have_events = yield self.store.get_seen_events_with_rejections(
-                event_auth_events - current_state
+                missing_auth
             )
+            logger.debug("Got events %s from store", have_events)
+            missing_auth.difference_update(have_events.keys())
         else:
             have_events = {}
 
@@ -2042,13 +2081,12 @@ class FederationHandler(BaseHandler):
             for e in auth_events.values()
         })
 
-        seen_events = set(have_events.keys())
-
-        missing_auth = event_auth_events - seen_events - current_state
-
         if missing_auth:
-            logger.info("Missing auth: %s", missing_auth)
             # If we don't have all the auth events, we need to get them.
+            logger.info(
+                "auth_events contains unknown events: %s",
+                missing_auth,
+            )
             try:
                 remote_auth_chain = yield self.federation_client.get_event_auth(
                     origin, event.room_id, event.event_id
@@ -2089,145 +2127,168 @@ class FederationHandler(BaseHandler):
                 have_events = yield self.store.get_seen_events_with_rejections(
                     event.auth_event_ids()
                 )
-                seen_events = set(have_events.keys())
             except Exception:
                 # FIXME:
                 logger.exception("Failed to get auth chain")
 
+        if event.internal_metadata.is_outlier():
+            logger.info("Skipping auth_event fetch for outlier")
+            return
+
         # FIXME: Assumes we have and stored all the state for all the
         # prev_events
-        current_state = set(e.event_id for e in auth_events.values())
-        different_auth = event_auth_events - current_state
+        different_auth = event_auth_events.difference(
+            e.event_id for e in auth_events.values()
+        )
+
+        if not different_auth:
+            return
+
+        logger.info(
+            "auth_events refers to events which are not in our calculated auth "
+            "chain: %s",
+            different_auth,
+        )
 
         room_version = yield self.store.get_room_version(event.room_id)
 
-        if different_auth and not event.internal_metadata.is_outlier():
-            # Do auth conflict res.
-            logger.info("Different auth: %s", different_auth)
-
-            different_events = yield logcontext.make_deferred_yieldable(
-                defer.gatherResults([
-                    logcontext.run_in_background(
-                        self.store.get_event,
-                        d,
-                        allow_none=True,
-                        allow_rejected=False,
-                    )
-                    for d in different_auth
-                    if d in have_events and not have_events[d]
-                ], consumeErrors=True)
-            ).addErrback(unwrapFirstError)
-
-            if different_events:
-                local_view = dict(auth_events)
-                remote_view = dict(auth_events)
-                remote_view.update({
-                    (d.type, d.state_key): d for d in different_events if d
-                })
-
-                new_state = yield self.state_handler.resolve_events(
-                    room_version,
-                    [list(local_view.values()), list(remote_view.values())],
-                    event
+        different_events = yield logcontext.make_deferred_yieldable(
+            defer.gatherResults([
+                logcontext.run_in_background(
+                    self.store.get_event,
+                    d,
+                    allow_none=True,
+                    allow_rejected=False,
                 )
+                for d in different_auth
+                if d in have_events and not have_events[d]
+            ], consumeErrors=True)
+        ).addErrback(unwrapFirstError)
 
-                auth_events.update(new_state)
+        if different_events:
+            local_view = dict(auth_events)
+            remote_view = dict(auth_events)
+            remote_view.update({
+                (d.type, d.state_key): d for d in different_events if d
+            })
 
-                current_state = set(e.event_id for e in auth_events.values())
-                different_auth = event_auth_events - current_state
+            new_state = yield self.state_handler.resolve_events(
+                room_version,
+                [list(local_view.values()), list(remote_view.values())],
+                event
+            )
 
-                yield self._update_context_for_auth_events(
-                    event, context, auth_events, event_key,
-                )
+            logger.info(
+                "After state res: updating auth_events with new state %s",
+                {
+                    (d.type, d.state_key): d.event_id for d in new_state.values()
+                    if auth_events.get((d.type, d.state_key)) != d
+                },
+            )
 
-        if different_auth and not event.internal_metadata.is_outlier():
-            logger.info("Different auth after resolution: %s", different_auth)
+            auth_events.update(new_state)
 
-            # Only do auth resolution if we have something new to say.
-            # We can't rove an auth failure.
-            do_resolution = False
+            different_auth = event_auth_events.difference(
+                e.event_id for e in auth_events.values()
+            )
 
-            provable = [
-                RejectedReason.NOT_ANCESTOR, RejectedReason.NOT_ANCESTOR,
-            ]
+            yield self._update_context_for_auth_events(
+                event, context, auth_events, event_key,
+            )
 
-            for e_id in different_auth:
-                if e_id in have_events:
-                    if have_events[e_id] in provable:
-                        do_resolution = True
-                        break
+        if not different_auth:
+            # we're done
+            return
 
-            if do_resolution:
-                prev_state_ids = yield context.get_prev_state_ids(self.store)
-                # 1. Get what we think is the auth chain.
-                auth_ids = yield self.auth.compute_auth_events(
-                    event, prev_state_ids
-                )
-                local_auth_chain = yield self.store.get_auth_chain(
-                    auth_ids, include_given=True
-                )
+        logger.info(
+            "auth_events still refers to events which are not in the calculated auth "
+            "chain after state resolution: %s",
+            different_auth,
+        )
 
-                try:
-                    # 2. Get remote difference.
-                    result = yield self.federation_client.query_auth(
-                        origin,
-                        event.room_id,
-                        event.event_id,
-                        local_auth_chain,
-                    )
+        # Only do auth resolution if we have something new to say.
+        # We can't prove an auth failure.
+        do_resolution = False
 
-                    seen_remotes = yield self.store.have_seen_events(
-                        [e.event_id for e in result["auth_chain"]]
-                    )
+        for e_id in different_auth:
+            if e_id in have_events:
+                if have_events[e_id] == RejectedReason.NOT_ANCESTOR:
+                    do_resolution = True
+                    break
 
-                    # 3. Process any remote auth chain events we haven't seen.
-                    for ev in result["auth_chain"]:
-                        if ev.event_id in seen_remotes:
-                            continue
+        if not do_resolution:
+            logger.info(
+                "Skipping auth resolution due to lack of provable rejection reasons"
+            )
+            return
 
-                        if ev.event_id == event.event_id:
-                            continue
+        logger.info("Doing auth resolution")
 
-                        try:
-                            auth_ids = ev.auth_event_ids()
-                            auth = {
-                                (e.type, e.state_key): e
-                                for e in result["auth_chain"]
-                                if e.event_id in auth_ids
-                                or event.type == EventTypes.Create
-                            }
-                            ev.internal_metadata.outlier = True
+        prev_state_ids = yield context.get_prev_state_ids(self.store)
 
-                            logger.debug(
-                                "do_auth %s different_auth: %s",
-                                event.event_id, e.event_id
-                            )
-
-                            yield self._handle_new_event(
-                                origin, ev, auth_events=auth
-                            )
-
-                            if ev.event_id in event_auth_events:
-                                auth_events[(ev.type, ev.state_key)] = ev
-                        except AuthError:
-                            pass
-
-                except Exception:
-                    # FIXME:
-                    logger.exception("Failed to query auth chain")
-
-                # 4. Look at rejects and their proofs.
-                # TODO.
-
-                yield self._update_context_for_auth_events(
-                    event, context, auth_events, event_key,
-                )
+        # 1. Get what we think is the auth chain.
+        auth_ids = yield self.auth.compute_auth_events(
+            event, prev_state_ids
+        )
+        local_auth_chain = yield self.store.get_auth_chain(
+            auth_ids, include_given=True
+        )
 
         try:
-            self.auth.check(room_version, event, auth_events=auth_events)
-        except AuthError as e:
-            logger.warn("Failed auth resolution for %r because %s", event, e)
-            raise e
+            # 2. Get remote difference.
+            result = yield self.federation_client.query_auth(
+                origin,
+                event.room_id,
+                event.event_id,
+                local_auth_chain,
+            )
+
+            seen_remotes = yield self.store.have_seen_events(
+                [e.event_id for e in result["auth_chain"]]
+            )
+
+            # 3. Process any remote auth chain events we haven't seen.
+            for ev in result["auth_chain"]:
+                if ev.event_id in seen_remotes:
+                    continue
+
+                if ev.event_id == event.event_id:
+                    continue
+
+                try:
+                    auth_ids = ev.auth_event_ids()
+                    auth = {
+                        (e.type, e.state_key): e
+                        for e in result["auth_chain"]
+                        if e.event_id in auth_ids
+                        or event.type == EventTypes.Create
+                    }
+                    ev.internal_metadata.outlier = True
+
+                    logger.debug(
+                        "do_auth %s different_auth: %s",
+                        event.event_id, e.event_id
+                    )
+
+                    yield self._handle_new_event(
+                        origin, ev, auth_events=auth
+                    )
+
+                    if ev.event_id in event_auth_events:
+                        auth_events[(ev.type, ev.state_key)] = ev
+                except AuthError:
+                    pass
+
+        except Exception:
+            # FIXME:
+            logger.exception("Failed to query auth chain")
+
+        # 4. Look at rejects and their proofs.
+        # TODO.
+
+        yield self._update_context_for_auth_events(
+            event, context, auth_events, event_key,
+        )
 
     @defer.inlineCallbacks
     def _update_context_for_auth_events(self, event, context, auth_events,
