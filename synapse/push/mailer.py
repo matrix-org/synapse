@@ -521,11 +521,11 @@ def format_ts_filter(value, format):
     return time.strftime(format, time.localtime(value / 1000))
 
 
-def load_jinja2_templates(config):
+def load_jinja2_templates(config, template_html_name, template_text_name):
     """Load the jinja2 email templates from disk
 
     Returns:
-        (notif_template_html, notif_template_text)
+        (template_html, template_text)
     """
     logger.info("loading email templates from '%s'", config.email_template_dir)
     loader = jinja2.FileSystemLoader(config.email_template_dir)
@@ -533,14 +533,10 @@ def load_jinja2_templates(config):
     env.filters["format_ts"] = format_ts_filter
     env.filters["mxc_to_http"] = _create_mxc_to_http_filter(config)
 
-    notif_template_html = env.get_template(
-        config.email_notif_template_html
-    )
-    notif_template_text = env.get_template(
-        config.email_notif_template_text
-    )
+    template_html = env.get_template(template_html_name)
+    template_text = env.get_template(template_text_name)
 
-    return notif_template_html, notif_template_text
+    return template_html, template_text
 
 
 def _create_mxc_to_http_filter(config):

@@ -19,7 +19,10 @@ from six import string_types
 
 from frozendict import frozendict
 
-from synapse.api.constants import EventTypes
+from twisted.internet import defer
+
+from synapse.api.constants import EventTypes, RelationTypes
+from synapse.util.async_helpers import yieldable_gather_results
 
 from . import EventBase
 
@@ -311,3 +314,92 @@ def serialize_event(e, time_now_ms, as_client_event=True,
         d = only_fields(d, only_event_fields)
 
     return d
+
+
+class EventClientSerializer(object):
+    """Serializes events that are to be sent to clients.
+
+    This is used for bundling extra information with any events to be sent to
+    clients.
+    """
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.experimental_msc1849_support_enabled = (
+            hs.config.experimental_msc1849_support_enabled
+        )
+
+    @defer.inlineCallbacks
+    def serialize_event(self, event, time_now, **kwargs):
+        """Serializes a single event.
+
+        Args:
+            event (EventBase)
+            time_now (int): The current time in milliseconds
+            **kwargs: Arguments to pass to `serialize_event`
+
+        Returns:
+            Deferred[dict]: The serialized event
+        """
+        # To handle the case of presence events and the like
+        if not isinstance(event, EventBase):
+            defer.returnValue(event)
+
+        event_id = event.event_id
+        serialized_event = serialize_event(event, time_now, **kwargs)
+
+        # If MSC1849 is enabled then we need to look if thre are any relations
+        # we need to bundle in with the event
+        if self.experimental_msc1849_support_enabled:
+            annotations = yield self.store.get_aggregation_groups_for_event(
+                event_id,
+            )
+            references = yield self.store.get_relations_for_event(
+                event_id, RelationTypes.REFERENCE, direction="f",
+            )
+
+            if annotations.chunk:
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.ANNOTATION] = annotations.to_dict()
+
+            if references.chunk:
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.REFERENCE] = references.to_dict()
+
+            edit = None
+            if event.type == EventTypes.Message:
+                edit = yield self.store.get_applicable_edit(event_id)
+
+            if edit:
+                # If there is an edit replace the content, preserving existing
+                # relations.
+
+                relations = event.content.get("m.relates_to")
+                serialized_event["content"] = edit.content.get("m.new_content", {})
+                if relations:
+                    serialized_event["content"]["m.relates_to"] = relations
+                else:
+                    serialized_event["content"].pop("m.relates_to", None)
+
+                r = serialized_event["unsigned"].setdefault("m.relations", {})
+                r[RelationTypes.REPLACE] = {
+                    "event_id": edit.event_id,
+                }
+
+        defer.returnValue(serialized_event)
+
+    def serialize_events(self, events, time_now, **kwargs):
+        """Serializes multiple events.
+
+        Args:
+            event (iter[EventBase])
+            time_now (int): The current time in milliseconds
+            **kwargs: Arguments to pass to `serialize_event`
+
+        Returns:
+            Deferred[list[dict]]: The list of serialized events
+        """
+        return yieldable_gather_results(
+            self.serialize_event, events,
+            time_now=time_now, **kwargs
+        )

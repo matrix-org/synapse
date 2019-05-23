@@ -19,7 +19,7 @@
 import logging
 import re
 
-from synapse.api.urls import CLIENT_PREFIX
+from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.http.servlet import RestServlet
 from synapse.rest.client.transactions import HttpTransactionCache
 
@@ -36,12 +36,12 @@ def client_path_patterns(path_regex, releases=(0,), include_in_unstable=True):
     Returns:
         SRE_Pattern
     """
-    patterns = [re.compile("^" + CLIENT_PREFIX + path_regex)]
+    patterns = [re.compile("^" + CLIENT_API_PREFIX + "/api/v1" + path_regex)]
     if include_in_unstable:
-        unstable_prefix = CLIENT_PREFIX.replace("/api/v1", "/unstable")
+        unstable_prefix = CLIENT_API_PREFIX + "/unstable"
         patterns.append(re.compile("^" + unstable_prefix + path_regex))
     for release in releases:
-        new_prefix = CLIENT_PREFIX.replace("/api/v1", "/r%d" % release)
+        new_prefix = CLIENT_API_PREFIX + "/r%d" % (release,)
         patterns.append(re.compile("^" + new_prefix + path_regex))
     return patterns
 

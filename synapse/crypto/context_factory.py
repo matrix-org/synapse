@@ -18,10 +18,10 @@ import logging
 from zope.interface import implementer
 
 from OpenSSL import SSL, crypto
-from twisted.internet._sslverify import _defaultCurveName
+from twisted.internet._sslverify import ClientTLSOptions, _defaultCurveName
 from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
-from twisted.internet.ssl import CertificateOptions, ContextFactory
+from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust
 from twisted.python.failure import Failure
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ def _tolerateErrors(wrapped):
 
 
 @implementer(IOpenSSLClientConnectionCreator)
-class ClientTLSOptions(object):
+class ClientTLSOptionsNoVerify(object):
     """
     Client creator for TLS without certificate identity verification. This is a
     copy of twisted.internet._sslverify.ClientTLSOptions with the identity
@@ -127,9 +127,30 @@ class ClientTLSOptionsFactory(object):
     to remote servers for federation."""
 
     def __init__(self, config):
-        # We don't use config options yet
-        self._options = CertificateOptions(verify=False)
+        self._config = config
+        self._options_noverify = CertificateOptions()
+
+        # Check if we're using a custom list of a CA certificates
+        trust_root = config.federation_ca_trust_root
+        if trust_root is None:
+            # Use CA root certs provided by OpenSSL
+            trust_root = platformTrust()
+
+        self._options_verify = CertificateOptions(trustRoot=trust_root)
 
     def get_options(self, host):
         # Use _makeContext so that we get a fresh OpenSSL CTX each time.
-        return ClientTLSOptions(host, self._options._makeContext())
+
+        # Check if certificate verification has been enabled
+        should_verify = self._config.federation_verify_certificates
+
+        # Check if we've disabled certificate verification for this host
+        if should_verify:
+            for regex in self._config.federation_certificate_verification_whitelist:
+                if regex.match(host):
+                    should_verify = False
+                    break
+
+        if should_verify:
+            return ClientTLSOptions(host, self._options_verify._makeContext())
+        return ClientTLSOptionsNoVerify(host, self._options_noverify._makeContext())

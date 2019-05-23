@@ -142,6 +142,38 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return self.runInteraction("get_room_summary", _get_room_summary_txn)
 
+    def _get_user_count_in_room_txn(self, txn, room_id, membership):
+        """
+        See get_user_count_in_room.
+        """
+        sql = (
+            "SELECT count(*) FROM room_memberships as m"
+            " INNER JOIN current_state_events as c"
+            " ON m.event_id = c.event_id "
+            " AND m.room_id = c.room_id "
+            " AND m.user_id = c.state_key"
+            " WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?"
+        )
+
+        txn.execute(sql, (room_id, membership))
+        row = txn.fetchone()
+        return row[0]
+
+    def get_user_count_in_room(self, room_id, membership):
+        """
+        Get the user count in a room with a particular membership.
+
+        Args:
+            room_id (str)
+            membership (Membership)
+
+        Returns:
+            Deferred[int]
+        """
+        return self.runInteraction(
+            "get_users_in_room", self._get_user_count_in_room_txn, room_id, membership
+        )
+
     @cached()
     def get_invited_rooms_for_user(self, user_id):
         """ Get all the rooms the user is invited to

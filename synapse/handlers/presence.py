@@ -828,6 +828,11 @@ class PresenceHandler(object):
             if typ != EventTypes.Member:
                 continue
 
+            if event_id is None:
+                # state has been deleted, so this is not a join. We only care about
+                # joins.
+                continue
+
             event = yield self.store.get_event(event_id)
             if event.content.get("membership") != Membership.JOIN:
                 # We only care about joins

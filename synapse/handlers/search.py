@@ -23,7 +23,6 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.events.utils import serialize_event
 from synapse.storage.state import StateFilter
 from synapse.visibility import filter_events_for_client
 
@@ -36,6 +35,7 @@ class SearchHandler(BaseHandler):
 
     def __init__(self, hs):
         super(SearchHandler, self).__init__(hs)
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def get_old_rooms_from_upgraded_room(self, room_id):
@@ -401,14 +401,16 @@ class SearchHandler(BaseHandler):
         time_now = self.clock.time_msec()
 
         for context in contexts.values():
-            context["events_before"] = [
-                serialize_event(e, time_now)
-                for e in context["events_before"]
-            ]
-            context["events_after"] = [
-                serialize_event(e, time_now)
-                for e in context["events_after"]
-            ]
+            context["events_before"] = (
+                yield self._event_serializer.serialize_events(
+                    context["events_before"], time_now,
+                )
+            )
+            context["events_after"] = (
+                yield self._event_serializer.serialize_events(
+                    context["events_after"], time_now,
+                )
+            )
 
         state_results = {}
         if include_state:
@@ -422,14 +424,13 @@ class SearchHandler(BaseHandler):
         # We're now about to serialize the events. We should not make any
         # blocking calls after this. Otherwise the 'age' will be wrong
 
-        results = [
-            {
+        results = []
+        for e in allowed_events:
+            results.append({
                 "rank": rank_map[e.event_id],
-                "result": serialize_event(e, time_now),
+                "result": (yield self._event_serializer.serialize_event(e, time_now)),
                 "context": contexts.get(e.event_id, {}),
-            }
-            for e in allowed_events
-        ]
+            })
 
         rooms_cat_res = {
             "results": results,
@@ -438,10 +439,13 @@ class SearchHandler(BaseHandler):
         }
 
         if state_results:
-            rooms_cat_res["state"] = {
-                room_id: [serialize_event(e, time_now) for e in state]
-                for room_id, state in state_results.items()
-            }
+            s = {}
+            for room_id, state in state_results.items():
+                s[room_id] = yield self._event_serializer.serialize_events(
+                    state, time_now,
+                )
+
+            rooms_cat_res["state"] = s
 
         if room_groups and "room_id" in group_keys:
             rooms_cat_res.setdefault("groups", {})["room_id"] = room_groups

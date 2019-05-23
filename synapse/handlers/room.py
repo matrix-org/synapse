@@ -27,7 +27,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
-from synapse.api.room_versions import DEFAULT_ROOM_VERSION, KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
@@ -71,6 +71,7 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.currently_upgrading_rooms = {}
+        self.config = hs.config
 
         # linearizer to stop two upgrades happening at once
         self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
@@ -411,7 +412,7 @@ class RoomCreationHandler(BaseHandler):
                 yield directory_handler.create_association(
                     requester, RoomAlias.from_string(alias),
                     new_room_id, servers=(self.hs.hostname, ),
-                    send_event=False,
+                    send_event=False, check_membership=False,
                 )
                 logger.info("Moved alias %s to new room", alias)
             except SynapseError as e:
@@ -484,7 +485,11 @@ class RoomCreationHandler(BaseHandler):
         if ratelimit:
             yield self.ratelimit(requester)
 
-        room_version = config.get("room_version", DEFAULT_ROOM_VERSION.identifier)
+        room_version = config.get(
+            "room_version",
+            self.config.default_room_version.identifier,
+        )
+
         if not isinstance(room_version, string_types):
             raise SynapseError(
                 400,
@@ -547,6 +552,7 @@ class RoomCreationHandler(BaseHandler):
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
                 send_event=False,
+                check_membership=False,
             )
 
         preset_config = config.get(

@@ -37,8 +37,12 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config = self.default_config("test")
 
         # some of the tests rely on us having a user consent version
-        hs_config.user_consent_version = "test_consent_version"
-        hs_config.max_mau_value = 50
+        hs_config["user_consent"] = {
+            "version": "test_consent_version",
+            "template_dir": ".",
+        }
+        hs_config["max_mau_value"] = 50
+        hs_config["limit_usage_by_mau"] = True
 
         hs = self.setup_test_homeserver(config=hs_config, expire_access_token=True)
         return hs
@@ -224,3 +228,10 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def test_register_not_support_user(self):
         res = self.get_success(self.handler.register(localpart='user'))
         self.assertFalse(self.store.is_support_user(res[0]))
+
+    def test_invalid_user_id_length(self):
+        invalid_user_id = "x" * 256
+        self.get_failure(
+            self.handler.register(localpart=invalid_user_id),
+            SynapseError
+        )

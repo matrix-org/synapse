@@ -45,7 +45,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
         return self.get_auth_chain_ids(
             event_ids, include_given=include_given
-        ).addCallback(self._get_events)
+        ).addCallback(self.get_events_as_list)
 
     def get_auth_chain_ids(self, event_ids, include_given=False):
         """Get auth events for given event_ids. The events *must* be state events.
@@ -316,7 +316,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 event_list,
                 limit,
             )
-            .addCallback(self._get_events)
+            .addCallback(self.get_events_as_list)
             .addCallback(lambda l: sorted(l, key=lambda e: -e.depth))
         )
 
@@ -382,7 +382,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             latest_events,
             limit,
         )
-        events = yield self._get_events(ids)
+        events = yield self.get_events_as_list(ids)
         defer.returnValue(events)
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events, limit):
