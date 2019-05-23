@@ -13,16 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-
 from twisted.internet import defer
 
 import synapse.api.errors
 
 import tests.unittest
 import tests.utils
-
-logger = logging.getLogger(__name__)
 
 
 class DeviceStoreTestCase(tests.unittest.TestCase):
