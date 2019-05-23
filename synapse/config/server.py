@@ -23,7 +23,6 @@ from netaddr import IPSet
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.python_dependencies import DependencyException, check_requirements
-from synapse.util.dictutils import merge_dicts
 
 from ._base import Config, ConfigError
 
@@ -330,6 +329,10 @@ class ServerConfig(Config):
             unsecure_port = 8008
 
         pid_file = os.path.join(data_dir_path, "homeserver.pid")
+
+        # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
+        # default config string
+        default_room_version = DEFAULT_ROOM_VERSION
         return """\
         ## Server ##
 
@@ -411,7 +414,7 @@ class ServerConfig(Config):
         #
         # For example, for room version 1, default_room_version should be set
         # to "1".
-        #default_room_version: "%(DEFAULT_ROOM_VERSION)s"
+        #default_room_version: "%(default_room_version)s"
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
@@ -611,7 +614,7 @@ class ServerConfig(Config):
         # Defaults to 'true'.
         #
         #allow_per_room_profiles: false
-        """ % merge_dicts(locals(), globals())
+        """ % locals()
 
     def read_arguments(self, args):
         if args.manhole is not None:
