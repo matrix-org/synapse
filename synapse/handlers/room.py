@@ -70,8 +70,16 @@ class RoomCreationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
-        self.currently_upgrading_rooms = {}
         self.config = hs.config
+
+        # Dict of {room_id: {user_id: 1}}
+        # Used for keeping track of rooms that are currently being upgraded
+        self.currently_upgrading_rooms = {}
+
+        # Dict of {room_id: request_response}
+        # Used for saving responses to requests to relay them to subsequent
+        # requests
+        self.upgrade_responses = {}
 
         # linearizer to stop two upgrades happening at once
         self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
@@ -92,11 +100,52 @@ class RoomCreationHandler(BaseHandler):
 
         user_id = requester.user.to_string()
 
+        # Check if this room is already being upgraded
         if old_room_id in self.currently_upgrading_rooms:
-            raise SynapseError(
-                400, "An upgrade for this room is currently in progress."
-            )
-        self.currently_upgrading_rooms[old_room_id] = True
+            if self.currently_upgrading_rooms[old_room_id]["user"] == requester.user:
+                # This user is trying to update the same room before the
+                # previous request is done. Send the same response as the first
+                # attempt.
+
+                # Say we're waiting on the response from another request
+                self.currently_upgrading_rooms[old_room_id]["pending_requests"] += 1
+
+                # Wait on the linearizer for this old room id
+                with (yield self._upgrade_linearizer.queue(old_room_id)):
+                    # Each run of the linearizer needs to wait on something or
+                    # else it will get stuck
+                    pass
+
+                logging.info("Room upgrade attempted again simultaneously by the same user. "
+                             "Responding to this request with the result of the previous attempt")
+
+                # Return what was responded to the previous request
+                response = self.upgrade_responses[old_room_id]
+
+                # Decrement upgrading entry and remove if necessary
+                self.currently_upgrading_rooms[old_room_id]["pending_requests"] -= 1
+                if self.currently_upgrading_rooms[old_room_id]["pending_requests"] <= 0:
+                    del self.currently_upgrading_rooms[old_room_id]
+
+                    # Remove saved response as well if nothing is waiting on it
+                    del self.upgrade_responses[old_room_id]
+
+                defer.returnValue(response)
+            else:
+                # Two different people are trying to upgrade the same room.
+                # Send the second an error.
+                #
+                # Of course this only gets caught if both users are on the same
+                # homeserver.
+                raise SynapseError(
+                    # 409 - HTTP for "Conflict"
+                    409, "An upgrade for this room is currently in progress",
+                )
+
+        # Mark this room as currently being upgraded by this user
+        self.currently_upgrading_rooms[old_room_id] = {
+            "user": requester.user, "pending_requests": 1,
+        }
 
         with (yield self._upgrade_linearizer.queue(old_room_id)):
             # start by allocating a new room id
@@ -157,7 +206,14 @@ class RoomCreationHandler(BaseHandler):
                 requester, old_room_id, new_room_id, old_room_state,
             )
 
-            del self.currently_upgrading_rooms[old_room_id]
+            # Remove the pending request and the entry for this room id if
+            # necessary
+            self.currently_upgrading_rooms[old_room_id]["pending_requests"] -= 1
+            if self.currently_upgrading_rooms[old_room_id]["pending_requests"] <= 0:
+                del self.currently_upgrading_rooms[old_room_id]
+            else:
+                # Save this response if another request is waiting on it
+                self.upgrade_responses[old_room_id] = new_room_id
 
             defer.returnValue(new_room_id)
 
