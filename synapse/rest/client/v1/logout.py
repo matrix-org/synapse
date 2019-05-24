@@ -40,11 +40,11 @@ class LogoutRestServlet(ClientV1RestServlet):
     def on_POST(self, request):
         try:
             requester = yield self.auth.get_user_by_req(request)
-        except AuthError:
+        except AuthError as e:
             # this implies the access token has already been deleted.
-            defer.returnValue((401, {
-                "errcode": "M_UNKNOWN_TOKEN",
-                "error": "Access Token unknown or expired"
+            defer.returnValue((e.code, {
+                "errcode": e.errcode,
+                "error": e.msg
             }))
         else:
             if requester.device_id is None:
