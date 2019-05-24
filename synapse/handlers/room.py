@@ -32,8 +32,8 @@ from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
-from synapse.visibility import filter_events_for_client
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
 
@@ -120,7 +120,7 @@ class RoomCreationHandler(BaseHandler):
         ret = yield self._upgrade_response_cache.wrap(
             (old_room_id, user_id, new_version),
             self._upgrade_room,
-            requester, old_room_id, new_version, # args for _upgrade_room
+            requester, old_room_id, new_version,  # args for _upgrade_room
         )
 
         defer.returnValue(ret)
