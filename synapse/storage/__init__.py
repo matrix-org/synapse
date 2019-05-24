@@ -287,7 +287,7 @@ class DataStore(
         from the mau figure in synapse.storage.monthly_active_users which,
         amongst other things, includes a 3 day grace period before a user counts.
         """
-        thirty_days_ago = int(self._clock.time_msec()) - (30 * 1000 * 60 * 60 * 24)
+        thirty_days_ago = int(self._clock.time_msec()) - (1000 * 60 * 60 * 24 * 30)
         return self.runInteraction(
             "count_monthly_users",
             self._count_users,
