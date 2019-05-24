@@ -85,7 +85,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # we run the lookup in a logcontext so that the patched inlineCallbacks can check
         # it is doing the right thing with logcontexts.
         wait_1_deferred = run_in_context(
-            kr.wait_for_previous_lookups, ["server1"], {"server1": lookup_1_deferred}
+            kr.wait_for_previous_lookups, {"server1": lookup_1_deferred}
         )
 
         # there were no previous lookups, so the deferred should be ready
@@ -94,7 +94,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # set off another wait. It should block because the first lookup
         # hasn't yet completed.
         wait_2_deferred = run_in_context(
-            kr.wait_for_previous_lookups, ["server1"], {"server1": lookup_2_deferred}
+            kr.wait_for_previous_lookups, {"server1": lookup_2_deferred}
         )
 
         self.assertFalse(wait_2_deferred.called)

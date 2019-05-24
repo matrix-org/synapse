@@ -180,9 +180,7 @@ class Keyring(object):
 
             # We want to wait for any previous lookups to complete before
             # proceeding.
-            yield self.wait_for_previous_lookups(
-                [rq.server_name for rq in verify_requests], server_to_deferred
-            )
+            yield self.wait_for_previous_lookups(server_to_deferred)
 
             # Actually start fetching keys.
             self._get_server_verify_keys(verify_requests)
@@ -215,12 +213,11 @@ class Keyring(object):
             logger.exception("Error starting key lookups")
 
     @defer.inlineCallbacks
-    def wait_for_previous_lookups(self, server_names, server_to_deferred):
+    def wait_for_previous_lookups(self, server_to_deferred):
         """Waits for any previous key lookups for the given servers to finish.
 
         Args:
-            server_names (list): list of server_names we want to lookup
-            server_to_deferred (dict): server_name to deferred which gets
+            server_to_deferred (dict[str, Deferred]): server_name to deferred which gets
                 resolved once we've finished looking up keys for that server.
                 The Deferreds should be regular twisted ones which call their
                 callbacks with no logcontext.
@@ -233,7 +230,7 @@ class Keyring(object):
         while True:
             wait_on = [
                 (server_name, self.key_downloads[server_name])
-                for server_name in server_names
+                for server_name in server_to_deferred.keys()
                 if server_name in self.key_downloads
             ]
             if not wait_on:
