@@ -116,8 +116,9 @@ class RoomCreationHandler(BaseHandler):
                     # else it will get stuck
                     pass
 
-                logging.info("Room upgrade attempted again simultaneously by the same user. "
-                             "Responding to this request with the result of the previous attempt")
+                logging.info("Room upgrade attempted again simultaneously "
+                             "by the same user. Responding to this request "
+                             "with the result of the previous attempt")
 
                 # Return what was responded to the previous request
                 response = self.upgrade_responses[old_room_id]
