@@ -166,6 +166,9 @@ class MessageHandler(object):
         now = self.clock.time_msec()
         events = yield self._event_serializer.serialize_events(
             room_state.values(), now,
+            # We don't bother bundling aggregations in when asked for state
+            # events, as clients won't use them.
+            bundle_aggregations=False,
         )
         defer.returnValue(events)
 
