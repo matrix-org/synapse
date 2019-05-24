@@ -34,7 +34,15 @@ class EmailConfig(Config):
         email_config = config.get("email", {})
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
-        if self.email_enable_notifs:
+        self.email_enable_password_reset_from_is = email_config.get(
+            "enable_password_reset_from_is", False,
+        )
+
+        self.validation_token_lifetime = email_config.get(
+            "validation_token_lifetime", 15 * 60,
+        )
+
+        if email_config != {}:
             # make sure we can import the required deps
             import jinja2
             import bleach
@@ -42,6 +50,95 @@ class EmailConfig(Config):
             jinja2
             bleach
 
+            self.email_smtp_host = email_config["smtp_host"]
+            self.email_smtp_port = email_config["smtp_port"]
+            self.email_notif_from = email_config["notif_from"]
+
+            template_dir = email_config.get("template_dir")
+            # we need an absolute path, because we change directory after starting (and
+            # we don't yet know what auxilliary templates like mail.css we will need).
+            # (Note that loading as package_resources with jinja.PackageLoader doesn't
+            # work for the same reason.)
+            if not template_dir:
+                template_dir = pkg_resources.resource_filename(
+                    'synapse', 'res/templates'
+                )
+            self.email_template_dir = os.path.abspath(template_dir)
+            self.email_riot_base_url = email_config.get(
+                "riot_base_url", None
+            )
+            self.email_smtp_user = email_config.get(
+                "smtp_user", None
+            )
+            self.email_smtp_pass = email_config.get(
+                "smtp_pass", None
+            )
+            self.require_transport_security = email_config.get(
+                "require_transport_security", False
+            )
+            self.email_app_name = email_config.get("app_name", "Matrix")
+
+            # make sure it's valid
+            parsed = email.utils.parseaddr(self.email_notif_from)
+            if parsed[1] == '':
+                raise RuntimeError("Invalid notif_from address")
+
+        if not self.email_enable_password_reset_from_is:
+            required = [
+                "smtp_host",
+                "smtp_port",
+                "notif_from",
+            ]
+
+            missing = []
+            for k in required:
+                if k not in email_config:
+                    missing.append(k)
+
+            if (len(missing) > 0):
+                raise RuntimeError(
+                    "email.enable_password_reset_from_is is False "
+                    "but required keys are missing: %s" %
+                    (", ".join(["email." + k for k in missing]),)
+                )
+
+            # Templates for password reset emails
+            self.email_password_reset_template_html = email_config.get(
+                "password_reset_template_html", "password_reset.html",
+            )
+            self.email_password_reset_template_text = email_config.get(
+                "password_reset_template_text", "password_reset.txt",
+            )
+            self.email_password_reset_failure_template = email_config.get(
+                "password_reset_failure_template", "password_reset_failure.html",
+            )
+            # This template does not support any replaceable variables, so we will
+            # read it from the disk once during setup
+            email_password_reset_success_template = email_config.get(
+                "password_reset_success_template", "password_reset_success.html",
+            )
+
+            # Check templates exist
+            for f in [self.email_password_reset_template_html,
+                      self.email_password_reset_template_text,
+                      self.email_password_reset_failure_template,
+                      email_password_reset_success_template]:
+                p = os.path.join(self.email_template_dir, f)
+                if not os.path.isfile(p):
+                    raise ConfigError("Unable to find template file %s" % (p, ))
+
+            # Retrieve content of web templates
+            self.email_password_reset_success_html_content = self._get_template_content(
+                self.email_template_dir, email_password_reset_success_template
+            )
+
+            if config.get("public_baseurl") is None:
+                raise RuntimeError(
+                    "email.enable_password_reset_from_is is False but no "
+                    "public_baseurl is set"
+                )
+
+        if self.email_enable_notifs:
             required = [
                 "smtp_host",
                 "smtp_port",
@@ -66,9 +163,6 @@ class EmailConfig(Config):
                     "email.enable_notifs is True but no public_baseurl is set"
                 )
 
-            self.email_smtp_host = email_config["smtp_host"]
-            self.email_smtp_port = email_config["smtp_port"]
-            self.email_notif_from = email_config["notif_from"]
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
             self.email_expiry_template_html = email_config.get(
@@ -78,79 +172,94 @@ class EmailConfig(Config):
                 "expiry_template_text", "notice_expiry.txt",
             )
 
-            template_dir = email_config.get("template_dir")
-            # we need an absolute path, because we change directory after starting (and
-            # we don't yet know what auxilliary templates like mail.css we will need).
-            # (Note that loading as package_resources with jinja.PackageLoader doesn't
-            # work for the same reason.)
-            if not template_dir:
-                template_dir = pkg_resources.resource_filename(
-                    'synapse', 'res/templates'
-                )
-            template_dir = os.path.abspath(template_dir)
-
             for f in self.email_notif_template_text, self.email_notif_template_html:
-                p = os.path.join(template_dir, f)
+                p = os.path.join(self.email_template_dir, f)
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find email template file %s" % (p, ))
-            self.email_template_dir = template_dir
 
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
-            self.email_riot_base_url = email_config.get(
-                "riot_base_url", None
-            )
-            self.email_smtp_user = email_config.get(
-                "smtp_user", None
-            )
-            self.email_smtp_pass = email_config.get(
-                "smtp_pass", None
-            )
-            self.require_transport_security = email_config.get(
-                "require_transport_security", False
-            )
-            if "app_name" in email_config:
-                self.email_app_name = email_config["app_name"]
-            else:
-                self.email_app_name = "Matrix"
 
-            # make sure it's valid
-            parsed = email.utils.parseaddr(self.email_notif_from)
-            if parsed[1] == '':
-                raise RuntimeError("Invalid notif_from address")
-        else:
-            self.email_enable_notifs = False
-            # Not much point setting defaults for the rest: it would be an
-            # error for them to be used.
+    def _get_template_content(self, template_dir, path):
+        fullpath = os.path.join(template_dir, path)
+
+        try:
+            with open(fullpath) as f:
+                return f.read()
+        except Exception as e:
+            raise ConfigError(
+                "Unable to read content of template: %s - %s", fullpath, e,
+            )
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
-        # Enable sending emails for notification events or expiry notices
-        # Defining a custom URL for Riot is only needed if email notifications
-        # should contain links to a self-hosted installation of Riot; when set
-        # the "app_name" setting is ignored.
+        # Enable sending emails for password resets, notification events or
+        # account expiry notices
         #
         # If your SMTP server requires authentication, the optional smtp_user &
         # smtp_pass variables should be used
         #
         #email:
-        #   enable_notifs: false
         #   smtp_host: "localhost"
-        #   smtp_port: 25
+        #   smtp_port: 25 # SSL: 465, STARTTLS: 587
         #   smtp_user: "exampleusername"
         #   smtp_pass: "examplepassword"
         #   require_transport_security: False
         #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
         #   app_name: Matrix
-        #   # if template_dir is unset, uses the example templates that are part of
-        #   # the Synapse distribution.
+        #
+        #   # Enable sending email notifications for new chat messages
+        #   #
+        #   enable_notifs: False
+        #
+        #   # Enable email notifications by default
+        #   notif_for_new_users: True
+        #
+        #   # Defining a custom URL for Riot is only needed if email notifications
+        #   # should contain links to a self-hosted installation of Riot; when set
+        #   # the "app_name" setting is ignored
+        #   riot_base_url: "http://localhost/riot"
+        #
+        #   # Disable sending password reset emails via the configured, trusted
+        #   # identity servers
+        #   #
+        #   # IMPORTANT! This will give a malicious or overtaken identity server
+        #   # the ability to reset passwords for your users! Make absolutely sure
+        #   # that you want to do this! It is strongly recommended that password
+        #   # reset emails be sent by the homeserver instead
+        #   #
+        #   #enable_password_reset_from_is: False
+        #
+        #   # Configure the time in seconds that a validation email or text
+        #   # message code will expire after sending
+        #   #
+        #   # This is currently used for password resets
+        #   #validation_token_lifetime: 900 # 15 minutes
+        #
+        #   # Template directory. All template files should be stored within this
+        #   # directory
+        #   #
         #   #template_dir: res/templates
+        #
+        #   # Templates for email notifications
+        #   #
         #   notif_template_html: notif_mail.html
         #   notif_template_text: notif_mail.txt
-        #   # Templates for account expiry notices.
+        #
+        #   # Templates for account expiry notices
+        #   #
         #   expiry_template_html: notice_expiry.html
         #   expiry_template_text: notice_expiry.txt
-        #   notif_for_new_users: True
-        #   riot_base_url: "http://localhost/riot"
+        #
+        #   # Templates for password reset emails sent by the homeserver
+        #   #
+        #   #password_reset_template_html: password_reset.html
+        #   #password_reset_template_text: password_reset.txt
+        #
+        #   # Templates for password reset success and failure pages that a user
+        #   # will see after attempting to reset their password
+        #   #
+        #   #password_reset_template_success_html: password_reset_success.html
+        #   #password_reset_template_failure_html: password_reset_failure.html
         """

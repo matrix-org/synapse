@@ -40,6 +40,7 @@ from synapse import events
 from synapse.api.urls import (
     CONTENT_REPO_PREFIX,
     FEDERATION_PREFIX,
+    IDENTITY_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_PREFIX,
     SERVER_KEY_V2_PREFIX,
@@ -63,6 +64,7 @@ from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
+from synapse.rest.identity import IdentityRestResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.well_known import WellKnownResource
@@ -187,6 +189,10 @@ class SynapseHomeServer(HomeServer):
             if self.get_config().saml2_enabled:
                 from synapse.rest.saml2 import SAML2Resource
                 resources["/_matrix/saml2"] = SAML2Resource(self)
+
+            resources.update({
+                IDENTITY_PREFIX: IdentityRestResource(self),
+            })
 
         if name == "consent":
             from synapse.rest.consent.consent_resource import ConsentResource
