@@ -20,7 +20,6 @@ from twisted.internet import defer
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
-from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import set_cors_headers, wrap_json_request_handler
 from synapse.http.servlet import parse_integer, parse_string
 
@@ -57,14 +56,10 @@ class ThumbnailResource(Resource):
     def _async_render_GET(self, request):
         set_cors_headers(request)
         server_name, media_id, _ = parse_media_id(request)
-        width = parse_integer(request, "width")
-        height = parse_integer(request, "height")
+        width = parse_integer(request, "width", required=True)
+        height = parse_integer(request, "height", required=True)
         method = parse_string(request, "method", "scale")
         m_type = parse_string(request, "type", "image/png")
-
-        if None in (width, height):
-            message = "Missing width and/or height param"
-            raise SynapseError(400, message, Codes.MISSING_PARAM)
 
         if server_name == self.server_name:
             if self.dynamic_thumbnails:
