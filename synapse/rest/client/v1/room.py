@@ -460,6 +460,7 @@ class JoinedRoomMemberListRestServlet(RestServlet):
     def __init__(self, hs):
         super(JoinedRoomMemberListRestServlet, self).__init__()
         self.message_handler = hs.get_message_handler()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id):
@@ -584,6 +585,7 @@ class RoomEventContextServlet(RestServlet):
         self.clock = hs.get_clock()
         self.room_context_handler = hs.get_room_context_handler()
         self._event_serializer = hs.get_event_client_serializer()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, event_id):
@@ -633,6 +635,7 @@ class RoomForgetRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super(RoomForgetRestServlet, self).__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
+        self.auth = hs.get_auth()
 
     def register(self, http_server):
         PATTERNS = ("/rooms/(?P<room_id>[^/]*)/forget")
@@ -853,6 +856,7 @@ class JoinedRoomsRestServlet(RestServlet):
     def __init__(self, hs):
         super(JoinedRoomsRestServlet, self).__init__()
         self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
