@@ -404,18 +404,18 @@ class CasTicketServlet(RestServlet):
         self.cas_service_url = hs.config.cas_service_url
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
+        self._http_client = hs.get_simple_http_client()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
-        http_client = self.hs.get_simple_http_client()
         uri = self.cas_server_url + "/proxyValidate"
         args = {
             "ticket": parse_string(request, "ticket", required=True),
             "service": self.cas_service_url
         }
         try:
-            body = yield http_client.get_raw(uri, args)
+            body = yield self._http_client.get_raw(uri, args)
         except PartialDownloadError as pde:
             # Twisted raises this error if the connection is closed,
             # even if that's being used old-http style to signal end-of-data
