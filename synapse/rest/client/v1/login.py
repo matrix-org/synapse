@@ -387,7 +387,7 @@ class CasRedirectServlet(RestServlet):
             b"redirectUrl": args[b"redirectUrl"][0]
         }).encode('ascii')
         hs_redirect_url = (self.cas_service_url +
-                           b"/_matrix/client/api/v1/login/cas/ticket")
+                           b"/_matrix/client/r0/login/cas/ticket")
         service_param = urllib.parse.urlencode({
             b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)
         }).encode('ascii')
