@@ -358,6 +358,9 @@ class SyncRestServlet(RestServlet):
         def serialize(events):
             return self._event_serializer.serialize_events(
                 events, time_now=time_now,
+                # We don't bundle "live" events, as otherwise clients
+                # will end up double counting annotations.
+                bundle_aggregations=False,
                 token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,

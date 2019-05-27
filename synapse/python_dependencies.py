@@ -74,14 +74,6 @@ REQUIREMENTS = [
     "attrs>=17.4.0",
 
     "netaddr>=0.7.18",
-
-    # requests is a transitive dep of treq, and urlib3 is a transitive dep
-    # of requests, as well as of sentry-sdk.
-    #
-    # As of requests 2.21, requests does not yet support urllib3 1.25.
-    # (If we do not pin it here, pip will give us the latest urllib3
-    # due to the dep via sentry-sdk.)
-    "urllib3<1.25",
 ]
 
 CONDITIONAL_REQUIREMENTS = {

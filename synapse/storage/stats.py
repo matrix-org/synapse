@@ -169,7 +169,7 @@ class StatsStore(StateDeltasStore):
 
         logger.info(
             "Processing the next %d rooms of %d remaining",
-            (len(rooms_to_work_on), progress["remaining"]),
+            len(rooms_to_work_on), progress["remaining"],
         )
 
         # Number of state events we've processed by going through each room
