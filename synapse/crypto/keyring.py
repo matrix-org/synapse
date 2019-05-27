@@ -730,7 +730,7 @@ def _handle_key_deferred(verify_request):
             502, "Error downloading keys for %s" % (server_name,), Codes.UNAUTHORIZED
         )
     except Exception as e:
-        logger.exception(
+        logger.warn(
             "Got Exception when downloading keys for %s: %s %s",
             server_name,
             type(e).__name__,
