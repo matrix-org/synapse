@@ -396,7 +396,7 @@ class CasRedirectServlet(RestServlet):
 
 
 class CasTicketServlet(RestServlet):
-    PATTERNS = client_patterns("/login/cas/ticket", releases=())
+    PATTERNS = client_patterns("/login/cas/ticket")
 
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__()
