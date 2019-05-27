@@ -38,6 +38,7 @@ class PushersRestServlet(RestServlet):
     def __init__(self, hs):
         super(PushersRestServlet, self).__init__()
         self.hs = hs
+        self.auth = hs.get_auth()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -76,6 +77,7 @@ class PushersSetRestServlet(RestServlet):
     def __init__(self, hs):
         super(PushersSetRestServlet, self).__init__()
         self.hs = hs
+        self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
         self.pusher_pool = self.hs.get_pusherpool()
 

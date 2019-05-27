@@ -37,6 +37,7 @@ class PushRuleRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(PushRuleRestServlet, self).__init__()
+        self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None

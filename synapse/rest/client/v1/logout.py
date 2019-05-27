@@ -30,7 +30,7 @@ class LogoutRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(LogoutRestServlet, self).__init__()
-        self._auth = hs.get_auth()
+        self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
 
@@ -51,7 +51,7 @@ class LogoutRestServlet(RestServlet):
             if requester.device_id is None:
                 # the acccess token wasn't associated with a device.
                 # Just delete the access token
-                access_token = self._auth.get_access_token_from_request(request)
+                access_token = self.auth.get_access_token_from_request(request)
                 yield self._auth_handler.delete_access_token(access_token)
             else:
                 yield self._device_handler.delete_device(
