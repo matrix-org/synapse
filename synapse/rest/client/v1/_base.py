@@ -15,10 +15,14 @@
 
 from synapse.rest.client.v2_alpha._base import client_patterns as _client_patterns
 
-def client_patterns(*args, v1=False, **kwargs):
+
+def client_patterns(*args, **kwargs):
     """
     A client_patterns creator that enables v1 for APIs.
     """
+    if "v1" in kwargs:
+        del kwargs["v1"]
     return _client_patterns(*args, v1=True, **kwargs)
+
 
 __all__ = ["client_patterns"]
