@@ -39,6 +39,10 @@ class AccountValidityConfig(Config):
             else:
                 self.renew_email_subject = "Renew your %(app)s account"
 
+            self.startup_job_max_delta = self.parse_duration(
+                config.get("startup_job_max_delta", 0),
+            )
+
         if self.renew_by_email_enabled and "public_baseurl" not in synapse_config:
             raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
@@ -131,11 +135,18 @@ class RegistrationConfig(Config):
         # after that the validity period changes and Synapse is restarted, the users'
         # expiration dates won't be updated unless their account is manually renewed.
         #
+        # If set, the ``startup_job_max_delta`` optional setting will make the startup job
+        # described above set a random expiration date between t + period  and
+        # t + period + startup_job_max_delta, t being the date and time at which the job
+        # sets the expiration date for a given user. This is useful for server admins that
+        # want to avoid Synapse sending a lot of renewal emails at once.
+        #
         #account_validity:
         #  enabled: True
         #  period: 6w
         #  renew_at: 1w
         #  renew_email_subject: "Renew your %%(app)s account"
+        #  startup_job_max_delta: 2d
 
         # The user must provide all of the below types of 3PID when registering.
         #
