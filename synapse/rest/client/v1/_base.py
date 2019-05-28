@@ -18,6 +18,12 @@ This module contains base REST classes for constructing client v1 servlets.
 """
 
 
-from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.rest.client.v2_alpha._base import client_patterns as _client_patterns
+
+def client_patterns(*args, v1=False, **kwargs):
+    """
+    A client_patterns creator that enables v1 for APIs.
+    """
+    return _client_patterns(*args, v1=True, **kwargs)
 
 __all__ = ["client_patterns"]
