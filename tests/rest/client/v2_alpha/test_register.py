@@ -483,5 +483,5 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
         res = self.get_success(self.store.get_expiration_ts_for_user(user_id))
 
-        self.assertLessEqual(res, now_ms + self.validity_period + self.delta)
+        self.assertLessEqual(res, now_ms + self.validity_period + self.max_delta)
         self.assertGreaterEqual(res, now_ms + self.validity_period)
