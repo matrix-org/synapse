@@ -554,10 +554,13 @@ class EventsStore(
             e_id for event in new_events for e_id in event.prev_event_ids()
         )
 
-        # Finally, remove any events which are prev_events of any existing events.
+        # Remove any events which are prev_events of any existing events.
         existing_prevs = yield self._get_events_which_are_prevs(result)
         result.difference_update(existing_prevs)
 
+        # Finally handle the case where the new events have soft-failed prev
+        # events. If they do we need to remove them and their prev events,
+        # otherwise we end up with dangling extremities.
         existing_prevs = yield self._get_prevs_before_rejected(
             e_id for event in new_events for e_id in event.prev_event_ids()
         )
@@ -602,7 +605,7 @@ class EventsStore(
 
         for chunk in batch_iter(event_ids, 100):
             yield self.runInteraction(
-                "_get_events_which_are_prevs", 
+                "_get_events_which_are_prevs",
                 _get_events_which_are_prevs_txn,
                 chunk,
             )
@@ -611,7 +614,9 @@ class EventsStore(
 
     @defer.inlineCallbacks
     def _get_prevs_before_rejected(self, event_ids):
-        """Given a set of events recursively find all prev events that have
+        """Get soft-failed ancestors to remove from the extremities.
+
+        Given a set of events recursively find all prev events that have
         been soft-failed or rejected. Then return those soft failed events
         and their prev events.
 
@@ -625,6 +630,9 @@ class EventsStore(
         Returns:
             Deferred[set[str]]
         """
+
+        # The set of event_ids to return. This includes all soft-failed events
+        # and their prev events.
         existing_prevs = set()
 
         def _get_prevs_before_rejected_txn(txn, batch):
@@ -660,7 +668,8 @@ class EventsStore(
 
         for chunk in batch_iter(event_ids, 100):
             yield self.runInteraction(
-                "_get_prevs_before_rejected", _get_prevs_before_rejected_txn,
+                "_get_prevs_before_rejected",
+                _get_prevs_before_rejected_txn,
                 chunk,
             )
 
