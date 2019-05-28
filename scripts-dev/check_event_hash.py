@@ -13,9 +13,11 @@ from synapse.crypto.event_signing import (
 
 
 class dictobj(dict):
-    def __init__(self, *args, **kargs):
+    def __init__(self, format_version, metadata, *args, **kargs):
         dict.__init__(self, *args, **kargs)
         self.__dict__ = self
+        self.format_version = format_version
+        self.internal_metadata = metadata
 
     def get_dict(self):
         return dict(self)
@@ -32,10 +34,12 @@ def main():
     parser.add_argument(
         "input_json", nargs="?", type=argparse.FileType('r'), default=sys.stdin
     )
+    parser.add_argument("--format_version", type=int)
     args = parser.parse_args()
     logging.basicConfig()
 
-    event_json = dictobj(json.load(args.input_json))
+    placeholder_metadata = dictobj(1, {}, {})
+    event_json = dictobj(args.format_version, placeholder_metadata, json.load(args.input_json))
 
     algorithms = {"sha256": hashlib.sha256}
 
