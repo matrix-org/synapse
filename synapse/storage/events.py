@@ -602,7 +602,8 @@ class EventsStore(
 
         for chunk in batch_iter(event_ids, 100):
             yield self.runInteraction(
-                "_get_events_which_are_prevs", _get_events_which_are_prevs_txn,
+                "_get_events_which_are_prevs", 
+                _get_events_which_are_prevs_txn,
                 chunk,
             )
 
