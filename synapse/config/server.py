@@ -588,6 +588,13 @@ class ServerConfig(Config):
         # Used in cases where the admin or server owner wants to limit to the
         # number of monthly active users.
         #
+        # 'limit_usage_by_mau' enables the monthly active user blocking. When
+        # a limit is reached the server returns a 'ResourceLimitError' with error
+        # type Codes.RESOURCE_LIMIT_EXCEEDED
+        #
+        # 'max_mau_value' is the hard limit of monthly active users above which
+        # the server will start blocking user actions.
+        #
         # 'mau_trial_days' is means to add a grace period for active users. It
         # means that users must be active for this number of days before they
         # can be considered active and guards against the case where lots of users
