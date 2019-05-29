@@ -1309,6 +1309,10 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
 
 
 class RoomComplexityServlet(BaseFederationServlet):
+    """
+    Indicates to other servers how complex (and therefore likely
+    resource-intensive) a public room this server knows about is.
+    """
     PATH = "/rooms/(?P<room_id>[^/]*)/complexity"
     PREFIX = FEDERATION_UNSTABLE_PREFIX
 
