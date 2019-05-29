@@ -17,8 +17,6 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError
-
 from .base import ClientV1RestServlet, client_path_patterns
 
 logger = logging.getLogger(__name__)
