@@ -584,6 +584,7 @@ class ServerConfig(Config):
         #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
         # Monthly Active User Blocking
+        #
         # Used in cases where the admin or server owner wants to limit to the
         # number of monthly active users.
         # 'mau_trial_days' is means to add a grace period for active users. It
