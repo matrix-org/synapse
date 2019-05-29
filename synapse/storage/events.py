@@ -2476,7 +2476,7 @@ class EventsStore(
 
             logger.info("Deleting up to %d forward extremities", len(to_delete))
 
-            self._simple_delete_many_txn(
+            deleted = self._simple_delete_many_txn(
                 txn=txn,
                 table="event_forward_extremities",
                 column="event_id",
@@ -2484,7 +2484,9 @@ class EventsStore(
                 keyvalues={},
             )
 
-            if to_delete:
+            logger.info("Deleted %d forward extremities", deleted)
+
+            if deleted:
                 # We now need to invalidate the caches of these rooms
                 rows = self._simple_select_many_txn(
                     txn,
