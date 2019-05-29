@@ -226,6 +226,8 @@ class LoggingContext(object):
             self.request = request
 
     def __str__(self):
+        if self.request:
+            return str(self.request)
         return "%s@%x" % (self.name, id(self))
 
     @classmethod
@@ -274,12 +276,10 @@ class LoggingContext(object):
         current = self.set_current_context(self.previous_context)
         if current is not self:
             if current is self.sentinel:
-                logger.warn("Expected logging context %s has been lost", self)
+                logger.warning("Expected logging context %s was lost", self)
             else:
-                logger.warn(
-                    "Current logging context %s is not expected context %s",
-                    current,
-                    self
+                logger.warning(
+                    "Expected logging context %s but found %s", self, current
                 )
         self.previous_context = None
         self.alive = False
@@ -433,10 +433,14 @@ class PreserveLoggingContext(object):
         context = LoggingContext.set_current_context(self.current_context)
 
         if context != self.new_context:
-            logger.warn(
-                "Unexpected logging context: %s is not %s",
-                context, self.new_context,
-            )
+            if context is LoggingContext.sentinel:
+                logger.warning("Expected logging context %s was lost", self.new_context)
+            else:
+                logger.warning(
+                    "Expected logging context %s but found %s",
+                    self.new_context,
+                    context,
+                )
 
         if self.current_context is not LoggingContext.sentinel:
             if not self.current_context.alive:
