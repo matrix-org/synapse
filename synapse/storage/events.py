@@ -616,9 +616,10 @@ class EventsStore(
     def _get_prevs_before_rejected(self, event_ids):
         """Get soft-failed ancestors to remove from the extremities.
 
-        Given a set of events recursively find all prev events that have
-        been soft-failed or rejected. Then return those soft failed events
-        and their prev events.
+        Given a set of events, find all those that have been soft-failed or
+        rejected. Returns those soft failed/rejected events and their prev
+        events (whether soft-failed/rejected or not), and recurses up the
+        prev-event graph until it finds no more soft-failed/rejected events.
 
         This is used to find extremities that are ancestors of new events, but
         are separated by soft failed events.
