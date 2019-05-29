@@ -588,14 +588,14 @@ class ServerConfig(Config):
         # Used in cases where the admin or server owner wants to limit to the
         # number of monthly active users.
         #
-        # 'limit_usage_by_mau' enables the monthly active user blocking. When
-        # a limit is reached the server returns a 'ResourceLimitError' with error
-        # type Codes.RESOURCE_LIMIT_EXCEEDED
+        # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
+        # anabled and a limit is reached the server returns a 'ResourceLimitError'
+        # with error type Codes.RESOURCE_LIMIT_EXCEEDED
         #
         # 'max_mau_value' is the hard limit of monthly active users above which
         # the server will start blocking user actions.
         #
-        # 'mau_trial_days' is means to add a grace period for active users. It
+        # 'mau_trial_days' is a means to add a grace period for active users. It
         # means that users must be active for this number of days before they
         # can be considered active and guards against the case where lots of users
         # sign up in a short space of time never to return after their initial
@@ -604,7 +604,7 @@ class ServerConfig(Config):
         #limit_usage_by_mau: False
         #max_mau_value: 50
         #mau_trial_days: 2
-
+        #
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau
         # is true, this is implied to be true.
