@@ -386,7 +386,7 @@ class CasRedirectServlet(RestServlet):
             b"redirectUrl": args[b"redirectUrl"][0]
         }).encode('ascii')
         hs_redirect_url = (self.cas_service_url +
-                           b"/_matrix/client/api/v1/login/cas/ticket")
+                           b"/_matrix/client/r0/login/cas/ticket")
         service_param = urllib.parse.urlencode({
             b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)
         }).encode('ascii')
@@ -395,7 +395,7 @@ class CasRedirectServlet(RestServlet):
 
 
 class CasTicketServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/login/cas/ticket", releases=())
+    PATTERNS = client_path_patterns("/login/cas/ticket")
 
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__(hs)
