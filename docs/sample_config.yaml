@@ -83,6 +83,16 @@ pid_file: DATADIR/homeserver.pid
 #
 #restrict_public_rooms_to_local_users: true
 
+# The default room version for newly created rooms.
+#
+# Known room versions are listed here:
+# https://matrix.org/docs/spec/#complete-list-of-room-versions
+#
+# For example, for room version 1, default_room_version should be set
+# to "1".
+#
+#default_room_version: "1"
+
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
 #gc_thresholds: [700, 10, 10]
@@ -747,6 +757,14 @@ uploads_path: "DATADIR/uploads"
 # link. ``%(app)s`` can be used as a placeholder for the ``app_name`` parameter
 # from the ``email`` section.
 #
+# Once this feature is enabled, Synapse will look for registered users without an
+# expiration date at startup and will add one to every account it found using the
+# current settings at that time.
+# This means that, if a validity period is set, and Synapse is restarted (it will
+# then derive an expiration date from the current validity period), and some time
+# after that the validity period changes and Synapse is restarted, the users'
+# expiration dates won't be updated unless their account is manually renewed.
+#
 #account_validity:
 #  enabled: True
 #  period: 6w
@@ -1085,9 +1103,9 @@ password_config:
 #
 # 'search_all_users' defines whether to search all users visible to your HS
 # when searching the user directory, rather than limiting to users visible
-# in public rooms.  Defaults to false.  If you set it True, you'll have to run
-# UPDATE user_directory_stream_pos SET stream_id = NULL;
-# on your database to tell it to rebuild the user_directory search indexes.
+# in public rooms.  Defaults to false.  If you set it True, you'll have to
+# rebuild the user_directory search indexes, see
+# https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
 #
 #user_directory:
 #  enabled: true
@@ -1143,6 +1161,22 @@ password_config:
 #  require_at_registration: False
 #  policy_name: Privacy Policy
 #
+
+
+
+# Local statistics collection. Used in populating the room directory.
+#
+# 'bucket_size' controls how large each statistics timeslice is. It can
+# be defined in a human readable short form -- e.g. "1d", "1y".
+#
+# 'retention' controls how long historical statistics will be kept for.
+# It can be defined in a human readable short form -- e.g. "1d", "1y".
+#
+#
+#stats:
+#   enabled: true
+#   bucket_size: 1d
+#   retention: 1y
 
 
 # Server Notices room configuration

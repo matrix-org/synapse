@@ -90,6 +90,15 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         channel = self._send_relation(RelationTypes.ANNOTATION, EventTypes.Member)
         self.assertEquals(400, channel.code, channel.json_body)
 
+    def test_deny_double_react(self):
+        """Test that we deny relations on membership events
+        """
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self.assertEquals(400, channel.code, channel.json_body)
+
     def test_basic_paginate_relations(self):
         """Tests that calling pagination API corectly the latest relations.
         """
@@ -234,13 +243,29 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         """Test that we can paginate within an annotation group.
         """
 
+        # We need to create ten separate users to send each reaction.
+        access_tokens = [self.user_token, self.user2_token]
+        idx = 0
+        while len(access_tokens) < 10:
+            user_id, token = self._create_user("test" + str(idx))
+            idx += 1
+
+            self.helper.join(self.room, user=user_id, tok=token)
+            access_tokens.append(token)
+
+        idx = 0
         expected_event_ids = []
         for _ in range(10):
             channel = self._send_relation(
-                RelationTypes.ANNOTATION, "m.reaction", key=u"👍"
+                RelationTypes.ANNOTATION,
+                "m.reaction",
+                key=u"👍",
+                access_token=access_tokens[idx],
             )
             self.assertEquals(200, channel.code, channel.json_body)
             expected_event_ids.append(channel.json_body["event_id"])
+
+            idx += 1
 
         # Also send a different type of reaction so that we test we don't see it
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
