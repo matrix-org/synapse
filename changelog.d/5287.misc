@@ -1,0 +1,1 @@
+Remove spurious debug from MatrixFederationHttpClient.get_json.
