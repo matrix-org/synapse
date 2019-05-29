@@ -17,6 +17,7 @@
 import logging
 from collections import namedtuple
 
+import six
 from six import raise_from
 from six.moves import urllib
 
@@ -346,6 +347,7 @@ class KeyFetcher(object):
         Args:
             server_name_and_key_ids (iterable[Tuple[str, iterable[str]]]):
                 list of (server_name, iterable[key_id]) tuples to fetch keys for
+                Note that the iterables may be iterated more than once.
 
         Returns:
             Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult|None]]]:
@@ -391,8 +393,7 @@ class BaseV2KeyFetcher(object):
         POST /_matrix/key/v2/query.
 
         Checks that each signature in the response that claims to come from the origin
-        server is valid. (Does not check that there actually is such a signature, for
-        some reason.)
+        server is valid, and that there is at least one such signature.
 
         Stores the json in server_keys_json so that it can be used for future responses
         to /_matrix/key/v2/query.
@@ -427,16 +428,25 @@ class BaseV2KeyFetcher(object):
                     verify_key=verify_key, valid_until_ts=ts_valid_until_ms
                 )
 
-        # TODO: improve this signature checking
         server_name = response_json["server_name"]
+        verified = False
         for key_id in response_json["signatures"].get(server_name, {}):
-            if key_id not in verify_keys:
+            # each of the keys used for the signature must be present in the response
+            # json.
+            key = verify_keys.get(key_id)
+            if not key:
                 raise KeyLookupError(
-                    "Key response must include verification keys for all signatures"
+                    "Key response is signed by key id %s:%s but that key is not "
+                    "present in the response" % (server_name, key_id)
                 )
 
-            verify_signed_json(
-                response_json, server_name, verify_keys[key_id].verify_key
+            verify_signed_json(response_json, server_name, key.verify_key)
+            verified = True
+
+        if not verified:
+            raise KeyLookupError(
+                "Key response for %s is not signed by the origin server"
+                % (server_name,)
             )
 
         for key_id, key_data in response_json["old_verify_keys"].items():
@@ -546,7 +556,16 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         Returns:
             Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult]]]: map
                 from server_name -> key_id -> FetchKeyResult
+
+        Raises:
+            KeyLookupError if there was an error processing the entire response from
+                the server
         """
+        logger.info(
+            "Requesting keys %s from notary server %s",
+            server_names_and_key_ids,
+            perspective_name,
+        )
         # TODO(mark): Set the minimum_valid_until_ts to that needed by
         # the events being validated or the current time if validating
         # an incoming request.
@@ -575,40 +594,31 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         time_now_ms = self.clock.time_msec()
 
         for response in query_response["server_keys"]:
-            if (
-                u"signatures" not in response
-                or perspective_name not in response[u"signatures"]
-            ):
+            # do this first, so that we can give useful errors thereafter
+            server_name = response.get("server_name")
+            if not isinstance(server_name, six.string_types):
                 raise KeyLookupError(
-                    "Key response not signed by perspective server"
-                    " %r" % (perspective_name,)
+                    "Malformed response from key notary server %s: invalid server_name"
+                    % (perspective_name,)
                 )
 
-            verified = False
-            for key_id in response[u"signatures"][perspective_name]:
-                if key_id in perspective_keys:
-                    verify_signed_json(
-                        response, perspective_name, perspective_keys[key_id]
-                    )
-                    verified = True
-
-            if not verified:
-                logging.info(
-                    "Response from perspective server %r not signed with a"
-                    " known key, signed with: %r, known keys: %r",
+            try:
+                processed_response = yield self._process_perspectives_response(
                     perspective_name,
-                    list(response[u"signatures"][perspective_name]),
-                    list(perspective_keys),
+                    perspective_keys,
+                    response,
+                    time_added_ms=time_now_ms,
                 )
-                raise KeyLookupError(
-                    "Response not signed with a known key for perspective"
-                    " server %r" % (perspective_name,)
+            except KeyLookupError as e:
+                logger.warning(
+                    "Error processing response from key notary server %s for origin "
+                    "server %s: %s",
+                    perspective_name,
+                    server_name,
+                    e,
                 )
-
-            processed_response = yield self.process_v2_response(
-                perspective_name, response, time_added_ms=time_now_ms
-            )
-            server_name = response["server_name"]
+                # we continue to process the rest of the response
+                continue
 
             added_keys.extend(
                 (server_name, key_id, key) for key_id, key in processed_response.items()
@@ -620,6 +630,53 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         )
 
         defer.returnValue(keys)
+
+    def _process_perspectives_response(
+        self, perspective_name, perspective_keys, response, time_added_ms
+    ):
+        """Parse a 'Server Keys' structure from the result of a /key/query request
+
+        Checks that the entry is correctly signed by the perspectives server, and then
+        passes over to process_v2_response
+
+        Args:
+            perspective_name (str): the name of the notary server that produced this
+                result
+
+            perspective_keys (dict[str, VerifyKey]): map of key_id->key for the
+                notary server
+
+            response (dict): the json-decoded Server Keys response object
+
+            time_added_ms (int): the timestamp to record in server_keys_json
+
+        Returns:
+            Deferred[dict[str, FetchKeyResult]]: map from key_id to result object
+        """
+        if (
+            u"signatures" not in response
+            or perspective_name not in response[u"signatures"]
+        ):
+            raise KeyLookupError("Response not signed by the notary server")
+
+        verified = False
+        for key_id in response[u"signatures"][perspective_name]:
+            if key_id in perspective_keys:
+                verify_signed_json(response, perspective_name, perspective_keys[key_id])
+                verified = True
+
+        if not verified:
+            raise KeyLookupError(
+                "Response not signed with a known key: signed with: %r, known keys: %r"
+                % (
+                    list(response[u"signatures"][perspective_name].keys()),
+                    list(perspective_keys.keys()),
+                )
+            )
+
+        return self.process_v2_response(
+            perspective_name, response, time_added_ms=time_added_ms
+        )
 
 
 class ServerKeyFetcher(BaseV2KeyFetcher):
@@ -673,12 +730,6 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 raise_from(KeyLookupError("Failed to connect to remote server"), e)
             except HttpResponseException as e:
                 raise_from(KeyLookupError("Remote server returned an error"), e)
-
-            if (
-                u"signatures" not in response
-                or server_name not in response[u"signatures"]
-            ):
-                raise KeyLookupError("Key response not signed by remote server")
 
             if response["server_name"] != server_name:
                 raise KeyLookupError(

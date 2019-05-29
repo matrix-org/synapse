@@ -56,8 +56,8 @@ class ThumbnailResource(Resource):
     def _async_render_GET(self, request):
         set_cors_headers(request)
         server_name, media_id, _ = parse_media_id(request)
-        width = parse_integer(request, "width")
-        height = parse_integer(request, "height")
+        width = parse_integer(request, "width", required=True)
+        height = parse_integer(request, "height", required=True)
         method = parse_string(request, "method", "scale")
         m_type = parse_string(request, "type", "image/png")
 
