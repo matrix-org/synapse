@@ -179,46 +179,39 @@ class StatsStore(StateDeltasStore):
 
             current_state_ids = yield self.get_current_state_ids(room_id)
 
-            join_rules = yield self.get_event(
-                current_state_ids.get((EventTypes.JoinRules, "")), allow_none=True
+            join_rules_id = current_state_ids.get((EventTypes.JoinRules, ""))
+            history_visibility_id = current_state_ids.get(
+                (EventTypes.RoomHistoryVisibility, "")
             )
-            history_visibility = yield self.get_event(
-                current_state_ids.get((EventTypes.RoomHistoryVisibility, "")),
-                allow_none=True,
-            )
-            encryption = yield self.get_event(
-                current_state_ids.get((EventTypes.RoomEncryption, "")), allow_none=True
-            )
-            name = yield self.get_event(
-                current_state_ids.get((EventTypes.Name, "")), allow_none=True
-            )
-            topic = yield self.get_event(
-                current_state_ids.get((EventTypes.Topic, "")), allow_none=True
-            )
-            avatar = yield self.get_event(
-                current_state_ids.get((EventTypes.RoomAvatar, "")), allow_none=True
-            )
-            canonical_alias = yield self.get_event(
-                current_state_ids.get((EventTypes.CanonicalAlias, "")), allow_none=True
-            )
+            encryption_id = current_state_ids.get((EventTypes.RoomEncryption, ""))
+            name_id = current_state_ids.get((EventTypes.Name, ""))
+            topic_id = current_state_ids.get((EventTypes.Topic, ""))
+            avatar_id = current_state_ids.get((EventTypes.RoomAvatar, ""))
+            canonical_alias_id = current_state_ids.get((EventTypes.CanonicalAlias, ""))
 
-            def _or_none(x, arg):
-                if x:
-                    return x.content.get(arg)
+            state_events = yield self.get_events([
+                join_rules_id, history_visibility_id, encryption_id, name_id,
+                topic_id, avatar_id, canonical_alias_id,
+            ])
+
+            def _get_or_none(event_id, arg):
+                event = state_events.get(event_id)
+                if event:
+                    return event.content.get(arg)
                 return None
 
             yield self.update_room_state(
                 room_id,
                 {
-                    "join_rules": _or_none(join_rules, "join_rule"),
-                    "history_visibility": _or_none(
-                        history_visibility, "history_visibility"
+                    "join_rules": _get_or_none(join_rules_id, "join_rule"),
+                    "history_visibility": _get_or_none(
+                        history_visibility_id, "history_visibility"
                     ),
-                    "encryption": _or_none(encryption, "algorithm"),
-                    "name": _or_none(name, "name"),
-                    "topic": _or_none(topic, "topic"),
-                    "avatar": _or_none(avatar, "url"),
-                    "canonical_alias": _or_none(canonical_alias, "alias"),
+                    "encryption": _get_or_none(encryption_id, "algorithm"),
+                    "name": _get_or_none(name_id, "name"),
+                    "topic": _get_or_none(topic_id, "topic"),
+                    "avatar": _get_or_none(avatar_id, "url"),
+                    "canonical_alias": _get_or_none(canonical_alias_id, "alias"),
                 },
             )
 
