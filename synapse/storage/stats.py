@@ -254,10 +254,13 @@ class StatsStore(StateDeltasStore):
                     {"room_id": room_id, "token": current_token},
                 )
 
+                # We've finished a room. Delete it from the table.
+                self._simple_delete_one_txn(
+                    txn, TEMP_TABLE + "_rooms", {"room_id": room_id},
+                )
+
             yield self.runInteraction("update_room_stats", _fetch_data)
 
-            # We've finished a room. Delete it from the table.
-            yield self._simple_delete_one(TEMP_TABLE + "_rooms", {"room_id": room_id})
             # Update the remaining counter.
             progress["remaining"] -= 1
             yield self.runInteraction(
