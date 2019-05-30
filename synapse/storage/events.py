@@ -2387,7 +2387,8 @@ class EventsStore(
             soft_failed_events_to_lookup = set()
 
             # First, we get `batch_size` events from the table, pulling out
-            # their prev events, if any, and their prev events rejection status.
+            # their successor events, if any, and their successor events
+            # rejection status.
             txn.execute(
                 """SELECT prev_event_id, event_id, internal_metadata,
                     rejections.event_id IS NOT NULL, events.outlier
@@ -2450,11 +2451,10 @@ class EventsStore(
                     if event_id in graph:
                         # Already handled this event previously, but we still
                         # want to record the edge.
-                        graph.setdefault(event_id, set()).add(prev_event_id)
-                        logger.info("Already handled")
+                        graph[event_id].add(prev_event_id)
                         continue
 
-                    graph.setdefault(event_id, set()).add(prev_event_id)
+                    graph[event_id] = {prev_event_id}
 
                     soft_failed = json.loads(metadata).get("soft_failed")
                     if soft_failed or rejected:
@@ -2474,8 +2474,6 @@ class EventsStore(
 
             to_delete.intersection_update(original_set)
 
-            logger.info("Deleting up to %d forward extremities", len(to_delete))
-
             deleted = self._simple_delete_many_txn(
                 txn=txn,
                 table="event_forward_extremities",
@@ -2484,7 +2482,11 @@ class EventsStore(
                 keyvalues={},
             )
 
-            logger.info("Deleted %d forward extremities", deleted)
+            logger.info(
+                "Deleted %d forward extremities of %d checked, to clean up #5269",
+                deleted,
+                len(original_set),
+            )
 
             if deleted:
                 # We now need to invalidate the caches of these rooms
@@ -2496,10 +2498,11 @@ class EventsStore(
                     keyvalues={},
                     retcols=("room_id",)
                 )
-                for row in rows:
+                room_ids = set(row["room_id"] for row in rows)
+                for room_id in room_ids:
                     txn.call_after(
                         self.get_latest_event_ids_in_room.invalidate,
-                        (row["room_id"],)
+                        (room_id,)
                     )
 
             self._simple_delete_many_txn(
