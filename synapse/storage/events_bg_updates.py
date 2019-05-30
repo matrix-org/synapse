@@ -255,7 +255,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
             soft_failed_events_to_lookup = set()
 
             # First, we get `batch_size` events from the table, pulling out
-            # their successor events, if any, and their successor events
+            # their successor events, if any, and the successor events'
             # rejection status.
             txn.execute(
                 """SELECT prev_event_id, event_id, internal_metadata,
