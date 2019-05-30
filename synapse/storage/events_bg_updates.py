@@ -30,7 +30,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
 
     EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
     EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
-    EVENT_DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
+    DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
 
     def __init__(self, db_conn, hs):
         super(EventsBackgroundUpdatesStore, self).__init__(db_conn, hs)
@@ -64,7 +64,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         )
 
         self.register_background_update_handler(
-            self.EVENT_DELETE_SOFT_FAILED_EXTREMITIES,
+            self.DELETE_SOFT_FAILED_EXTREMITIES,
             self._cleanup_extremities_bg_update,
         )
 
@@ -388,7 +388,7 @@ class EventsBackgroundUpdatesStore(BackgroundUpdateStore):
         )
 
         if not num_handled:
-            yield self._end_background_update(self.EVENT_DELETE_SOFT_FAILED_EXTREMITIES)
+            yield self._end_background_update(self.DELETE_SOFT_FAILED_EXTREMITIES)
 
             def _drop_table_txn(txn):
                 txn.execute("DROP TABLE _extremities_to_check")
