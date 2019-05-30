@@ -25,13 +25,12 @@ from synapse.http.servlet import RestServlet, parse_json_value_from_request, par
 from synapse.push.baserules import BASE_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
-
-from ._base import client_patterns
 
 
 class PushRuleRestServlet(RestServlet):
-    PATTERNS = client_patterns("/(?P<path>pushrules/.*)$")
+    PATTERNS = client_patterns("/(?P<path>pushrules/.*)$", v1=True)
     SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR = (
         "Unrecognised request: You probably wanted a trailing slash")
 

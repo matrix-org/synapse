@@ -29,11 +29,10 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
 from synapse.util.msisdn import phone_number_to_msisdn
-
-from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +81,7 @@ def login_id_thirdparty_from_phone(identifier):
 
 
 class LoginRestServlet(RestServlet):
-    PATTERNS = client_patterns("/login$")
+    PATTERNS = client_patterns("/login$", v1=True)
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
@@ -372,7 +371,7 @@ class LoginRestServlet(RestServlet):
 
 
 class CasRedirectServlet(RestServlet):
-    PATTERNS = client_patterns("/login/(cas|sso)/redirect")
+    PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
@@ -396,7 +395,7 @@ class CasRedirectServlet(RestServlet):
 
 
 class CasTicketServlet(RestServlet):
-    PATTERNS = client_patterns("/login/cas/ticket")
+    PATTERNS = client_patterns("/login/cas/ticket", v1=True)
 
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__()

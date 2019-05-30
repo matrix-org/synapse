@@ -24,15 +24,14 @@ from twisted.internet import defer
 from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.presence import format_user_presence_state
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
-
-from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class PresenceStatusRestServlet(RestServlet):
-    PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
+    PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status", v1=True)
 
     def __init__(self, hs):
         super(PresenceStatusRestServlet, self).__init__()

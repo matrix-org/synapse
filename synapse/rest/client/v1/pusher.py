@@ -26,14 +26,13 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.push import PusherConfigException
-
-from ._base import client_patterns
+from synapse.rest.client.v2_alpha._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class PushersRestServlet(RestServlet):
-    PATTERNS = client_patterns("/pushers$")
+    PATTERNS = client_patterns("/pushers$", v1=True)
 
     def __init__(self, hs):
         super(PushersRestServlet, self).__init__()
@@ -72,7 +71,7 @@ class PushersRestServlet(RestServlet):
 
 
 class PushersSetRestServlet(RestServlet):
-    PATTERNS = client_patterns("/pushers/set$")
+    PATTERNS = client_patterns("/pushers/set$", v1=True)
 
     def __init__(self, hs):
         super(PushersSetRestServlet, self).__init__()
@@ -145,7 +144,7 @@ class PushersRemoveRestServlet(RestServlet):
     """
     To allow pusher to be delete by clicking a link (ie. GET request)
     """
-    PATTERNS = client_patterns("/pushers/remove$")
+    PATTERNS = client_patterns("/pushers/remove$", v1=True)
     SUCCESS_HTML = b"<html><body>You have been unsubscribed</body><html>"
 
     def __init__(self, hs):

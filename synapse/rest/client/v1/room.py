@@ -35,11 +35,10 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.client.transactions import HttpTransactionCache
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
-
-from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -63,11 +62,11 @@ class RoomCreateRestServlet(TransactionRestServlet):
         register_txn_path(self, PATTERNS, http_server)
         # define CORS for all of /rooms in RoomCreateRestServlet for simplicity
         http_server.register_paths("OPTIONS",
-                                   client_patterns("/rooms(?:/.*)?$"),
+                                   client_patterns("/rooms(?:/.*)?$", v1=True),
                                    self.on_OPTIONS)
         # define CORS for /createRoom[/txnid]
         http_server.register_paths("OPTIONS",
-                                   client_patterns("/createRoom(?:/.*)?$"),
+                                   client_patterns("/createRoom(?:/.*)?$", v1=True),
                                    self.on_OPTIONS)
 
     def on_PUT(self, request, txn_id):
@@ -112,16 +111,16 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                      "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$")
 
         http_server.register_paths("GET",
-                                   client_patterns(state_key),
+                                   client_patterns(state_key, v1=True),
                                    self.on_GET)
         http_server.register_paths("PUT",
-                                   client_patterns(state_key),
+                                   client_patterns(state_key, v1=True),
                                    self.on_PUT)
         http_server.register_paths("GET",
-                                   client_patterns(no_state_key),
+                                   client_patterns(no_state_key, v1=True),
                                    self.on_GET_no_state_key)
         http_server.register_paths("PUT",
-                                   client_patterns(no_state_key),
+                                   client_patterns(no_state_key, v1=True),
                                    self.on_PUT_no_state_key)
 
     def on_GET_no_state_key(self, request, room_id, event_type):
@@ -304,7 +303,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing
 class PublicRoomListRestServlet(TransactionRestServlet):
-    PATTERNS = client_patterns("/publicRooms$")
+    PATTERNS = client_patterns("/publicRooms$", v1=True)
 
     def __init__(self, hs):
         super(PublicRoomListRestServlet, self).__init__(hs)
@@ -400,7 +399,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
 # TODO: Needs unit testing
 class RoomMemberListRestServlet(RestServlet):
-    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/members$")
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/members$", v1=True)
 
     def __init__(self, hs):
         super(RoomMemberListRestServlet, self).__init__()
@@ -455,7 +454,7 @@ class RoomMemberListRestServlet(RestServlet):
 # deprecated in favour of /members?membership=join?
 # except it does custom AS logic and has a simpler return format
 class JoinedRoomMemberListRestServlet(RestServlet):
-    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$")
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/joined_members$", v1=True)
 
     def __init__(self, hs):
         super(JoinedRoomMemberListRestServlet, self).__init__()
@@ -477,7 +476,7 @@ class JoinedRoomMemberListRestServlet(RestServlet):
 
 # TODO: Needs better unit testing
 class RoomMessageListRestServlet(RestServlet):
-    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$")
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/messages$", v1=True)
 
     def __init__(self, hs):
         super(RoomMessageListRestServlet, self).__init__()
@@ -510,7 +509,7 @@ class RoomMessageListRestServlet(RestServlet):
 
 # TODO: Needs unit testing
 class RoomStateRestServlet(RestServlet):
-    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state$")
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/state$", v1=True)
 
     def __init__(self, hs):
         super(RoomStateRestServlet, self).__init__()
@@ -531,7 +530,7 @@ class RoomStateRestServlet(RestServlet):
 
 # TODO: Needs unit testing
 class RoomInitialSyncRestServlet(RestServlet):
-    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$")
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/initialSync$", v1=True)
 
     def __init__(self, hs):
         super(RoomInitialSyncRestServlet, self).__init__()
@@ -552,7 +551,7 @@ class RoomInitialSyncRestServlet(RestServlet):
 
 class RoomEventServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)$"
+        "/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)$", v1=True
     )
 
     def __init__(self, hs):
@@ -577,7 +576,7 @@ class RoomEventServlet(RestServlet):
 
 class RoomEventContextServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$"
+        "/rooms/(?P<room_id>[^/]*)/context/(?P<event_id>[^/]*)$", v1=True
     )
 
     def __init__(self, hs):
@@ -784,7 +783,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
 
 class RoomTypingRestServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$"
+        "/rooms/(?P<room_id>[^/]*)/typing/(?P<user_id>[^/]*)$", v1=True
     )
 
     def __init__(self, hs):
@@ -825,9 +824,7 @@ class RoomTypingRestServlet(RestServlet):
 
 
 class SearchRestServlet(RestServlet):
-    PATTERNS = client_patterns(
-        "/search$"
-    )
+    PATTERNS = client_patterns("/search$", v1=True)
 
     def __init__(self, hs):
         super(SearchRestServlet, self).__init__()
@@ -851,7 +848,7 @@ class SearchRestServlet(RestServlet):
 
 
 class JoinedRoomsRestServlet(RestServlet):
-    PATTERNS = client_patterns("/joined_rooms$")
+    PATTERNS = client_patterns("/joined_rooms$", v1=True)
 
     def __init__(self, hs):
         super(JoinedRoomsRestServlet, self).__init__()
@@ -881,18 +878,18 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
     """
     http_server.register_paths(
         "POST",
-        client_patterns(regex_string + "$"),
+        client_patterns(regex_string + "$", v1=True),
         servlet.on_POST
     )
     http_server.register_paths(
         "PUT",
-        client_patterns(regex_string + "/(?P<txn_id>[^/]*)$"),
+        client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
         servlet.on_PUT
     )
     if with_get:
         http_server.register_paths(
             "GET",
-            client_patterns(regex_string + "/(?P<txn_id>[^/]*)$"),
+            client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
             servlet.on_GET
         )
 

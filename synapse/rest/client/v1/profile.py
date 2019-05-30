@@ -17,13 +17,12 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
-
-from ._base import client_patterns
 
 
 class ProfileDisplaynameRestServlet(RestServlet):
-    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname")
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/displayname", v1=True)
 
     def __init__(self, hs):
         super(ProfileDisplaynameRestServlet, self).__init__()
@@ -74,7 +73,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
 
 class ProfileAvatarURLRestServlet(RestServlet):
-    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url")
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)/avatar_url", v1=True)
 
     def __init__(self, hs):
         super(ProfileAvatarURLRestServlet, self).__init__()
@@ -124,7 +123,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
 
 class ProfileRestServlet(RestServlet):
-    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)")
+    PATTERNS = client_patterns("/profile/(?P<user_id>[^/]*)", v1=True)
 
     def __init__(self, hs):
         super(ProfileRestServlet, self).__init__()

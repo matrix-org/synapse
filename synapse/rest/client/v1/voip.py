@@ -20,12 +20,11 @@ import hmac
 from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet
-
-from ._base import client_patterns
+from synapse.rest.client.v2_alpha._base import client_patterns
 
 
 class VoipRestServlet(RestServlet):
-    PATTERNS = client_patterns("/voip/turnServer$")
+    PATTERNS = client_patterns("/voip/turnServer$", v1=True)
 
     def __init__(self, hs):
         super(VoipRestServlet, self).__init__()

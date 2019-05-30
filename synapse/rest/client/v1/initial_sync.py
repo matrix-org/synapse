@@ -16,14 +16,13 @@
 from twisted.internet import defer
 
 from synapse.http.servlet import RestServlet, parse_boolean
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.streams.config import PaginationConfig
-
-from ._base import client_patterns
 
 
 # TODO: Needs unit testing
 class InitialSyncRestServlet(RestServlet):
-    PATTERNS = client_patterns("/initialSync$")
+    PATTERNS = client_patterns("/initialSync$", v1=True)
 
     def __init__(self, hs):
         super(InitialSyncRestServlet, self).__init__()

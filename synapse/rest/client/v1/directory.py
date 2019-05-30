@@ -20,9 +20,8 @@ from twisted.internet import defer
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import RoomAlias
-
-from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ def register_servlets(hs, http_server):
 
 
 class ClientDirectoryServer(RestServlet):
-    PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$")
+    PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$", v1=True)
 
     def __init__(self, hs):
         super(ClientDirectoryServer, self).__init__()
@@ -122,7 +121,7 @@ class ClientDirectoryServer(RestServlet):
 
 
 class ClientDirectoryListServer(RestServlet):
-    PATTERNS = client_patterns("/directory/list/room/(?P<room_id>[^/]*)$")
+    PATTERNS = client_patterns("/directory/list/room/(?P<room_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
         super(ClientDirectoryListServer, self).__init__()
@@ -166,7 +165,7 @@ class ClientDirectoryListServer(RestServlet):
 
 class ClientAppserviceDirectoryListServer(RestServlet):
     PATTERNS = client_patterns(
-        "/directory/list/appservice/(?P<network_id>[^/]*)/(?P<room_id>[^/]*)$"
+        "/directory/list/appservice/(?P<network_id>[^/]*)/(?P<room_id>[^/]*)$", v1=True
     )
 
     def __init__(self, hs):
