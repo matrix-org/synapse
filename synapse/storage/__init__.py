@@ -36,6 +36,7 @@ from .engines import PostgresEngine
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
 from .events import EventsStore
+from .events_bg_updates import EventsBackgroundUpdatesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
@@ -65,6 +66,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataStore(
+    EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,
     RegistrationStore,
