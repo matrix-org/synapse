@@ -1,3 +1,12 @@
+Synapse 0.99.5.2 (2019-05-30)
+=============================
+
+Bugfixes
+--------
+
+- Fix bug where we leaked extremities when we soft failed events, leading to performance degradation. ([\#5274](https://github.com/matrix-org/synapse/issues/5274), [\#5278](https://github.com/matrix-org/synapse/issues/5278), [\#5291](https://github.com/matrix-org/synapse/issues/5291))
+
+
 Synapse 0.99.5.1 (2019-05-22)
 =============================
 
