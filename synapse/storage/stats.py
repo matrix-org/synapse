@@ -226,18 +226,9 @@ class StatsStore(StateDeltasStore):
                 current_token = self._get_max_stream_id_in_current_state_deltas_txn(txn)
 
                 current_state_events = len(current_state_ids)
-                joined_members = self._get_user_count_in_room_txn(
-                    txn, room_id, Membership.JOIN
-                )
-                invited_members = self._get_user_count_in_room_txn(
-                    txn, room_id, Membership.INVITE
-                )
-                left_members = self._get_user_count_in_room_txn(
-                    txn, room_id, Membership.LEAVE
-                )
-                banned_members = self._get_user_count_in_room_txn(
-                    txn, room_id, Membership.BAN
-                )
+
+                membership_counts = self._get_user_counts_in_room_txn(txn, room_id)
+
                 total_state_events = self._get_total_state_event_counts_txn(
                     txn, room_id
                 )
@@ -250,10 +241,10 @@ class StatsStore(StateDeltasStore):
                     {
                         "bucket_size": self.stats_bucket_size,
                         "current_state_events": current_state_events,
-                        "joined_members": joined_members,
-                        "invited_members": invited_members,
-                        "left_members": left_members,
-                        "banned_members": banned_members,
+                        "joined_members": membership_counts.get(Membership.JOIN, 0),
+                        "invited_members": membership_counts.get(Membership.INVITE, 0),
+                        "left_members": membership_counts.get(Membership.LEAVE, 0),
+                        "banned_members": membership_counts.get(Membership.BAN, 0),
                         "state_events": total_state_events,
                     },
                 )
