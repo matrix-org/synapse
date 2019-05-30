@@ -1,8 +1,7 @@
 Synapse 0.99.5.1 (2019-05-22)
 =============================
 
-No significant changes.
-
+0.99.5.1 supersedes 0.99.5 due to malformed debian changelog - no functional changes.
 
 Synapse 0.99.5 (2019-05-22)
 ===========================
