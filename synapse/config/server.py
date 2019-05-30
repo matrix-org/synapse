@@ -414,6 +414,7 @@ class ServerConfig(Config):
         #
         # For example, for room version 1, default_room_version should be set
         # to "1".
+        #
         #default_room_version: "%(default_room_version)s"
 
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined

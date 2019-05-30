@@ -43,9 +43,9 @@ class UserDirectoryConfig(Config):
         #
         # 'search_all_users' defines whether to search all users visible to your HS
         # when searching the user directory, rather than limiting to users visible
-        # in public rooms.  Defaults to false.  If you set it True, you'll have to run
-        # UPDATE user_directory_stream_pos SET stream_id = NULL;
-        # on your database to tell it to rebuild the user_directory search indexes.
+        # in public rooms.  Defaults to false.  If you set it True, you'll have to
+        # rebuild the user_directory search indexes, see
+        # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
         #
         #user_directory:
         #  enabled: true

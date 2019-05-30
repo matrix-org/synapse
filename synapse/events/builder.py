@@ -76,6 +76,7 @@ class EventBuilder(object):
     # someone tries to get them when they don't exist.
     _state_key = attr.ib(default=None)
     _redacts = attr.ib(default=None)
+    _origin_server_ts = attr.ib(default=None)
 
     internal_metadata = attr.ib(default=attr.Factory(lambda: _EventInternalMetadata({})))
 
@@ -141,6 +142,9 @@ class EventBuilder(object):
 
         if self._redacts is not None:
             event_dict["redacts"] = self._redacts
+
+        if self._origin_server_ts is not None:
+            event_dict["origin_server_ts"] = self._origin_server_ts
 
         defer.returnValue(
             create_local_event_from_event_dict(
@@ -209,6 +213,7 @@ class EventBuilderFactory(object):
             content=key_values.get("content", {}),
             unsigned=key_values.get("unsigned", {}),
             redacts=key_values.get("redacts", None),
+            origin_server_ts=key_values.get("origin_server_ts", None),
         )
 
 
@@ -245,7 +250,7 @@ def create_local_event_from_event_dict(clock, hostname, signing_key,
         event_dict["event_id"] = _create_event_id(clock, hostname)
 
     event_dict["origin"] = hostname
-    event_dict["origin_server_ts"] = time_now
+    event_dict.setdefault("origin_server_ts", time_now)
 
     event_dict.setdefault("unsigned", {})
     age = event_dict["unsigned"].pop("age", 0)

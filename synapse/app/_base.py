@@ -344,15 +344,21 @@ class _LimitedHostnameResolver(object):
 
     def resolveHostName(self, resolutionReceiver, hostName, portNumber=0,
                         addressTypes=None, transportSemantics='TCP'):
-        # Note this is happening deep within the reactor, so we don't need to
-        # worry about log contexts.
-
         # We need this function to return `resolutionReceiver` so we do all the
         # actual logic involving deferreds in a separate function.
-        self._resolve(
-            resolutionReceiver, hostName, portNumber,
-            addressTypes, transportSemantics,
-        )
+
+        # even though this is happening within the depths of twisted, we need to drop
+        # our logcontext before starting _resolve, otherwise: (a) _resolve will drop
+        # the logcontext if it returns an incomplete deferred; (b) _resolve will
+        # call the resolutionReceiver *with* a logcontext, which it won't be expecting.
+        with PreserveLoggingContext():
+            self._resolve(
+                resolutionReceiver,
+                hostName,
+                portNumber,
+                addressTypes,
+                transportSemantics,
+            )
 
         return resolutionReceiver
 
