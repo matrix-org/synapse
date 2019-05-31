@@ -475,6 +475,8 @@ class RoomMessageListRestServlet(ClientV1RestServlet):
         if filter_bytes:
             filter_json = urlparse.unquote(filter_bytes.decode("UTF-8"))
             event_filter = Filter(json.loads(filter_json))
+            if event_filter.filter_json.get("event_format", "client") == "federation":
+                as_client_event = False
         else:
             event_filter = None
         msgs = yield self.pagination_handler.get_messages(

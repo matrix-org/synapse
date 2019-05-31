@@ -1,0 +1,1 @@
+Refactor keyring.VerifyKeyRequest to use attr.s.
