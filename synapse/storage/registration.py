@@ -1156,3 +1156,18 @@ class RegistrationStore(
             updatevalues={"validated": 1},
             desc="mark_threepid_session_as_valid",
         )
+
+    @defer.inlineCallbacks
+    def delete_threepid_session(self, session_id):
+        """Removes a threepid validation session from the database. This can
+        be done after validation has been performed and whatever action was
+        waiting on it has been carried out
+
+        Args:
+            session_id (str): The ID of the session to delete
+        """
+        yield self._simple_delete(
+            table="threepid_validation_session",
+            keyvalues={"session_id": session_id},
+            desc="delete_threepid_session",
+        )
