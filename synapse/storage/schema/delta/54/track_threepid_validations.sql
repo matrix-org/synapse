@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS threepid_validation_session (
     address TEXT NOT NULL,
     client_secret TEXT NOT NULL,
     last_send_attempt BIGINT NOT NULL,
-    validated BOOL DEFAULT 0 NOT NULL
+    validated BOOL DEFAULT false NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS threepid_validation_token (
