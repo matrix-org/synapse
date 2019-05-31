@@ -133,7 +133,7 @@ class RegistrationConfig(Config):
         # after that the validity period changes and Synapse is restarted, the users'
         # expiration dates won't be updated unless their account is manually renewed. This
         # date will be randomly selected within a range [now + period ; now + period + d],
-        # where d is equal to 10% of the validity period.
+        # where d is equal to 10%% of the validity period.
         #
         #account_validity:
         #  enabled: True
