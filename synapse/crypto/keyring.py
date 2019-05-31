@@ -15,12 +15,12 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
 
 import six
 from six import raise_from
 from six.moves import urllib
 
+import attr
 from signedjson.key import (
     decode_verify_key_bytes,
     encode_verify_key_base64,
@@ -57,22 +57,32 @@ from synapse.util.retryutils import NotRetryingDestination
 logger = logging.getLogger(__name__)
 
 
-VerifyKeyRequest = namedtuple(
-    "VerifyRequest", ("server_name", "key_ids", "json_object", "deferred")
-)
-"""
-A request for a verify key to verify a JSON object.
+@attr.s(slots=True, cmp=False)
+class VerifyKeyRequest(object):
+    """
+    A request for a verify key to verify a JSON object.
 
-Attributes:
-    server_name(str): The name of the server to verify against.
-    key_ids(set(str)): The set of key_ids to that could be used to verify the
-        JSON object
-    json_object(dict): The JSON object to verify.
-    deferred(Deferred[str, str, nacl.signing.VerifyKey]):
-        A deferred (server_name, key_id, verify_key) tuple that resolves when
-        a verify key has been fetched. The deferreds' callbacks are run with no
-        logcontext.
-"""
+    Attributes:
+        server_name(str): The name of the server to verify against.
+
+        key_ids(set[str]): The set of key_ids to that could be used to verify the
+            JSON object
+
+        json_object(dict): The JSON object to verify.
+
+        deferred(Deferred[str, str, nacl.signing.VerifyKey]):
+            A deferred (server_name, key_id, verify_key) tuple that resolves when
+            a verify key has been fetched. The deferreds' callbacks are run with no
+            logcontext.
+
+            If we are unable to find a key which satisfies the request, the deferred
+            errbacks with an M_UNAUTHORIZED SynapseError.
+    """
+
+    server_name = attr.ib()
+    key_ids = attr.ib()
+    json_object = attr.ib()
+    deferred = attr.ib()
 
 
 class KeyLookupError(ValueError):
@@ -767,31 +777,8 @@ def _handle_key_deferred(verify_request):
         SynapseError if there was a problem performing the verification
     """
     server_name = verify_request.server_name
-    try:
-        with PreserveLoggingContext():
-            _, key_id, verify_key = yield verify_request.deferred
-    except KeyLookupError as e:
-        logger.warn(
-            "Failed to download keys for %s: %s %s",
-            server_name,
-            type(e).__name__,
-            str(e),
-        )
-        raise SynapseError(
-            502, "Error downloading keys for %s" % (server_name,), Codes.UNAUTHORIZED
-        )
-    except Exception as e:
-        logger.exception(
-            "Got Exception when downloading keys for %s: %s %s",
-            server_name,
-            type(e).__name__,
-            str(e),
-        )
-        raise SynapseError(
-            401,
-            "No key for %s with id %s" % (server_name, verify_request.key_ids),
-            Codes.UNAUTHORIZED,
-        )
+    with PreserveLoggingContext():
+        _, key_id, verify_key = yield verify_request.deferred
 
     json_object = verify_request.json_object
 

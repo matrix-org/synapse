@@ -618,7 +618,12 @@ class EventsWorkerStore(SQLBaseStore):
         """
         See get_total_state_event_counts.
         """
-        sql = "SELECT COUNT(*) FROM state_events WHERE room_id=?"
+        # We join against the events table as that has an index on room_id
+        sql = """
+            SELECT COUNT(*) FROM state_events
+            INNER JOIN events USING (room_id, event_id)
+            WHERE room_id=?
+        """
         txn.execute(sql, (room_id,))
         row = txn.fetchone()
         return row[0] if row else 0
