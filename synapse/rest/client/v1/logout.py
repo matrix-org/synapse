@@ -17,7 +17,6 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError
 from synapse.http.servlet import RestServlet
 from synapse.rest.client.v2_alpha._base import client_patterns
 
