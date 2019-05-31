@@ -329,7 +329,7 @@ class SQLBaseStore(object):
              user_id (str): User ID to set an expiration date for.
              use_delta (bool): If set to False, the expiration date for the user will be
                 now + validity period. If set to True, this expiration date will be a
-                random value in the [now + period; now + period + d] range, d being a
+                random value in the [now + period - d ; now + period] range, d being a
                 delta equal to 10% of the validity period.
         """
         now_ms = self._clock.time_msec()
@@ -337,8 +337,8 @@ class SQLBaseStore(object):
 
         if use_delta:
             expiration_ts = self.rand.randrange(
+                expiration_ts - self._account_validity.startup_job_max_delta,
                 expiration_ts,
-                expiration_ts + self._account_validity.startup_job_max_delta,
             )
 
         self._simple_insert_txn(
