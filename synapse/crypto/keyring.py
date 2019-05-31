@@ -394,7 +394,7 @@ class BaseV2KeyFetcher(object):
 
     @defer.inlineCallbacks
     def process_v2_response(
-        self, from_server, response_json, time_added_ms, requested_ids=[]
+        self, from_server, response_json, time_added_ms
     ):
         """Parse a 'Server Keys' structure from the result of a /key request
 
@@ -416,10 +416,6 @@ class BaseV2KeyFetcher(object):
             response_json (dict): the json-decoded Server Keys response object
 
             time_added_ms (int): the timestamp to record in server_keys_json
-
-            requested_ids (iterable[str]): a list of the key IDs that were requested.
-                We will store the json for these key ids as well as any that are
-                actually in the response
 
         Returns:
             Deferred[dict[str, FetchKeyResult]]: map from key_id to result object
@@ -476,11 +472,6 @@ class BaseV2KeyFetcher(object):
 
         signed_key_json_bytes = encode_canonical_json(signed_key_json)
 
-        # for reasons I don't quite understand, we store this json for the key ids we
-        # requested, as well as those we got.
-        updated_key_ids = set(requested_ids)
-        updated_key_ids.update(verify_keys)
-
         yield logcontext.make_deferred_yieldable(
             defer.gatherResults(
                 [
@@ -493,7 +484,7 @@ class BaseV2KeyFetcher(object):
                         ts_expires_ms=ts_valid_until_ms,
                         key_json_bytes=signed_key_json_bytes,
                     )
-                    for key_id in updated_key_ids
+                    for key_id in verify_keys
                 ],
                 consumeErrors=True,
             ).addErrback(unwrapFirstError)
@@ -749,7 +740,6 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
 
             response_keys = yield self.process_v2_response(
                 from_server=server_name,
-                requested_ids=[requested_key_id],
                 response_json=response,
                 time_added_ms=time_now_ms,
             )
