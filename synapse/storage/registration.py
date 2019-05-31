@@ -963,7 +963,6 @@ class RegistrationStore(
         We do this by grandfathering in existing user threepids assuming that
         they used one of the server configured trusted identity servers.
         """
-
         id_servers = set(self.config.trusted_third_party_id_servers)
 
         def _bg_user_threepids_grandfather_txn(txn):
@@ -984,3 +983,176 @@ class RegistrationStore(
         yield self._end_background_update("user_threepids_grandfather")
 
         defer.returnValue(1)
+
+    @defer.inlineCallbacks
+    def get_threepid_validation_session(self, medium, address, client_secret):
+        """Gets the latest session_id and send_attempt (if available) for a
+        client_secret/medium/address combo
+
+        Args:
+            medium (str): The medium of the 3PID
+            address (str): The address of the 3PID
+            client_secret (str): A unique string provided by the client to
+                help identify this validation attempt
+
+        Returns:
+            deferred {str, int}|None: A dict containing the
+                latest session_id and send_attempt count for this 3PID.
+                Otherwise None if there hasn't been a previous attempt
+        """
+        row = yield self._simple_select_one(
+            table="threepid_validation_session",
+            keyvalues={
+                "medium": medium,
+                "address": address,
+                "client_secret": client_secret,
+            },
+            retcols=["session_id", "last_send_attempt"],
+            allow_none=True,
+            desc="get_threepid_validation_session",
+        )
+
+        defer.returnValue(row)
+
+    @defer.inlineCallbacks
+    def validate_threepid_validation_token(
+        self,
+        session_id,
+        client_secret,
+        token,
+        current_ts,
+    ):
+        """Validate a validation token, session_id and client_secret
+
+        Args:
+            session_id (str): The id of a validation session
+            client_secret (str): A unique string provided by the client to
+                help identify this validation attempt
+            token (str): A validation token
+            current_ts (int): The current unix time in milliseconds. Used for
+                checking token expiry status
+
+        Returns:
+            deferred (bool, str|None): A tuple where the first value represents
+                whether the provided sid/client_secret/token combo was correct,
+                and the second being the link to redirect the user to if there
+                is one
+        """
+        # Check that everything matches in the DB
+        def validate_threepid_validation_token_txn(
+            txn,
+            token,
+            client_secret,
+            ts,
+        ):
+            sql = ("SELECT token, next_link FROM threepid_validation_token "
+                   "WHERE token = ? AND session_id = (SELECT session_id FROM "
+                   "threepid_validation_session WHERE client_secret = ?) AND "
+                   "expires > ? LIMIT 1")
+            txn.execute(sql, (token, client_secret, ts))
+
+            row = txn.fetchone()
+
+            # Return None if we didn't get a match
+            if not row:
+                return None, None
+
+            return row[0], row[1]
+
+        a_token, next_link = yield self.runInteraction(
+            "validate_threepid_validation_token",
+            validate_threepid_validation_token_txn,
+            token,
+            client_secret,
+            current_ts,
+        )
+
+        # Check if we got a match
+        defer.returnValue((a_token is not None, next_link))
+
+    @defer.inlineCallbacks
+    def upsert_threepid_validation_session(
+        self,
+        medium,
+        address,
+        client_secret,
+        send_attempt,
+        session_id,
+    ):
+        """Upsert a threepid validation session
+
+        Args:
+            medium (str): The medium of the 3PID
+            address (str): The address of the 3PID
+            client_secret (str): A unique string provided by the client to
+                help identify this validation attempt
+            session_id (str): The id of this validation session
+        """
+        yield self._simple_upsert(
+            table="threepid_validation_session",
+            keyvalues={"session_id": session_id},
+            values={"last_send_attempt": send_attempt},
+            insertion_values={
+                "medium": medium,
+                "address": address,
+                "client_secret": client_secret,
+            },
+            desc="upsert_threepid_validation_session",
+        )
+
+    @defer.inlineCallbacks
+    def insert_threepid_validation_token(
+        self,
+        session_id,
+        token,
+        next_link,
+        expires,
+    ):
+        """Insert a new 3PID validation token and details
+
+        Args:
+            session_id (str): The id of the validation session this attempt
+                is related to
+            token (str): The validation token
+            expires (int): The timestamp for which after this token will no
+                longer be valid
+        """
+        yield self._simple_insert(
+            table="threepid_validation_token",
+            values={
+                "session_id": session_id,
+                "token": token,
+                "next_link": next_link,
+                "expires": expires,
+            },
+            desc="insert_threepid_validation_token",
+        )
+
+    @defer.inlineCallbacks
+    def cull_expired_threepid_validation_tokens(self):
+        """Remove threepid validation tokens with expiry dates that have passed"""
+        def cull_expired_threepid_validation_tokens_txn(txn, ts):
+            sql = ("DELETE FROM threepid_validation_token WHERE "
+                   "expires < ?")
+            return txn.execute(sql, (ts,))
+
+        yield self.runInteraction(
+            "cull_expired_threepid_validation_tokens",
+            cull_expired_threepid_validation_tokens_txn,
+            self.clock.time_msec(),
+        )
+
+    @defer.inlineCallbacks
+    def validate_threepid_session(self, session_id):
+        """Mark a threepid validation session as validated. Called after a
+        user has successfully validated their 3PID through some mechanism
+
+        Args:
+            session_id (str): The ID of the session to mark as valid
+        """
+        yield self._simple_update(
+            table="threepid_validation_session",
+            keyvalues={"session_id": session_id},
+            updatevalues={"validated": 1},
+            desc="mark_threepid_session_as_valid",
+        )
