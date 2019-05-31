@@ -13,11 +13,16 @@
  * limitations under the License.
  */
 
--- Start a background job to cleanup extremities that were incorrectly added
--- by bug #5269.
-INSERT INTO background_updates (update_name, progress_json) VALUES
-  ('delete_soft_failed_extremities', '{}');
+-- This delta file gets run after `54/stats.sql` delta.
 
-DROP TABLE IF EXISTS _extremities_to_check;  -- To make this delta schema file idempotent.
-CREATE TABLE _extremities_to_check AS SELECT event_id FROM event_forward_extremities;
-CREATE INDEX _extremities_to_check_id ON _extremities_to_check(event_id);
+-- We want to add some indices to the temporary stats table, so we re-insert
+-- 'populate_stats_createtables' if we are still processing the rooms update.
+INSERT INTO background_updates (update_name, progress_json)
+    SELECT 'populate_stats_createtables', '{}'
+    WHERE
+        'populate_stats_process_rooms' IN (
+            SELECT update_name FROM background_updates
+        )
+        AND 'populate_stats_createtables' NOT IN (  -- don't insert if already exists
+            SELECT update_name FROM background_updates
+        );
