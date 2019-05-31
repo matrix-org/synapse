@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS threepid_validation_session (
 
 CREATE TABLE IF NOT EXISTS threepid_validation_token (
     token TEXT PRIMARY KEY,
-    session_id TEXT,
+    session_id TEXT NOT NULL,
     next_link TEXT,
     expires BIGINT NOT NULL
 );
