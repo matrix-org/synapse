@@ -30,9 +30,18 @@ Let's assume that we expect clients to connect to our server at
       server {
           listen 443 ssl;
           listen [::]:443 ssl;
+          
+          # add here your ssl config as desribed in
+          # https://nginx.org/en/docs/http/configuring_https_servers.html
           server_name matrix.example.com;
 
           location /_matrix {
+              proxy_set_header Host $host;
+              # to be on the safe site if module real ip not available
+              proxy_set_header X-Real-IP $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Port $server_port;
+              proxy_set_header X-Forwarded-Proto $scheme;
               proxy_pass http://localhost:8008;
               proxy_set_header X-Forwarded-For $remote_addr;
           }
@@ -41,9 +50,19 @@ Let's assume that we expect clients to connect to our server at
       server {
           listen 8448 ssl default_server;
           listen [::]:8448 ssl default_server;
+          
+          # add here your ssl config as desribed in
+          # https://nginx.org/en/docs/http/configuring_https_servers.html
+          
           server_name example.com;
 
           location / {
+              proxy_set_header Host $host;
+              # to be on the safe site if module real ip not available
+              proxy_set_header X-Real-IP $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Port $server_port;
+              proxy_set_header X-Forwarded-Proto $scheme;
               proxy_pass http://localhost:8008;
               proxy_set_header X-Forwarded-For $remote_addr;
           }
@@ -85,15 +104,80 @@ Let's assume that we expect clients to connect to our server at
 
 * HAProxy::
 
+      global
+        log stdout format raw daemon info
+        tune.ssl.default-dh-param 3072
+        
+        # https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy-1.8.0&openssl=1.1.0i&hsts=yes&profile=modern
+        # set default parameters to the intermediate configuration
+        ssl-default-bind-ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256
+        ssl-default-bind-options ssl-min-ver TLSv1.1 no-tls-tickets
+
+        ssl-default-server-ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256
+        ssl-default-server-options ssl-min-ver TLSv1.1 no-tls-tickets
+      
+      #---------------------------------------------------------------------
+      # common defaults that all the 'listen' and 'backend' sections will
+      # use if not designated in their block
+      #---------------------------------------------------------------------
+      defaults
+        mode                    tcp
+        log                     global
+        option                  dontlognull
+        retries                 3
+        timeout http-request    10s
+        timeout queue           2m
+        timeout connect         10s
+        timeout client          5m
+        timeout server          5m
+        timeout http-keep-alive 10s
+        timeout check           10s
+        maxconn                 750
+        
       frontend https
         bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
 
+        mode http
+        option dontlognull
+        option forwardfor
+        option http-ignore-probes
+        # for haproxy 1.9 and upper can this be enabled
+        # option http-use-htx
+        
+        # Strip off Proxy headers to prevent HTTpoxy (https://httpoxy.org/)
+        http-request del-header Proxy
+
+        http-request set-header Host %[req.hdr(host),lower]
+        http-request set-header X-Forwarded-Proto https if { ssl_fc }
+        http-request set-header X-Forwarded-Proto http  if !{ ssl_fc }
+        http-request set-header X-Forwarded-Host %[req.hdr(host),lower]
+        http-request set-header X-Forwarded-Port %[dst_port]
+        http-request set-header X-Forwarded-Proto-Version h2 if { ssl_fc_alpn -i h2 }
+   
         # Matrix client traffic
-        acl matrix hdr(host) -i matrix.example.com
+        acl matrix req.hdr(host) -i matrix.example.com
         use_backend matrix if matrix
 
       frontend matrix-federation
         bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
+        
+        mode http
+        option dontlognull
+        option forwardfor
+        option http-ignore-probes
+        # for haproxy 1.9 and upper can this be enabled
+        # option http-use-htx
+        
+        # Strip off Proxy headers to prevent HTTpoxy (https://httpoxy.org/)
+        http-request del-header Proxy
+
+        http-request set-header Host %[req.hdr(host),lower]
+        http-request set-header X-Forwarded-Proto https if { ssl_fc }
+        http-request set-header X-Forwarded-Proto http  if !{ ssl_fc }
+        http-request set-header X-Forwarded-Host %[req.hdr(host),lower]
+        http-request set-header X-Forwarded-Port %[dst_port]
+        http-request set-header X-Forwarded-Proto-Version h2 if { ssl_fc_alpn -i h2 }
+        
         default_backend matrix
 
       backend matrix
