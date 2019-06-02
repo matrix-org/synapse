@@ -75,6 +75,7 @@ class SAML2Config(Config):
         # override them.
         #
         #saml2_config:
+        #  enabled: true
         #  sp_config:
         #    # point this to the IdP's metadata. You can use either a local file or
         #    # (preferably) a URL.

@@ -56,6 +56,7 @@ var show_login = function() {
     }
 
     if (matrixLogin.serverAcceptsSso) {
+        $("#sso_form").attr("action", "/_matrix/client/r0/login/sso/redirect");
         $("#sso_flow").show();
     } else if (matrixLogin.serverAcceptsCas) {
         $("#sso_form").attr("action", "/_matrix/client/r0/login/cas/redirect");
@@ -79,7 +80,7 @@ var fetch_info = function(cb) {
     $.get(matrixLogin.endpoint, function(response) {
         var serverAcceptsPassword = false;
         var serverAcceptsCas = false;
-        for (var i=0; i<response.flows.length; i++) {
+        for (var i = 0; i < response.flows.length; i++) {
             var flow = response.flows[i];
             if ("m.login.cas" === flow.type) {
                 matrixLogin.serverAcceptsCas = true;
@@ -121,6 +122,7 @@ matrixLogin.onLogin = function(response) {
     // clobber this function
     console.log("onLogin - This function should be replaced to proceed.");
     console.log(response);
+    alert("Login successful!");
 };
 
 var parseQsFromUrl = function(query) {
@@ -143,7 +145,7 @@ var try_token = function() {
     if (pos == -1) {
         return false;
     }
-    var qs = parseQsFromUrl(window.location.href.substr(pos+1));
+    var qs = parseQsFromUrl(window.location.href.substr(pos + 1));
 
     var loginToken = qs.loginToken;
 
