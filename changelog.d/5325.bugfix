@@ -1,0 +1,1 @@
+Add account_validity's email_sent column to the list of boolean columns in synapse_port_db.
