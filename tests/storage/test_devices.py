@@ -75,15 +75,68 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
     def test_get_devices_by_remote(self):
         device_ids = ["device_id1", "device_id2"]
 
-        # Add a device update to the stream
+        # Add two device updates with a single stream_id
         yield self.store.add_device_change_to_streams(
             "user_id", device_ids, ["somehost"],
         )
 
         # Get all device updates ever meant for this remote
-        res = yield self.store.get_devices_by_remote("somehost", -1, limit=100)
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "somehost", -1, limit=100,
+        )
 
-        device_updates = res[1]
+        # Check original device_ids are contained within these updates
+        self._check_devices_in_updates(device_ids, device_updates)
+
+        # Test breaking the update limit in 1, 101, and 1 device_id segments
+        # First test adding an update with 1 device
+        device_ids = ["device_id0"]
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids, ["someotherhost"],
+        )
+
+        # Get all device updates ever meant for this remote
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "someotherhost", now_stream_id, limit=100,
+        )
+
+        # Check we got a single device update
+        self._check_devices_in_updates(device_ids, device_updates)
+
+        # Try adding 101 updates (we expect to get an empty list back as it
+        # broke the limit)
+        device_ids = ["device_id" + str(i + 1) for i in range(101)]
+
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids, ["someotherhost"],
+        )
+
+        # Get all device updates meant for this remote.
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "someotherhost", now_stream_id, limit=100,
+        )
+
+        # We should get an empty list back as this broke the limit
+        self.assertEqual(len(device_updates), 0)
+
+        # Try to insert one more device update. The 101 devices should've been cleared,
+        # so we should now just get one device update: this new one
+        device_ids = ["newdevice"]
+        yield self.store.add_device_change_to_streams(
+            "user_id", device_ids, ["someotherhost"],
+        )
+
+        # Get all device updates meant for this remote.
+        now_stream_id, device_updates = yield self.store.get_devices_by_remote(
+            "someotherhost", now_stream_id, limit=100,
+        )
+
+        # We should just get our one device update
+        self._check_devices_in_updates(device_ids, device_updates)
+
+    def _check_devices_in_updates(self, device_ids, device_updates):
+        """Check that an specific device ids exist in a list of device update EDUs"""
+        self.assertEqual(len(device_updates), len(device_ids))
 
         for update in device_updates:
             d_id = update["device_id"]
