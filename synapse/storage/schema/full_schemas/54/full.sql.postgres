@@ -3,12 +3,6 @@
 
 
 
-CREATE TABLE _extremities_to_check (
-    event_id text
-);
-
-
-
 CREATE TABLE access_tokens (
     id bigint NOT NULL,
     user_id text NOT NULL,
@@ -58,6 +52,7 @@ CREATE TABLE application_services_txns (
     txn_id integer NOT NULL,
     event_ids text NOT NULL
 );
+
 
 
 CREATE TABLE appservice_room_list (
@@ -1201,6 +1196,7 @@ ALTER TABLE ONLY application_services_txns
     ADD CONSTRAINT application_services_txns_as_id_txn_id_key UNIQUE (as_id, txn_id);
 
 
+
 ALTER TABLE ONLY appservice_stream_position
     ADD CONSTRAINT appservice_stream_position_lock_key UNIQUE (lock);
 
@@ -1526,7 +1522,7 @@ ALTER TABLE ONLY users
 
 
 
-CREATE INDEX _extremities_to_check_id ON _extremities_to_check USING btree (event_id);
+CREATE INDEX access_tokens_device_id ON access_tokens USING btree (user_id, device_id);
 
 
 
@@ -1554,6 +1550,10 @@ CREATE INDEX current_state_delta_stream_idx ON current_state_delta_stream USING 
 
 
 
+CREATE INDEX current_state_events_member_index ON current_state_events USING btree (state_key) WHERE (type = 'm.room.member'::text);
+
+
+
 CREATE INDEX deleted_pushers_stream_id ON deleted_pushers USING btree (stream_id);
 
 
@@ -1570,7 +1570,7 @@ CREATE INDEX device_federation_outbox_id ON device_federation_outbox USING btree
 
 
 
-CREATE INDEX device_inbox_stream_id ON device_inbox USING btree (stream_id);
+CREATE INDEX device_inbox_stream_id_user_id ON device_inbox USING btree (stream_id, user_id);
 
 
 
@@ -1594,7 +1594,19 @@ CREATE INDEX device_lists_outbound_pokes_user ON device_lists_outbound_pokes USI
 
 
 
+CREATE UNIQUE INDEX device_lists_remote_cache_unique_id ON device_lists_remote_cache USING btree (user_id, device_id);
+
+
+
+CREATE UNIQUE INDEX device_lists_remote_extremeties_unique_idx ON device_lists_remote_extremeties USING btree (user_id);
+
+
+
 CREATE INDEX device_lists_stream_id ON device_lists_stream USING btree (stream_id, user_id);
+
+
+
+CREATE INDEX device_lists_stream_user_id ON device_lists_stream USING btree (user_id, device_id);
 
 
 
@@ -1638,7 +1650,15 @@ CREATE INDEX evauth_edges_id ON event_auth USING btree (event_id);
 
 
 
+CREATE INDEX event_contains_url_index ON events USING btree (room_id, topological_ordering, stream_ordering) WHERE ((contains_url = true) AND (outlier = false));
+
+
+
 CREATE INDEX event_json_room_id ON event_json USING btree (room_id);
+
+
+
+CREATE INDEX event_push_actions_highlights_index ON event_push_actions USING btree (user_id, room_id, topological_ordering, stream_ordering) WHERE (highlight = 1);
 
 
 
@@ -1655,6 +1675,10 @@ CREATE INDEX event_push_actions_staging_id ON event_push_actions_staging USING b
 
 
 CREATE INDEX event_push_actions_stream_ordering ON event_push_actions USING btree (stream_ordering, user_id);
+
+
+
+CREATE INDEX event_push_actions_u_highlight ON event_push_actions USING btree (user_id, stream_ordering);
 
 
 
@@ -1678,7 +1702,15 @@ CREATE INDEX event_search_ev_ridx ON event_search USING btree (room_id);
 
 
 
+CREATE UNIQUE INDEX event_search_event_id_idx ON event_search USING btree (event_id);
+
+
+
 CREATE INDEX event_search_fts_idx ON event_search USING gin (vector);
+
+
+
+CREATE INDEX event_to_state_groups_sg_index ON event_to_state_groups USING btree (state_group);
 
 
 
@@ -1783,6 +1815,10 @@ CREATE INDEX local_media_repository_url_cache_expires_idx ON local_media_reposit
 
 
 CREATE INDEX local_media_repository_url_cache_media_idx ON local_media_repository_url_cache USING btree (media_id);
+
+
+
+CREATE INDEX local_media_repository_url_idx ON local_media_repository USING btree (created_ts) WHERE (url_cache IS NOT NULL);
 
 
 
@@ -1914,7 +1950,7 @@ CREATE INDEX state_group_edges_prev_idx ON state_group_edges USING btree (prev_s
 
 
 
-CREATE INDEX state_groups_state_id ON state_groups_state USING btree (state_group);
+CREATE INDEX state_groups_state_type_idx ON state_groups_state USING btree (state_group, type, state_key);
 
 
 
@@ -1962,7 +1998,19 @@ CREATE INDEX user_filters_by_user_id_filter_id ON user_filters USING btree (user
 
 
 
-CREATE INDEX user_ips_user_ip ON user_ips USING btree (user_id, access_token, ip);
+CREATE INDEX user_ips_device_id ON user_ips USING btree (user_id, device_id, last_seen);
+
+
+
+CREATE INDEX user_ips_last_seen ON user_ips USING btree (user_id, last_seen);
+
+
+
+CREATE INDEX user_ips_last_seen_only ON user_ips USING btree (last_seen);
+
+
+
+CREATE UNIQUE INDEX user_ips_user_token_ip_unique_index ON user_ips USING btree (user_id, access_token, ip);
 
 
 
@@ -1979,6 +2027,10 @@ CREATE INDEX user_threepids_medium_address ON user_threepids USING btree (medium
 
 
 CREATE INDEX user_threepids_user_id ON user_threepids USING btree (user_id);
+
+
+
+CREATE INDEX users_creation_ts ON users USING btree (creation_ts);
 
 
 
