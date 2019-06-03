@@ -156,6 +156,8 @@ class KeyStore(SQLBaseStore):
             ts_valid_until_ms (int): The time when this json stops being valid.
             key_json (bytes): The encoded JSON.
         """
+        # debug for notary server test flakiness FIXME remove before release!
+        logger.info("storing key %s/%s with expiry %i", server_name, key_id, ts_now_ms)
         return self._simple_upsert(
             table="server_keys_json",
             keyvalues={
