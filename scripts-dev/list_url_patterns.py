@@ -20,9 +20,7 @@ class CallVisitor(ast.NodeVisitor):
         else:
             return
 
-        if name == "client_path_patterns":
-            PATTERNS_V1.append(node.args[0].s)
-        elif name == "client_v2_patterns":
+        if name == "client_patterns":
             PATTERNS_V2.append(node.args[0].s)
 
 

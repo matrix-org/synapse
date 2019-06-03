@@ -17,17 +17,18 @@ import logging
 
 from twisted.internet import defer
 
-from .base import ClientV1RestServlet, client_path_patterns
+from synapse.http.servlet import RestServlet
+from synapse.rest.client.v2_alpha._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
-class LogoutRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/logout$")
+class LogoutRestServlet(RestServlet):
+    PATTERNS = client_patterns("/logout$", v1=True)
 
     def __init__(self, hs):
-        super(LogoutRestServlet, self).__init__(hs)
-        self._auth = hs.get_auth()
+        super(LogoutRestServlet, self).__init__()
+        self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
 
@@ -41,7 +42,7 @@ class LogoutRestServlet(ClientV1RestServlet):
         if requester.device_id is None:
             # the acccess token wasn't associated with a device.
             # Just delete the access token
-            access_token = self._auth.get_access_token_from_request(request)
+            access_token = self.auth.get_access_token_from_request(request)
             yield self._auth_handler.delete_access_token(access_token)
         else:
             yield self._device_handler.delete_device(
@@ -50,11 +51,11 @@ class LogoutRestServlet(ClientV1RestServlet):
         defer.returnValue((200, {}))
 
 
-class LogoutAllRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/logout/all$")
+class LogoutAllRestServlet(RestServlet):
+    PATTERNS = client_patterns("/logout/all$", v1=True)
 
     def __init__(self, hs):
-        super(LogoutAllRestServlet, self).__init__(hs)
+        super(LogoutAllRestServlet, self).__init__()
         self.auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
