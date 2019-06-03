@@ -60,21 +60,6 @@ CREATE TABLE application_services_txns (
 );
 
 
-
-CREATE TABLE applied_module_schemas (
-    module_name text NOT NULL,
-    file text NOT NULL
-);
-
-
-
-CREATE TABLE applied_schema_deltas (
-    version integer NOT NULL,
-    file text NOT NULL
-);
-
-
-
 CREATE TABLE appservice_room_list (
     appservice_id text NOT NULL,
     network_id text NOT NULL,
@@ -475,7 +460,7 @@ CREATE TABLE group_roles (
     group_id text NOT NULL,
     role_id text NOT NULL,
     profile text NOT NULL,
-    is_boolean NOT NULL
+    is_public boolean NOT NULL
 );
 
 
@@ -484,7 +469,7 @@ CREATE TABLE group_room_categories (
     group_id text NOT NULL,
     category_id text NOT NULL,
     profile text NOT NULL,
-    is_boolean NOT NULL
+    is_public boolean NOT NULL
 );
 
 
@@ -492,7 +477,7 @@ CREATE TABLE group_room_categories (
 CREATE TABLE group_rooms (
     group_id text NOT NULL,
     room_id text NOT NULL,
-    is_boolean NOT NULL
+    is_public boolean NOT NULL
 );
 
 
@@ -520,7 +505,7 @@ CREATE TABLE group_summary_rooms (
     room_id text NOT NULL,
     category_id text NOT NULL,
     room_order bigint NOT NULL,
-    is_boolean NOT NULL,
+    is_public boolean NOT NULL,
     CONSTRAINT group_summary_rooms_room_order_check CHECK ((room_order > 0))
 );
 
@@ -531,7 +516,7 @@ CREATE TABLE group_summary_users (
     user_id text NOT NULL,
     role_id text NOT NULL,
     user_order bigint NOT NULL,
-    is_boolean NOT NULL
+    is_public boolean NOT NULL
 );
 
 
@@ -540,7 +525,7 @@ CREATE TABLE group_users (
     group_id text NOT NULL,
     user_id text NOT NULL,
     is_admin boolean NOT NULL,
-    is_boolean NOT NULL
+    is_public boolean NOT NULL
 );
 
 
@@ -551,7 +536,7 @@ CREATE TABLE groups (
     avatar_url text,
     short_description text,
     long_description text,
-    is_boolean NOT NULL,
+    is_public boolean NOT NULL,
     join_policy text DEFAULT 'invite'::text NOT NULL
 );
 
@@ -578,7 +563,7 @@ CREATE TABLE local_group_membership (
     user_id text NOT NULL,
     is_admin boolean NOT NULL,
     membership text NOT NULL,
-    is_sed boolean NOT NULL,
+    is_publicised boolean NOT NULL,
     content text NOT NULL
 );
 
@@ -695,7 +680,7 @@ CREATE TABLE profiles (
 
 
 
-CREATE TABLE room_list_stream (
+CREATE TABLE public_room_list_stream (
     stream_id bigint NOT NULL,
     room_id text NOT NULL,
     visibility boolean NOT NULL,
@@ -966,17 +951,8 @@ CREATE TABLE room_tags_revisions (
 
 CREATE TABLE rooms (
     room_id text NOT NULL,
-    is_boolean,
+    is_public boolean,
     creator text
-);
-
-
-
-CREATE TABLE schema_version (
-    lock character(1) DEFAULT 'X'::bpchar NOT NULL,
-    version integer NOT NULL,
-    upgraded boolean NOT NULL,
-    CONSTRAINT schema_version_lock_check CHECK ((lock = 'X'::bpchar))
 );
 
 
@@ -1135,7 +1111,7 @@ CREATE TABLE user_stats (
     user_id text NOT NULL,
     ts bigint NOT NULL,
     bucket_size integer NOT NULL,
-    rooms integer NOT NULL,
+    public_rooms integer NOT NULL,
     private_rooms integer NOT NULL
 );
 
@@ -1175,7 +1151,7 @@ CREATE TABLE users (
 
 
 
-CREATE TABLE users_in_rooms (
+CREATE TABLE users_in_public_rooms (
     user_id text NOT NULL,
     room_id text NOT NULL
 );
@@ -1223,17 +1199,6 @@ ALTER TABLE ONLY application_services_state
 
 ALTER TABLE ONLY application_services_txns
     ADD CONSTRAINT application_services_txns_as_id_txn_id_key UNIQUE (as_id, txn_id);
-
-
-
-ALTER TABLE ONLY applied_module_schemas
-    ADD CONSTRAINT applied_module_schemas_module_name_file_key UNIQUE (module_name, file);
-
-
-
-ALTER TABLE ONLY applied_schema_deltas
-    ADD CONSTRAINT applied_schema_deltas_version_file_key UNIQUE (version, file);
-
 
 
 ALTER TABLE ONLY appservice_stream_position
@@ -1518,11 +1483,6 @@ ALTER TABLE ONLY room_tags
 
 ALTER TABLE ONLY rooms
     ADD CONSTRAINT rooms_pkey PRIMARY KEY (room_id);
-
-
-
-ALTER TABLE ONLY schema_version
-    ADD CONSTRAINT schema_version_lock_key UNIQUE (lock);
 
 
 
@@ -1846,15 +1806,15 @@ CREATE INDEX presence_stream_user_id ON presence_stream USING btree (user_id);
 
 
 
-CREATE INDEX room_index ON rooms USING btree (is_;
+CREATE INDEX public_room_index ON rooms USING btree (is_public);
 
 
 
-CREATE INDEX room_list_stream_idx ON room_list_stream USING btree (stream_id);
+CREATE INDEX public_room_list_stream_idx ON public_room_list_stream USING btree (stream_id);
 
 
 
-CREATE INDEX room_list_stream_rm_idx ON room_list_stream USING btree (room_id, stream_id);
+CREATE INDEX public_room_list_stream_rm_idx ON public_room_list_stream USING btree (room_id, stream_id);
 
 
 
@@ -2022,7 +1982,7 @@ CREATE INDEX user_threepids_user_id ON user_threepids USING btree (user_id);
 
 
 
-CREATE UNIQUE INDEX users_in_rooms_u_idx ON users_in_rooms USING btree (user_id, room_id);
+CREATE UNIQUE INDEX users_in_public_rooms_u_idx ON users_in_public_rooms USING btree (user_id, room_id);
 
 
 

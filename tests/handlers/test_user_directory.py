@@ -96,6 +96,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.handle_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
 
+    @unittest.DEBUG
     def test_private_room(self):
         """
         A user can be searched for only by people that are either in a public
@@ -340,6 +341,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
         return hs
 
+    @unittest.DEBUG
     def test_disabling_room_list(self):
         self.config.user_directory_search_enabled = True
 

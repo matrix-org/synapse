@@ -255,7 +255,6 @@ CREATE INDEX user_ips_last_seen_only ON user_ips (last_seen);
 CREATE INDEX users_creation_ts ON users (creation_ts);
 CREATE INDEX event_to_state_groups_sg_index ON event_to_state_groups (state_group);
 CREATE UNIQUE INDEX device_lists_remote_cache_unique_id ON device_lists_remote_cache (user_id, device_id);
-CREATE TABLE sqlite_stat1(tbl,idx,stat);
 CREATE INDEX state_groups_state_type_idx ON state_groups_state(state_group, type, state_key);
 CREATE UNIQUE INDEX device_lists_remote_extremeties_unique_idx ON device_lists_remote_extremeties (user_id);
 CREATE UNIQUE INDEX user_ips_user_token_ip_unique_index ON user_ips (user_id, access_token, ip);
