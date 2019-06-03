@@ -352,7 +352,7 @@ class Keyring(object):
         Args:
             fetcher (KeyFetcher): fetcher to use to fetch the keys
             remaining_requests (set[VerifyKeyRequest]): outstanding key requests.
-                Any successfully-completed requests will be reomved from the list.
+                Any successfully-completed requests will be removed from the list.
         """
         # dict[str, dict[str, int]]: keys to fetch.
         # server_name -> key_id -> min_valid_ts
@@ -362,10 +362,16 @@ class Keyring(object):
             # any completed requests should already have been removed
             assert not verify_request.deferred.called
             keys_for_server = missing_keys[verify_request.server_name]
+
             for key_id in verify_request.key_ids:
-                current_min_ts = keys_for_server.get(key_id, -1)
-                if current_min_ts < verify_request.minimum_valid_until_ts:
-                    keys_for_server[key_id] = verify_request.minimum_valid_until_ts
+                # If we have several requests for the same key, then we only need to
+                # request that key once, but we should do so with the greatest
+                # min_valid_until_ts of the requests, so that we can satisfy all of
+                # the requests.
+                keys_for_server[key_id] = max(
+                    keys_for_server.get(key_id, -1),
+                    verify_request.minimum_valid_until_ts
+                )
 
         results = yield fetcher.get_keys(missing_keys)
 
