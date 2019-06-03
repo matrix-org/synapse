@@ -21,14 +21,12 @@ import re
 from twisted.internet import defer
 
 from synapse.api.errors import InteractiveAuthIncompleteError
-from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
+from synapse.api.urls import CLIENT_API_PREFIX
 
 logger = logging.getLogger(__name__)
 
 
-def client_v2_patterns(path_regex, releases=(0,),
-                       v2_alpha=True,
-                       unstable=True):
+def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
     """Creates a regex compiled client path with the correct client path
     prefix.
 
@@ -39,13 +37,14 @@ def client_v2_patterns(path_regex, releases=(0,),
         SRE_Pattern
     """
     patterns = []
-    if v2_alpha:
-        patterns.append(re.compile("^" + CLIENT_V2_ALPHA_PREFIX + path_regex))
     if unstable:
-        unstable_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/unstable")
+        unstable_prefix = CLIENT_API_PREFIX + "/unstable"
         patterns.append(re.compile("^" + unstable_prefix + path_regex))
+    if v1:
+        v1_prefix = CLIENT_API_PREFIX + "/api/v1"
+        patterns.append(re.compile("^" + v1_prefix + path_regex))
     for release in releases:
-        new_prefix = CLIENT_V2_ALPHA_PREFIX.replace("/v2_alpha", "/r%d" % release)
+        new_prefix = CLIENT_API_PREFIX + "/r%d" % (release,)
         patterns.append(re.compile("^" + new_prefix + path_regex))
     return patterns
 

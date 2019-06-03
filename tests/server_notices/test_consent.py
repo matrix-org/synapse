@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import os
+
 import synapse.rest.admin
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
@@ -30,20 +33,27 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
+        tmpdir = self.mktemp()
+        os.mkdir(tmpdir)
         self.consent_notice_message = "consent %(consent_uri)s"
         config = self.default_config()
-        config.user_consent_version = "1"
-        config.user_consent_server_notice_content = {
-            "msgtype": "m.text",
-            "body": self.consent_notice_message,
+        config["user_consent"] = {
+            "version": "1",
+            "template_dir": tmpdir,
+            "server_notice_content": {
+                "msgtype": "m.text",
+                "body": self.consent_notice_message,
+            },
         }
-        config.public_baseurl = "https://example.com/"
-        config.form_secret = "123abc"
+        config["public_baseurl"] = "https://example.com/"
+        config["form_secret"] = "123abc"
 
-        config.server_notices_mxid = "@notices:test"
-        config.server_notices_mxid_display_name = "test display name"
-        config.server_notices_mxid_avatar_url = None
-        config.server_notices_room_name = "Server Notices"
+        config["server_notices"] = {
+            "system_mxid_localpart": "notices",
+            "system_mxid_display_name": "test display name",
+            "system_mxid_avatar_url": None,
+            "room_name": "Server Notices",
+        }
 
         hs = self.setup_test_homeserver(config=config)
 

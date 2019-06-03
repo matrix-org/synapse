@@ -110,7 +110,7 @@ def setupdb():
         atexit.register(_cleanup)
 
 
-def default_config(name):
+def default_config(name, parse=False):
     """
     Create a reasonable test config.
     """
@@ -121,75 +121,71 @@ def default_config(name):
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
+        "event_cache_size": 1,
+        "enable_registration": True,
+        "enable_registration_captcha": False,
+        "macaroon_secret_key": "not even a little secret",
+        "expire_access_token": False,
+        "trusted_third_party_id_servers": [],
+        "room_invite_state_types": [],
+        "password_providers": [],
+        "worker_replication_url": "",
+        "worker_app": None,
+        "email_enable_notifs": False,
+        "block_non_admin_invites": False,
+        "federation_domain_whitelist": None,
+        "filter_timeline_limit": 5000,
+        "user_directory_search_all_users": False,
+        "user_consent_server_notice_content": None,
+        "block_events_without_consent_error": None,
+        "user_consent_at_registration": False,
+        "user_consent_policy_name": "Privacy Policy",
+        "media_storage_providers": [],
+        "autocreate_auto_join_rooms": True,
+        "auto_join_rooms": [],
+        "limit_usage_by_mau": False,
+        "hs_disabled": False,
+        "hs_disabled_message": "",
+        "hs_disabled_limit_type": "",
+        "max_mau_value": 50,
+        "mau_trial_days": 0,
+        "mau_stats_only": False,
+        "mau_limits_reserved_threepids": [],
+        "admin_contact": None,
+        "rc_federation": {
+            "reject_limit": 10,
+            "sleep_limit": 10,
+            "sleep_delay": 10,
+            "concurrent": 10,
+        },
+        "rc_message": {"per_second": 10000, "burst_count": 10000},
+        "rc_registration": {"per_second": 10000, "burst_count": 10000},
+        "rc_login": {
+            "address": {"per_second": 10000, "burst_count": 10000},
+            "account": {"per_second": 10000, "burst_count": 10000},
+            "failed_attempts": {"per_second": 10000, "burst_count": 10000},
+        },
+        "saml2_enabled": False,
+        "public_baseurl": None,
+        "default_identity_server": None,
+        "key_refresh_interval": 24 * 60 * 60 * 1000,
+        "old_signing_keys": {},
+        "tls_fingerprints": [],
+        "use_frozen_dicts": False,
+        # We need a sane default_room_version, otherwise attempts to create
+        # rooms will fail.
+        "default_room_version": "1",
+        # disable user directory updates, because they get done in the
+        # background, which upsets the test runner.
+        "update_user_directory": False,
     }
 
-    config = HomeServerConfig()
-    config.parse_config_dict(config_dict)
+    if parse:
+        config = HomeServerConfig()
+        config.parse_config_dict(config_dict)
+        return config
 
-    # TODO: move this stuff into config_dict or get rid of it
-    config.event_cache_size = 1
-    config.enable_registration = True
-    config.enable_registration_captcha = False
-    config.macaroon_secret_key = "not even a little secret"
-    config.expire_access_token = False
-    config.trusted_third_party_id_servers = []
-    config.room_invite_state_types = []
-    config.password_providers = []
-    config.worker_replication_url = ""
-    config.worker_app = None
-    config.email_enable_notifs = False
-    config.block_non_admin_invites = False
-    config.federation_domain_whitelist = None
-    config.federation_rc_reject_limit = 10
-    config.federation_rc_sleep_limit = 10
-    config.federation_rc_sleep_delay = 100
-    config.federation_rc_concurrent = 10
-    config.filter_timeline_limit = 5000
-    config.user_directory_search_all_users = False
-    config.user_consent_server_notice_content = None
-    config.block_events_without_consent_error = None
-    config.user_consent_at_registration = False
-    config.user_consent_policy_name = "Privacy Policy"
-    config.media_storage_providers = []
-    config.autocreate_auto_join_rooms = True
-    config.auto_join_rooms = []
-    config.limit_usage_by_mau = False
-    config.hs_disabled = False
-    config.hs_disabled_message = ""
-    config.hs_disabled_limit_type = ""
-    config.max_mau_value = 50
-    config.mau_trial_days = 0
-    config.mau_stats_only = False
-    config.mau_limits_reserved_threepids = []
-    config.admin_contact = None
-    config.rc_messages_per_second = 10000
-    config.rc_message_burst_count = 10000
-    config.rc_registration.per_second = 10000
-    config.rc_registration.burst_count = 10000
-    config.rc_login_address.per_second = 10000
-    config.rc_login_address.burst_count = 10000
-    config.rc_login_account.per_second = 10000
-    config.rc_login_account.burst_count = 10000
-    config.rc_login_failed_attempts.per_second = 10000
-    config.rc_login_failed_attempts.burst_count = 10000
-    config.saml2_enabled = False
-    config.public_baseurl = None
-    config.default_identity_server = None
-    config.key_refresh_interval = 24 * 60 * 60 * 1000
-    config.old_signing_keys = {}
-    config.tls_fingerprints = []
-
-    config.use_frozen_dicts = False
-
-    # we need a sane default_room_version, otherwise attempts to create rooms will
-    # fail.
-    config.default_room_version = "1"
-
-    # disable user directory updates, because they get done in the
-    # background, which upsets the test runner.
-    config.update_user_directory = False
-
-    return config
+    return config_dict
 
 
 class TestHomeServer(HomeServer):
@@ -223,7 +219,7 @@ def setup_test_homeserver(
         from twisted.internet import reactor
 
     if config is None:
-        config = default_config(name)
+        config = default_config(name, parse=True)
 
     config.ldap_enabled = False
 
@@ -380,12 +376,7 @@ def register_federation_servlets(hs, resource):
         resource=resource,
         authenticator=federation_server.Authenticator(hs),
         ratelimiter=FederationRateLimiter(
-            hs.get_clock(),
-            window_size=hs.config.federation_rc_window_size,
-            sleep_limit=hs.config.federation_rc_sleep_limit,
-            sleep_msec=hs.config.federation_rc_sleep_delay,
-            reject_limit=hs.config.federation_rc_reject_limit,
-            concurrent_requests=hs.config.federation_rc_concurrent,
+            hs.get_clock(), config=hs.config.rc_federation
         ),
     )
 

@@ -161,7 +161,7 @@ specify values for `SYNAPSE_CONFIG_PATH`, `SYNAPSE_SERVER_NAME` and
 example:
 
 ```
-docker run -it --rm
+docker run -it --rm \
     --mount type=volume,src=synapse-data,dst=/data \
     -e SYNAPSE_CONFIG_PATH=/data/homeserver.yaml \
     -e SYNAPSE_SERVER_NAME=my.matrix.host \

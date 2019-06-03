@@ -39,6 +39,8 @@ class AccountValidityConfig(Config):
             else:
                 self.renew_email_subject = "Renew your %(app)s account"
 
+            self.startup_job_max_delta = self.period * 10. / 100.
+
         if self.renew_by_email_enabled and "public_baseurl" not in synapse_config:
             raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
@@ -122,6 +124,16 @@ class RegistrationConfig(Config):
         # ``renew_email_subject`` is the subject of the email sent out with the renewal
         # link. ``%%(app)s`` can be used as a placeholder for the ``app_name`` parameter
         # from the ``email`` section.
+        #
+        # Once this feature is enabled, Synapse will look for registered users without an
+        # expiration date at startup and will add one to every account it found using the
+        # current settings at that time.
+        # This means that, if a validity period is set, and Synapse is restarted (it will
+        # then derive an expiration date from the current validity period), and some time
+        # after that the validity period changes and Synapse is restarted, the users'
+        # expiration dates won't be updated unless their account is manually renewed. This
+        # date will be randomly selected within a range [now + period - d ; now + period],
+        # where d is equal to 10%% of the validity period.
         #
         #account_validity:
         #  enabled: True

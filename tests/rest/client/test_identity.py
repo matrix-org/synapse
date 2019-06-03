@@ -32,7 +32,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         config = self.default_config()
-        config.enable_3pid_lookup = False
+        config["enable_3pid_lookup"] = False
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs

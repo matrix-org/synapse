@@ -26,7 +26,7 @@ from synapse.http.servlet import (
 )
 from synapse.types import StreamToken
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class KeyUploadServlet(RestServlet):
       },
     }
     """
-    PATTERNS = client_v2_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
+    PATTERNS = client_patterns("/keys/upload(/(?P<device_id>[^/]+))?$")
 
     def __init__(self, hs):
         """
@@ -130,7 +130,7 @@ class KeyQueryServlet(RestServlet):
     } } } } } }
     """
 
-    PATTERNS = client_v2_patterns("/keys/query$")
+    PATTERNS = client_patterns("/keys/query$")
 
     def __init__(self, hs):
         """
@@ -159,7 +159,7 @@ class KeyChangesServlet(RestServlet):
         200 OK
         { "changed": ["@foo:example.com"] }
     """
-    PATTERNS = client_v2_patterns("/keys/changes$")
+    PATTERNS = client_patterns("/keys/changes$")
 
     def __init__(self, hs):
         """
@@ -209,7 +209,7 @@ class OneTimeKeyServlet(RestServlet):
     } } } }
 
     """
-    PATTERNS = client_v2_patterns("/keys/claim$")
+    PATTERNS = client_patterns("/keys/claim$")
 
     def __init__(self, hs):
         super(OneTimeKeyServlet, self).__init__()

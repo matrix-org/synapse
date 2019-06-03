@@ -59,7 +59,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
         for flow in channel.json_body["flows"]:
             self.assertIsInstance(flow["stages"], list)
             self.assertTrue(len(flow["stages"]) > 0)
-            self.assertEquals(flow["stages"][-1], "m.login.terms")
+            self.assertTrue("m.login.terms" in flow["stages"])
 
         expected_params = {
             "m.login.terms": {

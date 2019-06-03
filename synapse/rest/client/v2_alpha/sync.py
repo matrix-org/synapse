@@ -26,14 +26,13 @@ from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
 from synapse.events.utils import (
     format_event_for_client_v2_without_room_id,
     format_event_raw,
-    serialize_event,
 )
 from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
 
-from ._base import client_v2_patterns, set_timeline_upper_limit
+from ._base import client_patterns, set_timeline_upper_limit
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ class SyncRestServlet(RestServlet):
         }
     """
 
-    PATTERNS = client_v2_patterns("/sync$")
+    PATTERNS = client_patterns("/sync$")
     ALLOWED_PRESENCE = set(["online", "offline", "unavailable"])
 
     def __init__(self, hs):
@@ -86,6 +85,7 @@ class SyncRestServlet(RestServlet):
         self.filtering = hs.get_filtering()
         self.presence_handler = hs.get_presence_handler()
         self._server_notices_sender = hs.get_server_notices_sender()
+        self._event_serializer = hs.get_event_client_serializer()
 
     @defer.inlineCallbacks
     def on_GET(self, request):
@@ -168,14 +168,14 @@ class SyncRestServlet(RestServlet):
             )
 
         time_now = self.clock.time_msec()
-        response_content = self.encode_response(
+        response_content = yield self.encode_response(
             time_now, sync_result, requester.access_token_id, filter
         )
 
         defer.returnValue((200, response_content))
 
-    @staticmethod
-    def encode_response(time_now, sync_result, access_token_id, filter):
+    @defer.inlineCallbacks
+    def encode_response(self, time_now, sync_result, access_token_id, filter):
         if filter.event_format == 'client':
             event_formatter = format_event_for_client_v2_without_room_id
         elif filter.event_format == 'federation':
@@ -183,24 +183,24 @@ class SyncRestServlet(RestServlet):
         else:
             raise Exception("Unknown event format %s" % (filter.event_format, ))
 
-        joined = SyncRestServlet.encode_joined(
+        joined = yield self.encode_joined(
             sync_result.joined, time_now, access_token_id,
             filter.event_fields,
             event_formatter,
         )
 
-        invited = SyncRestServlet.encode_invited(
+        invited = yield self.encode_invited(
             sync_result.invited, time_now, access_token_id,
             event_formatter,
         )
 
-        archived = SyncRestServlet.encode_archived(
+        archived = yield self.encode_archived(
             sync_result.archived, time_now, access_token_id,
             filter.event_fields,
             event_formatter,
         )
 
-        return {
+        defer.returnValue({
             "account_data": {"events": sync_result.account_data},
             "to_device": {"events": sync_result.to_device},
             "device_lists": {
@@ -222,7 +222,7 @@ class SyncRestServlet(RestServlet):
             },
             "device_one_time_keys_count": sync_result.device_one_time_keys_count,
             "next_batch": sync_result.next_batch.to_string(),
-        }
+        })
 
     @staticmethod
     def encode_presence(events, time_now):
@@ -239,8 +239,8 @@ class SyncRestServlet(RestServlet):
             ]
         }
 
-    @staticmethod
-    def encode_joined(rooms, time_now, token_id, event_fields, event_formatter):
+    @defer.inlineCallbacks
+    def encode_joined(self, rooms, time_now, token_id, event_fields, event_formatter):
         """
         Encode the joined rooms in a sync result
 
@@ -261,15 +261,15 @@ class SyncRestServlet(RestServlet):
         """
         joined = {}
         for room in rooms:
-            joined[room.room_id] = SyncRestServlet.encode_room(
+            joined[room.room_id] = yield self.encode_room(
                 room, time_now, token_id, joined=True, only_fields=event_fields,
                 event_formatter=event_formatter,
             )
 
-        return joined
+        defer.returnValue(joined)
 
-    @staticmethod
-    def encode_invited(rooms, time_now, token_id, event_formatter):
+    @defer.inlineCallbacks
+    def encode_invited(self, rooms, time_now, token_id, event_formatter):
         """
         Encode the invited rooms in a sync result
 
@@ -289,7 +289,7 @@ class SyncRestServlet(RestServlet):
         """
         invited = {}
         for room in rooms:
-            invite = serialize_event(
+            invite = yield self._event_serializer.serialize_event(
                 room.invite, time_now, token_id=token_id,
                 event_format=event_formatter,
                 is_invite=True,
@@ -302,10 +302,10 @@ class SyncRestServlet(RestServlet):
                 "invite_state": {"events": invited_state}
             }
 
-        return invited
+        defer.returnValue(invited)
 
-    @staticmethod
-    def encode_archived(rooms, time_now, token_id, event_fields, event_formatter):
+    @defer.inlineCallbacks
+    def encode_archived(self, rooms, time_now, token_id, event_fields, event_formatter):
         """
         Encode the archived rooms in a sync result
 
@@ -326,17 +326,17 @@ class SyncRestServlet(RestServlet):
         """
         joined = {}
         for room in rooms:
-            joined[room.room_id] = SyncRestServlet.encode_room(
+            joined[room.room_id] = yield self.encode_room(
                 room, time_now, token_id, joined=False,
                 only_fields=event_fields,
                 event_formatter=event_formatter,
             )
 
-        return joined
+        defer.returnValue(joined)
 
-    @staticmethod
+    @defer.inlineCallbacks
     def encode_room(
-            room, time_now, token_id, joined,
+            self, room, time_now, token_id, joined,
             only_fields, event_formatter,
     ):
         """
@@ -355,9 +355,13 @@ class SyncRestServlet(RestServlet):
         Returns:
             dict[str, object]: the room, encoded in our response format
         """
-        def serialize(event):
-            return serialize_event(
-                event, time_now, token_id=token_id,
+        def serialize(events):
+            return self._event_serializer.serialize_events(
+                events, time_now=time_now,
+                # We don't bundle "live" events, as otherwise clients
+                # will end up double counting annotations.
+                bundle_aggregations=False,
+                token_id=token_id,
                 event_format=event_formatter,
                 only_event_fields=only_fields,
             )
@@ -376,8 +380,8 @@ class SyncRestServlet(RestServlet):
                     event.event_id, room.room_id, event.room_id,
                 )
 
-        serialized_state = [serialize(e) for e in state_events]
-        serialized_timeline = [serialize(e) for e in timeline_events]
+        serialized_state = yield serialize(state_events)
+        serialized_timeline = yield serialize(timeline_events)
 
         account_data = room.account_data
 
@@ -397,7 +401,7 @@ class SyncRestServlet(RestServlet):
             result["unread_notifications"] = room.unread_notifications
             result["summary"] = room.summary
 
-        return result
+        defer.returnValue(result)
 
 
 def register_servlets(hs, http_server):

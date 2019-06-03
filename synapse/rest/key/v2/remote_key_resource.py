@@ -20,7 +20,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.crypto.keyring import KeyLookupError
+from synapse.crypto.keyring import KeyLookupError, ServerKeyFetcher
 from synapse.http.server import respond_with_json_bytes, wrap_json_request_handler
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
@@ -89,7 +89,7 @@ class RemoteKey(Resource):
     isLeaf = True
 
     def __init__(self, hs):
-        self.keyring = hs.get_keyring()
+        self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
@@ -217,7 +217,7 @@ class RemoteKey(Resource):
         if cache_misses and query_remote_on_cache_miss:
             for server_name, key_ids in cache_misses.items():
                 try:
-                    yield self.keyring.get_server_verify_key_v2_direct(
+                    yield self.fetcher.get_server_verify_key_v2_direct(
                         server_name, key_ids
                     )
                 except KeyLookupError as e:

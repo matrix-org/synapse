@@ -16,7 +16,6 @@
 import os
 
 import attr
-from netaddr import IPSet
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -24,9 +23,6 @@ from twisted.internet.error import DNSLookupError
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol
 from twisted.web._newclient import ResponseDone
-
-from synapse.config.repository import MediaStorageProviderConfig
-from synapse.util.module_loader import load_module
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -67,23 +63,23 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        self.storage_path = self.mktemp()
-        os.mkdir(self.storage_path)
-
         config = self.default_config()
-        config.url_preview_enabled = True
-        config.max_spider_size = 9999999
-        config.url_preview_ip_range_blacklist = IPSet(
-            (
-                "192.168.1.1",
-                "1.0.0.0/8",
-                "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-                "2001:800::/21",
-            )
+        config["url_preview_enabled"] = True
+        config["max_spider_size"] = 9999999
+        config["url_preview_ip_range_blacklist"] = (
+            "192.168.1.1",
+            "1.0.0.0/8",
+            "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+            "2001:800::/21",
         )
-        config.url_preview_ip_range_whitelist = IPSet(("1.1.1.1",))
-        config.url_preview_url_blacklist = []
-        config.media_store_path = self.storage_path
+        config["url_preview_ip_range_whitelist"] = ("1.1.1.1",)
+        config["url_preview_url_blacklist"] = []
+
+        self.storage_path = self.mktemp()
+        self.media_store_path = self.mktemp()
+        os.mkdir(self.storage_path)
+        os.mkdir(self.media_store_path)
+        config["media_store_path"] = self.media_store_path
 
         provider_config = {
             "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
@@ -93,11 +89,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "config": {"directory": self.storage_path},
         }
 
-        loaded = list(load_module(provider_config)) + [
-            MediaStorageProviderConfig(False, False, False)
-        ]
-
-        config.media_storage_providers = [loaded]
+        config["media_storage_providers"] = [provider_config]
 
         hs = self.setup_test_homeserver(config=config)
 
@@ -297,12 +289,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -318,12 +310,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -339,7 +331,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
         self.assertEqual(
             channel.json_body,
             {
@@ -347,6 +338,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 'error': 'IP address blocked by IP blacklist entry',
             },
         )
+        self.assertEqual(channel.code, 403)
 
     def test_blacklisted_ip_range_direct(self):
         """
@@ -414,12 +406,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         request.render(self.preview_url)
         self.pump()
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -439,12 +431,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # No requests made.
         self.assertEqual(len(self.reactor.tcpClients), 0)
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
 
@@ -460,11 +452,11 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         request.render(self.preview_url)
         self.pump()
 
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 502)
         self.assertEqual(
             channel.json_body,
             {
                 'errcode': 'M_UNKNOWN',
-                'error': 'IP address blocked by IP blacklist entry',
+                'error': 'DNS resolution failure during URL preview generation',
             },
         )
