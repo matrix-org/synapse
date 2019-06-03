@@ -4,6 +4,7 @@ INSERT INTO federation_stream_position (type, stream_id) VALUES ('federation', -
 INSERT INTO federation_stream_position (type, stream_id) SELECT 'events', coalesce(max(stream_ordering), -1) FROM events;
 INSERT INTO user_directory_stream_pos (stream_id) VALUES (null);
 INSERT INTO stats_stream_pos (stream_id) VALUES (null);
+INSERT INTO event_push_summary_stream_ordering (stream_ordering) VALUES (0);
 
 --- User dir population
 
