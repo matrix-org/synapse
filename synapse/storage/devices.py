@@ -87,8 +87,6 @@ class DeviceWorkerStore(SQLBaseStore):
         if not has_changed:
             defer.returnValue((now_stream_id, []))
 
-        logger.debug("Getting from %d to %d", from_stream_id, now_stream_id)
-
         # We retrieve n+1 devices from the list of outbound pokes where n is
         # our outbound device update limit. We then check if the very last
         # device has the same stream_id as the second-to-last device. If so,
