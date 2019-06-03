@@ -340,7 +340,8 @@ class StatsStore(StateDeltasStore):
             "avatar",
             "canonical_alias"
         ):
-            if "\0" in fields.get(col, ""):
+            field = fields.get(col)
+            if field and "\0" in field:
                 fields[col] = None
 
         return self._simple_upsert(
