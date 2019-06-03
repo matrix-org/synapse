@@ -87,7 +87,7 @@ class VerifyKeyRequest(object):
     key_ids = attr.ib()
     json_object = attr.ib()
     minimum_valid_until_ts = attr.ib()
-    deferred = attr.ib(factory=defer.Deferred)
+    deferred = attr.ib(default=attr.Factory(defer.Deferred))
 
 
 class KeyLookupError(ValueError):
