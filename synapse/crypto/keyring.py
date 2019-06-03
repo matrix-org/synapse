@@ -751,7 +751,15 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
         self.client = hs.get_http_client()
 
     def get_keys(self, keys_to_fetch):
-        """see KeyFetcher.get_keys"""
+        """
+        Args:
+            keys_to_fetch (dict[str, iterable[str]]):
+                the keys to be fetched. server_name -> key_ids
+
+        Returns:
+            Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult|None]]]:
+                map from server_name -> key_id -> FetchKeyResult
+        """
 
         results = {}
 
