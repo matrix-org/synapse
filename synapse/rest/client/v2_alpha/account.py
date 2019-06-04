@@ -32,13 +32,13 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import random_string
 from synapse.util.threepids import check_3pid_allowed
 
-from ._base import client_v2_patterns, interactive_auth_handler
+from ._base import client_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
 
 
 class EmailPasswordRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/password/email/requestToken$")
+    PATTERNS = client_patterns("/account/password/email/requestToken$")
 
     def __init__(self, hs):
         super(EmailPasswordRequestTokenRestServlet, self).__init__()
@@ -174,7 +174,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
 
 class MsisdnPasswordRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/password/msisdn/requestToken$")
+    PATTERNS = client_patterns("/account/password/msisdn/requestToken$")
 
     def __init__(self, hs):
         super(MsisdnPasswordRequestTokenRestServlet, self).__init__()
@@ -212,7 +212,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
 
 class PasswordRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/password$")
+    PATTERNS = client_patterns("/account/password$")
 
     def __init__(self, hs):
         super(PasswordRestServlet, self).__init__()
@@ -285,7 +285,7 @@ class PasswordRestServlet(RestServlet):
 
 
 class DeactivateAccountRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/deactivate$")
+    PATTERNS = client_patterns("/account/deactivate$")
 
     def __init__(self, hs):
         super(DeactivateAccountRestServlet, self).__init__()
@@ -333,7 +333,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
 
 class EmailThreepidRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/email/requestToken$")
+    PATTERNS = client_patterns("/account/3pid/email/requestToken$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -368,7 +368,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
 
 class MsisdnThreepidRequestTokenRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/msisdn/requestToken$")
+    PATTERNS = client_patterns("/account/3pid/msisdn/requestToken$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -405,7 +405,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
 
 class ThreepidRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid$")
+    PATTERNS = client_patterns("/account/3pid$")
 
     def __init__(self, hs):
         super(ThreepidRestServlet, self).__init__()
@@ -469,7 +469,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidDeleteRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/3pid/delete$")
+    PATTERNS = client_patterns("/account/3pid/delete$")
 
     def __init__(self, hs):
         super(ThreepidDeleteRestServlet, self).__init__()
@@ -506,7 +506,7 @@ class ThreepidDeleteRestServlet(RestServlet):
 
 
 class WhoamiRestServlet(RestServlet):
-    PATTERNS = client_v2_patterns("/account/whoami$")
+    PATTERNS = client_patterns("/account/whoami$")
 
     def __init__(self, hs):
         super(WhoamiRestServlet, self).__init__()

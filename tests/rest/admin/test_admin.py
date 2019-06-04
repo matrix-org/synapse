@@ -408,7 +408,6 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         users_in_room = self.get_success(self.store.get_users_in_room(room_id))
         self.assertEqual([], users_in_room)
 
-    @unittest.DEBUG
     def test_shutdown_room_block_peek(self):
         """Test that a world_readable room can no longer be peeked into after
         it has been shut down.
