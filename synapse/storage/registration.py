@@ -17,6 +17,7 @@
 
 import re
 
+from six import iterkeys
 from six.moves import range
 
 from twisted.internet import defer
@@ -990,16 +991,20 @@ class RegistrationStore(
         client_secret,
         address=None,
         sid=None,
+        validated=None,
     ):
-        """Gets the latest session_id and send_attempt (if available) for a
-        client_secret/medium/address combo
+        """Gets a session_id and last_send_attempt (if available) for a
+        client_secret/medium/(address|session_id) combo
 
         Args:
             medium (str): The medium of the 3PID
             address (str): The address of the 3PID
-            address (str): The ID of the validatino session
+            sid (str): The ID of the validation session
             client_secret (str): A unique string provided by the client to
                 help identify this validation attempt
+            validated (bool|None): Whether sessions should be filtered by
+                whether they have been validated already or not. None to
+                perform no filtering
 
         Returns:
             deferred {str, int}|None: A dict containing the
@@ -1018,18 +1023,36 @@ class RegistrationStore(
         else:
             raise StoreError(500, "Either address or sid must be provided")
 
-        return self._simple_select_one(
-            table="threepid_validation_session",
-            keyvalues=keyvalues,
-            retcols=[
-                "address",
-                "medium",
-                "session_id",
-                "last_send_attempt",
-                "validated_at",
-            ],
-            allow_none=True,
-            desc="get_threepid_validation_session",
+        def get_threepid_validation_session_txn(txn):
+            cols_to_return = [
+                "session_id", "medium", "address",
+                "client_secret", "last_send_attempt", "validated_at",
+            ]
+
+            sql = "SELECT %s FROM threepid_validation_session" % ", ".join(cols_to_return)
+            sql += " WHERE %s" % " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
+
+            if validated is not None:
+                sql += " AND validated_at IS " + ("NOT NULL" if validated else "NULL")
+
+            sql += " LIMIT 1"
+
+            txn.execute(sql, list(keyvalues.values()))
+            row = txn.fetchone()
+
+            if not row:
+                return None
+
+            # Convert the resulting row to a dictionary
+            ret = {}
+            for i in range(len(cols_to_return)):
+                ret[cols_to_return[i]] = row[i]
+
+            return ret
+
+        return self.runInteraction(
+            "get_threepid_validation_session",
+            get_threepid_validation_session_txn,
         )
 
     @defer.inlineCallbacks
