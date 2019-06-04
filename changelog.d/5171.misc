@@ -1,1 +1,0 @@
-Update tests to consistently be configured via the same code that is used when loading from configuration files.

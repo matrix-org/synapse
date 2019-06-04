@@ -1,1 +1,0 @@
-Expose DataStore._get_events as get_events_as_list.
