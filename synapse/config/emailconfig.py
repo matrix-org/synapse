@@ -51,10 +51,11 @@ class EmailConfig(Config):
             self.email_app_name = "Matrix"
 
         self.email_notif_from = email_config.get("notif_from", None)
-        # make sure it's valid
-        parsed = email.utils.parseaddr(self.email_notif_from)
-        if self.email_notif_from and parsed[1] == '':
-            raise RuntimeError("Invalid notif_from address")
+        if self.email_notif_from is not None:
+            # make sure it's valid
+            parsed = email.utils.parseaddr(self.email_notif_from)
+            if parsed[1] == '':
+                raise RuntimeError("Invalid notif_from address")
 
         template_dir = email_config.get("template_dir")
         # we need an absolute path, because we change directory after starting (and
