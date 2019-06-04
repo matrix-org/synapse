@@ -644,7 +644,6 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                         for server_name, server_keys in keys_to_fetch.items()
                     }
                 },
-                long_retries=True,
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
             raise_from(KeyLookupError("Failed to connect to remote server"), e)
