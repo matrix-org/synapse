@@ -984,7 +984,6 @@ class RegistrationStore(
 
         defer.returnValue(1)
 
-    @defer.inlineCallbacks
     def get_threepid_validation_session(
         self,
         medium,
@@ -1019,7 +1018,7 @@ class RegistrationStore(
         else:
             raise StoreError(500, "Either address or sid must be provided")
 
-        row = yield self._simple_select_one(
+        return self._simple_select_one(
             table="threepid_validation_session",
             keyvalues=keyvalues,
             retcols=[
@@ -1032,8 +1031,6 @@ class RegistrationStore(
             allow_none=True,
             desc="get_threepid_validation_session",
         )
-
-        defer.returnValue(row)
 
     @defer.inlineCallbacks
     def validate_threepid_session(
@@ -1054,10 +1051,8 @@ class RegistrationStore(
                 checking token expiry status
 
         Returns:
-            deferred (bool, str|None): A tuple where the first value represents
-                whether the provided sid/client_secret/token combo was correct,
-                and the second being the link to redirect the user to if there
-                is one
+            deferred str|None: A str representing a link to redirect the user
+            to if there is one.
         """
         row = yield self._simple_select_one(
             table="threepid_validation_session",
@@ -1109,10 +1104,9 @@ class RegistrationStore(
             desc="validate_threepid_session_update",
         )
 
-        # Check if we got a match
+        # Return next_link if it exists
         defer.returnValue(next_link)
 
-    @defer.inlineCallbacks
     def upsert_threepid_validation_session(
         self,
         medium,
@@ -1142,7 +1136,7 @@ class RegistrationStore(
         if validated_at:
             insertion_values["validated_at"] = validated_at
 
-        yield self._simple_upsert(
+        return self._simple_upsert(
             table="threepid_validation_session",
             keyvalues={"session_id": session_id},
             values={"last_send_attempt": send_attempt},
@@ -1150,7 +1144,6 @@ class RegistrationStore(
             desc="upsert_threepid_validation_session",
         )
 
-    @defer.inlineCallbacks
     def insert_threepid_validation_token(
         self,
         session_id,
@@ -1167,7 +1160,7 @@ class RegistrationStore(
             expires (int): The timestamp for which after this token will no
                 longer be valid
         """
-        yield self._simple_insert(
+        return self._simple_insert(
             table="threepid_validation_token",
             values={
                 "session_id": session_id,
@@ -1178,21 +1171,22 @@ class RegistrationStore(
             desc="insert_threepid_validation_token",
         )
 
-    @defer.inlineCallbacks
     def cull_expired_threepid_validation_tokens(self):
         """Remove threepid validation tokens with expiry dates that have passed"""
         def cull_expired_threepid_validation_tokens_txn(txn, ts):
-            sql = ("DELETE FROM threepid_validation_token WHERE "
-                   "expires < ?")
+            sql = """
+            DELETE FROM threepid_validation_token WHERE
+            expires < ?
+            """
+
             return txn.execute(sql, (ts,))
 
-        yield self.runInteraction(
+        return self.runInteraction(
             "cull_expired_threepid_validation_tokens",
             cull_expired_threepid_validation_tokens_txn,
             self.clock.time_msec(),
         )
 
-    @defer.inlineCallbacks
     def delete_threepid_session(self, session_id):
         """Removes a threepid validation session from the database. This can
         be done after validation has been performed and whatever action was
@@ -1201,13 +1195,12 @@ class RegistrationStore(
         Args:
             session_id (str): The ID of the session to delete
         """
-        yield self._simple_delete(
+        return self._simple_delete(
             table="threepid_validation_session",
             keyvalues={"session_id": session_id},
             desc="delete_threepid_session",
         )
 
-    @defer.inlineCallbacks
     def delete_threepid_tokens(self, session_id):
         """Removes threepid validation tokens from the database which match a
         given session ID.
@@ -1216,7 +1209,7 @@ class RegistrationStore(
             session_id (str): The ID of the session to delete
         """
         # Delete tokens associated with this session id
-        yield self._simple_delete_one(
+        return self._simple_delete_one(
             table="threepid_validation_token",
             keyvalues={"session_id": session_id},
             desc="delete_threepid_session_tokens",

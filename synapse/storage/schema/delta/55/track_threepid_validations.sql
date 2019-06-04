@@ -28,7 +28,4 @@ CREATE TABLE IF NOT EXISTS threepid_validation_token (
     expires BIGINT NOT NULL
 );
 
-CREATE INDEX threepid_validations_session_id ON threepid_validation_session(session_id);
-
 CREATE INDEX threepid_validation_token_session_id ON threepid_validation_token(session_id);
-CREATE INDEX threepid_validation_expires ON threepid_validation_token(expires);
