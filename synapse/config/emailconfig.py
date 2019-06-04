@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2015-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,12 +31,49 @@ logger = logging.getLogger(__name__)
 
 class EmailConfig(Config):
     def read_config(self, config):
+        # TODO: We should separate better the email configuration from the notification
+        # and account validity config.
+
         self.email_enable_notifs = False
 
         email_config = config.get("email", {})
-        self.email_enable_notifs = email_config.get("enable_notifs", False)
 
-        if self.email_enable_notifs:
+        self.email_smtp_host = email_config.get("smtp_host", None)
+        self.email_smtp_port = email_config.get("smtp_port", None)
+        self.email_smtp_user = email_config.get("smtp_user", None)
+        self.email_smtp_pass = email_config.get("smtp_pass", None)
+        self.require_transport_security = email_config.get(
+            "require_transport_security", False
+        )
+        if "app_name" in email_config:
+            self.email_app_name = email_config["app_name"]
+        else:
+            self.email_app_name = "Matrix"
+
+        self.email_notif_from = email_config.get("notif_from", None)
+        # make sure it's valid
+        parsed = email.utils.parseaddr(self.email_notif_from)
+        if self.email_notif_from and parsed[1] == '':
+            raise RuntimeError("Invalid notif_from address")
+
+        template_dir = email_config.get("template_dir")
+        # we need an absolute path, because we change directory after starting (and
+        # we don't yet know what auxilliary templates like mail.css we will need).
+        # (Note that loading as package_resources with jinja.PackageLoader doesn't
+        # work for the same reason.)
+        if not template_dir:
+            template_dir = pkg_resources.resource_filename(
+                'synapse', 'res/templates'
+            )
+
+        self.email_template_dir = os.path.abspath(template_dir)
+
+        self.email_enable_notifs = email_config.get("enable_notifs", False)
+        account_validity_renewal_enabled = config.get(
+            "account_validity", {},
+        ).get("renew_at")
+
+        if self.email_enable_notifs or account_validity_renewal_enabled:
             # make sure we can import the required deps
             import jinja2
             import bleach
@@ -42,6 +81,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
+        if self.email_enable_notifs:
             required = [
                 "smtp_host",
                 "smtp_port",
@@ -66,34 +106,13 @@ class EmailConfig(Config):
                     "email.enable_notifs is True but no public_baseurl is set"
                 )
 
-            self.email_smtp_host = email_config["smtp_host"]
-            self.email_smtp_port = email_config["smtp_port"]
-            self.email_notif_from = email_config["notif_from"]
             self.email_notif_template_html = email_config["notif_template_html"]
             self.email_notif_template_text = email_config["notif_template_text"]
-            self.email_expiry_template_html = email_config.get(
-                "expiry_template_html", "notice_expiry.html",
-            )
-            self.email_expiry_template_text = email_config.get(
-                "expiry_template_text", "notice_expiry.txt",
-            )
-
-            template_dir = email_config.get("template_dir")
-            # we need an absolute path, because we change directory after starting (and
-            # we don't yet know what auxilliary templates like mail.css we will need).
-            # (Note that loading as package_resources with jinja.PackageLoader doesn't
-            # work for the same reason.)
-            if not template_dir:
-                template_dir = pkg_resources.resource_filename(
-                    'synapse', 'res/templates'
-                )
-            template_dir = os.path.abspath(template_dir)
 
             for f in self.email_notif_template_text, self.email_notif_template_html:
-                p = os.path.join(template_dir, f)
+                p = os.path.join(self.email_template_dir, f)
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find email template file %s" % (p, ))
-            self.email_template_dir = template_dir
 
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
@@ -101,28 +120,24 @@ class EmailConfig(Config):
             self.email_riot_base_url = email_config.get(
                 "riot_base_url", None
             )
-            self.email_smtp_user = email_config.get(
-                "smtp_user", None
-            )
-            self.email_smtp_pass = email_config.get(
-                "smtp_pass", None
-            )
-            self.require_transport_security = email_config.get(
-                "require_transport_security", False
-            )
-            if "app_name" in email_config:
-                self.email_app_name = email_config["app_name"]
-            else:
-                self.email_app_name = "Matrix"
-
-            # make sure it's valid
-            parsed = email.utils.parseaddr(self.email_notif_from)
-            if parsed[1] == '':
-                raise RuntimeError("Invalid notif_from address")
         else:
             self.email_enable_notifs = False
             # Not much point setting defaults for the rest: it would be an
             # error for them to be used.
+
+        if account_validity_renewal_enabled:
+            self.email_expiry_template_html = email_config.get(
+                "expiry_template_html", "notice_expiry.html",
+            )
+            self.email_expiry_template_text = email_config.get(
+                "expiry_template_text", "notice_expiry.txt",
+            )
+
+            for f in self.email_expiry_template_text, self.email_expiry_template_html:
+                p = os.path.join(self.email_template_dir, f)
+                if not os.path.isfile(p):
+                    raise ConfigError("Unable to find email template file %s" % (p, ))
+
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
