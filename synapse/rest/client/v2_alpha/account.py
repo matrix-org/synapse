@@ -159,7 +159,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             )
 
         token_expires = (self.hs.clock.time_msec() +
-                         self.config.validation_token_lifetime * 1000)
+                         self.config.email_validation_token_lifetime * 1000)
 
         yield self.datastore.insert_threepid_validation_token(
             session_id, token, kwargs.get("next_link"), token_expires,

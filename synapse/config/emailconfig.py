@@ -78,7 +78,7 @@ class EmailConfig(Config):
             "enable_password_reset_from_is", False,
         )
 
-        self.validation_token_lifetime = email_config.get(
+        self.email_validation_token_lifetime = email_config.get(
             "validation_token_lifetime", 15 * 60,
         )
 
