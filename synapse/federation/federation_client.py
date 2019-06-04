@@ -279,6 +279,7 @@ class FederationClient(FederationBase):
                     "Failed to get PDU %s from %s because %s",
                     event_id, destination, e,
                 )
+                continue
             except NotRetryingDestination as e:
                 logger.info(str(e))
                 continue
