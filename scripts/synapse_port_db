@@ -467,8 +467,23 @@ class Porter(object):
             self.progress.set_state("Preparing SQLite3")
             self.setup_db(sqlite_config, sqlite_engine)
 
+            # Check if all background updates are done, abort if not
+            updates_complete = yield self.sqlite_store.has_completed_background_updates()
+            if not updates_complete:
+                sys.exit(
+                    "Pending background updates exist in the SQLite database."
+                    " Please start Synapse again and wait until every update has finished"
+                    " before running this script."
+                )
+
             self.progress.set_state("Preparing PostgreSQL")
             self.setup_db(postgres_config, postgres_engine)
+
+            # Manually apply all background updates on the db
+            postgres_ready = yield self.postgres_store.has_completed_background_updates()
+            while not postgres_ready:
+                yield self.store.do_next_background_update(100)
+                postgres_ready = yield self.postgres_store.has_completed_background_updates()
 
             self.progress.set_state("Creating port tables")
 
