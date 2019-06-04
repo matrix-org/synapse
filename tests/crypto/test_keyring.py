@@ -25,11 +25,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.crypto import keyring
-from synapse.crypto.keyring import (
-    KeyLookupError,
-    PerspectivesKeyFetcher,
-    ServerKeyFetcher,
-)
+from synapse.crypto.keyring import PerspectivesKeyFetcher, ServerKeyFetcher
 from synapse.storage.keys import FetchKeyResult
 from synapse.util import logcontext
 from synapse.util.logcontext import LoggingContext
@@ -364,9 +360,11 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
             bytes(res["key_json"]), canonicaljson.encode_canonical_json(response)
         )
 
-        # change the server name: it should cause a rejection
+        # change the server name: the result should be ignored
         response["server_name"] = "OTHER_SERVER"
-        self.get_failure(fetcher.get_keys(keys_to_fetch), KeyLookupError)
+
+        keys = self.get_success(fetcher.get_keys(keys_to_fetch))
+        self.assertEqual(keys, {})
 
 
 class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
