@@ -138,7 +138,6 @@ class EmailConfig(Config):
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find email template file %s" % (p, ))
 
-
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable sending emails for notification events or expiry notices
