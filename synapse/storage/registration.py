@@ -22,7 +22,7 @@ from six.moves import range
 from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, StoreError
+from synapse.api.errors import Codes, StoreError, ThreepidValidationError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.types import UserID
@@ -422,7 +422,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def get_user_id_by_threepid(self, medium, address):
+    def get_user_id_by_threepid(self, medium, address, require_verified=False):
         """Returns user id from threepid
 
         Args:
@@ -985,13 +985,20 @@ class RegistrationStore(
         defer.returnValue(1)
 
     @defer.inlineCallbacks
-    def get_threepid_validation_session(self, medium, address, client_secret):
+    def get_threepid_validation_session(
+        self,
+        medium,
+        client_secret,
+        address=None,
+        sid=None,
+    ):
         """Gets the latest session_id and send_attempt (if available) for a
         client_secret/medium/address combo
 
         Args:
             medium (str): The medium of the 3PID
             address (str): The address of the 3PID
+            address (str): The ID of the validatino session
             client_secret (str): A unique string provided by the client to
                 help identify this validation attempt
 
@@ -1000,14 +1007,28 @@ class RegistrationStore(
                 latest session_id and send_attempt count for this 3PID.
                 Otherwise None if there hasn't been a previous attempt
         """
+        keyvalues = {
+            "medium": medium,
+            "client_secret": client_secret,
+        }
+
+        if sid:
+            keyvalues["session_id"] = sid
+        elif address:
+            keyvalues["address"] = address
+        else:
+            raise StoreError(500, "Either address or sid must be provided")
+
         row = yield self._simple_select_one(
             table="threepid_validation_session",
-            keyvalues={
-                "medium": medium,
-                "address": address,
-                "client_secret": client_secret,
-            },
-            retcols=["session_id", "last_send_attempt"],
+            keyvalues=keyvalues,
+            retcols=[
+                "address",
+                "medium",
+                "session_id",
+                "last_send_attempt",
+                "validated_at",
+            ],
             allow_none=True,
             desc="get_threepid_validation_session",
         )
@@ -1015,14 +1036,14 @@ class RegistrationStore(
         defer.returnValue(row)
 
     @defer.inlineCallbacks
-    def validate_threepid_validation_token(
+    def validate_threepid_session(
         self,
         session_id,
         client_secret,
         token,
         current_ts,
     ):
-        """Validate a validation token, session_id and client_secret
+        """Attempt to validate a threepid session using a token
 
         Args:
             session_id (str): The id of a validation session
@@ -1038,37 +1059,58 @@ class RegistrationStore(
                 and the second being the link to redirect the user to if there
                 is one
         """
-        # Check that everything matches in the DB
-        def validate_threepid_validation_token_txn(
-            txn,
-            token,
-            client_secret,
-            ts,
-        ):
-            sql = ("SELECT token, next_link FROM threepid_validation_token "
-                   "WHERE token = ? AND session_id = (SELECT session_id FROM "
-                   "threepid_validation_session WHERE client_secret = ?) AND "
-                   "expires > ? LIMIT 1")
-            txn.execute(sql, (token, client_secret, ts))
+        row = yield self._simple_select_one(
+            table="threepid_validation_session",
+            keyvalues={"session_id": session_id},
+            retcols=["client_secret", "validated_at"],
+            desc="validate_threepid_session_select_session",
+            allow_none=True,
+        )
 
-            row = txn.fetchone()
+        if not row:
+            raise ThreepidValidationError(400, "Unknown session_id")
+        retrieved_client_secret = row["client_secret"]
+        validated_at = row["validated_at"]
 
-            # Return None if we didn't get a match
-            if not row:
-                return None, None
+        if validated_at:
+            raise ThreepidValidationError(
+                400, "This session has already been validated",
+            )
+        if retrieved_client_secret != client_secret:
+            raise ThreepidValidationError(
+                400, "This client_secret does not match the provided session_id",
+            )
 
-            return row[0], row[1]
+        row = yield self._simple_select_one(
+            table="threepid_validation_token",
+            keyvalues={"session_id": session_id, "token": token},
+            retcols=["expires", "next_link"],
+            desc="validate_threepid_session_select_token",
+            allow_none=True,
+        )
 
-        a_token, next_link = yield self.runInteraction(
-            "validate_threepid_validation_token",
-            validate_threepid_validation_token_txn,
-            token,
-            client_secret,
-            current_ts,
+        if not row:
+            raise ThreepidValidationError(
+                400, "Validation token not found or has expired",
+            )
+        expires = row["expires"]
+        next_link = row["next_link"]
+
+        if expires <= current_ts:
+            raise ThreepidValidationError(
+                400, "This token has expired. Please request a new one",
+            )
+
+        # Looks good. Validate the session
+        yield self._simple_update(
+            table="threepid_validation_session",
+            keyvalues={"session_id": session_id},
+            updatevalues={"validated_at": self.clock.time_msec()},
+            desc="validate_threepid_session_update",
         )
 
         # Check if we got a match
-        defer.returnValue((a_token is not None, next_link))
+        defer.returnValue(next_link)
 
     @defer.inlineCallbacks
     def upsert_threepid_validation_session(
@@ -1078,6 +1120,7 @@ class RegistrationStore(
         client_secret,
         send_attempt,
         session_id,
+        validated_at=None,
     ):
         """Upsert a threepid validation session
 
@@ -1087,16 +1130,23 @@ class RegistrationStore(
             client_secret (str): A unique string provided by the client to
                 help identify this validation attempt
             session_id (str): The id of this validation session
+            validated_at (int): The unix timestamp in milliseconds of when
+                the session was marked as valid
         """
+        insertion_values = {
+            "medium": medium,
+            "address": address,
+            "client_secret": client_secret,
+        }
+
+        if validated_at:
+            insertion_values["validated_at"] = validated_at
+
         yield self._simple_upsert(
             table="threepid_validation_session",
             keyvalues={"session_id": session_id},
             values={"last_send_attempt": send_attempt},
-            insertion_values={
-                "medium": medium,
-                "address": address,
-                "client_secret": client_secret,
-            },
+            insertion_values=insertion_values,
             desc="upsert_threepid_validation_session",
         )
 
@@ -1143,21 +1193,6 @@ class RegistrationStore(
         )
 
     @defer.inlineCallbacks
-    def validate_threepid_session(self, session_id):
-        """Mark a threepid validation session as validated. Called after a
-        user has successfully validated their 3PID through some mechanism
-
-        Args:
-            session_id (str): The ID of the session to mark as valid
-        """
-        yield self._simple_update(
-            table="threepid_validation_session",
-            keyvalues={"session_id": session_id},
-            updatevalues={"validated": 1},
-            desc="mark_threepid_session_as_valid",
-        )
-
-    @defer.inlineCallbacks
     def delete_threepid_session(self, session_id):
         """Removes a threepid validation session from the database. This can
         be done after validation has been performed and whatever action was
@@ -1170,4 +1205,19 @@ class RegistrationStore(
             table="threepid_validation_session",
             keyvalues={"session_id": session_id},
             desc="delete_threepid_session",
+        )
+
+    @defer.inlineCallbacks
+    def delete_threepid_tokens(self, session_id):
+        """Removes threepid validation tokens from the database which match a
+        given session ID.
+
+        Args:
+            session_id (str): The ID of the session to delete
+        """
+        # Delete tokens associated with this session id
+        yield self._simple_delete_one(
+            table="threepid_validation_token",
+            keyvalues={"session_id": session_id},
+            desc="delete_threepid_session_tokens",
         )
