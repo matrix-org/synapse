@@ -339,6 +339,15 @@ class UnsupportedRoomVersionError(SynapseError):
         )
 
 
+class ThreepidValidationError(SynapseError):
+    """An error raised when there was a problem authorising an event."""
+
+    def __init__(self, *args, **kwargs):
+        if "errcode" not in kwargs:
+            kwargs["errcode"] = Codes.FORBIDDEN
+        super(ThreepidValidationError, self).__init__(*args, **kwargs)
+
+
 class IncompatibleRoomVersionError(SynapseError):
     """A server is trying to join a room whose version it does not support.
 
