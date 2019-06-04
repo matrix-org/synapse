@@ -134,7 +134,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 context_11.request = "11"
 
                 res_deferreds = kr.verify_json_objects_for_server(
-                    [("server10", json1, 0), ("server11", {}, 0)]
+                    [("server10", json1, 0, "test10"), ("server11", {}, 0, "test11")]
                 )
 
                 # the unsigned json should be rejected pretty quickly
@@ -171,7 +171,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 self.http_client.post_json.return_value = defer.Deferred()
 
                 res_deferreds_2 = kr.verify_json_objects_for_server(
-                    [("server10", json1, 0)]
+                    [("server10", json1, 0, "test")]
                 )
                 res_deferreds_2[0].addBoth(self.check_context, None)
                 yield logcontext.make_deferred_yieldable(res_deferreds_2[0])
@@ -205,11 +205,11 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, "server9", key1)
 
         # should fail immediately on an unsigned object
-        d = _verify_json_for_server(kr, "server9", {}, 0)
+        d = _verify_json_for_server(kr, "server9", {}, 0, "test unsigned")
         self.failureResultOf(d, SynapseError)
 
         # should suceed on a signed object
-        d = _verify_json_for_server(kr, "server9", json1, 500)
+        d = _verify_json_for_server(kr, "server9", json1, 500, "test signed")
         # self.assertFalse(d.called)
         self.get_success(d)
 
@@ -239,7 +239,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # the first request should succeed; the second should fail because the key
         # has expired
         results = kr.verify_json_objects_for_server(
-            [("server1", json1, 500), ("server1", json1, 1500)]
+            [("server1", json1, 500, "test1"), ("server1", json1, 1500, "test2")]
         )
         self.assertEqual(len(results), 2)
         self.get_success(results[0])
@@ -284,7 +284,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, "server1", key1)
 
         results = kr.verify_json_objects_for_server(
-            [("server1", json1, 1200), ("server1", json1, 1500)]
+            [("server1", json1, 1200, "test1"), ("server1", json1, 1500, "test2")]
         )
         self.assertEqual(len(results), 2)
         self.get_success(results[0])
@@ -522,16 +522,14 @@ def run_in_context(f, *args, **kwargs):
     defer.returnValue(rv)
 
 
-def _verify_json_for_server(keyring, server_name, json_object, validity_time):
+def _verify_json_for_server(kr, *args):
     """thin wrapper around verify_json_for_server which makes sure it is wrapped
     with the patched defer.inlineCallbacks.
     """
 
     @defer.inlineCallbacks
     def v():
-        rv1 = yield keyring.verify_json_for_server(
-            server_name, json_object, validity_time
-        )
+        rv1 = yield kr.verify_json_for_server(*args)
         defer.returnValue(rv1)
 
     return run_in_context(v)
