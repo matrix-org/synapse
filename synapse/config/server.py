@@ -604,7 +604,7 @@ class ServerConfig(Config):
         #limit_usage_by_mau: False
         #max_mau_value: 50
         #mau_trial_days: 2
-        #
+
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau
         # is true, this is implied to be true.
