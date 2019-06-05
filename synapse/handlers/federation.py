@@ -35,6 +35,7 @@ from synapse.api.errors import (
     CodeMessageException,
     FederationDeniedError,
     FederationError,
+    RequestSendFailed,
     StoreError,
     SynapseError,
 )
@@ -2027,9 +2028,21 @@ class FederationHandler(BaseHandler):
         """
         room_version = yield self.store.get_room_version(event.room_id)
 
-        yield self._update_auth_events_and_context_for_auth(
-            origin, event, context, auth_events
-        )
+        try:
+            yield self._update_auth_events_and_context_for_auth(
+                origin, event, context, auth_events
+            )
+        except Exception:
+            # We don't really mind if the above fails, so lets not fail
+            # processing if it does. However, it really shouldn't fail so
+            # let's still log as an exception since we'll still want to fix
+            # any bugs.
+            logger.exception(
+                "Failed to double check auth events for %s with remote. "
+                "Ignoring failure and continuing processing of event.",
+                event.event_id,
+            )
+
         try:
             self.auth.check(room_version, event, auth_events=auth_events)
         except AuthError as e:
@@ -2041,6 +2054,15 @@ class FederationHandler(BaseHandler):
         self, origin, event, context, auth_events
     ):
         """Helper for do_auth. See there for docs.
+
+        Checks whether a given event has the expected auth events. If it
+        doesn't then we talk to the remote server to compare state to see if
+        we can come to a consensus (e.g. if one server missed some valid
+        state).
+
+        This attempts to resovle any potential divergence of state between
+        servers, but is not essential and so failures should not block further
+        processing of the event.
 
         Args:
             origin (str):
@@ -2088,9 +2110,15 @@ class FederationHandler(BaseHandler):
                 missing_auth,
             )
             try:
-                remote_auth_chain = yield self.federation_client.get_event_auth(
-                    origin, event.room_id, event.event_id
-                )
+                try:
+                    remote_auth_chain = yield self.federation_client.get_event_auth(
+                        origin, event.room_id, event.event_id
+                    )
+                except RequestSendFailed as e:
+                    # The other side isn't around or doesn't implement the
+                    # endpoint, so lets just bail out.
+                    logger.info("Failed to get event auth from remote: %s", e)
+                    return
 
                 seen_remotes = yield self.store.have_seen_events(
                     [e.event_id for e in remote_auth_chain]
@@ -2236,12 +2264,18 @@ class FederationHandler(BaseHandler):
 
         try:
             # 2. Get remote difference.
-            result = yield self.federation_client.query_auth(
-                origin,
-                event.room_id,
-                event.event_id,
-                local_auth_chain,
-            )
+            try:
+                result = yield self.federation_client.query_auth(
+                    origin,
+                    event.room_id,
+                    event.event_id,
+                    local_auth_chain,
+                )
+            except RequestSendFailed as e:
+                # The other side isn't around or doesn't implement the
+                # endpoint, so lets just bail out.
+                logger.info("Failed to query auth from remote: %s", e)
+                return
 
             seen_remotes = yield self.store.have_seen_events(
                 [e.event_id for e in result["auth_chain"]]
