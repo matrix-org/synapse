@@ -1023,8 +1023,10 @@ class RegistrationStore(
         ]
 
         def get_threepid_validation_session_txn(txn):
-            sql = "SELECT %s FROM threepid_validation_session" % ", ".join(cols_to_return)
-            sql += " WHERE %s" % " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
+            sql = "SELECT %s FROM threepid_validation_session WHERE %s" % (
+                ", ".join(cols_to_return),
+                " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
+            )
 
             if validated is not None:
                 sql += " AND validated_at IS " + ("NOT NULL" if validated else "NULL")
