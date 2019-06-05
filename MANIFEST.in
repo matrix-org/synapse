@@ -11,6 +11,10 @@ include demo/*.sh
 recursive-include synapse/storage/schema *.sql
 recursive-include synapse/storage/schema *.py
 
+recursive-include res *.html
+recursive-include res *.txt
+recursive-include res *.eml
+
 recursive-include docs *
 recursive-include scripts *
 recursive-include scripts-dev *
