@@ -145,7 +145,7 @@ You can do this with a `.well-known` file as follows:
  1. Keep the SRV record in place - it is needed for backwards compatibility
     with Synapse 0.34 and earlier.
 
- 2. Give synapse a certificate corresponding to the target domain
+  2. Give Synapse a certificate corresponding to the target domain
     (`customer.example.net` in the above example). You can either use Synapse's 
     built-in [ACME support](./ACME.md) for this (via the `domain` parameter in 
     the `acme` section), or acquire a certificate yourself and give it to 
