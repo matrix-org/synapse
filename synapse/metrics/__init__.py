@@ -25,7 +25,7 @@ import six
 
 import attr
 from prometheus_client import Counter, Gauge, Histogram
-from prometheus_client.core import REGISTRY, GaugeMetricFamily
+from prometheus_client.core import REGISTRY, GaugeMetricFamily, HistogramMetricFamily
 
 from twisted.internet import reactor
 
@@ -185,6 +185,35 @@ class InFlightGauge(object):
             yield gauge
 
     def _register_with_collector(self):
+        if self.name in all_gauges.keys():
+            logger.warning("%s already registered, reregistering" % (self.name,))
+            REGISTRY.unregister(all_gauges.pop(self.name))
+
+        REGISTRY.register(self)
+        all_gauges[self.name] = self
+
+
+@attr.s(hash=True)
+class BucketCollector(object):
+
+    name = attr.ib()
+    data_collector = attr.ib()
+
+    def collect(self):
+
+        # Fetch the data -- this must be synchronous!
+        data = self.data_collector()
+
+        res = []
+        for i in sorted(data.keys()):
+            res.append([i, data[i]])
+
+        res.append(["+Inf", 0])
+
+        metric = HistogramMetricFamily(self.name, "", buckets=res, sum_value=sum(data.values()))
+        yield metric
+
+    def __attrs_post_init__(self):
         if self.name in all_gauges.keys():
             logger.warning("%s already registered, reregistering" % (self.name,))
             REGISTRY.unregister(all_gauges.pop(self.name))

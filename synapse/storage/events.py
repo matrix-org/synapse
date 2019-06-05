@@ -17,7 +17,7 @@
 
 import itertools
 import logging
-from collections import OrderedDict, deque, namedtuple
+from collections import OrderedDict, deque, namedtuple, defaultdict
 from functools import wraps
 
 from six import iteritems, text_type
@@ -33,6 +33,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.metrics import BucketCollector
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateResolutionStore
 from synapse.storage.background_updates import BackgroundUpdateStore
@@ -226,6 +227,35 @@ class EventsStore(
 
         self._event_persist_queue = _EventPeristenceQueue()
         self._state_resolution_handler = hs.get_state_resolution_handler()
+
+        # Collect metrics on the number of forward extremities that exist.
+        self._current_forward_extremities_amount = {}
+
+        BucketCollector(
+            "synapse_forward_extremities",
+            lambda: self._current_forward_extremities_amount
+        )
+
+        # Read the extrems every 60 sec
+        hs.get_clock().looping_call(self._read_forward_extremities, 60000)
+
+    @defer.inlineCallbacks
+    def _read_forward_extremities(self):
+
+        def fetch(txn):
+            txn.execute(
+                "select room_id, count(*) c from event_forward_extremities group by room_id"
+            )
+            return txn.fetchall()
+
+        res = self.runInteraction("read_forward_extremities", fetch)
+
+        d = defaultdict(default=0)
+
+        for i in res:
+            d[res[1]] += 1
+
+        self._current_forward_extremities_amount = d
 
     @defer.inlineCallbacks
     def persist_events(self, events_and_contexts, backfilled=False):
