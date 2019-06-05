@@ -587,15 +587,14 @@ class SyncHandler(object):
         # for the "name" value and default to an empty string.
         if name_id:
             name = yield self.store.get_event(name_id, allow_none=True)
-            if name and name.content and name.content.get("name", ""):
+            if name and name.content.get("name", ""):
                 defer.returnValue(summary)
 
         if canonical_alias_id:
             canonical_alias = yield self.store.get_event(
                 canonical_alias_id, allow_none=True,
             )
-            if (canonical_alias and canonical_alias.content
-                    and canonical_alias.content.get("alias", "")):
+            if canonical_alias and canonical_alias.content.get("alias", ""):
                 defer.returnValue(summary)
 
         joined_user_ids = [
