@@ -232,7 +232,8 @@ class FederationClient(FederationBase):
                 moving to the next destination. None indicates no timeout.
 
         Returns:
-            Deferred: Results in the requested PDU.
+            Deferred: Results in the requested PDU, or None if we were unable to find
+               it.
         """
 
         # TODO: Rate limit the number of times we try and get the same event.
@@ -257,7 +258,12 @@ class FederationClient(FederationBase):
                     destination, event_id, timeout=timeout,
                 )
 
-                logger.debug("transaction_data %r", transaction_data)
+                logger.debug(
+                    "retrieved event id %s from %s: %r",
+                    event_id,
+                    destination,
+                    transaction_data,
+                )
 
                 pdu_list = [
                     event_from_pdu_json(p, format_ver, outlier=outlier)
@@ -331,7 +337,11 @@ class FederationClient(FederationBase):
             )
 
             if failed_to_fetch:
-                logger.warn("Failed to get %r", failed_to_fetch)
+                logger.warning(
+                    "Failed to fetch missing state/auth events for %s: %s",
+                    room_id,
+                    failed_to_fetch
+                )
 
             event_map = {
                 ev.event_id: ev for ev in fetched_events
