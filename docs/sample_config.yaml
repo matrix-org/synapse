@@ -271,7 +271,7 @@ listeners:
 # 'max_mau_value' is the hard limit of monthly active users above which
 # the server will start blocking user actions.
 #
-# 'mau_trial_days' is a means to add a grace period for active users. It
+# 'mau_trial_days' is a means for adding a grace period for active users. It
 # means that users must be active for this number of days before they
 # can be considered active and guards against the case where lots of users
 # sign up in a short space of time never to return after their initial
