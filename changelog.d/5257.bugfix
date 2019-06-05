@@ -1,0 +1,1 @@
+Fix error code when there is an invalid parameter on /_matrix/client/r0/publicRooms

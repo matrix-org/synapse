@@ -33,6 +33,7 @@ from synapse.api.errors import (
     IncompatibleRoomVersionError,
     NotFoundError,
     SynapseError,
+    UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.crypto.event_signing import compute_event_signature
@@ -198,9 +199,20 @@ class FederationServer(FederationBase):
 
             try:
                 room_version = yield self.store.get_room_version(room_id)
-                format_ver = room_version_to_event_format(room_version)
             except NotFoundError:
                 logger.info("Ignoring PDU for unknown room_id: %s", room_id)
+                continue
+
+            try:
+                format_ver = room_version_to_event_format(room_version)
+            except UnsupportedRoomVersionError:
+                # this can happen if support for a given room version is withdrawn,
+                # so that we still get events for said room.
+                logger.info(
+                    "Ignoring PDU for room %s with unknown version %s",
+                    room_id,
+                    room_version,
+                )
                 continue
 
             event = event_from_pdu_json(p, format_ver)

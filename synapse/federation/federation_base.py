@@ -265,11 +265,22 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
     ]
 
     more_deferreds = keyring.verify_json_objects_for_server([
-        (p.sender_domain, p.redacted_pdu_json)
+        (p.sender_domain, p.redacted_pdu_json, 0)
         for p in pdus_to_check_sender
     ])
 
+    def sender_err(e, pdu_to_check):
+        errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
+            pdu_to_check.pdu.event_id,
+            pdu_to_check.sender_domain,
+            e.getErrorMessage(),
+        )
+        # XX not really sure if these are the right codes, but they are what
+        # we've done for ages
+        raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+
     for p, d in zip(pdus_to_check_sender, more_deferreds):
+        d.addErrback(sender_err, p)
         p.deferreds.append(d)
 
     # now let's look for events where the sender's domain is different to the
@@ -287,11 +298,22 @@ def _check_sigs_on_pdus(keyring, room_version, pdus):
         ]
 
         more_deferreds = keyring.verify_json_objects_for_server([
-            (get_domain_from_id(p.pdu.event_id), p.redacted_pdu_json)
+            (get_domain_from_id(p.pdu.event_id), p.redacted_pdu_json, 0)
             for p in pdus_to_check_event_id
         ])
 
+        def event_err(e, pdu_to_check):
+            errmsg = (
+                "event id %s: unable to verify signature for event id domain: %s" % (
+                    pdu_to_check.pdu.event_id,
+                    e.getErrorMessage(),
+                )
+            )
+            # XX as above: not really sure if these are the right codes
+            raise SynapseError(400, errmsg, Codes.UNAUTHORIZED)
+
         for p, d in zip(pdus_to_check_event_id, more_deferreds):
+            d.addErrback(event_err, p)
             p.deferreds.append(d)
 
     # replace lists of deferreds with single Deferreds

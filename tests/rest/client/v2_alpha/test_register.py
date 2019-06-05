@@ -1,13 +1,31 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017-2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import datetime
 import json
 import os
 
 import pkg_resources
 
+import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v1 import admin, login
+from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import account_validity, register, sync
 
 from tests import unittest
@@ -40,11 +58,10 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         as_token = "i_am_an_app_service"
 
         appservice = ApplicationService(
-            as_token, self.hs.config.server_name,
+            as_token,
+            self.hs.config.server_name,
             id="1234",
-            namespaces={
-                "users": [{"regex": r"@as_user.*", "exclusive": True}],
-            },
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
         )
 
         self.hs.get_datastore().services_cache.append(appservice)
@@ -56,10 +73,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
-        det_data = {
-            "user_id": user_id,
-            "home_server": self.hs.hostname,
-        }
+        det_data = {"user_id": user_id, "home_server": self.hs.hostname}
         self.assertDictContainsSubset(det_data, channel.json_body)
 
     def test_POST_appservice_registration_invalid(self):
@@ -127,10 +141,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
 
-        det_data = {
-            "home_server": self.hs.hostname,
-            "device_id": "guest_device",
-        }
+        det_data = {"home_server": self.hs.hostname, "device_id": "guest_device"}
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
 
@@ -158,7 +169,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.reactor.advance(retry_after_ms / 1000.)
+        self.reactor.advance(retry_after_ms / 1000.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
@@ -186,7 +197,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             else:
                 self.assertEquals(channel.result["code"], b"200", channel.result)
 
-        self.reactor.advance(retry_after_ms / 1000.)
+        self.reactor.advance(retry_after_ms / 1000.0)
 
         request, channel = self.make_request(b"POST", self.url + b"?kind=guest", b"{}")
         self.render(request)
@@ -198,7 +209,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         register.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
@@ -207,9 +218,11 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
         # Test for account expiring after a week.
-        config.enable_registration = True
-        config.account_validity.enabled = True
-        config.account_validity.period = 604800000  # Time in ms for 1 week
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+        }
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -220,23 +233,19 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.reactor.advance(datetime.timedelta(weeks=1).total_seconds())
 
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
-            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result,
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
 
     def test_manual_renewal(self):
@@ -252,21 +261,17 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         admin_tok = self.login("admin", "adminpassword")
 
         url = "/_matrix/client/unstable/admin/account_validity/validity"
-        params = {
-            "user_id": user_id,
-        }
+        params = {"user_id": user_id}
         request_data = json.dumps(params)
         request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok,
+            b"POST", url, request_data, access_token=admin_tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -285,20 +290,18 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         }
         request_data = json.dumps(params)
         request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok,
+            b"POST", url, request_data, access_token=admin_tok
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # The specific endpoint doesn't matter, all we need is an authenticated
         # endpoint.
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(
-            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result,
+            channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
 
 
@@ -307,7 +310,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
     skip = "No Jinja installed" if not load_jinja2_templates else None
     servlets = [
         register.register_servlets,
-        admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         sync.register_servlets,
         account_validity.register_servlets,
@@ -315,14 +318,17 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
+
         # Test for account expiring after a week and renewal emails being sent 2
         # days before expiry.
-        config.enable_registration = True
-        config.account_validity.enabled = True
-        config.account_validity.renew_by_email_enabled = True
-        config.account_validity.period = 604800000  # Time in ms for 1 week
-        config.account_validity.renew_at = 172800000  # Time in ms for 2 days
-        config.account_validity.renew_email_subject = "Renew your account"
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+            "renew_at": 172800000,  # Time in ms for 2 days
+            "renew_by_email_enabled": True,
+            "renew_email_subject": "Renew your account",
+        }
 
         # Email config.
         self.email_attempts = []
@@ -331,17 +337,23 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
             self.email_attempts.append((args, kwargs))
             return
 
-        config.email_template_dir = os.path.abspath(
-            pkg_resources.resource_filename('synapse', 'res/templates')
-        )
-        config.email_expiry_template_html = "notice_expiry.html"
-        config.email_expiry_template_text = "notice_expiry.txt"
-        config.email_smtp_host = "127.0.0.1"
-        config.email_smtp_port = 20
-        config.require_transport_security = False
-        config.email_smtp_user = None
-        config.email_smtp_pass = None
-        config.email_notif_from = "test@example.com"
+        config["email"] = {
+            "enable_notifs": True,
+            "template_dir": os.path.abspath(
+                pkg_resources.resource_filename('synapse', 'res/templates')
+            ),
+            "expiry_template_html": "notice_expiry.html",
+            "expiry_template_text": "notice_expiry.txt",
+            "notif_template_html": "notif_mail.html",
+            "notif_template_text": "notif_mail.txt",
+            "smtp_host": "127.0.0.1",
+            "smtp_port": 20,
+            "require_transport_security": False,
+            "smtp_user": None,
+            "smtp_pass": None,
+            "notif_from": "test@example.com",
+        }
+        config["public_baseurl"] = "aaa"
 
         self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
 
@@ -357,10 +369,15 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # We need to manually add an email address otherwise the handler will do
         # nothing.
         now = self.hs.clock.time_msec()
-        self.get_success(self.store.user_add_threepid(
-            user_id=user_id, medium="email", address="kermit@example.com",
-            validated_at=now, added_at=now,
-        ))
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
 
         # Move 6 days forward. This should trigger a renewal email to be sent.
         self.reactor.advance(datetime.timedelta(days=6).total_seconds())
@@ -378,9 +395,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # our access token should be denied from now, otherwise they should
         # succeed.
         self.reactor.advance(datetime.timedelta(days=3).total_seconds())
-        request, channel = self.make_request(
-            b"GET", "/sync", access_token=tok,
-        )
+        request, channel = self.make_request(b"GET", "/sync", access_token=tok)
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
@@ -392,16 +407,65 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # We need to manually add an email address otherwise the handler will do
         # nothing.
         now = self.hs.clock.time_msec()
-        self.get_success(self.store.user_add_threepid(
-            user_id=user_id, medium="email", address="kermit@example.com",
-            validated_at=now, added_at=now,
-        ))
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
 
         request, channel = self.make_request(
-            b"POST", "/_matrix/client/unstable/account_validity/send_mail",
+            b"POST",
+            "/_matrix/client/unstable/account_validity/send_mail",
             access_token=tok,
         )
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.assertEqual(len(self.email_attempts), 1)
+
+
+class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        self.validity_period = 10
+        self.max_delta = self.validity_period * 10. / 100.
+
+        config = self.default_config()
+
+        config["enable_registration"] = True
+        config["account_validity"] = {
+            "enabled": False,
+        }
+
+        self.hs = self.setup_test_homeserver(config=config)
+        self.hs.config.account_validity.period = self.validity_period
+
+        self.store = self.hs.get_datastore()
+
+        return self.hs
+
+    def test_background_job(self):
+        """
+        Tests the same thing as test_background_job, except that it sets the
+        startup_job_max_delta parameter and checks that the expiration date is within the
+        allowed range.
+        """
+        user_id = self.register_user("kermit_delta", "user")
+
+        self.hs.config.account_validity.startup_job_max_delta = self.max_delta
+
+        now_ms = self.hs.clock.time_msec()
+        self.get_success(self.store._set_expiration_date_when_missing())
+
+        res = self.get_success(self.store.get_expiration_ts_for_user(user_id))
+
+        self.assertGreaterEqual(res, now_ms + self.validity_period - self.max_delta)
+        self.assertLessEqual(res, now_ms + self.validity_period)

@@ -19,11 +19,11 @@ from twisted.internet import defer
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
-from synapse.api.urls import CLIENT_V2_ALPHA_PREFIX
+from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet, parse_string
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ class AuthRestServlet(RestServlet):
     cannot be handled in the normal flow (with requests to the same endpoint).
     Current use is for web fallback auth.
     """
-    PATTERNS = client_v2_patterns(r"/auth/(?P<stagetype>[\w\.]*)/fallback/web")
+    PATTERNS = client_patterns(r"/auth/(?P<stagetype>[\w\.]*)/fallback/web")
 
     def __init__(self, hs):
         super(AuthRestServlet, self).__init__()
@@ -139,8 +139,8 @@ class AuthRestServlet(RestServlet):
         if stagetype == LoginType.RECAPTCHA:
             html = RECAPTCHA_TEMPLATE % {
                 'session': session,
-                'myurl': "%s/auth/%s/fallback/web" % (
-                    CLIENT_V2_ALPHA_PREFIX, LoginType.RECAPTCHA
+                'myurl': "%s/r0/auth/%s/fallback/web" % (
+                    CLIENT_API_PREFIX, LoginType.RECAPTCHA
                 ),
                 'sitekey': self.hs.config.recaptcha_public_key,
             }
@@ -159,8 +159,8 @@ class AuthRestServlet(RestServlet):
                     self.hs.config.public_baseurl,
                     self.hs.config.user_consent_version,
                 ),
-                'myurl': "%s/auth/%s/fallback/web" % (
-                    CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS
+                'myurl': "%s/r0/auth/%s/fallback/web" % (
+                    CLIENT_API_PREFIX, LoginType.TERMS
                 ),
             }
             html_bytes = html.encode("utf8")
@@ -203,8 +203,8 @@ class AuthRestServlet(RestServlet):
             else:
                 html = RECAPTCHA_TEMPLATE % {
                     'session': session,
-                    'myurl': "%s/auth/%s/fallback/web" % (
-                        CLIENT_V2_ALPHA_PREFIX, LoginType.RECAPTCHA
+                    'myurl': "%s/r0/auth/%s/fallback/web" % (
+                        CLIENT_API_PREFIX, LoginType.RECAPTCHA
                     ),
                     'sitekey': self.hs.config.recaptcha_public_key,
                 }
@@ -240,8 +240,8 @@ class AuthRestServlet(RestServlet):
                         self.hs.config.public_baseurl,
                         self.hs.config.user_consent_version,
                     ),
-                    'myurl': "%s/auth/%s/fallback/web" % (
-                        CLIENT_V2_ALPHA_PREFIX, LoginType.TERMS
+                    'myurl': "%s/r0/auth/%s/fallback/web" % (
+                        CLIENT_API_PREFIX, LoginType.TERMS
                     ),
                 }
             html_bytes = html.encode("utf8")

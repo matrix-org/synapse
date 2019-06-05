@@ -24,13 +24,13 @@ from synapse.http.servlet import (
     parse_string,
 )
 
-from ._base import client_v2_patterns
+from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
 
 class RoomKeysServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/room_keys/keys(/(?P<room_id>[^/]+))?(/(?P<session_id>[^/]+))?$"
     )
 
@@ -256,7 +256,7 @@ class RoomKeysServlet(RestServlet):
 
 
 class RoomKeysNewVersionServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/room_keys/version$"
     )
 
@@ -314,7 +314,7 @@ class RoomKeysNewVersionServlet(RestServlet):
 
 
 class RoomKeysVersionServlet(RestServlet):
-    PATTERNS = client_v2_patterns(
+    PATTERNS = client_patterns(
         "/room_keys/version(/(?P<version>[^/]+))?$"
     )
 

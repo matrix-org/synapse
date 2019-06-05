@@ -33,9 +33,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red",
-            http_client=None,
-            federation_client=Mock(),
+            "red", http_client=None, federation_client=Mock()
         )
 
         self.store = self.hs.get_datastore()
@@ -210,9 +208,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         return access_token
 
     def do_sync_for_user(self, token):
-        request, channel = self.make_request(
-            "GET", "/sync", access_token=token
-        )
+        request, channel = self.make_request("GET", "/sync", access_token=token)
         self.render(request)
 
         if channel.code != 200:

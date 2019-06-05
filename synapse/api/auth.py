@@ -556,7 +556,7 @@ class Auth(object):
         """ Check if the given user is a local server admin.
 
         Args:
-            user (str): mxid of user to check
+            user (UserID): user to check
 
         Returns:
             bool: True if the user is an admin
