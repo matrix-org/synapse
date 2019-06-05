@@ -224,7 +224,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 "room_id": "room",
                 "event_id": "a1",
                 "prev_event_id": "a2",
-                "stream_id": "bleb",
+                "stream_id": 60,
             }
         ]
 
@@ -241,7 +241,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 "room_id": "room",
                 "event_id": "a2",
                 "prev_event_id": "a1",
-                "stream_id": "bleb",
+                "stream_id": 100,
             }
         ]
 
