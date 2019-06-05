@@ -30,6 +30,7 @@ from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
 from synapse.storage._base import LoggingTransaction, SQLBaseStore
+from synapse.storage.background_updates import BackgroundUpdateStore
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 
@@ -121,6 +122,14 @@ class Store(object):
     _simple_update_one = SQLBaseStore.__dict__["_simple_update_one"]
     _simple_update_one_txn = SQLBaseStore.__dict__["_simple_update_one_txn"]
     _simple_update_txn = SQLBaseStore.__dict__["_simple_update_txn"]
+
+    has_completed_background_updates = BackgroundUpdateStore.__dict__[
+        "has_completed_background_updates",
+    ]
+    do_next_background_update = BackgroundUpdateStore.__dict__[
+        "do_next_background_update",
+    ]
+    _do_background_update = BackgroundUpdateStore.__dict__["_do_background_update"]
 
     def runInteraction(self, desc, func, *args, **kwargs):
         def r(conn):
