@@ -131,12 +131,6 @@ def default_config(name, parse=False):
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,
-        "email": {
-            "enable_notifs": False,
-            "smtp_host": "somehost",
-            "smtp_port": 25,
-            "notif_from": "someone <someone@example.com>",
-        },
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
         "filter_timeline_limit": 5000,

@@ -64,7 +64,7 @@ class EmailConfig(Config):
         # work for the same reason.)
         if not template_dir:
             template_dir = pkg_resources.resource_filename(
-                'synapse', '../res/templates'
+                'synapse', 'res/templates'
             )
 
         self.email_template_dir = os.path.abspath(template_dir)
@@ -94,7 +94,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if not self.email_enable_password_reset_from_is:
+        if self.allow_password_resets and not self.email_enable_password_reset_from_is:
             required = [
                 "smtp_host",
                 "smtp_port",

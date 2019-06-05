@@ -21,6 +21,8 @@ class PasswordConfig(Config):
     """
 
     def read_config(self, config):
+        self.allow_password_resets = config.get("allow_password_resets", False)
+
         password_config = config.get("password_config", {})
         if password_config is None:
             password_config = {}
@@ -30,6 +32,18 @@ class PasswordConfig(Config):
 
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """\
+        # Allow users to reset their password
+        #
+        # Resetting a user's password is done either by sending a token from
+        # Synapse, or asking an identity server to do so. In Synapse v1.0,
+        # sending a password reset token from an identity server was turned off
+        # by default for security reasons.
+        #
+        # If enable_password_reset_from_is is False, you must fill out the
+        # "email" section of the config before enabling password resets
+        #
+        #allow_password_resets: False
+
         password_config:
            # Uncomment to disable password login
            #
