@@ -77,6 +77,14 @@ class EmailConfig(Config):
         self.email_enable_password_reset_from_is = email_config.get(
             "enable_password_reset_from_is", False,
         )
+        self.enable_password_resets = (
+            self.email_enable_password_reset_from_is
+            or (not self.email_enable_password_reset_from_is and email_config != {})
+        )
+        if email_config == {} and not self.email_enable_password_reset_from_is:
+            logger.warn(
+                "User password resets have been disabled due to lack of email config."
+            )
 
         self.email_validation_token_lifetime = email_config.get(
             "validation_token_lifetime", 15 * 60,
@@ -206,7 +214,7 @@ class EmailConfig(Config):
     def default_config(self, config_dir_path, server_name, **kwargs):
         return """
         # Enable sending emails for password resets, notification events or
-        # account expiry notices
+        # account expiry notices.
         #
         # If your SMTP server requires authentication, the optional smtp_user &
         # smtp_pass variables should be used

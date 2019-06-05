@@ -1006,18 +1006,6 @@ signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 #   algorithm: "HS256"
 
 
-# Allow users to reset their password
-#
-# Resetting a user's password is done either by sending a token from
-# Synapse, or asking an identity server to do so. In Synapse v1.0,
-# sending a password reset token from an identity server was turned off
-# by default for security reasons.
-#
-# If enable_password_reset_from_is is False, you must fill out the
-# "email" section of the config before enabling password resets
-#
-#enable_password_resets: False
-
 password_config:
    # Uncomment to disable password login
    #
@@ -1031,7 +1019,7 @@ password_config:
 
 
 # Enable sending emails for password resets, notification events or
-# account expiry notices
+# account expiry notices.
 #
 # If your SMTP server requires authentication, the optional smtp_user &
 # smtp_pass variables should be used
