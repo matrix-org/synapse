@@ -250,7 +250,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             f.value.args[0], "'not a real thing' is not a valid membership"
         )
 
-    @unittest.DEBUG
     def test_redacted_prev_event(self):
         """
         If the prev_event does not exist, then it is assumed to be a LEAVE.
