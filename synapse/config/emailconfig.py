@@ -85,7 +85,8 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.email_enable_password_reset_from_is
+            or (self.enable_password_resets
+                and self.email_enable_password_reset_from_is)
         ):
             # make sure we can import the required deps
             import jinja2
@@ -94,7 +95,7 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.allow_password_resets and not self.email_enable_password_reset_from_is:
+        if self.enable_password_resets and not self.email_enable_password_reset_from_is:
             required = [
                 "smtp_host",
                 "smtp_port",

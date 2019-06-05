@@ -68,6 +68,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if not self.config.enable_password_resets:
+            raise SynapseError(400, "Password resets have been disabled on this server")
+
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(body, [
@@ -184,6 +187,9 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
+        if not self.config.enable_password_resets:
+            raise SynapseError(400, "Password resets have been disabled on this server")
+
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(body, [

@@ -21,7 +21,7 @@ class PasswordConfig(Config):
     """
 
     def read_config(self, config):
-        self.allow_password_resets = config.get("allow_password_resets", False)
+        self.enable_password_resets = config.get("enable_password_resets", False)
 
         password_config = config.get("password_config", {})
         if password_config is None:
@@ -42,7 +42,7 @@ class PasswordConfig(Config):
         # If enable_password_reset_from_is is False, you must fill out the
         # "email" section of the config before enabling password resets
         #
-        #allow_password_resets: False
+        #enable_password_resets: False
 
         password_config:
            # Uncomment to disable password login
