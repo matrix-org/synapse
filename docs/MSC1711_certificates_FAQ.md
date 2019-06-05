@@ -146,11 +146,10 @@ You can do this with a `.well-known` file as follows:
     with Synapse 0.34 and earlier.
 
  2. Give synapse a certificate corresponding to the target domain
-    (`customer.example.net` in the above example). Currently Synapse's ACME
-    support [does not support
-    this](https://github.com/matrix-org/synapse/issues/4552), so you will have
-    to acquire a certificate yourself and give it to Synapse via
-    `tls_certificate_path` and `tls_private_key_path`.
+    (`customer.example.net` in the above example). You can either use Synapse's 
+    built-in [ACME support](./ACME.md) for this (via the `domain` parameter in 
+    the `acme` section), or acquire a certificate yourself and give it to 
+    Synapse via `tls_certificate_path` and `tls_private_key_path`.
 
  3. Restart Synapse to ensure the new certificate is loaded.
 
