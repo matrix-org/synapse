@@ -76,7 +76,7 @@ REQUIREMENTS = [
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.2",
-    "html5lib>=1.0",
+    "html5lib>=1.0.1",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
