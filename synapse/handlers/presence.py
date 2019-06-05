@@ -828,14 +828,17 @@ class PresenceHandler(object):
                 # joins.
                 continue
 
-            event = yield self.store.get_event(event_id)
-            if event.content.get("membership") != Membership.JOIN:
+            event = yield self.store.get_event(event_id, allow_none=True)
+            if not event or event.content.get("membership") != Membership.JOIN:
                 # We only care about joins
                 continue
 
             if prev_event_id:
-                prev_event = yield self.store.get_event(prev_event_id)
-                if prev_event.content.get("membership") == Membership.JOIN:
+                prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+                if (
+                    prev_event
+                    and prev_event.content.get("membership") == Membership.JOIN
+                ):
                     # Ignore changes to join events.
                     continue
 
