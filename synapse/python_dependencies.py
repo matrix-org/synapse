@@ -74,13 +74,12 @@ REQUIREMENTS = [
     "attrs>=17.4.0",
 
     "netaddr>=0.7.18",
-    "Jinja2>=2.9",
-    "bleach>=1.4.2",
-    "html5lib>=1.0.1",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
+    "email.enable_notifs": ["Jinja2>=2.9", "bleach>=1.4.2"],
+    "enable_password_resets": ["Jinja2>=2.9", "bleach>=1.4.2"],
 
     # we use execute_batch, which arrived in psycopg 2.7.
     "postgres": ["psycopg2>=2.7"],
