@@ -95,15 +95,22 @@ class EmailConfig(Config):
             bleach
 
         if not self.email_enable_password_reset_from_is:
-            if (
-                not self.email_smtp_host
-                or not self.email_smtp_port
-                or not self.email_notif_from
-            ):
+            required = [
+                "smtp_host",
+                "smtp_port",
+                "notif_from",
+            ]
+
+            missing = []
+            for k in required:
+                if k not in email_config:
+                    missing.append(k)
+
+            if (len(missing) > 0):
                 raise RuntimeError(
                     "email.enable_password_reset_from_is is False "
-                    "but not all of the following are set: "
-                    "email.smtp_host, email.smtp_port, email_notif_from"
+                    "but required keys are missing: %s" %
+                    (", ".join(["email." + k for k in missing]),)
                 )
 
             # Templates for password reset emails
