@@ -27,7 +27,6 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
 )
-from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import random_string
 from synapse.util.threepids import check_3pid_allowed
@@ -47,7 +46,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
 
-        if not hs.config.email_enable_password_reset_from_is:
+        if (
+            hs.config.enable_password_resets
+            and not hs.config.email_enable_password_reset_from_is
+        ):
+            from synapse.push.mailer import Mailer, load_jinja2_templates
             templates = load_jinja2_templates(
                 config=hs.config,
                 template_html_name=hs.config.email_password_reset_template_html,
