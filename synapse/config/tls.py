@@ -107,7 +107,7 @@ class TlsConfig(Config):
             certs = []
             for ca_file in custom_ca_list:
                 logger.debug("Reading custom CA certificate file: %s", ca_file)
-                content = self.read_file(ca_file)
+                content = self.read_file(ca_file, "federation_custom_ca_list")
 
                 # Parse the CA certificates
                 try:
