@@ -299,12 +299,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         ]
 
         # Handle our fake deltas, which has a user going from LEAVE -> JOIN.
-        f = self.get_success(self.handler._handle_deltas(deltas))
+        self.get_success(self.handler._handle_deltas(deltas))
 
         # One delta, with two joined members -- the room creator, and our fake
         # user.
         r = self.get_success(self.store.get_deltas_for_room(room_1, 0))
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]["joined_members"], 2)
-
-
