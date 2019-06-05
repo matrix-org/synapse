@@ -95,7 +95,8 @@ class EmailConfig(Config):
             bleach
 
         if not self.email_enable_password_reset_from_is:
-            if (not self.email_smtp_host
+            if (
+                not self.email_smtp_host
                 or not self.email_smtp_port
                 or not self.email_notif_from
             ):
