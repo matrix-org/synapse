@@ -261,7 +261,7 @@ listeners:
 
 # Monthly Active User Blocking
 #
-# Used in cases where the admin or server owner wants to limit to the
+# Used in cases where the admin or server owner wants to limit the
 # number of monthly active users.
 #
 # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
