@@ -1,1 +1,1 @@
-Allow expired user to trigger renewal email sending manually
+Allow expired user to trigger renewal email sending manually.
