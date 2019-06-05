@@ -1,1 +1,1 @@
-Refactor keyring.VerifyKeyRequest to use attr.s.
+Preparatory work for key-validity features.

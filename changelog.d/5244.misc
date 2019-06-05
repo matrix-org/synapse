@@ -1,1 +1,1 @@
-Refactor synapse.crypto.keyring to use a KeyFetcher interface.
+Preparatory work for key-validity features.
