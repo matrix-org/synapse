@@ -184,7 +184,13 @@ class Auth(object):
         return event_auth.get_public_keys(invite_event)
 
     @defer.inlineCallbacks
-    def get_user_by_req(self, request, allow_guest=False, rights="access"):
+    def get_user_by_req(
+        self,
+        request,
+        allow_guest=False,
+        rights="access",
+        allow_expired=False,
+    ):
         """ Get a registered user's ID.
 
         Args:
@@ -229,7 +235,7 @@ class Auth(object):
             is_guest = user_info["is_guest"]
 
             # Deny the request if the user account has expired.
-            if self._account_validity.enabled:
+            if self._account_validity.enabled and not allow_expired:
                 user_id = user.to_string()
                 expiration_ts = yield self.store.get_expiration_ts_for_user(user_id)
                 if expiration_ts is not None and self.clock.time_msec() >= expiration_ts:
