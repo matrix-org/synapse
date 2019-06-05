@@ -134,6 +134,7 @@ def default_config(name, parse=False):
         "email_enable_notifs": False,
         "email_smtp_host": "somehost",
         "email_smtp_port": 25,
+        "template_dir": "res/templates",
         "email_notif_from": "someone <someone@example.com>",
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
