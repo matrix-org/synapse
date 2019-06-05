@@ -2034,8 +2034,14 @@ class FederationHandler(BaseHandler):
             )
         except Exception:
             # We don't really mind if the above fails, so lets not fail
-            # processing if it does.
-            logger.exception("Failed to call _update_auth_events_and_context_for_auth")
+            # processing if it does. However, it really shouldn't fail so
+            # let's still log as an exception since we'll still want to fix
+            # any bugs.
+            logger.exception(
+                "Failed to double check auth events for %s with remote. "
+                "Ignoring failure and continuing processing of event.",
+                event.event_id,
+            )
 
         try:
             self.auth.check(room_version, event, auth_events=auth_events)
@@ -2108,9 +2114,10 @@ class FederationHandler(BaseHandler):
                     remote_auth_chain = yield self.federation_client.get_event_auth(
                         origin, event.room_id, event.event_id
                     )
-                except RequestSendFailed:
+                except RequestSendFailed as e:
                     # The other side isn't around or doesn't implement the
                     # endpoint, so lets just bail out.
+                    logger.info("Failed to get event auth from remote: %s", e)
                     return
 
                 seen_remotes = yield self.store.have_seen_events(
@@ -2264,9 +2271,10 @@ class FederationHandler(BaseHandler):
                     event.event_id,
                     local_auth_chain,
                 )
-            except RequestSendFailed:
+            except RequestSendFailed as e:
                 # The other side isn't around or doesn't implement the
                 # endpoint, so lets just bail out.
+                logger.info("Failed to query auth from remote: %s", e)
                 return
 
             seen_remotes = yield self.store.have_seen_events(
