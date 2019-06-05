@@ -1,6 +1,8 @@
 Building full schema dumps
 ==========================
 
+These schemas need to be made from a database that has had all background updates run.
+
 Postgres
 --------
 
@@ -10,5 +12,8 @@ SQLite
 ------
 
 $ sqlite3 $DATABASE_FILE ".schema" > full.sql.sqlite
+
+After
+-----
 
 Delete the CREATE statements for "sqlite_stat1", "schema_version", "applied_schema_deltas", and "applied_module_schemas".
