@@ -230,7 +230,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
     PATTERNS = [
-        re.compile("^/_synapse/password_reset/(email|msisdn)/submit_token/*$"),
+        re.compile("^/_synapse/password_reset/(?P<medium>[^/]*)/submit_token/*$"),
     ]
 
     def __init__(self, hs):
@@ -246,7 +246,10 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.datastore = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def on_GET(self, request):
+    def on_GET(self, request, medium):
+        if medium != "email":
+            raise SynapseError(400, "This medium is currently not supported for password resets")
+
         sid = parse_string(request, "sid")
         client_secret = parse_string(request, "client_secret")
         token = parse_string(request, "token")
@@ -310,7 +313,10 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         return template.render(**template_vars)
 
     @defer.inlineCallbacks
-    def on_POST(self, request):
+    def on_POST(self, request, medium):
+        if medium != "email":
+            raise SynapseError(400, "This medium is currently not supported for password resets")
+
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, [
             'sid', 'client_secret', 'token',
