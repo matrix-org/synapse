@@ -85,7 +85,7 @@ class EmailConfig(Config):
         self.email_password_reset_behaviour = (
             "remote" if email_trust_identity_server_for_password_resets else "local"
         )
-        if not email_trust_identity_server_for_password_resets and email_config == {}:
+        if self.email_password_reset_behaviour == "local" and email_config == {}:
             logger.warn(
                 "User password resets have been disabled due to lack of email config"
             )
@@ -123,8 +123,8 @@ class EmailConfig(Config):
             if (len(missing) > 0):
                 raise RuntimeError(
                     "email.password_reset_behaviour is set to 'local' "
-                    "but required keys are missing: %s" %
-                    (", ".join(["email." + k for k in missing]),)
+                    "but required keys are missing: %s email config: %s" %
+                    (", ".join(["email." + k for k in missing]), email_config)
                 )
 
             # Templates for password reset emails
