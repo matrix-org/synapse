@@ -153,8 +153,13 @@ class EmailConfig(Config):
                     raise ConfigError("Unable to find template file %s" % (p, ))
 
             # Retrieve content of web templates
-            self.email_password_reset_success_html_content = self._get_template_content(
-                self.email_template_dir, email_password_reset_success_template
+            filepath = os.path.join(
+                self.email_template_dir,
+                email_password_reset_success_template,
+            )
+            self.email_password_reset_success_html_content = self.read_file(
+                filepath, 
+                "email.password_reset_template_success_html",
             )
 
             if config.get("public_baseurl") is None:

@@ -229,7 +229,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 class ThreepidSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
     PATTERNS = [
-        re.compile("/_synapse/password_reset/validate/(email|msisdn)/submitToken/*$"),
+        re.compile("^/_synapse/password_reset/(email|msisdn)/submit_token/*$"),
     ]
 
     def __init__(self, hs):
@@ -237,6 +237,7 @@ class ThreepidSubmitTokenServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
+        super(ThreepidSubmitTokenServlet, self).__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.config = hs.config
@@ -640,6 +641,7 @@ class WhoamiRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     MsisdnPasswordRequestTokenRestServlet(hs).register(http_server)
+    ThreepidSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
