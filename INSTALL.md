@@ -5,6 +5,7 @@
   * [Prebuilt packages](#prebuilt-packages)
 * [Setting up Synapse](#setting-up-synapse)
   * [TLS certificates](#tls-certificates)
+  * [Email](#email)
   * [Registering a user](#registering-a-user)
   * [Setting up a TURN server](#setting-up-a-turn-server)
   * [URL previews](#url-previews)
