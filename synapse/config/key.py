@@ -255,21 +255,28 @@ def _perspectives_to_key_servers(config):
 
     # 'perspectives' looks like:
     #
-    # perspectives:
-    #   servers:
-    #     "matrix.org":
-    #       verify_keys:
-    #         "ed25519:auto":
-    #           key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
-    #
-    # the equivalent trusted_keys entry looks like:
-    #
     # {
-    #     "server_name": "matrix.org",
-    #     "verify_keys": {
-    #         "ed25519:auto": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
+    #     "servers": {
+    #         "matrix.org": {
+    #             "verify_keys": {
+    #                 "ed25519:auto": {
+    #                     "key": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+    #                 }
+    #             }
+    #         }
     #     }
     # }
+    #
+    # 'trusted_keys' looks like:
+    #
+    # [
+    #     {
+    #         "server_name": "matrix.org",
+    #         "verify_keys": {
+    #             "ed25519:auto": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
+    #         }
+    #     }
+    # ]
 
     perspectives_servers = config.get("perspectives", {}).get("servers", {})
 
