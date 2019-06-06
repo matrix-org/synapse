@@ -52,7 +52,7 @@ returned by the Client-Server API:
 Upgrading to v1.0
 =================
 
-Validation of TLS certificates 
+Validation of TLS certificates
 ------------------------------
 
 Synapse v1.0 is the first release to enforce
@@ -65,9 +65,9 @@ that have not correctly configured their certificates.
 
 In rare cases, it may be desirable to disable certificate checking: for
 example, it might be essential to be able to federate with a given legacy
-server in a closed federation. This can be done in one of two ways:- *
-Configure the global switch ``federation_verify_certificates`` to ``false``. *
-Configure a whitelist of server domains to trust via
+server in a closed federation. This can be done in one of two ways:-
+ * Configure the global switch ``federation_verify_certificates`` to ``false``.
+ * Configure a whitelist of server domains to trust via
    ``federation_certificate_verification_whitelist``.
 
 See the `sample configuration file
@@ -91,7 +91,7 @@ and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
 ``smtp_pass``, and ``require_transport_security``..
 
 If you are absolutely certain that you wish to continue using an identity
-server for password resets, set ``enable_password_reset_from_is`` to ``true``.
+server for password resets, set ``trust_identity_server_for_password_resets`` to ``true``.
 
 See the `sample configuration file
 <https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
