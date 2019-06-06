@@ -389,8 +389,13 @@ class AuthHandler(BaseHandler):
                     clientip=clientip,
                     password_servlet=password_servlet,
                 )
+            elif login_type == LoginType.RECAPTCHA:
+                res = yield checker(
+                    authdict,
+                    clientip,
+                )
             else:
-                res = yield checker(authdict, clientip=clientip)
+                res = yield checker(authdict)
             defer.returnValue(res)
 
         # build a v1-login-style dict out of the authdict and fall back to the
