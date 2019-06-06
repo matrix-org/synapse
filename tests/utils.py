@@ -31,6 +31,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.api.room_versions import RoomVersions
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
 from synapse.server import HomeServer
@@ -174,7 +175,7 @@ def default_config(name, parse=False):
         "use_frozen_dicts": False,
         # We need a sane default_room_version, otherwise attempts to create
         # rooms will fail.
-        "default_room_version": "4",
+        "default_room_version": DEFAULT_ROOM_VERSION,
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         "update_user_directory": False,
