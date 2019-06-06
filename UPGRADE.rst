@@ -69,7 +69,7 @@ Configure a whitelist of server domains to trust via
 
 See the `sample configuration file
 <https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
-for more details on these settings. Password reset emails When a user requests
+for more details on these settings. When a user requests
 a password reset, Synapse will send an email to the user to confirm the
 request.
 
