@@ -71,9 +71,12 @@ server in a closed federation. This can be done in one of two ways:-
    ``federation_certificate_verification_whitelist``.
 
 See the `sample configuration file <docs/sample_config.yaml>`_
-for more details on these settings. When a user requests
-a password reset, Synapse will send an email to the user to confirm the
-request.
+for more details on these settings. 
+
+Email
+-----
+When a user requests a password reset, Synapse will send an email to the 
+user to confirm the request.
 
 Previous versions of Synapse delegated the job of sending this email to an
 identity server. If the identity server was somehow malicious or became
@@ -87,7 +90,7 @@ disabled.
 To configure an SMTP server for Synapse, modify the configuration section
 headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
 and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
-``smtp_pass``, and ``require_transport_security``..
+``smtp_pass``, and ``require_transport_security``.
 
 If you are absolutely certain that you wish to continue using an identity
 server for password resets, set ``trust_identity_server_for_password_resets`` to ``true``.
