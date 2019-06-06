@@ -158,7 +158,13 @@ class PresenceHandler(object):
         # have not yet been persisted
         self.unpersisted_users_changes = set()
 
-        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self._on_shutdown)
+        hs.get_reactor().addSystemEventTrigger(
+            "before",
+            "shutdown",
+            run_as_background_process,
+            "presence.on_shutdown",
+            self._on_shutdown,
+        )
 
         self.serial_to_user = {}
         self._next_serial = 1

@@ -247,7 +247,14 @@ class IdentityHandler(BaseHandler):
         defer.returnValue(changed)
 
     @defer.inlineCallbacks
-    def requestEmailToken(self, id_server, email, client_secret, send_attempt, **kwargs):
+    def requestEmailToken(
+        self,
+        id_server,
+        email,
+        client_secret,
+        send_attempt,
+        next_link=None,
+    ):
         if not self._should_trust_id_server(id_server):
             raise SynapseError(
                 400, "Untrusted ID server '%s'" % id_server,
@@ -259,7 +266,9 @@ class IdentityHandler(BaseHandler):
             'client_secret': client_secret,
             'send_attempt': send_attempt,
         }
-        params.update(kwargs)
+
+        if next_link:
+            params.update({'next_link': next_link})
 
         try:
             data = yield self.http_client.post_json_get_json(

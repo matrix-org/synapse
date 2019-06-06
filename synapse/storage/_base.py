@@ -588,6 +588,10 @@ class SQLBaseStore(object):
         Args:
             table : string giving the table name
             values : dict of new column names and values for them
+            or_ignore : bool stating whether an exception should be raised
+                when a conflicting row already exists. If True, False will be
+                returned by the function instead
+            desc : string giving a description of the transaction
 
         Returns:
             bool: Whether the row was inserted or not. Only useful when
@@ -1228,8 +1232,8 @@ class SQLBaseStore(object):
         )
 
         txn.execute(select_sql, list(keyvalues.values()))
-
         row = txn.fetchone()
+
         if not row:
             if allow_none:
                 return None

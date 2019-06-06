@@ -132,7 +132,6 @@ def default_config(name, parse=False):
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,
-        "email_enable_notifs": False,
         "block_non_admin_invites": False,
         "federation_domain_whitelist": None,
         "filter_timeline_limit": 5000,
