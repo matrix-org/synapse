@@ -1,0 +1,2052 @@
+
+
+
+
+
+CREATE TABLE access_tokens (
+    id bigint NOT NULL,
+    user_id text NOT NULL,
+    device_id text,
+    token text NOT NULL,
+    last_used bigint
+);
+
+
+
+CREATE TABLE account_data (
+    user_id text NOT NULL,
+    account_data_type text NOT NULL,
+    stream_id bigint NOT NULL,
+    content text NOT NULL
+);
+
+
+
+CREATE TABLE account_data_max_stream_id (
+    lock character(1) DEFAULT 'X'::bpchar NOT NULL,
+    stream_id bigint NOT NULL,
+    CONSTRAINT private_user_data_max_stream_id_lock_check CHECK ((lock = 'X'::bpchar))
+);
+
+
+
+CREATE TABLE account_validity (
+    user_id text NOT NULL,
+    expiration_ts_ms bigint NOT NULL,
+    email_sent boolean NOT NULL,
+    renewal_token text
+);
+
+
+
+CREATE TABLE application_services_state (
+    as_id text NOT NULL,
+    state character varying(5),
+    last_txn integer
+);
+
+
+
+CREATE TABLE application_services_txns (
+    as_id text NOT NULL,
+    txn_id integer NOT NULL,
+    event_ids text NOT NULL
+);
+
+
+
+CREATE TABLE appservice_room_list (
+    appservice_id text NOT NULL,
+    network_id text NOT NULL,
+    room_id text NOT NULL
+);
+
+
+
+CREATE TABLE appservice_stream_position (
+    lock character(1) DEFAULT 'X'::bpchar NOT NULL,
+    stream_ordering bigint,
+    CONSTRAINT appservice_stream_position_lock_check CHECK ((lock = 'X'::bpchar))
+);
+
+
+
+CREATE TABLE background_updates (
+    update_name text NOT NULL,
+    progress_json text NOT NULL,
+    depends_on text
+);
+
+
+
+CREATE TABLE blocked_rooms (
+    room_id text NOT NULL,
+    user_id text NOT NULL
+);
+
+
+
+CREATE TABLE cache_invalidation_stream (
+    stream_id bigint,
+    cache_func text,
+    keys text[],
+    invalidation_ts bigint
+);
+
+
+
+CREATE TABLE current_state_delta_stream (
+    stream_id bigint NOT NULL,
+    room_id text NOT NULL,
+    type text NOT NULL,
+    state_key text NOT NULL,
+    event_id text,
+    prev_event_id text
+);
+
+
+
+CREATE TABLE current_state_events (
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    type text NOT NULL,
+    state_key text NOT NULL
+);
+
+
+
+CREATE TABLE deleted_pushers (
+    stream_id bigint NOT NULL,
+    app_id text NOT NULL,
+    pushkey text NOT NULL,
+    user_id text NOT NULL
+);
+
+
+
+CREATE TABLE destinations (
+    destination text NOT NULL,
+    retry_last_ts bigint,
+    retry_interval integer
+);
+
+
+
+CREATE TABLE device_federation_inbox (
+    origin text NOT NULL,
+    message_id text NOT NULL,
+    received_ts bigint NOT NULL
+);
+
+
+
+CREATE TABLE device_federation_outbox (
+    destination text NOT NULL,
+    stream_id bigint NOT NULL,
+    queued_ts bigint NOT NULL,
+    messages_json text NOT NULL
+);
+
+
+
+CREATE TABLE device_inbox (
+    user_id text NOT NULL,
+    device_id text NOT NULL,
+    stream_id bigint NOT NULL,
+    message_json text NOT NULL
+);
+
+
+
+CREATE TABLE device_lists_outbound_last_success (
+    destination text NOT NULL,
+    user_id text NOT NULL,
+    stream_id bigint NOT NULL
+);
+
+
+
+CREATE TABLE device_lists_outbound_pokes (
+    destination text NOT NULL,
+    stream_id bigint NOT NULL,
+    user_id text NOT NULL,
+    device_id text NOT NULL,
+    sent boolean NOT NULL,
+    ts bigint NOT NULL
+);
+
+
+
+CREATE TABLE device_lists_remote_cache (
+    user_id text NOT NULL,
+    device_id text NOT NULL,
+    content text NOT NULL
+);
+
+
+
+CREATE TABLE device_lists_remote_extremeties (
+    user_id text NOT NULL,
+    stream_id text NOT NULL
+);
+
+
+
+CREATE TABLE device_lists_stream (
+    stream_id bigint NOT NULL,
+    user_id text NOT NULL,
+    device_id text NOT NULL
+);
+
+
+
+CREATE TABLE device_max_stream_id (
+    stream_id bigint NOT NULL
+);
+
+
+
+CREATE TABLE devices (
+    user_id text NOT NULL,
+    device_id text NOT NULL,
+    display_name text
+);
+
+
+
+CREATE TABLE e2e_device_keys_json (
+    user_id text NOT NULL,
+    device_id text NOT NULL,
+    ts_added_ms bigint NOT NULL,
+    key_json text NOT NULL
+);
+
+
+
+CREATE TABLE e2e_one_time_keys_json (
+    user_id text NOT NULL,
+    device_id text NOT NULL,
+    algorithm text NOT NULL,
+    key_id text NOT NULL,
+    ts_added_ms bigint NOT NULL,
+    key_json text NOT NULL
+);
+
+
+
+CREATE TABLE e2e_room_keys (
+    user_id text NOT NULL,
+    room_id text NOT NULL,
+    session_id text NOT NULL,
+    version bigint NOT NULL,
+    first_message_index integer,
+    forwarded_count integer,
+    is_verified boolean,
+    session_data text NOT NULL
+);
+
+
+
+CREATE TABLE e2e_room_keys_versions (
+    user_id text NOT NULL,
+    version bigint NOT NULL,
+    algorithm text NOT NULL,
+    auth_data text NOT NULL,
+    deleted smallint DEFAULT 0 NOT NULL
+);
+
+
+
+CREATE TABLE erased_users (
+    user_id text NOT NULL
+);
+
+
+
+CREATE TABLE event_auth (
+    event_id text NOT NULL,
+    auth_id text NOT NULL,
+    room_id text NOT NULL
+);
+
+
+
+CREATE TABLE event_backward_extremities (
+    event_id text NOT NULL,
+    room_id text NOT NULL
+);
+
+
+
+CREATE TABLE event_edges (
+    event_id text NOT NULL,
+    prev_event_id text NOT NULL,
+    room_id text NOT NULL,
+    is_state boolean NOT NULL
+);
+
+
+
+CREATE TABLE event_forward_extremities (
+    event_id text NOT NULL,
+    room_id text NOT NULL
+);
+
+
+
+CREATE TABLE event_json (
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    internal_metadata text NOT NULL,
+    json text NOT NULL,
+    format_version integer
+);
+
+
+
+CREATE TABLE event_push_actions (
+    room_id text NOT NULL,
+    event_id text NOT NULL,
+    user_id text NOT NULL,
+    profile_tag character varying(32),
+    actions text NOT NULL,
+    topological_ordering bigint,
+    stream_ordering bigint,
+    notif smallint,
+    highlight smallint
+);
+
+
+
+CREATE TABLE event_push_actions_staging (
+    event_id text NOT NULL,
+    user_id text NOT NULL,
+    actions text NOT NULL,
+    notif smallint NOT NULL,
+    highlight smallint NOT NULL
+);
+
+
+
+CREATE TABLE event_push_summary (
+    user_id text NOT NULL,
+    room_id text NOT NULL,
+    notif_count bigint NOT NULL,
+    stream_ordering bigint NOT NULL
+);
+
+
+
+CREATE TABLE event_push_summary_stream_ordering (
+    lock character(1) DEFAULT 'X'::bpchar NOT NULL,
+    stream_ordering bigint NOT NULL,
+    CONSTRAINT event_push_summary_stream_ordering_lock_check CHECK ((lock = 'X'::bpchar))
+);
+
+
+
+CREATE TABLE event_reference_hashes (
+    event_id text,
+    algorithm text,
+    hash bytea
+);
+
+
+
+CREATE TABLE event_relations (
+    event_id text NOT NULL,
+    relates_to_id text NOT NULL,
+    relation_type text NOT NULL,
+    aggregation_key text
+);
+
+
+
+CREATE TABLE event_reports (
+    id bigint NOT NULL,
+    received_ts bigint NOT NULL,
+    room_id text NOT NULL,
+    event_id text NOT NULL,
+    user_id text NOT NULL,
+    reason text,
+    content text
+);
+
+
+
+CREATE TABLE event_search (
+    event_id text,
+    room_id text,
+    sender text,
+    key text,
+    vector tsvector,
+    origin_server_ts bigint,
+    stream_ordering bigint
+);
+
+
+
+CREATE TABLE event_to_state_groups (
+    event_id text NOT NULL,
+    state_group bigint NOT NULL
+);
+
+
+
+CREATE TABLE events (
+    stream_ordering integer NOT NULL,
+    topological_ordering bigint NOT NULL,
+    event_id text NOT NULL,
+    type text NOT NULL,
+    room_id text NOT NULL,
+    content text,
+    unrecognized_keys text,
+    processed boolean NOT NULL,
+    outlier boolean NOT NULL,
+    depth bigint DEFAULT 0 NOT NULL,
+    origin_server_ts bigint,
+    received_ts bigint,
+    sender text,
+    contains_url boolean
+);
+
+
+
+CREATE TABLE ex_outlier_stream (
+    event_stream_ordering bigint NOT NULL,
+    event_id text NOT NULL,
+    state_group bigint NOT NULL
+);
+
+
+
+CREATE TABLE federation_stream_position (
+    type text NOT NULL,
+    stream_id integer NOT NULL
+);
+
+
+
+CREATE TABLE group_attestations_remote (
+    group_id text NOT NULL,
+    user_id text NOT NULL,
+    valid_until_ms bigint NOT NULL,
+    attestation_json text NOT NULL
+);
+
+
+
+CREATE TABLE group_attestations_renewals (
+    group_id text NOT NULL,
+    user_id text NOT NULL,
+    valid_until_ms bigint NOT NULL
+);
+
+
+
+CREATE TABLE group_invites (
+    group_id text NOT NULL,
+    user_id text NOT NULL
+);
+
+
+
+CREATE TABLE group_roles (
+    group_id text NOT NULL,
+    role_id text NOT NULL,
+    profile text NOT NULL,
+    is_public boolean NOT NULL
+);
+
+
+
+CREATE TABLE group_room_categories (
+    group_id text NOT NULL,
+    category_id text NOT NULL,
+    profile text NOT NULL,
+    is_public boolean NOT NULL
+);
+
+
+
+CREATE TABLE group_rooms (
+    group_id text NOT NULL,
+    room_id text NOT NULL,
+    is_public boolean NOT NULL
+);
+
+
+
+CREATE TABLE group_summary_roles (
+    group_id text NOT NULL,
+    role_id text NOT NULL,
+    role_order bigint NOT NULL,
+    CONSTRAINT group_summary_roles_role_order_check CHECK ((role_order > 0))
+);
+
+
+
+CREATE TABLE group_summary_room_categories (
+    group_id text NOT NULL,
+    category_id text NOT NULL,
+    cat_order bigint NOT NULL,
+    CONSTRAINT group_summary_room_categories_cat_order_check CHECK ((cat_order > 0))
+);
+
+
+
+CREATE TABLE group_summary_rooms (
+    group_id text NOT NULL,
+    room_id text NOT NULL,
+    category_id text NOT NULL,
+    room_order bigint NOT NULL,
+    is_public boolean NOT NULL,
+    CONSTRAINT group_summary_rooms_room_order_check CHECK ((room_order > 0))
+);
+
+
+
+CREATE TABLE group_summary_users (
+    group_id text NOT NULL,
+    user_id text NOT NULL,
+    role_id text NOT NULL,
+    user_order bigint NOT NULL,
+    is_public boolean NOT NULL
+);
+
+
+
+CREATE TABLE group_users (
+    group_id text NOT NULL,
+    user_id text NOT NULL,
+    is_admin boolean NOT NULL,
+    is_public boolean NOT NULL
+);
+
+
+
+CREATE TABLE groups (
+    group_id text NOT NULL,
+    name text,
+    avatar_url text,
+    short_description text,
+    long_description text,
+    is_public boolean NOT NULL,
+    join_policy text DEFAULT 'invite'::text NOT NULL
+);
+
+
+
+CREATE TABLE guest_access (
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    guest_access text NOT NULL
+);
+
+
+
+CREATE TABLE history_visibility (
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    history_visibility text NOT NULL
+);
+
+
+
+CREATE TABLE local_group_membership (
+    group_id text NOT NULL,
+    user_id text NOT NULL,
+    is_admin boolean NOT NULL,
+    membership text NOT NULL,
+    is_publicised boolean NOT NULL,
+    content text NOT NULL
+);
+
+
+
+CREATE TABLE local_group_updates (
+    stream_id bigint NOT NULL,
+    group_id text NOT NULL,
+    user_id text NOT NULL,
+    type text NOT NULL,
+    content text NOT NULL
+);
+
+
+
+CREATE TABLE local_invites (
+    stream_id bigint NOT NULL,
+    inviter text NOT NULL,
+    invitee text NOT NULL,
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    locally_rejected text,
+    replaced_by text
+);
+
+
+
+CREATE TABLE local_media_repository (
+    media_id text,
+    media_type text,
+    media_length integer,
+    created_ts bigint,
+    upload_name text,
+    user_id text,
+    quarantined_by text,
+    url_cache text,
+    last_access_ts bigint
+);
+
+
+
+CREATE TABLE local_media_repository_thumbnails (
+    media_id text,
+    thumbnail_width integer,
+    thumbnail_height integer,
+    thumbnail_type text,
+    thumbnail_method text,
+    thumbnail_length integer
+);
+
+
+
+CREATE TABLE local_media_repository_url_cache (
+    url text,
+    response_code integer,
+    etag text,
+    expires_ts bigint,
+    og text,
+    media_id text,
+    download_ts bigint
+);
+
+
+
+CREATE TABLE monthly_active_users (
+    user_id text NOT NULL,
+    "timestamp" bigint NOT NULL
+);
+
+
+
+CREATE TABLE open_id_tokens (
+    token text NOT NULL,
+    ts_valid_until_ms bigint NOT NULL,
+    user_id text NOT NULL
+);
+
+
+
+CREATE TABLE presence (
+    user_id text NOT NULL,
+    state character varying(20),
+    status_msg text,
+    mtime bigint
+);
+
+
+
+CREATE TABLE presence_allow_inbound (
+    observed_user_id text NOT NULL,
+    observer_user_id text NOT NULL
+);
+
+
+
+CREATE TABLE presence_stream (
+    stream_id bigint,
+    user_id text,
+    state text,
+    last_active_ts bigint,
+    last_federation_update_ts bigint,
+    last_user_sync_ts bigint,
+    status_msg text,
+    currently_active boolean
+);
+
+
+
+CREATE TABLE profiles (
+    user_id text NOT NULL,
+    displayname text,
+    avatar_url text
+);
+
+
+
+CREATE TABLE public_room_list_stream (
+    stream_id bigint NOT NULL,
+    room_id text NOT NULL,
+    visibility boolean NOT NULL,
+    appservice_id text,
+    network_id text
+);
+
+
+
+CREATE TABLE push_rules (
+    id bigint NOT NULL,
+    user_name text NOT NULL,
+    rule_id text NOT NULL,
+    priority_class smallint NOT NULL,
+    priority integer DEFAULT 0 NOT NULL,
+    conditions text NOT NULL,
+    actions text NOT NULL
+);
+
+
+
+CREATE TABLE push_rules_enable (
+    id bigint NOT NULL,
+    user_name text NOT NULL,
+    rule_id text NOT NULL,
+    enabled smallint
+);
+
+
+
+CREATE TABLE push_rules_stream (
+    stream_id bigint NOT NULL,
+    event_stream_ordering bigint NOT NULL,
+    user_id text NOT NULL,
+    rule_id text NOT NULL,
+    op text NOT NULL,
+    priority_class smallint,
+    priority integer,
+    conditions text,
+    actions text
+);
+
+
+
+CREATE TABLE pusher_throttle (
+    pusher bigint NOT NULL,
+    room_id text NOT NULL,
+    last_sent_ts bigint,
+    throttle_ms bigint
+);
+
+
+
+CREATE TABLE pushers (
+    id bigint NOT NULL,
+    user_name text NOT NULL,
+    access_token bigint,
+    profile_tag text NOT NULL,
+    kind text NOT NULL,
+    app_id text NOT NULL,
+    app_display_name text NOT NULL,
+    device_display_name text NOT NULL,
+    pushkey text NOT NULL,
+    ts bigint NOT NULL,
+    lang text,
+    data text,
+    last_stream_ordering integer,
+    last_success bigint,
+    failing_since bigint
+);
+
+
+
+CREATE TABLE ratelimit_override (
+    user_id text NOT NULL,
+    messages_per_second bigint,
+    burst_count bigint
+);
+
+
+
+CREATE TABLE receipts_graph (
+    room_id text NOT NULL,
+    receipt_type text NOT NULL,
+    user_id text NOT NULL,
+    event_ids text NOT NULL,
+    data text NOT NULL
+);
+
+
+
+CREATE TABLE receipts_linearized (
+    stream_id bigint NOT NULL,
+    room_id text NOT NULL,
+    receipt_type text NOT NULL,
+    user_id text NOT NULL,
+    event_id text NOT NULL,
+    data text NOT NULL
+);
+
+
+
+CREATE TABLE received_transactions (
+    transaction_id text,
+    origin text,
+    ts bigint,
+    response_code integer,
+    response_json bytea,
+    has_been_referenced smallint DEFAULT 0
+);
+
+
+
+CREATE TABLE redactions (
+    event_id text NOT NULL,
+    redacts text NOT NULL
+);
+
+
+
+CREATE TABLE rejections (
+    event_id text NOT NULL,
+    reason text NOT NULL,
+    last_check text NOT NULL
+);
+
+
+
+CREATE TABLE remote_media_cache (
+    media_origin text,
+    media_id text,
+    media_type text,
+    created_ts bigint,
+    upload_name text,
+    media_length integer,
+    filesystem_id text,
+    last_access_ts bigint,
+    quarantined_by text
+);
+
+
+
+CREATE TABLE remote_media_cache_thumbnails (
+    media_origin text,
+    media_id text,
+    thumbnail_width integer,
+    thumbnail_height integer,
+    thumbnail_method text,
+    thumbnail_type text,
+    thumbnail_length integer,
+    filesystem_id text
+);
+
+
+
+CREATE TABLE remote_profile_cache (
+    user_id text NOT NULL,
+    displayname text,
+    avatar_url text,
+    last_check bigint NOT NULL
+);
+
+
+
+CREATE TABLE room_account_data (
+    user_id text NOT NULL,
+    room_id text NOT NULL,
+    account_data_type text NOT NULL,
+    stream_id bigint NOT NULL,
+    content text NOT NULL
+);
+
+
+
+CREATE TABLE room_alias_servers (
+    room_alias text NOT NULL,
+    server text NOT NULL
+);
+
+
+
+CREATE TABLE room_aliases (
+    room_alias text NOT NULL,
+    room_id text NOT NULL,
+    creator text
+);
+
+
+
+CREATE TABLE room_depth (
+    room_id text NOT NULL,
+    min_depth integer NOT NULL
+);
+
+
+
+CREATE TABLE room_memberships (
+    event_id text NOT NULL,
+    user_id text NOT NULL,
+    sender text NOT NULL,
+    room_id text NOT NULL,
+    membership text NOT NULL,
+    forgotten integer DEFAULT 0,
+    display_name text,
+    avatar_url text
+);
+
+
+
+CREATE TABLE room_names (
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    name text NOT NULL
+);
+
+
+
+CREATE TABLE room_state (
+    room_id text NOT NULL,
+    join_rules text,
+    history_visibility text,
+    encryption text,
+    name text,
+    topic text,
+    avatar text,
+    canonical_alias text
+);
+
+
+
+CREATE TABLE room_stats (
+    room_id text NOT NULL,
+    ts bigint NOT NULL,
+    bucket_size integer NOT NULL,
+    current_state_events integer NOT NULL,
+    joined_members integer NOT NULL,
+    invited_members integer NOT NULL,
+    left_members integer NOT NULL,
+    banned_members integer NOT NULL,
+    state_events integer NOT NULL
+);
+
+
+
+CREATE TABLE room_stats_earliest_token (
+    room_id text NOT NULL,
+    token bigint NOT NULL
+);
+
+
+
+CREATE TABLE room_tags (
+    user_id text NOT NULL,
+    room_id text NOT NULL,
+    tag text NOT NULL,
+    content text NOT NULL
+);
+
+
+
+CREATE TABLE room_tags_revisions (
+    user_id text NOT NULL,
+    room_id text NOT NULL,
+    stream_id bigint NOT NULL
+);
+
+
+
+CREATE TABLE rooms (
+    room_id text NOT NULL,
+    is_public boolean,
+    creator text
+);
+
+
+
+CREATE TABLE server_keys_json (
+    server_name text NOT NULL,
+    key_id text NOT NULL,
+    from_server text NOT NULL,
+    ts_added_ms bigint NOT NULL,
+    ts_valid_until_ms bigint NOT NULL,
+    key_json bytea NOT NULL
+);
+
+
+
+CREATE TABLE server_signature_keys (
+    server_name text,
+    key_id text,
+    from_server text,
+    ts_added_ms bigint,
+    verify_key bytea,
+    ts_valid_until_ms bigint
+);
+
+
+
+CREATE TABLE state_events (
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    type text NOT NULL,
+    state_key text NOT NULL,
+    prev_state text
+);
+
+
+
+CREATE TABLE state_group_edges (
+    state_group bigint NOT NULL,
+    prev_state_group bigint NOT NULL
+);
+
+
+
+CREATE SEQUENCE state_group_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+
+CREATE TABLE state_groups (
+    id bigint NOT NULL,
+    room_id text NOT NULL,
+    event_id text NOT NULL
+);
+
+
+
+CREATE TABLE state_groups_state (
+    state_group bigint NOT NULL,
+    room_id text NOT NULL,
+    type text NOT NULL,
+    state_key text NOT NULL,
+    event_id text NOT NULL
+);
+
+
+
+CREATE TABLE stats_stream_pos (
+    lock character(1) DEFAULT 'X'::bpchar NOT NULL,
+    stream_id bigint,
+    CONSTRAINT stats_stream_pos_lock_check CHECK ((lock = 'X'::bpchar))
+);
+
+
+
+CREATE TABLE stream_ordering_to_exterm (
+    stream_ordering bigint NOT NULL,
+    room_id text NOT NULL,
+    event_id text NOT NULL
+);
+
+
+
+CREATE TABLE threepid_guest_access_tokens (
+    medium text,
+    address text,
+    guest_access_token text,
+    first_inviter text
+);
+
+
+
+CREATE TABLE topics (
+    event_id text NOT NULL,
+    room_id text NOT NULL,
+    topic text NOT NULL
+);
+
+
+
+CREATE TABLE user_daily_visits (
+    user_id text NOT NULL,
+    device_id text,
+    "timestamp" bigint NOT NULL
+);
+
+
+
+CREATE TABLE user_directory (
+    user_id text NOT NULL,
+    room_id text,
+    display_name text,
+    avatar_url text
+);
+
+
+
+CREATE TABLE user_directory_search (
+    user_id text NOT NULL,
+    vector tsvector
+);
+
+
+
+CREATE TABLE user_directory_stream_pos (
+    lock character(1) DEFAULT 'X'::bpchar NOT NULL,
+    stream_id bigint,
+    CONSTRAINT user_directory_stream_pos_lock_check CHECK ((lock = 'X'::bpchar))
+);
+
+
+
+CREATE TABLE user_filters (
+    user_id text,
+    filter_id bigint,
+    filter_json bytea
+);
+
+
+
+CREATE TABLE user_ips (
+    user_id text NOT NULL,
+    access_token text NOT NULL,
+    device_id text,
+    ip text NOT NULL,
+    user_agent text NOT NULL,
+    last_seen bigint NOT NULL
+);
+
+
+
+CREATE TABLE user_stats (
+    user_id text NOT NULL,
+    ts bigint NOT NULL,
+    bucket_size integer NOT NULL,
+    public_rooms integer NOT NULL,
+    private_rooms integer NOT NULL
+);
+
+
+
+CREATE TABLE user_threepid_id_server (
+    user_id text NOT NULL,
+    medium text NOT NULL,
+    address text NOT NULL,
+    id_server text NOT NULL
+);
+
+
+
+CREATE TABLE user_threepids (
+    user_id text NOT NULL,
+    medium text NOT NULL,
+    address text NOT NULL,
+    validated_at bigint NOT NULL,
+    added_at bigint NOT NULL
+);
+
+
+
+CREATE TABLE users (
+    name text,
+    password_hash text,
+    creation_ts bigint,
+    admin smallint DEFAULT 0 NOT NULL,
+    upgrade_ts bigint,
+    is_guest smallint DEFAULT 0 NOT NULL,
+    appservice_id text,
+    consent_version text,
+    consent_server_notice_sent text,
+    user_type text
+);
+
+
+
+CREATE TABLE users_in_public_rooms (
+    user_id text NOT NULL,
+    room_id text NOT NULL
+);
+
+
+
+CREATE TABLE users_pending_deactivation (
+    user_id text NOT NULL
+);
+
+
+
+CREATE TABLE users_who_share_private_rooms (
+    user_id text NOT NULL,
+    other_user_id text NOT NULL,
+    room_id text NOT NULL
+);
+
+
+
+ALTER TABLE ONLY access_tokens
+    ADD CONSTRAINT access_tokens_pkey PRIMARY KEY (id);
+
+
+
+ALTER TABLE ONLY access_tokens
+    ADD CONSTRAINT access_tokens_token_key UNIQUE (token);
+
+
+
+ALTER TABLE ONLY account_data
+    ADD CONSTRAINT account_data_uniqueness UNIQUE (user_id, account_data_type);
+
+
+
+ALTER TABLE ONLY account_validity
+    ADD CONSTRAINT account_validity_pkey PRIMARY KEY (user_id);
+
+
+
+ALTER TABLE ONLY application_services_state
+    ADD CONSTRAINT application_services_state_pkey PRIMARY KEY (as_id);
+
+
+
+ALTER TABLE ONLY application_services_txns
+    ADD CONSTRAINT application_services_txns_as_id_txn_id_key UNIQUE (as_id, txn_id);
+
+
+
+ALTER TABLE ONLY appservice_stream_position
+    ADD CONSTRAINT appservice_stream_position_lock_key UNIQUE (lock);
+
+
+
+ALTER TABLE ONLY background_updates
+    ADD CONSTRAINT background_updates_uniqueness UNIQUE (update_name);
+
+
+
+ALTER TABLE ONLY current_state_events
+    ADD CONSTRAINT current_state_events_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY current_state_events
+    ADD CONSTRAINT current_state_events_room_id_type_state_key_key UNIQUE (room_id, type, state_key);
+
+
+
+ALTER TABLE ONLY destinations
+    ADD CONSTRAINT destinations_pkey PRIMARY KEY (destination);
+
+
+
+ALTER TABLE ONLY devices
+    ADD CONSTRAINT device_uniqueness UNIQUE (user_id, device_id);
+
+
+
+ALTER TABLE ONLY e2e_device_keys_json
+    ADD CONSTRAINT e2e_device_keys_json_uniqueness UNIQUE (user_id, device_id);
+
+
+
+ALTER TABLE ONLY e2e_one_time_keys_json
+    ADD CONSTRAINT e2e_one_time_keys_json_uniqueness UNIQUE (user_id, device_id, algorithm, key_id);
+
+
+
+ALTER TABLE ONLY event_backward_extremities
+    ADD CONSTRAINT event_backward_extremities_event_id_room_id_key UNIQUE (event_id, room_id);
+
+
+
+ALTER TABLE ONLY event_edges
+    ADD CONSTRAINT event_edges_event_id_prev_event_id_room_id_is_state_key UNIQUE (event_id, prev_event_id, room_id, is_state);
+
+
+
+ALTER TABLE ONLY event_forward_extremities
+    ADD CONSTRAINT event_forward_extremities_event_id_room_id_key UNIQUE (event_id, room_id);
+
+
+
+ALTER TABLE ONLY event_push_actions
+    ADD CONSTRAINT event_id_user_id_profile_tag_uniqueness UNIQUE (room_id, event_id, user_id, profile_tag);
+
+
+
+ALTER TABLE ONLY event_json
+    ADD CONSTRAINT event_json_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY event_push_summary_stream_ordering
+    ADD CONSTRAINT event_push_summary_stream_ordering_lock_key UNIQUE (lock);
+
+
+
+ALTER TABLE ONLY event_reference_hashes
+    ADD CONSTRAINT event_reference_hashes_event_id_algorithm_key UNIQUE (event_id, algorithm);
+
+
+
+ALTER TABLE ONLY event_reports
+    ADD CONSTRAINT event_reports_pkey PRIMARY KEY (id);
+
+
+
+ALTER TABLE ONLY event_to_state_groups
+    ADD CONSTRAINT event_to_state_groups_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY events
+    ADD CONSTRAINT events_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY events
+    ADD CONSTRAINT events_pkey PRIMARY KEY (stream_ordering);
+
+
+
+ALTER TABLE ONLY ex_outlier_stream
+    ADD CONSTRAINT ex_outlier_stream_pkey PRIMARY KEY (event_stream_ordering);
+
+
+
+ALTER TABLE ONLY group_roles
+    ADD CONSTRAINT group_roles_group_id_role_id_key UNIQUE (group_id, role_id);
+
+
+
+ALTER TABLE ONLY group_room_categories
+    ADD CONSTRAINT group_room_categories_group_id_category_id_key UNIQUE (group_id, category_id);
+
+
+
+ALTER TABLE ONLY group_summary_roles
+    ADD CONSTRAINT group_summary_roles_group_id_role_id_role_order_key UNIQUE (group_id, role_id, role_order);
+
+
+
+ALTER TABLE ONLY group_summary_room_categories
+    ADD CONSTRAINT group_summary_room_categories_group_id_category_id_cat_orde_key UNIQUE (group_id, category_id, cat_order);
+
+
+
+ALTER TABLE ONLY group_summary_rooms
+    ADD CONSTRAINT group_summary_rooms_group_id_category_id_room_id_room_order_key UNIQUE (group_id, category_id, room_id, room_order);
+
+
+
+ALTER TABLE ONLY guest_access
+    ADD CONSTRAINT guest_access_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY history_visibility
+    ADD CONSTRAINT history_visibility_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY local_media_repository
+    ADD CONSTRAINT local_media_repository_media_id_key UNIQUE (media_id);
+
+
+
+ALTER TABLE ONLY local_media_repository_thumbnails
+    ADD CONSTRAINT local_media_repository_thumbn_media_id_thumbnail_width_thum_key UNIQUE (media_id, thumbnail_width, thumbnail_height, thumbnail_type);
+
+
+
+ALTER TABLE ONLY user_threepids
+    ADD CONSTRAINT medium_address UNIQUE (medium, address);
+
+
+
+ALTER TABLE ONLY open_id_tokens
+    ADD CONSTRAINT open_id_tokens_pkey PRIMARY KEY (token);
+
+
+
+ALTER TABLE ONLY presence_allow_inbound
+    ADD CONSTRAINT presence_allow_inbound_observed_user_id_observer_user_id_key UNIQUE (observed_user_id, observer_user_id);
+
+
+
+ALTER TABLE ONLY presence
+    ADD CONSTRAINT presence_user_id_key UNIQUE (user_id);
+
+
+
+ALTER TABLE ONLY account_data_max_stream_id
+    ADD CONSTRAINT private_user_data_max_stream_id_lock_key UNIQUE (lock);
+
+
+
+ALTER TABLE ONLY profiles
+    ADD CONSTRAINT profiles_user_id_key UNIQUE (user_id);
+
+
+
+ALTER TABLE ONLY push_rules_enable
+    ADD CONSTRAINT push_rules_enable_pkey PRIMARY KEY (id);
+
+
+
+ALTER TABLE ONLY push_rules_enable
+    ADD CONSTRAINT push_rules_enable_user_name_rule_id_key UNIQUE (user_name, rule_id);
+
+
+
+ALTER TABLE ONLY push_rules
+    ADD CONSTRAINT push_rules_pkey PRIMARY KEY (id);
+
+
+
+ALTER TABLE ONLY push_rules
+    ADD CONSTRAINT push_rules_user_name_rule_id_key UNIQUE (user_name, rule_id);
+
+
+
+ALTER TABLE ONLY pusher_throttle
+    ADD CONSTRAINT pusher_throttle_pkey PRIMARY KEY (pusher, room_id);
+
+
+
+ALTER TABLE ONLY pushers
+    ADD CONSTRAINT pushers2_app_id_pushkey_user_name_key UNIQUE (app_id, pushkey, user_name);
+
+
+
+ALTER TABLE ONLY pushers
+    ADD CONSTRAINT pushers2_pkey PRIMARY KEY (id);
+
+
+
+ALTER TABLE ONLY receipts_graph
+    ADD CONSTRAINT receipts_graph_uniqueness UNIQUE (room_id, receipt_type, user_id);
+
+
+
+ALTER TABLE ONLY receipts_linearized
+    ADD CONSTRAINT receipts_linearized_uniqueness UNIQUE (room_id, receipt_type, user_id);
+
+
+
+ALTER TABLE ONLY received_transactions
+    ADD CONSTRAINT received_transactions_transaction_id_origin_key UNIQUE (transaction_id, origin);
+
+
+
+ALTER TABLE ONLY redactions
+    ADD CONSTRAINT redactions_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY rejections
+    ADD CONSTRAINT rejections_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY remote_media_cache
+    ADD CONSTRAINT remote_media_cache_media_origin_media_id_key UNIQUE (media_origin, media_id);
+
+
+
+ALTER TABLE ONLY remote_media_cache_thumbnails
+    ADD CONSTRAINT remote_media_cache_thumbnails_media_origin_media_id_thumbna_key UNIQUE (media_origin, media_id, thumbnail_width, thumbnail_height, thumbnail_type);
+
+
+
+ALTER TABLE ONLY room_account_data
+    ADD CONSTRAINT room_account_data_uniqueness UNIQUE (user_id, room_id, account_data_type);
+
+
+
+ALTER TABLE ONLY room_aliases
+    ADD CONSTRAINT room_aliases_room_alias_key UNIQUE (room_alias);
+
+
+
+ALTER TABLE ONLY room_depth
+    ADD CONSTRAINT room_depth_room_id_key UNIQUE (room_id);
+
+
+
+ALTER TABLE ONLY room_memberships
+    ADD CONSTRAINT room_memberships_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY room_names
+    ADD CONSTRAINT room_names_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY room_tags_revisions
+    ADD CONSTRAINT room_tag_revisions_uniqueness UNIQUE (user_id, room_id);
+
+
+
+ALTER TABLE ONLY room_tags
+    ADD CONSTRAINT room_tag_uniqueness UNIQUE (user_id, room_id, tag);
+
+
+
+ALTER TABLE ONLY rooms
+    ADD CONSTRAINT rooms_pkey PRIMARY KEY (room_id);
+
+
+
+ALTER TABLE ONLY server_keys_json
+    ADD CONSTRAINT server_keys_json_uniqueness UNIQUE (server_name, key_id, from_server);
+
+
+
+ALTER TABLE ONLY server_signature_keys
+    ADD CONSTRAINT server_signature_keys_server_name_key_id_key UNIQUE (server_name, key_id);
+
+
+
+ALTER TABLE ONLY state_events
+    ADD CONSTRAINT state_events_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY state_groups
+    ADD CONSTRAINT state_groups_pkey PRIMARY KEY (id);
+
+
+
+ALTER TABLE ONLY stats_stream_pos
+    ADD CONSTRAINT stats_stream_pos_lock_key UNIQUE (lock);
+
+
+
+ALTER TABLE ONLY topics
+    ADD CONSTRAINT topics_event_id_key UNIQUE (event_id);
+
+
+
+ALTER TABLE ONLY user_directory_stream_pos
+    ADD CONSTRAINT user_directory_stream_pos_lock_key UNIQUE (lock);
+
+
+
+ALTER TABLE ONLY users
+    ADD CONSTRAINT users_name_key UNIQUE (name);
+
+
+
+CREATE INDEX access_tokens_device_id ON access_tokens USING btree (user_id, device_id);
+
+
+
+CREATE INDEX account_data_stream_id ON account_data USING btree (user_id, stream_id);
+
+
+
+CREATE INDEX application_services_txns_id ON application_services_txns USING btree (as_id);
+
+
+
+CREATE UNIQUE INDEX appservice_room_list_idx ON appservice_room_list USING btree (appservice_id, network_id, room_id);
+
+
+
+CREATE UNIQUE INDEX blocked_rooms_idx ON blocked_rooms USING btree (room_id);
+
+
+
+CREATE INDEX cache_invalidation_stream_id ON cache_invalidation_stream USING btree (stream_id);
+
+
+
+CREATE INDEX current_state_delta_stream_idx ON current_state_delta_stream USING btree (stream_id);
+
+
+
+CREATE INDEX current_state_events_member_index ON current_state_events USING btree (state_key) WHERE (type = 'm.room.member'::text);
+
+
+
+CREATE INDEX deleted_pushers_stream_id ON deleted_pushers USING btree (stream_id);
+
+
+
+CREATE INDEX device_federation_inbox_sender_id ON device_federation_inbox USING btree (origin, message_id);
+
+
+
+CREATE INDEX device_federation_outbox_destination_id ON device_federation_outbox USING btree (destination, stream_id);
+
+
+
+CREATE INDEX device_federation_outbox_id ON device_federation_outbox USING btree (stream_id);
+
+
+
+CREATE INDEX device_inbox_stream_id_user_id ON device_inbox USING btree (stream_id, user_id);
+
+
+
+CREATE INDEX device_inbox_user_stream_id ON device_inbox USING btree (user_id, device_id, stream_id);
+
+
+
+CREATE INDEX device_lists_outbound_last_success_idx ON device_lists_outbound_last_success USING btree (destination, user_id, stream_id);
+
+
+
+CREATE INDEX device_lists_outbound_pokes_id ON device_lists_outbound_pokes USING btree (destination, stream_id);
+
+
+
+CREATE INDEX device_lists_outbound_pokes_stream ON device_lists_outbound_pokes USING btree (stream_id);
+
+
+
+CREATE INDEX device_lists_outbound_pokes_user ON device_lists_outbound_pokes USING btree (destination, user_id);
+
+
+
+CREATE UNIQUE INDEX device_lists_remote_cache_unique_id ON device_lists_remote_cache USING btree (user_id, device_id);
+
+
+
+CREATE UNIQUE INDEX device_lists_remote_extremeties_unique_idx ON device_lists_remote_extremeties USING btree (user_id);
+
+
+
+CREATE INDEX device_lists_stream_id ON device_lists_stream USING btree (stream_id, user_id);
+
+
+
+CREATE INDEX device_lists_stream_user_id ON device_lists_stream USING btree (user_id, device_id);
+
+
+
+CREATE UNIQUE INDEX e2e_room_keys_idx ON e2e_room_keys USING btree (user_id, room_id, session_id);
+
+
+
+CREATE UNIQUE INDEX e2e_room_keys_versions_idx ON e2e_room_keys_versions USING btree (user_id, version);
+
+
+
+CREATE UNIQUE INDEX erased_users_user ON erased_users USING btree (user_id);
+
+
+
+CREATE INDEX ev_b_extrem_id ON event_backward_extremities USING btree (event_id);
+
+
+
+CREATE INDEX ev_b_extrem_room ON event_backward_extremities USING btree (room_id);
+
+
+
+CREATE INDEX ev_edges_id ON event_edges USING btree (event_id);
+
+
+
+CREATE INDEX ev_edges_prev_id ON event_edges USING btree (prev_event_id);
+
+
+
+CREATE INDEX ev_extrem_id ON event_forward_extremities USING btree (event_id);
+
+
+
+CREATE INDEX ev_extrem_room ON event_forward_extremities USING btree (room_id);
+
+
+
+CREATE INDEX evauth_edges_id ON event_auth USING btree (event_id);
+
+
+
+CREATE INDEX event_contains_url_index ON events USING btree (room_id, topological_ordering, stream_ordering) WHERE ((contains_url = true) AND (outlier = false));
+
+
+
+CREATE INDEX event_json_room_id ON event_json USING btree (room_id);
+
+
+
+CREATE INDEX event_push_actions_highlights_index ON event_push_actions USING btree (user_id, room_id, topological_ordering, stream_ordering) WHERE (highlight = 1);
+
+
+
+CREATE INDEX event_push_actions_rm_tokens ON event_push_actions USING btree (user_id, room_id, topological_ordering, stream_ordering);
+
+
+
+CREATE INDEX event_push_actions_room_id_user_id ON event_push_actions USING btree (room_id, user_id);
+
+
+
+CREATE INDEX event_push_actions_staging_id ON event_push_actions_staging USING btree (event_id);
+
+
+
+CREATE INDEX event_push_actions_stream_ordering ON event_push_actions USING btree (stream_ordering, user_id);
+
+
+
+CREATE INDEX event_push_actions_u_highlight ON event_push_actions USING btree (user_id, stream_ordering);
+
+
+
+CREATE INDEX event_push_summary_user_rm ON event_push_summary USING btree (user_id, room_id);
+
+
+
+CREATE INDEX event_reference_hashes_id ON event_reference_hashes USING btree (event_id);
+
+
+
+CREATE UNIQUE INDEX event_relations_id ON event_relations USING btree (event_id);
+
+
+
+CREATE INDEX event_relations_relates ON event_relations USING btree (relates_to_id, relation_type, aggregation_key);
+
+
+
+CREATE INDEX event_search_ev_ridx ON event_search USING btree (room_id);
+
+
+
+CREATE UNIQUE INDEX event_search_event_id_idx ON event_search USING btree (event_id);
+
+
+
+CREATE INDEX event_search_fts_idx ON event_search USING gin (vector);
+
+
+
+CREATE INDEX event_to_state_groups_sg_index ON event_to_state_groups USING btree (state_group);
+
+
+
+CREATE INDEX events_order_room ON events USING btree (room_id, topological_ordering, stream_ordering);
+
+
+
+CREATE INDEX events_room_stream ON events USING btree (room_id, stream_ordering);
+
+
+
+CREATE INDEX events_ts ON events USING btree (origin_server_ts, stream_ordering);
+
+
+
+CREATE INDEX group_attestations_remote_g_idx ON group_attestations_remote USING btree (group_id, user_id);
+
+
+
+CREATE INDEX group_attestations_remote_u_idx ON group_attestations_remote USING btree (user_id);
+
+
+
+CREATE INDEX group_attestations_remote_v_idx ON group_attestations_remote USING btree (valid_until_ms);
+
+
+
+CREATE INDEX group_attestations_renewals_g_idx ON group_attestations_renewals USING btree (group_id, user_id);
+
+
+
+CREATE INDEX group_attestations_renewals_u_idx ON group_attestations_renewals USING btree (user_id);
+
+
+
+CREATE INDEX group_attestations_renewals_v_idx ON group_attestations_renewals USING btree (valid_until_ms);
+
+
+
+CREATE UNIQUE INDEX group_invites_g_idx ON group_invites USING btree (group_id, user_id);
+
+
+
+CREATE INDEX group_invites_u_idx ON group_invites USING btree (user_id);
+
+
+
+CREATE UNIQUE INDEX group_rooms_g_idx ON group_rooms USING btree (group_id, room_id);
+
+
+
+CREATE INDEX group_rooms_r_idx ON group_rooms USING btree (room_id);
+
+
+
+CREATE UNIQUE INDEX group_summary_rooms_g_idx ON group_summary_rooms USING btree (group_id, room_id, category_id);
+
+
+
+CREATE INDEX group_summary_users_g_idx ON group_summary_users USING btree (group_id);
+
+
+
+CREATE UNIQUE INDEX group_users_g_idx ON group_users USING btree (group_id, user_id);
+
+
+
+CREATE INDEX group_users_u_idx ON group_users USING btree (user_id);
+
+
+
+CREATE UNIQUE INDEX groups_idx ON groups USING btree (group_id);
+
+
+
+CREATE INDEX local_group_membership_g_idx ON local_group_membership USING btree (group_id);
+
+
+
+CREATE INDEX local_group_membership_u_idx ON local_group_membership USING btree (user_id, group_id);
+
+
+
+CREATE INDEX local_invites_for_user_idx ON local_invites USING btree (invitee, locally_rejected, replaced_by, room_id);
+
+
+
+CREATE INDEX local_invites_id ON local_invites USING btree (stream_id);
+
+
+
+CREATE INDEX local_media_repository_thumbnails_media_id ON local_media_repository_thumbnails USING btree (media_id);
+
+
+
+CREATE INDEX local_media_repository_url_cache_by_url_download_ts ON local_media_repository_url_cache USING btree (url, download_ts);
+
+
+
+CREATE INDEX local_media_repository_url_cache_expires_idx ON local_media_repository_url_cache USING btree (expires_ts);
+
+
+
+CREATE INDEX local_media_repository_url_cache_media_idx ON local_media_repository_url_cache USING btree (media_id);
+
+
+
+CREATE INDEX local_media_repository_url_idx ON local_media_repository USING btree (created_ts) WHERE (url_cache IS NOT NULL);
+
+
+
+CREATE INDEX monthly_active_users_time_stamp ON monthly_active_users USING btree ("timestamp");
+
+
+
+CREATE UNIQUE INDEX monthly_active_users_users ON monthly_active_users USING btree (user_id);
+
+
+
+CREATE INDEX open_id_tokens_ts_valid_until_ms ON open_id_tokens USING btree (ts_valid_until_ms);
+
+
+
+CREATE INDEX presence_stream_id ON presence_stream USING btree (stream_id, user_id);
+
+
+
+CREATE INDEX presence_stream_user_id ON presence_stream USING btree (user_id);
+
+
+
+CREATE INDEX public_room_index ON rooms USING btree (is_public);
+
+
+
+CREATE INDEX public_room_list_stream_idx ON public_room_list_stream USING btree (stream_id);
+
+
+
+CREATE INDEX public_room_list_stream_rm_idx ON public_room_list_stream USING btree (room_id, stream_id);
+
+
+
+CREATE INDEX push_rules_enable_user_name ON push_rules_enable USING btree (user_name);
+
+
+
+CREATE INDEX push_rules_stream_id ON push_rules_stream USING btree (stream_id);
+
+
+
+CREATE INDEX push_rules_stream_user_stream_id ON push_rules_stream USING btree (user_id, stream_id);
+
+
+
+CREATE INDEX push_rules_user_name ON push_rules USING btree (user_name);
+
+
+
+CREATE UNIQUE INDEX ratelimit_override_idx ON ratelimit_override USING btree (user_id);
+
+
+
+CREATE INDEX receipts_linearized_id ON receipts_linearized USING btree (stream_id);
+
+
+
+CREATE INDEX receipts_linearized_room_stream ON receipts_linearized USING btree (room_id, stream_id);
+
+
+
+CREATE INDEX receipts_linearized_user ON receipts_linearized USING btree (user_id);
+
+
+
+CREATE INDEX received_transactions_ts ON received_transactions USING btree (ts);
+
+
+
+CREATE INDEX redactions_redacts ON redactions USING btree (redacts);
+
+
+
+CREATE INDEX remote_profile_cache_time ON remote_profile_cache USING btree (last_check);
+
+
+
+CREATE UNIQUE INDEX remote_profile_cache_user_id ON remote_profile_cache USING btree (user_id);
+
+
+
+CREATE INDEX room_account_data_stream_id ON room_account_data USING btree (user_id, stream_id);
+
+
+
+CREATE INDEX room_alias_servers_alias ON room_alias_servers USING btree (room_alias);
+
+
+
+CREATE INDEX room_aliases_id ON room_aliases USING btree (room_id);
+
+
+
+CREATE INDEX room_depth_room ON room_depth USING btree (room_id);
+
+
+
+CREATE INDEX room_memberships_room_id ON room_memberships USING btree (room_id);
+
+
+
+CREATE INDEX room_memberships_user_id ON room_memberships USING btree (user_id);
+
+
+
+CREATE INDEX room_names_room_id ON room_names USING btree (room_id);
+
+
+
+CREATE UNIQUE INDEX room_state_room ON room_state USING btree (room_id);
+
+
+
+CREATE UNIQUE INDEX room_stats_earliest_token_idx ON room_stats_earliest_token USING btree (room_id);
+
+
+
+CREATE UNIQUE INDEX room_stats_room_ts ON room_stats USING btree (room_id, ts);
+
+
+
+CREATE INDEX state_group_edges_idx ON state_group_edges USING btree (state_group);
+
+
+
+CREATE INDEX state_group_edges_prev_idx ON state_group_edges USING btree (prev_state_group);
+
+
+
+CREATE INDEX state_groups_state_type_idx ON state_groups_state USING btree (state_group, type, state_key);
+
+
+
+CREATE INDEX stream_ordering_to_exterm_idx ON stream_ordering_to_exterm USING btree (stream_ordering);
+
+
+
+CREATE INDEX stream_ordering_to_exterm_rm_idx ON stream_ordering_to_exterm USING btree (room_id, stream_ordering);
+
+
+
+CREATE UNIQUE INDEX threepid_guest_access_tokens_index ON threepid_guest_access_tokens USING btree (medium, address);
+
+
+
+CREATE INDEX topics_room_id ON topics USING btree (room_id);
+
+
+
+CREATE INDEX user_daily_visits_ts_idx ON user_daily_visits USING btree ("timestamp");
+
+
+
+CREATE INDEX user_daily_visits_uts_idx ON user_daily_visits USING btree (user_id, "timestamp");
+
+
+
+CREATE INDEX user_directory_room_idx ON user_directory USING btree (room_id);
+
+
+
+CREATE INDEX user_directory_search_fts_idx ON user_directory_search USING gin (vector);
+
+
+
+CREATE UNIQUE INDEX user_directory_search_user_idx ON user_directory_search USING btree (user_id);
+
+
+
+CREATE UNIQUE INDEX user_directory_user_idx ON user_directory USING btree (user_id);
+
+
+
+CREATE INDEX user_filters_by_user_id_filter_id ON user_filters USING btree (user_id, filter_id);
+
+
+
+CREATE INDEX user_ips_device_id ON user_ips USING btree (user_id, device_id, last_seen);
+
+
+
+CREATE INDEX user_ips_last_seen ON user_ips USING btree (user_id, last_seen);
+
+
+
+CREATE INDEX user_ips_last_seen_only ON user_ips USING btree (last_seen);
+
+
+
+CREATE UNIQUE INDEX user_ips_user_token_ip_unique_index ON user_ips USING btree (user_id, access_token, ip);
+
+
+
+CREATE UNIQUE INDEX user_stats_user_ts ON user_stats USING btree (user_id, ts);
+
+
+
+CREATE UNIQUE INDEX user_threepid_id_server_idx ON user_threepid_id_server USING btree (user_id, medium, address, id_server);
+
+
+
+CREATE INDEX user_threepids_medium_address ON user_threepids USING btree (medium, address);
+
+
+
+CREATE INDEX user_threepids_user_id ON user_threepids USING btree (user_id);
+
+
+
+CREATE INDEX users_creation_ts ON users USING btree (creation_ts);
+
+
+
+CREATE UNIQUE INDEX users_in_public_rooms_u_idx ON users_in_public_rooms USING btree (user_id, room_id);
+
+
+
+CREATE INDEX users_who_share_private_rooms_o_idx ON users_who_share_private_rooms USING btree (other_user_id);
+
+
+
+CREATE INDEX users_who_share_private_rooms_r_idx ON users_who_share_private_rooms USING btree (room_id);
+
+
+
+CREATE UNIQUE INDEX users_who_share_private_rooms_u_idx ON users_who_share_private_rooms USING btree (user_id, other_user_id, room_id);
+
+
+
