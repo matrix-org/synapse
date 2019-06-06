@@ -158,7 +158,7 @@ class EmailConfig(Config):
                 email_password_reset_success_template,
             )
             self.email_password_reset_success_html_content = self.read_file(
-                filepath, 
+                filepath,
                 "email.password_reset_template_success_html",
             )
 
