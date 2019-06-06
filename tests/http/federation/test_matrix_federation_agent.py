@@ -57,6 +57,7 @@ class MatrixFederationAgentTests(TestCase):
         # present will not be trusted. We should do better here, though.
         config_dict = default_config("test", parse=False)
         config_dict["federation_verify_certificates"] = False
+        config_dict["trusted_key_servers"] = []
         config = HomeServerConfig()
         config.parse_config_dict(config_dict)
 
