@@ -408,15 +408,14 @@ and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
 ``smtp_pass``, and ``require_transport_security``..
 
 If Synapse is not configured with an SMTP server, password reset via email will
- be disabled.
+ be disabled by default.
 
-Previous versions of Synapse delegated the job of sending this email to an
-identity server. If the identity server was somehow malicious or became
-compromised, it would be theoretically possible to hijack an account through
-this means.
+Alternatively it is possible delegate the sending of email to the server's identity server.
+Doing so is convenient but not recommended, since a malicious or compromised identity server could
+theoretically hijack a given user's account by redirecting mail.
 
-If you are absolutely certain that you wish to continue using an identity
-server for password resets, set ``disable_local_password_reset`` to ``true``
+If you are absolutely certain that you wish to use the server's identity
+server for password resets, set ``trust_identity_server_for_password_resets`` to ``true``
 under the ``email:`` configuration section.
 
 ## Registering a user
