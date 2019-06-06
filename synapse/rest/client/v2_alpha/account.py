@@ -27,7 +27,6 @@ from synapse.http.servlet import (
     assert_params_in_dict,
     parse_json_object_from_request,
 )
-from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import random_string
 from synapse.util.threepids import check_3pid_allowed
