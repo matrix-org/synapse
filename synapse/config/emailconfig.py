@@ -231,7 +231,7 @@ class EmailConfig(Config):
         # smtp_pass variables should be used
         #
         #email:
-        #   enable_notifs: False
+        #   enable_notifs: false
         #   smtp_host: "localhost"
         #   smtp_port: 25 # SSL: 465, STARTTLS: 587
         #   smtp_user: "exampleusername"

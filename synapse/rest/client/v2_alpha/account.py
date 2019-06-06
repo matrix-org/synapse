@@ -176,7 +176,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
         token_expires = (self.hs.clock.time_msec() +
                          self.config.email_validation_token_lifetime)
-        logger.info("lifetime: %s", self.config.email_validation_token_lifetime)
 
         yield self.datastore.start_or_continue_validation_session(
             "email", email, session_id, client_secret, send_attempt,
