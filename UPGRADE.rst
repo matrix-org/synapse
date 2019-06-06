@@ -70,8 +70,7 @@ server in a closed federation. This can be done in one of two ways:-
  * Configure a whitelist of server domains to trust via
    ``federation_certificate_verification_whitelist``.
 
-See the `sample configuration file
-<https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml>`_
+See the `sample configuration file <docs/sample_config.yaml>`_
 for more details on these settings. When a user requests
 a password reset, Synapse will send an email to the user to confirm the
 request.
