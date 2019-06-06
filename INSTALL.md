@@ -400,7 +400,7 @@ please take a look at [our guide](docs/MSC1711_certificates_FAQ.md#configuring-c
 ## Email
 
 It is desirable for Synapse to have the capability to send email.
-in the case of password reset.
+For example, this is required to support the 'password reset' feature.
 
 To configure an SMTP server for Synapse, modify the configuration section
 headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
