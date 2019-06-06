@@ -383,19 +383,11 @@ class AuthHandler(BaseHandler):
         if checker is not None:
             # XXX: Temporary workaround for having Synapse handle password resets
             # See AuthHandler.check_auth for further details
-            if login_type == LoginType.EMAIL_IDENTITY:
-                res = yield checker(
-                    authdict,
-                    clientip=clientip,
-                    password_servlet=password_servlet,
-                )
-            elif login_type == LoginType.RECAPTCHA:
-                res = yield checker(
-                    authdict,
-                    clientip,
-                )
-            else:
-                res = yield checker(authdict)
+            res = yield checker(
+                authdict,
+                clientip=clientip,
+                password_servlet=password_servlet,
+            )
             defer.returnValue(res)
 
         # build a v1-login-style dict out of the authdict and fall back to the
@@ -409,7 +401,7 @@ class AuthHandler(BaseHandler):
         defer.returnValue(canonical_id)
 
     @defer.inlineCallbacks
-    def _check_recaptcha(self, authdict, clientip):
+    def _check_recaptcha(self, authdict, clientip, **kwargs):
         try:
             user_response = authdict["response"]
         except KeyError:
@@ -458,13 +450,13 @@ class AuthHandler(BaseHandler):
     def _check_email_identity(self, authdict, **kwargs):
         return self._check_threepid('email', authdict, **kwargs)
 
-    def _check_msisdn(self, authdict, _):
+    def _check_msisdn(self, authdict, **kwargs):
         return self._check_threepid('msisdn', authdict)
 
-    def _check_dummy_auth(self, authdict, _):
+    def _check_dummy_auth(self, authdict, **kwargs):
         return defer.succeed(True)
 
-    def _check_terms_auth(self, authdict, _):
+    def _check_terms_auth(self, authdict, **kwargs):
         return defer.succeed(True)
 
     @defer.inlineCallbacks
@@ -483,9 +475,6 @@ class AuthHandler(BaseHandler):
                 threepid_creds["client_secret"],
                 sid=threepid_creds["sid"],
             )
-
-            logger.info("STUFF: %s", medium)
-            logger.info("ROW: %s", row)
 
             threepid = {
                 "medium": row["medium"],
